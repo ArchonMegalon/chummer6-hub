@@ -10,6 +10,7 @@ await InteropExportVerification.RunAsync();
 await OfflineSyncVerification.RunAsync();
 await PipelineProjectionVerification.RunAsync();
 await SupportCrashVerification.RunAsync();
+InstallLinkingContinuationVerification.Run();
 await StateStoreBackupVerification.RunAsync();
 CompatibilityVerification.Run();
 await HubApiRuntimeGuardrailVerification.RunAsync();

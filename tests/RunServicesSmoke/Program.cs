@@ -2491,7 +2491,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var installLinkingController = new InstallLinkingController(
         linkedIdentityClient,
         accounts,
-        installLinking)
+        installLinking,
+        releases,
+        supportCases,
+        supportPresentation)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -3034,7 +3037,10 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(emailitRequests.Any(item => item.Body.Contains("Your request is in.", StringComparison.Ordinal)), "request-received mail should acknowledge the submitted request.");
     Assert(emailitRequests.Any(item => item.Body.Contains("Award: Denied", StringComparison.Ordinal) && item.Body.Contains("No implementation is planned for this report.", StringComparison.Ordinal)), "rejected audited-decision mail should include the Denied award and the no-implementation explanation.");
     Assert(emailitRequests.Any(item => item.Body.Contains("Award: Clad Feedbacker", StringComparison.Ordinal) && item.Body.Contains("Within the next preview drop.", StringComparison.Ordinal)), "audited-decision mail should include the award and ETA text.");
-    Assert(emailitRequests.Any(item => item.Body.Contains("Please test it on the affected flow", StringComparison.Ordinal) && item.Body.Contains("https://chummer.run/downloads", StringComparison.Ordinal)), "fix-available mail should ask the reporter to test the release and include the download route.");
+    Assert(emailitRequests.Any(item =>
+        item.Body.Contains("Please test it on the affected linked install", StringComparison.Ordinal)
+        && item.Body.Contains("https://chummer.run/downloads", StringComparison.Ordinal)
+        && item.Body.Contains("Linked install rail:", StringComparison.Ordinal)), "fix-available mail should ask the reporter to test the linked install and include the download plus install rail routes.");
     Assert(emailitRequests.All(item => string.Equals(item.Authorization, "emailit-smoke-token", StringComparison.Ordinal)), "Emailit sends should use the configured provider token.");
     Assert(emailitRequests.All(item => !string.IsNullOrWhiteSpace(item.IdempotencyKey)), "Emailit sends should carry an idempotency key.");
 
