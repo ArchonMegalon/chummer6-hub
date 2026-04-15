@@ -74,6 +74,35 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobRejectsExternalAbsoluteEvidenceRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "support",
+            RequestedBy: "support.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "case-11709",
+                    SourcePackKind: "support_case",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "support-case:11709",
+                    EvidenceRefs:
+                    [
+                        "support:11709",
+                        "privacy:bounded",
+                        "https://provider.example/artifacts/case-11709",
+                        "install:preview"
+                    ],
+                    SupportCaseId: "11709")
+            ])));
+
+        Assert.Contains("external absolute URI", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("one-off provider flows", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobRejectsDuplicateSourcePackIds()
     {
         ArtifactFactoryOrchestrationService service = new();

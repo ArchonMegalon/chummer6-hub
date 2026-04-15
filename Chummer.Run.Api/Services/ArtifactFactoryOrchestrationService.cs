@@ -268,9 +268,9 @@ public sealed class ArtifactFactoryOrchestrationService
         RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.ProvenanceRef, "provenanceRef");
         if (!string.IsNullOrWhiteSpace(sourcePack.PublicShelfRef))
         {
-            RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
             RejectNonLocalPublicShelfRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
             RejectPublicShelfRefOutsideRecipeRoutes(sourcePack.SourcePackId, family, sourcePack.PublicShelfRef, "publicShelfRef");
+            RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
         }
 
         RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.ReleaseArtifactId, "releaseArtifactId");
@@ -337,6 +337,12 @@ public sealed class ArtifactFactoryOrchestrationService
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has provider-specific {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
         }
+
+        if (IsAbsoluteHttpRef(normalized))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has external absolute URI {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
+        }
     }
 
     private static int FirstRefPrefixSeparatorIndex(string normalized)
@@ -360,6 +366,11 @@ public sealed class ArtifactFactoryOrchestrationService
 
         return Math.Min(colonIndex, slashIndex);
     }
+
+    private static bool IsAbsoluteHttpRef(string normalized)
+        => Uri.TryCreate(normalized, UriKind.Absolute, out Uri? uri)
+            && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
 
     private static void RejectNonLocalPublicShelfEvidenceRef(string sourcePackId, string evidenceRef)
     {
