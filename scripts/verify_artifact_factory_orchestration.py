@@ -154,6 +154,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "commit cbae3cdd",
         "commit f0142482",
         "commit a66a06bb",
+        "commit 9a8e56f0",
         "test_verifier_fails_closed_when_proof_commit_anchor_is_not_on_current_branch",
         "test_verifier_fails_closed_when_branch_guard_commit_pin_is_missing",
         "test_verifier_fails_closed_when_output_shelf_pin_commit_is_missing",
@@ -191,6 +192,7 @@ QUEUE_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit cbae3cdd tightens M107 artifact factory output shelf proof",
     "/docker/chummercomplete/chummer.run-services commit f0142482 pins M107 artifact factory output shelf proof",
     "/docker/chummercomplete/chummer.run-services commit a66a06bb tightens M107 artifact output shelf proof pin",
+    "/docker/chummercomplete/chummer.run-services commit 9a8e56f0 tightens M107 artifact shelf proof floor",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
 ]
 
@@ -221,6 +223,7 @@ SUCCESSOR_REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit cbae3cdd tightens M107 artifact factory output shelf proof",
     "/docker/chummercomplete/chummer.run-services commit f0142482 pins M107 artifact factory output shelf proof",
     "/docker/chummercomplete/chummer.run-services commit a66a06bb tightens M107 artifact output shelf proof pin",
+    "/docker/chummercomplete/chummer.run-services commit 9a8e56f0 tightens M107 artifact shelf proof floor",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
     "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py exits 0.",
@@ -270,6 +273,7 @@ REQUIRED_QUEUE_PROOF = {
     "/docker/chummercomplete/chummer.run-services commit cbae3cdd tightens M107 artifact factory output shelf proof.",
     "/docker/chummercomplete/chummer.run-services commit f0142482 pins M107 artifact factory output shelf proof.",
     "/docker/chummercomplete/chummer.run-services commit a66a06bb tightens M107 artifact output shelf proof pin.",
+    "/docker/chummercomplete/chummer.run-services commit 9a8e56f0 tightens M107 artifact shelf proof floor.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
 }
 REQUIRED_REGISTRY_EVIDENCE = {
@@ -295,6 +299,7 @@ REQUIRED_REGISTRY_EVIDENCE = {
     "/docker/chummercomplete/chummer.run-services commit cbae3cdd tightens M107 artifact factory output shelf proof.",
     "/docker/chummercomplete/chummer.run-services commit f0142482 pins M107 artifact factory output shelf proof.",
     "/docker/chummercomplete/chummer.run-services commit a66a06bb tightens M107 artifact output shelf proof pin.",
+    "/docker/chummercomplete/chummer.run-services commit 9a8e56f0 tightens M107 artifact shelf proof floor.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
