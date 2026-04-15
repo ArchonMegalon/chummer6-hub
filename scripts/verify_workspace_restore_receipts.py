@@ -22,6 +22,12 @@ LOCAL_RELEASE_PROOF_PATH = Path(
         ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
     )
 )
+SERVED_RELEASE_PROOF_PATH = Path(
+    os.environ.get(
+        "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_SERVED_RELEASE_PROOF",
+        ROOT / "Chummer.Run.Api" / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
+    )
+)
 REGISTRY_PATH = Path(
     os.environ.get(
         "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY",
@@ -411,6 +417,7 @@ def main() -> int:
     check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
     check_local_release_proof(LOCAL_RELEASE_PROOF_PATH, missing)
+    check_local_release_proof(SERVED_RELEASE_PROOF_PATH, missing)
     check_required_local_commits(missing)
 
     if missing:
