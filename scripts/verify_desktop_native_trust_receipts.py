@@ -267,9 +267,11 @@ FORBIDDEN_PROOF_MARKERS = [
     "ACTIVE_RUN_HANDOFF",
     "active-run helper",
     "active-run helper command",
+    "active-run helper commands",
     "operator telemetry",
     "run_ooda_design_supervisor_until_quiet",
     "ooda_design_supervisor.py",
+    "operator/OODA loop",
     "design_supervisor_ooda",
 ]
 FORBIDDEN_PROOF_MARKER_MATCHES = [

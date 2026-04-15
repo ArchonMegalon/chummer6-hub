@@ -675,7 +675,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n",
                     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n"
                     "      - /VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md\n"
-                    "      - active-run helper command run_ooda_design_supervisor_until_quiet.py output\n",
+                    "      - active-run helper commands run_ooda_design_supervisor_until_quiet.py output\n",
                 )
                 + "\n",
                 encoding="utf-8",
@@ -711,6 +711,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             self.assertIn(
                 "canonical successor queue staging block has forbidden active-run proof marker: active-run helper command",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: active-run helper commands",
                 result.stderr,
             )
             self.assertIn(
@@ -751,7 +755,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "\n".join(
                     [
                         *REGISTRY_102_1_LINES,
-                        "          - Task_Local_Telemetry.generated.json Active-Run Helper Command output from ooda_design_supervisor.py",
+                        "          - Task_Local_Telemetry.generated.json Active-Run Helper Commands output from ooda_design_supervisor.py and the operator/OODA loop",
                     ]
                 )
                 + "\n",
@@ -786,7 +790,15 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
             self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: active-run helper commands",
+                result.stderr,
+            )
+            self.assertIn(
                 "canonical successor registry block has forbidden active-run proof marker: ooda_design_supervisor.py",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: operator/OODA loop",
                 result.stderr,
             )
 
