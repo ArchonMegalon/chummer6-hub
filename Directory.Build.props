@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <RestorePackagesPath Condition="'$(RestorePackagesPath)' == ''">$(MSBuildThisFileDirectory).tmp/nuget/packages</RestorePackagesPath>
+  </PropertyGroup>
+</Project>
