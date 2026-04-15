@@ -184,6 +184,15 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
     ],
 }
 
+FORBIDDEN_PROOF_MARKERS = [
+    "/var/lib/codex-fleet",
+    "TASK_LOCAL_TELEMETRY",
+    "ACTIVE_RUN_HANDOFF",
+    "active-run helper",
+    "operator telemetry",
+    "design_supervisor_ooda",
+]
+
 REQUIRED_PROOF_PACKAGE = {
     "package_id": PACKAGE_ID,
     "milestone_id": 102,
@@ -251,6 +260,7 @@ def _verify_marker_block(
     markers: list[str],
     label: str,
     required_lists: dict[str, list[str]] | None = None,
+    forbidden_markers: list[str] | None = None,
 ) -> None:
     if not path.is_file():
         errors.append(f"missing canonical {label} file: {path}")
@@ -265,6 +275,11 @@ def _verify_marker_block(
     for marker in markers:
         if marker not in block:
             errors.append(f"canonical {label} block missing marker: {marker}")
+
+    if forbidden_markers is not None:
+        for marker in forbidden_markers:
+            if marker in block:
+                errors.append(f"canonical {label} block has forbidden active-run proof marker: {marker}")
 
     if required_lists is not None:
         for key, expected_values in required_lists.items():
@@ -522,6 +537,7 @@ def main() -> int:
         REQUIRED_CANONICAL_QUEUE_MARKERS,
         "successor queue staging",
         REQUIRED_CANONICAL_QUEUE_LISTS,
+        FORBIDDEN_PROOF_MARKERS,
     )
     _verify_marker_block(
         errors,
@@ -530,6 +546,7 @@ def main() -> int:
         REQUIRED_CANONICAL_QUEUE_MARKERS,
         "design successor queue staging",
         REQUIRED_CANONICAL_QUEUE_LISTS,
+        FORBIDDEN_PROOF_MARKERS,
     )
     _verify_marker_block(
         errors,
@@ -538,6 +555,7 @@ def main() -> int:
         REQUIRED_CANONICAL_REGISTRY_MARKERS,
         "successor registry",
         REQUIRED_CANONICAL_REGISTRY_LISTS,
+        FORBIDDEN_PROOF_MARKERS,
     )
 
     if errors:

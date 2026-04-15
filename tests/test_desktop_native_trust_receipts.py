@@ -567,6 +567,136 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn("canonical successor registry block has wrong evidence", result.stderr)
 
+    def test_verifier_fail_closes_successor_queue_active_run_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            design_queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.design.generated.yaml"
+            registry_path = Path(temp_root) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            complete_queue = "\n".join(
+                [
+                    "items:",
+                    "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                    "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
+                    "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
+                    "    milestone_id: 102",
+                    "    wave: W6",
+                    "    repo: chummer6-hub",
+                    "    status: complete",
+                    "    landed_commit: 160af58f",
+                    *QUEUE_PROOF_LINES,
+                    "    allowed_paths:",
+                    "      - Chummer.Run.Api",
+                    "      - scripts",
+                    "      - tests",
+                    "    owned_surfaces:",
+                    "      - desktop_native_claim_and_recovery",
+                    "      - support_followthrough:install_truth",
+                ]
+            )
+            queue_path.write_text(
+                complete_queue.replace(
+                    "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n",
+                    "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n"
+                    "      - /var/lib/codex-fleet/chummer_design_supervisor/shard-1/ACTIVE_RUN_HANDOFF.generated.md\n",
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            registry_path.write_text(
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_NEXT90_QUEUE_STAGING_PATH": str(queue_path),
+                    "CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH": str(design_queue_path),
+                    "CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH": str(registry_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: /var/lib/codex-fleet",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: ACTIVE_RUN_HANDOFF",
+                result.stderr,
+            )
+
+    def test_verifier_fail_closes_successor_registry_active_run_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            design_queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.design.generated.yaml"
+            registry_path = Path(temp_root) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            complete_queue = "\n".join(
+                [
+                    "items:",
+                    "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                    "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
+                    "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
+                    "    milestone_id: 102",
+                    "    wave: W6",
+                    "    repo: chummer6-hub",
+                    "    status: complete",
+                    "    landed_commit: 160af58f",
+                    *QUEUE_PROOF_LINES,
+                    "    allowed_paths:",
+                    "      - Chummer.Run.Api",
+                    "      - scripts",
+                    "      - tests",
+                    "    owned_surfaces:",
+                    "      - desktop_native_claim_and_recovery",
+                    "      - support_followthrough:install_truth",
+                ]
+            )
+            queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            registry_path.write_text(
+                "\n".join(
+                    [
+                        *REGISTRY_102_1_LINES,
+                        "          - TASK_LOCAL_TELEMETRY.generated.json active-run helper output",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_NEXT90_QUEUE_STAGING_PATH": str(queue_path),
+                    "CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH": str(design_queue_path),
+                    "CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH": str(registry_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: TASK_LOCAL_TELEMETRY",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: active-run helper",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_generated_proof_package_scope_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
