@@ -280,7 +280,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             service_text = service_path.read_text(encoding="utf-8")
             service_path.write_text(
                 service_text.replace(
-                    "\n        if (IsAbsoluteHttpRef(normalized))\n"
+                    "\n        if (IsAbsoluteHttpRef(normalized) || IsUriLikeExternalRef(normalized, fieldName))\n"
                     "        {\n"
                     "            throw new InvalidDataException(\n"
                     "                $\"source pack '{sourcePackId}' has external absolute URI {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.\");\n"
@@ -291,6 +291,12 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "        => Uri.TryCreate(normalized, UriKind.Absolute, out Uri? uri)\n"
                     "            && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)\n"
                     "                || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));\n",
+                    "",
+                ).replace(
+                    "\n    private static bool IsUriLikeExternalRef(string normalized, string fieldName)\n"
+                    "        => !(fieldName.Equals(\"evidenceRef\", StringComparison.Ordinal)\n"
+                    "                && normalized.StartsWith(\"public-shelf:\", StringComparison.OrdinalIgnoreCase))\n"
+                    "            && normalized.Contains(\"://\", StringComparison.Ordinal);\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -309,7 +315,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("IsAbsoluteHttpRef", result.stderr)
+        self.assertIn("IsUriLikeExternalRef", result.stderr)
 
     def test_verifier_fails_closed_when_duplicate_source_pack_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-proof-") as temp_dir:
