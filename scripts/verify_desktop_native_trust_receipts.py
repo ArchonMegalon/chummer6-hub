@@ -51,6 +51,9 @@ REQUIRED_SOURCE_MARKERS = {
         "NeedsInstallUpdate",
         "Invalid desktop continuation grants should fail closed.",
     ],
+    Path("scripts/ai/verify.sh"): [
+        "python3 scripts/verify_desktop_native_trust_receipts.py",
+    ],
 }
 
 
@@ -331,6 +334,19 @@ def _verify_required_commits(errors: list[str], repo_root: Path) -> None:
             errors.append(f"required M102 desktop-native trust proof commit does not resolve: {commit}")
 
 
+def _verify_required_source_markers(errors: list[str], repo_root: Path) -> None:
+    for relative_path, markers in REQUIRED_SOURCE_MARKERS.items():
+        path = repo_root / relative_path
+        if not path.is_file():
+            errors.append(f"missing source file: {relative_path}")
+            continue
+
+        text = path.read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                errors.append(f"{relative_path} missing marker: {marker}")
+
+
 def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -390,17 +406,7 @@ def main() -> int:
 
     _verify_required_repo_anchor_paths(errors, repo_root)
     _verify_required_commits(errors, repo_root)
-
-    for relative_path, markers in REQUIRED_SOURCE_MARKERS.items():
-        path = repo_root / relative_path
-        if not path.is_file():
-            errors.append(f"missing source file: {relative_path}")
-            continue
-
-        text = path.read_text(encoding="utf-8")
-        for marker in markers:
-            if marker not in text:
-                errors.append(f"{relative_path} missing marker: {marker}")
+    _verify_required_source_markers(errors, repo_root)
 
     proof_path = _proof_path(repo_root)
     if not proof_path.is_file():

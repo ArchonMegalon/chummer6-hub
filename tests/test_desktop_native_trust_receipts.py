@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import importlib.util
 import os
 import subprocess
 import tempfile
@@ -43,6 +44,16 @@ REGISTRY_102_1_LINES = [
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
 ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer.run-services/"
+
+
+def load_verifier_module():
+    spec = importlib.util.spec_from_file_location("verify_desktop_native_trust_receipts", VERIFY_SCRIPT)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load verifier module from {VERIFY_SCRIPT}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def proof_anchor_paths() -> list[Path]:
@@ -699,6 +710,27 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             "0000000000000000000000000000000000000000",
             result.stderr,
         )
+
+    def test_verifier_fail_closes_missing_standard_verify_wiring(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            verify_sh = repo_root / "scripts/ai/verify.sh"
+            verify_sh.write_text("#!/usr/bin/env bash\nset -euo pipefail\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "scripts/ai/verify.sh missing marker: python3 scripts/verify_desktop_native_trust_receipts.py",
+                errors,
+            )
 
     def test_verifier_fail_closes_top_level_m102_proof_route_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
