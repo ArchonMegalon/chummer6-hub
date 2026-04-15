@@ -105,6 +105,50 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobBindsOutputsToApprovedAnchoredPackWhenSourcePacksAreMixed()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobLaunchResult result = service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "aaa-evidence-pack",
+                    SourcePackKind: "release_evidence",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-evidence:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-macos-arm64",
+                        "public-shelf:/downloads/install/avalonia-osx-arm64-installer"
+                    ],
+                    PublicShelfRef: "/downloads/install/avalonia-osx-arm64-installer"),
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "zzz-release-artifact-pack",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:artifact:avalonia-osx-arm64-installer",
+                        "promotion:channel:preview",
+                        "public-shelf:/downloads/install/avalonia-osx-arm64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-osx-arm64-installer")
+            ],
+            RequestedFormats: ["packet"]));
+
+        Assert.Contains(result.OutputBindings, binding =>
+            string.Equals(binding.PublicRef, "/artifacts/release-bundles/avalonia-osx-arm64-installer/packet", StringComparison.Ordinal)
+            && string.Equals(binding.ReleaseArtifactId, "avalonia-osx-arm64-installer", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.OutputBindings, binding =>
+            binding.PublicRef.Contains(result.JobId, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void ControllerLaunchJobRequiresInternalToken()
     {
         InternalArtifactFactoryController controller = BuildController(token: "expected-token");

@@ -388,9 +388,7 @@ public sealed class ArtifactFactoryOrchestrationService
         IReadOnlyList<ArtifactFactoryMediaSourcePack> sourcePacks,
         IReadOnlyList<string> outputFormats)
     {
-        ArtifactFactoryMediaSourcePack anchor = sourcePacks
-            .OrderBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase)
-            .First();
+        ArtifactFactoryMediaSourcePack anchor = SelectOutputAnchor(family, sourcePacks);
         string baseRef = BuildPublicOutputBaseRef(family, jobId, anchor);
 
         return outputFormats
@@ -403,6 +401,25 @@ public sealed class ArtifactFactoryOrchestrationService
                 PublicationId: anchor.PublicationId))
             .OrderBy(static item => item.Format, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static ArtifactFactoryMediaSourcePack SelectOutputAnchor(
+        string family,
+        IReadOnlyList<ArtifactFactoryMediaSourcePack> sourcePacks)
+    {
+        return sourcePacks
+            .Where(pack => family switch
+            {
+                "release" => !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId),
+                "fix" => !string.IsNullOrWhiteSpace(pack.SupportCaseId)
+                    || !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId),
+                "support" => !string.IsNullOrWhiteSpace(pack.SupportCaseId),
+                "publication" => !string.IsNullOrWhiteSpace(pack.PublicationId),
+                _ => false
+            })
+            .OrderBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault()
+            ?? sourcePacks.OrderBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase).First();
     }
 
     private static string BuildPublicOutputBaseRef(
