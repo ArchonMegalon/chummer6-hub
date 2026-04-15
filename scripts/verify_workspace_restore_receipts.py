@@ -211,6 +211,14 @@ QUEUE_STAGING_MARKERS = [
     "entitlement_sync:conflict_receipts",
 ]
 
+FORBIDDEN_PROOF_MARKERS = [
+    "TASK_LOCAL_TELEMETRY",
+    "ACTIVE_RUN_HANDOFF",
+    "active-run helper",
+    "operator telemetry",
+    "design_supervisor_ooda",
+]
+
 
 def read_text(relative_path: str) -> str:
     path = ROOT / relative_path
@@ -291,6 +299,13 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
         return
 
     require_markers(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
+    reject_forbidden_markers(f"{path}:{PACKAGE_ID}", queue_block, FORBIDDEN_PROOF_MARKERS, missing)
+
+
+def reject_forbidden_markers(label: str, text: str, markers: list[str], missing: list[str]) -> None:
+    for marker in markers:
+        if marker in text:
+            missing.append(f"{label}: forbidden active-run proof marker: {marker}")
 
 
 def check_local_release_proof(path: Path, missing: list[str]) -> None:
@@ -416,6 +431,12 @@ def main() -> int:
             missing.append(f"{REGISTRY_PATH}: missing registry task block for 105.1")
         else:
             require_markers(f"{REGISTRY_PATH}:105.1", registry_block, REGISTRY_MARKERS, missing)
+            reject_forbidden_markers(
+                f"{REGISTRY_PATH}:105.1",
+                registry_block,
+                FORBIDDEN_PROOF_MARKERS,
+                missing,
+            )
 
     check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)

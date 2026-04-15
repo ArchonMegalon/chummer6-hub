@@ -278,6 +278,82 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("105.1", result.stderr)
         self.assertIn("commit b39147dc tightens the workspace restore verifier", result.stderr)
 
+    def test_verifier_fails_closed_when_registry_uses_active_run_telemetry_as_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-telemetry-") as temp_dir:
+            temp_root = Path(temp_dir)
+            registry_path = temp_root / "registry.yaml"
+            fleet_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            design_queue_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            source_registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            registry_text = source_registry_path.read_text(encoding="utf-8").replace(
+                "          - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
+                "          - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
+                "          - /var/lib/codex-fleet/chummer_design_supervisor/shard-5/ACTIVE_RUN_HANDOFF.generated.md\n",
+                1,
+            )
+            registry_path.write_text(registry_text, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(fleet_queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: ACTIVE_RUN_HANDOFF", result.stderr)
+
+    def test_verifier_fails_closed_when_queue_uses_active_run_telemetry_as_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-telemetry-") as temp_dir:
+            temp_root = Path(temp_dir)
+            queue_path = temp_root / "queue.yaml"
+            design_queue_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_text = source_queue_path.read_text(encoding="utf-8").replace(
+                "      - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
+                "      - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
+                "      - TASK_LOCAL_TELEMETRY.generated.json active-run helper output\n",
+                1,
+            )
+            queue_path.write_text(queue_text, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+
     def test_verifier_fails_closed_when_design_queue_staging_drops_package(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-design-queue-") as temp_dir:
             temp_root = Path(temp_dir)
