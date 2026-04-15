@@ -156,6 +156,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
         "/docker/chummercomplete/chummer.run-services commit 266d526b pins the M102 queue proof hardening commit so stale queue proof cannot keep the package green.",
         "/docker/chummercomplete/chummer.run-services commit 6ea510c8 pins the M102 telemetry guard proof evidence so future shards verify the latest closed-package guard.",
+        "/docker/chummercomplete/chummer.run-services commit 7a825c73 pins the M102 desktop trust guard evidence into the verifier and unit guard.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -175,6 +176,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
         "/docker/chummercomplete/chummer.run-services commit 266d526b pins the M102 queue proof hardening commit.",
         "/docker/chummercomplete/chummer.run-services commit 6ea510c8 pins the M102 telemetry guard proof evidence.",
+        "/docker/chummercomplete/chummer.run-services commit 7a825c73 pins the M102 desktop trust guard evidence.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -221,6 +223,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "9fcec2a0",
     "266d526b",
     "6ea510c8",
+    "7a825c73",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
