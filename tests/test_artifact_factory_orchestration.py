@@ -456,6 +456,35 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("successor frontier 1421219975", result.stderr)
 
+    def test_verifier_rejects_forbidden_active_run_proof_markers_case_insensitively(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-forbidden-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            source_queue = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            queue_text = source_queue.read_text(encoding="utf-8")
+            queue_path.write_text(
+                queue_text.replace(
+                    "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.\n",
+                    "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.\n"
+                    "      - Operator Telemetry helper output from a worker run.\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: operator telemetry", result.stderr)
+
     def test_verifier_fails_closed_when_structured_frontier_id_is_missing(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-structured-frontier-proof-") as temp_dir:
             queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
