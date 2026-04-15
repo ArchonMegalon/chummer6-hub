@@ -40,6 +40,8 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
         Assert.Equal(["caption", "packet", "preview_card"], result.OutputFormats);
         Assert.Contains("release-pack-20260415", result.SourcePackIds);
         Assert.Contains("/downloads/install/avalonia-osx-arm64-installer", result.PublicProofShelfRefs);
+        Assert.Contains("/artifacts/release-bundles/avalonia-osx-arm64-installer", result.PublicProofShelfRefs);
+        Assert.Contains("/artifacts/release-bundles/avalonia-osx-arm64-installer", result.MediaFactoryRequest.PublicProofShelfRefs);
         Assert.Contains(result.OutputBindings, binding =>
             string.Equals(binding.Format, "preview_card", StringComparison.Ordinal)
             && string.Equals(binding.PublicRef, "/artifacts/release-bundles/avalonia-osx-arm64-installer/preview_card", StringComparison.Ordinal)
@@ -316,6 +318,8 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
             RequestedFormats: ["packet"]));
 
         Assert.Contains("/downloads/install/avalonia-linux-x64-installer", result.PublicProofShelfRefs);
+        Assert.Contains("/artifacts/release-bundles/avalonia-linux-x64-installer", result.PublicProofShelfRefs);
+        Assert.Contains("/artifacts/release-bundles/avalonia-linux-x64-installer", result.MediaFactoryRequest.PublicProofShelfRefs);
         Assert.Contains(result.OutputBindings, binding =>
             string.Equals(binding.PublicRef, "/artifacts/release-bundles/avalonia-linux-x64-installer/packet", StringComparison.Ordinal)
             && string.Equals(binding.ReceiptRef, $"artifact-factory:{result.JobId}:packet", StringComparison.Ordinal));

@@ -86,6 +86,9 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'return $"/artifacts/release-bundles/{Uri.EscapeDataString(anchor.ReleaseArtifactId)}";',
         'return $"/account/{supportPath}/{Uri.EscapeDataString(anchor.SupportCaseId)}";',
         'return $"/artifacts/publications/{Uri.EscapeDataString(anchor.PublicationId)}/bundles";',
+        "publicProofShelfRefs.AddRange(BuildOutputShelfRefs(outputBindings));",
+        "private static IEnumerable<string> BuildOutputShelfRefs(IReadOnlyList<ArtifactFactoryOutputBinding> outputBindings)",
+        "yield return binding.PublicRef[..separatorIndex];",
         'string shelfRef = anchor.PublicShelfRef.Trim().TrimEnd(\'/\');',
         '&& TryBuildReleaseBundleRefFromDownloadShelfRef(shelfRef, out string? releaseBundleRef)',
         "private static bool TryBuildReleaseBundleRefFromDownloadShelfRef(string shelfRef, out string releaseBundleRef)",
@@ -126,6 +129,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'string.Equals(binding.PublicRef, "/artifacts/release-bundles/avalonia-osx-arm64-installer/preview_card", StringComparison.Ordinal)',
         'Assert.Contains("/account/support/11709", support.PublicProofShelfRefs);',
         'Assert.Contains("/account/support/11709", fix.MediaFactoryRequest.PublicProofShelfRefs);',
+        'Assert.Contains("/artifacts/release-bundles/avalonia-osx-arm64-installer", result.MediaFactoryRequest.PublicProofShelfRefs);',
+        'Assert.Contains("/artifacts/release-bundles/avalonia-linux-x64-installer", result.MediaFactoryRequest.PublicProofShelfRefs);',
     ],
     "tests/test_artifact_factory_orchestration.py": [
         "test_verifier_fails_closed_when_queue_package_is_duplicated",
