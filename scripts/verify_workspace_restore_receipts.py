@@ -371,8 +371,9 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
 
 
 def reject_forbidden_markers(label: str, text: str, markers: list[str], missing: list[str]) -> None:
+    normalized_text = text.casefold()
     for marker in markers:
-        if marker in text:
+        if marker.casefold() in normalized_text:
             missing.append(f"{label}: forbidden active-run proof marker: {marker}")
 
 
