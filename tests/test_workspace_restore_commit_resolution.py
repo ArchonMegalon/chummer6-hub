@@ -33,6 +33,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"cb560573"', script_text)
         self.assertIn('"7c92635e"', script_text)
         self.assertIn('"c90d02e0"', script_text)
+        self.assertIn('"211ce4a1"', script_text)
 
     def test_verifier_fails_closed_when_required_local_commit_does_not_resolve(self) -> None:
         env = os.environ.copy()
