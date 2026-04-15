@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
+
+PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
+LANDED_COMMIT = "160af58f"
+FRONTIER_ID = 2897065929
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -49,7 +54,7 @@ REQUIRED_PROOF_RECEIPTS = {
     "desktop_native_claim_and_recovery": {
         "package_id": "next90-m102-hub-desktop-native-trust",
         "milestone_id": 102,
-        "frontier_id": 2897065929,
+        "frontier_id": FRONTIER_ID,
         "surfaces": [
             "desktop_native_claim_and_recovery",
             "install_claim_restore_continue",
@@ -64,7 +69,7 @@ REQUIRED_PROOF_RECEIPTS = {
     "support_followthrough:install_truth": {
         "package_id": "next90-m102-hub-desktop-native-trust",
         "milestone_id": 102,
-        "frontier_id": 2897065929,
+        "frontier_id": FRONTIER_ID,
         "surfaces": [
             "support_followthrough:install_truth",
             "support_case_install_readiness",
@@ -77,6 +82,66 @@ REQUIRED_PROOF_RECEIPTS = {
         ],
     },
 }
+
+
+REQUIRED_CANONICAL_QUEUE_MARKERS = [
+    f"package_id: {PACKAGE_ID}",
+    "milestone_id: 102",
+    "repo: chummer6-hub",
+    "status: complete",
+    f"landed_commit: {LANDED_COMMIT}",
+    "desktop_native_claim_and_recovery",
+    "support_followthrough:install_truth",
+]
+
+REQUIRED_CANONICAL_REGISTRY_MARKERS = [
+    "id: 102.1",
+    "owner: chummer6-hub",
+    "status: complete",
+    f"landed_commit: {LANDED_COMMIT}",
+    PACKAGE_ID,
+    "desktop_native_claim_and_recovery",
+    "support_followthrough:install_truth",
+]
+
+DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
+
+
+def _configured_path(env_name: str, default_path: Path) -> Path:
+    override = os.environ.get(env_name)
+    return Path(override) if override else default_path
+
+
+def _extract_yaml_block(text: str, anchor: str) -> str | None:
+    start = text.find(anchor)
+    if start < 0:
+        return None
+
+    next_item = text.find("\n  - ", start + len(anchor))
+    return text[start:] if next_item < 0 else text[start:next_item]
+
+
+def _verify_marker_block(
+    errors: list[str],
+    path: Path,
+    anchor: str,
+    markers: list[str],
+    label: str,
+) -> None:
+    if not path.is_file():
+        errors.append(f"missing canonical {label} file: {path}")
+        return
+
+    text = path.read_text(encoding="utf-8")
+    block = _extract_yaml_block(text, anchor)
+    if block is None:
+        errors.append(f"canonical {label} missing block anchored by: {anchor}")
+        return
+
+    for marker in markers:
+        if marker not in block:
+            errors.append(f"canonical {label} block missing marker: {marker}")
 
 
 def main() -> int:
@@ -138,6 +203,21 @@ def main() -> int:
                     for required in expected[key]:
                         if required not in actual:
                             errors.append(f"{receipt_id} missing {key[:-1]}: {required}")
+
+    _verify_marker_block(
+        errors,
+        _configured_path("CHUMMER_NEXT90_QUEUE_STAGING_PATH", DEFAULT_QUEUE_STAGING_PATH),
+        f"package_id: {PACKAGE_ID}",
+        REQUIRED_CANONICAL_QUEUE_MARKERS,
+        "successor queue staging",
+    )
+    _verify_marker_block(
+        errors,
+        _configured_path("CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH", DEFAULT_SUCCESSOR_REGISTRY_PATH),
+        "id: 102.1",
+        REQUIRED_CANONICAL_REGISTRY_MARKERS,
+        "successor registry",
+    )
 
     if errors:
         print("desktop native trust receipt verification failed:", file=sys.stderr)
