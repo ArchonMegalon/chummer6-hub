@@ -105,6 +105,7 @@ REQUIRED_CANONICAL_REGISTRY_MARKERS = [
 ]
 
 DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
 
 
@@ -210,6 +211,13 @@ def main() -> int:
         f"package_id: {PACKAGE_ID}",
         REQUIRED_CANONICAL_QUEUE_MARKERS,
         "successor queue staging",
+    )
+    _verify_marker_block(
+        errors,
+        _configured_path("CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH", DEFAULT_DESIGN_QUEUE_STAGING_PATH),
+        f"package_id: {PACKAGE_ID}",
+        REQUIRED_CANONICAL_QUEUE_MARKERS,
+        "design successor queue staging",
     )
     _verify_marker_block(
         errors,
