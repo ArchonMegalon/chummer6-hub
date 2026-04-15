@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+import yaml
+
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_ARTIFACT_FACTORY_ROOT", DEFAULT_ROOT))
@@ -103,11 +105,152 @@ SUCCESSOR_REGISTRY_MARKERS = [
     "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.",
 ]
 
+PACKAGE_ID = "next90-m107-hub-artifact-factory"
+MILESTONE_ID = 107
+WORK_TASK_ID = 107.1
+REQUIRED_QUEUE_FIELDS = {
+    "title": "Stand up artifact-factory orchestration for release, support, and publication bundles",
+    "task": "Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
+    "repo": "chummer6-hub",
+    "status": "complete",
+    "landed_commit": "e25842ac",
+}
+REQUIRED_ALLOWED_PATHS = {"Chummer.Run.Api", "scripts", "tests"}
+REQUIRED_OWNED_SURFACES = {"artifact_factory:orchestration", "public_proof_shelf:release_bundles"}
+REQUIRED_QUEUE_PROOF = {
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+    "/docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
+    "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
+    "python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
+    "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+}
+REQUIRED_REGISTRY_EVIDENCE = {
+    "/docker/chummercomplete/chummer.run-services commit cda8849a binds release, fix, support, and publication recipe jobs to stable public proof shelf output refs.",
+    "/docker/chummercomplete/chummer.run-services commit e25842ac tightens mixed source-pack output anchoring so release bundle refs always bind to an approved artifact-bearing source pack.",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs proves release, support, fix, and publication bundles route through approved source-pack receipts.",
+    "/docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py fail-closes missing recipe families, internal endpoint auth, public proof shelf bundle refs, and anchored source-pack output selection.",
+    "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py exits 0.",
+    "python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py exits 0.",
+    "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.",
+}
+
 
 def read_text(path: Path) -> str:
     if not path.is_file():
         raise FileNotFoundError(f"missing required file: {path}")
     return path.read_text(encoding="utf-8")
+
+
+def load_yaml(path: Path) -> object:
+    return yaml.safe_load(read_text(path))
+
+
+def find_queue_item(data: object) -> dict:
+    if not isinstance(data, dict):
+        raise ValueError("queue staging root must be a mapping.")
+    items = data.get("items")
+    if not isinstance(items, list):
+        raise ValueError("queue staging is missing an items list.")
+
+    for item in items:
+        if isinstance(item, dict) and item.get("package_id") == PACKAGE_ID:
+            return item
+    raise ValueError(f"queue staging is missing package_id {PACKAGE_ID}.")
+
+
+def find_successor_task(data: object) -> dict:
+    if not isinstance(data, dict):
+        raise ValueError("successor registry root must be a mapping.")
+    milestones = data.get("milestones")
+    if not isinstance(milestones, list):
+        raise ValueError("successor registry is missing a milestones list.")
+
+    milestone = next(
+        (
+            item
+            for item in milestones
+            if isinstance(item, dict) and item.get("id") == MILESTONE_ID
+        ),
+        None,
+    )
+    if not isinstance(milestone, dict):
+        raise ValueError(f"successor registry is missing milestone {MILESTONE_ID}.")
+
+    work_tasks = milestone.get("work_tasks")
+    if not isinstance(work_tasks, list):
+        raise ValueError(f"milestone {MILESTONE_ID} is missing work_tasks.")
+
+    task = next(
+        (
+            item
+            for item in work_tasks
+            if isinstance(item, dict) and float(item.get("id", -1)) == WORK_TASK_ID
+        ),
+        None,
+    )
+    if not isinstance(task, dict):
+        raise ValueError(f"milestone {MILESTONE_ID} is missing work task {WORK_TASK_ID}.")
+    return task
+
+
+def require_exact_set(missing: list[str], label: str, actual: object, expected: set[str]) -> None:
+    if not isinstance(actual, list):
+        missing.append(f"{label}: expected list")
+        return
+    actual_set = {str(item) for item in actual}
+    for item in sorted(expected - actual_set):
+        missing.append(f"{label}: missing {item}")
+    for item in sorted(actual_set - expected):
+        missing.append(f"{label}: unexpected {item}")
+
+
+def require_contains_set(missing: list[str], label: str, actual: object, expected: set[str]) -> None:
+    if not isinstance(actual, list):
+        missing.append(f"{label}: expected list")
+        return
+    actual_set = {str(item) for item in actual}
+    for item in sorted(expected - actual_set):
+        missing.append(f"{label}: missing {item}")
+
+
+def verify_queue_authority(missing: list[str], path: Path) -> None:
+    try:
+        item = find_queue_item(load_yaml(path))
+    except (FileNotFoundError, ValueError, yaml.YAMLError) as exc:
+        missing.append(f"{path}: {exc}")
+        return
+
+    if item.get("milestone_id") != MILESTONE_ID:
+        missing.append(f"{path}: {PACKAGE_ID} milestone_id must be {MILESTONE_ID}")
+    for field, expected in REQUIRED_QUEUE_FIELDS.items():
+        if item.get(field) != expected:
+            missing.append(f"{path}: {PACKAGE_ID} {field} must be {expected!r}")
+    require_exact_set(missing, f"{path}: {PACKAGE_ID} allowed_paths", item.get("allowed_paths"), REQUIRED_ALLOWED_PATHS)
+    require_exact_set(missing, f"{path}: {PACKAGE_ID} owned_surfaces", item.get("owned_surfaces"), REQUIRED_OWNED_SURFACES)
+    require_contains_set(missing, f"{path}: {PACKAGE_ID} proof", item.get("proof"), REQUIRED_QUEUE_PROOF)
+
+
+def verify_successor_registry_authority(missing: list[str], path: Path) -> None:
+    try:
+        task = find_successor_task(load_yaml(path))
+    except (FileNotFoundError, ValueError, yaml.YAMLError) as exc:
+        missing.append(f"{path}: {exc}")
+        return
+
+    if task.get("owner") != "chummer6-hub":
+        missing.append(f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} owner must be chummer6-hub")
+    if task.get("status") != "complete":
+        missing.append(f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} status must be complete")
+    if task.get("title") != "Orchestrate recipe-backed artifact jobs from approved release, support, and publication packs.":
+        missing.append(f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} title drifted")
+    require_contains_set(
+        missing,
+        f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} evidence",
+        task.get("evidence"),
+        REQUIRED_REGISTRY_EVIDENCE,
+    )
 
 
 def main() -> int:
@@ -132,6 +275,7 @@ def main() -> int:
         for marker in QUEUE_MARKERS:
             if marker not in queue_text:
                 missing.append(f"{QUEUE_STAGING_PATH}: {marker}")
+        verify_queue_authority(missing, QUEUE_STAGING_PATH)
 
     try:
         registry_text = read_text(SUCCESSOR_REGISTRY_PATH)
@@ -141,6 +285,7 @@ def main() -> int:
         for marker in SUCCESSOR_REGISTRY_MARKERS:
             if marker not in registry_text:
                 missing.append(f"{SUCCESSOR_REGISTRY_PATH}: {marker}")
+        verify_successor_registry_authority(missing, SUCCESSOR_REGISTRY_PATH)
 
     if missing:
         for item in missing:
