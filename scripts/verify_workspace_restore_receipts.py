@@ -15,6 +15,12 @@ PROOF_PATH = Path(
         ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
     )
 )
+LOCAL_RELEASE_PROOF_PATH = Path(
+    os.environ.get(
+        "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF",
+        ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
+    )
+)
 REGISTRY_PATH = Path(
     os.environ.get(
         "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY",
@@ -35,6 +41,8 @@ DESIGN_QUEUE_STAGING_PATH = Path(
 )
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
 LANDED_COMMIT = "4d4b3856"
+FRONTIER_ID = 4623636482
+MILESTONE_ID = 105
 
 SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Campaign.Contracts/CampaignContracts.cs": [
@@ -91,6 +99,25 @@ PROOF_MARKERS = [
     "string.Equals(item.Kind, \"entitlement_artifact_drift\", StringComparison.OrdinalIgnoreCase)",
     "accountSource.Contains(\"Continue is blocked until this receipt is resolved.\"",
 ]
+
+LOCAL_RELEASE_PROOF_RECEIPTS: dict[str, dict[str, object]] = {
+    "workspace_restore:provenance": {
+        "routes": ["/home/work", "/account/work"],
+        "surfaces": [
+            "workspace_restore:provenance",
+            "workspace_restore",
+            "account_workspace_detail",
+        ],
+    },
+    "entitlement_sync:conflict_receipts": {
+        "routes": ["/home/work", "/account/work"],
+        "surfaces": [
+            "entitlement_sync:conflict_receipts",
+            "entitlement_sync",
+            "workspace_restore",
+        ],
+    },
+}
 
 REGISTRY_MARKERS = [
     "id: 105.1",
@@ -200,6 +227,75 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
     require_markers(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
 
 
+def check_local_release_proof(path: Path, missing: list[str]) -> None:
+    if not path.is_file():
+        missing.append(f"missing local release proof: {path}")
+        return
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        missing.append(f"invalid local release proof: {path}: {exc}")
+        return
+
+    if payload.get("status") != "passed":
+        missing.append(f"{path}: status must be passed")
+
+    package = payload.get("successor_queue_package")
+    if not isinstance(package, dict):
+        missing.append(f"{path}: missing successor_queue_package")
+    else:
+        expected_package_values = {
+            "package_id": PACKAGE_ID,
+            "milestone_id": MILESTONE_ID,
+            "frontier_id": FRONTIER_ID,
+        }
+        for key, expected in expected_package_values.items():
+            if package.get(key) != expected:
+                missing.append(f"{path}: successor_queue_package.{key} must be {expected!r}")
+
+        surfaces = package.get("owned_surfaces")
+        if not isinstance(surfaces, list):
+            missing.append(f"{path}: successor_queue_package.owned_surfaces must be a list")
+        else:
+            surface_set = {item for item in surfaces if isinstance(item, str)}
+            for receipt_id in LOCAL_RELEASE_PROOF_RECEIPTS:
+                if receipt_id not in surface_set:
+                    missing.append(f"{path}: successor_queue_package.owned_surfaces missing {receipt_id}")
+
+    proof_routes = payload.get("proof_routes")
+    proof_route_set = {item for item in proof_routes if isinstance(item, str)} if isinstance(proof_routes, list) else set()
+    for route in ["/home/work", "/account/work"]:
+        if route not in proof_route_set:
+            missing.append(f"{path}: proof_routes missing {route}")
+
+    receipts = {
+        item.get("receipt_id"): item
+        for item in payload.get("proof_receipts", [])
+        if isinstance(item, dict)
+    }
+    for receipt_id, expected in LOCAL_RELEASE_PROOF_RECEIPTS.items():
+        receipt = receipts.get(receipt_id)
+        if not isinstance(receipt, dict):
+            missing.append(f"{path}: proof_receipts missing {receipt_id}")
+            continue
+
+        for key, expected_value in {
+            "package_id": PACKAGE_ID,
+            "milestone_id": MILESTONE_ID,
+            "frontier_id": FRONTIER_ID,
+        }.items():
+            if receipt.get(key) != expected_value:
+                missing.append(f"{path}: {receipt_id}.{key} must be {expected_value!r}")
+
+        for key in ["routes", "surfaces"]:
+            values = receipt.get(key)
+            value_set = {item for item in values if isinstance(item, str)} if isinstance(values, list) else set()
+            for required in expected[key]:
+                if required not in value_set:
+                    missing.append(f"{path}: {receipt_id}.{key} missing {required}")
+
+
 def main() -> int:
     missing: list[str] = []
 
@@ -240,6 +336,7 @@ def main() -> int:
 
     check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
+    check_local_release_proof(LOCAL_RELEASE_PROOF_PATH, missing)
 
     if missing:
         for item in missing:
