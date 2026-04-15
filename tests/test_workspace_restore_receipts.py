@@ -25,6 +25,16 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
         self.assertIn("workspace restore receipt proof passed", result.stdout)
 
+    def test_standard_verify_entrypoint_runs_workspace_restore_receipt_guard(self) -> None:
+        verify_script = REPO_ROOT / "scripts" / "ai" / "verify.sh"
+        script_text = verify_script.read_text(encoding="utf-8")
+
+        self.assertIn("python3 scripts/verify_workspace_restore_receipts.py", script_text)
+        self.assertIn(
+            "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py",
+            script_text,
+        )
+
     def test_verifier_fails_closed_when_proof_drops_recovery_hint_marker(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-proof-") as temp_dir:
             temp_root = Path(temp_dir)
