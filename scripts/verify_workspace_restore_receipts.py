@@ -329,6 +329,8 @@ FORBIDDEN_PROOF_MARKERS = [
     "operator telemetry",
     "operator/OODA",
     "design_supervisor_ooda",
+    "ooda_design_supervisor.py",
+    "run_ooda_design_supervisor_until_quiet",
     "/var/lib/codex-fleet",
 ]
 

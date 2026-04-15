@@ -147,6 +147,38 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
         self.assertIn("forbidden active-run proof marker: /var/lib/codex-fleet", result.stderr)
         self.assertIn(PACKAGE_ID, result.stderr)
 
+    def test_verifier_rejects_blocked_ooda_helper_command_names_as_queue_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-ooda-helper-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                source_queue_path.read_text(encoding="utf-8").replace(
+                    "      - python3 scripts/verify_workspace_restore_receipts.py\n",
+                    "      - run_ooda_design_supervisor_until_quiet.py output from an active worker run\n"
+                    "      - python3 scripts/verify_workspace_restore_receipts.py\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: run_ooda_design_supervisor_until_quiet", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
     def test_verifier_fails_closed_when_design_queue_drops_frontier_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-design-frontier-") as temp_dir:
             queue_path = Path(temp_dir) / "design-queue.yaml"
