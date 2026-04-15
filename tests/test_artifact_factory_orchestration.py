@@ -205,6 +205,68 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("RejectPublicShelfRefOutsideRecipeRoutes", result.stderr)
 
+    def test_verifier_fails_closed_when_public_path_id_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-path-id-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    '        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.ReleaseArtifactId, "releaseArtifactId");\n'
+                    '        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.SupportCaseId, "supportCaseId");\n'
+                    '        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.PublicationId, "publicationId");\n',
+                    "",
+                ).replace(
+                    "\n    private static void RejectUnsafePublicPathId(string sourcePackId, string? value, string fieldName)\n"
+                    "    {\n"
+                    "        if (string.IsNullOrWhiteSpace(value))\n"
+                    "        {\n"
+                    "            return;\n"
+                    "        }\n\n"
+                    "        string pathId = value.Trim();\n"
+                    "        if (pathId.Contains('?', StringComparison.Ordinal)\n"
+                    "            || pathId.Contains('#', StringComparison.Ordinal)\n"
+                    "            || pathId.Contains('/', StringComparison.Ordinal)\n"
+                    "            || pathId.Contains('\\\\', StringComparison.Ordinal))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must be stable public proof shelf segments.\");\n"
+                    "        }\n\n"
+                    "        string decoded = Uri.UnescapeDataString(pathId);\n"
+                    "        if (decoded is \".\" or \"..\"\n"
+                    "            || decoded.Contains('/', StringComparison.Ordinal)\n"
+                    "            || decoded.Contains('\\\\', StringComparison.Ordinal))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must not contain traversal or encoded path separators.\");\n"
+                    "        }\n"
+                    "    }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RejectUnsafePublicPathId", result.stderr)
+
     def test_verifier_fails_closed_when_duplicate_source_pack_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-proof-") as temp_dir:
             temp_root = Path(temp_dir)
