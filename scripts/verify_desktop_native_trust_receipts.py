@@ -197,6 +197,8 @@ REQUIRED_PROOF_PACKAGE = {
 REQUIRED_RESOLVING_COMMITS = [
     LANDED_COMMIT,
     "e27f24c1",
+    "0ea22419",
+    "b4d761a2",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
