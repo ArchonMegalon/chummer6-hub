@@ -454,6 +454,30 @@ def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | No
     return stable
 
 
+def _verify_json_has_no_forbidden_markers(
+    errors: list[str],
+    value: object,
+    label: str,
+    path: str = "$",
+) -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            _verify_json_has_no_forbidden_markers(errors, child, label, f"{path}.{key}")
+        return
+
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            _verify_json_has_no_forbidden_markers(errors, child, label, f"{path}[{index}]")
+        return
+
+    if not isinstance(value, str):
+        return
+
+    for marker in FORBIDDEN_PROOF_MARKERS:
+        if marker in value:
+            errors.append(f"{label} has forbidden active-run proof marker at {path}: {marker}")
+
+
 def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, proof_path: Path) -> None:
     materializer_path = repo_root / "scripts" / "materialize_hub_local_release_proof.py"
     if not materializer_path.is_file():
@@ -513,6 +537,8 @@ def main() -> int:
         except json.JSONDecodeError as exc:
             errors.append(f"proof file is not valid json: {exc}")
         else:
+            _verify_json_has_no_forbidden_markers(errors, proof, "published proof file")
+
             proof_routes = proof.get("proof_routes")
             if not isinstance(proof_routes, list):
                 errors.append("proof missing list field: proof_routes")
