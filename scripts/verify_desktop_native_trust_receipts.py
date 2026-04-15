@@ -162,6 +162,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit b9404a4c pins the M102 desktop trust latest proof guard.",
         "/docker/chummercomplete/chummer.run-services commit e6ae11a7 pins the M102 desktop trust guard closure.",
         "/docker/chummercomplete/chummer.run-services commit 4c542b50 pins the latest M102 desktop trust closure guard.",
+        "/docker/chummercomplete/chummer.run-services commit 02bed909 pins the M102 desktop trust closure guard.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -187,6 +188,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit b9404a4c pins the M102 desktop trust latest proof guard.",
         "/docker/chummercomplete/chummer.run-services commit e6ae11a7 pins the M102 desktop trust guard closure.",
         "/docker/chummercomplete/chummer.run-services commit 4c542b50 pins the latest M102 desktop trust closure guard.",
+        "/docker/chummercomplete/chummer.run-services commit 02bed909 pins the M102 desktop trust closure guard.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -239,6 +241,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "b9404a4c",
     "e6ae11a7",
     "4c542b50",
+    "02bed909",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
