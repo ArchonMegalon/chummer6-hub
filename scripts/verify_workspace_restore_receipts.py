@@ -99,6 +99,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "1d5a811f",
     "f02e985f",
     "0f06bcef",
+    "1ca535e2",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -269,6 +270,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 1d5a811f pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit f02e985f tightens the M105 blocked-helper command guard so queue and registry proof cannot cite active-run OODA helper command output.",
     "/docker/chummercomplete/chummer.run-services commit 0f06bcef pins the M105 helper guard proof floor.",
+    "/docker/chummercomplete/chummer.run-services commit 1ca535e2 pins the M105 workspace helper proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -315,6 +317,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 1d5a811f pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit f02e985f tightens the M105 blocked-helper command guard so queue and registry proof cannot cite active-run OODA helper command output.",
     "/docker/chummercomplete/chummer.run-services commit 0f06bcef pins the M105 helper guard proof floor.",
+    "/docker/chummercomplete/chummer.run-services commit 1ca535e2 pins the M105 workspace helper proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
