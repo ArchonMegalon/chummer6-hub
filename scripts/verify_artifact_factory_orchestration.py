@@ -41,6 +41,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "successor registry must contain exactly one work task",
         "FORBIDDEN_PROOF_MARKERS",
         "reject_forbidden_proof_markers(",
+        "item_lower = item.lower()",
+        "marker.lower() in item_lower",
     ],
     "scripts/ai/verify.sh": [
         "python3 scripts/verify_artifact_factory_orchestration.py",
@@ -417,8 +419,9 @@ def reject_forbidden_proof_markers(missing: list[str], label: str, proof_items: 
 
     for raw_item in proof_items:
         item = str(raw_item)
+        item_lower = item.lower()
         for marker in FORBIDDEN_PROOF_MARKERS:
-            if marker in item:
+            if marker.lower() in item_lower:
                 missing.append(f"{label}: forbidden active-run proof marker: {marker}")
 
 
