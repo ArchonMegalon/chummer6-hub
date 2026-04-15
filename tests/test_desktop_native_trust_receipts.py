@@ -680,6 +680,26 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_non_resolving_proof_commit(self) -> None:
+        result = subprocess.run(
+            ["python3", str(VERIFY_SCRIPT)],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            env={
+                **dict(os.environ),
+                "CHUMMER_DESKTOP_NATIVE_TRUST_EXTRA_REQUIRED_COMMITS": "0000000000000000000000000000000000000000",
+            },
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "required M102 desktop-native trust proof commit does not resolve: "
+            "0000000000000000000000000000000000000000",
+            result.stderr,
+        )
+
     def test_verifier_fail_closes_top_level_m102_proof_route_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"

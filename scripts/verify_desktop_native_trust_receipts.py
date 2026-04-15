@@ -169,6 +169,11 @@ REQUIRED_PROOF_PACKAGE = {
     "owned_surfaces": REQUIRED_CANONICAL_QUEUE_LISTS["owned_surfaces"],
 }
 
+REQUIRED_RESOLVING_COMMITS = [
+    LANDED_COMMIT,
+    "e27f24c1",
+]
+
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
 DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
@@ -302,6 +307,30 @@ def _verify_required_repo_anchor_paths(errors: list[str], repo_root: Path) -> No
             errors.append(f"canonical proof anchor does not resolve: {ABSOLUTE_REPO_PREFIX}{relative_path}")
 
 
+def _required_resolving_commits() -> list[str]:
+    commits = list(REQUIRED_RESOLVING_COMMITS)
+    extra_commits = os.environ.get("CHUMMER_DESKTOP_NATIVE_TRUST_EXTRA_REQUIRED_COMMITS", "")
+    for commit in extra_commits.split(","):
+        commit = commit.strip()
+        if commit and commit not in commits:
+            commits.append(commit)
+
+    return commits
+
+
+def _verify_required_commits(errors: list[str], repo_root: Path) -> None:
+    for commit in _required_resolving_commits():
+        result = subprocess.run(
+            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            errors.append(f"required M102 desktop-native trust proof commit does not resolve: {commit}")
+
+
 def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -360,6 +389,7 @@ def main() -> int:
     errors: list[str] = []
 
     _verify_required_repo_anchor_paths(errors, repo_root)
+    _verify_required_commits(errors, repo_root)
 
     for relative_path, markers in REQUIRED_SOURCE_MARKERS.items():
         path = repo_root / relative_path
