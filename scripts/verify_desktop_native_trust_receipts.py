@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -325,6 +326,7 @@ MATERIALIZER_ARGS = [
     "120",
     "true",
 ]
+COMMIT_PROOF_RE = re.compile(r"\bcommit\s+([0-9a-f]{8,40})\b", re.IGNORECASE)
 
 
 def _configured_path(env_name: str, default_path: Path) -> Path:
@@ -470,6 +472,32 @@ def _required_resolving_commits() -> list[str]:
     return commits
 
 
+def _extract_proof_commit_ids(values: list[str]) -> set[str]:
+    commit_ids: set[str] = set()
+    for value in values:
+        match = COMMIT_PROOF_RE.search(value)
+        if match is not None:
+            commit_ids.add(match.group(1).lower())
+
+    return commit_ids
+
+
+def _verify_canonical_commit_floor_consistency(errors: list[str]) -> None:
+    queue_commits = _extract_proof_commit_ids(REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+    registry_commits = _extract_proof_commit_ids(REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+    required_commits = {commit.lower() for commit in REQUIRED_RESOLVING_COMMITS}
+
+    if queue_commits != registry_commits:
+        errors.append(
+            "M102 canonical queue and registry proof commit floors differ: "
+            f"queue={sorted(queue_commits)!r}, registry={sorted(registry_commits)!r}"
+        )
+
+    for commit in sorted(queue_commits | registry_commits):
+        if commit not in required_commits:
+            errors.append(f"M102 canonical proof cites commit not enforced by resolver: {commit}")
+
+
 def _verify_required_commits(errors: list[str], repo_root: Path) -> None:
     for commit in _required_resolving_commits():
         result = subprocess.run(
@@ -580,6 +608,7 @@ def main() -> int:
 
     _verify_required_repo_anchor_paths(errors, repo_root)
     _verify_required_commits(errors, repo_root)
+    _verify_canonical_commit_floor_consistency(errors)
     _verify_required_source_markers(errors, repo_root)
 
     proof_path = _proof_path(repo_root)
