@@ -81,6 +81,18 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertEqual("complete", m102_package["status"])
             self.assertEqual("160af58f", m102_package["landed_commit"])
             self.assertEqual(["Chummer.Run.Api", "scripts", "tests"], m102_package["allowed_paths"])
+            m105_package = next(
+                item
+                for item in payload["successor_queue_packages"]
+                if item["package_id"] == "next90-m105-hub-workspace-continuity"
+            )
+            self.assertEqual("complete", m105_package["status"])
+            self.assertEqual("4d4b3856", m105_package["landed_commit"])
+            self.assertEqual(["Chummer.Run.Api", "scripts", "tests"], m105_package["allowed_paths"])
+            self.assertEqual(
+                ["workspace_restore:provenance", "entitlement_sync:conflict_receipts"],
+                m105_package["owned_surfaces"],
+            )
 
     def test_verifier_fail_closes_successor_queue_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -408,6 +420,100 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("proof package has wrong allowed_paths", result.stderr)
+
+    def test_verifier_fail_closes_top_level_m102_proof_route_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof["proof_routes"] = [
+                item
+                for item in proof["proof_routes"]
+                if item != "/api/v1/install-linking/continuation"
+            ]
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("proof_routes missing M102 route: /api/v1/install-linking/continuation", result.stderr)
+
+    def test_verifier_fail_closes_top_level_m102_journey_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof["journeys_passed"] = [
+                item
+                for item in proof["journeys_passed"]
+                if item != "install_claim_restore_continue"
+            ]
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("journeys_passed missing M102 journey: install_claim_restore_continue", result.stderr)
 
 
 if __name__ == "__main__":
