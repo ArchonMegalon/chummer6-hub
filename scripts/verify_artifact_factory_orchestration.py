@@ -75,6 +75,9 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'return $"/account/{supportPath}/{Uri.EscapeDataString(anchor.SupportCaseId)}";',
         'return $"/artifacts/publications/{Uri.EscapeDataString(anchor.PublicationId)}/bundles";',
         'string shelfRef = anchor.PublicShelfRef.Trim().TrimEnd(\'/\');',
+        '&& TryBuildReleaseBundleRefFromDownloadShelfRef(shelfRef, out string? releaseBundleRef)',
+        "private static bool TryBuildReleaseBundleRefFromDownloadShelfRef(string shelfRef, out string releaseBundleRef)",
+        'const string downloadInstallPrefix = "/downloads/install/";',
         'return shelfRef.EndsWith("/bundles", StringComparison.OrdinalIgnoreCase)',
     ],
     "Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs": [
@@ -94,6 +97,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "LaunchJobBindsOutputsToApprovedAnchoredPackWhenSourcePacksAreMixed",
         "LaunchJobBuildsSupportAndFixJobsFromAnchoredApprovedPacks",
         "LaunchJobBindsReleaseOutputsToApprovedPublicShelfRefWhenArtifactIdIsAbsent",
+        "LaunchJobBindsReleaseDownloadShelfAnchorToReleaseBundleShelf",
         "LaunchJobBindsPublicationOutputsToApprovedPublicShelfRefWhenPublicationIdIsAbsent",
         "ControllerLaunchJobRequiresInternalToken",
         "LaunchJobRejectsProviderSpecificEvidenceRefs",
