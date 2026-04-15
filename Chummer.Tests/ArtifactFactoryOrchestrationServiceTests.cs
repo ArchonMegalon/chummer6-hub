@@ -194,6 +194,36 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobRejectsProviderSpecificEvidenceRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-macos-arm64",
+                        "provider:one-off-render:runway",
+                        "public-shelf:/downloads/install/avalonia-osx-arm64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-osx-arm64-installer")
+            ])));
+
+        Assert.Contains("provider-specific evidenceRef", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("approved source-pack receipts", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("one-off provider flows", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobRejectsRecipeWhenApprovedPackLacksRequiredReceiptEvidence()
     {
         ArtifactFactoryOrchestrationService service = new();

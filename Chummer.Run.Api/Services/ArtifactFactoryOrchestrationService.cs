@@ -61,6 +61,20 @@ public sealed class ArtifactFactoryOrchestrationService
 {
     private const string ContractName = "chummer.run.artifact_factory.recipe_job.v1";
     private const string RecipeVersion = "2026-04-15";
+    private static readonly IReadOnlySet<string> ProviderSpecificRefPrefixes =
+        new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "provider",
+            "vendor",
+            "one_off",
+            "one-off",
+            "heygen",
+            "elevenlabs",
+            "runway",
+            "replicate",
+            "veo"
+        };
+
     private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly IReadOnlyDictionary<string, ArtifactFactoryRecipe> Recipes =
         new Dictionary<string, ArtifactFactoryRecipe>(StringComparer.OrdinalIgnoreCase)
@@ -229,6 +243,12 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             throw new InvalidDataException($"source pack '{sourcePack.SourcePackId}' is missing provenanceRef.");
         }
+
+        RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.ProvenanceRef, "provenanceRef");
+        if (!string.IsNullOrWhiteSpace(sourcePack.PublicShelfRef))
+        {
+            RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
+        }
     }
 
     private static void ValidateRecipeAnchors(
@@ -266,9 +286,28 @@ public sealed class ArtifactFactoryOrchestrationService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        foreach (string evidenceRef in evidenceRefs)
+        {
+            RejectProviderSpecificRef(sourcePack.SourcePackId, evidenceRef, "evidenceRef");
+        }
+
         return evidenceRefs.Length > 0
             ? evidenceRefs
             : [$"provenance:{sourcePack.ProvenanceRef.Trim()}"];
+    }
+
+    private static void RejectProviderSpecificRef(string sourcePackId, string value, string fieldName)
+    {
+        string normalized = value.Trim();
+        int separatorIndex = normalized.IndexOf(':');
+        string prefix = separatorIndex >= 0
+            ? normalized[..separatorIndex].Trim()
+            : string.Empty;
+        if (ProviderSpecificRefPrefixes.Contains(prefix))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has provider-specific {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
+        }
     }
 
     private static string[] NormalizeOutputFormats(IReadOnlyList<string>? requestedFormats, ArtifactFactoryRecipe recipe)
