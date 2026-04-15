@@ -453,6 +453,20 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
         for item in payload.get("proof_receipts", [])
         if isinstance(item, dict)
     }
+    package_receipt_ids = {
+        receipt_id
+        for receipt_id, receipt in receipts.items()
+        if isinstance(receipt_id, str)
+        and receipt.get("package_id") == PACKAGE_ID
+        and receipt.get("milestone_id") == MILESTONE_ID
+        and receipt.get("frontier_id") == FRONTIER_ID
+    }
+    expected_receipt_ids = set(LOCAL_RELEASE_PROOF_RECEIPTS)
+    if package_receipt_ids != expected_receipt_ids:
+        missing.append(
+            f"{path}: package-scoped proof_receipts for {PACKAGE_ID} must be {sorted(expected_receipt_ids)!r}"
+        )
+
     for receipt_id, expected in LOCAL_RELEASE_PROOF_RECEIPTS.items():
         receipt = receipts.get(receipt_id)
         if not isinstance(receipt, dict):
