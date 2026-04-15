@@ -272,6 +272,10 @@ public sealed class ArtifactFactoryOrchestrationService
             RejectNonLocalPublicShelfRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
             RejectPublicShelfRefOutsideRecipeRoutes(sourcePack.SourcePackId, family, sourcePack.PublicShelfRef, "publicShelfRef");
         }
+
+        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.ReleaseArtifactId, "releaseArtifactId");
+        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.SupportCaseId, "supportCaseId");
+        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.PublicationId, "publicationId");
     }
 
     private static void ValidateRecipeAnchors(
@@ -428,6 +432,33 @@ public sealed class ArtifactFactoryOrchestrationService
                 throw new InvalidDataException(
                     $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must not contain traversal or encoded path separators.");
             }
+        }
+    }
+
+    private static void RejectUnsafePublicPathId(string sourcePackId, string? value, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        string pathId = value.Trim();
+        if (pathId.Contains('?', StringComparison.Ordinal)
+            || pathId.Contains('#', StringComparison.Ordinal)
+            || pathId.Contains('/', StringComparison.Ordinal)
+            || pathId.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must be stable public proof shelf segments.");
+        }
+
+        string decoded = Uri.UnescapeDataString(pathId);
+        if (decoded is "." or ".."
+            || decoded.Contains('/', StringComparison.Ordinal)
+            || decoded.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must not contain traversal or encoded path separators.");
         }
     }
 
