@@ -151,6 +151,45 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("allowed_paths", result.stderr)
         self.assertIn("Chummer.Run.Api", result.stderr)
 
+    def test_verifier_fails_closed_when_queue_staging_drops_dotnet_restore_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-dotnet-") as temp_dir:
+            temp_root = Path(temp_dir)
+            queue_path = temp_root / "queue.yaml"
+            design_queue_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_text = source_queue_path.read_text(encoding="utf-8").replace(
+                '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests" --no-restore\n',
+                "",
+                1,
+            )
+            queue_path.write_text(queue_text, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignSpineRestoreReceiptTests", result.stderr)
+        self.assertIn("CampaignWorkspaceServerPlaneServiceTests", result.stderr)
+        self.assertIn("CampaignOsLocalProofMaterializerTests", result.stderr)
+
     def test_verifier_fails_closed_when_registry_drops_landed_commit(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -188,6 +227,44 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("105.1", result.stderr)
         self.assertIn("landed_commit: 4d4b3856", result.stderr)
+
+    def test_verifier_fails_closed_when_registry_drops_release_proof_guard_evidence(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-") as temp_dir:
+            temp_root = Path(temp_dir)
+            registry_path = temp_root / "registry.yaml"
+            fleet_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            design_queue_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            source_registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            registry_text = source_registry_path.read_text(encoding="utf-8").replace(
+                "          - /docker/chummercomplete/chummer.run-services commit b39147dc tightens the workspace restore verifier so Hub local release proof must retain the next90-m105-hub-workspace-continuity package, frontier id 4623636482, /home/work and /account/work routes, and both workspace_restore:provenance and entitlement_sync:conflict_receipts receipts.\n",
+                "",
+                1,
+            )
+            registry_path.write_text(registry_text, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(fleet_queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("105.1", result.stderr)
+        self.assertIn("commit b39147dc tightens the workspace restore verifier", result.stderr)
 
     def test_verifier_fails_closed_when_design_queue_staging_drops_package(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-design-queue-") as temp_dir:

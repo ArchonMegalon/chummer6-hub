@@ -143,9 +143,11 @@ REGISTRY_MARKERS = [
     "status: complete",
     f"landed_commit: {LANDED_COMMIT}",
     f"/docker/chummercomplete/chummer.run-services commit {LANDED_COMMIT} emits workspace_restore provenance receipts",
+    "/docker/chummercomplete/chummer.run-services commit b39147dc tightens the workspace restore verifier so Hub local release proof must retain the next90-m105-hub-workspace-continuity package, frontier id 4623636482, /home/work and /account/work routes, and both workspace_restore:provenance and entitlement_sync:conflict_receipts receipts.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
+    "dotnet test Chummer.Tests/Chummer.Tests.csproj --filter \"CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests\" --no-restore exits 0",
 ]
 
 QUEUE_STAGING_MARKERS = [
@@ -158,6 +160,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "python3 scripts/verify_workspace_restore_receipts.py",
     "python3 -m unittest tests/test_workspace_restore_receipts.py",
+    "dotnet test Chummer.Tests/Chummer.Tests.csproj --filter \"CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests\" --no-restore",
     "allowed_paths:\n      - Chummer.Run.Api\n      - scripts\n      - tests\n    owned_surfaces:",
     "workspace_restore:provenance",
     "entitlement_sync:conflict_receipts",
