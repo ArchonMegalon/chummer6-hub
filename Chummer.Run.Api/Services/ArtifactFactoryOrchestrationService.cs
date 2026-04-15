@@ -150,13 +150,13 @@ public sealed class ArtifactFactoryOrchestrationService
         HashSet<string> sourcePackIds = new(StringComparer.OrdinalIgnoreCase);
         foreach (ApprovedArtifactSourcePack sourcePack in request.SourcePacks)
         {
-            ValidateSourcePack(sourcePack, recipe);
+            ValidateSourcePack(sourcePack, family, recipe);
             if (!sourcePackIds.Add(sourcePack.SourcePackId))
             {
                 throw new InvalidDataException($"duplicate source pack id '{sourcePack.SourcePackId}' is not allowed.");
             }
 
-            IReadOnlyList<string> evidenceRefs = NormalizeEvidenceRefs(sourcePack);
+            IReadOnlyList<string> evidenceRefs = NormalizeEvidenceRefs(sourcePack, family);
             sourcePacks.Add(new ArtifactFactoryMediaSourcePack(
                 SourcePackId: sourcePack.SourcePackId.Trim(),
                 SourcePackKind: NormalizeToken(sourcePack.SourcePackKind),
@@ -235,7 +235,7 @@ public sealed class ArtifactFactoryOrchestrationService
                 OutputBindings: outputBindings));
     }
 
-    private static void ValidateSourcePack(ApprovedArtifactSourcePack sourcePack, ArtifactFactoryRecipe recipe)
+    private static void ValidateSourcePack(ApprovedArtifactSourcePack sourcePack, string family, ArtifactFactoryRecipe recipe)
     {
         if (string.IsNullOrWhiteSpace(sourcePack.SourcePackId))
         {
@@ -268,6 +268,7 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
             RejectNonLocalPublicShelfRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
+            RejectPublicShelfRefOutsideRecipeRoutes(sourcePack.SourcePackId, family, sourcePack.PublicShelfRef, "publicShelfRef");
         }
     }
 
@@ -298,7 +299,7 @@ public sealed class ArtifactFactoryOrchestrationService
         }
     }
 
-    private static IReadOnlyList<string> NormalizeEvidenceRefs(ApprovedArtifactSourcePack sourcePack)
+    private static IReadOnlyList<string> NormalizeEvidenceRefs(ApprovedArtifactSourcePack sourcePack, string family)
     {
         string[] evidenceRefs = (sourcePack.EvidenceRefs ?? Array.Empty<string>())
             .Select(static item => item.Trim())
@@ -310,6 +311,7 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             RejectProviderSpecificRef(sourcePack.SourcePackId, evidenceRef, "evidenceRef");
             RejectNonLocalPublicShelfEvidenceRef(sourcePack.SourcePackId, evidenceRef);
+            RejectPublicShelfEvidenceRefOutsideRecipeRoutes(sourcePack.SourcePackId, family, evidenceRef);
         }
 
         return evidenceRefs.Length > 0
@@ -365,6 +367,18 @@ public sealed class ArtifactFactoryOrchestrationService
         RejectNonLocalPublicShelfRef(sourcePackId, publicShelfRef, "evidenceRef");
     }
 
+    private static void RejectPublicShelfEvidenceRefOutsideRecipeRoutes(string sourcePackId, string family, string evidenceRef)
+    {
+        const string publicShelfPrefix = "public-shelf:";
+        if (!evidenceRef.StartsWith(publicShelfPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        string publicShelfRef = evidenceRef[publicShelfPrefix.Length..];
+        RejectPublicShelfRefOutsideRecipeRoutes(sourcePackId, family, publicShelfRef, "evidenceRef");
+    }
+
     private static void RejectNonLocalPublicShelfRef(string sourcePackId, string value, string fieldName)
     {
         string publicShelfRef = value.Trim();
@@ -372,6 +386,25 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has non-local public proof shelf {fieldName} '{value}'; artifact factory output refs must stay on the Chummer public proof shelf.");
+        }
+    }
+
+    private static void RejectPublicShelfRefOutsideRecipeRoutes(string sourcePackId, string family, string value, string fieldName)
+    {
+        string publicShelfRef = value.Trim();
+        string[] allowedPrefixes = family switch
+        {
+            "release" => ["/downloads/install/", "/artifacts/release-bundles/"],
+            "fix" => ["/account/support/", "/account/fix-followthrough/", "/downloads/install/", "/artifacts/release-bundles/"],
+            "support" => ["/account/support/", "/account/support-packets/"],
+            "publication" => ["/artifacts/publications/"],
+            _ => []
+        };
+
+        if (allowedPrefixes.Length == 0 || !allowedPrefixes.Any(prefix => publicShelfRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has public proof shelf {fieldName} '{value}' outside recipe {family} shelf routes; artifact factory bundle refs must stay on approved release, support, fix, or publication shelves.");
         }
     }
 

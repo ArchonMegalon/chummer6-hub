@@ -428,6 +428,62 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobRejectsCrossRecipePublicShelfRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "release_evidence",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/account/support/11709"
+                    ],
+                    PublicShelfRef: "/account/support/11709")
+            ])));
+
+        Assert.Contains("outside recipe release shelf routes", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("approved release, support, fix, or publication shelves", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchJobRejectsCrossRecipePublicShelfEvidenceRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "publication",
+            RequestedBy: "creator.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "publication-pack-redmond-brief",
+                    SourcePackKind: "creator_publication",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "publication:redmond-brief:v3",
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "public-shelf:/artifacts/release-bundles/current-preview-build"
+                    ],
+                    PublicationId: "redmond-brief")
+            ])));
+
+        Assert.Contains("outside recipe publication shelf routes", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("evidenceRef", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobRejectsRecipeWhenApprovedPackLacksRequiredReceiptEvidence()
     {
         ArtifactFactoryOrchestrationService service = new();
