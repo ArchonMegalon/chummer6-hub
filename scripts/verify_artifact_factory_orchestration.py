@@ -98,12 +98,13 @@ QUEUE_MARKERS = [
     "package_id: next90-m107-hub-artifact-factory",
     "milestone_id: 107",
     "status: complete",
-    "landed_commit: e25842ac",
+    "landed_commit: b9e6b52e",
     "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
     "Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
     "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
     "artifact_factory:orchestration",
     "public_proof_shelf:release_bundles",
+    "/docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards",
 ]
 
 SUCCESSOR_REGISTRY_MARKERS = [
@@ -115,6 +116,7 @@ SUCCESSOR_REGISTRY_MARKERS = [
     "title: Orchestrate recipe-backed artifact jobs from approved release, support, and publication packs.",
     "status: complete",
     "/docker/chummercomplete/chummer.run-services commit e25842ac tightens mixed source-pack output anchoring",
+    "/docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs",
     "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py exits 0.",
     "python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py exits 0.",
@@ -129,7 +131,7 @@ REQUIRED_QUEUE_FIELDS = {
     "task": "Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
     "repo": "chummer6-hub",
     "status": "complete",
-    "landed_commit": "e25842ac",
+    "landed_commit": "b9e6b52e",
 }
 REQUIRED_ALLOWED_PATHS = {"Chummer.Run.Api", "scripts", "tests"}
 REQUIRED_OWNED_SURFACES = {"artifact_factory:orchestration", "public_proof_shelf:release_bundles"}
@@ -142,10 +144,12 @@ REQUIRED_QUEUE_PROOF = {
     "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
     "python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
     "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+    "/docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
 }
 REQUIRED_REGISTRY_EVIDENCE = {
     "/docker/chummercomplete/chummer.run-services commit cda8849a binds release, fix, support, and publication recipe jobs to stable public proof shelf output refs.",
     "/docker/chummercomplete/chummer.run-services commit e25842ac tightens mixed source-pack output anchoring so release bundle refs always bind to an approved artifact-bearing source pack.",
+    "/docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards so approved local refs cannot cross from release or publication recipes onto the wrong shelf family.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs proves release, support, fix, and publication bundles route through approved source-pack receipts.",
