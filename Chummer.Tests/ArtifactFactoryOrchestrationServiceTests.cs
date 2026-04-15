@@ -343,6 +343,62 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobRejectsExternalPublicShelfRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "release_evidence",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-macos-arm64",
+                        "public-shelf:https://vendor.example/rendered/preview"
+                    ],
+                    PublicShelfRef: "https://vendor.example/rendered/preview")
+            ])));
+
+        Assert.Contains("non-local public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Chummer public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchJobRejectsExternalPublicShelfEvidenceRefs()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "publication",
+            RequestedBy: "creator.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "publication-pack-redmond-brief",
+                    SourcePackKind: "creator_publication",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "publication:redmond-brief:v3",
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "public-shelf:https://vendor.example/rendered/publication"
+                    ],
+                    PublicationId: "redmond-brief")
+            ])));
+
+        Assert.Contains("non-local public proof shelf", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("evidenceRef", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobRejectsRecipeWhenApprovedPackLacksRequiredReceiptEvidence()
     {
         ArtifactFactoryOrchestrationService service = new();
