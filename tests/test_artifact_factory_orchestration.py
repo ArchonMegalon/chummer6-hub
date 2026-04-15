@@ -148,6 +148,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    landed_commit: e25842ac",
                         "    proof:",
                         "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
                         "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
                         "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
                         "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
