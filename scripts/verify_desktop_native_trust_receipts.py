@@ -183,6 +183,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 3760ef63 tightens M102 active-run proof marker matching so queue, registry, and generated proof evidence reject helper references regardless of casing.",
         "/docker/chummercomplete/chummer.run-services commit 0337eeb5 pins the M102 active-run casing proof guard.",
         "/docker/chummercomplete/chummer.run-services commit ad21e50f pins the M102 active-run casing proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit 51c46e74 pins the M102 desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -229,6 +230,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 3760ef63 tightens M102 active-run proof marker matching so queue, registry, and generated proof evidence reject helper references regardless of casing.",
         "/docker/chummercomplete/chummer.run-services commit 0337eeb5 pins the M102 active-run casing proof guard.",
         "/docker/chummercomplete/chummer.run-services commit ad21e50f pins the M102 active-run casing proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit 51c46e74 pins the M102 desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -306,6 +308,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "3760ef63",
     "0337eeb5",
     "ad21e50f",
+    "51c46e74",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
