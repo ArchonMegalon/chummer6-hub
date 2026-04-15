@@ -384,6 +384,61 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("commit cfd5d208", result.stderr)
 
+    def test_verifier_fails_closed_when_latest_proof_guard_commit_pin_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-latest-guard-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                "\n".join(
+                    [
+                        "items:",
+                        "  - title: Stand up artifact-factory orchestration for release, support, and publication bundles",
+                        "    task: Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
+                        "    package_id: next90-m107-hub-artifact-factory",
+                        "    milestone_id: 107",
+                        "    repo: chummer6-hub",
+                        "    status: complete",
+                        "    landed_commit: b9e6b52e",
+                        "    proof:",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
+                        "    allowed_paths:",
+                        "      - Chummer.Run.Api",
+                        "      - scripts",
+                        "      - tests",
+                        "    owned_surfaces:",
+                        "      - artifact_factory:orchestration",
+                        "      - public_proof_shelf:release_bundles",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("commit 60125d9e", result.stderr)
+
     def test_verifier_fails_closed_when_design_queue_source_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-design-queue-proof-") as temp_dir:
             design_queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
