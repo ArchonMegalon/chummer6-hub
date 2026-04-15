@@ -32,6 +32,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'RequiredReceiptPrefixes: ["publication", "moderation", "public-shelf"]',
         'RejectProviderSpecificRef(sourcePack.SourcePackId, evidenceRef, "evidenceRef");',
         'artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.',
+        "private static ArtifactFactoryMediaSourcePack SelectOutputAnchor(",
+        '"release" => !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId),',
         'return $"/artifacts/release-bundles/{Uri.EscapeDataString(anchor.ReleaseArtifactId)}";',
         'return $"/account/{supportPath}/{Uri.EscapeDataString(anchor.SupportCaseId)}";',
         'return $"/artifacts/publications/{Uri.EscapeDataString(anchor.PublicationId)}/bundles";',
@@ -46,6 +48,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs": [
         "LaunchJobBuildsReleaseRecipeFromApprovedSourcePacks",
         "LaunchJobBuildsPublicationProofShelfRoute",
+        "LaunchJobBindsOutputsToApprovedAnchoredPackWhenSourcePacksAreMixed",
         "LaunchJobBuildsSupportAndFixJobsFromAnchoredApprovedPacks",
         "ControllerLaunchJobRequiresInternalToken",
         "LaunchJobRejectsProviderSpecificEvidenceRefs",
