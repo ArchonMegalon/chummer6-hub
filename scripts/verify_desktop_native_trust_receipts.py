@@ -44,6 +44,13 @@ REQUIRED_SOURCE_MARKERS = {
         "Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.",
         "Support follow-through stays on the same install rail",
     ],
+    Path("Chummer.Run.Api/Views/Accounts/Account.cshtml"): [
+        "The next safe action is still inside Chummer on the already-downloaded device.",
+        "Only use the recovery code if that copy explicitly enters recovery mode.",
+        "Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked.",
+        "Use Devices & access for relinking, guided update follow-through, and support closure on the same copy.",
+        "instead of starting a fresh browser ritual.",
+    ],
     Path("tests/RunServicesVerification/InstallLinkingContinuationVerification.cs"): [
         "ContinueClaimedInstall(",
         "response.FallbackPosture.Contains(\"Claim codes are a recovery fallback\"",
