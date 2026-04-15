@@ -34,6 +34,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     "scripts/verify_artifact_factory_orchestration.py": [
         "CHUMMER_ARTIFACT_FACTORY_DESIGN_QUEUE_STAGING",
         "DESIGN_QUEUE_STAGING_PATH",
+        '"frontier_id": 1421219975',
         "verify_queue_authority(missing, queue_path)",
         "queue staging must contain exactly one package_id",
         "successor registry must contain exactly one milestone",
@@ -126,6 +127,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     ],
     "tests/test_artifact_factory_orchestration.py": [
         "test_verifier_fails_closed_when_queue_package_is_duplicated",
+        "test_verifier_fails_closed_when_structured_frontier_id_is_missing",
         "test_verifier_fails_closed_when_duplicate_source_pack_guard_is_removed",
         "test_verifier_fails_closed_when_queue_guard_commit_pin_is_missing",
         "commit cfd5d208",
@@ -207,6 +209,7 @@ REQUIRED_QUEUE_FIELDS = {
     "repo": "chummer6-hub",
     "status": "complete",
     "landed_commit": "b9e6b52e",
+    "frontier_id": 1421219975,
 }
 REQUIRED_ALLOWED_PATHS = {"Chummer.Run.Api", "scripts", "tests"}
 REQUIRED_OWNED_SURFACES = {"artifact_factory:orchestration", "public_proof_shelf:release_bundles"}
