@@ -166,6 +166,7 @@ REGISTRY_MARKERS = [
 QUEUE_STAGING_MARKERS = [
     "title: Emit provenance and conflict receipts for workspace restore and continuity",
     f"package_id: {PACKAGE_ID}\n",
+    f"frontier_id: {FRONTIER_ID}",
     "milestone_id: 105",
     "repo: chummer6-hub",
     "status: complete",
