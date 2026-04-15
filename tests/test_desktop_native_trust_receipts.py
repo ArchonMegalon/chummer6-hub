@@ -73,6 +73,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn("support_followthrough:install_truth", proof)
             self.assertIn("/api/v1/install-linking/continuation", proof)
             payload = json.loads(proof)
+            self.assertIn("/account/access", payload["proof_routes"])
             m102_package = next(
                 item
                 for item in payload["successor_queue_packages"]

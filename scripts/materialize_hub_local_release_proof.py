@@ -113,6 +113,7 @@ def main() -> int:
             "/downloads/install/avalonia-linux-x64-installer/continue.json",
             "/api/v1/install-linking/continuation",
             "/home/access",
+            "/account/access",
             "/home/work",
             "/account/work",
             "/account/support",

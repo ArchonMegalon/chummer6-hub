@@ -83,6 +83,18 @@ REQUIRED_PROOF_RECEIPTS = {
     },
 }
 
+REQUIRED_TOP_LEVEL_PROOF_ROUTES = [
+    "/downloads/install/avalonia-linux-x64-installer/continue.json",
+    "/api/v1/install-linking/continuation",
+    "/account/access",
+    "/account/support",
+    "/contact",
+]
+
+REQUIRED_TOP_LEVEL_JOURNEYS = [
+    "install_claim_restore_continue",
+]
+
 
 REQUIRED_CANONICAL_QUEUE_MARKERS = [
     f"package_id: {PACKAGE_ID}",
@@ -254,6 +266,24 @@ def main() -> int:
         except json.JSONDecodeError as exc:
             errors.append(f"proof file is not valid json: {exc}")
         else:
+            proof_routes = proof.get("proof_routes")
+            if not isinstance(proof_routes, list):
+                errors.append("proof missing list field: proof_routes")
+            else:
+                proof_route_set = {item for item in proof_routes if isinstance(item, str)}
+                for required in REQUIRED_TOP_LEVEL_PROOF_ROUTES:
+                    if required not in proof_route_set:
+                        errors.append(f"proof_routes missing M102 route: {required}")
+
+            journeys_passed = proof.get("journeys_passed")
+            if not isinstance(journeys_passed, list):
+                errors.append("proof missing list field: journeys_passed")
+            else:
+                journey_set = {item for item in journeys_passed if isinstance(item, str)}
+                for required in REQUIRED_TOP_LEVEL_JOURNEYS:
+                    if required not in journey_set:
+                        errors.append(f"journeys_passed missing M102 journey: {required}")
+
             packages = proof.get("successor_queue_packages")
             proof_package = None
             if isinstance(packages, list):
