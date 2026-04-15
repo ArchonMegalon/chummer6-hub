@@ -60,6 +60,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "290ec61e",
     "1d11729a",
     "35db07af",
+    "784fbcef",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -195,6 +196,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 5796e220 wires the M105 workspace restore verifier into scripts/ai/verify.sh so standard Hub verification runs the closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.",
     "/docker/chummercomplete/chummer.run-services commit 1d11729a fail-closes M105 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
+    "/docker/chummercomplete/chummer.run-services commit 784fbcef pins the M105 workspace continuity receipt materializer so regenerated local release proof cannot drop the closed package metadata, provenance receipts, or conflict receipts.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -213,7 +215,9 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 5796e220 wires the M105 workspace restore verifier into scripts/ai/verify.sh so standard Hub verification runs the closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.",
     "/docker/chummercomplete/chummer.run-services commit 1d11729a fail-closes M105 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
+    "/docker/chummercomplete/chummer.run-services commit 784fbcef pins the M105 workspace continuity receipt materializer so regenerated local release proof cannot drop the closed package metadata, provenance receipts, or conflict receipts.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
+    "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_commit_resolution.py",
     "python3 scripts/verify_workspace_restore_receipts.py",
