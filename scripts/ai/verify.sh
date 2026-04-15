@@ -2321,5 +2321,7 @@ python3 scripts/verify_desktop_native_trust_receipts.py
 python3 -m unittest tests/test_desktop_native_trust_receipts.py
 python3 scripts/verify_workspace_restore_receipts.py
 python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py
+python3 scripts/verify_artifact_factory_orchestration.py
+python3 -m unittest tests/test_artifact_factory_orchestration.py
 
 bash scripts/ai/run_services_smoke.sh
