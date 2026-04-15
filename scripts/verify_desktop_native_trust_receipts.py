@@ -69,6 +69,11 @@ REQUIRED_PROOF_RECEIPTS = {
         "package_id": "next90-m102-hub-desktop-native-trust",
         "milestone_id": 102,
         "frontier_id": FRONTIER_ID,
+        "summary": (
+            "Claim and recovery continuation now have installer/app-native receipts: guided setup is the default, "
+            "claim codes are recovery fallback only, and the claimed desktop app can call the grant-bound "
+            "continuation endpoint without a browser redemption ritual."
+        ),
         "surfaces": [
             "desktop_native_claim_and_recovery",
             "install_claim_restore_continue",
@@ -84,6 +89,10 @@ REQUIRED_PROOF_RECEIPTS = {
         "package_id": "next90-m102-hub-desktop-native-trust",
         "milestone_id": 102,
         "frontier_id": FRONTIER_ID,
+        "summary": (
+            "Support follow-through carries installed build, current release, channel, head, platform, fallback, "
+            "update, and rollback truth on the same install rail used by the desktop client."
+        ),
         "surfaces": [
             "support_followthrough:install_truth",
             "support_case_install_readiness",
@@ -175,8 +184,10 @@ REQUIRED_PROOF_PACKAGE = {
     "frontier_id": FRONTIER_ID,
     "status": "complete",
     "landed_commit": LANDED_COMMIT,
+    "title": "Unify claim, install, update, and support recovery into one desktop-native flow",
     "allowed_paths": REQUIRED_CANONICAL_QUEUE_LISTS["allowed_paths"],
     "owned_surfaces": REQUIRED_CANONICAL_QUEUE_LISTS["owned_surfaces"],
+    "exit_criterion": "Claim, update, rollback, recovery, and support followthrough happen from the installer or app, not as browser ritual.",
 }
 
 REQUIRED_RESOLVING_COMMITS = [
@@ -479,7 +490,7 @@ def main() -> int:
                     errors.append(f"proof missing receipt: {receipt_id}")
                     continue
 
-                for key in ("package_id", "milestone_id", "frontier_id"):
+                for key in ("package_id", "milestone_id", "frontier_id", "summary"):
                     if receipt.get(key) != expected[key]:
                         errors.append(f"{receipt_id} has wrong {key}: {receipt.get(key)!r}")
 
