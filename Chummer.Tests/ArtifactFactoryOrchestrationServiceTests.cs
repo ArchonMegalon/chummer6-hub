@@ -40,7 +40,12 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
         Assert.Equal(["caption", "packet", "preview_card"], result.OutputFormats);
         Assert.Contains("release-pack-20260415", result.SourcePackIds);
         Assert.Contains("/downloads/install/avalonia-osx-arm64-installer", result.PublicProofShelfRefs);
+        Assert.Contains(result.OutputBindings, binding =>
+            string.Equals(binding.Format, "preview_card", StringComparison.Ordinal)
+            && string.Equals(binding.PublicRef, "/artifacts/release-bundles/avalonia-osx-arm64-installer/preview_card", StringComparison.Ordinal)
+            && string.Equals(binding.ReceiptRef, $"artifact-factory:{result.JobId}:preview_card", StringComparison.Ordinal));
         Assert.Equal("chummer.run.artifact_factory.recipe_job.v1", result.MediaFactoryRequest.ContractName);
+        Assert.Equal(result.OutputBindings, result.MediaFactoryRequest.OutputBindings);
         Assert.Contains(result.MediaFactoryRequest.RequiredReceiptRefs, receipt => receipt.StartsWith("promotion:", StringComparison.Ordinal));
         Assert.DoesNotContain(result.MediaFactoryRequest.RequiredReceiptRefs, receipt => receipt.Contains("provider", StringComparison.OrdinalIgnoreCase));
     }
@@ -92,6 +97,10 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
 
         Assert.Equal("publication-proof-shelf-bundle", result.RecipeId);
         Assert.Contains("/artifacts/publications/redmond-brief", result.PublicProofShelfRefs);
+        Assert.Contains(result.OutputBindings, binding =>
+            string.Equals(binding.Format, "caption", StringComparison.Ordinal)
+            && string.Equals(binding.PublicRef, "/artifacts/publications/redmond-brief/bundles/caption", StringComparison.Ordinal)
+            && string.Equals(binding.PublicationId, "redmond-brief", StringComparison.Ordinal));
         Assert.Contains(result.RequiredReceiptRefs, receipt => receipt.StartsWith("public-shelf:", StringComparison.Ordinal));
     }
 
@@ -281,8 +290,17 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
 
         Assert.Equal("support-case-proof-packet", support.RecipeId);
         Assert.Equal(["audio", "caption", "packet", "preview_card"], support.OutputFormats);
+        Assert.Contains("/account/support/11709", support.PublicProofShelfRefs);
         Assert.Equal("fix-followthrough-bundle", fix.RecipeId);
+        Assert.Contains("/account/support/11709", fix.PublicProofShelfRefs);
         Assert.Contains(fix.MediaFactoryRequest.ApprovedSourcePacks, pack => string.Equals(pack.SupportCaseId, "11709", StringComparison.Ordinal));
+        Assert.Contains("/account/support/11709", fix.MediaFactoryRequest.PublicProofShelfRefs);
+        Assert.Contains(support.OutputBindings, binding =>
+            string.Equals(binding.PublicRef, "/account/support-packets/11709/packet", StringComparison.Ordinal)
+            && string.Equals(binding.ReceiptRef, $"artifact-factory:{support.JobId}:packet", StringComparison.Ordinal));
+        Assert.Contains(fix.OutputBindings, binding =>
+            string.Equals(binding.PublicRef, "/account/fix-followthrough/11709/packet", StringComparison.Ordinal)
+            && string.Equals(binding.ReceiptRef, $"artifact-factory:{fix.JobId}:packet", StringComparison.Ordinal));
     }
 
     private static InternalArtifactFactoryController BuildController(string token)
