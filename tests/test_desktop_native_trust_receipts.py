@@ -27,6 +27,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 266d526b pins the M102 queue proof hardening commit.",
     "      - /docker/chummercomplete/chummer.run-services commit 6ea510c8 pins the M102 telemetry guard proof evidence.",
     "      - /docker/chummercomplete/chummer.run-services commit 7a825c73 pins the M102 desktop trust guard evidence.",
+    "      - /docker/chummercomplete/chummer.run-services commit aff39474 pins the M102 desktop trust latest guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -50,6 +51,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 266d526b pins the M102 queue proof hardening commit so stale queue proof cannot keep the package green.",
     "          - /docker/chummercomplete/chummer.run-services commit 6ea510c8 pins the M102 telemetry guard proof evidence so future shards verify the latest closed-package guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 7a825c73 pins the M102 desktop trust guard evidence into the verifier and unit guard.",
+    "          - /docker/chummercomplete/chummer.run-services commit aff39474 pins the M102 desktop trust latest guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -978,6 +980,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "266d526b",
                 "6ea510c8",
                 "7a825c73",
+                "aff39474",
             ],
             verifier._required_resolving_commits(),
         )
