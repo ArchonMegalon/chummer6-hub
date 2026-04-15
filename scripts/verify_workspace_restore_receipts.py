@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -43,6 +44,19 @@ PACKAGE_ID = "next90-m105-hub-workspace-continuity"
 LANDED_COMMIT = "4d4b3856"
 FRONTIER_ID = 4623636482
 MILESTONE_ID = 105
+DEFAULT_REQUIRED_LOCAL_COMMITS = [
+    LANDED_COMMIT,
+    "b39147dc",
+    "5796e220",
+]
+REQUIRED_LOCAL_COMMITS = [
+    item.strip()
+    for item in os.environ.get(
+        "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REQUIRED_COMMITS",
+        ",".join(DEFAULT_REQUIRED_LOCAL_COMMITS),
+    ).split(",")
+    if item.strip()
+]
 
 SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Campaign.Contracts/CampaignContracts.cs": [
@@ -338,6 +352,19 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
                     missing.append(f"{path}: {receipt_id}.summary missing {marker}")
 
 
+def check_required_local_commits(missing: list[str]) -> None:
+    for commit in REQUIRED_LOCAL_COMMITS:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}"],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        if result.returncode != 0:
+            missing.append(f"{ROOT}: required local commit does not resolve: {commit}")
+
+
 def main() -> int:
     missing: list[str] = []
 
@@ -379,6 +406,7 @@ def main() -> int:
     check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
     check_local_release_proof(LOCAL_RELEASE_PROOF_PATH, missing)
+    check_required_local_commits(missing)
 
     if missing:
         for item in missing:

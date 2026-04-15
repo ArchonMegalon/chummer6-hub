@@ -31,7 +31,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
 
         self.assertIn("python3 scripts/verify_workspace_restore_receipts.py", script_text)
         self.assertIn(
-            "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py",
+            "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py",
             script_text,
         )
 
