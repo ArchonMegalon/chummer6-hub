@@ -58,6 +58,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "e1f65c8b",
     "b72eaf89",
     "290ec61e",
+    "1d11729a",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -183,6 +184,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit b39147dc tightens the workspace restore verifier so Hub local release proof must retain the next90-m105-hub-workspace-continuity package, frontier id 4623636482, /home/work and /account/work routes, and both workspace_restore:provenance and entitlement_sync:conflict_receipts receipts.",
     "/docker/chummercomplete/chummer.run-services commit 5796e220 wires the M105 workspace restore verifier into scripts/ai/verify.sh so standard Hub verification runs the closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.",
+    "/docker/chummercomplete/chummer.run-services commit 1d11729a fail-closes M105 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -200,6 +202,7 @@ QUEUE_STAGING_MARKERS = [
     f"landed_commit: {LANDED_COMMIT}",
     "/docker/chummercomplete/chummer.run-services commit 5796e220 wires the M105 workspace restore verifier into scripts/ai/verify.sh so standard Hub verification runs the closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.",
+    "/docker/chummercomplete/chummer.run-services commit 1d11729a fail-closes M105 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_commit_resolution.py",
