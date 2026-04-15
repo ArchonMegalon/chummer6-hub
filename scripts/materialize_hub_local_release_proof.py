@@ -45,7 +45,14 @@ def main() -> int:
             "package_id": "next90-m105-hub-workspace-continuity",
             "milestone_id": 105,
             "frontier_id": 4623636482,
+            "status": "complete",
+            "landed_commit": "4d4b3856",
             "title": "Emit provenance and conflict receipts for workspace restore and continuity",
+            "allowed_paths": [
+                "Chummer.Run.Api",
+                "scripts",
+                "tests",
+            ],
             "owned_surfaces": [
                 "workspace_restore:provenance",
                 "entitlement_sync:conflict_receipts",
@@ -75,7 +82,14 @@ def main() -> int:
                 "package_id": "next90-m105-hub-workspace-continuity",
                 "milestone_id": 105,
                 "frontier_id": 4623636482,
+                "status": "complete",
+                "landed_commit": "4d4b3856",
                 "title": "Emit provenance and conflict receipts for workspace restore and continuity",
+                "allowed_paths": [
+                    "Chummer.Run.Api",
+                    "scripts",
+                    "tests",
+                ],
                 "owned_surfaces": [
                     "workspace_restore:provenance",
                     "entitlement_sync:conflict_receipts",

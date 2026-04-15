@@ -119,6 +119,23 @@ LOCAL_RELEASE_PROOF_RECEIPTS: dict[str, dict[str, object]] = {
     },
 }
 
+LOCAL_RELEASE_PROOF_PACKAGE: dict[str, object] = {
+    "package_id": PACKAGE_ID,
+    "milestone_id": MILESTONE_ID,
+    "frontier_id": FRONTIER_ID,
+    "status": "complete",
+    "landed_commit": LANDED_COMMIT,
+    "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests",
+    ],
+    "owned_surfaces": [
+        "workspace_restore:provenance",
+        "entitlement_sync:conflict_receipts",
+    ],
+}
+
 REGISTRY_MARKERS = [
     "id: 105.1",
     "owner: chummer6-hub",
@@ -245,23 +262,19 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
     if not isinstance(package, dict):
         missing.append(f"{path}: missing successor_queue_package")
     else:
-        expected_package_values = {
-            "package_id": PACKAGE_ID,
-            "milestone_id": MILESTONE_ID,
-            "frontier_id": FRONTIER_ID,
-        }
-        for key, expected in expected_package_values.items():
+        for key, expected in LOCAL_RELEASE_PROOF_PACKAGE.items():
             if package.get(key) != expected:
                 missing.append(f"{path}: successor_queue_package.{key} must be {expected!r}")
 
-        surfaces = package.get("owned_surfaces")
-        if not isinstance(surfaces, list):
-            missing.append(f"{path}: successor_queue_package.owned_surfaces must be a list")
-        else:
-            surface_set = {item for item in surfaces if isinstance(item, str)}
-            for receipt_id in LOCAL_RELEASE_PROOF_RECEIPTS:
-                if receipt_id not in surface_set:
-                    missing.append(f"{path}: successor_queue_package.owned_surfaces missing {receipt_id}")
+    packages = payload.get("successor_queue_packages")
+    package_list = [item for item in packages if isinstance(item, dict)] if isinstance(packages, list) else []
+    closed_package = next((item for item in package_list if item.get("package_id") == PACKAGE_ID), None)
+    if not isinstance(closed_package, dict):
+        missing.append(f"{path}: successor_queue_packages missing {PACKAGE_ID}")
+    else:
+        for key, expected in LOCAL_RELEASE_PROOF_PACKAGE.items():
+            if closed_package.get(key) != expected:
+                missing.append(f"{path}: successor_queue_packages[{PACKAGE_ID}].{key} must be {expected!r}")
 
     proof_routes = payload.get("proof_routes")
     proof_route_set = {item for item in proof_routes if isinstance(item, str)} if isinstance(proof_routes, list) else set()
