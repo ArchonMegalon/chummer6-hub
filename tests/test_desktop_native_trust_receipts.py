@@ -57,6 +57,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit ed3989d9 pins the M102 desktop trust proof floor guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 653b23f0 tightens M102 desktop trust proof floor guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 1a1c5615 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit ed689925 pins M102 desktop trust latest proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -110,6 +111,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit ed3989d9 pins the M102 desktop trust proof floor guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 653b23f0 tightens M102 desktop trust proof floor guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 1a1c5615 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit ed689925 pins M102 desktop trust latest proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1133,6 +1135,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "ed3989d9",
                 "653b23f0",
                 "1a1c5615",
+                "ed689925",
             ],
             verifier._required_resolving_commits(),
         )
@@ -1147,7 +1150,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = [
                 value
                 for value in original_queue_proof
-                if "commit 1a1c5615 pins M102 desktop trust current proof floor" not in value
+                if "commit ed689925 pins M102 desktop trust latest proof floor" not in value
             ]
             errors: list[str] = []
             verifier._verify_canonical_commit_floor_consistency(errors)
@@ -1161,13 +1164,13 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.REQUIRED_RESOLVING_COMMITS = [
                 commit
                 for commit in original_required_commits
-                if commit != "1a1c5615"
+                if commit != "ed689925"
             ]
             errors = []
             verifier._verify_canonical_commit_floor_consistency(errors)
 
             self.assertIn(
-                "M102 canonical proof cites commit not enforced by resolver: 1a1c5615",
+                "M102 canonical proof cites commit not enforced by resolver: ed689925",
                 errors,
             )
         finally:
