@@ -42,6 +42,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit ec81b660 pins M102 desktop trust current proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit b2d5cbfc tightens M102 generated proof hygiene.",
     "      - /docker/chummercomplete/chummer.run-services commit 5eac0f47 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 91514d42 pins M102 desktop trust proof guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -80,6 +81,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit ec81b660 pins M102 desktop trust current proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit b2d5cbfc tightens M102 generated proof hygiene.",
     "          - /docker/chummercomplete/chummer.run-services commit 5eac0f47 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 91514d42 pins M102 desktop trust proof guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1088,6 +1090,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "ec81b660",
                 "b2d5cbfc",
                 "5eac0f47",
+                "91514d42",
             ],
             verifier._required_resolving_commits(),
         )
