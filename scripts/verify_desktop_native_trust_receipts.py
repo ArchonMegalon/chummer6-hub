@@ -246,6 +246,10 @@ FORBIDDEN_PROOF_MARKERS = [
     "operator telemetry",
     "design_supervisor_ooda",
 ]
+FORBIDDEN_PROOF_MARKER_MATCHES = [
+    (marker, marker.casefold())
+    for marker in FORBIDDEN_PROOF_MARKERS
+]
 
 REQUIRED_PROOF_PACKAGE = {
     "package_id": PACKAGE_ID,
@@ -358,8 +362,14 @@ def _verify_marker_block(
             errors.append(f"canonical {label} block missing marker: {marker}")
 
     if forbidden_markers is not None:
-        for marker in forbidden_markers:
-            if marker in block:
+        block_folded = block.casefold()
+        marker_matches = (
+            FORBIDDEN_PROOF_MARKER_MATCHES
+            if forbidden_markers == FORBIDDEN_PROOF_MARKERS
+            else [(marker, marker.casefold()) for marker in forbidden_markers]
+        )
+        for marker, marker_folded in marker_matches:
+            if marker_folded in block_folded:
                 errors.append(f"canonical {label} block has forbidden active-run proof marker: {marker}")
 
     if required_lists is not None:
@@ -506,8 +516,9 @@ def _verify_json_has_no_forbidden_markers(
     if not isinstance(value, str):
         return
 
-    for marker in FORBIDDEN_PROOF_MARKERS:
-        if marker in value:
+    folded_value = value.casefold()
+    for marker, marker_folded in FORBIDDEN_PROOF_MARKER_MATCHES:
+        if marker_folded in folded_value:
             errors.append(f"{label} has forbidden active-run proof marker at {path}: {marker}")
 
 
