@@ -27,6 +27,12 @@ QUEUE_STAGING_PATH = Path(
         "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
     )
 )
+DESIGN_QUEUE_STAGING_PATH = Path(
+    os.environ.get(
+        "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING",
+        "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+    )
+)
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
 LANDED_COMMIT = "2fe9dec5"
 
@@ -100,7 +106,7 @@ REGISTRY_MARKERS = [
 
 QUEUE_STAGING_MARKERS = [
     "title: Emit provenance and conflict receipts for workspace restore and continuity",
-    f"package_id: {PACKAGE_ID}",
+    f"package_id: {PACKAGE_ID}\n",
     "milestone_id: 105",
     "repo: chummer6-hub",
     "status: complete",
@@ -140,7 +146,7 @@ def extract_registry_task_block(text: str) -> str:
 
 
 def extract_queue_package_block(text: str) -> str:
-    marker = f"    package_id: {PACKAGE_ID}"
+    marker = f"    package_id: {PACKAGE_ID}\n"
     package_id_index = text.find(marker)
     if package_id_index == -1:
         return ""
@@ -177,6 +183,21 @@ def flatten_required_markers(payload: dict[str, object]) -> set[str]:
                 raise ValueError(f"proof marker for {journey_id} must be a string")
             markers.add(marker)
     return markers
+
+
+def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
+    try:
+        queue_staging_text = read_absolute_text(path, label)
+    except FileNotFoundError as exc:
+        missing.append(str(exc))
+        return
+
+    queue_block = extract_queue_package_block(queue_staging_text)
+    if not queue_block:
+        missing.append(f"{path}: missing queue package block for {PACKAGE_ID}")
+        return
+
+    require_markers(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
 
 
 def main() -> int:
@@ -217,16 +238,8 @@ def main() -> int:
         else:
             require_markers(f"{REGISTRY_PATH}:105.1", registry_block, REGISTRY_MARKERS, missing)
 
-    try:
-        queue_staging_text = read_absolute_text(QUEUE_STAGING_PATH, "queue staging")
-    except FileNotFoundError as exc:
-        missing.append(str(exc))
-    else:
-        queue_block = extract_queue_package_block(queue_staging_text)
-        if not queue_block:
-            missing.append(f"{QUEUE_STAGING_PATH}: missing queue package block for {PACKAGE_ID}")
-        else:
-            require_markers(f"{QUEUE_STAGING_PATH}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
+    check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
+    check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
 
     if missing:
         for item in missing:
