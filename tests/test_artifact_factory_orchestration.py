@@ -719,6 +719,123 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertIn(str(design_queue_path), result.stderr)
         self.assertIn("successor frontier 1421219975", result.stderr)
 
+    def test_verifier_fails_closed_when_queue_uses_active_run_telemetry_as_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-telemetry-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                "\n".join(
+                    [
+                        "items:",
+                        "  - title: Stand up artifact-factory orchestration for release, support, and publication bundles",
+                        "    task: Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
+                        "    package_id: next90-m107-hub-artifact-factory",
+                        "    milestone_id: 107",
+                        "    repo: chummer6-hub",
+                        "    status: complete",
+                        "    landed_commit: b9e6b52e",
+                        "    proof:",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
+                        "      - /var/lib/codex-fleet/chummer_design_supervisor/shard-13/ACTIVE_RUN_HANDOFF.generated.md",
+                        "    allowed_paths:",
+                        "      - Chummer.Run.Api",
+                        "      - scripts",
+                        "      - tests",
+                        "    owned_surfaces:",
+                        "      - artifact_factory:orchestration",
+                        "      - public_proof_shelf:release_bundles",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: /var/lib/codex-fleet", result.stderr)
+        self.assertIn("forbidden active-run proof marker: ACTIVE_RUN_HANDOFF", result.stderr)
+
+    def test_verifier_fails_closed_when_registry_uses_active_run_telemetry_as_evidence(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-registry-telemetry-proof-") as temp_dir:
+            registry_path = Path(temp_dir) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            registry_path.write_text(
+                "\n".join(
+                    [
+                        "program_wave: next_90_day_product_advance",
+                        "milestones:",
+                        "  - id: 107",
+                        "    title: Artifact factory and public proof shelf",
+                        "    work_tasks:",
+                        "      - id: 107.1",
+                        "        owner: chummer6-hub",
+                        "        title: Orchestrate recipe-backed artifact jobs from approved release, support, and publication packs.",
+                        "        status: complete",
+                        "        evidence:",
+                        "          - /docker/chummercomplete/chummer.run-services commit cda8849a binds release, fix, support, and publication recipe jobs to stable public proof shelf output refs.",
+                        "          - /docker/chummercomplete/chummer.run-services commit e25842ac tightens mixed source-pack output anchoring so release bundle refs always bind to an approved artifact-bearing source pack.",
+                        "          - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards so approved local refs cannot cross from release or publication recipes onto the wrong shelf family.",
+                        "          - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution so stale file or commit anchors cannot keep the completed package green.",
+                        "          - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "          - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "          - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "          - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "          - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "          - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "          - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
+                        "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
+                        "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
+                        "          - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs proves release, support, fix, and publication bundles route through approved source-pack receipts.",
+                        "          - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py fail-closes missing recipe families, internal endpoint auth, public proof shelf bundle refs, and anchored source-pack output selection.",
+                        "          - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py exits 0.",
+                        "          - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py exits 0.",
+                        "          - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.",
+                        "          - TASK_LOCAL_TELEMETRY.generated.json active-run helper output",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_SUCCESSOR_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+        self.assertIn("forbidden active-run proof marker: active-run helper", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
