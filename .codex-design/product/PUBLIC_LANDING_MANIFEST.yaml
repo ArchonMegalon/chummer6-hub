@@ -228,6 +228,24 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: artifact detail only
+  - path: /artifacts/campaign-primer-video
+    title: Campaign primer video detail
+    audience: public
+    purpose: artifact_detail
+    requires_auth: false
+    guest_fallback: /artifacts/campaign-primer-video
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: artifact detail only
+  - path: /artifacts/mission-brief-video
+    title: Mission briefing video detail
+    audience: public
+    purpose: artifact_detail
+    requires_auth: false
+    guest_fallback: /artifacts/mission-brief-video
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: artifact detail only
   - path: /artifacts/replay-after-action
     title: Replay and after-action detail
     audience: public
