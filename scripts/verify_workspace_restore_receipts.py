@@ -94,6 +94,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "29f7ec9b",
     "46551461",
     "af336c17",
+    "aa61c498",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
