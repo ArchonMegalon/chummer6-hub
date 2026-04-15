@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -168,6 +170,12 @@ DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90
 DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
 ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer.run-services/"
+MATERIALIZER_ARGS = [
+    "https://chummer.run",
+    "docker-compose.yml",
+    "120",
+    "true",
+]
 
 
 def _configured_path(env_name: str, default_path: Path) -> Path:
@@ -288,6 +296,59 @@ def _verify_required_repo_anchor_paths(errors: list[str], repo_root: Path) -> No
             errors.append(f"canonical proof anchor does not resolve: {ABSOLUTE_REPO_PREFIX}{relative_path}")
 
 
+def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"{label} is not valid json: {exc}")
+        return None
+
+    if not isinstance(payload, dict):
+        errors.append(f"{label} is not a json object")
+        return None
+
+    stable = dict(payload)
+    stable.pop("generated_at", None)
+    return stable
+
+
+def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, proof_path: Path) -> None:
+    materializer_path = repo_root / "scripts" / "materialize_hub_local_release_proof.py"
+    if not materializer_path.is_file():
+        errors.append("missing proof materializer: scripts/materialize_hub_local_release_proof.py")
+        return
+
+    published = _stable_json_payload(proof_path, errors, "published proof file")
+    if published is None:
+        return
+
+    with tempfile.TemporaryDirectory() as temp_root:
+        expected_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        result = subprocess.run(
+            ["python3", str(materializer_path), str(expected_path), *MATERIALIZER_ARGS],
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            errors.append(
+                "proof materializer failed while checking reproducibility: "
+                f"stdout={result.stdout!r} stderr={result.stderr!r}"
+            )
+            return
+
+        expected = _stable_json_payload(expected_path, errors, "materialized proof file")
+        if expected is None:
+            return
+
+    if published != expected:
+        errors.append(
+            "published HUB_LOCAL_RELEASE_PROOF.generated.json drifts from "
+            "scripts/materialize_hub_local_release_proof.py for next90-m102-hub-desktop-native-trust"
+        )
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     errors: list[str] = []
@@ -313,6 +374,7 @@ def main() -> int:
             display_path = proof_path
         errors.append(f"missing proof file: {display_path}")
     else:
+        _verify_materialized_proof_reproducible(errors, repo_root, proof_path)
         try:
             proof = json.loads(proof_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
