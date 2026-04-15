@@ -15,6 +15,20 @@ PROOF_PATH = Path(
         ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
     )
 )
+REGISTRY_PATH = Path(
+    os.environ.get(
+        "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY",
+        "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml",
+    )
+)
+QUEUE_STAGING_PATH = Path(
+    os.environ.get(
+        "CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING",
+        "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+    )
+)
+PACKAGE_ID = "next90-m105-hub-workspace-continuity"
+LANDED_COMMIT = "2fe9dec5"
 
 SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Campaign.Contracts/CampaignContracts.cs": [
@@ -72,12 +86,81 @@ PROOF_MARKERS = [
     "accountSource.Contains(\"Continue is blocked until this receipt is resolved.\"",
 ]
 
+REGISTRY_MARKERS = [
+    "id: 105.1",
+    "owner: chummer6-hub",
+    "title: Emit provenance and conflict receipts for roaming workspace and entitlement replication.",
+    "status: complete",
+    f"landed_commit: {LANDED_COMMIT}",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/CampaignSpineService.cs emits workspace_restore provenance receipts",
+    "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
+    "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
+    "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
+]
+
+QUEUE_STAGING_MARKERS = [
+    "title: Emit provenance and conflict receipts for workspace restore and continuity",
+    f"package_id: {PACKAGE_ID}",
+    "milestone_id: 105",
+    "repo: chummer6-hub",
+    "status: complete",
+    f"landed_commit: {LANDED_COMMIT}",
+    "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
+    "python3 scripts/verify_workspace_restore_receipts.py",
+    "python3 -m unittest tests/test_workspace_restore_receipts.py",
+    "workspace_restore:provenance",
+    "entitlement_sync:conflict_receipts",
+]
+
 
 def read_text(relative_path: str) -> str:
     path = ROOT / relative_path
     if not path.is_file():
         raise FileNotFoundError(f"missing required source file: {path}")
     return path.read_text(encoding="utf-8")
+
+
+def read_absolute_text(path: Path, label: str) -> str:
+    if not path.is_file():
+        raise FileNotFoundError(f"missing required {label}: {path}")
+    return path.read_text(encoding="utf-8")
+
+
+def extract_registry_task_block(text: str) -> str:
+    marker = "      - id: 105.1"
+    start = text.find(marker)
+    if start == -1:
+        return ""
+
+    next_task = text.find("\n      - id:", start + len(marker))
+    next_milestone = text.find("\n  - id:", start + len(marker))
+    candidates = [index for index in [next_task, next_milestone] if index != -1]
+    end = min(candidates) if candidates else len(text)
+    return text[start:end]
+
+
+def extract_queue_package_block(text: str) -> str:
+    marker = f"    package_id: {PACKAGE_ID}"
+    package_id_index = text.find(marker)
+    if package_id_index == -1:
+        return ""
+
+    start = text.rfind("\n  - title:", 0, package_id_index)
+    if start == -1:
+        start = package_id_index
+    else:
+        start += 1
+
+    end = text.find("\n  - title:", package_id_index + len(marker))
+    if end == -1:
+        end = len(text)
+    return text[start:end]
+
+
+def require_markers(label: str, text: str, markers: list[str], missing: list[str]) -> None:
+    for marker in markers:
+        if marker not in text:
+            missing.append(f"{label}: {marker}")
 
 
 def flatten_required_markers(payload: dict[str, object]) -> set[str]:
@@ -122,6 +205,28 @@ def main() -> int:
             for marker in PROOF_MARKERS:
                 if marker not in proof_markers:
                     missing.append(f"{PROOF_PATH}: {marker}")
+
+    try:
+        registry_text = read_absolute_text(REGISTRY_PATH, "successor registry")
+    except FileNotFoundError as exc:
+        missing.append(str(exc))
+    else:
+        registry_block = extract_registry_task_block(registry_text)
+        if not registry_block:
+            missing.append(f"{REGISTRY_PATH}: missing registry task block for 105.1")
+        else:
+            require_markers(f"{REGISTRY_PATH}:105.1", registry_block, REGISTRY_MARKERS, missing)
+
+    try:
+        queue_staging_text = read_absolute_text(QUEUE_STAGING_PATH, "queue staging")
+    except FileNotFoundError as exc:
+        missing.append(str(exc))
+    else:
+        queue_block = extract_queue_package_block(queue_staging_text)
+        if not queue_block:
+            missing.append(f"{QUEUE_STAGING_PATH}: missing queue package block for {PACKAGE_ID}")
+        else:
+            require_markers(f"{QUEUE_STAGING_PATH}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
 
     if missing:
         for item in missing:
