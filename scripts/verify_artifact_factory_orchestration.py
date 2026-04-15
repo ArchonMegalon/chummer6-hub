@@ -179,6 +179,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "commit 94f0c9e1",
         "commit f22ce5a5",
         "commit b15c2193",
+        "commit 9b032c87",
         "test_verifier_fails_closed_when_proof_commit_anchor_is_not_on_current_branch",
         "test_verifier_fails_closed_when_branch_guard_commit_pin_is_missing",
         "test_verifier_fails_closed_when_output_shelf_pin_commit_is_missing",
@@ -187,6 +188,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "test_verifier_fails_closed_when_current_duplicate_queue_proof_guard_is_missing",
         "test_verifier_fails_closed_when_current_m107_guard_floor_is_missing",
         "test_verifier_fails_closed_when_source_pack_id_proof_pin_is_missing",
+        "test_verifier_fails_closed_when_artifact_path_id_guard_pin_is_missing",
     ],
 }
 
@@ -228,6 +230,7 @@ QUEUE_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 94f0c9e1 pins M107 current duplicate queue guard",
     "/docker/chummercomplete/chummer.run-services commit f22ce5a5 tightens M107 artifact factory source-pack id normalization",
     "/docker/chummercomplete/chummer.run-services commit b15c2193 pins M107 source pack id proof",
+    "/docker/chummercomplete/chummer.run-services commit 9b032c87 tightens M107 artifact path id guards",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
 ]
 
@@ -266,6 +269,7 @@ SUCCESSOR_REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 94f0c9e1 pins M107 current duplicate queue guard",
     "/docker/chummercomplete/chummer.run-services commit f22ce5a5 tightens M107 artifact factory source-pack id normalization",
     "/docker/chummercomplete/chummer.run-services commit b15c2193 pins M107 source pack id proof",
+    "/docker/chummercomplete/chummer.run-services commit 9b032c87 tightens M107 artifact path id guards",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
     "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py exits 0.",
@@ -337,6 +341,7 @@ REQUIRED_QUEUE_PROOF = {
     "/docker/chummercomplete/chummer.run-services commit 94f0c9e1 pins M107 current duplicate queue guard.",
     "/docker/chummercomplete/chummer.run-services commit f22ce5a5 tightens M107 artifact factory source-pack id normalization.",
     "/docker/chummercomplete/chummer.run-services commit b15c2193 pins M107 source pack id proof.",
+    "/docker/chummercomplete/chummer.run-services commit 9b032c87 tightens M107 artifact path id guards.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
 }
 REQUIRED_REGISTRY_EVIDENCE = {
@@ -370,6 +375,7 @@ REQUIRED_REGISTRY_EVIDENCE = {
     "/docker/chummercomplete/chummer.run-services commit 94f0c9e1 pins M107 current duplicate queue guard.",
     "/docker/chummercomplete/chummer.run-services commit f22ce5a5 tightens M107 artifact factory source-pack id normalization.",
     "/docker/chummercomplete/chummer.run-services commit b15c2193 pins M107 source pack id proof.",
+    "/docker/chummercomplete/chummer.run-services commit 9b032c87 tightens M107 artifact path id guards.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
