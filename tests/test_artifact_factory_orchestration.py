@@ -404,6 +404,48 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertIn("proof anchor does not resolve", result.stderr)
         self.assertIn("MissingArtifactFactoryProofAnchor.cs", result.stderr)
 
+    def test_verifier_fails_closed_when_proof_commit_anchor_is_not_on_current_branch(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-branch-proof-") as temp_dir:
+            fake_bin = Path(temp_dir) / "bin"
+            fake_bin.mkdir()
+            fake_git = fake_bin / "git"
+            fake_git.write_text(
+                "\n".join(
+                    [
+                        "#!/usr/bin/env bash",
+                        "if [[ \"$1\" == \"-C\" ]]; then",
+                        "  shift 2",
+                        "fi",
+                        "if [[ \"$1\" == \"cat-file\" && \"$2\" == \"-e\" ]]; then",
+                        "  exit 0",
+                        "fi",
+                        "if [[ \"$1\" == \"merge-base\" && \"$2\" == \"--is-ancestor\" ]]; then",
+                        "  exit 1",
+                        "fi",
+                        "exit 0",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            fake_git.chmod(0o755)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("commit proof anchor is not on the current branch", result.stderr)
+        self.assertIn("commit b9e6b52e", result.stderr)
+
     def test_verifier_fails_closed_when_queue_frontier_pin_is_missing(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-frontier-proof-") as temp_dir:
             queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"

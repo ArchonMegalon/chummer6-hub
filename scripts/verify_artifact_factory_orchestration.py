@@ -145,6 +145,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "commit 326db197",
         "commit bd67b5ff",
         "commit 6851982b",
+        "test_verifier_fails_closed_when_proof_commit_anchor_is_not_on_current_branch",
     ],
 }
 
@@ -415,6 +416,16 @@ def verify_proof_anchors_resolve(missing: list[str], label: str, proof_items: ob
         )
         if result.returncode != 0:
             missing.append(f"{label}: commit proof anchor does not resolve: {item}")
+            continue
+
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, "HEAD"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode != 0:
+            missing.append(f"{label}: commit proof anchor is not on the current branch: {item}")
 
 
 def reject_forbidden_proof_markers(missing: list[str], label: str, proof_items: object) -> None:
