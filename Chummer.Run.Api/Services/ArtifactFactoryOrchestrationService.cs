@@ -320,7 +320,7 @@ public sealed class ArtifactFactoryOrchestrationService
     private static void RejectProviderSpecificRef(string sourcePackId, string value, string fieldName)
     {
         string normalized = value.Trim();
-        int separatorIndex = normalized.IndexOf(':');
+        int separatorIndex = FirstRefPrefixSeparatorIndex(normalized);
         string prefix = separatorIndex >= 0
             ? normalized[..separatorIndex].Trim()
             : string.Empty;
@@ -329,6 +329,28 @@ public sealed class ArtifactFactoryOrchestrationService
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has provider-specific {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
         }
+    }
+
+    private static int FirstRefPrefixSeparatorIndex(string normalized)
+    {
+        if (normalized.StartsWith("/", StringComparison.Ordinal))
+        {
+            return -1;
+        }
+
+        int colonIndex = normalized.IndexOf(':');
+        int slashIndex = normalized.IndexOf('/');
+        if (colonIndex < 0)
+        {
+            return slashIndex;
+        }
+
+        if (slashIndex < 0)
+        {
+            return colonIndex;
+        }
+
+        return Math.Min(colonIndex, slashIndex);
     }
 
     private static void RejectNonLocalPublicShelfEvidenceRef(string sourcePackId, string evidenceRef)
