@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -158,6 +159,7 @@ REQUIRED_REGISTRY_EVIDENCE = {
     "python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py exits 0.",
     "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.",
 }
+REPO_ABSOLUTE_PREFIX = "/docker/chummercomplete/chummer.run-services/"
 
 
 def read_text(path: Path) -> str:
@@ -238,6 +240,47 @@ def require_contains_set(missing: list[str], label: str, actual: object, expecte
         missing.append(f"{label}: missing {item}")
 
 
+def repo_relative_anchor_path(proof_item: str) -> Path | None:
+    candidate = proof_item.strip().split(maxsplit=1)[0].rstrip(".,")
+    if not candidate.startswith(REPO_ABSOLUTE_PREFIX):
+        return None
+    return ROOT / candidate.removeprefix(REPO_ABSOLUTE_PREFIX)
+
+
+def commit_anchor(proof_item: str) -> str | None:
+    prefix = f"{REPO_ABSOLUTE_PREFIX.rstrip('/')} commit "
+    if not proof_item.startswith(prefix):
+        return None
+    remainder = proof_item.removeprefix(prefix).strip()
+    if not remainder:
+        return None
+    return remainder.split(maxsplit=1)[0].rstrip(".,")
+
+
+def verify_proof_anchors_resolve(missing: list[str], label: str, proof_items: object) -> None:
+    if not isinstance(proof_items, list):
+        missing.append(f"{label}: expected list")
+        return
+
+    for raw_item in proof_items:
+        item = str(raw_item)
+        anchor_path = repo_relative_anchor_path(item)
+        if anchor_path is not None and not anchor_path.is_file():
+            missing.append(f"{label}: proof anchor does not resolve: {item}")
+
+        commit = commit_anchor(item)
+        if commit is None or not (ROOT / ".git").exists():
+            continue
+        result = subprocess.run(
+            ["git", "-C", str(ROOT), "cat-file", "-e", f"{commit}^{{commit}}"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        if result.returncode != 0:
+            missing.append(f"{label}: commit proof anchor does not resolve: {item}")
+
+
 def verify_queue_authority(missing: list[str], path: Path) -> None:
     try:
         item = find_queue_item(load_yaml(path))
@@ -253,6 +296,7 @@ def verify_queue_authority(missing: list[str], path: Path) -> None:
     require_exact_set(missing, f"{path}: {PACKAGE_ID} allowed_paths", item.get("allowed_paths"), REQUIRED_ALLOWED_PATHS)
     require_exact_set(missing, f"{path}: {PACKAGE_ID} owned_surfaces", item.get("owned_surfaces"), REQUIRED_OWNED_SURFACES)
     require_contains_set(missing, f"{path}: {PACKAGE_ID} proof", item.get("proof"), REQUIRED_QUEUE_PROOF)
+    verify_proof_anchors_resolve(missing, f"{path}: {PACKAGE_ID} proof", item.get("proof"))
 
 
 def verify_successor_registry_authority(missing: list[str], path: Path) -> None:
@@ -273,6 +317,11 @@ def verify_successor_registry_authority(missing: list[str], path: Path) -> None:
         f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} evidence",
         task.get("evidence"),
         REQUIRED_REGISTRY_EVIDENCE,
+    )
+    verify_proof_anchors_resolve(
+        missing,
+        f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} evidence",
+        task.get("evidence"),
     )
 
 
