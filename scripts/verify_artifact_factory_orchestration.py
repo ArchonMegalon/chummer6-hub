@@ -35,6 +35,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "CHUMMER_ARTIFACT_FACTORY_DESIGN_QUEUE_STAGING",
         "DESIGN_QUEUE_STAGING_PATH",
         "verify_queue_authority(missing, queue_path)",
+        "FORBIDDEN_PROOF_MARKERS",
+        "reject_forbidden_proof_markers(",
     ],
     "scripts/ai/verify.sh": [
         "python3 scripts/verify_artifact_factory_orchestration.py",
@@ -219,6 +221,15 @@ REQUIRED_REGISTRY_EVIDENCE = {
     "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.",
 }
 REPO_ABSOLUTE_PREFIX = "/docker/chummercomplete/chummer.run-services/"
+FORBIDDEN_PROOF_MARKERS = [
+    "/var/lib/codex-fleet",
+    "TASK_LOCAL_TELEMETRY",
+    "ACTIVE_RUN_HANDOFF",
+    "active-run helper",
+    "operator telemetry",
+    "run_ooda_design_supervisor_until_quiet",
+    "ooda_design_supervisor.py",
+]
 
 
 def read_text(path: Path) -> str:
@@ -340,6 +351,17 @@ def verify_proof_anchors_resolve(missing: list[str], label: str, proof_items: ob
             missing.append(f"{label}: commit proof anchor does not resolve: {item}")
 
 
+def reject_forbidden_proof_markers(missing: list[str], label: str, proof_items: object) -> None:
+    if not isinstance(proof_items, list):
+        return
+
+    for raw_item in proof_items:
+        item = str(raw_item)
+        for marker in FORBIDDEN_PROOF_MARKERS:
+            if marker in item:
+                missing.append(f"{label}: forbidden active-run proof marker: {marker}")
+
+
 def verify_queue_authority(missing: list[str], path: Path) -> None:
     try:
         item = find_queue_item(load_yaml(path))
@@ -355,6 +377,7 @@ def verify_queue_authority(missing: list[str], path: Path) -> None:
     require_exact_set(missing, f"{path}: {PACKAGE_ID} allowed_paths", item.get("allowed_paths"), REQUIRED_ALLOWED_PATHS)
     require_exact_set(missing, f"{path}: {PACKAGE_ID} owned_surfaces", item.get("owned_surfaces"), REQUIRED_OWNED_SURFACES)
     require_contains_set(missing, f"{path}: {PACKAGE_ID} proof", item.get("proof"), REQUIRED_QUEUE_PROOF)
+    reject_forbidden_proof_markers(missing, f"{path}: {PACKAGE_ID} proof", item.get("proof"))
     verify_proof_anchors_resolve(missing, f"{path}: {PACKAGE_ID} proof", item.get("proof"))
 
 
@@ -376,6 +399,11 @@ def verify_successor_registry_authority(missing: list[str], path: Path) -> None:
         f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} evidence",
         task.get("evidence"),
         REQUIRED_REGISTRY_EVIDENCE,
+    )
+    reject_forbidden_proof_markers(
+        missing,
+        f"{path}: milestone {MILESTONE_ID} task {WORK_TASK_ID} evidence",
+        task.get("evidence"),
     )
     verify_proof_anchors_resolve(
         missing,
