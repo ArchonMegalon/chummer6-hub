@@ -129,6 +129,13 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(response.SupportHref.Contains("applicationVersion=0.7.1-preview", StringComparison.Ordinal), "Support continuation should carry current release version truth.");
             VerificationAssert.True(response.RollbackAction.Contains("previous installed copy", StringComparison.OrdinalIgnoreCase), "Continuation should keep rollback on the previous installed copy.");
             VerificationAssert.Equal(1, response.SupportCases.Count, "Continuation should carry linked support-case follow-through.");
+            VerificationAssert.Equal("install-native", response.SupportCases[0].InstallationId, "Support follow-through should stay bound to the same claimed install.");
+            VerificationAssert.Equal("0.7.0-preview", response.SupportCases[0].ApplicationVersion, "Support follow-through should expose installed build version truth.");
+            VerificationAssert.Equal("preview", response.SupportCases[0].ReleaseChannel, "Support follow-through should expose installed channel truth.");
+            VerificationAssert.Equal("avalonia", response.SupportCases[0].HeadId, "Support follow-through should expose installed head truth.");
+            VerificationAssert.Equal("linux", response.SupportCases[0].Platform, "Support follow-through should expose installed platform truth.");
+            VerificationAssert.Equal("x64", response.SupportCases[0].Arch, "Support follow-through should expose installed architecture truth.");
+            VerificationAssert.True(string.Equals(response.SupportCases[0].InstalledBuildReceiptId, "receipt-old", StringComparison.Ordinal), "Support follow-through should cite the installed build receipt.");
             VerificationAssert.True(response.SupportCases[0].NeedsInstallUpdate, "Support follow-through should require the linked install to update before reporter verification.");
 
             ActionResult<DesktopInstallNativeContinuationResponse> unauthorizedResult = controller.ContinueClaimedInstall(
