@@ -80,6 +80,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<ReleaseBundlePromotionService>();
         services.AddSingleton<ReleaseBundleUploadSessionService>();
         services.AddSingleton<ReleaseUploadTicketService>();
+        services.AddSingleton<ArtifactFactoryOrchestrationService>();
         services.AddSingleton<FleetReceiptVerifier>();
         services.AddSingleton<HubEmailLinkVerificationService>();
         services.AddHttpClient<FleetBridgeService>();
