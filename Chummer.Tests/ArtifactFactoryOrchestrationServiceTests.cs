@@ -81,7 +81,12 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     SourcePackKind: "creator_publication",
                     ApprovalState: "approved",
                     ProvenanceRef: "publication:redmond-brief:v3",
-                    EvidenceRefs: ["publication:redmond-brief:v3", "moderation:approved:redmond-brief"],
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "public-shelf:/artifacts/publications/redmond-brief"
+                    ],
                     PublicationId: "redmond-brief")
             ]));
 
@@ -105,7 +110,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     SourcePackKind: "fix_receipt",
                     ApprovalState: "approved",
                     ProvenanceRef: "fix:11709",
-                    EvidenceRefs: ["fix:11709", "install:preview"],
+                    EvidenceRefs: ["fix:11709", "install:preview", "support:11709"],
                     SupportCaseId: "11709")
             ]));
 
@@ -129,7 +134,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     SourcePackKind: "fix_receipt",
                     ApprovalState: "approved",
                     ProvenanceRef: "fix:11709",
-                    EvidenceRefs: ["fix:11709", "install:preview"],
+                    EvidenceRefs: ["fix:11709", "install:preview", "support:11709"],
                     SupportCaseId: "11709")
             ]));
 
@@ -174,13 +179,42 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     SourcePackKind: "creator_publication",
                     ApprovalState: "approved",
                     ProvenanceRef: "publication:redmond-brief:v3",
-                    EvidenceRefs: ["publication:redmond-brief:v3", "moderation:approved:redmond-brief"],
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "public-shelf:/artifacts/publications/redmond-brief"
+                    ],
                     PublicationId: "redmond-brief")
             ],
             RequestedFormats: ["preview-card", "provider-render-script"])));
 
         Assert.Contains("does not allow output format", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("provider_render_script", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchJobRejectsRecipeWhenApprovedPackLacksRequiredReceiptEvidence()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs: ["release:run-20260415", "public-shelf:/downloads/install/avalonia-osx-arm64-installer"],
+                    ReleaseArtifactId: "avalonia-osx-arm64-installer")
+            ])));
+
+        Assert.Contains("requires approved source-pack receipt evidence", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("promotion", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("pending-receipt", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

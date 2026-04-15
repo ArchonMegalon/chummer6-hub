@@ -162,12 +162,13 @@ public sealed class ArtifactFactoryOrchestrationService
 
         ValidateRecipeAnchors(family, request.SourcePacks, recipe);
 
-        foreach (string prefix in recipe.RequiredReceiptPrefixes)
+        string[] missingReceiptPrefixes = recipe.RequiredReceiptPrefixes
+            .Where(prefix => !requiredReceiptRefs.Any(receipt => receipt.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+        if (missingReceiptPrefixes.Length > 0)
         {
-            if (!requiredReceiptRefs.Any(receipt => receipt.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
-            {
-                requiredReceiptRefs.Add($"{prefix}:pending-receipt");
-            }
+            throw new InvalidDataException(
+                $"recipe {recipe.RecipeId} requires approved source-pack receipt evidence for: {string.Join(", ", missingReceiptPrefixes)}.");
         }
 
         string[] outputFormats = NormalizeOutputFormats(request.RequestedFormats, recipe);
