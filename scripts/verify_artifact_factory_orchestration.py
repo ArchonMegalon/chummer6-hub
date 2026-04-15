@@ -202,6 +202,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "commit ce1c6611",
         "commit 67ae7dab",
         "commit 65ac67a8",
+        "commit e0121780",
         "test_verifier_fails_closed_when_proof_commit_anchor_is_not_on_current_branch",
         "test_verifier_fails_closed_when_branch_guard_commit_pin_is_missing",
         "test_verifier_fails_closed_when_output_shelf_pin_commit_is_missing",
@@ -220,6 +221,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "test_verifier_fails_closed_when_refreshed_guard_floor_pin_is_missing",
         "test_verifier_fails_closed_when_latest_refreshed_guard_floor_pin_is_missing",
         "test_verifier_fails_closed_when_pinned_refreshed_proof_floor_is_missing",
+        "test_verifier_fails_closed_when_external_uri_guard_proof_floor_is_missing",
     ],
 }
 
@@ -271,6 +273,7 @@ QUEUE_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit ce1c6611 pins M107 artifact factory proof floor guard",
     "/docker/chummercomplete/chummer.run-services commit 67ae7dab requires refreshed M107 proof floor",
     "/docker/chummercomplete/chummer.run-services commit 65ac67a8 pins M107 refreshed artifact factory proof floor",
+    "/docker/chummercomplete/chummer.run-services commit e0121780 tightens M107 artifact factory external URI guard",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
 ]
 
@@ -318,6 +321,7 @@ SUCCESSOR_REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 285e97be tightens the current M107 artifact factory proof floor guard",
     "/docker/chummercomplete/chummer.run-services commit ce1c6611 pins M107 artifact factory proof floor guard",
     "/docker/chummercomplete/chummer.run-services commit 65ac67a8 pins M107 refreshed artifact factory proof floor",
+    "/docker/chummercomplete/chummer.run-services commit e0121780 tightens M107 artifact factory external URI guard",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
     "python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py exits 0.",
@@ -399,6 +403,7 @@ REQUIRED_QUEUE_PROOF = {
     "/docker/chummercomplete/chummer.run-services commit ce1c6611 pins M107 artifact factory proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit 67ae7dab requires refreshed M107 proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 65ac67a8 pins M107 refreshed artifact factory proof floor.",
+    "/docker/chummercomplete/chummer.run-services commit e0121780 tightens M107 artifact factory external URI guard.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
 }
 REQUIRED_REGISTRY_EVIDENCE = {
@@ -442,6 +447,7 @@ REQUIRED_REGISTRY_EVIDENCE = {
     "/docker/chummercomplete/chummer.run-services commit ce1c6611 pins M107 artifact factory proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit 67ae7dab requires refreshed M107 proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 65ac67a8 pins M107 refreshed artifact factory proof floor.",
+    "/docker/chummercomplete/chummer.run-services commit e0121780 tightens M107 artifact factory external URI guard.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
