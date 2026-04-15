@@ -114,6 +114,17 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
     ],
 }
 
+REQUIRED_PROOF_PACKAGE = {
+    "package_id": PACKAGE_ID,
+    "milestone_id": 102,
+    "frontier_id": FRONTIER_ID,
+    "status": "complete",
+    "landed_commit": LANDED_COMMIT,
+    "allowed_paths": REQUIRED_CANONICAL_QUEUE_LISTS["allowed_paths"],
+    "owned_surfaces": REQUIRED_CANONICAL_QUEUE_LISTS["owned_surfaces"],
+}
+
+DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
 DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
@@ -122,6 +133,11 @@ DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/p
 def _configured_path(env_name: str, default_path: Path) -> Path:
     override = os.environ.get(env_name)
     return Path(override) if override else default_path
+
+
+def _proof_path(repo_root: Path) -> Path:
+    configured = _configured_path("CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH", DEFAULT_PROOF_PATH)
+    return configured if configured.is_absolute() else repo_root / configured
 
 
 def _extract_yaml_block(text: str, anchor: str) -> str | None:
@@ -213,9 +229,13 @@ def main() -> int:
             if marker not in text:
                 errors.append(f"{relative_path} missing marker: {marker}")
 
-    proof_path = repo_root / ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json"
+    proof_path = _proof_path(repo_root)
     if not proof_path.is_file():
-        errors.append(f"missing proof file: {proof_path.relative_to(repo_root)}")
+        try:
+            display_path = proof_path.relative_to(repo_root)
+        except ValueError:
+            display_path = proof_path
+        errors.append(f"missing proof file: {display_path}")
     else:
         try:
             proof = json.loads(proof_path.read_text(encoding="utf-8"))
@@ -223,14 +243,25 @@ def main() -> int:
             errors.append(f"proof file is not valid json: {exc}")
         else:
             packages = proof.get("successor_queue_packages")
-            if not isinstance(packages, list) or not any(
-                isinstance(item, dict)
-                and item.get("package_id") == "next90-m102-hub-desktop-native-trust"
-                and item.get("milestone_id") == 102
-                and item.get("frontier_id") == 2897065929
-                for item in packages
-            ):
+            proof_package = None
+            if isinstance(packages, list):
+                proof_package = next(
+                    (
+                        item
+                        for item in packages
+                        if isinstance(item, dict)
+                        and item.get("package_id") == PACKAGE_ID
+                    ),
+                    None,
+                )
+
+            if not isinstance(proof_package, dict):
                 errors.append("proof missing successor_queue_packages entry for next90-m102-hub-desktop-native-trust")
+            else:
+                for key, expected in REQUIRED_PROOF_PACKAGE.items():
+                    actual = proof_package.get(key)
+                    if actual != expected:
+                        errors.append(f"proof package has wrong {key}: expected {expected!r}, got {actual!r}")
 
             receipts = {
                 item.get("receipt_id"): item

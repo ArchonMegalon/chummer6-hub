@@ -57,7 +57,14 @@ def main() -> int:
                 "package_id": "next90-m102-hub-desktop-native-trust",
                 "milestone_id": 102,
                 "frontier_id": 2897065929,
+                "status": "complete",
+                "landed_commit": "160af58f",
                 "title": "Unify claim, install, update, and support recovery into one desktop-native flow",
+                "allowed_paths": [
+                    "Chummer.Run.Api",
+                    "scripts",
+                    "tests",
+                ],
                 "owned_surfaces": [
                     "desktop_native_claim_and_recovery",
                     "support_followthrough:install_truth",

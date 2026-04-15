@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import tempfile
@@ -58,6 +59,15 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn("desktop_native_claim_and_recovery", proof)
             self.assertIn("support_followthrough:install_truth", proof)
             self.assertIn("/api/v1/install-linking/continuation", proof)
+            payload = json.loads(proof)
+            m102_package = next(
+                item
+                for item in payload["successor_queue_packages"]
+                if item["package_id"] == "next90-m102-hub-desktop-native-trust"
+            )
+            self.assertEqual("complete", m102_package["status"])
+            self.assertEqual("160af58f", m102_package["landed_commit"])
+            self.assertEqual(["Chummer.Run.Api", "scripts", "tests"], m102_package["allowed_paths"])
 
     def test_verifier_fail_closes_successor_queue_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -266,6 +276,54 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("canonical successor queue staging block has wrong allowed_paths", result.stderr)
+
+    def test_verifier_fail_closes_generated_proof_package_scope_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            m102_package = next(
+                item
+                for item in proof["successor_queue_packages"]
+                if item["package_id"] == "next90-m102-hub-desktop-native-trust"
+            )
+            m102_package["allowed_paths"] = ["Chummer.Run.Api", "scripts"]
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("proof package has wrong allowed_paths", result.stderr)
 
 
 if __name__ == "__main__":
