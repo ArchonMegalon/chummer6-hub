@@ -279,6 +279,39 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertIn("allowed_paths", result.stderr)
         self.assertIn("unexpected Chummer.Run.AI", result.stderr)
 
+    def test_verifier_fails_closed_when_queue_package_is_duplicated(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-duplicate-queue-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                "\n".join(
+                    [
+                        "items:",
+                        "  - title: Stand up artifact-factory orchestration for release, support, and publication bundles",
+                        "    package_id: next90-m107-hub-artifact-factory",
+                        "    milestone_id: 107",
+                        "  - title: Duplicate stale artifact-factory package",
+                        "    package_id: next90-m107-hub-artifact-factory",
+                        "    milestone_id: 107",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("exactly one package_id next90-m107-hub-artifact-factory", result.stderr)
+
     def test_verifier_fails_closed_when_queue_proof_anchor_does_not_resolve(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-proof-anchor-") as temp_dir:
             queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"

@@ -35,6 +35,9 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "CHUMMER_ARTIFACT_FACTORY_DESIGN_QUEUE_STAGING",
         "DESIGN_QUEUE_STAGING_PATH",
         "verify_queue_authority(missing, queue_path)",
+        "queue staging must contain exactly one package_id",
+        "successor registry must contain exactly one milestone",
+        "successor registry must contain exactly one work task",
         "FORBIDDEN_PROOF_MARKERS",
         "reject_forbidden_proof_markers(",
     ],
@@ -115,6 +118,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'Assert.Contains("/account/support/11709", fix.MediaFactoryRequest.PublicProofShelfRefs);',
     ],
     "tests/test_artifact_factory_orchestration.py": [
+        "test_verifier_fails_closed_when_queue_package_is_duplicated",
         "test_verifier_fails_closed_when_queue_guard_commit_pin_is_missing",
         "commit cfd5d208",
         "commit 60125d9e",
@@ -253,10 +257,18 @@ def find_queue_item(data: object) -> dict:
     if not isinstance(items, list):
         raise ValueError("queue staging is missing an items list.")
 
-    for item in items:
-        if isinstance(item, dict) and item.get("package_id") == PACKAGE_ID:
-            return item
-    raise ValueError(f"queue staging is missing package_id {PACKAGE_ID}.")
+    matches = [
+        item
+        for item in items
+        if isinstance(item, dict) and item.get("package_id") == PACKAGE_ID
+    ]
+    if not matches:
+        raise ValueError(f"queue staging is missing package_id {PACKAGE_ID}.")
+    if len(matches) > 1:
+        raise ValueError(
+            f"queue staging must contain exactly one package_id {PACKAGE_ID}; found {len(matches)}."
+        )
+    return matches[0]
 
 
 def find_successor_task(data: object) -> dict:
@@ -266,32 +278,35 @@ def find_successor_task(data: object) -> dict:
     if not isinstance(milestones, list):
         raise ValueError("successor registry is missing a milestones list.")
 
-    milestone = next(
-        (
-            item
-            for item in milestones
-            if isinstance(item, dict) and item.get("id") == MILESTONE_ID
-        ),
-        None,
-    )
-    if not isinstance(milestone, dict):
+    matching_milestones = [
+        item
+        for item in milestones
+        if isinstance(item, dict) and item.get("id") == MILESTONE_ID
+    ]
+    if not matching_milestones:
         raise ValueError(f"successor registry is missing milestone {MILESTONE_ID}.")
+    if len(matching_milestones) > 1:
+        raise ValueError(
+            f"successor registry must contain exactly one milestone {MILESTONE_ID}; found {len(matching_milestones)}."
+        )
+    milestone = matching_milestones[0]
 
     work_tasks = milestone.get("work_tasks")
     if not isinstance(work_tasks, list):
         raise ValueError(f"milestone {MILESTONE_ID} is missing work_tasks.")
 
-    task = next(
-        (
-            item
-            for item in work_tasks
-            if isinstance(item, dict) and float(item.get("id", -1)) == WORK_TASK_ID
-        ),
-        None,
-    )
-    if not isinstance(task, dict):
+    matching_tasks = [
+        item
+        for item in work_tasks
+        if isinstance(item, dict) and float(item.get("id", -1)) == WORK_TASK_ID
+    ]
+    if not matching_tasks:
         raise ValueError(f"milestone {MILESTONE_ID} is missing work task {WORK_TASK_ID}.")
-    return task
+    if len(matching_tasks) > 1:
+        raise ValueError(
+            f"successor registry must contain exactly one work task {WORK_TASK_ID} under milestone {MILESTONE_ID}; found {len(matching_tasks)}."
+        )
+    return matching_tasks[0]
 
 
 def require_exact_set(missing: list[str], label: str, actual: object, expected: set[str]) -> None:
