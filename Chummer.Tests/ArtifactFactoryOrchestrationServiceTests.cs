@@ -218,6 +218,72 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobBindsReleaseOutputsToApprovedPublicShelfRefWhenArtifactIdIsAbsent()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobLaunchResult result = service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-shelf-pack-20260415",
+                    SourcePackKind: "release_evidence",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/artifacts/release-bundles/current-preview-build"
+                    ],
+                    PublicShelfRef: "/artifacts/release-bundles/current-preview-build")
+            ],
+            RequestedFormats: ["preview-card"]));
+
+        Assert.Contains("/artifacts/release-bundles/current-preview-build", result.PublicProofShelfRefs);
+        Assert.Contains(result.OutputBindings, binding =>
+            string.Equals(binding.PublicRef, "/artifacts/release-bundles/current-preview-build/bundles/preview_card", StringComparison.Ordinal)
+            && string.Equals(binding.ReceiptRef, $"artifact-factory:{result.JobId}:preview_card", StringComparison.Ordinal));
+        Assert.Contains(result.MediaFactoryRequest.ApprovedSourcePacks, pack =>
+            string.Equals(pack.PublicShelfRef, "/artifacts/release-bundles/current-preview-build", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LaunchJobBindsPublicationOutputsToApprovedPublicShelfRefWhenPublicationIdIsAbsent()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobLaunchResult result = service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "publication",
+            RequestedBy: "creator.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "publication-shelf-redmond-brief",
+                    SourcePackKind: "publication",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "publication:redmond-brief:v3",
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "public-shelf:/artifacts/publications/redmond-brief"
+                    ],
+                    PublicShelfRef: "/artifacts/publications/redmond-brief")
+            ],
+            RequestedFormats: ["caption"]));
+
+        Assert.Contains("/artifacts/publications/redmond-brief", result.PublicProofShelfRefs);
+        Assert.Contains(result.OutputBindings, binding =>
+            string.Equals(binding.PublicRef, "/artifacts/publications/redmond-brief/bundles/caption", StringComparison.Ordinal)
+            && string.Equals(binding.ReceiptRef, $"artifact-factory:{result.JobId}:caption", StringComparison.Ordinal));
+        Assert.Contains(result.MediaFactoryRequest.ApprovedSourcePacks, pack =>
+            string.Equals(pack.PublicShelfRef, "/artifacts/publications/redmond-brief", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void LaunchJobRejectsProviderSpecificOutputFormats()
     {
         ArtifactFactoryOrchestrationService service = new();
