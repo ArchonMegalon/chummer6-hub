@@ -206,8 +206,9 @@ public sealed class ArtifactFactoryOrchestrationService
         string locale = NormalizeOptional(request.Locale) ?? "en-US";
         string jobId = BuildJobId(family, sourcePacks, outputFormats, audience, locale);
         string[] receiptRefs = requiredReceiptRefs.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
-        string[] proofShelfRefs = publicProofShelfRefs.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         ArtifactFactoryOutputBinding[] outputBindings = BuildOutputBindings(family, jobId, sourcePacks, outputFormats);
+        publicProofShelfRefs.AddRange(BuildOutputShelfRefs(outputBindings));
+        string[] proofShelfRefs = publicProofShelfRefs.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
 
         return new ArtifactFactoryJobLaunchResult(
             JobId: jobId,
@@ -504,6 +505,18 @@ public sealed class ArtifactFactoryOrchestrationService
                 PublicationId: anchor.PublicationId))
             .OrderBy(static item => item.Format, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+    }
+
+    private static IEnumerable<string> BuildOutputShelfRefs(IReadOnlyList<ArtifactFactoryOutputBinding> outputBindings)
+    {
+        foreach (ArtifactFactoryOutputBinding binding in outputBindings)
+        {
+            int separatorIndex = binding.PublicRef.LastIndexOf('/');
+            if (separatorIndex > 0)
+            {
+                yield return binding.PublicRef[..separatorIndex];
+            }
+        }
     }
 
     private static ArtifactFactoryMediaSourcePack SelectOutputAnchor(
