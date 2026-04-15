@@ -175,6 +175,58 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("missing queue package block", result.stderr)
         self.assertIn("next90-m105-hub-workspace-continuity", result.stderr)
 
+    def test_verifier_fails_closed_when_local_release_proof_drops_conflict_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            payload["proof_receipts"] = [
+                receipt
+                for receipt in payload["proof_receipts"]
+                if receipt.get("receipt_id") != "entitlement_sync:conflict_receipts"
+            ]
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof_receipts missing entitlement_sync:conflict_receipts", result.stderr)
+
+    def test_verifier_fails_closed_when_local_release_proof_points_at_wrong_frontier(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-frontier-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            payload["successor_queue_package"]["frontier_id"] = 1
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("successor_queue_package.frontier_id must be 4623636482", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
