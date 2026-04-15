@@ -489,6 +489,40 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn(str(served_proof_path), result.stderr)
         self.assertIn("proof_receipts missing entitlement_sync:conflict_receipts", result.stderr)
 
+    def test_verifier_fails_closed_when_served_workspace_receipt_drifts_from_local_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-served-drift-") as temp_dir:
+            temp_root = Path(temp_dir)
+            served_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_served_proof_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "wwwroot"
+                / "proofs"
+                / "mac-codex-release"
+                / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            )
+            payload = json.loads(source_served_proof_path.read_text(encoding="utf-8"))
+            for receipt in payload["proof_receipts"]:
+                if receipt.get("receipt_id") == "workspace_restore:provenance":
+                    receipt["surfaces"] = receipt["surfaces"] + ["served_only_workspace_surface"]
+            served_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_SERVED_RELEASE_PROOF"] = str(served_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof_receipts[workspace_restore:provenance] must match", result.stderr)
+        self.assertIn(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json", result.stderr)
+
     def test_verifier_fails_closed_when_local_release_proof_drops_recoverable_conflict_summary(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-release-summary-") as temp_dir:
             temp_root = Path(temp_dir)

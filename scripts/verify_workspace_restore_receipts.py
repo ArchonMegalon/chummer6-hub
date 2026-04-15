@@ -446,6 +446,86 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
                     missing.append(f"{path}: {receipt_id}.summary missing {marker}")
 
 
+def read_release_proof_payload(path: Path, label: str, missing: list[str]) -> dict[str, object] | None:
+    if not path.is_file():
+        missing.append(f"missing {label}: {path}")
+        return None
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        missing.append(f"invalid {label}: {path}: {exc}")
+        return None
+
+    if not isinstance(payload, dict):
+        missing.append(f"invalid {label}: {path}: payload must be an object")
+        return None
+
+    return payload
+
+
+def find_closed_package(payload: dict[str, object]) -> dict[str, object] | None:
+    packages = payload.get("successor_queue_packages")
+    if not isinstance(packages, list):
+        return None
+
+    return next(
+        (
+            item
+            for item in packages
+            if isinstance(item, dict) and item.get("package_id") == PACKAGE_ID
+        ),
+        None,
+    )
+
+
+def release_proof_receipt_map(payload: dict[str, object]) -> dict[str, dict[str, object]]:
+    receipts = payload.get("proof_receipts")
+    if not isinstance(receipts, list):
+        return {}
+
+    return {
+        item["receipt_id"]: item
+        for item in receipts
+        if isinstance(item, dict) and isinstance(item.get("receipt_id"), str)
+    }
+
+
+def check_served_release_proof_matches_local(missing: list[str]) -> None:
+    local_payload = read_release_proof_payload(
+        LOCAL_RELEASE_PROOF_PATH,
+        "local release proof",
+        missing,
+    )
+    served_payload = read_release_proof_payload(
+        SERVED_RELEASE_PROOF_PATH,
+        "served release proof",
+        missing,
+    )
+    if local_payload is None or served_payload is None:
+        return
+
+    if local_payload.get("successor_queue_package") != served_payload.get("successor_queue_package"):
+        missing.append(
+            f"{SERVED_RELEASE_PROOF_PATH}: successor_queue_package must match {LOCAL_RELEASE_PROOF_PATH}"
+        )
+
+    local_package = find_closed_package(local_payload)
+    served_package = find_closed_package(served_payload)
+    if local_package != served_package:
+        missing.append(
+            f"{SERVED_RELEASE_PROOF_PATH}: successor_queue_packages[{PACKAGE_ID}] must match {LOCAL_RELEASE_PROOF_PATH}"
+        )
+
+    local_receipts = release_proof_receipt_map(local_payload)
+    served_receipts = release_proof_receipt_map(served_payload)
+    for receipt_id in LOCAL_RELEASE_PROOF_RECEIPTS:
+        if local_receipts.get(receipt_id) != served_receipts.get(receipt_id):
+            missing.append(
+                f"{SERVED_RELEASE_PROOF_PATH}: proof_receipts[{receipt_id}] must match {LOCAL_RELEASE_PROOF_PATH}"
+            )
+
+
 def check_required_local_commits(missing: list[str]) -> None:
     for commit in REQUIRED_LOCAL_COMMITS:
         result = subprocess.run(
@@ -507,6 +587,7 @@ def main() -> int:
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
     check_local_release_proof(LOCAL_RELEASE_PROOF_PATH, missing)
     check_local_release_proof(SERVED_RELEASE_PROOF_PATH, missing)
+    check_served_release_proof_matches_local(missing)
     check_required_local_commits(missing)
 
     if missing:
