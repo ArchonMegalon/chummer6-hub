@@ -267,6 +267,7 @@ public sealed class ArtifactFactoryOrchestrationService
         if (!string.IsNullOrWhiteSpace(sourcePack.PublicShelfRef))
         {
             RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
+            RejectNonLocalPublicShelfRef(sourcePack.SourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
         }
     }
 
@@ -308,6 +309,7 @@ public sealed class ArtifactFactoryOrchestrationService
         foreach (string evidenceRef in evidenceRefs)
         {
             RejectProviderSpecificRef(sourcePack.SourcePackId, evidenceRef, "evidenceRef");
+            RejectNonLocalPublicShelfEvidenceRef(sourcePack.SourcePackId, evidenceRef);
         }
 
         return evidenceRefs.Length > 0
@@ -326,6 +328,28 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has provider-specific {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
+        }
+    }
+
+    private static void RejectNonLocalPublicShelfEvidenceRef(string sourcePackId, string evidenceRef)
+    {
+        const string publicShelfPrefix = "public-shelf:";
+        if (!evidenceRef.StartsWith(publicShelfPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        string publicShelfRef = evidenceRef[publicShelfPrefix.Length..];
+        RejectNonLocalPublicShelfRef(sourcePackId, publicShelfRef, "evidenceRef");
+    }
+
+    private static void RejectNonLocalPublicShelfRef(string sourcePackId, string value, string fieldName)
+    {
+        string publicShelfRef = value.Trim();
+        if (!publicShelfRef.StartsWith("/", StringComparison.Ordinal) || publicShelfRef.StartsWith("//", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has non-local public proof shelf {fieldName} '{value}'; artifact factory output refs must stay on the Chummer public proof shelf.");
         }
     }
 
