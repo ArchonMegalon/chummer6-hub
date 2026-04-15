@@ -45,6 +45,115 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RestoreProvenanceReceiptsProjectFallbackSurfaceFromKind()
+    {
+        WorkspaceRestoreProvenanceReceipt[] projected = InvokeProjectRestoreProvenanceReceipts(
+        [
+            new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: "receipt-entitlement",
+                Kind: "active_entitlement",
+                SubjectId: "grant-1",
+                Surface: "",
+                Summary: "Active grant remains replayable.",
+                Proof: null,
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z")),
+            new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: "receipt-workspace",
+                Kind: "claimed_installation",
+                SubjectId: "install-1",
+                Surface: "",
+                Summary: "Claimed install remains replayable.",
+                Proof: null,
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"))
+        ]);
+
+        Assert.Equal("entitlement_sync", projected[0].Surface);
+        Assert.Equal("workspace_restore", projected[1].Surface);
+    }
+
+    [Fact]
+    public void RestoreConflictSurfaceClassifiesEntitlementKindsWithoutPrefix()
+    {
+        string surface = InvokeResolveRestoreConflictSurface("restore_entitlement_drift");
+        Assert.Equal("entitlement_sync", surface);
+    }
+
+    [Fact]
+    public void RestoreConflictProjectionPreservesDeclaredSurfaceAndBlockingState()
+    {
+        WorkspaceRestoreConflictReceiptProjection[] projected = InvokeProjectRestoreConflictReceipts(
+        [
+            new WorkspaceRestoreConflictReceipt(
+                ReceiptId: "receipt-entitlement",
+                Severity: "attention",
+                Kind: "entitlement_expired",
+                SubjectId: "grant-1",
+                Summary: "Grant expired.",
+                Resolution: "Refresh access.",
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"),
+                Surface: "entitlement_sync",
+                BlocksContinue: true),
+            new WorkspaceRestoreConflictReceipt(
+                ReceiptId: "receipt-install",
+                Severity: "warning",
+                Kind: "claimed_installation_stale",
+                SubjectId: "install-1",
+                Summary: "Install is stale.",
+                Resolution: "Relink.",
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"),
+                Surface: "workspace_restore",
+                BlocksContinue: false)
+        ]);
+
+        Assert.Equal("entitlement_sync", projected[0].Surface);
+        Assert.True(projected[0].BlocksContinue);
+        Assert.Equal("workspace_restore", projected[1].Surface);
+        Assert.False(projected[1].BlocksContinue);
+    }
+
+    [Fact]
+    public void RestoreReceiptProjectionCanonicalizesDeclaredSurfaceCasing()
+    {
+        WorkspaceRestoreProvenanceReceipt[] provenanceReceipts = InvokeProjectRestoreProvenanceReceipts(
+        [
+            new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: "receipt-entitlement",
+                Kind: "active_entitlement",
+                SubjectId: "grant-1",
+                Surface: "Entitlement_Sync",
+                Summary: "Active grant remains replayable.",
+                Proof: null,
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z")),
+            new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: "receipt-workspace",
+                Kind: "claimed_installation",
+                SubjectId: "install-1",
+                Surface: "Workspace_Restore",
+                Summary: "Claimed install remains replayable.",
+                Proof: null,
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"))
+        ]);
+
+        WorkspaceRestoreConflictReceiptProjection[] conflictReceipts = InvokeProjectRestoreConflictReceipts(
+        [
+            new WorkspaceRestoreConflictReceipt(
+                ReceiptId: "conflict-entitlement",
+                Severity: "attention",
+                Kind: "entitlement_missing",
+                SubjectId: "grant-1",
+                Summary: "Entitlement proof is missing.",
+                Resolution: "Refresh access.",
+                ObservedAtUtc: DateTimeOffset.Parse("2026-04-03T00:00:00Z"),
+                Surface: "Entitlement_Sync",
+                BlocksContinue: true)
+        ]);
+
+        Assert.Equal("entitlement_sync", provenanceReceipts[0].Surface);
+        Assert.Equal("workspace_restore", provenanceReceipts[1].Surface);
+        Assert.Equal("entitlement_sync", conflictReceipts[0].Surface);
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsOpForShorthandAcrossWhitespaceAndPunctuation()
     {
         var packet = new GovernedPrepPacketSummary(
@@ -1811,6 +1920,55 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void CampaignWorkspaceSummaryMakesRestoreReceiptPostureExplicitBySurface()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore() with
+        {
+            ProvenanceReceipts =
+            [
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: "receipt-workspace",
+                    Kind: "claimed_installation",
+                    SubjectId: "install-1",
+                    Surface: "workspace_restore",
+                    Summary: "Claimed install is retained.",
+                    Proof: null,
+                    ObservedAtUtc: DateTimeOffset.Parse("2026-04-14T00:00:00Z")),
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: "receipt-entitlement",
+                    Kind: "active_entitlement",
+                    SubjectId: "grant-1",
+                    Surface: "entitlement_sync",
+                    Summary: "Entitlement is retained.",
+                    Proof: null,
+                    ObservedAtUtc: DateTimeOffset.Parse("2026-04-14T00:00:00Z"))
+            ],
+            ConflictReceipts =
+            [
+                new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: "conflict-entitlement",
+                    Severity: "attention",
+                    Kind: "entitlement_missing",
+                    SubjectId: "install-1",
+                    Summary: "Claimed install lacks entitlement proof.",
+                    Resolution: "Refresh install linking.",
+                    ObservedAtUtc: DateTimeOffset.Parse("2026-04-14T00:00:00Z"),
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true)
+            ]
+        };
+
+        CampaignWorkspaceSummary summary = InvokeBuildCampaignWorkspaceSummary(workspace, restore);
+
+        Assert.Contains("2 restore provenance receipt(s) are explicit", summary.RestoreSummary, StringComparison.Ordinal);
+        Assert.Contains("1 workspace restore", summary.RestoreSummary, StringComparison.Ordinal);
+        Assert.Contains("1 entitlement sync", summary.RestoreSummary, StringComparison.Ordinal);
+        Assert.Contains("1 conflict receipt(s) are explicit", summary.RestoreSummary, StringComparison.Ordinal);
+        Assert.Contains("1 blocking", summary.RestoreSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RosterReadinessHighlightsPreferAttentionCueOverEarlierReviewCue()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterAndAftermath();
@@ -2035,6 +2193,35 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Equal("rule_environment_mismatch", summary.Status);
         Assert.Contains("One runner uses a stale compatibility fingerprint.", summary.Summary, StringComparison.Ordinal);
         Assert.DoesNotContain("Ruleset should be reviewed.", summary.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NextSafeActionCuePrefersBlockingRestoreConflictOverGenericWorkspaceAction()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore() with
+        {
+            ConflictSummaries = ["Claimed installs are on different channels."],
+            ConflictReceipts =
+            [
+                new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: "restore-conflict:channel-drift",
+                    Severity: "attention",
+                    Kind: "restore_summary_conflict",
+                    SubjectId: "restore-plane",
+                    Summary: "Claimed installs are on different channels.",
+                    Resolution: "Open the restore rail and confirm the current preview-vs-stable posture before you continue here.",
+                    ObservedAtUtc: DateTimeOffset.Parse("2026-04-14T00:00:00Z"),
+                    Surface: "workspace_restore",
+                    BlocksContinue: true)
+            ]
+        };
+
+        dynamic cue = InvokeBuildNextSafeActionCue(workspace, restore);
+
+        Assert.Equal("Review restore receipts", (string)cue.Label);
+        Assert.Equal("restore", (string)cue.SourceKind);
+        Assert.Contains("confirm the current preview-vs-stable posture", (string)cue.Summary, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -8197,6 +8384,35 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         return Assert.IsType<bool>(method.Invoke(null, [packet, queryTokens]));
     }
 
+    private static WorkspaceRestoreProvenanceReceipt[] InvokeProjectRestoreProvenanceReceipts(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? receipts)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("ProjectRestoreProvenanceReceipts", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ProjectRestoreProvenanceReceipts was not found.");
+
+        return Assert.IsAssignableFrom<WorkspaceRestoreProvenanceReceipt[]>(method.Invoke(null, [receipts]));
+    }
+
+    private static string InvokeResolveRestoreConflictSurface(string? kind)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("ResolveRestoreConflictSurface", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ResolveRestoreConflictSurface was not found.");
+
+        return Assert.IsType<string>(method.Invoke(null, [kind]));
+    }
+
+    private static WorkspaceRestoreConflictReceiptProjection[] InvokeProjectRestoreConflictReceipts(
+        IReadOnlyList<WorkspaceRestoreConflictReceipt>? receipts)
+    {
+        MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
+            .GetMethod("ProjectRestoreConflictReceipts", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("ProjectRestoreConflictReceipts was not found.");
+
+        return Assert.IsAssignableFrom<WorkspaceRestoreConflictReceiptProjection[]>(method.Invoke(null, [receipts]));
+    }
+
     private static GovernedPrepPacketSummary InvokeResolvePrepPacket(CampaignPrepLibrarySummary prepLibrary, string requestedPacketId)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
@@ -8435,13 +8651,13 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         return Assert.IsType<WorkspaceStateSummary>(method.Invoke(null, [workspace, null, ruleEnvironmentHealth, continuityConflicts, supportDigests, travelMode, nextSafeAction]));
     }
 
-    private static object InvokeBuildNextSafeActionCue(CampaignWorkspaceProjection workspace)
+    private static object InvokeBuildNextSafeActionCue(CampaignWorkspaceProjection workspace, WorkspaceRestoreProjection? restore = null)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
             .GetMethod("BuildNextSafeActionCue", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("BuildNextSafeActionCue was not found.");
 
-        object? cue = method.Invoke(null, [workspace, null, Array.Empty<SupportCaseDigestViewModel>()]);
+        object? cue = method.Invoke(null, [workspace, restore ?? BuildEmptyRestore(), null, Array.Empty<SupportCaseDigestViewModel>()]);
         return cue ?? throw new InvalidOperationException("BuildNextSafeActionCue returned null.");
     }
 

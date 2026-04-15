@@ -14,6 +14,7 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class CampaignSpineService
 {
     private static readonly JsonSerializerOptions ComparisonJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan RestoreSnapshotStaleWindow = TimeSpan.FromDays(30);
     private static readonly IReadOnlyList<string> DefaultPersonalPreviewCapabilities =
     [
         "can_manage_members",
@@ -1380,6 +1381,18 @@ public sealed class CampaignSpineService
         {
             conflictSummaries.Add("Recent dossiers and campaigns carry different rule-environment fingerprints; restore should confirm the intended rules posture before applying sync.");
         }
+        if (activeGrants.Any(grant =>
+                !string.Equals(grant.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase)
+                || grant.ExpiresAtUtc <= generatedAtUtc))
+        {
+            conflictSummaries.Add("Entitlement replay includes stale or expired grants; relink before trusting restored access on another device.");
+        }
+        if (claimedInstallations.Any(installation =>
+                !string.Equals(installation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase)
+                || generatedAtUtc - installation.UpdatedAtUtc > RestoreSnapshotStaleWindow))
+        {
+            conflictSummaries.Add("Claimed-installation replay includes stale or inactive device state; confirm and relink before continuing.");
+        }
 
         var recentArtifacts = (installLinking?.RecentReceipts ?? Array.Empty<DownloadReceiptDto>())
             .Where(static item => !string.IsNullOrWhiteSpace(item.ArtifactId))
@@ -1507,7 +1520,9 @@ public sealed class CampaignSpineService
                 Proof: string.IsNullOrWhiteSpace(grantId)
                     ? $"artifact:{installation.ArtifactId}"
                     : $"artifact:{installation.ArtifactId}; grant:{grantId}",
-                ObservedAtUtc: observedAtUtc));
+                ObservedAtUtc: observedAtUtc,
+                Authority: "hub_registry_install_linking",
+                RecoveryHint: "Open Devices and access from this install when the restore rail needs a fresh claim or relink receipt."));
             installationIndex++;
         }
 
@@ -1524,7 +1539,11 @@ public sealed class CampaignSpineService
                 Surface: "entitlement_sync",
                 Summary: $"Entitlement grant {grant.GrantId} ({grant.Status}) on {label} is replayable to the restore plane until {grant.ExpiresAtUtc:yyyy-MM-dd}.",
                 Proof: $"status:{grant.Status};issued:{grant.IssuedAtUtc:O}",
-                ObservedAtUtc: observedAtUtc));
+                ObservedAtUtc: observedAtUtc,
+                Authority: "hub_entitlement_ledger",
+                RecoveryHint: matchedInstallation
+                    ? "If this grant expires or drifts, refresh account access on the same claimed install before continuing."
+                    : "Resolve the orphaned grant in account access before trusting replay on a second device."));
         }
 
         foreach (RestoreArtifactProjection artifact in recentArtifacts)
@@ -1536,7 +1555,9 @@ public sealed class CampaignSpineService
                 Surface: "entitlement_sync",
                 Summary: $"Recent artifact {artifact.Label} ({artifact.ArtifactId}) is explicit in restore with kind {artifact.Kind} and channel {artifact.Channel ?? "unknown"} {artifact.Version}.",
                 Proof: $"{artifact.Channel ?? "unknown"}::{artifact.Version ?? "rev"}::{artifact.Kind}",
-                ObservedAtUtc: observedAtUtc));
+                ObservedAtUtc: observedAtUtc,
+                Authority: "hub_registry_release_receipts",
+                RecoveryHint: "Redownload or refresh the signed-in install rail if this artifact receipt no longer matches the device you are restoring."));
         }
 
         foreach (RuleEnvironmentRef environment in ruleEnvironments.Take(4))
@@ -1547,9 +1568,11 @@ public sealed class CampaignSpineService
                 Kind: "rule_environment",
                 SubjectId: environment.EnvironmentId,
                 Surface: "workspace_restore",
-                Summary: $"Restore retains rule environment {environmentLabel} with {environment.SourcePacks.Length} source pack(s) and {environment.HouseRulePacks.Length} house rule(s).",
+                Summary: $"Restore retains rule environment {environmentLabel} with {environment.SourcePacks.Count} source pack(s) and {environment.HouseRulePacks.Count} house rule(s).",
                 Proof: $"{environment.CompatibilityFingerprint}:{environment.ApprovalState}",
-                ObservedAtUtc: observedAtUtc));
+                ObservedAtUtc: observedAtUtc,
+                Authority: "core_rule_environment_receipts",
+                RecoveryHint: "Review packs and governed approval state before computing against a different rule environment on this device."));
         }
 
         if (dossiers.Count > 0 || campaigns.Count > 0)
@@ -1562,7 +1585,9 @@ public sealed class CampaignSpineService
                 Surface: "workspace_restore",
                 Summary: $"Restore plane inventory snapshot includes {inventory} for immediate continue readiness.",
                 Proof: inventory,
-                ObservedAtUtc: observedAtUtc));
+                ObservedAtUtc: observedAtUtc,
+                Authority: "hub_campaign_spine_projection",
+                RecoveryHint: "If this inventory does not match the device you expected, stop before editing and review the restore plane first."));
         }
 
         return receipts;
@@ -1585,18 +1610,20 @@ public sealed class CampaignSpineService
             foreach (string summary in conflictSummaries.Take(2))
             {
                 receipts.Add(new WorkspaceRestoreConflictReceipt(
-                    ReceiptId: StableId("restore-conflict", $"{userId}:{conflictIndex}:{summary.Length}:{observedAtUtc:yyyyMMddHHmmss}"),
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{conflictIndex}:{summary}"),
                     Severity: "warning",
                     Kind: "restore_summary_conflict",
                     SubjectId: "restore-plane",
                     Summary: summary,
                     Resolution: "Open the restore plane and confirm intended posture before editing or continuing this workspace on a different device.",
-                    ObservedAtUtc: observedAtUtc));
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "workspace_restore",
+                    BlocksContinue: true));
                 conflictIndex++;
             }
         }
 
-        Dictionary<string, ClaimedInstallationDto> grantsByInstallation = activeGrants
+        Dictionary<string, InstallationGrantDto> grantsByInstallation = activeGrants
             .Where(static item => !string.IsNullOrWhiteSpace(item.InstallationId))
             .GroupBy(static item => item.InstallationId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.OrdinalIgnoreCase);
@@ -1607,6 +1634,34 @@ public sealed class CampaignSpineService
 
         foreach (InstallationGrantDto grant in activeGrants)
         {
+            if (!string.Equals(grant.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{grant.GrantId}:status-{grant.Status}"),
+                    Severity: "attention",
+                    Kind: "entitlement_status_mismatch",
+                    SubjectId: grant.GrantId,
+                    Summary: $"Entitlement {grant.GrantId} is `{grant.Status}` and cannot be replayed as active restore access.",
+                    Resolution: "Rotate the install claim or refresh grant status in account access before restoring this workspace.",
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true));
+            }
+
+            if (grant.ExpiresAtUtc <= observedAtUtc)
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{grant.GrantId}:expired"),
+                    Severity: "attention",
+                    Kind: "entitlement_expired",
+                    SubjectId: grant.GrantId,
+                    Summary: $"Entitlement {grant.GrantId} expired at {grant.ExpiresAtUtc:O} and is stale for restore replay.",
+                    Resolution: "Refresh install linking to mint a current entitlement before continuing on this device.",
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true));
+            }
+
             if (!claimedInstallationIds.Contains(grant.InstallationId))
             {
                 receipts.Add(new WorkspaceRestoreConflictReceipt(
@@ -1616,12 +1671,62 @@ public sealed class CampaignSpineService
                     SubjectId: grant.GrantId,
                     Summary: $"Active entitlement {grant.GrantId} is not tied to a claimed installation ({grant.InstallationId}) in the roaming restore packet.",
                     Resolution: "Resolve by reclaiming the install on this account or rotating the stale entitlement before reusing this device.",
-                    ObservedAtUtc: observedAtUtc));
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true));
             }
         }
 
         foreach (ClaimedInstallationDto installation in claimedInstallations)
         {
+            RestoreArtifactProjection? artifactEvidence = recentArtifacts.FirstOrDefault(
+                item => !string.IsNullOrWhiteSpace(item.ArtifactId)
+                    && string.Equals(item.ArtifactId, installation.ArtifactId, StringComparison.OrdinalIgnoreCase));
+
+            if (!string.Equals(installation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase))
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{installation.InstallationId}:status-{installation.Status}"),
+                    Severity: "attention",
+                    Kind: "claimed_installation_inactive",
+                    SubjectId: installation.InstallationId,
+                    Summary: $"Claimed install {installation.InstallationId} is `{installation.Status}` and needs relink before restore replay.",
+                    Resolution: "Reclaim the installation from account access so restore continuity only references active devices.",
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "workspace_restore",
+                    BlocksContinue: true));
+            }
+
+            if (observedAtUtc - installation.UpdatedAtUtc > RestoreSnapshotStaleWindow)
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{installation.InstallationId}:stale-claimed-install"),
+                    Severity: "warning",
+                    Kind: "claimed_installation_stale",
+                    SubjectId: installation.InstallationId,
+                    Summary: $"Claimed install {installation.InstallationId} has not refreshed since {installation.UpdatedAtUtc:O}; restore evidence may be stale.",
+                    Resolution: "Reopen the install from account access and relink to refresh claim and entitlement replay evidence.",
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "workspace_restore",
+                    BlocksContinue: false));
+            }
+
+            if (artifactEvidence is not null
+                && (HasRestoreDrift(installation.Channel, artifactEvidence.Channel)
+                    || HasRestoreDrift(installation.Version, artifactEvidence.Version)))
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{installation.InstallationId}:artifact-drift"),
+                    Severity: "attention",
+                    Kind: "entitlement_artifact_drift",
+                    SubjectId: installation.InstallationId,
+                    Summary: $"Claimed install {installation.InstallationId} now reports {installation.Channel ?? "unknown"} {installation.Version ?? "unknown"}, but restore only has artifact replay proof for {artifactEvidence.Channel ?? "unknown"} {artifactEvidence.Version ?? "unknown"}.",
+                    Resolution: "Refresh the signed-in install rail or redownload the current release before you continue on another device so entitlement replay matches the install you are carrying forward.",
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true));
+            }
+
             if (!grantsByInstallation.ContainsKey(installation.InstallationId)
                 && !string.Equals(string.Empty, installation.InstallationId, StringComparison.Ordinal))
             {
@@ -1632,11 +1737,13 @@ public sealed class CampaignSpineService
                     SubjectId: installation.InstallationId,
                     Summary: $"Claimed install {installation.InstallationId} lacks an active entitlement grant in this roaming snapshot.",
                     Resolution: "Refresh install linking or rotate local claim state so entitlement replay remains bounded and verifiable.",
-                    ObservedAtUtc: observedAtUtc));
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true));
             }
 
             bool hasArtifactEvidence = recentArtifacts.Any(
-                static item => !string.IsNullOrWhiteSpace(item.ArtifactId)
+                item => !string.IsNullOrWhiteSpace(item.ArtifactId)
                     && string.Equals(item.ArtifactId, installation.ArtifactId, StringComparison.OrdinalIgnoreCase));
             if (!hasArtifactEvidence)
             {
@@ -1647,7 +1754,9 @@ public sealed class CampaignSpineService
                     SubjectId: installation.InstallationId,
                     Summary: $"Restore snapshot has no reconnectable artifact receipt for {installation.InstallationId}; stale install claims can silently lose continuity.",
                     Resolution: "Open account claim/restore flow and refresh downloadable artifact receipts before proceeding.",
-                    ObservedAtUtc: observedAtUtc));
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "workspace_restore",
+                    BlocksContinue: false));
             }
         }
 
@@ -1660,10 +1769,21 @@ public sealed class CampaignSpineService
                 SubjectId: "rule-environment",
                 Summary: "Restore includes mixed rule-environment fingerprints across dossier and campaign projections.",
                 Resolution: "Review rule packs and choose a single active set before the next continue step.",
-                ObservedAtUtc: observedAtUtc));
+                ObservedAtUtc: observedAtUtc,
+                Surface: "workspace_restore",
+                BlocksContinue: true));
         }
 
         return receipts;
+    }
+
+    private static bool HasRestoreDrift(string? left, string? right)
+    {
+        string? normalizedLeft = AccountService.NormalizeOptional(left);
+        string? normalizedRight = AccountService.NormalizeOptional(right);
+        return normalizedLeft is not null
+            && normalizedRight is not null
+            && !string.Equals(normalizedLeft, normalizedRight, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildClaimedDeviceRestoreSummary(

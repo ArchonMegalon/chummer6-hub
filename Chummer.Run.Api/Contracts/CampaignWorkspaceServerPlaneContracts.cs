@@ -30,7 +30,20 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     CampaignMemoryProjection? CampaignMemory,
     NextSessionCarryForwardProjection? NextSessionCarryForward,
     NextSafeActionCue NextSafeAction,
+    IReadOnlyList<WorkspaceRestoreProvenanceReceipt> RestoreProvenanceReceipts,
+    IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> RestoreConflictReceipts,
     DateTimeOffset GeneratedAtUtc);
+
+public sealed record WorkspaceRestoreConflictReceiptProjection(
+    string ReceiptId,
+    string Severity,
+    string Kind,
+    string Surface,
+    string SubjectId,
+    string Summary,
+    string? Resolution,
+    DateTimeOffset ObservedAtUtc,
+    bool BlocksContinue);
 
 public sealed record GmOperationsReadinessSummary(
     string Status,
