@@ -823,6 +823,14 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_verifier_requires_desktop_native_hardening_commits(self) -> None:
+        verifier = load_verifier_module()
+
+        self.assertEqual(
+            ["160af58f", "e27f24c1", "0ea22419", "b4d761a2"],
+            verifier._required_resolving_commits(),
+        )
+
     def test_verifier_fail_closes_missing_standard_verify_wiring(self) -> None:
         verifier = load_verifier_module()
 
