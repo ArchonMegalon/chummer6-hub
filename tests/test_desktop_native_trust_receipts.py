@@ -48,6 +48,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit b473e033 pins the current M102 desktop trust guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 782fa007 requires the current M102 desktop trust proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit 26817b22 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 6cf10549 pins M102 desktop trust 268 proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -92,6 +93,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit b473e033 pins the current M102 desktop trust guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 782fa007 requires the current M102 desktop trust proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit 26817b22 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 6cf10549 pins M102 desktop trust 268 proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1106,6 +1108,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "b473e033",
                 "782fa007",
                 "26817b22",
+                "6cf10549",
             ],
             verifier._required_resolving_commits(),
         )
