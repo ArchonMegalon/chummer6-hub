@@ -42,6 +42,25 @@ REGISTRY_102_1_LINES = [
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
+ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer.run-services/"
+
+
+def proof_anchor_paths() -> list[Path]:
+    anchors: list[Path] = []
+    for value in [*QUEUE_PROOF_LINES, *REGISTRY_102_1_LINES]:
+        stripped = value.strip()
+        if not stripped.startswith("- "):
+            continue
+
+        proof_value = stripped[2:]
+        if not proof_value.startswith(ABSOLUTE_REPO_PREFIX):
+            continue
+
+        relative = proof_value[len(ABSOLUTE_REPO_PREFIX) :].split(" ", 1)[0]
+        if relative and relative not in {str(item) for item in anchors}:
+            anchors.append(Path(relative))
+
+    return anchors
 
 
 class DesktopNativeTrustReceiptTests(unittest.TestCase):
@@ -440,6 +459,37 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("proof package has wrong allowed_paths", result.stderr)
+
+    def test_verifier_fail_closes_missing_canonical_proof_anchor(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            anchor_root = Path(temp_root)
+            missing_anchor = Path("tests/test_desktop_native_trust_receipts.py")
+            for anchor in proof_anchor_paths():
+                if anchor == missing_anchor:
+                    continue
+
+                path = anchor_root / anchor
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("placeholder\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_RUN_SERVICES_PROOF_ANCHOR_ROOT": str(anchor_root),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "canonical proof anchor does not resolve: "
+                "/docker/chummercomplete/chummer.run-services/tests/test_desktop_native_trust_receipts.py",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_top_level_m102_proof_route_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:

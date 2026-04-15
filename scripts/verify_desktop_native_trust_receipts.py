@@ -167,11 +167,17 @@ DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.gener
 DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
+ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer.run-services/"
 
 
 def _configured_path(env_name: str, default_path: Path) -> Path:
     override = os.environ.get(env_name)
     return Path(override) if override else default_path
+
+
+def _configured_repo_anchor_root(repo_root: Path) -> Path:
+    override = os.environ.get("CHUMMER_RUN_SERVICES_PROOF_ANCHOR_ROOT")
+    return Path(override) if override else repo_root
 
 
 def _proof_path(repo_root: Path) -> Path:
@@ -253,9 +259,40 @@ def _extract_yaml_string_list(block: str, key: str) -> list[str] | None:
     return None
 
 
+def _repo_anchor_from_proof_text(value: str) -> Path | None:
+    if not value.startswith(ABSOLUTE_REPO_PREFIX):
+        return None
+
+    relative = value[len(ABSOLUTE_REPO_PREFIX) :].split(" ", 1)[0].strip()
+    return Path(relative) if relative else None
+
+
+def _required_repo_anchor_paths() -> list[Path]:
+    anchors: list[Path] = []
+    for values in (
+        REQUIRED_CANONICAL_QUEUE_LISTS["proof"],
+        REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"],
+    ):
+        for value in values:
+            anchor = _repo_anchor_from_proof_text(value)
+            if anchor is not None and anchor not in anchors:
+                anchors.append(anchor)
+
+    return anchors
+
+
+def _verify_required_repo_anchor_paths(errors: list[str], repo_root: Path) -> None:
+    anchor_root = _configured_repo_anchor_root(repo_root)
+    for relative_path in _required_repo_anchor_paths():
+        if not (anchor_root / relative_path).exists():
+            errors.append(f"canonical proof anchor does not resolve: {ABSOLUTE_REPO_PREFIX}{relative_path}")
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     errors: list[str] = []
+
+    _verify_required_repo_anchor_paths(errors, repo_root)
 
     for relative_path, markers in REQUIRED_SOURCE_MARKERS.items():
         path = repo_root / relative_path
