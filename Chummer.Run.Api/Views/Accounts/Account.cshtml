@@ -38,6 +38,27 @@
     var activeAccessRights = Model.InstallLinking.ActiveGrants?.Count ?? 0;
     var pendingClaims = Model.InstallLinking.PendingClaimTickets.Count;
     var openSupportCases = Model.SupportCases.Count(item => !string.Equals(item.Status, "user_notified", StringComparison.OrdinalIgnoreCase));
+    var linkedInstallations = Model.InstallLinking.ClaimedInstallations ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.ClaimedInstallationDto>();
+    var activeGrants = Model.InstallLinking.ActiveGrants ?? Array.Empty<Chummer.Hub.Registry.Contracts.InstallLinking.InstallationGrantDto>();
+    var pendingClaimTickets = Model.InstallLinking.PendingClaimTickets.OrderByDescending(static item => item.CreatedAtUtc).ToArray();
+    var installRailSupportCases = Model.SupportCaseSummaries
+        .Where(item =>
+            string.Equals(item.Case.Kind, "install_help", StringComparison.OrdinalIgnoreCase)
+            || !string.IsNullOrWhiteSpace(item.Case.InstallationId)
+            || !string.IsNullOrWhiteSpace(item.Case.ReleaseChannel)
+            || !string.IsNullOrWhiteSpace(item.Case.Platform))
+        .OrderByDescending(item => item.Case.UpdatedAtUtc)
+        .ToArray();
+    var leadInstallation = linkedInstallations.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
+    var leadGrant = leadInstallation is null
+        ? activeGrants.OrderByDescending(static item => item.IssuedAtUtc).FirstOrDefault()
+        : activeGrants
+            .Where(item => string.Equals(item.InstallationId, leadInstallation.InstallationId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.IssuedAtUtc)
+            .FirstOrDefault()
+            ?? activeGrants.OrderByDescending(static item => item.IssuedAtUtc).FirstOrDefault();
+    var leadPendingClaim = pendingClaimTickets.FirstOrDefault();
+    var leadInstallRailSupport = installRailSupportCases.FirstOrDefault();
     var dossierCount = Model.CampaignSpine.Dossiers.Count;
     var campaignCount = Model.CampaignSpine.Campaigns.Count;
     var runCount = Model.CampaignSpine.Runs.Count;
@@ -97,6 +118,40 @@
         || selectedBuildLabHandoff is not null
         || selectedRulesNavigatorAnswer is not null
         || selectedCreatorPublication is not null;
+    var installRailHeading = "Start the next linked install from this account";
+    var installRailSummary = "Open Downloads while signed in to keep the next install, update handoff, and support history on the same account rail from the first successful launch.";
+    var installRailPrimaryLabel = "Open downloads";
+    var installRailPrimaryHref = "/downloads";
+    var installRailSecondaryLabel = "Open install help";
+    var installRailSecondaryHref = "/contact?kind=install_help";
+
+    if (leadInstallRailSupport is not null)
+    {
+        installRailHeading = "Tracked install follow-through";
+        installRailSummary = $"{leadInstallRailSupport.NextSafeAction} {leadInstallRailSupport.InstallReadinessSummary}";
+        installRailPrimaryLabel = leadInstallRailSupport.PrimaryActionLabel;
+        installRailPrimaryHref = leadInstallRailSupport.PrimaryActionHref;
+        installRailSecondaryLabel = "Open tracked support";
+        installRailSecondaryHref = leadInstallRailSupport.DetailHref;
+    }
+    else if (leadPendingClaim is not null)
+    {
+        installRailHeading = "Finish the pending install on that device";
+        installRailSummary = "The next safe action is still inside Chummer on the already-downloaded device. Only use the recovery code if that copy explicitly enters recovery mode. Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked.";
+        installRailPrimaryLabel = "Open downloads";
+        installRailPrimaryHref = "/downloads";
+        installRailSecondaryLabel = "Open tracked support";
+        installRailSecondaryHref = "/account/support";
+    }
+    else if (leadInstallation is not null)
+    {
+        installRailHeading = "This linked install is your default return rail";
+        installRailSummary = "Use Devices & access for relinking, guided update follow-through, and support closure on the same copy. Keep recovery boring by staying on one linked install rail instead of starting a fresh browser ritual.";
+        installRailPrimaryLabel = "Open downloads";
+        installRailPrimaryHref = "/downloads";
+        installRailSecondaryLabel = "Open tracked support";
+        installRailSecondaryHref = "/account/support";
+    }
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -757,6 +812,62 @@
                     <h2>Devices &amp; access</h2>
                     <p>Keep linked installs, preview access, and download handoff in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
                 </div>
+                <article class="app-action-card app-action-card--primary">
+                    <span class="tag">Current install rail</span>
+                    <h3>@installRailHeading</h3>
+                    <p>@installRailSummary</p>
+                    <div class="settings-summary-list">
+                        <div class="settings-summary-row">
+                            <span>Recommended for this install</span>
+                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open downloads to confirm the current guided installer path.")</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Who can get it now</span>
+                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open downloads to confirm the live access posture.")</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Fix availability</span>
+                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Fix availability", "Open downloads to confirm whether the current linked install already has the fix.")</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Current caution</span>
+                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Use the current release rail when you need the newest caution before you continue this install.")</strong>
+                        </div>
+                        @if (leadInstallation is not null)
+                        {
+                            <div class="settings-summary-row">
+                                <span>Linked copy</span>
+                                <strong>@(InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)) · @PlatformSummary(leadInstallation.Platform, leadInstallation.Arch) · @InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)</strong>
+                            </div>
+                        }
+                        @if (leadGrant is not null)
+                        {
+                            <div class="settings-summary-row">
+                                <span>Access right</span>
+                                <strong>Active until @leadGrant.ExpiresAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm") UTC</strong>
+                            </div>
+                        }
+                        @if (leadPendingClaim is not null)
+                        {
+                            <div class="settings-summary-row">
+                                <span>Recovery fallback</span>
+                                <strong>@leadPendingClaim.ArtifactLabel · use the pending code only if that device explicitly opens in recovery mode.</strong>
+                            </div>
+                        }
+                        @if (leadInstallRailSupport is not null)
+                        {
+                            <div class="settings-summary-row">
+                                <span>Tracked support</span>
+                                <strong>@leadInstallRailSupport.StageLabel · @leadInstallRailSupport.ClosureSummary</strong>
+                            </div>
+                        }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
+                        <a class="button-like button-like--secondary" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
+                    </div>
+                    <p class="muted-copy">Devices &amp; access is the calmer return path after the installer or app does the real work. Recovery codes stay below as a fallback, not the first instruction.</p>
+                </article>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
                         <span>Recent install handoffs</span>
@@ -828,8 +939,8 @@
                 @if (pendingClaims > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Finish on another device</summary>
-                        <p class="muted-copy">Use these codes only on the device that is opening the already-downloaded build for the first time.</p>
+                        <summary>Finish on another device (Recovery mode only)</summary>
+                        <p class="muted-copy">Enter each code in Chummer if it opens in recovery mode on the already-downloaded device. Do not redeem claim codes in a browser tab.</p>
                         <div class="settings-summary-list">
                             @foreach (var ticket in Model.InstallLinking.PendingClaimTickets)
                             {

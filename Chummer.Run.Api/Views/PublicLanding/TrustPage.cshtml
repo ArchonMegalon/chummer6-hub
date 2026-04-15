@@ -242,8 +242,8 @@ else
                         <input id="supportHeadId" name="headId" maxlength="64" placeholder="avalonia or another shipped head" value="@Model.SupportIntake.DefaultHeadId" />
                     </div>
                     <div class="field">
-                        <label for="supportInstallationId">Install or claim code</label>
-                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id or claim code" value="@Model.SupportIntake.DefaultInstallationId" />
+                        <label for="supportInstallationId">Install id</label>
+                        <input id="supportInstallationId" name="installationId" maxlength="64" placeholder="Optional install id from Devices and access" value="@Model.SupportIntake.DefaultInstallationId" />
                     </div>
                     <div class="field">
                         <label for="supportArch">Architecture</label>
@@ -261,9 +261,24 @@ else
                 <div class="stacked-actions">
                     <button class="button-like button-like--primary" type="submit">Submit support case</button>
                     <a class="button-like button-like--secondary" href="@Model.SupportIntake.AccountSupportHref">@Model.SupportIntake.AccountSupportLabel</a>
+                    <a class="button-like button-like--ghost" href="@Model.SupportIntake.InstallAccessHref">@Model.SupportIntake.InstallAccessLabel</a>
                 </div>
             </form>
             <p class="muted-copy">@Model.SupportIntake.ResponseExpectation</p>
+            @if (!string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailHref)
+                && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
+                && !string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary))
+            {
+                <div class="compact-rail">
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>@(Model.SupportIntake.RecoveryModeOnly ? "Recovery stays on this install rail" : "Return to the guided installer after support")</h3>
+                            <p>@Model.SupportIntake.InstallRailSummary</p>
+                        </div>
+                        <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@Model.SupportIntake.InstallRailLabel</a>
+                    </article>
+                </div>
+            }
 
             <div class="compact-rail">
                 @foreach (var option in Model.SupportIntake.Options)

@@ -24,6 +24,7 @@ public sealed record SupportProgressEmailDispatchResult(
     string? Reason = null,
     string? EtaText = null,
     string? DownloadUrl = null,
+    string? InstallRailUrl = null,
     string? Error = null);
 
 public sealed class SupportProgressEmailWorkflowService
@@ -67,7 +68,8 @@ public sealed class SupportProgressEmailWorkflowService
             implementationPosture: null,
             reason: null,
             etaText: null,
-            downloadUrl: null);
+            downloadUrl: null,
+            installRailUrl: null);
     }
 
     public SupportProgressEmailDispatchResult SendAuditedDecision(
@@ -106,7 +108,8 @@ public sealed class SupportProgressEmailWorkflowService
             implementationPosture: implementationPosture,
             reason: reason,
             etaText: etaText,
-            downloadUrl: null);
+            downloadUrl: null,
+            installRailUrl: null);
     }
 
     public SupportProgressEmailDispatchResult SendFixAvailable(
@@ -118,19 +121,23 @@ public sealed class SupportProgressEmailWorkflowService
 
         string downloadUrl = NormalizeOptional(request.DownloadUrl, 400)
             ?? $"{ResolvePublicBaseUrl()}/downloads";
+        string? installRailUrl = HasInstallRailContext(supportCase)
+            ? $"{ResolvePublicBaseUrl()}/account/access"
+            : null;
 
         return Dispatch(
             supportCase,
             stageId: "fix_available",
             subject: $"Chummer fix available now: {supportCase.Title}",
-            content: BuildFixAvailableContent(supportCase, request, downloadUrl),
+            content: BuildFixAvailableContent(supportCase, request, downloadUrl, installRailUrl),
             awardKey: null,
             awardLabel: null,
             decisionOutcome: null,
             implementationPosture: null,
             reason: NormalizeOptional(request.Note, 160),
             etaText: null,
-            downloadUrl: downloadUrl);
+            downloadUrl: downloadUrl,
+            installRailUrl: installRailUrl);
     }
 
     private SupportProgressEmailDispatchResult Dispatch(
@@ -144,7 +151,8 @@ public sealed class SupportProgressEmailWorkflowService
         string? implementationPosture,
         string? reason,
         string? etaText,
-        string? downloadUrl)
+        string? downloadUrl,
+        string? installRailUrl)
     {
         DateTimeOffset now = DateTimeOffset.UtcNow;
         string recipient = NormalizeOptional(supportCase.ReporterEmail, 256) ?? string.Empty;
@@ -165,6 +173,7 @@ public sealed class SupportProgressEmailWorkflowService
                 reason,
                 etaText,
                 downloadUrl,
+                installRailUrl,
                 "workflow_disabled",
                 now);
         }
@@ -183,6 +192,7 @@ public sealed class SupportProgressEmailWorkflowService
                 reason,
                 etaText,
                 downloadUrl,
+                installRailUrl,
                 "reporter_email_missing",
                 now);
         }
@@ -208,6 +218,7 @@ public sealed class SupportProgressEmailWorkflowService
                 reason,
                 etaText,
                 downloadUrl,
+                installRailUrl,
                 "workflow_unconfigured",
                 now);
         }
@@ -231,6 +242,7 @@ public sealed class SupportProgressEmailWorkflowService
                 reason: reason,
                 etaText: etaText,
                 downloadUrl: downloadUrl,
+                installRailUrl: installRailUrl,
                 idempotencyKey: idempotencyKey,
                 fromEmail: fromEmail,
                 fromName: fromName);
@@ -273,6 +285,7 @@ public sealed class SupportProgressEmailWorkflowService
                 Reason: reason,
                 EtaText: etaText,
                 DownloadUrl: downloadUrl,
+                InstallRailUrl: installRailUrl,
                 Error: null);
         }
         catch (Exception ex)
@@ -295,6 +308,7 @@ public sealed class SupportProgressEmailWorkflowService
                 reason,
                 etaText,
                 downloadUrl,
+                installRailUrl,
                 ex.Message,
                 now,
                 deliveryId);
@@ -316,6 +330,7 @@ public sealed class SupportProgressEmailWorkflowService
         string? reason,
         string? etaText,
         string? downloadUrl,
+        string? installRailUrl,
         string idempotencyKey,
         string fromEmail,
         string fromName)
@@ -336,6 +351,15 @@ public sealed class SupportProgressEmailWorkflowService
         AddMetadataIfValue(metadata, "reason", reason);
         AddMetadataIfValue(metadata, "eta_text", etaText);
         AddMetadataIfValue(metadata, "download_url", downloadUrl);
+        AddMetadataIfValue(metadata, "install_rail_url", installRailUrl);
+        AddMetadataIfValue(metadata, "installation_id", supportCase.InstallationId);
+        AddMetadataIfValue(metadata, "application_version", supportCase.ApplicationVersion);
+        AddMetadataIfValue(metadata, "release_channel", supportCase.ReleaseChannel);
+        AddMetadataIfValue(metadata, "head_id", supportCase.HeadId);
+        AddMetadataIfValue(metadata, "platform", supportCase.Platform);
+        AddMetadataIfValue(metadata, "arch", supportCase.Arch);
+        AddMetadataIfValue(metadata, "fixed_version", supportCase.FixedVersion);
+        AddMetadataIfValue(metadata, "fixed_channel", supportCase.FixedChannel);
 
         var payload = new
         {
@@ -552,7 +576,8 @@ public sealed class SupportProgressEmailWorkflowService
     private static string BuildFixAvailableContent(
         SupportCaseProjection supportCase,
         SupportCaseNotificationRequest request,
-        string downloadUrl)
+        string downloadUrl,
+        string? installRailUrl)
         => string.Join(
             "\n",
             new[]
@@ -560,12 +585,49 @@ public sealed class SupportProgressEmailWorkflowService
                 $"Your feedback is incorporated in the current release for case {supportCase.CaseId}.",
                 request.Note.Trim(),
                 "",
-                "Please test it on the affected flow and tell Chummer if the fix holds.",
+                HasInstallRailContext(supportCase)
+                    ? "Please test it on the affected linked install and tell Chummer if the fix holds."
+                    : "Please test it on the affected flow and tell Chummer if the fix holds.",
                 $"Download: {downloadUrl}",
+                !string.IsNullOrWhiteSpace(installRailUrl)
+                    ? $"Linked install rail: {installRailUrl}"
+                    : string.Empty,
+                BuildAffectedInstallLine(supportCase),
                 string.IsNullOrWhiteSpace(supportCase.FixedVersion)
                     ? string.Empty
                     : $"Target build: {BuildReleaseLabel(supportCase.FixedChannel, supportCase.FixedVersion)}",
             }.Where(static line => !string.IsNullOrWhiteSpace(line)));
+
+    private static string BuildAffectedInstallLine(SupportCaseProjection supportCase)
+    {
+        if (!HasInstallRailContext(supportCase))
+        {
+            return string.Empty;
+        }
+
+        string?[] parts =
+        [
+            supportCase.InstallationId,
+            supportCase.ApplicationVersion,
+            supportCase.ReleaseChannel,
+            supportCase.HeadId,
+            supportCase.Platform,
+            supportCase.Arch
+        ];
+        string descriptor = string.Join(" · ", parts.Where(static item => !string.IsNullOrWhiteSpace(item)));
+        return string.IsNullOrWhiteSpace(descriptor)
+            ? string.Empty
+            : $"Affected install: {descriptor}";
+    }
+
+    private static bool HasInstallRailContext(SupportCaseProjection supportCase)
+        => string.Equals(NormalizeOptional(supportCase.Kind, 64), SupportCaseKinds.InstallHelp, StringComparison.OrdinalIgnoreCase)
+           || !string.IsNullOrWhiteSpace(supportCase.InstallationId)
+           || !string.IsNullOrWhiteSpace(supportCase.ApplicationVersion)
+           || !string.IsNullOrWhiteSpace(supportCase.ReleaseChannel)
+           || !string.IsNullOrWhiteSpace(supportCase.HeadId)
+           || !string.IsNullOrWhiteSpace(supportCase.Platform)
+           || !string.IsNullOrWhiteSpace(supportCase.Arch);
 
     private static string BuildReleaseLabel(string? channel, string? version)
     {
@@ -659,6 +721,7 @@ public sealed class SupportProgressEmailWorkflowService
         string? reason,
         string? etaText,
         string? downloadUrl,
+        string? installRailUrl,
         string error,
         DateTimeOffset occurredAtUtc)
         => new(
@@ -677,6 +740,7 @@ public sealed class SupportProgressEmailWorkflowService
             Reason: reason,
             EtaText: etaText,
             DownloadUrl: downloadUrl,
+            InstallRailUrl: installRailUrl,
             Error: error);
 
     private static SupportProgressEmailDispatchResult BuildFailed(
@@ -691,6 +755,7 @@ public sealed class SupportProgressEmailWorkflowService
         string? reason,
         string? etaText,
         string? downloadUrl,
+        string? installRailUrl,
         string error,
         DateTimeOffset occurredAtUtc,
         string? deliveryId = null)
@@ -710,6 +775,7 @@ public sealed class SupportProgressEmailWorkflowService
             Reason: reason,
             EtaText: etaText,
             DownloadUrl: downloadUrl,
+            InstallRailUrl: installRailUrl,
             Error: Truncate(error, 600));
 
     private string ResolveEaBaseUrl()

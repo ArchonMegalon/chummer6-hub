@@ -2317,4 +2317,7 @@ if bash scripts/audit-ui-parity.sh; then
 fi
 mv "$visual_receipt_backup" "$visual_receipt_path"
 
+python3 scripts/verify_desktop_native_trust_receipts.py
+python3 -m unittest tests/test_desktop_native_trust_receipts.py
+
 bash scripts/ai/run_services_smoke.sh

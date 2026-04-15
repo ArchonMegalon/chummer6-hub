@@ -255,6 +255,8 @@ public sealed record DownloadDispatchPageViewModel(
     string AccountLabel,
     string HelpHref,
     string HelpLabel,
+    string SupportHref,
+    string SupportLabel,
     ReleaseDisplayViewModel Display,
     string Channel,
     string Version,
@@ -350,6 +352,8 @@ public sealed record SupportIntakeViewModel(
     bool Authenticated,
     string AccountSupportHref,
     string AccountSupportLabel,
+    string InstallAccessHref,
+    string InstallAccessLabel,
     string ResponseExpectation,
     string? SubmissionNotice,
     string AttachmentHelp,
@@ -364,7 +368,11 @@ public sealed record SupportIntakeViewModel(
     string? DefaultReleaseChannel = null,
     string? DefaultHeadId = null,
     string? DefaultArch = null,
-    string? ContextHint = null);
+    string? ContextHint = null,
+    string? InstallRailHref = null,
+    string? InstallRailLabel = null,
+    string? InstallRailSummary = null,
+    bool RecoveryModeOnly = false);
 
 public sealed record SupportSubmittedPageViewModel(
     SiteChromeViewModel Chrome,
