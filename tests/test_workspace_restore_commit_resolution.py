@@ -53,6 +53,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"1f4f0e2e"', script_text)
         self.assertIn('"29f7ec9b"', script_text)
         self.assertIn('"46551461"', script_text)
+        self.assertIn('"b4da7025"', script_text)
         self.assertIn('"af336c17"', script_text)
         self.assertIn('"aa61c498"', script_text)
         self.assertIn('"1b1c5427"', script_text)
@@ -62,6 +63,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"1ca535e2"', script_text)
         self.assertIn('"25fb4391"', script_text)
         self.assertIn('"41c106c8"', script_text)
+        self.assertIn('"b4bdc153"', script_text)
         self.assertIn("commit fcdd1fa5 pins the current M105 workspace proof floor", script_text)
         self.assertIn("commit 021de48a requires the current M105 queue proof guard", script_text)
         self.assertIn("commit 5bf1a11e pins the current M105 workspace queue guard", script_text)
@@ -80,6 +82,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit 442c76c2 pins the M105 workspace receipt guard floor", script_text)
         self.assertIn("commit 1f4f0e2e requires the current M105 workspace receipt guard floor", script_text)
         self.assertIn("commit 29f7ec9b pins the M105 workspace receipt proof floor", script_text)
+        self.assertIn("commit b4da7025 pins the M105 workspace proof floor guard", script_text)
         self.assertIn("commit 46551461 tightens the M105 standard verify entrypoint guard", script_text)
         self.assertIn("commit 1b1c5427 pins the M105 workspace proof floor guard", script_text)
         self.assertIn("commit 1d5a811f pins the M105 workspace proof floor guard", script_text)
@@ -88,6 +91,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit 1ca535e2 pins the M105 workspace helper proof floor", script_text)
         self.assertIn("commit 25fb4391 pins the M105 workspace proof floor", script_text)
         self.assertIn("commit 41c106c8 pins the M105 workspace proof floor guard", script_text)
+        self.assertIn("commit b4bdc153 pins the M105 workspace proof floor guard", script_text)
 
     def test_verifier_fails_closed_when_required_local_commit_does_not_resolve(self) -> None:
         env = os.environ.copy()
