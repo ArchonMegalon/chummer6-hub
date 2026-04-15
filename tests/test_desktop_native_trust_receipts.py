@@ -143,6 +143,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "items:",
                         "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                         "    package_id: next90-m102-hub-desktop-native-trust",
+                        "    frontier_id: 2897065929",
                         "    milestone_id: 102",
                         "    repo: chummer6-hub",
                         "    status: in_progress",
@@ -162,6 +163,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "items:",
                         "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                         "    package_id: next90-m102-hub-desktop-native-trust",
+                        "    frontier_id: 2897065929",
                         "    milestone_id: 102",
                         "    repo: chummer6-hub",
                         "    status: complete",
@@ -212,6 +214,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "items:",
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    repo: chummer6-hub",
                     "    status: complete",
@@ -253,6 +256,58 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn("canonical design successor queue staging block missing marker: landed_commit: 160af58f", result.stderr)
 
+    def test_verifier_fail_closes_successor_queue_frontier_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            design_queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.design.generated.yaml"
+            registry_path = Path(temp_root) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            complete_queue = "\n".join(
+                [
+                    "items:",
+                    "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                    "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
+                    "    milestone_id: 102",
+                    "    repo: chummer6-hub",
+                    "    status: complete",
+                    "    landed_commit: 160af58f",
+                    *QUEUE_PROOF_LINES,
+                    "    allowed_paths:",
+                    "      - Chummer.Run.Api",
+                    "      - scripts",
+                    "      - tests",
+                    "    owned_surfaces:",
+                    "      - desktop_native_claim_and_recovery",
+                    "      - support_followthrough:install_truth",
+                ]
+            )
+            queue_path.write_text(
+                complete_queue.replace("    frontier_id: 2897065929\n", "") + "\n",
+                encoding="utf-8",
+            )
+            design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            registry_path.write_text(
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_NEXT90_QUEUE_STAGING_PATH": str(queue_path),
+                    "CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH": str(design_queue_path),
+                    "CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH": str(registry_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("canonical successor queue staging block missing marker: frontier_id: 2897065929", result.stderr)
+
     def test_verifier_fail_closes_successor_queue_scope_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
@@ -263,6 +318,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "items:",
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    repo: chummer6-hub",
                     "    status: complete",
@@ -314,6 +370,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "items:",
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    repo: chummer6-hub",
                     "    status: complete",
@@ -369,6 +426,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "items:",
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    repo: chummer6-hub",
                     "    status: complete",

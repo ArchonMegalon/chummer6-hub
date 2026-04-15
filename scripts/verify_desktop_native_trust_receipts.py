@@ -102,6 +102,7 @@ REQUIRED_TOP_LEVEL_JOURNEYS = [
 
 REQUIRED_CANONICAL_QUEUE_MARKERS = [
     f"package_id: {PACKAGE_ID}",
+    f"frontier_id: {FRONTIER_ID}",
     "milestone_id: 102",
     "repo: chummer6-hub",
     "status: complete",
