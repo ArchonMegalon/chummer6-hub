@@ -90,6 +90,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "7e908447",
     "2df21683",
     "442c76c2",
+    "1f4f0e2e",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -248,6 +249,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 7e908447 tightens the M105 workspace receipt proof so package-scoped release proof cannot widen beyond the canonical workspace_restore:provenance and entitlement_sync:conflict_receipts receipts.",
     "/docker/chummercomplete/chummer.run-services commit 2df21683 pins the M105 workspace receipt proof floor so future shards verify the latest closed-package guard instead of repeating it.",
     "/docker/chummercomplete/chummer.run-services commit 442c76c2 pins the M105 workspace receipt guard floor so canonical registry and queue proof must cite the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit 1f4f0e2e requires the current M105 workspace receipt guard floor so future shards verify the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -287,6 +289,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 7e908447 tightens the M105 workspace receipt proof so package-scoped release proof cannot widen beyond the canonical workspace_restore:provenance and entitlement_sync:conflict_receipts receipts.",
     "/docker/chummercomplete/chummer.run-services commit 2df21683 pins the M105 workspace receipt proof floor so future shards verify the latest closed-package guard instead of repeating it.",
     "/docker/chummercomplete/chummer.run-services commit 442c76c2 pins the M105 workspace receipt guard floor so canonical registry and queue proof must cite the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit 1f4f0e2e requires the current M105 workspace receipt guard floor so future shards verify the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
