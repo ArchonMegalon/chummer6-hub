@@ -16,6 +16,7 @@ REQUIRED_SOURCE_MARKERS = {
         '[HttpPost("continuation")]',
         "ResolveInstallationForGrant(request.InstallationId, request.AccessToken)",
         "DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false)",
+        "FallbackPosture: continuation?.FallbackPosture",
         "BuildNativeNextSafeAction(updateAvailable, leadSupportCase, continuation)",
         "SupportCases: supportCases",
     ],
@@ -43,6 +44,7 @@ REQUIRED_SOURCE_MARKERS = {
     ],
     Path("tests/RunServicesVerification/InstallLinkingContinuationVerification.cs"): [
         "ContinueClaimedInstall(",
+        "response.FallbackPosture.Contains(\"Claim codes are a recovery fallback\"",
         "UpdateAvailable",
         "NeedsInstallUpdate",
         "Invalid desktop continuation grants should fail closed.",

@@ -124,6 +124,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(string.Equals(response.InstalledBuildReceiptId, "receipt-old", StringComparison.Ordinal), "Continuation should cite the installed build receipt.");
             VerificationAssert.True(response.UpdateAvailable, "Continuation should mark a newer release as update-available.");
             VerificationAssert.Equal("0.7.1-preview", response.CurrentReleaseVersion, "Continuation should include current release truth.");
+            VerificationAssert.True(response.FallbackPosture.Contains("Claim codes are a recovery fallback", StringComparison.Ordinal), "Continuation should expose fallback posture so desktop, support, and download surfaces agree.");
             VerificationAssert.True(response.SupportHref.Contains("installationId=install-native", StringComparison.Ordinal), "Support continuation should carry installation identity.");
             VerificationAssert.True(response.SupportHref.Contains("applicationVersion=0.7.1-preview", StringComparison.Ordinal), "Support continuation should carry current release version truth.");
             VerificationAssert.True(response.RollbackAction.Contains("previous installed copy", StringComparison.OrdinalIgnoreCase), "Continuation should keep rollback on the previous installed copy.");
