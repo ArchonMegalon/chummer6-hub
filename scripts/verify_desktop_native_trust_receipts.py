@@ -103,6 +103,18 @@ REQUIRED_CANONICAL_REGISTRY_MARKERS = [
 ]
 
 REQUIRED_CANONICAL_QUEUE_LISTS = {
+    "proof": [
+        "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InstallLinkingController.cs",
+        "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/DesktopInstallRail.cs",
+        "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Support/SupportCasePresentationService.cs",
+        "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml",
+        "/docker/chummercomplete/chummer.run-services/scripts/verify_desktop_native_trust_receipts.py",
+        "/docker/chummercomplete/chummer.run-services/tests/test_desktop_native_trust_receipts.py",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "python3 scripts/verify_desktop_native_trust_receipts.py",
+        "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
+        'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
+    ],
     "allowed_paths": [
         "Chummer.Run.Api",
         "scripts",
