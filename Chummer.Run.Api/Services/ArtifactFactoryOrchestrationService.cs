@@ -68,23 +68,31 @@ public sealed class ArtifactFactoryOrchestrationService
             ["release"] = new(
                 RecipeId: "release-proof-shelf-bundle",
                 AllowedSourceKinds: ["release", "release_evidence", "desktop_release", "install_receipt"],
-                DefaultFormats: ["preview_card", "caption", "packet", "short_video"],
-                RequiredReceiptPrefixes: ["release", "promotion", "public-shelf"]),
+                DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                RequiredReceiptPrefixes: ["release", "promotion", "public-shelf"],
+                RequiredAnchorDescription: "a release artifact id or public proof shelf ref"),
             ["fix"] = new(
                 RecipeId: "fix-followthrough-bundle",
                 AllowedSourceKinds: ["fix_receipt", "support_case", "install_receipt", "release"],
-                DefaultFormats: ["preview_card", "caption", "packet"],
-                RequiredReceiptPrefixes: ["fix", "install", "support"]),
+                DefaultFormats: ["preview_card", "caption", "packet", "audio"],
+                AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                RequiredReceiptPrefixes: ["fix", "install", "support"],
+                RequiredAnchorDescription: "a support case id or release artifact id"),
             ["support"] = new(
                 RecipeId: "support-case-proof-packet",
                 AllowedSourceKinds: ["support_case", "crash_report", "install_receipt", "release"],
-                DefaultFormats: ["preview_card", "caption", "packet"],
-                RequiredReceiptPrefixes: ["support", "privacy", "install"]),
+                DefaultFormats: ["preview_card", "caption", "packet", "audio"],
+                AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                RequiredReceiptPrefixes: ["support", "privacy", "install"],
+                RequiredAnchorDescription: "a support case id"),
             ["publication"] = new(
                 RecipeId: "publication-proof-shelf-bundle",
                 AllowedSourceKinds: ["publication", "creator_publication", "campaign_recap", "runtime_bundle"],
-                DefaultFormats: ["preview_card", "caption", "packet", "short_video"],
-                RequiredReceiptPrefixes: ["publication", "moderation", "public-shelf"])
+                DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                RequiredReceiptPrefixes: ["publication", "moderation", "public-shelf"],
+                RequiredAnchorDescription: "a publication id or public proof shelf ref")
         };
 
     public ArtifactFactoryJobLaunchResult LaunchJob(ArtifactFactoryJobLaunchRequest request)
@@ -152,6 +160,8 @@ public sealed class ArtifactFactoryOrchestrationService
             }
         }
 
+        ValidateRecipeAnchors(family, request.SourcePacks, recipe);
+
         foreach (string prefix in recipe.RequiredReceiptPrefixes)
         {
             if (!requiredReceiptRefs.Any(receipt => receipt.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
@@ -160,7 +170,7 @@ public sealed class ArtifactFactoryOrchestrationService
             }
         }
 
-        string[] outputFormats = NormalizeOutputFormats(request.RequestedFormats, recipe.DefaultFormats);
+        string[] outputFormats = NormalizeOutputFormats(request.RequestedFormats, recipe);
         string audience = NormalizeOptional(request.Audience) ?? "public-proof-shelf";
         string locale = NormalizeOptional(request.Locale) ?? "en-US";
         string jobId = BuildJobId(family, sourcePacks, outputFormats, audience, locale);
@@ -220,6 +230,33 @@ public sealed class ArtifactFactoryOrchestrationService
         }
     }
 
+    private static void ValidateRecipeAnchors(
+        string family,
+        IReadOnlyList<ApprovedArtifactSourcePack> sourcePacks,
+        ArtifactFactoryRecipe recipe)
+    {
+        bool hasRequiredAnchor = family switch
+        {
+            "release" => sourcePacks.Any(static pack =>
+                !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId)
+                || !string.IsNullOrWhiteSpace(pack.PublicShelfRef)),
+            "fix" => sourcePacks.Any(static pack =>
+                !string.IsNullOrWhiteSpace(pack.SupportCaseId)
+                || !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId)),
+            "support" => sourcePacks.Any(static pack =>
+                !string.IsNullOrWhiteSpace(pack.SupportCaseId)),
+            "publication" => sourcePacks.Any(static pack =>
+                !string.IsNullOrWhiteSpace(pack.PublicationId)
+                || !string.IsNullOrWhiteSpace(pack.PublicShelfRef)),
+            _ => false
+        };
+
+        if (!hasRequiredAnchor)
+        {
+            throw new InvalidDataException($"recipe {recipe.RecipeId} requires {recipe.RequiredAnchorDescription} from an approved source pack.");
+        }
+    }
+
     private static IReadOnlyList<string> NormalizeEvidenceRefs(ApprovedArtifactSourcePack sourcePack)
     {
         string[] evidenceRefs = (sourcePack.EvidenceRefs ?? Array.Empty<string>())
@@ -233,9 +270,9 @@ public sealed class ArtifactFactoryOrchestrationService
             : [$"provenance:{sourcePack.ProvenanceRef.Trim()}"];
     }
 
-    private static string[] NormalizeOutputFormats(IReadOnlyList<string>? requestedFormats, IReadOnlyList<string> defaultFormats)
+    private static string[] NormalizeOutputFormats(IReadOnlyList<string>? requestedFormats, ArtifactFactoryRecipe recipe)
     {
-        string[] formats = (requestedFormats is { Count: > 0 } ? requestedFormats : defaultFormats)
+        string[] formats = (requestedFormats is { Count: > 0 } ? requestedFormats : recipe.DefaultFormats)
             .Select(NormalizeToken)
             .Where(static item => item.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -244,6 +281,14 @@ public sealed class ArtifactFactoryOrchestrationService
         if (formats.Length == 0)
         {
             throw new InvalidDataException("at least one output format is required.");
+        }
+
+        string[] unsupportedFormats = formats
+            .Where(format => !recipe.AllowedFormats.Contains(format, StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        if (unsupportedFormats.Length > 0)
+        {
+            throw new InvalidDataException($"recipe {recipe.RecipeId} does not allow output format(s): {string.Join(", ", unsupportedFormats)}.");
         }
 
         return formats;
@@ -290,5 +335,7 @@ public sealed class ArtifactFactoryOrchestrationService
         string RecipeId,
         IReadOnlyList<string> AllowedSourceKinds,
         IReadOnlyList<string> DefaultFormats,
-        IReadOnlyList<string> RequiredReceiptPrefixes);
+        IReadOnlyList<string> AllowedFormats,
+        IReadOnlyList<string> RequiredReceiptPrefixes,
+        string RequiredAnchorDescription);
 }

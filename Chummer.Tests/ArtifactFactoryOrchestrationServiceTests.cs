@@ -59,7 +59,8 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     SourcePackId: "case-11709",
                     SourcePackKind: "support_case",
                     ApprovalState: "draft",
-                    ProvenanceRef: "support-case:11709")
+                    ProvenanceRef: "support-case:11709",
+                    SupportCaseId: "11709")
             ])));
 
         Assert.Contains("not approved", ex.Message, StringComparison.OrdinalIgnoreCase);
@@ -104,7 +105,8 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     SourcePackKind: "fix_receipt",
                     ApprovalState: "approved",
                     ProvenanceRef: "fix:11709",
-                    EvidenceRefs: ["fix:11709", "install:preview"])
+                    EvidenceRefs: ["fix:11709", "install:preview"],
+                    SupportCaseId: "11709")
             ]));
 
         ObjectResult unauthorized = Assert.IsType<ObjectResult>(result.Result);
@@ -127,12 +129,96 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
                     SourcePackKind: "fix_receipt",
                     ApprovalState: "approved",
                     ProvenanceRef: "fix:11709",
-                    EvidenceRefs: ["fix:11709", "install:preview"])
+                    EvidenceRefs: ["fix:11709", "install:preview"],
+                    SupportCaseId: "11709")
             ]));
 
         OkObjectResult ok = Assert.IsType<OkObjectResult>(response.Result);
         ArtifactFactoryJobLaunchResult result = Assert.IsType<ArtifactFactoryJobLaunchResult>(ok.Value);
         Assert.Equal("fix-followthrough-bundle", result.RecipeId);
+    }
+
+    [Fact]
+    public void LaunchJobRequiresShelfBindableRecipeAnchors()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-evidence-only",
+                    SourcePackKind: "release_evidence",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs: ["release:run-20260415", "promotion:startup-smoke"])
+            ])));
+
+        Assert.Contains("release artifact id or public proof shelf ref", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchJobRejectsProviderSpecificOutputFormats()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "publication",
+            RequestedBy: "creator.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "publication-pack-redmond-brief",
+                    SourcePackKind: "creator_publication",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "publication:redmond-brief:v3",
+                    EvidenceRefs: ["publication:redmond-brief:v3", "moderation:approved:redmond-brief"],
+                    PublicationId: "redmond-brief")
+            ],
+            RequestedFormats: ["preview-card", "provider-render-script"])));
+
+        Assert.Contains("does not allow output format", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("provider_render_script", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchJobBuildsSupportAndFixJobsFromAnchoredApprovedPacks()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobLaunchResult support = service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "support",
+            RequestedBy: "support.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "support-pack-11709",
+                    SourcePackKind: "support_case",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "support-case:11709",
+                    EvidenceRefs: ["support:11709", "privacy:redacted", "install:preview"],
+                    SupportCaseId: "11709")
+            ]));
+        ArtifactFactoryJobLaunchResult fix = service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "fix",
+            RequestedBy: "support.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "fix-pack-11709",
+                    SourcePackKind: "fix_receipt",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "fix:11709",
+                    EvidenceRefs: ["fix:11709", "install:preview", "support:11709"],
+                    SupportCaseId: "11709")
+            ]));
+
+        Assert.Equal("support-case-proof-packet", support.RecipeId);
+        Assert.Equal(["audio", "caption", "packet", "preview_card"], support.OutputFormats);
+        Assert.Equal("fix-followthrough-bundle", fix.RecipeId);
+        Assert.Contains(fix.MediaFactoryRequest.ApprovedSourcePacks, pack => string.Equals(pack.SupportCaseId, "11709", StringComparison.Ordinal));
     }
 
     private static InternalArtifactFactoryController BuildController(string token)
