@@ -71,11 +71,13 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             queue_text = source_queue_path.read_text(encoding="utf-8")
             queue_text = queue_text.replace(
                 "    package_id: next90-m105-hub-workspace-continuity\n"
+                "    frontier_id: 4623636482\n"
                 "    milestone_id: 105\n"
                 "    wave: W8\n"
                 "    repo: chummer6-hub\n"
                 "    status: complete\n",
                 "    package_id: next90-m105-hub-workspace-continuity\n"
+                "    frontier_id: 4623636482\n"
                 "    milestone_id: 105\n"
                 "    wave: W8\n"
                 "    repo: chummer6-hub\n",
