@@ -17,6 +17,7 @@ SOURCE_FILES = [
     "Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
     "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
     "Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+    "tests/test_artifact_factory_orchestration.py",
 ]
 
 
@@ -217,9 +218,10 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             service_text = service_path.read_text(encoding="utf-8")
             service_path.write_text(
                 service_text.replace(
-                    "            if (!sourcePackIds.Add(sourcePack.SourcePackId))\n"
+                    "            string normalizedSourcePackId = sourcePack.SourcePackId.Trim();\n"
+                    "            if (!sourcePackIds.Add(normalizedSourcePackId))\n"
                     "            {\n"
-                    "                throw new InvalidDataException($\"duplicate source pack id '{sourcePack.SourcePackId}' is not allowed.\");\n"
+                    "                throw new InvalidDataException($\"duplicate source pack id '{normalizedSourcePackId}' is not allowed.\");\n"
                     "            }\n\n",
                     "",
                 ),
@@ -239,7 +241,51 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("duplicate source pack id", result.stderr)
+        self.assertIn("normalizedSourcePackId", result.stderr)
+
+    def test_verifier_fails_closed_when_normalized_duplicate_source_pack_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-normalized-source-pack-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            string normalizedSourcePackId = sourcePack.SourcePackId.Trim();\n"
+                    "            if (!sourcePackIds.Add(normalizedSourcePackId))\n"
+                    "            {\n"
+                    "                throw new InvalidDataException($\"duplicate source pack id '{normalizedSourcePackId}' is not allowed.\");\n"
+                    "            }\n\n",
+                    "            if (!sourcePackIds.Add(sourcePack.SourcePackId))\n"
+                    "            {\n"
+                    "                throw new InvalidDataException($\"duplicate source pack id '{sourcePack.SourcePackId}' is not allowed.\");\n"
+                    "            }\n\n",
+                ).replace(
+                    "                SourcePackId: normalizedSourcePackId,\n",
+                    "                SourcePackId: sourcePack.SourcePackId.Trim(),\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("normalizedSourcePackId", result.stderr)
 
     def test_verifier_fails_closed_when_orchestration_service_is_not_registered(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-wiring-proof-") as temp_dir:

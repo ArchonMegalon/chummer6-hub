@@ -114,6 +114,46 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobRejectsWhitespacePaddedDuplicateSourcePackIds()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-macos-arm64",
+                        "public-shelf:/downloads/install/avalonia-osx-arm64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-osx-arm64-installer"),
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "  release-pack-20260415  ",
+                    SourcePackKind: "release_evidence",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-evidence:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:duplicate-evidence",
+                        "promotion:startup-smoke:avalonia-macos-arm64",
+                        "public-shelf:/downloads/install/avalonia-osx-arm64-installer"
+                    ],
+                    PublicShelfRef: "/downloads/install/avalonia-osx-arm64-installer")
+            ])));
+
+        Assert.Contains("duplicate source pack id", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("release-pack-20260415", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobBuildsPublicationProofShelfRoute()
     {
         ArtifactFactoryOrchestrationService service = new();
