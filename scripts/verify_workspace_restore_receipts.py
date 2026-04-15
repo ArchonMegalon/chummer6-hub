@@ -95,6 +95,15 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind)",
         "IsEntitlementRestoreKind(kind)",
     ],
+    "scripts/materialize_hub_local_release_proof.py": [
+        '"package_id": "next90-m105-hub-workspace-continuity"',
+        '"frontier_id": 4623636482',
+        '"status": "complete"',
+        '"landed_commit": "4d4b3856"',
+        '"workspace_restore:provenance"',
+        '"entitlement_sync:conflict_receipts"',
+        '"Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture."',
+    ],
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": [
         "Restore provenance and conflict receipts",
         "Authority: @HumanizeStatus(receipt.Authority, \"hub\")",

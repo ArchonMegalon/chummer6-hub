@@ -483,6 +483,62 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("continue-blocking conflicts", result.stderr)
         self.assertIn("recoverable receipts", result.stderr)
 
+    def test_materializer_emits_closed_workspace_continuity_receipts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-materializer-") as temp_dir:
+            release_proof_path = Path(temp_dir) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materializer = REPO_ROOT / "scripts" / "materialize_hub_local_release_proof.py"
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(materializer),
+                    str(release_proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
+            payload = json.loads(release_proof_path.read_text(encoding="utf-8"))
+
+        package = payload["successor_queue_package"]
+        self.assertEqual("next90-m105-hub-workspace-continuity", package["package_id"])
+        self.assertEqual(105, package["milestone_id"])
+        self.assertEqual(4623636482, package["frontier_id"])
+        self.assertEqual("complete", package["status"])
+        self.assertEqual("4d4b3856", package["landed_commit"])
+        self.assertEqual(["Chummer.Run.Api", "scripts", "tests"], package["allowed_paths"])
+        self.assertEqual(
+            ["workspace_restore:provenance", "entitlement_sync:conflict_receipts"],
+            package["owned_surfaces"],
+        )
+
+        receipt_by_id = {
+            receipt["receipt_id"]: receipt
+            for receipt in payload["proof_receipts"]
+        }
+        for receipt_id in ["workspace_restore:provenance", "entitlement_sync:conflict_receipts"]:
+            self.assertIn(receipt_id, receipt_by_id)
+            self.assertEqual("next90-m105-hub-workspace-continuity", receipt_by_id[receipt_id]["package_id"])
+            self.assertEqual(105, receipt_by_id[receipt_id]["milestone_id"])
+            self.assertEqual(4623636482, receipt_by_id[receipt_id]["frontier_id"])
+            self.assertIn("/home/work", receipt_by_id[receipt_id]["routes"])
+            self.assertIn("/account/work", receipt_by_id[receipt_id]["routes"])
+
+        self.assertIn("workspace_restore:provenance", receipt_by_id["workspace_restore:provenance"]["surfaces"])
+        self.assertIn("entitlement_sync:conflict_receipts", receipt_by_id["entitlement_sync:conflict_receipts"]["surfaces"])
+        self.assertIn("claimed installs", receipt_by_id["workspace_restore:provenance"]["summary"])
+        self.assertIn("restore inventory", receipt_by_id["workspace_restore:provenance"]["summary"])
+        self.assertIn("Entitlement drift", receipt_by_id["entitlement_sync:conflict_receipts"]["summary"])
+        self.assertIn("continue-blocking conflicts", receipt_by_id["entitlement_sync:conflict_receipts"]["summary"])
+        self.assertIn("recoverable receipts", receipt_by_id["entitlement_sync:conflict_receipts"]["summary"])
+
     def test_verifier_fails_closed_when_local_release_proof_points_at_wrong_frontier(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-release-frontier-") as temp_dir:
             temp_root = Path(temp_dir)
