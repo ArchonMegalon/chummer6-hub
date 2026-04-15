@@ -90,8 +90,6 @@ REQUIRED_CANONICAL_QUEUE_MARKERS = [
     "repo: chummer6-hub",
     "status: complete",
     f"landed_commit: {LANDED_COMMIT}",
-    "desktop_native_claim_and_recovery",
-    "support_followthrough:install_truth",
 ]
 
 REQUIRED_CANONICAL_REGISTRY_MARKERS = [
@@ -103,6 +101,18 @@ REQUIRED_CANONICAL_REGISTRY_MARKERS = [
     "desktop_native_claim_and_recovery",
     "support_followthrough:install_truth",
 ]
+
+REQUIRED_CANONICAL_QUEUE_LISTS = {
+    "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests",
+    ],
+    "owned_surfaces": [
+        "desktop_native_claim_and_recovery",
+        "support_followthrough:install_truth",
+    ],
+}
 
 DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
@@ -129,6 +139,7 @@ def _verify_marker_block(
     anchor: str,
     markers: list[str],
     label: str,
+    required_lists: dict[str, list[str]] | None = None,
 ) -> None:
     if not path.is_file():
         errors.append(f"missing canonical {label} file: {path}")
@@ -143,6 +154,48 @@ def _verify_marker_block(
     for marker in markers:
         if marker not in block:
             errors.append(f"canonical {label} block missing marker: {marker}")
+
+    if required_lists is not None:
+        for key, expected_values in required_lists.items():
+            actual_values = _extract_yaml_string_list(block, key)
+            if actual_values is None:
+                errors.append(f"canonical {label} block missing list: {key}")
+                continue
+
+            if actual_values != expected_values:
+                errors.append(
+                    f"canonical {label} block has wrong {key}: "
+                    f"expected {expected_values!r}, got {actual_values!r}"
+                )
+
+
+def _extract_yaml_string_list(block: str, key: str) -> list[str] | None:
+    lines = block.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() != f"{key}:":
+            continue
+
+        values: list[str] = []
+        list_indent: int | None = None
+        for child in lines[index + 1 :]:
+            stripped = child.strip()
+            if not stripped:
+                continue
+
+            indent = len(child) - len(child.lstrip(" "))
+            if list_indent is None:
+                list_indent = indent
+            elif indent < list_indent:
+                break
+
+            if not stripped.startswith("- "):
+                break
+
+            values.append(stripped[2:].strip())
+
+        return values
+
+    return None
 
 
 def main() -> int:
@@ -211,6 +264,7 @@ def main() -> int:
         f"package_id: {PACKAGE_ID}",
         REQUIRED_CANONICAL_QUEUE_MARKERS,
         "successor queue staging",
+        REQUIRED_CANONICAL_QUEUE_LISTS,
     )
     _verify_marker_block(
         errors,
@@ -218,6 +272,7 @@ def main() -> int:
         f"package_id: {PACKAGE_ID}",
         REQUIRED_CANONICAL_QUEUE_MARKERS,
         "design successor queue staging",
+        REQUIRED_CANONICAL_QUEUE_LISTS,
     )
     _verify_marker_block(
         errors,
