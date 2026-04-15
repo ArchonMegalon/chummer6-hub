@@ -195,6 +195,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 74dff34c tightens M102 forbidden command evidence guard.",
         "/docker/chummercomplete/chummer.run-services commit aea02326 pins the M102 forbidden command proof floor.",
         "/docker/chummercomplete/chummer.run-services commit 2330a11c pins the current M102 desktop trust proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit 99a03a04 pins the M102 current desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -252,6 +253,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 74dff34c tightens M102 forbidden command evidence guard.",
         "/docker/chummercomplete/chummer.run-services commit aea02326 pins the M102 forbidden command proof floor.",
         "/docker/chummercomplete/chummer.run-services commit 2330a11c pins the current M102 desktop trust proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit 99a03a04 pins the M102 current desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -345,6 +347,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "74dff34c",
     "aea02326",
     "2330a11c",
+    "99a03a04",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
