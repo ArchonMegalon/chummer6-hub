@@ -11,6 +11,11 @@ SCRIPT = REPO_ROOT / "scripts" / "verify_workspace_restore_receipts.py"
 
 
 class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
+    def test_default_required_commits_include_closed_package_hardening_commit(self) -> None:
+        script_text = SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn('"80454b41"', script_text)
+
     def test_verifier_fails_closed_when_required_local_commit_does_not_resolve(self) -> None:
         env = os.environ.copy()
         env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REQUIRED_COMMITS"] = "4d4b3856,00000000"
