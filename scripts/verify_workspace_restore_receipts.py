@@ -108,6 +108,12 @@ LOCAL_RELEASE_PROOF_RECEIPTS: dict[str, dict[str, object]] = {
             "workspace_restore",
             "account_workspace_detail",
         ],
+        "summary_markers": [
+            "claimed installs",
+            "recent artifacts",
+            "rule environments",
+            "restore inventory",
+        ],
     },
     "entitlement_sync:conflict_receipts": {
         "routes": ["/home/work", "/account/work"],
@@ -115,6 +121,13 @@ LOCAL_RELEASE_PROOF_RECEIPTS: dict[str, dict[str, object]] = {
             "entitlement_sync:conflict_receipts",
             "entitlement_sync",
             "workspace_restore",
+        ],
+        "summary_markers": [
+            "Entitlement drift",
+            "stale claims",
+            "missing grants",
+            "continue-blocking conflicts",
+            "recoverable receipts",
         ],
     },
 }
@@ -311,6 +324,14 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
             for required in expected[key]:
                 if required not in value_set:
                     missing.append(f"{path}: {receipt_id}.{key} missing {required}")
+
+        summary = receipt.get("summary")
+        if not isinstance(summary, str):
+            missing.append(f"{path}: {receipt_id}.summary must be a string")
+        else:
+            for marker in expected["summary_markers"]:
+                if marker not in summary:
+                    missing.append(f"{path}: {receipt_id}.summary missing {marker}")
 
 
 def main() -> int:
