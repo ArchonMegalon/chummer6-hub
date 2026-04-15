@@ -86,6 +86,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "70b6f382",
     "0014a763",
     "d26e961c",
+    "9f723c15",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -240,6 +241,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 70b6f382 tightens the M105 served workspace proof guard so public served receipts cannot drift from the local proof shelf.",
     "/docker/chummercomplete/chummer.run-services commit 0014a763 tightens the M105 active-run proof marker guard to reject forbidden helper evidence case-insensitively.",
     "/docker/chummercomplete/chummer.run-services commit d26e961c tightens the M105 workspace release proof guard so package metadata and receipt routes or surfaces must match the canonical closed-package receipt exactly.",
+    "/docker/chummercomplete/chummer.run-services commit 9f723c15 tightens the M105 queue mirror guard so Fleet and design completed-package rows cannot drift while retaining required proof tokens.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -275,6 +277,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 70b6f382 tightens the M105 served workspace proof guard so public served receipts cannot drift from the local proof shelf.",
     "/docker/chummercomplete/chummer.run-services commit 0014a763 tightens the M105 active-run proof marker guard to reject forbidden helper evidence case-insensitively.",
     "/docker/chummercomplete/chummer.run-services commit d26e961c tightens the M105 workspace release proof guard so package metadata and receipt routes or surfaces must match the canonical closed-package receipt exactly.",
+    "/docker/chummercomplete/chummer.run-services commit 9f723c15 tightens the M105 queue mirror guard so Fleet and design completed-package rows cannot drift while retaining required proof tokens.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
