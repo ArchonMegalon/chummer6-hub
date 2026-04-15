@@ -1131,6 +1131,44 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier._required_resolving_commits(),
         )
 
+    def test_verifier_fail_closes_canonical_commit_floor_drift(self) -> None:
+        verifier = load_verifier_module()
+        original_queue_proof = list(verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        original_registry_evidence = list(verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        original_required_commits = list(verifier.REQUIRED_RESOLVING_COMMITS)
+
+        try:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = [
+                value
+                for value in original_queue_proof
+                if "commit ed3989d9 pins the M102 desktop trust proof floor guard" not in value
+            ]
+            errors: list[str] = []
+            verifier._verify_canonical_commit_floor_consistency(errors)
+
+            self.assertTrue(
+                any("M102 canonical queue and registry proof commit floors differ" in error for error in errors),
+                errors,
+            )
+
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = list(original_queue_proof)
+            verifier.REQUIRED_RESOLVING_COMMITS = [
+                commit
+                for commit in original_required_commits
+                if commit != "ed3989d9"
+            ]
+            errors = []
+            verifier._verify_canonical_commit_floor_consistency(errors)
+
+            self.assertIn(
+                "M102 canonical proof cites commit not enforced by resolver: ed3989d9",
+                errors,
+            )
+        finally:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence
+            verifier.REQUIRED_RESOLVING_COMMITS = original_required_commits
+
     def test_verifier_fail_closes_missing_standard_verify_wiring(self) -> None:
         verifier = load_verifier_module()
 
