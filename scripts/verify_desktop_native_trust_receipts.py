@@ -230,6 +230,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "7a825c73",
     "aff39474",
     "38d50742",
+    "b9404a4c",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
