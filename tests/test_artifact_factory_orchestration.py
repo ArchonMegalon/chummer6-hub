@@ -1310,6 +1310,34 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("commit 5b901df5", result.stderr)
 
+    def test_verifier_fails_closed_when_output_shelf_guard_commit_pin_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-output-shelf-guard-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            source_queue = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            queue_text = source_queue.read_text(encoding="utf-8")
+            queue_path.write_text(
+                queue_text.replace(
+                    "      - /docker/chummercomplete/chummer.run-services commit cbae3cdd tightens M107 artifact factory output shelf proof.\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("commit cbae3cdd", result.stderr)
+
     def test_verifier_fails_closed_when_design_queue_source_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-design-queue-proof-") as temp_dir:
             design_queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
