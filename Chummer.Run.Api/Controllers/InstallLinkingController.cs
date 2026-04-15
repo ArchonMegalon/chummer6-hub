@@ -114,7 +114,7 @@ public sealed class InstallLinkingController : ControllerBase
             ? null
             : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
-        IReadOnlyList<DesktopInstallSupportContinuationCase> supportCases = ResolveSupportContinuationCases(installation, installSummary);
+        IReadOnlyList<DesktopInstallSupportContinuationCase> supportCases = ResolveSupportContinuationCases(installation, installSummary, receipt);
         DesktopInstallSupportContinuationCase? leadSupportCase = supportCases.FirstOrDefault(static item => item.ReporterActionNeeded)
             ?? supportCases.FirstOrDefault();
         string supportHref = releaseArtifact is null
@@ -198,7 +198,8 @@ public sealed class InstallLinkingController : ControllerBase
 
     private IReadOnlyList<DesktopInstallSupportContinuationCase> ResolveSupportContinuationCases(
         ClaimedInstallationDto installation,
-        InstallLinkingSummaryDto installSummary)
+        InstallLinkingSummaryDto installSummary,
+        DownloadReceiptDto? receipt)
     {
         IReadOnlyList<SupportCaseProjection> reporterCases = _supportCases.ListForReporter(installation.UserId, installation.SubjectId).Items;
         var relevantCases = reporterCases
@@ -208,6 +209,13 @@ public sealed class InstallLinkingController : ControllerBase
             .Take(4)
             .Select(item => new DesktopInstallSupportContinuationCase(
                 CaseId: item.Case.CaseId,
+                InstallationId: installation.InstallationId,
+                ApplicationVersion: installation.Version,
+                ReleaseChannel: installation.Channel,
+                HeadId: NormalizeResponseValue(installation.HeadId),
+                Platform: NormalizeResponseValue(installation.Platform),
+                Arch: NormalizeResponseValue(installation.Arch),
+                InstalledBuildReceiptId: receipt?.ReceiptId,
                 StatusLabel: item.StatusLabel,
                 StageLabel: item.StageLabel,
                 NextSafeAction: item.NextSafeAction,
@@ -322,6 +330,13 @@ public sealed record DesktopInstallNativeContinuationResponse(
 
 public sealed record DesktopInstallSupportContinuationCase(
     string CaseId,
+    string InstallationId,
+    string ApplicationVersion,
+    string ReleaseChannel,
+    string HeadId,
+    string Platform,
+    string Arch,
+    string? InstalledBuildReceiptId,
     string StatusLabel,
     string StageLabel,
     string NextSafeAction,

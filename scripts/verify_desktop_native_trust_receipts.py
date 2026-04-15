@@ -20,6 +20,8 @@ REQUIRED_SOURCE_MARKERS = {
         "DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false)",
         "FallbackPosture: continuation?.FallbackPosture",
         "BuildNativeNextSafeAction(updateAvailable, leadSupportCase, continuation)",
+        "ResolveSupportContinuationCases(installation, installSummary, receipt)",
+        "InstalledBuildReceiptId: receipt?.ReceiptId",
         "SupportCases: supportCases",
     ],
     Path("Chummer.Run.Api/Services/DesktopInstallRail.cs"): [
@@ -56,6 +58,8 @@ REQUIRED_SOURCE_MARKERS = {
         "response.FallbackPosture.Contains(\"Claim codes are a recovery fallback\"",
         "UpdateAvailable",
         "NeedsInstallUpdate",
+        "response.SupportCases[0].InstalledBuildReceiptId",
+        "Support follow-through should expose installed build version truth.",
         "Invalid desktop continuation grants should fail closed.",
     ],
     Path("scripts/ai/verify.sh"): [
