@@ -91,6 +91,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "2df21683",
     "442c76c2",
     "1f4f0e2e",
+    "29f7ec9b",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -250,6 +251,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 2df21683 pins the M105 workspace receipt proof floor so future shards verify the latest closed-package guard instead of repeating it.",
     "/docker/chummercomplete/chummer.run-services commit 442c76c2 pins the M105 workspace receipt guard floor so canonical registry and queue proof must cite the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 1f4f0e2e requires the current M105 workspace receipt guard floor so future shards verify the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit 29f7ec9b pins the M105 workspace receipt proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -290,6 +292,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 2df21683 pins the M105 workspace receipt proof floor so future shards verify the latest closed-package guard instead of repeating it.",
     "/docker/chummercomplete/chummer.run-services commit 442c76c2 pins the M105 workspace receipt guard floor so canonical registry and queue proof must cite the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 1f4f0e2e requires the current M105 workspace receipt guard floor so future shards verify the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit 29f7ec9b pins the M105 workspace receipt proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
@@ -306,8 +309,11 @@ FORBIDDEN_PROOF_MARKERS = [
     "TASK_LOCAL_TELEMETRY",
     "ACTIVE_RUN_HANDOFF",
     "active-run helper",
+    "active-run helper command",
     "operator telemetry",
+    "operator/OODA",
     "design_supervisor_ooda",
+    "/var/lib/codex-fleet",
 ]
 
 
