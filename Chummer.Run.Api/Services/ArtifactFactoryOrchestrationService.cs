@@ -387,6 +387,8 @@ public sealed class ArtifactFactoryOrchestrationService
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has non-local public proof shelf {fieldName} '{value}'; artifact factory output refs must stay on the Chummer public proof shelf.");
         }
+
+        RejectUnsafePublicShelfRef(sourcePackId, publicShelfRef, fieldName);
     }
 
     private static void RejectPublicShelfRefOutsideRecipeRoutes(string sourcePackId, string family, string value, string fieldName)
@@ -405,6 +407,25 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has public proof shelf {fieldName} '{value}' outside recipe {family} shelf routes; artifact factory bundle refs must stay on approved release, support, fix, or publication shelves.");
+        }
+    }
+
+    private static void RejectUnsafePublicShelfRef(string sourcePackId, string publicShelfRef, string fieldName)
+    {
+        if (publicShelfRef.Contains('?', StringComparison.Ordinal) || publicShelfRef.Contains('#', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must be stable shelf paths without query strings or fragments.");
+        }
+
+        foreach (string segment in publicShelfRef.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string decodedSegment = Uri.UnescapeDataString(segment);
+            if (decodedSegment is "." or ".." || decodedSegment.Contains('/', StringComparison.Ordinal) || decodedSegment.Contains('\\', StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must not contain traversal or encoded path separators.");
+            }
         }
     }
 
