@@ -378,6 +378,25 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
     reject_forbidden_markers(f"{path}:{PACKAGE_ID}", queue_block, FORBIDDEN_PROOF_MARKERS, missing)
 
 
+def check_queue_staging_blocks_match(missing: list[str]) -> None:
+    try:
+        fleet_text = read_absolute_text(QUEUE_STAGING_PATH, "fleet queue staging")
+        design_text = read_absolute_text(DESIGN_QUEUE_STAGING_PATH, "design queue staging")
+    except FileNotFoundError as exc:
+        missing.append(str(exc))
+        return
+
+    fleet_block = extract_queue_package_block(fleet_text)
+    design_block = extract_queue_package_block(design_text)
+    if not fleet_block or not design_block:
+        return
+
+    if fleet_block != design_block:
+        missing.append(
+            f"{QUEUE_STAGING_PATH}:{PACKAGE_ID} must match {DESIGN_QUEUE_STAGING_PATH}:{PACKAGE_ID}"
+        )
+
+
 def reject_forbidden_markers(label: str, text: str, markers: list[str], missing: list[str]) -> None:
     normalized_text = text.casefold()
     for marker in markers:
@@ -598,6 +617,7 @@ def main() -> int:
 
     check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
+    check_queue_staging_blocks_match(missing)
     check_local_release_proof(LOCAL_RELEASE_PROOF_PATH, missing)
     check_local_release_proof(SERVED_RELEASE_PROOF_PATH, missing)
     check_served_release_proof_matches_local(missing)

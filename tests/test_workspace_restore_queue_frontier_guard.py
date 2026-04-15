@@ -128,6 +128,39 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
         self.assertIn("frontier_id: 4623636482", result.stderr)
         self.assertIn(PACKAGE_ID, result.stderr)
 
+    def test_verifier_fails_closed_when_fleet_and_design_queue_rows_drift(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-drift-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                source_queue_path.read_text(encoding="utf-8").replace(
+                    "      - /docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py\n",
+                    "      - /docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py\n"
+                    "      - /docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must match", result.stderr)
+        self.assertIn("NEXT_90_DAY_QUEUE_STAGING.generated.yaml", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
