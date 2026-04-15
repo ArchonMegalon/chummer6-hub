@@ -64,6 +64,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'RejectPublicShelfRefOutsideRecipeRoutes(sourcePack.SourcePackId, family, sourcePack.PublicShelfRef, "publicShelfRef");',
         'RejectNonLocalPublicShelfEvidenceRef(sourcePack.SourcePackId, evidenceRef);',
         'RejectPublicShelfEvidenceRefOutsideRecipeRoutes(sourcePack.SourcePackId, family, evidenceRef);',
+        'throw new InvalidDataException($"duplicate source pack id \'{sourcePack.SourcePackId}\' is not allowed.");',
         "private static int FirstRefPrefixSeparatorIndex(string normalized)",
         "int slashIndex = normalized.IndexOf('/');",
         "private static void RejectPublicShelfRefOutsideRecipeRoutes(string sourcePackId, string family, string value, string fieldName)",
@@ -104,6 +105,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "LaunchJobBuildsPublicationProofShelfRoute",
         "LaunchJobBindsOutputsToApprovedAnchoredPackWhenSourcePacksAreMixed",
         "LaunchJobBuildsSupportAndFixJobsFromAnchoredApprovedPacks",
+        "LaunchJobRejectsDuplicateSourcePackIds",
         "LaunchJobBindsReleaseOutputsToApprovedPublicShelfRefWhenArtifactIdIsAbsent",
         "LaunchJobBindsReleaseDownloadShelfAnchorToReleaseBundleShelf",
         "LaunchJobBindsPublicationOutputsToApprovedPublicShelfRefWhenPublicationIdIsAbsent",
@@ -124,6 +126,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     ],
     "tests/test_artifact_factory_orchestration.py": [
         "test_verifier_fails_closed_when_queue_package_is_duplicated",
+        "test_verifier_fails_closed_when_duplicate_source_pack_guard_is_removed",
         "test_verifier_fails_closed_when_queue_guard_commit_pin_is_missing",
         "commit cfd5d208",
         "commit 60125d9e",
