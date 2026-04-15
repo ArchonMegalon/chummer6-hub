@@ -492,7 +492,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<SupportClosureCue> supportClosures = BuildSupportClosures(context.SupportDigests);
         IReadOnlyList<KnownIssueAffectingInstall> knownIssues = BuildKnownIssues(context.SupportDigests);
         IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests, prepLibrary, gmOperations, travelMode, context.LeadRun);
-        NextSafeActionCue nextSafeAction = BuildNextSafeActionCue(context.Workspace, installLinking, context.SupportDigests);
+        NextSafeActionCue nextSafeAction = BuildNextSafeActionCue(context.Workspace, context.Restore, installLinking, context.SupportDigests);
         WorkspaceStateSummary workspaceState = BuildWorkspaceStateSummary(
             context.Workspace,
             installLinking,
@@ -529,8 +529,34 @@ public sealed class CampaignWorkspaceServerPlaneService
             CampaignMemory: context.Workspace.CampaignMemory,
             NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
             NextSafeAction: nextSafeAction,
+            RestoreProvenanceReceipts: ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts),
+            RestoreConflictReceipts: ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts),
             GeneratedAtUtc: context.GeneratedAtUtc);
     }
+
+    private static IReadOnlyList<WorkspaceRestoreProvenanceReceipt> ProjectRestoreProvenanceReceipts(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? restoreProvenanceReceipts)
+        => (restoreProvenanceReceipts ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
+            .Select(receipt => receipt with
+            {
+                Surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind)
+            })
+            .ToArray();
+
+    private static IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> ProjectRestoreConflictReceipts(
+        IReadOnlyList<WorkspaceRestoreConflictReceipt>? restoreConflictReceipts)
+        => (restoreConflictReceipts ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
+            .Select(receipt => new WorkspaceRestoreConflictReceiptProjection(
+                ReceiptId: receipt.ReceiptId,
+                Severity: receipt.Severity,
+                Kind: receipt.Kind,
+                Surface: ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind),
+                SubjectId: receipt.SubjectId,
+                Summary: receipt.Summary,
+                Resolution: receipt.Resolution,
+                ObservedAtUtc: receipt.ObservedAtUtc,
+                BlocksContinue: receipt.BlocksContinue))
+            .ToArray();
 
     private static GmOperationsReadinessSummary BuildGmOperationsReadiness(
         CampaignWorkspaceProjection workspace,
@@ -885,11 +911,13 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Count();
         CampaignReadinessCue? attentionCue = ResolvePriorityReadinessCue(workspace.ReadinessCues, requireSummary: true);
         string restorePrefetchSummary = DescribeRestorePrefetchSummary(restore);
+        string restoreReceiptSummary = DescribeRestoreReceiptSummary(restore);
         string restoreSummary = restore.ConflictSummaries.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item)) is { } conflictSummary
             ? $"{conflictSummary} {restorePrefetchSummary}"
             : restore.LocalOnlyNotes.FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item)) is { } localOnlySummary
                 ? $"{restorePrefetchSummary} {localOnlySummary}"
                 : $"{restorePrefetchSummary} Restore posture is attached to claimed installs and continuity snapshots instead of a local-only guess.";
+        restoreSummary = $"{restoreSummary} {restoreReceiptSummary}";
         string publicationSummary = recapCount == 0
             ? "No recap-safe output is pinned yet, so the workspace still needs its first publication-safe continuity handoff."
             : $"{recapCount} publication-safe output(s) are attached to the same campaign continuity spine.";
@@ -918,6 +946,24 @@ public sealed class CampaignWorkspaceServerPlaneService
             UpdatedAtUtc: digest?.UpdatedAtUtc
                 ?? workspace.LatestContinuity?.CapturedAtUtc
                 ?? restore.GeneratedAtUtc);
+    }
+
+    private static string DescribeRestoreReceiptSummary(WorkspaceRestoreProjection restore)
+    {
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts = ProjectRestoreProvenanceReceipts(restore.ProvenanceReceipts);
+        IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> conflictReceipts = ProjectRestoreConflictReceipts(restore.ConflictReceipts);
+        int workspaceProvenanceCount = provenanceReceipts.Count(static receipt => string.Equals(receipt.Surface, "workspace_restore", StringComparison.OrdinalIgnoreCase));
+        int entitlementProvenanceCount = provenanceReceipts.Count(static receipt => string.Equals(receipt.Surface, "entitlement_sync", StringComparison.OrdinalIgnoreCase));
+        int workspaceConflictCount = conflictReceipts.Count(static receipt => string.Equals(receipt.Surface, "workspace_restore", StringComparison.OrdinalIgnoreCase));
+        int entitlementConflictCount = conflictReceipts.Count(static receipt => string.Equals(receipt.Surface, "entitlement_sync", StringComparison.OrdinalIgnoreCase));
+        int blockingConflictCount = conflictReceipts.Count(static receipt => receipt.BlocksContinue);
+
+        if (provenanceReceipts.Count == 0 && conflictReceipts.Count == 0)
+        {
+            return "No provenance or conflict receipts are attached to this restore projection yet.";
+        }
+
+        return $"{provenanceReceipts.Count} restore provenance receipt(s) are explicit ({workspaceProvenanceCount} workspace restore, {entitlementProvenanceCount} entitlement sync); {conflictReceipts.Count} conflict receipt(s) are explicit ({workspaceConflictCount} workspace restore, {entitlementConflictCount} entitlement sync, {blockingConflictCount} blocking).";
     }
 
     private static WorkspaceStateSummary BuildWorkspaceStateSummary(
@@ -1244,6 +1290,37 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "critical" => "critical",
                 _ => "warning"
             };
+
+    private static string ResolveRestoreConflictSurface(string? kind)
+    {
+        return ResolveRestoreReceiptSurface(declaredSurface: null, kind);
+    }
+
+    private static string ResolveRestoreReceiptSurface(string? declaredSurface, string? kind)
+    {
+        string normalizedSurface = NormalizeOptional(declaredSurface) ?? string.Empty;
+        if (string.Equals(normalizedSurface, "workspace_restore", StringComparison.OrdinalIgnoreCase))
+        {
+            return "workspace_restore";
+        }
+
+        if (string.Equals(normalizedSurface, "entitlement_sync", StringComparison.OrdinalIgnoreCase))
+        {
+            return "entitlement_sync";
+        }
+
+        return IsEntitlementRestoreKind(kind) || normalizedSurface.Contains("entitlement", StringComparison.OrdinalIgnoreCase)
+            ? "entitlement_sync"
+            : "workspace_restore";
+    }
+
+    private static bool IsEntitlementRestoreKind(string? kind)
+    {
+        string normalizedKind = NormalizeOptional(kind) ?? string.Empty;
+        return normalizedKind.StartsWith("entitlement_", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("entitlement", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("grant", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static IReadOnlyList<RecapShelfEntry> BuildRecapShelf(
         CampaignWorkspaceProjection workspace,
@@ -1916,9 +1993,33 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static NextSafeActionCue BuildNextSafeActionCue(
         CampaignWorkspaceProjection workspace,
+        WorkspaceRestoreProjection restore,
         InstallLinkingSummaryDto? installLinking,
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
     {
+        WorkspaceRestoreConflictReceipt? blockingRestoreConflict = (restore.ConflictReceipts ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
+            .FirstOrDefault(static receipt => receipt.BlocksContinue);
+        if (blockingRestoreConflict is not null)
+        {
+            return new NextSafeActionCue(
+                ActionId: $"restore:{workspace.WorkspaceId}:{StableCueId(blockingRestoreConflict.ReceiptId)}",
+                Label: "Review restore receipts",
+                Summary: NormalizeOptional(blockingRestoreConflict.Resolution)
+                    ?? "Review the restore and entitlement receipts before you continue this shared campaign on another device.",
+                SourceKind: "restore");
+        }
+
+        string? restoreConflictSummary = restore.ConflictSummaries
+            .FirstOrDefault(static item => !string.IsNullOrWhiteSpace(item));
+        if (!string.IsNullOrWhiteSpace(restoreConflictSummary))
+        {
+            return new NextSafeActionCue(
+                ActionId: $"restore:{workspace.WorkspaceId}",
+                Label: "Review restore posture",
+                Summary: "Open the restore rail and confirm the current channel, rule environment, and entitlement posture before you continue here.",
+                SourceKind: "restore");
+        }
+
         SupportCaseDigestViewModel? actionCase = ResolvePrioritySupportDigest(supportDigests);
         if (actionCase is not null)
         {

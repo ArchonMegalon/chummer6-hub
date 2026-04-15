@@ -1266,6 +1266,14 @@
                                         <span>Next safe action</span>
                                         <strong>@selectedWorkspaceServerPlane.NextSafeAction.Label · @selectedWorkspaceServerPlane.NextSafeAction.Summary</strong>
                                     </div>
+                                    <div class="settings-summary-row">
+                                        <span>Restore provenance receipts</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None yet" : $"{selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count} receipts")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Restore conflict receipts</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "No active conflicts" : $"{selectedWorkspaceServerPlane.RestoreConflictReceipts.Count} receipts")</strong>
+                                    </div>
                                     @if (selectedWorkspacePortableExchangeNotice is not null)
                                     {
                                         <div class="settings-summary-row">
@@ -1609,6 +1617,66 @@
                                         <li><strong>@HumanizeStatus(conflict.Severity, "Info"):</strong> @conflict.Summary <span>@conflict.ResolutionAction</span></li>
                                     }
                                 </ul>
+                            </details>
+                            <details class="details-drawer">
+                                <summary>Restore provenance and conflict receipts</summary>
+                                <div class="settings-summary-list">
+                                    <div class="settings-summary-row">
+                                        <span>Provenance receipts</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count.ToString())</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Conflict receipts</span>
+                                        <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreConflictReceipts.Count.ToString())</strong>
+                                    </div>
+                                </div>
+                                @if (selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0)
+                                {
+                                    <p class="muted-copy">No restore provenance receipts are attached to this workspace yet.</p>
+                                }
+                                else
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var receipt in selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Take(6))
+                                        {
+                                            <li>
+                                                <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Kind, "receipt"):</strong>
+                                                @receipt.Summary
+                                                @if (!string.IsNullOrWhiteSpace(receipt.Authority))
+                                                {
+                                                    <span>Authority: @HumanizeStatus(receipt.Authority, "hub")</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(receipt.Proof))
+                                                {
+                                                    <span>Proof: @receipt.Proof</span>
+                                                }
+                                                @if (!string.IsNullOrWhiteSpace(receipt.RecoveryHint))
+                                                {
+                                                    <span>@receipt.RecoveryHint</span>
+                                                }
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                @if (selectedWorkspaceServerPlane.RestoreConflictReceipts.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var receipt in selectedWorkspaceServerPlane.RestoreConflictReceipts.Take(6))
+                                        {
+                                            <li>
+                                                <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Severity, "Warning"):</strong>
+                                                @receipt.Summary
+                                                <span>@HumanizeStatus(receipt.Kind, "receipt").</span>
+                                                <span>@(receipt.BlocksContinue ? "Continue is blocked until this receipt is resolved." : "Review before continuing.")</span>
+                                                <span>@(string.IsNullOrWhiteSpace(receipt.Resolution) ? "Review restore evidence before continuing." : receipt.Resolution)</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                else
+                                {
+                                    <p class="muted-copy">No restore conflict receipts are active for this workspace right now.</p>
+                                }
                             </details>
 
                             @if (selectedWorkspaceServerPlane.Runboard is not null)

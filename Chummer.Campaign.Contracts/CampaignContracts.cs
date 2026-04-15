@@ -302,9 +302,9 @@ public sealed record WorkspaceRestoreProjection(
     IReadOnlyList<ClaimedDeviceRestoreProjection> ClaimedDevices,
     IReadOnlyList<string> ConflictSummaries,
     IReadOnlyList<string> LocalOnlyNotes,
+    DateTimeOffset GeneratedAtUtc,
     IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? ProvenanceReceipts = null,
-    IReadOnlyList<WorkspaceRestoreConflictReceipt>? ConflictReceipts = null,
-    DateTimeOffset GeneratedAtUtc);
+    IReadOnlyList<WorkspaceRestoreConflictReceipt>? ConflictReceipts = null);
 
 public sealed record CommunityOperatorProjection(
     string GroupId,
@@ -564,7 +564,9 @@ public sealed record WorkspaceRestoreProvenanceReceipt(
     string Surface,
     string Summary,
     string? Proof,
-    DateTimeOffset ObservedAtUtc);
+    DateTimeOffset ObservedAtUtc,
+    string? Authority = null,
+    string? RecoveryHint = null);
 
 public sealed record WorkspaceRestoreConflictReceipt(
     string ReceiptId,
@@ -573,7 +575,9 @@ public sealed record WorkspaceRestoreConflictReceipt(
     string SubjectId,
     string Summary,
     string? Resolution,
-    DateTimeOffset ObservedAtUtc);
+    DateTimeOffset ObservedAtUtc,
+    string? Surface = null,
+    bool BlocksContinue = false);
 
 public sealed record RestoreEntitlementProjection(
     string EntitlementId,
