@@ -39,6 +39,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "queue staging must contain exactly one package_id",
         "successor registry must contain exactly one milestone",
         "successor registry must contain exactly one work task",
+        "verify_queue_mirror_alignment(missing, queue_paths)",
+        "queue mirror drift",
         "FORBIDDEN_PROOF_MARKERS",
         "reject_forbidden_proof_markers(",
         "item_lower = item.lower()",
@@ -143,6 +145,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "test_verifier_fails_closed_when_normalized_duplicate_source_pack_guard_is_removed",
         "test_verifier_fails_closed_when_queue_guard_commit_pin_is_missing",
         "test_verifier_fails_closed_when_current_duplicate_queue_guard_proof_is_missing",
+        "test_verifier_fails_closed_when_fleet_and_design_queue_rows_drift",
         "commit cfd5d208",
         "commit 60125d9e",
         "commit c98a49f2",
@@ -275,6 +278,20 @@ REQUIRED_QUEUE_FIELDS = {
 }
 REQUIRED_ALLOWED_PATHS = {"Chummer.Run.Api", "scripts", "tests"}
 REQUIRED_OWNED_SURFACES = {"artifact_factory:orchestration", "public_proof_shelf:release_bundles"}
+QUEUE_MIRROR_FIELDS = (
+    "title",
+    "task",
+    "package_id",
+    "milestone_id",
+    "wave",
+    "repo",
+    "status",
+    "frontier_id",
+    "landed_commit",
+    "proof",
+    "allowed_paths",
+    "owned_surfaces",
+)
 REQUIRED_QUEUE_PROOF = {
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
     "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
@@ -537,6 +554,27 @@ def verify_queue_authority(missing: list[str], path: Path) -> None:
     verify_proof_anchors_resolve(missing, f"{path}: {PACKAGE_ID} proof", item.get("proof"))
 
 
+def verify_queue_mirror_alignment(missing: list[str], queue_paths: list[Path]) -> None:
+    if len(queue_paths) < 2:
+        return
+
+    queue_items: list[tuple[Path, dict]] = []
+    for path in queue_paths:
+        try:
+            queue_items.append((path, find_queue_item(load_yaml(path))))
+        except (FileNotFoundError, ValueError, yaml.YAMLError):
+            return
+
+    baseline_path, baseline_item = queue_items[0]
+    for path, item in queue_items[1:]:
+        for field in QUEUE_MIRROR_FIELDS:
+            if item.get(field) != baseline_item.get(field):
+                missing.append(
+                    f"{path}: queue mirror drift for {PACKAGE_ID} field {field}; "
+                    f"must match {baseline_path} exactly."
+                )
+
+
 def verify_successor_registry_authority(missing: list[str], path: Path) -> None:
     try:
         task = find_successor_task(load_yaml(path))
@@ -597,6 +635,8 @@ def main() -> int:
                 if marker not in queue_text:
                     missing.append(f"{queue_path}: {marker}")
             verify_queue_authority(missing, queue_path)
+
+    verify_queue_mirror_alignment(missing, queue_paths)
 
     try:
         registry_text = read_text(SUCCESSOR_REGISTRY_PATH)

@@ -1640,6 +1640,36 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("commit b15c2193", result.stderr)
 
+    def test_verifier_fails_closed_when_fleet_and_design_queue_rows_drift(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-mirror-drift-") as temp_dir:
+            design_queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            source_queue = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            queue_text = source_queue.read_text(encoding="utf-8")
+            design_queue_path.write_text(
+                queue_text.replace(
+                    "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.\n",
+                    "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.\n"
+                    "      - closed package proof mirror drift sentinel.\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("queue mirror drift", result.stderr)
+        self.assertIn("field proof", result.stderr)
+
     def test_verifier_fails_closed_when_design_queue_source_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-design-queue-proof-") as temp_dir:
             design_queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
