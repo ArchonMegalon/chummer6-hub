@@ -25,6 +25,23 @@ QUEUE_PROOF_LINES = [
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
 ]
+REGISTRY_102_1_LINES = [
+    "milestones:",
+    "  - id: 102",
+    "    work_tasks:",
+    "      - id: 102.1",
+    "        owner: chummer6-hub",
+    "        status: complete",
+    "        landed_commit: 160af58f",
+    "        evidence:",
+    "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InstallLinkingController.cs exposes /api/v1/install-linking/continuation for grant-bound claimed desktop installs with current release, update, rollback, and support continuation truth.",
+    "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml and /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/Accounts/Account.cshtml make guided setup/app continuation the default and keep claim codes as recovery fallback only.",
+    "          - /docker/chummercomplete/chummer.run-services/scripts/verify_desktop_native_trust_receipts.py fail-closes missing source markers and missing successor proof receipts for desktop_native_claim_and_recovery and support_followthrough:install_truth.",
+    "          - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json carries next90-m102-hub-desktop-native-trust proof receipts for /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
+    "          - /docker/chummercomplete/chummer.run-services commit e27f24c1 tightens desktop-native continuation fallback-posture proof so claimed installs return the same fallback posture used by download and support recovery.",
+    "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
+    '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
+]
 
 
 class DesktopNativeTrustReceiptTests(unittest.TestCase):
@@ -144,20 +161,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 encoding="utf-8",
             )
             registry_path.write_text(
-                "\n".join(
-                    [
-                        "milestones:",
-                        "  - id: 102",
-                        "    work_tasks:",
-                        "      - id: 102.1",
-                        "        owner: chummer6-hub",
-                        "        status: complete",
-                        "        landed_commit: 160af58f",
-                        "        evidence:",
-                        "          - next90-m102-hub-desktop-native-trust desktop_native_claim_and_recovery support_followthrough:install_truth",
-                    ]
-                )
-                + "\n",
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
                 encoding="utf-8",
             )
 
@@ -209,20 +213,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 encoding="utf-8",
             )
             registry_path.write_text(
-                "\n".join(
-                    [
-                        "milestones:",
-                        "  - id: 102",
-                        "    work_tasks:",
-                        "      - id: 102.1",
-                        "        owner: chummer6-hub",
-                        "        status: complete",
-                        "        landed_commit: 160af58f",
-                        "        evidence:",
-                        "          - next90-m102-hub-desktop-native-trust desktop_native_claim_and_recovery support_followthrough:install_truth",
-                    ]
-                )
-                + "\n",
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
                 encoding="utf-8",
             )
 
@@ -273,20 +264,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
             registry_path.write_text(
-                "\n".join(
-                    [
-                        "milestones:",
-                        "  - id: 102",
-                        "    work_tasks:",
-                        "      - id: 102.1",
-                        "        owner: chummer6-hub",
-                        "        status: complete",
-                        "        landed_commit: 160af58f",
-                        "        evidence:",
-                        "          - next90-m102-hub-desktop-native-trust desktop_native_claim_and_recovery support_followthrough:install_truth",
-                    ]
-                )
-                + "\n",
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
                 encoding="utf-8",
             )
 
@@ -341,18 +319,58 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
             registry_path.write_text(
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_NEXT90_QUEUE_STAGING_PATH": str(queue_path),
+                    "CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH": str(design_queue_path),
+                    "CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH": str(registry_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("canonical successor queue staging block has wrong proof", result.stderr)
+
+    def test_verifier_fail_closes_successor_registry_evidence_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            design_queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.design.generated.yaml"
+            registry_path = Path(temp_root) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            complete_queue = "\n".join(
+                [
+                    "items:",
+                    "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                    "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    milestone_id: 102",
+                    "    repo: chummer6-hub",
+                    "    status: complete",
+                    "    landed_commit: 160af58f",
+                    *QUEUE_PROOF_LINES,
+                    "    allowed_paths:",
+                    "      - Chummer.Run.Api",
+                    "      - scripts",
+                    "      - tests",
+                    "    owned_surfaces:",
+                    "      - desktop_native_claim_and_recovery",
+                    "      - support_followthrough:install_truth",
+                ]
+            )
+            queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            registry_path.write_text(
                 "\n".join(
-                    [
-                        "milestones:",
-                        "  - id: 102",
-                        "    work_tasks:",
-                        "      - id: 102.1",
-                        "        owner: chummer6-hub",
-                        "        status: complete",
-                        "        landed_commit: 160af58f",
-                        "        evidence:",
-                        "          - next90-m102-hub-desktop-native-trust desktop_native_claim_and_recovery support_followthrough:install_truth",
-                    ]
+                    line
+                    for line in REGISTRY_102_1_LINES
+                    if "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest" not in line
                 )
                 + "\n",
                 encoding="utf-8",
@@ -373,7 +391,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
 
             self.assertNotEqual(0, result.returncode)
-            self.assertIn("canonical successor queue staging block has wrong proof", result.stderr)
+            self.assertIn("canonical successor registry block has wrong evidence", result.stderr)
 
     def test_verifier_fail_closes_generated_proof_package_scope_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
