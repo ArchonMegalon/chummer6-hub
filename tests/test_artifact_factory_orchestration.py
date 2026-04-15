@@ -157,6 +157,43 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("RejectPublicShelfRefOutsideRecipeRoutes", result.stderr)
 
+    def test_verifier_fails_closed_when_duplicate_source_pack_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            if (!sourcePackIds.Add(sourcePack.SourcePackId))\n"
+                    "            {\n"
+                    "                throw new InvalidDataException($\"duplicate source pack id '{sourcePack.SourcePackId}' is not allowed.\");\n"
+                    "            }\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate source pack id", result.stderr)
+
     def test_verifier_fails_closed_when_orchestration_service_is_not_registered(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-wiring-proof-") as temp_dir:
             temp_root = Path(temp_dir)
