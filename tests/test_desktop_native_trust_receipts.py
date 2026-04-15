@@ -936,6 +936,71 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_generated_proof_active_run_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            m102_receipt = next(
+                item
+                for item in proof["proof_receipts"]
+                if item["receipt_id"] == "support_followthrough:install_truth"
+            )
+            m102_receipt["evidence"] = [
+                "/var/lib/codex-fleet/chummer_design_supervisor/shard-1/ACTIVE_RUN_HANDOFF.generated.md",
+                "operator telemetry helper output",
+            ]
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[0]: /var/lib/codex-fleet",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[0]: ACTIVE_RUN_HANDOFF",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[1]: operator telemetry",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_missing_canonical_proof_anchor(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             anchor_root = Path(temp_root)
