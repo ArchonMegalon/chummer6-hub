@@ -151,14 +151,15 @@ public sealed class ArtifactFactoryOrchestrationService
         foreach (ApprovedArtifactSourcePack sourcePack in request.SourcePacks)
         {
             ValidateSourcePack(sourcePack, family, recipe);
-            if (!sourcePackIds.Add(sourcePack.SourcePackId))
+            string normalizedSourcePackId = sourcePack.SourcePackId.Trim();
+            if (!sourcePackIds.Add(normalizedSourcePackId))
             {
-                throw new InvalidDataException($"duplicate source pack id '{sourcePack.SourcePackId}' is not allowed.");
+                throw new InvalidDataException($"duplicate source pack id '{normalizedSourcePackId}' is not allowed.");
             }
 
             IReadOnlyList<string> evidenceRefs = NormalizeEvidenceRefs(sourcePack, family);
             sourcePacks.Add(new ArtifactFactoryMediaSourcePack(
-                SourcePackId: sourcePack.SourcePackId.Trim(),
+                SourcePackId: normalizedSourcePackId,
                 SourcePackKind: NormalizeToken(sourcePack.SourcePackKind),
                 ProvenanceRef: sourcePack.ProvenanceRef.Trim(),
                 EvidenceRefs: evidenceRefs,
