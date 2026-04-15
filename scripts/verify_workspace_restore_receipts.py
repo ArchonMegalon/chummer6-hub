@@ -70,6 +70,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "1b8d9363",
     "e0521ca5",
     "06e2ec99",
+    "cb560573",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -208,6 +209,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 784fbcef pins the M105 workspace continuity receipt materializer so regenerated local release proof cannot drop the closed package metadata, provenance receipts, or conflict receipts.",
     "/docker/chummercomplete/chummer.run-services commit a45d9e9e pins the M105 workspace guard closure so stale clones cannot satisfy completed-package proof without the latest local guard commits.",
     "/docker/chummercomplete/chummer.run-services commit a002019a pins the latest M105 workspace proof guard so future shards verify the closed successor package instead of repeating it.",
+    "/docker/chummercomplete/chummer.run-services commit cb560573 requires the M105 queue proof floor so registry and queue closure cannot regress behind the latest completed-package guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -229,6 +231,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 784fbcef pins the M105 workspace continuity receipt materializer so regenerated local release proof cannot drop the closed package metadata, provenance receipts, or conflict receipts.",
     "/docker/chummercomplete/chummer.run-services commit a45d9e9e pins the M105 workspace guard closure so stale clones cannot satisfy completed-package proof without the latest local guard commits.",
     "/docker/chummercomplete/chummer.run-services commit a002019a pins the latest M105 workspace proof guard so future shards verify the closed successor package instead of repeating it.",
+    "/docker/chummercomplete/chummer.run-services commit cb560573 requires the M105 queue proof floor so registry and queue closure cannot regress behind the latest completed-package guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
