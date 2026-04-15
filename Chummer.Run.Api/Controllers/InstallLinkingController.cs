@@ -134,6 +134,8 @@ public sealed class InstallLinkingController : ControllerBase
             CurrentReleaseVersion: manifest.Version,
             CurrentReleaseChannel: manifest.Channel,
             CurrentArtifactId: releaseArtifact?.Id,
+            FallbackPosture: continuation?.FallbackPosture
+                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
             UpdateAvailable: updateAvailable,
             NextSafeAction: BuildNativeNextSafeAction(updateAvailable, leadSupportCase, continuation),
             UpdateAction: updateAvailable
@@ -309,6 +311,7 @@ public sealed record DesktopInstallNativeContinuationResponse(
     string CurrentReleaseVersion,
     string CurrentReleaseChannel,
     string? CurrentArtifactId,
+    string FallbackPosture,
     bool UpdateAvailable,
     string NextSafeAction,
     string UpdateAction,
