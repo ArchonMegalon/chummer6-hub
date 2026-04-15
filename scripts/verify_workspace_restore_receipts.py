@@ -72,6 +72,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "06e2ec99",
     "cb560573",
     "7c92635e",
+    "c90d02e0",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -349,8 +350,11 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
         missing.append(f"missing local release proof: {path}")
         return
 
+    proof_text = path.read_text(encoding="utf-8")
+    reject_forbidden_markers(str(path), proof_text, FORBIDDEN_PROOF_MARKERS, missing)
+
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = json.loads(proof_text)
     except json.JSONDecodeError as exc:
         missing.append(f"invalid local release proof: {path}: {exc}")
         return

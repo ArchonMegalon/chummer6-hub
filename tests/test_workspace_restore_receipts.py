@@ -419,6 +419,40 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("proof_receipts missing entitlement_sync:conflict_receipts", result.stderr)
 
+    def test_verifier_fails_closed_when_local_release_proof_uses_active_run_telemetry_as_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-telemetry-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            payload["proof_receipts"].append(
+                {
+                    "receipt_id": "active-run-helper-output",
+                    "package_id": "next90-m105-hub-workspace-continuity",
+                    "milestone_id": 105,
+                    "frontier_id": 4623636482,
+                    "routes": ["/home/work"],
+                    "surfaces": ["workspace_restore:provenance"],
+                    "summary": "TASK_LOCAL_TELEMETRY.generated.json active-run helper output",
+                }
+            )
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+
     def test_verifier_fails_closed_when_served_release_proof_drops_conflict_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-served-proof-") as temp_dir:
             temp_root = Path(temp_dir)
