@@ -538,12 +538,37 @@ public sealed class ArtifactFactoryOrchestrationService
         if (!string.IsNullOrWhiteSpace(anchor.PublicShelfRef))
         {
             string shelfRef = anchor.PublicShelfRef.Trim().TrimEnd('/');
+            if (family.Equals("release", StringComparison.OrdinalIgnoreCase)
+                && TryBuildReleaseBundleRefFromDownloadShelfRef(shelfRef, out string? releaseBundleRef))
+            {
+                return releaseBundleRef;
+            }
+
             return shelfRef.EndsWith("/bundles", StringComparison.OrdinalIgnoreCase)
                 ? shelfRef
                 : $"{shelfRef}/bundles";
         }
 
         return $"/artifacts/release-bundles/{Uri.EscapeDataString(jobId)}";
+    }
+
+    private static bool TryBuildReleaseBundleRefFromDownloadShelfRef(string shelfRef, out string releaseBundleRef)
+    {
+        const string downloadInstallPrefix = "/downloads/install/";
+        releaseBundleRef = string.Empty;
+        if (!shelfRef.StartsWith(downloadInstallPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string releaseArtifactId = shelfRef[downloadInstallPrefix.Length..].Trim('/');
+        if (string.IsNullOrWhiteSpace(releaseArtifactId))
+        {
+            return false;
+        }
+
+        releaseBundleRef = $"/artifacts/release-bundles/{Uri.EscapeDataString(releaseArtifactId)}";
+        return true;
     }
 
     private static string NormalizeToken(string? value)

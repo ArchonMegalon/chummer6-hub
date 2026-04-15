@@ -251,6 +251,39 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchJobBindsReleaseDownloadShelfAnchorToReleaseBundleShelf()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobLaunchResult result = service.LaunchJob(new ArtifactFactoryJobLaunchRequest(
+            Family: "release",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-download-shelf-pack-20260415",
+                    SourcePackKind: "release_evidence",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer"
+                    ],
+                    PublicShelfRef: "/downloads/install/avalonia-linux-x64-installer")
+            ],
+            RequestedFormats: ["packet"]));
+
+        Assert.Contains("/downloads/install/avalonia-linux-x64-installer", result.PublicProofShelfRefs);
+        Assert.Contains(result.OutputBindings, binding =>
+            string.Equals(binding.PublicRef, "/artifacts/release-bundles/avalonia-linux-x64-installer/packet", StringComparison.Ordinal)
+            && string.Equals(binding.ReceiptRef, $"artifact-factory:{result.JobId}:packet", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.OutputBindings, binding =>
+            binding.PublicRef.StartsWith("/downloads/install/", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void LaunchJobBindsPublicationOutputsToApprovedPublicShelfRefWhenPublicationIdIsAbsent()
     {
         ArtifactFactoryOrchestrationService service = new();
