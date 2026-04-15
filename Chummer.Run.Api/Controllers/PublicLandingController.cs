@@ -423,6 +423,11 @@ public sealed class PublicLandingController : Controller
             var steps = bootstrapScriptDownload
                 ? BuildBootstrapSteps(bootstrapPlatform)
                 : release.SignedInDispatchSteps;
+            var supportHref = DesktopInstallRail.BuildSupportHref(
+                artifact,
+                manifest,
+                installationId: null,
+                bootstrapScriptDownload);
             var terminalInstallCommand = bootstrapScriptDownload && bootstrapTicket is not null
                 ? BuildBootstrapInstallCommand(
                     bootstrapPlatform,
@@ -455,13 +460,15 @@ public sealed class PublicLandingController : Controller
                 BootstrapFeatureCards: BuildBootstrapFeatureCards(bootstrapPlatform),
                 AutoStartDownload: !bootstrapScriptDownload,
                 BootstrapScriptDownload: bootstrapScriptDownload,
-                PromoteSecondaryDownload: string.Equals(bootstrapPlatform, "windows", StringComparison.Ordinal),
+                PromoteSecondaryDownload: false,
                 SecondaryDownloadHref: bootstrapScriptDownload ? rawDownloadHref : null,
                 SecondaryDownloadLabel: bootstrapScriptDownload ? BuildBootstrapSecondaryDownloadLabel(bootstrapPlatform) : null,
                 AccountHref: "/account/access",
                 AccountLabel: "Open Devices and access",
                 HelpHref: release.InstallHelpHref,
                 HelpLabel: release.InstallHelpLabel,
+                SupportHref: supportHref,
+                SupportLabel: "Open tracked support",
                 Display: release.Display,
                 Channel: manifest.Channel,
                 Version: manifest.Version,
@@ -470,7 +477,7 @@ public sealed class PublicLandingController : Controller
                     : option.PlatformLabel,
                 PlatformLabel: option.PlatformLabel,
                 HeadLabel: option.HeadLabel,
-                ClaimExchangeUrl: bootstrapScriptDownload ? null : $"/downloads/install/{Uri.EscapeDataString(artifactId)}/claim.json",
+                ClaimExchangeUrl: bootstrapScriptDownload ? null : $"/downloads/install/{Uri.EscapeDataString(artifactId)}/continue.json",
                 ClaimCode: dispatch?.ClaimTicket?.ClaimCode,
                 ClaimCodeExpiresAtUtc: dispatch?.ClaimTicket?.ExpiresAtUtc,
                 Steps: steps,
@@ -532,6 +539,21 @@ public sealed class PublicLandingController : Controller
             AccountLabel: "Back to downloads",
             HelpHref: release.InstallHelpHref,
             HelpLabel: release.InstallHelpLabel,
+            SupportHref: QueryHelpers.AddQueryString(
+                "/contact",
+                new Dictionary<string, string?>
+                {
+                    ["kind"] = SupportCaseKinds.InstallHelp,
+                    ["title"] = $"{headLabel} Windows proof install help",
+                    ["summary"] = "Proof-lane Windows installer needs help on this device.",
+                    ["detail"] = "The proof-only Windows installer path needs help on this device. Keep support on the same install rail.",
+                    ["applicationVersion"] = manifest.Version,
+                    ["releaseChannel"] = manifest.Channel,
+                    ["headId"] = proofInstaller.Head,
+                    ["platform"] = "windows",
+                    ["arch"] = "x64"
+                }),
+            SupportLabel: "Open tracked support",
             Display: release.Display,
             Channel: manifest.Channel,
             Version: manifest.Version,
@@ -718,6 +740,7 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/downloads/install/{artifactId}/claim.json")]
+    [HttpGet("/downloads/install/{artifactId}/continue.json")]
     [Produces("application/json")]
     public IActionResult DownloadDispatchBootstrapClaim([FromRoute] string artifactId)
     {
@@ -751,13 +774,39 @@ public sealed class PublicLandingController : Controller
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "install claim code is unavailable for this artifact.");
         }
 
+        string supportHref = DesktopInstallRail.BuildSupportHref(
+            artifact,
+            manifest,
+            installationId: null,
+            recoveryMode: true);
+        DesktopInstallContinuationReceipt continuation = DesktopInstallRail.BuildContinuationReceipt(
+            artifact,
+            manifest,
+            recoveryMode: true);
+
         Response.Headers["Cache-Control"] = "private, no-store";
         return Ok(new
         {
             artifactId = artifact.Id,
             claimCode = dispatch.ClaimTicket.ClaimCode,
             expiresAtUtc = dispatch.ClaimTicket.ExpiresAtUtc,
-            status = "pass"
+            status = "pass",
+            nextSafeAction = continuation.NextSafeAction,
+            recoveryModeOnly = true,
+            applicationVersion = continuation.ApplicationVersion,
+            releaseChannel = continuation.ReleaseChannel,
+            headId = continuation.HeadId,
+            platform = continuation.Platform,
+            platformId = continuation.PlatformId,
+            arch = continuation.Arch,
+            fallbackPosture = continuation.FallbackPosture,
+            updateAction = continuation.UpdateAction,
+            rollbackAction = continuation.RollbackAction,
+            accountHref = "/account/access",
+            downloadsHref = "/downloads",
+            helpHref = "/help#install-update",
+            supportHref,
+            supportSummary = continuation.SupportContinuation
         });
     }
 
@@ -968,6 +1017,7 @@ public sealed class PublicLandingController : Controller
         var trackedCase = subject is null
             ? null
             : _supportCases.GetForReporter(caseId, user!.UserId, subject.SubjectId);
+        DesktopInstallRailContext installRail = ResolveSupportIntakeRailFromQuery();
         var highlights = new List<string>
         {
             $"Case id {caseId}",
@@ -976,6 +1026,10 @@ public sealed class PublicLandingController : Controller
         if (trackedCase?.Attachments is { Count: > 0 })
         {
             highlights.Add($"{trackedCase.Attachments.Count} attachment(s) saved");
+        }
+        if (!string.IsNullOrWhiteSpace(installRail.Summary))
+        {
+            highlights.Add(installRail.Summary);
         }
 
         var actions = new List<TrustPageActionViewModel>();
@@ -993,6 +1047,10 @@ public sealed class PublicLandingController : Controller
         }
 
         actions.Add(new TrustPageActionViewModel("Return to help", "/help", "secondary"));
+        if (!string.IsNullOrWhiteSpace(installRail.ReturnHref) && !string.IsNullOrWhiteSpace(installRail.ReturnLabel))
+        {
+            actions.Add(new TrustPageActionViewModel(installRail.ReturnLabel!, installRail.ReturnHref!, "ghost"));
+        }
 
         return View("~/Views/PublicLanding/SupportSubmitted.cshtml", new SupportSubmittedPageViewModel(
             Chrome: chrome,
@@ -1057,7 +1115,10 @@ public sealed class PublicLandingController : Controller
 
             var user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var created = _supportCases.Submit(user?.UserId, subject?.SubjectId, request, await ReadSupportUploadsAsync(attachments, cancellationToken));
-            return Redirect($"/contact/submitted/{Uri.EscapeDataString(created.CaseId)}");
+            string submittedHref = QueryHelpers.AddQueryString(
+                $"/contact/submitted/{Uri.EscapeDataString(created.CaseId)}",
+                BuildSupportRailQuery(ResolveSupportIntakeRailFromQuery()));
+            return Redirect(submittedHref);
         }
         catch (ArgumentException ex)
         {
@@ -1080,7 +1141,11 @@ public sealed class PublicLandingController : Controller
                         ReleaseChannel: releaseChannel,
                         HeadId: headId,
                         Arch: arch,
-                        ContextHint: ResolveSupportContextHintFromRequestQuery()))
+                        ContextHint: ResolveSupportContextHintFromRequestQuery(),
+                        ArtifactId: NormalizeSupportPrefill(Request.Query.TryGetValue("artifactId", out var artifactValues) ? artifactValues.ToString() : null),
+                        RecoveryMode: Request.Query.TryGetValue("recoveryMode", out var recoveryValues)
+                            && bool.TryParse(recoveryValues.ToString(), out bool recoveryMode)
+                            && recoveryMode))
             };
             return View("~/Views/PublicLanding/TrustPage.cshtml", model);
         }
@@ -1633,7 +1698,11 @@ public sealed class PublicLandingController : Controller
             ReleaseChannel: releaseChannel,
             HeadId: headId,
             Arch: arch,
-            ContextHint: ResolveSupportContextHintFromRequestQuery());
+            ContextHint: ResolveSupportContextHintFromRequestQuery(),
+            ArtifactId: NormalizeSupportPrefill(Request.Query.TryGetValue("artifactId", out var artifactValues) ? artifactValues.ToString() : null),
+            RecoveryMode: Request.Query.TryGetValue("recoveryMode", out var recoveryValues)
+                && bool.TryParse(recoveryValues.ToString(), out bool recoveryMode)
+                && recoveryMode);
     }
 
     private string? ResolveSupportContextHintFromRequestQuery()
@@ -1672,13 +1741,48 @@ public sealed class PublicLandingController : Controller
     private static string? NormalizeSupportPrefill(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
+    private DesktopInstallRailContext ResolveSupportIntakeRailFromQuery()
+    {
+        string? artifactId = NormalizeSupportPrefill(Request.Query.TryGetValue("artifactId", out var artifactValues) ? artifactValues.ToString() : null);
+        bool recoveryMode = Request.Query.TryGetValue("recoveryMode", out var recoveryValues)
+            && bool.TryParse(recoveryValues.ToString(), out bool parsedRecoveryMode)
+            && parsedRecoveryMode;
+        return DesktopInstallRail.ResolveSupportIntakeRail(artifactId, recoveryMode);
+    }
+
+    private static Dictionary<string, string?> BuildSupportRailQuery(DesktopInstallRailContext installRail)
+    {
+        if (string.IsNullOrWhiteSpace(installRail.ReturnHref))
+        {
+            return new Dictionary<string, string?>();
+        }
+
+        const string dispatchPrefix = "/downloads/install/";
+        if (!installRail.ReturnHref.StartsWith(dispatchPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return new Dictionary<string, string?>();
+        }
+
+        string artifactId = installRail.ReturnHref[dispatchPrefix.Length..];
+        return new Dictionary<string, string?>
+        {
+            ["artifactId"] = artifactId,
+            ["recoveryMode"] = installRail.RecoveryModeOnly ? "true" : "false"
+        };
+    }
+
     private static SupportIntakeViewModel BuildSupportIntakeModel(
         bool authenticated,
         string? submissionNotice,
         SupportIntakeDefaults installDefaults,
         SupportIntakeOverrides overrides)
-        => new(
-            ActionHref: "/contact",
+    {
+        DesktopInstallRailContext installRail = DesktopInstallRail.ResolveSupportIntakeRail(
+            overrides.ArtifactId,
+            overrides.RecoveryMode);
+
+        return new(
+            ActionHref: QueryHelpers.AddQueryString("/contact", BuildSupportRailQuery(installRail)),
             Heading: "Open a first-party support case",
             Intro: authenticated
                 ? "Use the form for a quick report here, or open Account > Support when you want the full tracked case view."
@@ -1686,6 +1790,8 @@ public sealed class PublicLandingController : Controller
             Authenticated: authenticated,
             AccountSupportHref: authenticated ? "/account/support" : "/signup?next=%2Faccount%2Fsupport",
             AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",
+            InstallAccessHref: installRail.ReturnHref ?? "/account/access",
+            InstallAccessLabel: installRail.ReturnLabel ?? "Open Devices and access",
             ResponseExpectation: authenticated
                 ? "Tracked cases stay visible in Account. When the report is actionable, the next routed update should show up there without sending you into side channels."
                 : "Guest cases should include a reply email. We usually answer preview support within two working days when the report includes a clear reproduction path.",
@@ -1707,12 +1813,17 @@ public sealed class PublicLandingController : Controller
             DefaultReleaseChannel: overrides.ReleaseChannel ?? installDefaults.ReleaseChannel,
             DefaultHeadId: overrides.HeadId ?? installDefaults.HeadId,
             DefaultArch: overrides.Arch ?? installDefaults.Arch,
+            InstallRailHref: installRail.ReturnHref,
+            InstallRailLabel: installRail.ReturnLabel,
+            InstallRailSummary: installRail.Summary,
+            RecoveryModeOnly: installRail.RecoveryModeOnly,
             ContextHint: string.Join(" ",
                 new[]
                 {
                     installDefaults.ContextHint,
                     overrides.ContextHint
                 }.Where(static item => !string.IsNullOrWhiteSpace(item))));
+    }
 
     private async Task<SupportIntakeDefaults> ResolveSupportIntakeDefaultsAsync(CancellationToken cancellationToken)
     {
@@ -2420,7 +2531,9 @@ public sealed class PublicLandingController : Controller
         string? ReleaseChannel = null,
         string? HeadId = null,
         string? Arch = null,
-        string? ContextHint = null);
+        string? ContextHint = null,
+        string? ArtifactId = null,
+        bool RecoveryMode = false);
 
     private static async Task<IReadOnlyList<SupportAttachmentUpload>> ReadSupportUploadsAsync(
         IReadOnlyList<IFormFile>? files,
@@ -2792,7 +2905,7 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Install command",
-            "windows" => "Windows install command (advanced)",
+            "windows" => "Windows install command",
             "linux" => "Linux install command",
             _ => null
         };
@@ -2801,7 +2914,7 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Copy this into Terminal.",
-            "windows" => "Advanced: paste this into PowerShell when you want the guided linked setup flow.",
+            "windows" => "Paste this into PowerShell.",
             "linux" => "Paste this into your shell.",
             _ => null
         };
@@ -2869,7 +2982,7 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Download raw DMG instead",
-            "windows" => "Download installer .exe",
+            "windows" => "Download raw installer fallback",
             "linux" => "Download raw package instead",
             _ => null
         };
@@ -2877,7 +2990,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapDispatchSummary(string? platform)
         => platform switch
         {
-            "windows" => "Download the Windows installer .exe below. The PowerShell setup assistant stays available as an advanced option when you want the guided account-linked setup flow.",
+            "windows" => "Copy the Windows install command below. It streams a short-lived guided setup assistant, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account.",
             "linux" => "Paste the shell install command below. It streams a short-lived Linux setup assistant, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account.",
             _ => "Copy the install command and run it in Terminal."
         };
@@ -2885,7 +2998,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapDispatchNote(string? platform)
         => platform switch
         {
-            "windows" => "The direct .exe is the normal Windows path. The PowerShell setup assistant remains available as an advanced account-linked flow when you want guided multi-step setup and claim recovery.",
+            "windows" => "The guided Windows setup assistant is the default linked-install path. Use the raw installer fallback only for support-directed recovery.",
             "linux" => "The shell command keeps the published Debian packages unchanged while streaming a short-lived guided setup assistant that can attach the install relationship to this account from the first launch.",
             _ => "macOS can quarantine a downloaded unsigned .command and label it as damaged. The single-use Terminal command avoids that by streaming the same short-lived setup assistant directly into bash while keeping the published DMGs unchanged."
         };
@@ -2895,11 +3008,11 @@ public sealed class PublicLandingController : Controller
         {
             "windows" =>
             [
-                "Download the installer .exe below for the normal Windows setup flow.",
-                "Open the advanced PowerShell section only when you want the guided account-linked setup assistant instead of the direct installer path.",
+                "Copy the Windows install command below and paste it into PowerShell.",
                 "The Windows setup assistant offers Auto select for the matching desktop builds on this PC, lets you switch to manual selection when you want different heads, asks where to install them, whether quick access should stay in the Start menu or add Desktop links, whether to open Chummer when it finishes, and then verifies that linking actually completed.",
                 "PowerShell then shows staged progress while it downloads the selected installers, verifies their published SHA-256 digests, installs the selected apps, and preserves rollback-safe installer behavior.",
-                "Each selected app is started once through a short-lived environment handoff so it is already linked to this account the next time you open it."
+                "Each selected app is started once through a short-lived environment handoff so it is already linked to this account the next time you open it.",
+                "Use the raw installer fallback only when support asks for a manual recovery lane."
             ],
             "linux" =>
             [
@@ -3882,7 +3995,7 @@ public sealed class PublicLandingController : Controller
                         candidateOption.DirectFileHref,
                         QueryString.Create("ticket", effectiveBootstrapTicket)),
                     ClaimUrl: BuildAbsoluteUrl(
-                        $"/downloads/install/{Uri.EscapeDataString(candidate.Id)}/claim.json",
+                        $"/downloads/install/{Uri.EscapeDataString(candidate.Id)}/continue.json",
                         QueryString.Create("ticket", effectiveBootstrapTicket)),
                     Sha256: candidate.Sha256,
                     PackageName: candidate.FileName ?? Path.GetFileName(candidate.Url),

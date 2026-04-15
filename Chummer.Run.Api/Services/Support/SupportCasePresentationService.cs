@@ -54,6 +54,7 @@ public sealed class SupportCasePresentationService
         ArgumentNullException.ThrowIfNull(supportCase);
 
         string status = NormalizeStatus(supportCase.Status);
+        bool installRailCase = HasInstallRailContext(supportCase);
         string fixedReleaseLabel = BuildFixedReleaseLabel(supportCase.FixedVersion, supportCase.FixedChannel);
         string detailHref = $"/account/support/{Uri.EscapeDataString(supportCase.CaseId)}";
         string? affectedInstallSummary = BuildAffectedInstallSummary(supportCase);
@@ -73,8 +74,8 @@ public sealed class SupportCasePresentationService
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The closure notice already went out, and the reporter confirmed that the fix worked on the affected install."
                     : $"The closure notice already went out for {fixedReleaseLabel}, and the reporter confirmed that the fix worked on the affected install.",
-                "Open downloads",
-                "/downloads",
+                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseVerificationStates.StillBroken => (
                 "Needs follow-up",
@@ -115,30 +116,36 @@ public sealed class SupportCasePresentationService
                 false),
             SupportCaseStatuses.Fixed => (
                 "Fixed",
-                "Watch the release lane and downloads so this fix can reach your installed channel.",
+                installRailCase
+                    ? "Open Devices and access, then continue on the same linked install rail when the fixed build reaches your install."
+                    : "Watch the release lane and downloads so this fix can reach your installed channel.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The underlying issue is fixed, but the release handoff may still be moving."
                     : $"The underlying issue is fixed and is moving through {fixedReleaseLabel}.",
-                "Open downloads",
-                "/downloads",
+                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseStatuses.ReleasedToReporterChannel => (
                 "Released",
-                "Open downloads or update this linked install to pick up the reporter-ready fix.",
+                installRailCase
+                    ? "Open Devices and access, then update or relink the same linked install to pick up the reporter-ready fix."
+                    : "Open downloads or update this linked install to pick up the reporter-ready fix.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The fix reached a reporter-ready release channel."
                     : $"The fix reached {fixedReleaseLabel}.",
-                "Open downloads",
-                "/downloads",
+                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseStatuses.UserNotified => (
                 "Closed with notice",
-                "Update or reinstall if needed, then reopen support only if the same issue still reproduces.",
+                installRailCase
+                    ? "Open Devices and access, then update, relink, or reinstall on the same account rail if needed."
+                    : "Update or reinstall if needed, then reopen support only if the same issue still reproduces.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "Chummer already sent the closure notice for this case."
                     : $"Chummer already sent the closure notice for {fixedReleaseLabel}.",
-                "Open downloads",
-                "/downloads",
+                installRailCase ? "Open Devices and access" : "Open downloads",
+                installRailCase ? "/account/access" : "/downloads",
                 false),
             SupportCaseStatuses.Deferred => (
                 "Deferred",
@@ -294,6 +301,11 @@ public sealed class SupportCasePresentationService
     {
         if (!string.IsNullOrWhiteSpace(supportCase.ReporterUserId) || !string.IsNullOrWhiteSpace(supportCase.ReporterSubjectId))
         {
+            if (HasInstallRailContext(supportCase))
+            {
+                return "Follow-up stays inside Account > Support and Devices & access for this signed-in install rail.";
+            }
+
             return "Follow-up stays inside Account > Support for this signed-in report.";
         }
 
@@ -304,6 +316,13 @@ public sealed class SupportCasePresentationService
 
         return "Follow-up stays attached to this case id until a clearer response lane exists.";
     }
+
+    private static bool HasInstallRailContext(SupportCaseProjection supportCase)
+        => string.Equals(NormalizeOptional(supportCase.Kind, 64), SupportCaseKinds.InstallHelp, StringComparison.OrdinalIgnoreCase)
+           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.InstallationId, 64))
+           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.ReleaseChannel, 64))
+           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.HeadId, 64))
+           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.Platform, 64));
 
     private static string BuildReleaseProgressSummary(
         SupportCaseProjection supportCase,

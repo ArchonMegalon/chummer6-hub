@@ -126,9 +126,9 @@ public sealed class InstallLinkingController : ControllerBase
             ArtifactId: installation.ArtifactId,
             ApplicationVersion: installation.Version,
             ReleaseChannel: installation.Channel,
-            HeadId: installation.HeadId,
-            Platform: installation.Platform,
-            Arch: installation.Arch,
+            HeadId: NormalizeResponseValue(installation.HeadId),
+            Platform: NormalizeResponseValue(installation.Platform),
+            Arch: NormalizeResponseValue(installation.Arch),
             InstallStatus: installation.Status,
             InstalledBuildReceiptId: receipt?.ReceiptId,
             CurrentReleaseVersion: manifest.Version,
@@ -287,6 +287,9 @@ public sealed class InstallLinkingController : ControllerBase
                 ["platform"] = installation.Platform,
                 ["arch"] = installation.Arch
             });
+
+    private static string NormalizeResponseValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
 }
 
 public sealed record DesktopInstallNativeContinuationRequest(

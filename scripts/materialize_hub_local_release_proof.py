@@ -11,6 +11,22 @@ def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+def _stable_payload(payload: dict) -> dict:
+    stable = dict(payload)
+    stable.pop("generated_at", None)
+    return stable
+
+
+def _load_existing_payload(path: Path) -> dict | None:
+    if not path.is_file():
+        return None
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return loaded if isinstance(loaded, dict) else None
+
+
 def main() -> int:
     if len(sys.argv) != 6:
         print(
@@ -25,6 +41,41 @@ def main() -> int:
     payload = {
         "contract_name": "chummer6-hub.local_release_proof",
         "status": "passed",
+        "successor_queue_package": {
+            "package_id": "next90-m105-hub-workspace-continuity",
+            "milestone_id": 105,
+            "frontier_id": 4623636482,
+            "title": "Emit provenance and conflict receipts for workspace restore and continuity",
+            "owned_surfaces": [
+                "workspace_restore:provenance",
+                "entitlement_sync:conflict_receipts",
+            ],
+            "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture.",
+        },
+        "successor_queue_packages": [
+            {
+                "package_id": "next90-m102-hub-desktop-native-trust",
+                "milestone_id": 102,
+                "frontier_id": 2897065929,
+                "title": "Unify claim, install, update, and support recovery into one desktop-native flow",
+                "owned_surfaces": [
+                    "desktop_native_claim_and_recovery",
+                    "support_followthrough:install_truth",
+                ],
+                "exit_criterion": "Claim, update, rollback, recovery, and support followthrough happen from the installer or app, not as browser ritual.",
+            },
+            {
+                "package_id": "next90-m105-hub-workspace-continuity",
+                "milestone_id": 105,
+                "frontier_id": 4623636482,
+                "title": "Emit provenance and conflict receipts for workspace restore and continuity",
+                "owned_surfaces": [
+                    "workspace_restore:provenance",
+                    "entitlement_sync:conflict_receipts",
+                ],
+                "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture.",
+            },
+        ],
         "base_url": base_url,
         "compose_file": compose_file,
         "playwright_timeout_seconds": int(timeout_seconds),
@@ -38,13 +89,88 @@ def main() -> int:
         ],
         "proof_routes": [
             "/downloads/install/avalonia-linux-x64-installer",
+            "/downloads/install/avalonia-linux-x64-installer/continue.json",
+            "/api/v1/install-linking/continuation",
             "/home/access",
             "/home/work",
             "/account/work",
             "/account/support",
             "/contact",
         ],
+        "proof_receipts": [
+            {
+                "receipt_id": "desktop_native_claim_and_recovery",
+                "package_id": "next90-m102-hub-desktop-native-trust",
+                "milestone_id": 102,
+                "frontier_id": 2897065929,
+                "summary": "Claim and recovery continuation now have installer/app-native receipts: guided setup is the default, claim codes are recovery fallback only, and the claimed desktop app can call the grant-bound continuation endpoint without a browser redemption ritual.",
+                "routes": [
+                    "/downloads/install/avalonia-linux-x64-installer/continue.json",
+                    "/api/v1/install-linking/continuation",
+                    "/account/access",
+                ],
+                "surfaces": [
+                    "desktop_native_claim_and_recovery",
+                    "install_claim_restore_continue",
+                    "claimed_install_continuation",
+                ],
+            },
+            {
+                "receipt_id": "support_followthrough:install_truth",
+                "package_id": "next90-m102-hub-desktop-native-trust",
+                "milestone_id": 102,
+                "frontier_id": 2897065929,
+                "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
+                "routes": [
+                    "/api/v1/install-linking/continuation",
+                    "/account/support",
+                    "/contact",
+                ],
+                "surfaces": [
+                    "support_followthrough:install_truth",
+                    "support_case_install_readiness",
+                    "desktop_update_rollback_recovery",
+                ],
+            },
+            {
+                "receipt_id": "workspace_restore:provenance",
+                "package_id": "next90-m105-hub-workspace-continuity",
+                "milestone_id": 105,
+                "frontier_id": 4623636482,
+                "summary": "Workspace restore continuity emits provenance receipts for claimed installs, recent artifacts, rule environments, and restore inventory on the shared account workspace surfaces.",
+                "routes": [
+                    "/home/work",
+                    "/account/work",
+                ],
+                "surfaces": [
+                    "workspace_restore:provenance",
+                    "workspace_restore",
+                    "account_workspace_detail",
+                ],
+            },
+            {
+                "receipt_id": "entitlement_sync:conflict_receipts",
+                "package_id": "next90-m105-hub-workspace-continuity",
+                "milestone_id": 105,
+                "frontier_id": 4623636482,
+                "summary": "Entitlement drift, stale claims, missing grants, and continue-blocking conflicts emit recoverable receipts on the same restore lane instead of falling back to support folklore.",
+                "routes": [
+                    "/home/work",
+                    "/account/work",
+                ],
+                "surfaces": [
+                    "entitlement_sync:conflict_receipts",
+                    "entitlement_sync",
+                    "workspace_restore",
+                ],
+            },
+        ],
     }
+
+    existing_payload = _load_existing_payload(out_path)
+    if existing_payload is not None and _stable_payload(existing_payload) == _stable_payload(payload):
+        print(f"hub local proof unchanged: {out_path}")
+        return 0
 
     payload["generated_at"] = iso_now()
 
