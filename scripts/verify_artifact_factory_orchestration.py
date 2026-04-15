@@ -17,6 +17,12 @@ QUEUE_STAGING_PATH = Path(
         "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
     )
 )
+DESIGN_QUEUE_STAGING_PATH = Path(
+    os.environ.get(
+        "CHUMMER_ARTIFACT_FACTORY_DESIGN_QUEUE_STAGING",
+        "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+    )
+)
 SUCCESSOR_REGISTRY_PATH = Path(
     os.environ.get(
         "CHUMMER_ARTIFACT_FACTORY_SUCCESSOR_REGISTRY",
@@ -25,6 +31,15 @@ SUCCESSOR_REGISTRY_PATH = Path(
 )
 
 SOURCE_MARKERS: dict[str, list[str]] = {
+    "scripts/verify_artifact_factory_orchestration.py": [
+        "CHUMMER_ARTIFACT_FACTORY_DESIGN_QUEUE_STAGING",
+        "DESIGN_QUEUE_STAGING_PATH",
+        "verify_queue_authority(missing, queue_path)",
+    ],
+    "scripts/ai/verify.sh": [
+        "python3 scripts/verify_artifact_factory_orchestration.py",
+        "python3 -m unittest tests/test_artifact_factory_orchestration.py",
+    ],
     "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs": [
         'private const string ContractName = "chummer.run.artifact_factory.recipe_job.v1";',
         '["release"] = new(',
@@ -347,15 +362,21 @@ def main() -> int:
             if marker not in text:
                 missing.append(f"{relative_path}: {marker}")
 
-    try:
-        queue_text = read_text(QUEUE_STAGING_PATH)
-    except FileNotFoundError as exc:
-        missing.append(str(exc))
-    else:
-        for marker in QUEUE_MARKERS:
-            if marker not in queue_text:
-                missing.append(f"{QUEUE_STAGING_PATH}: {marker}")
-        verify_queue_authority(missing, QUEUE_STAGING_PATH)
+    queue_paths: list[Path] = []
+    for queue_path in (QUEUE_STAGING_PATH, DESIGN_QUEUE_STAGING_PATH):
+        if queue_path not in queue_paths:
+            queue_paths.append(queue_path)
+
+    for queue_path in queue_paths:
+        try:
+            queue_text = read_text(queue_path)
+        except FileNotFoundError as exc:
+            missing.append(str(exc))
+        else:
+            for marker in QUEUE_MARKERS:
+                if marker not in queue_text:
+                    missing.append(f"{queue_path}: {marker}")
+            verify_queue_authority(missing, queue_path)
 
     try:
         registry_text = read_text(SUCCESSOR_REGISTRY_PATH)
