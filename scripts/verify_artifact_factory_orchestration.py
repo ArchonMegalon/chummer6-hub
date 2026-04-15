@@ -69,7 +69,7 @@ QUEUE_MARKERS = [
     "package_id: next90-m107-hub-artifact-factory",
     "milestone_id: 107",
     "status: complete",
-    "landed_commit: 49e9b2cf",
+    "landed_commit: e25842ac",
     "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
     "Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
     "dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
