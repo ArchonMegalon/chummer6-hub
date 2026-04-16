@@ -76,6 +76,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit c9bbf63c tightens M102 served proof shelf route guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
+    "      - /docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -148,6 +149,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit c9bbf63c tightens M102 served proof shelf route guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
+    "          - /docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1544,6 +1546,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "c9bbf63c",
                 "2f7ed420",
                 "15c5f0e5",
+                "a270dcd0",
             ],
             verifier._required_resolving_commits(),
         )
@@ -1729,6 +1732,53 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn("proof_routes missing M102 route: /api/v1/install-linking/continuation", result.stderr)
 
+    def test_verifier_fail_closes_duplicate_m102_proof_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof["proof_routes"].append("/API/V1/INSTALL-LINKING/CONTINUATION")
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "published proof file proof_routes has duplicate entries: "
+                "/API/V1/INSTALL-LINKING/CONTINUATION",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_top_level_m102_journey_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -1775,6 +1825,111 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("journeys_passed missing M102 journey: install_claim_restore_continue", result.stderr)
+
+    def test_verifier_fail_closes_duplicate_m102_journey_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof["journeys_passed"].append("Install_Claim_Restore_Continue")
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "published proof file journeys_passed has duplicate entries: "
+                "Install_Claim_Restore_Continue",
+                result.stderr,
+            )
+
+    def test_verifier_fail_closes_duplicate_m102_receipt_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            receipt = next(
+                item
+                for item in proof["proof_receipts"]
+                if item["receipt_id"] == "support_followthrough:install_truth"
+            )
+            receipt["routes"].append("/ACCOUNT/SUPPORT")
+            receipt["surfaces"].append("Support_Followthrough:Install_Truth")
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "published proof file support_followthrough:install_truth surfaces "
+                "has duplicate entries: Support_Followthrough:Install_Truth",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file support_followthrough:install_truth routes "
+                "has duplicate entries: /ACCOUNT/SUPPORT",
+                result.stderr,
+            )
 
 
 if __name__ == "__main__":
