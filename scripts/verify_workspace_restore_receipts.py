@@ -785,6 +785,11 @@ def check_served_release_proof_matches_local(missing: list[str]) -> None:
             f"{SERVED_RELEASE_PROOF_PATH}: successor_queue_package must match {LOCAL_RELEASE_PROOF_PATH}"
         )
 
+    if local_payload.get("proof_routes") != served_payload.get("proof_routes"):
+        missing.append(
+            f"{SERVED_RELEASE_PROOF_PATH}: proof_routes must match {LOCAL_RELEASE_PROOF_PATH}"
+        )
+
     local_package = find_closed_package(local_payload)
     served_package = find_closed_package(served_payload)
     if local_package != served_package:

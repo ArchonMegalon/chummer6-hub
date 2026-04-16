@@ -125,6 +125,40 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("CampaignSpineController.cs", result.stderr)
         self.assertIn("[HttpGet(\"me/restore\")]", result.stderr)
 
+    def test_verifier_fails_closed_when_served_release_proof_routes_drift_from_local(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-served-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            local_proof_path = temp_root / "local-proof.json"
+            served_proof_path = temp_root / "served-proof.json"
+            source_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_proof_path.read_text(encoding="utf-8"))
+            local_proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+            served_payload = dict(payload)
+            served_payload["proof_routes"] = [
+                route
+                for route in payload["proof_routes"]
+                if route != "/api/v1/install-linking/continuation"
+            ]
+            served_proof_path.write_text(json.dumps(served_payload, indent=2), encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(local_proof_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_SERVED_RELEASE_PROOF"] = str(served_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof_routes must match", result.stderr)
+        self.assertIn("served-proof.json", result.stderr)
+
     def test_verifier_fails_closed_when_receipt_observation_stability_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-lifecycle-") as temp_dir:
             temp_root = Path(temp_dir)
