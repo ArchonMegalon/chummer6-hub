@@ -82,6 +82,24 @@ def _append_supervisor_status_helper_proof(text: str) -> str:
     )
 
 
+def _append_registry_task_local_telemetry_proof(text: str) -> str:
+    task_marker = "      - id: 105.1\n"
+    task_index = text.find(task_marker)
+    if task_index == -1:
+        raise AssertionError("missing registry task block for 105.1")
+
+    evidence_index = text.find("        evidence:\n", task_index)
+    if evidence_index == -1:
+        raise AssertionError("missing evidence block for 105.1")
+
+    insert_at = evidence_index + len("        evidence:\n")
+    return (
+        text[:insert_at]
+        + "          - TASK_LOCAL_TELEMETRY.generated.json worker-run telemetry summary is not repo-local M105 package proof.\n"
+        + text[insert_at:]
+    )
+
+
 def _duplicate_package_row(text: str) -> str:
     package_marker = f"    package_id: {PACKAGE_ID}\n"
     package_index = text.find(package_marker)
@@ -340,6 +358,33 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("commit 9f425d04 tightens M105 package-scoped receipt proof", result.stderr)
+        self.assertIn("105.1", result.stderr)
+
+    def test_verifier_rejects_task_local_telemetry_as_registry_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-task-telemetry-") as temp_dir:
+            registry_path = Path(temp_dir) / "registry.yaml"
+            source_registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            registry_path.write_text(
+                _append_registry_task_local_telemetry_proof(source_registry_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
         self.assertIn("105.1", result.stderr)
 
     def test_verifier_fails_closed_when_fleet_and_design_queue_rows_drift(self) -> None:
