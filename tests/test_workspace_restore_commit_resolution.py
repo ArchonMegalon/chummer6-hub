@@ -75,6 +75,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"79764447"', script_text)
         self.assertIn('"2960fc91"', script_text)
         self.assertIn('"0f4a31d3"', script_text)
+        self.assertIn('"d7788857"', script_text)
         self.assertIn("commit fcdd1fa5 pins the current M105 workspace proof floor", script_text)
         self.assertIn("commit 021de48a requires the current M105 queue proof guard", script_text)
         self.assertIn("commit 5bf1a11e pins the current M105 workspace queue guard", script_text)
@@ -113,6 +114,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit 06b0e574 pins the current M105 workspace proof floor guard", script_text)
         self.assertIn("commit 79764447 pins the M105 workspace current proof floor", script_text)
         self.assertIn("commit 0f4a31d3 pins the M105 workspace proof floor", script_text)
+        self.assertIn("commit d7788857 tightens the M105 workspace canonical proof floor", script_text)
 
     def test_verifier_fails_closed_when_required_local_commit_does_not_resolve(self) -> None:
         env = os.environ.copy()
