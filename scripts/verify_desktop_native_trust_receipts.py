@@ -213,6 +213,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit c9bbf63c tightens M102 served proof shelf route guard.",
         "/docker/chummercomplete/chummer.run-services commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
         "/docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
+        "/docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -282,6 +283,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit c9bbf63c tightens M102 served proof shelf route guard.",
         "/docker/chummercomplete/chummer.run-services commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
         "/docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
+        "/docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -387,6 +389,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "c9bbf63c",
     "2f7ed420",
     "15c5f0e5",
+    "a270dcd0",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
@@ -697,6 +700,26 @@ def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, 
         )
 
 
+def _verify_unique_string_list(errors: list[str], values: list, label: str) -> None:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+
+        normalized = value.strip().casefold()
+        if not normalized:
+            continue
+
+        if normalized in seen:
+            duplicates.add(value.strip())
+        else:
+            seen.add(normalized)
+
+    if duplicates:
+        errors.append(f"{label} has duplicate entries: {', '.join(sorted(duplicates))}")
+
+
 def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> None:
     _verify_json_has_no_forbidden_markers(errors, proof, label)
 
@@ -704,6 +727,7 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
     if not isinstance(proof_routes, list):
         errors.append(f"{label} missing list field: proof_routes")
     else:
+        _verify_unique_string_list(errors, proof_routes, f"{label} proof_routes")
         proof_route_set = {item for item in proof_routes if isinstance(item, str)}
         for required in REQUIRED_TOP_LEVEL_PROOF_ROUTES:
             if required not in proof_route_set:
@@ -713,6 +737,7 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
     if not isinstance(journeys_passed, list):
         errors.append(f"{label} missing list field: journeys_passed")
     else:
+        _verify_unique_string_list(errors, journeys_passed, f"{label} journeys_passed")
         journey_set = {item for item in journeys_passed if isinstance(item, str)}
         for required in REQUIRED_TOP_LEVEL_JOURNEYS:
             if required not in journey_set:
@@ -775,6 +800,7 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
                 errors.append(f"{label} {receipt_id} missing list field: {key}")
                 continue
 
+            _verify_unique_string_list(errors, actual_values, f"{label} {receipt_id} {key}")
             actual = {item for item in actual_values if isinstance(item, str)}
             for required in expected[key]:
                 if required not in actual:
