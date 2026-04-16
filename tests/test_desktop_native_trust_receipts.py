@@ -919,6 +919,54 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_allows_generated_at_timestamp_only_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof["generatedAt"] = "2099-01-01T00:00:00Z"
+            proof["generated_at"] = "2099-01-01T00:00:00Z"
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertEqual(
+                0,
+                result.returncode,
+                msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
+            )
+            self.assertIn("desktop native trust receipts verified", result.stdout)
+
     def test_verifier_fail_closes_weakened_generated_package_exit_criterion(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
