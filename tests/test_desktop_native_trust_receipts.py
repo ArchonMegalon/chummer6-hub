@@ -107,6 +107,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 5917695a pins the M102 current verifier floor.",
     "      - /docker/chummercomplete/chummer.run-services commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
     "      - /docker/chummercomplete/chummer.run-services commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
+    "      - /docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -210,6 +211,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 5917695a pins the M102 current verifier floor.",
     "          - /docker/chummercomplete/chummer.run-services commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
     "          - /docker/chummercomplete/chummer.run-services commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
+    "          - /docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1834,6 +1836,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "5917695a",
                 "2ded9038",
                 "e7b5177b",
+                "d72386ee",
             ],
             verifier._required_resolving_commits(),
         )
