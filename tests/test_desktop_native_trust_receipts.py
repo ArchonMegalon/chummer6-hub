@@ -109,6 +109,8 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
     "      - /docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
+    "      - /docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
+    "      - /docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -214,6 +216,8 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
     "          - /docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
+    "          - /docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
+    "          - /docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1841,6 +1845,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "d72386ee",
                 "fee0655a",
                 "568b8358",
+                "e0bcd91d",
             ],
             verifier._required_resolving_commits(),
         )

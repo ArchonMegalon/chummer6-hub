@@ -13,8 +13,8 @@ from pathlib import Path
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
-CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "568b8358"
-CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 callback query proof"
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "e0bcd91d"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin M102 callback query proof floor"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -260,6 +260,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
         "/docker/chummercomplete/chummer.run-services commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
         "/docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
+        "/docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -363,6 +364,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
         "/docker/chummercomplete/chummer.run-services commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
         "/docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
+        "/docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -516,6 +518,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "d72386ee",
     "fee0655a",
     "568b8358",
+    "e0bcd91d",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
