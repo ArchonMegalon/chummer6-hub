@@ -515,7 +515,12 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
 
     packages = payload.get("successor_queue_packages")
     package_list = [item for item in packages if isinstance(item, dict)] if isinstance(packages, list) else []
-    closed_package = next((item for item in package_list if item.get("package_id") == PACKAGE_ID), None)
+    closed_packages = [item for item in package_list if item.get("package_id") == PACKAGE_ID]
+    if len(closed_packages) != 1:
+        missing.append(
+            f"{path}: successor_queue_packages must contain exactly one {PACKAGE_ID}; found {len(closed_packages)}"
+        )
+    closed_package = closed_packages[0] if closed_packages else None
     if not isinstance(closed_package, dict):
         missing.append(f"{path}: successor_queue_packages missing {PACKAGE_ID}")
     else:
@@ -547,6 +552,20 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
         missing.append(
             f"{path}: package-scoped proof_receipts for {PACKAGE_ID} must be {sorted(expected_receipt_ids)!r}"
         )
+    for expected_receipt_id in expected_receipt_ids:
+        matching_receipt_count = sum(
+            1
+            for item in payload.get("proof_receipts", [])
+            if isinstance(item, dict)
+            and item.get("package_id") == PACKAGE_ID
+            and item.get("milestone_id") == MILESTONE_ID
+            and item.get("frontier_id") == FRONTIER_ID
+            and item.get("receipt_id") == expected_receipt_id
+        )
+        if matching_receipt_count != 1:
+            missing.append(
+                f"{path}: proof_receipts must contain exactly one package-scoped {expected_receipt_id}; found {matching_receipt_count}"
+            )
 
     for receipt_id, expected in LOCAL_RELEASE_PROOF_RECEIPTS.items():
         receipt = receipts.get(receipt_id)
