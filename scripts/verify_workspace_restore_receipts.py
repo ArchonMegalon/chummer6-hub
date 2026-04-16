@@ -166,6 +166,12 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "GetMyRestoreProjection(CancellationToken cancellationToken)",
         "return Ok(_campaignSpine.GetRestoreProjection(user, installLinking));",
     ],
+    "Chummer.Run.Api/Services/Community/WorkspaceLifecyclePolicyService.cs": [
+        "ProvenanceReceipts = NormalizeReceiptObservations(candidate.ProvenanceReceipts, existing.ProvenanceReceipts)",
+        "ConflictReceipts = NormalizeConflictObservations(candidate.ConflictReceipts, existing.ConflictReceipts)",
+        "existingObservedById.TryGetValue(item.ReceiptId, out DateTimeOffset observedAtUtc)",
+        "item with { ObservedAtUtc = observedAtUtc }",
+    ],
     "Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs": [
         "RestoreProvenanceReceipts: ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts)",
         "RestoreConflictReceipts: ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts)",
@@ -200,6 +206,16 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "VerifyRestoreReceiptsSurviveCommunityStoreReload();",
         "Restore projection should emit provenance receipts for entitlement, install, and rule-posture replay.",
         "Entitlement drift receipts should stay explicitly classified under entitlement sync and block continue until resolved.",
+    ],
+    "tests/RunServicesVerification/WorkspaceLifecycleRetentionVerification.cs": [
+        "VerifyUnchangedRestoreProjectionPreservesReceiptObservationTimestamps();",
+        "Unchanged restore projections should preserve provenance receipt observation timestamps.",
+        "Unchanged restore projections should preserve conflict receipt observation timestamps.",
+    ],
+    "Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs": [
+        "FinalizeRestoreProjectionPreservesReceiptObservationTimestampsWhenContentIsUnchanged",
+        "Assert.Equal(existing.ProvenanceReceipts![0].ObservedAtUtc.ToString(\"O\"), finalized.ProvenanceReceipts![0].ObservedAtUtc.ToString(\"O\"));",
+        "Assert.Equal(existing.ConflictReceipts![0].ObservedAtUtc.ToString(\"O\"), finalized.ConflictReceipts![0].ObservedAtUtc.ToString(\"O\"));",
     ],
 }
 

@@ -125,6 +125,43 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("CampaignSpineController.cs", result.stderr)
         self.assertIn("[HttpGet(\"me/restore\")]", result.stderr)
 
+    def test_verifier_fails_closed_when_receipt_observation_stability_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-lifecycle-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = temp_root / "Chummer.Run.Api" / "Services" / "Community" / "WorkspaceLifecyclePolicyService.cs"
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "WorkspaceLifecyclePolicyService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8").replace(
+                    "ProvenanceReceipts = NormalizeReceiptObservations(candidate.ProvenanceReceipts, existing.ProvenanceReceipts),\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("WorkspaceLifecyclePolicyService.cs", result.stderr)
+        self.assertIn("NormalizeReceiptObservations", result.stderr)
+
     def test_verifier_fails_closed_when_queue_staging_drops_complete_status(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-") as temp_dir:
             temp_root = Path(temp_dir)

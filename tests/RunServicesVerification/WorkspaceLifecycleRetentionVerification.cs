@@ -13,6 +13,7 @@ internal static class WorkspaceLifecycleRetentionVerification
     {
         VerifyWorkspaceRetentionRunbook();
         VerifyExpiredRestoreSummariesArePrunedAndRegenerated();
+        VerifyUnchangedRestoreProjectionPreservesReceiptObservationTimestamps();
         return Task.CompletedTask;
     }
 
@@ -108,6 +109,74 @@ internal static class WorkspaceLifecycleRetentionVerification
             ConflictSummaries: ["stale restore packet"],
             LocalOnlyNotes: ["local cache stays local"],
             GeneratedAtUtc: generatedAtUtc);
+
+    private static void VerifyUnchangedRestoreProjectionPreservesReceiptObservationTimestamps()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_WORKSPACE_RESTORE_RETENTION_DAYS"] = "30"
+            })
+            .Build();
+
+        WorkspaceLifecyclePolicyService lifecycle = new(configuration);
+        DateTimeOffset baselineGeneratedAtUtc = DateTimeOffset.UtcNow.AddHours(-12);
+        DateTimeOffset baselineObservedAtUtc = baselineGeneratedAtUtc.AddMinutes(5);
+
+        WorkspaceRestoreProjection existing = BuildRestoreProjection("usr_receipt", baselineGeneratedAtUtc) with
+        {
+            ProvenanceReceipts =
+            [
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: "restore-provenance:claimed-install",
+                    Kind: "claimed_installation",
+                    SubjectId: "install-01",
+                    Surface: "workspace_restore",
+                    Summary: "Restore packet retains the claimed install lane.",
+                    Proof: "artifact:avalonia-linux",
+                    ObservedAtUtc: baselineObservedAtUtc)
+            ],
+            ConflictReceipts =
+            [
+                new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: "restore-conflict:missing-artifact",
+                    Severity: "warning",
+                    Kind: "restore_artifact_missing",
+                    SubjectId: "install-01",
+                    Summary: "Restore snapshot has no reconnectable artifact receipt.",
+                    Resolution: "Refresh install linking before continuing.",
+                    ObservedAtUtc: baselineObservedAtUtc)
+            ]
+        };
+
+        WorkspaceRestoreProjection candidate = existing with
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            ProvenanceReceipts =
+            [
+                existing.ProvenanceReceipts![0] with { ObservedAtUtc = DateTimeOffset.UtcNow }
+            ],
+            ConflictReceipts =
+            [
+                existing.ConflictReceipts![0] with { ObservedAtUtc = DateTimeOffset.UtcNow }
+            ]
+        };
+
+        WorkspaceRestoreProjection finalized = lifecycle.FinalizeRestoreProjection(existing, candidate, DateTimeOffset.UtcNow);
+
+        VerificationAssert.Equal(
+            existing.GeneratedAtUtc.ToString("O"),
+            finalized.GeneratedAtUtc.ToString("O"),
+            "Unchanged restore projections should keep the original generated timestamp.");
+        VerificationAssert.Equal(
+            existing.ProvenanceReceipts![0].ObservedAtUtc.ToString("O"),
+            finalized.ProvenanceReceipts![0].ObservedAtUtc.ToString("O"),
+            "Unchanged restore projections should preserve provenance receipt observation timestamps.");
+        VerificationAssert.Equal(
+            existing.ConflictReceipts![0].ObservedAtUtc.ToString("O"),
+            finalized.ConflictReceipts![0].ObservedAtUtc.ToString("O"),
+            "Unchanged restore projections should preserve conflict receipt observation timestamps.");
+    }
 
     private static string ResolveRepoRoot()
     {
