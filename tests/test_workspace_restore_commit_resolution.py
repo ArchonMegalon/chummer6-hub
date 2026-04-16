@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 import os
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -24,6 +26,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"5c8e5527"', script_text)
         self.assertIn('"bd398493"', script_text)
         self.assertIn('"a45d9e9e"', script_text)
+        self.assertIn('"a002019a"', script_text)
         self.assertIn('"717af57e"', script_text)
         self.assertIn('"346c3ede"', script_text)
         self.assertIn('"8d59d95f"', script_text)
@@ -32,6 +35,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"06e2ec99"', script_text)
         self.assertIn('"cb560573"', script_text)
         self.assertIn('"7c92635e"', script_text)
+        self.assertIn('"fcdd1fa5"', script_text)
         self.assertIn('"c90d02e0"', script_text)
         self.assertIn('"211ce4a1"', script_text)
         self.assertIn('"93182934"', script_text)
@@ -163,6 +167,27 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit d882db69 pins the M105 workspace proof floor guard", script_text)
         self.assertIn("commit db4fe453 tightens M105 served proof route mirroring", script_text)
         self.assertIn("/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
+
+    def test_all_registry_and_queue_commit_citations_are_required_to_resolve(self) -> None:
+        spec = importlib.util.spec_from_file_location("workspace_restore_verifier", SCRIPT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        verifier = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(verifier)
+
+        cited_commits = {
+            match
+            for markers in [verifier.REGISTRY_MARKERS, verifier.QUEUE_STAGING_MARKERS]
+            for marker in markers
+            for match in re.findall(r"commit ([0-9a-f]{8})", marker)
+        }
+        cited_commits.add(verifier.LANDED_COMMIT)
+
+        required_commits = set(verifier.DEFAULT_REQUIRED_LOCAL_COMMITS)
+        self.assertFalse(
+            cited_commits - required_commits,
+            f"commit citations must be present in DEFAULT_REQUIRED_LOCAL_COMMITS: {sorted(cited_commits - required_commits)}",
+        )
 
     def test_verifier_fails_closed_when_required_local_commit_does_not_resolve(self) -> None:
         env = os.environ.copy()
