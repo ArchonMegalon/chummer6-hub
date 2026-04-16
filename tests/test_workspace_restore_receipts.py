@@ -94,6 +94,33 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("!string.IsNullOrWhiteSpace(item.RecoveryHint)", result.stderr)
 
+    def test_verifier_rejects_active_run_markers_in_campaign_os_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-proof-helper-") as temp_dir:
+            temp_root = Path(temp_dir)
+            proof_path = temp_root / "proof.json"
+            source_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            payload = json.loads(source_proof_path.read_text(encoding="utf-8"))
+            payload["required_markers"]["campaign_session_recover_recap"].append(
+                "TASK_LOCAL_TELEMETRY.generated.json active-run helper output is not M105 proof."
+            )
+            proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_PROOF"] = str(proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+        self.assertIn("proof.json", result.stderr)
+
     def test_verifier_fails_closed_when_restore_api_route_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-api-route-") as temp_dir:
             temp_root = Path(temp_dir)
