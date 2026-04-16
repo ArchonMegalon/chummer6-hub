@@ -692,28 +692,45 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
         if route not in proof_route_set:
             missing.append(f"{path}: proof_routes missing {route}")
 
+    proof_receipts = payload.get("proof_receipts", [])
+    proof_receipt_list = [item for item in proof_receipts if isinstance(item, dict)] if isinstance(proof_receipts, list) else []
     receipts = {
         item.get("receipt_id"): item
-        for item in payload.get("proof_receipts", [])
-        if isinstance(item, dict)
+        for item in proof_receipt_list
+        if isinstance(item.get("receipt_id"), str)
     }
+    package_scoped_receipts = [
+        item
+        for item in proof_receipt_list
+        if item.get("package_id") == PACKAGE_ID
+        and item.get("milestone_id") == MILESTONE_ID
+        and item.get("frontier_id") == FRONTIER_ID
+    ]
     package_receipt_ids = {
-        receipt_id
-        for receipt_id, receipt in receipts.items()
-        if isinstance(receipt_id, str)
-        and receipt.get("package_id") == PACKAGE_ID
-        and receipt.get("milestone_id") == MILESTONE_ID
-        and receipt.get("frontier_id") == FRONTIER_ID
+        item.get("receipt_id")
+        for item in package_scoped_receipts
+        if isinstance(item.get("receipt_id"), str)
     }
     expected_receipt_ids = set(LOCAL_RELEASE_PROOF_RECEIPTS)
     if package_receipt_ids != expected_receipt_ids:
         missing.append(
             f"{path}: package-scoped proof_receipts for {PACKAGE_ID} must be {sorted(expected_receipt_ids)!r}"
         )
+    if len(package_scoped_receipts) != len(expected_receipt_ids):
+        missing.append(
+            f"{path}: package-scoped proof_receipts for {PACKAGE_ID} must contain only "
+            f"{sorted(expected_receipt_ids)!r}; found {len(package_scoped_receipts)} row(s)"
+        )
+    for item in package_scoped_receipts:
+        receipt_id = item.get("receipt_id")
+        if receipt_id not in expected_receipt_ids:
+            missing.append(
+                f"{path}: package-scoped proof_receipts for {PACKAGE_ID} contains non-canonical receipt_id {receipt_id!r}"
+            )
     for expected_receipt_id in expected_receipt_ids:
         global_matching_receipt_count = sum(
             1
-            for item in payload.get("proof_receipts", [])
+            for item in proof_receipt_list
             if isinstance(item, dict)
             and item.get("receipt_id") == expected_receipt_id
         )
@@ -724,7 +741,7 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
 
         matching_receipt_count = sum(
             1
-            for item in payload.get("proof_receipts", [])
+            for item in proof_receipt_list
             if isinstance(item, dict)
             and item.get("package_id") == PACKAGE_ID
             and item.get("milestone_id") == MILESTONE_ID
