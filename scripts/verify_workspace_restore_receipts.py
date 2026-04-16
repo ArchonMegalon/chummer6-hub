@@ -123,6 +123,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "2da59c68",
     "71e514b2",
     "e0d2bff6",
+    "c6f628ef",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -315,6 +316,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 2da59c68 pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit 71e514b2 pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit e0d2bff6 pins the M105 workspace queue-frontier guard proof.",
+    "/docker/chummercomplete/chummer.run-services commit c6f628ef pins the M105 verifier to the canonical queue-frontier proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -384,6 +386,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 2da59c68 pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit 71e514b2 pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit e0d2bff6 pins the M105 workspace queue-frontier guard proof.",
+    "/docker/chummercomplete/chummer.run-services commit c6f628ef pins the M105 verifier to the canonical queue-frontier proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
