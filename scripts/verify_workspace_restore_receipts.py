@@ -143,6 +143,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "a7e826d3",
     "d882db69",
     "db4fe453",
+    "57a5b16d",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -374,6 +375,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit a7e826d3 pins the M105 workspace receipt uniqueness proof floor.",
     "/docker/chummercomplete/chummer.run-services commit d882db69 pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit db4fe453 tightens M105 served proof route mirroring so public proof shelves cannot drift from local route receipts.",
+    "/docker/chummercomplete/chummer.run-services commit 57a5b16d tightens M105 proof commit citation resolution so every registry and queue commit proof citation must resolve locally.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -461,6 +463,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit a7e826d3 pins the M105 workspace receipt uniqueness proof floor.",
     "/docker/chummercomplete/chummer.run-services commit d882db69 pins the M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit db4fe453 tightens M105 served proof route mirroring so public proof shelves cannot drift from local route receipts.",
+    "/docker/chummercomplete/chummer.run-services commit 57a5b16d tightens M105 proof commit citation resolution so every registry and queue commit proof citation must resolve locally.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
