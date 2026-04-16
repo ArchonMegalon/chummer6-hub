@@ -237,6 +237,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 76b350fc tightens M102 materialized proof guard.",
         "/docker/chummercomplete/chummer.run-services commit d3b19c88 pins the M102 materialized proof floor.",
         "/docker/chummercomplete/chummer.run-services commit 39af99da pins the M102 materialized proof floor guard.",
+        "/docker/chummercomplete/chummer.run-services commit 7d86f38e pins the current M102 desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -328,6 +329,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 76b350fc tightens M102 materialized proof guard.",
         "/docker/chummercomplete/chummer.run-services commit d3b19c88 pins the M102 materialized proof floor.",
         "/docker/chummercomplete/chummer.run-services commit 39af99da pins the M102 materialized proof floor guard.",
+        "/docker/chummercomplete/chummer.run-services commit 7d86f38e pins the current M102 desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -470,6 +472,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "39af99da",
     "a4d16005",
     "1893a245",
+    "7d86f38e",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
