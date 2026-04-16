@@ -51,6 +51,12 @@ PACKAGE_TASK = "Make roaming workspace, entitlement replication, stale state, an
 LANDED_COMMIT = "4d4b3856"
 FRONTIER_ID = 4623636482
 MILESTONE_ID = 105
+PACKAGE_REPO_ROOT = "/docker/chummercomplete/chummer.run-services/"
+ALLOWED_PROOF_PATH_PREFIXES = (
+    "Chummer.Run.Api/",
+    "scripts/",
+    "tests/",
+)
 DEFAULT_REQUIRED_LOCAL_COMMITS = [
     LANDED_COMMIT,
     "b39147dc",
@@ -583,6 +589,7 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
 
     require_markers(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
     reject_forbidden_markers(f"{path}:{PACKAGE_ID}", queue_block, FORBIDDEN_PROOF_MARKERS, missing)
+    reject_out_of_scope_proof_paths(f"{path}:{PACKAGE_ID}", queue_block, missing)
 
 
 def check_queue_staging_blocks_match(missing: list[str]) -> None:
@@ -609,6 +616,26 @@ def reject_forbidden_markers(label: str, text: str, markers: list[str], missing:
     for marker in markers:
         if marker.casefold() in normalized_text:
             missing.append(f"{label}: forbidden active-run proof marker: {marker}")
+
+
+def reject_out_of_scope_proof_paths(label: str, text: str, missing: list[str]) -> None:
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line.startswith("- "):
+            continue
+
+        proof_item = line[2:].strip()
+        if not proof_item.startswith(PACKAGE_REPO_ROOT):
+            continue
+        if proof_item.startswith(f"{PACKAGE_REPO_ROOT}commit "):
+            continue
+
+        relative_path = proof_item[len(PACKAGE_REPO_ROOT):]
+        if not relative_path.startswith(ALLOWED_PROOF_PATH_PREFIXES):
+            missing.append(
+                f"{label}: proof path must stay inside allowed package roots "
+                f"{', '.join(ALLOWED_PROOF_PATH_PREFIXES)}: {proof_item}"
+            )
 
 
 def check_local_release_proof(path: Path, missing: list[str]) -> None:
@@ -886,6 +913,7 @@ def main() -> int:
                 FORBIDDEN_PROOF_MARKERS,
                 missing,
             )
+            reject_out_of_scope_proof_paths(f"{REGISTRY_PATH}:105.1", registry_block, missing)
 
     check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
