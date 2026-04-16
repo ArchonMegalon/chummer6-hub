@@ -824,7 +824,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n",
                     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n"
                     "      - /VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md\n"
-                    "      - active-run helper commands run_ooda_design_supervisor_until_quiet.py output\n",
+                    "      - active-run helper commands run_ooda_design_supervisor_until_quiet.py output\n"
+                    "      - supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled\n",
                 )
                 + "\n",
                 encoding="utf-8",
@@ -870,6 +871,26 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "canonical successor queue staging block has forbidden active-run proof marker: run_ooda_design_supervisor_until_quiet",
                 result.stderr,
             )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: supervisor status",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: status query",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: status_query_supported",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: polling_disabled",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: polling disabled",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_successor_registry_active_run_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -905,6 +926,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     [
                         *REGISTRY_102_1_LINES,
                         "          - Task_Local_Telemetry.generated.json Active-Run Helper Commands output from ooda_design_supervisor.py and the operator/OODA loop",
+                        "          - Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
                     ]
                 )
                 + "\n",
@@ -948,6 +970,26 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             self.assertIn(
                 "canonical successor registry block has forbidden active-run proof marker: operator/OODA loop",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: supervisor status",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: status query",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: status_query_supported",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: polling_disabled",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: polling disabled",
                 result.stderr,
             )
 
@@ -1350,6 +1392,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             m102_receipt["evidence"] = [
                 "/VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md",
                 "Operator Telemetry helper output",
+                "Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
             ]
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
@@ -1379,6 +1422,31 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn(
                 "published proof file has forbidden active-run proof marker "
                 "at $.proof_receipts[1].evidence[1]: operator telemetry",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[2]: supervisor status",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[2]: status query",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[2]: status_query_supported",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[2]: polling_disabled",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[2]: polling disabled",
                 result.stderr,
             )
 
