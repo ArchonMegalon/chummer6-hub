@@ -86,10 +86,63 @@ public sealed class WorkspaceLifecyclePolicyService
             return candidate with { GeneratedAtUtc = now };
         }
 
-        WorkspaceRestoreProjection stableCandidate = candidate with { GeneratedAtUtc = existing.GeneratedAtUtc };
+        WorkspaceRestoreProjection stableCandidate = candidate with
+        {
+            GeneratedAtUtc = existing.GeneratedAtUtc,
+            ProvenanceReceipts = NormalizeReceiptObservations(candidate.ProvenanceReceipts, existing.ProvenanceReceipts),
+            ConflictReceipts = NormalizeConflictObservations(candidate.ConflictReceipts, existing.ConflictReceipts)
+        };
         return ContentEquals(existing, stableCandidate)
             ? existing
             : candidate with { GeneratedAtUtc = now };
+    }
+
+    private static IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? NormalizeReceiptObservations(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? candidate,
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? existing)
+    {
+        if (candidate is null)
+        {
+            return null;
+        }
+
+        Dictionary<string, DateTimeOffset> existingObservedById = (existing ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ReceiptId))
+            .GroupBy(static item => item.ReceiptId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.First().ObservedAtUtc,
+                StringComparer.OrdinalIgnoreCase);
+
+        return candidate
+            .Select(item => existingObservedById.TryGetValue(item.ReceiptId, out DateTimeOffset observedAtUtc)
+                ? item with { ObservedAtUtc = observedAtUtc }
+                : item)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<WorkspaceRestoreConflictReceipt>? NormalizeConflictObservations(
+        IReadOnlyList<WorkspaceRestoreConflictReceipt>? candidate,
+        IReadOnlyList<WorkspaceRestoreConflictReceipt>? existing)
+    {
+        if (candidate is null)
+        {
+            return null;
+        }
+
+        Dictionary<string, DateTimeOffset> existingObservedById = (existing ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
+            .Where(static item => !string.IsNullOrWhiteSpace(item.ReceiptId))
+            .GroupBy(static item => item.ReceiptId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.First().ObservedAtUtc,
+                StringComparer.OrdinalIgnoreCase);
+
+        return candidate
+            .Select(item => existingObservedById.TryGetValue(item.ReceiptId, out DateTimeOffset observedAtUtc)
+                ? item with { ObservedAtUtc = observedAtUtc }
+                : item)
+            .ToArray();
     }
 
     private static bool ContentEquals<T>(T left, T right)
