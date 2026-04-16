@@ -64,6 +64,24 @@ def _append_active_run_handoff_path(text: str) -> str:
     )
 
 
+def _append_supervisor_status_helper_proof(text: str) -> str:
+    package_marker = f"    package_id: {PACKAGE_ID}\n"
+    package_index = text.find(package_marker)
+    if package_index == -1:
+        raise AssertionError(f"missing package row for {PACKAGE_ID}")
+
+    proof_index = text.find("    proof:\n", package_index)
+    if proof_index == -1:
+        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
+
+    insert_at = proof_index + len("    proof:\n")
+    return (
+        text[:insert_at]
+        + "      - Supervisor status helper says the successor-wave telemetry eta is green.\n"
+        + text[insert_at:]
+    )
+
+
 def _duplicate_package_row(text: str) -> str:
     package_marker = f"    package_id: {PACKAGE_ID}\n"
     package_index = text.find(package_marker)
@@ -180,6 +198,35 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden active-run proof marker: ACTIVE_RUN_HANDOFF", result.stderr)
         self.assertIn("forbidden active-run proof marker: /var/lib/codex-fleet", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
+    def test_verifier_rejects_supervisor_status_and_telemetry_helper_phrasing_as_queue_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-supervisor-helper-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                _append_supervisor_status_helper_proof(source_queue_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: successor-wave telemetry", result.stderr)
+        self.assertIn("forbidden active-run proof marker: supervisor status", result.stderr)
+        self.assertIn("forbidden active-run proof marker: status helper", result.stderr)
         self.assertIn(PACKAGE_ID, result.stderr)
 
     def test_verifier_rejects_blocked_ooda_helper_command_names_as_queue_proof(self) -> None:
