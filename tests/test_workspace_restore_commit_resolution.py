@@ -93,6 +93,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"f6cd760e"', script_text)
         self.assertIn('"03517936"', script_text)
         self.assertIn('"57da8fb3"', script_text)
+        self.assertIn('"aa7d6b9a"', script_text)
         self.assertIn("commit fcdd1fa5 pins the current M105 workspace proof floor", script_text)
         self.assertIn("commit 021de48a requires the current M105 queue proof guard", script_text)
         self.assertIn("commit 5bf1a11e pins the current M105 workspace queue guard", script_text)
@@ -148,6 +149,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit f6cd760e tightens the M105 verifier to require the current queue-cited workspace proof floor", script_text)
         self.assertIn("commit 03517936 tightens the M105 restore API proof guard", script_text)
         self.assertIn("commit 57da8fb3 preserves workspace restore receipt observation timestamps", script_text)
+        self.assertIn("commit aa7d6b9a pins the M105 current workspace proof floor", script_text)
         self.assertIn("/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
 
     def test_verifier_fails_closed_when_required_local_commit_does_not_resolve(self) -> None:
