@@ -78,6 +78,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
     "      - /docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
     "      - /docker/chummercomplete/chummer.run-services commit 4fa19f0c pins M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 6f468ee9 tightens M102 worker-state proof guard so run-state helper output cannot close desktop-native trust evidence.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -152,6 +153,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
     "          - /docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
     "          - /docker/chummercomplete/chummer.run-services commit 4fa19f0c pins M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 6f468ee9 tightens M102 worker-state proof guard so run-state helper output cannot close desktop-native trust evidence.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1618,6 +1620,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "15c5f0e5",
                 "a270dcd0",
                 "4fa19f0c",
+                "6f468ee9",
             ],
             verifier._required_resolving_commits(),
         )
