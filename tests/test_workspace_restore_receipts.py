@@ -307,6 +307,49 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("105.1", result.stderr)
         self.assertIn("commit b39147dc tightens the workspace restore verifier", result.stderr)
 
+    def test_verifier_fails_closed_when_registry_duplicates_completed_task_row(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-duplicate-") as temp_dir:
+            temp_root = Path(temp_dir)
+            registry_path = temp_root / "registry.yaml"
+            fleet_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            design_queue_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            source_registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            registry_text = source_registry_path.read_text(encoding="utf-8")
+            task_marker = "      - id: 105.1\n"
+            task_start = registry_text.find(task_marker)
+            self.assertNotEqual(-1, task_start)
+            next_task = registry_text.find("\n      - id:", task_start + len(task_marker))
+            next_milestone = registry_text.find("\n  - id:", task_start + len(task_marker))
+            task_end = min(index for index in [next_task, next_milestone] if index != -1)
+            task_block = registry_text[task_start:task_end]
+            registry_path.write_text(
+                registry_text[:task_end] + "\n" + task_block + registry_text[task_end:],
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(fleet_queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected exactly one registry task block for 105.1", result.stderr)
+
     def test_verifier_fails_closed_when_registry_uses_active_run_telemetry_as_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-telemetry-") as temp_dir:
             temp_root = Path(temp_dir)
