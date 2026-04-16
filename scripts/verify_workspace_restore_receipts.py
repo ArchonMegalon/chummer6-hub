@@ -47,6 +47,7 @@ DESIGN_QUEUE_STAGING_PATH = Path(
     )
 )
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
+PACKAGE_TASK = "Make roaming workspace, entitlement replication, stale state, and conflict posture explicit and recoverable."
 LANDED_COMMIT = "4d4b3856"
 FRONTIER_ID = 4623636482
 MILESTONE_ID = 105
@@ -327,6 +328,7 @@ REGISTRY_MARKERS = [
 
 QUEUE_STAGING_MARKERS = [
     "title: Emit provenance and conflict receipts for workspace restore and continuity",
+    f"task: {PACKAGE_TASK}",
     f"package_id: {PACKAGE_ID}\n",
     f"frontier_id: {FRONTIER_ID}",
     "milestone_id: 105",
