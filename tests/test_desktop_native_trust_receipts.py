@@ -87,6 +87,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit cae283e9 requires the current M102 desktop trust proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit e908400b pins the M102 current desktop trust proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit 1870132d pins the latest M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 6b811ca2 pins the latest M102 desktop trust guard floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -170,6 +171,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit cae283e9 requires the current M102 desktop trust proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit e908400b pins the M102 current desktop trust proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit 1870132d pins the latest M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 6b811ca2 pins the latest M102 desktop trust guard floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -270,6 +272,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn("support_followthrough:install_truth", proof)
             self.assertIn("/api/v1/install-linking/continuation", proof)
             payload = json.loads(proof)
+            self.assertIn("/downloads/install/avalonia-linux-x64-installer/continue.json", payload["proof_routes"])
+            self.assertIn("/api/v1/install-linking/continuation", payload["proof_routes"])
             self.assertIn("/account/access", payload["proof_routes"])
             m102_package = next(
                 item
@@ -1664,6 +1668,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "cae283e9",
                 "e908400b",
                 "1870132d",
+                "6b811ca2",
             ],
             verifier._required_resolving_commits(),
         )
