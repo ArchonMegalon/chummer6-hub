@@ -102,6 +102,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit c0c4dca1 records the M102 desktop trust proof citation.",
     "      - /docker/chummercomplete/chummer.run-services commit 42a3d5a4 pins the M102 desktop trust citation floor.",
     "      - /docker/chummercomplete/chummer.run-services commit af567e58 pins the M102 desktop trust verifier floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 2620a2f4 requires the M102 desktop trust verifier floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -200,6 +201,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit c0c4dca1 records the M102 desktop trust proof citation.",
     "          - /docker/chummercomplete/chummer.run-services commit 42a3d5a4 pins the M102 desktop trust citation floor.",
     "          - /docker/chummercomplete/chummer.run-services commit af567e58 pins the M102 desktop trust verifier floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 2620a2f4 requires the M102 desktop trust verifier floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1820,6 +1822,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "c0c4dca1",
                 "42a3d5a4",
                 "af567e58",
+                "2620a2f4",
             ],
             verifier._required_resolving_commits(),
         )
