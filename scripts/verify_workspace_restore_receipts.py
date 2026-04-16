@@ -131,6 +131,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "138d84ef",
     "109face0",
     "28b9e40a",
+    "f6cd760e",
     "03517936",
     "57da8fb3",
 ]
@@ -354,6 +355,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 138d84ef pins the latest M105 workspace task guard floor.",
     "/docker/chummercomplete/chummer.run-services commit 109face0 pins the M105 workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 28b9e40a pins the M105 workspace proof floor guard.",
+    "/docker/chummercomplete/chummer.run-services commit f6cd760e tightens the M105 verifier to require the current queue-cited workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 03517936 tightens the M105 restore API proof guard so completed-package proof fails if /api/v1/campaign-spine/me/restore loses the workspace restore projection route.",
     "/docker/chummercomplete/chummer.run-services commit 57da8fb3 preserves workspace restore receipt observation timestamps for unchanged provenance and conflict receipts and pins the behavior in verifier proof.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
@@ -433,6 +435,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 138d84ef pins the latest M105 workspace task guard floor.",
     "/docker/chummercomplete/chummer.run-services commit 109face0 pins the M105 workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 28b9e40a pins the M105 workspace proof floor guard.",
+    "/docker/chummercomplete/chummer.run-services commit f6cd760e tightens the M105 verifier to require the current queue-cited workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 03517936 tightens the M105 restore API proof guard so completed-package proof fails if /api/v1/campaign-spine/me/restore loses the workspace restore projection route.",
     "/docker/chummercomplete/chummer.run-services commit 57da8fb3 preserves workspace restore receipt observation timestamps for unchanged provenance and conflict receipts and pins the behavior in verifier proof.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
