@@ -24,6 +24,12 @@ REQUIRED_SOURCE_MARKERS = {
         "ResolveSupportContinuationCases(installation, installSummary, receipt)",
         "InstalledBuildReceiptId: receipt?.ReceiptId",
         "SupportCases: supportCases",
+        "NormalizeCallbackUri(installLinkCallbackUri)",
+        "string.Equals(parsed.Scheme, \"chummer\", StringComparison.OrdinalIgnoreCase)",
+        "string.Equals(parsed.Host, \"install-link\", StringComparison.OrdinalIgnoreCase)",
+        "string.Equals(parsed.Host, \"127.0.0.1\", StringComparison.OrdinalIgnoreCase)",
+        "string.Equals(parsed.Host, \"localhost\", StringComparison.OrdinalIgnoreCase)",
+        "[\"installLinkTransport\"] = \"grant_callback\"",
     ],
     Path("Chummer.Run.Api/Services/DesktopInstallRail.cs"): [
         "Claim codes are a recovery fallback, not a browser redemption step.",
