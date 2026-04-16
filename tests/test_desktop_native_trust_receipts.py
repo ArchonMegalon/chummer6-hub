@@ -86,6 +86,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 7cf5461b pins the M102 desktop trust proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit cae283e9 requires the current M102 desktop trust proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit e908400b pins the M102 current desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 1870132d pins the latest M102 desktop trust proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -168,6 +169,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 7cf5461b pins the M102 desktop trust proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit cae283e9 requires the current M102 desktop trust proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit e908400b pins the M102 current desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 1870132d pins the latest M102 desktop trust proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1661,6 +1663,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "7cf5461b",
                 "cae283e9",
                 "e908400b",
+                "1870132d",
             ],
             verifier._required_resolving_commits(),
         )
