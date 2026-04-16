@@ -128,6 +128,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "fa17ff4d",
     "72f96452",
     "664737cb",
+    "138d84ef",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -324,6 +325,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit fa17ff4d tightens the M105 workspace queue task guard so completed-package proof must retain the exact assigned successor task text.",
     "/docker/chummercomplete/chummer.run-services commit 72f96452 pins the M105 workspace task guard proof.",
     "/docker/chummercomplete/chummer.run-services commit 664737cb pins the current M105 workspace task guard floor.",
+    "/docker/chummercomplete/chummer.run-services commit 138d84ef pins the latest M105 workspace task guard floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -398,6 +400,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit fa17ff4d tightens the M105 workspace queue task guard so completed-package proof must retain the exact assigned successor task text.",
     "/docker/chummercomplete/chummer.run-services commit 72f96452 pins the M105 workspace task guard proof.",
     "/docker/chummercomplete/chummer.run-services commit 664737cb pins the current M105 workspace task guard floor.",
+    "/docker/chummercomplete/chummer.run-services commit 138d84ef pins the latest M105 workspace task guard floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
