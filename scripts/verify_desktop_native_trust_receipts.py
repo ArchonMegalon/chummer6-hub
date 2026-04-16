@@ -13,8 +13,8 @@ from pathlib import Path
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
-CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "a4d16005"
-CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin M102 desktop trust proof floor guard"
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "1893a245"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin current M102 desktop trust proof floor"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -469,6 +469,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "d3b19c88",
     "39af99da",
     "a4d16005",
+    "1893a245",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
