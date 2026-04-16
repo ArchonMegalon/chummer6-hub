@@ -156,6 +156,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "9f425d04",
     "7c7a741a",
     "75dba18c",
+    "f221ec3f",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -392,6 +393,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit a08ba77b tightens M105 embedded proof path scope so prose proof bullets cannot cite paths outside Chummer.Run.Api, scripts, or tests.",
     "/docker/chummercomplete/chummer.run-services commit 9f425d04 tightens M105 package-scoped receipt proof so untracked workspace continuity receipt rows cannot hide beside the canonical receipts.",
     "/docker/chummercomplete/chummer.run-services commit 75dba18c pins the current M105 workspace receipt test proof floor so future shards verify the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit f221ec3f tightens the M105 worker telemetry proof guard so completed-package evidence cannot cite control-plane helper output or worker-run telemetry summaries.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -484,6 +486,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit a08ba77b tightens M105 embedded proof path scope so prose proof bullets cannot cite paths outside Chummer.Run.Api, scripts, or tests.",
     "/docker/chummercomplete/chummer.run-services commit 9f425d04 tightens M105 package-scoped receipt proof so untracked workspace continuity receipt rows cannot hide beside the canonical receipts.",
     "/docker/chummercomplete/chummer.run-services commit 75dba18c pins the current M105 workspace receipt test proof floor so future shards verify the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit f221ec3f tightens the M105 worker telemetry proof guard so completed-package evidence cannot cite control-plane helper output or worker-run telemetry summaries.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
