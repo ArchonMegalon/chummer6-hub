@@ -109,6 +109,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "1a0ba130",
     "63313972",
     "0b038324",
+    "447f2a90",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -289,6 +290,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 1a0ba130 pins the M105 workspace duplicate proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 63313972 pins the M105 workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 0b038324 tightens M105 local and served release proof uniqueness so duplicate closed-package rows or duplicate package-scoped receipts cannot keep the package green.",
+    "/docker/chummercomplete/chummer.run-services commit 447f2a90 pins the M105 workspace uniqueness proof floor so future shards verify the current closed-package guard instead of repeating it.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -345,6 +347,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 1a0ba130 pins the M105 workspace duplicate proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 63313972 pins the M105 workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 0b038324 tightens M105 local and served release proof uniqueness so duplicate closed-package rows or duplicate package-scoped receipts cannot keep the package green.",
+    "/docker/chummercomplete/chummer.run-services commit 447f2a90 pins the M105 workspace uniqueness proof floor so future shards verify the current closed-package guard instead of repeating it.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
