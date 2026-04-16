@@ -385,6 +385,10 @@ def extract_registry_task_block(text: str) -> str:
     return text[start:end]
 
 
+def count_registry_task_blocks(text: str) -> int:
+    return text.count("      - id: 105.1\n")
+
+
 def extract_queue_package_block(text: str) -> str:
     marker = f"    package_id: {PACKAGE_ID}\n"
     package_id_index = text.find(marker)
@@ -401,6 +405,10 @@ def extract_queue_package_block(text: str) -> str:
     if end == -1:
         end = len(text)
     return text[start:end]
+
+
+def count_queue_package_blocks(text: str) -> int:
+    return text.count(f"    package_id: {PACKAGE_ID}\n")
 
 
 def require_markers(label: str, text: str, markers: list[str], missing: list[str]) -> None:
@@ -436,6 +444,10 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
     if not queue_block:
         missing.append(f"{path}: missing queue package block for {PACKAGE_ID}")
         return
+
+    package_block_count = count_queue_package_blocks(queue_staging_text)
+    if package_block_count != 1:
+        missing.append(f"{path}: expected exactly one queue package block for {PACKAGE_ID}; found {package_block_count}")
 
     require_markers(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
     reject_forbidden_markers(f"{path}:{PACKAGE_ID}", queue_block, FORBIDDEN_PROOF_MARKERS, missing)
@@ -692,6 +704,10 @@ def main() -> int:
     except FileNotFoundError as exc:
         missing.append(str(exc))
     else:
+        task_block_count = count_registry_task_blocks(registry_text)
+        if task_block_count != 1:
+            missing.append(f"{REGISTRY_PATH}: expected exactly one registry task block for 105.1; found {task_block_count}")
+
         registry_block = extract_registry_task_block(registry_text)
         if not registry_block:
             missing.append(f"{REGISTRY_PATH}: missing registry task block for 105.1")
