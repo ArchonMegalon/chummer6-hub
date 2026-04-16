@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -628,17 +629,18 @@ def reject_out_of_scope_proof_paths(label: str, text: str, missing: list[str]) -
             continue
 
         proof_item = line[2:].strip()
-        if not proof_item.startswith(PACKAGE_REPO_ROOT):
-            continue
-        if proof_item.startswith(f"{PACKAGE_REPO_ROOT}commit "):
+        if not proof_item.startswith(PACKAGE_REPO_ROOT) and PACKAGE_REPO_ROOT not in proof_item:
             continue
 
-        relative_path = proof_item[len(PACKAGE_REPO_ROOT):]
-        if not relative_path.startswith(ALLOWED_PROOF_PATH_PREFIXES):
-            missing.append(
-                f"{label}: proof path must stay inside allowed package roots "
-                f"{', '.join(ALLOWED_PROOF_PATH_PREFIXES)}: {proof_item}"
-            )
+        for match in re.finditer(re.escape(PACKAGE_REPO_ROOT) + r"(?P<target>[^\s,;:)]+)", proof_item):
+            relative_path = match.group("target").rstrip(".,")
+            if relative_path.startswith("commit"):
+                continue
+            if not relative_path.startswith(ALLOWED_PROOF_PATH_PREFIXES):
+                missing.append(
+                    f"{label}: proof path must stay inside allowed package roots "
+                    f"{', '.join(ALLOWED_PROOF_PATH_PREFIXES)}: {PACKAGE_REPO_ROOT}{relative_path}"
+                )
 
 
 def check_local_release_proof(path: Path, missing: list[str]) -> None:
