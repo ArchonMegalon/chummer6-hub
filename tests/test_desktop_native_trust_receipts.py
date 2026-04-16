@@ -209,6 +209,25 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         )
         self.assertIn("desktop native trust receipts verified", result.stdout)
 
+    def test_verifier_fail_closes_missing_current_local_proof_floor(self) -> None:
+        result = subprocess.run(
+            ["python3", str(VERIFY_SCRIPT)],
+            cwd=REPO_ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+            env={
+                **dict(os.environ),
+                "CHUMMER_DESKTOP_NATIVE_TRUST_CURRENT_PROOF_FLOOR_COMMIT": "deadbeef",
+            },
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn(
+            "current M102 desktop-native trust proof floor does not resolve: deadbeef",
+            result.stderr,
+        )
+
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
