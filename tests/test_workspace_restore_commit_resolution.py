@@ -76,6 +76,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"2960fc91"', script_text)
         self.assertIn('"0f4a31d3"', script_text)
         self.assertIn('"d7788857"', script_text)
+        self.assertIn('"8dcd8b46"', script_text)
         self.assertIn("commit fcdd1fa5 pins the current M105 workspace proof floor", script_text)
         self.assertIn("commit 021de48a requires the current M105 queue proof guard", script_text)
         self.assertIn("commit 5bf1a11e pins the current M105 workspace queue guard", script_text)
