@@ -91,6 +91,14 @@ def _remove_current_queue_frontier_proof(text: str) -> str:
     return text.replace(marker, "", 1)
 
 
+def _remove_package_scoped_receipt_proof(text: str) -> str:
+    marker = "      - /docker/chummercomplete/chummer.run-services commit 9f425d04 tightens M105 package-scoped receipt proof so untracked workspace continuity receipt rows cannot hide beside the canonical receipts.\n"
+    if marker not in text:
+        raise AssertionError("missing package-scoped receipt proof floor")
+
+    return text.replace(marker, "", 1)
+
+
 class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
     def test_verifier_fails_closed_when_fleet_queue_drops_frontier_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-fleet-frontier-") as temp_dir:
@@ -258,6 +266,33 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("commit e0d2bff6 pins the M105 workspace queue-frontier guard proof", result.stderr)
+        self.assertIn("105.1", result.stderr)
+
+    def test_verifier_fails_closed_when_registry_drops_package_scoped_receipt_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-receipt-proof-") as temp_dir:
+            registry_path = Path(temp_dir) / "registry.yaml"
+            source_registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            registry_path.write_text(
+                _remove_package_scoped_receipt_proof(source_registry_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("commit 9f425d04 tightens M105 package-scoped receipt proof", result.stderr)
         self.assertIn("105.1", result.stderr)
 
     def test_verifier_fails_closed_when_fleet_and_design_queue_rows_drift(self) -> None:
