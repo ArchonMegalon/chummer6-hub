@@ -616,6 +616,66 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("workspace_restore:provenance", result.stderr)
         self.assertIn("entitlement_sync:conflict_receipts", result.stderr)
 
+    def test_verifier_fails_closed_when_local_release_proof_duplicates_closed_package(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-duplicate-package-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            closed_package = next(
+                package
+                for package in payload["successor_queue_packages"]
+                if package.get("package_id") == "next90-m105-hub-workspace-continuity"
+            )
+            payload["successor_queue_packages"].append(dict(closed_package))
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("successor_queue_packages must contain exactly one next90-m105-hub-workspace-continuity", result.stderr)
+        self.assertIn("found 2", result.stderr)
+
+    def test_verifier_fails_closed_when_local_release_proof_duplicates_package_receipt_id(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-duplicate-receipt-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            receipt = next(
+                receipt
+                for receipt in payload["proof_receipts"]
+                if receipt.get("receipt_id") == "workspace_restore:provenance"
+            )
+            payload["proof_receipts"].append(dict(receipt))
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof_receipts must contain exactly one package-scoped workspace_restore:provenance", result.stderr)
+        self.assertIn("found 2", result.stderr)
+
     def test_verifier_fails_closed_when_served_release_proof_drops_conflict_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-served-proof-") as temp_dir:
             temp_root = Path(temp_dir)
