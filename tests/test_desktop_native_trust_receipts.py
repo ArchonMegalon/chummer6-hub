@@ -874,7 +874,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py\n"
                     "      - /VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md\n"
                     "      - active-run helper commands run_ooda_design_supervisor_until_quiet.py output\n"
-                    "      - supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled\n",
+                    "      - supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled\n"
+                    "      - task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff\n",
                 )
                 + "\n",
                 encoding="utf-8",
@@ -940,6 +941,38 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "canonical successor queue staging block has forbidden active-run proof marker: polling disabled",
                 result.stderr,
             )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: task-local telemetry",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: first_commands",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: frontier_briefs",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: remaining milestones",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: remaining queue items",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: critical path",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: successor frontier detail",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: shard runtime handoff",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_successor_registry_active_run_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -976,6 +1009,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         *REGISTRY_102_1_LINES,
                         "          - Task_Local_Telemetry.generated.json Active-Run Helper Commands output from ooda_design_supervisor.py and the operator/OODA loop",
                         "          - Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
+                        "          - Task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff",
                     ]
                 )
                 + "\n",
@@ -1039,6 +1073,38 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             self.assertIn(
                 "canonical successor registry block has forbidden active-run proof marker: polling disabled",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: task-local telemetry",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: first_commands",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: frontier_briefs",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: remaining milestones",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: remaining queue items",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: critical path",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: successor frontier detail",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: shard runtime handoff",
                 result.stderr,
             )
 
@@ -1442,6 +1508,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "/VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md",
                 "Operator Telemetry helper output",
                 "Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
+                "Task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff",
             ]
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
@@ -1496,6 +1563,46 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn(
                 "published proof file has forbidden active-run proof marker "
                 "at $.proof_receipts[1].evidence[2]: polling disabled",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: task-local telemetry",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: first_commands",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: frontier_briefs",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: remaining milestones",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: remaining queue items",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: critical path",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: successor frontier detail",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[3]: shard runtime handoff",
                 result.stderr,
             )
 
