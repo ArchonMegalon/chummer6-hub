@@ -993,6 +993,40 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("successor_queue_packages[next90-m105-hub-workspace-continuity].status must be 'complete'", result.stderr)
         self.assertIn("successor_queue_packages[next90-m105-hub-workspace-continuity].allowed_paths", result.stderr)
 
+    def test_verifier_rejects_duplicate_unscoped_release_proof_receipt_ids(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-duplicate-receipt-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            duplicate = dict(
+                next(
+                    receipt
+                    for receipt in payload["proof_receipts"]
+                    if receipt.get("receipt_id") == "workspace_restore:provenance"
+                )
+            )
+            duplicate.pop("package_id", None)
+            duplicate.pop("milestone_id", None)
+            duplicate.pop("frontier_id", None)
+            payload["proof_receipts"].append(duplicate)
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof_receipts must contain exactly one workspace_restore:provenance; found 2", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
