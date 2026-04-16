@@ -112,10 +112,14 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
     }
 
     [Theory]
-    [InlineData("http://127.0.0.1:47761/install-link/callback?state=desktop", "127.0.0.1", "/install-link/callback")]
-    [InlineData("http://[::1]:47763/install-link/callback?state=desktop", "[::1]", "/install-link/callback")]
-    [InlineData("https://localhost:47762/install-link/callback", "localhost", "/install-link/callback")]
-    public async Task Browser_install_link_preserves_app_local_callback_targets(string callbackUri, string expectedHost, string expectedPath)
+    [InlineData("http://127.0.0.1:47761/install-link/callback?state=desktop", "127.0.0.1", "/install-link/callback", true)]
+    [InlineData("http://[::1]:47763/install-link/callback?state=desktop", "[::1]", "/install-link/callback", true)]
+    [InlineData("https://localhost:47762/install-link/callback", "localhost", "/install-link/callback", false)]
+    public async Task Browser_install_link_preserves_app_local_callback_targets(
+        string callbackUri,
+        string expectedHost,
+        string expectedPath,
+        bool expectDesktopState)
     {
         using Fixture fixture = new(authenticated: true);
         fixture.Controller.ControllerContext = new ControllerContext
@@ -140,6 +144,11 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal(expectedHost, redirectUri.Host);
         Assert.Equal(expectedPath, redirectUri.AbsolutePath);
         Assert.Contains("code=", redirect.Url, StringComparison.Ordinal);
+        if (expectDesktopState)
+        {
+            Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);
+        }
+
         Assert.Contains("installationId=ins-local-callback", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("installLinkMode=browser_callback", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("installLinkTransport=grant_callback", redirect.Url, StringComparison.Ordinal);

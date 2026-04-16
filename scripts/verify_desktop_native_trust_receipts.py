@@ -78,6 +78,7 @@ REQUIRED_SOURCE_MARKERS = {
         "http://[::1]:47763/install-link/callback?state=desktop",
         "https://localhost:47762/install-link/callback",
         "The controller should emit a valid app-local callback URI.",
+        'Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);',
         "installLinkTransport=grant_callback",
     ],
     Path("scripts/ai/verify.sh"): [
