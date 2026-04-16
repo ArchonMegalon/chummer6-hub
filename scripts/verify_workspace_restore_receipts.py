@@ -114,6 +114,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "06b0e574",
     "79764447",
     "2960fc91",
+    "0f4a31d3",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -298,6 +299,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit a8f94a63 pins the M105 workspace uniqueness proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 06b0e574 pins the current M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit 79764447 pins the M105 workspace current proof floor.",
+    "/docker/chummercomplete/chummer.run-services commit 0f4a31d3 pins the M105 workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
     "python3 -m unittest tests/test_workspace_restore_receipts.py exits 0.",
@@ -358,6 +360,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit a8f94a63 pins the M105 workspace uniqueness proof floor.",
     "/docker/chummercomplete/chummer.run-services commit 06b0e574 pins the current M105 workspace proof floor guard.",
     "/docker/chummercomplete/chummer.run-services commit 79764447 pins the M105 workspace current proof floor.",
+    "/docker/chummercomplete/chummer.run-services commit 0f4a31d3 pins the M105 workspace proof floor.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
