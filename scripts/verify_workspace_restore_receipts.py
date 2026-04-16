@@ -152,6 +152,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "db4fe453",
     "57a5b16d",
     "02596ecc",
+    "a08ba77b",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -385,6 +386,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit db4fe453 tightens M105 served proof route mirroring so public proof shelves cannot drift from local route receipts.",
     "/docker/chummercomplete/chummer.run-services commit 57a5b16d tightens M105 proof commit citation resolution so every registry and queue commit proof citation must resolve locally.",
     "/docker/chummercomplete/chummer.run-services commit 02596ecc tightens M105 proof path scope so registry and queue proof paths must stay inside Chummer.Run.Api, scripts, or tests.",
+    "/docker/chummercomplete/chummer.run-services commit a08ba77b tightens M105 embedded proof path scope so prose proof bullets cannot cite paths outside Chummer.Run.Api, scripts, or tests.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -474,6 +476,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit db4fe453 tightens M105 served proof route mirroring so public proof shelves cannot drift from local route receipts.",
     "/docker/chummercomplete/chummer.run-services commit 57a5b16d tightens M105 proof commit citation resolution so every registry and queue commit proof citation must resolve locally.",
     "/docker/chummercomplete/chummer.run-services commit 02596ecc tightens M105 proof path scope so registry and queue proof paths must stay inside Chummer.Run.Api, scripts, or tests.",
+    "/docker/chummercomplete/chummer.run-services commit a08ba77b tightens M105 embedded proof path scope so prose proof bullets cannot cite paths outside Chummer.Run.Api, scripts, or tests.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
