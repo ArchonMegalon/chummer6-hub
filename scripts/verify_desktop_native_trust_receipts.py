@@ -580,6 +580,7 @@ def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | No
         return None
 
     stable = dict(payload)
+    stable.pop("generatedAt", None)
     stable.pop("generated_at", None)
     return stable
 
