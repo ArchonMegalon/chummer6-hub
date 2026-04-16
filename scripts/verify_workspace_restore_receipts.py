@@ -159,6 +159,12 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "Kind: \"claimed_installation_stale\"",
         "Surface: \"workspace_restore\"",
     ],
+    "Chummer.Run.Api/Controllers/CampaignSpineController.cs": [
+        "[HttpGet(\"me/restore\")]",
+        "[ProducesResponseType<WorkspaceRestoreProjection>(StatusCodes.Status200OK)]",
+        "GetMyRestoreProjection(CancellationToken cancellationToken)",
+        "return Ok(_campaignSpine.GetRestoreProjection(user, installLinking));",
+    ],
     "Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs": [
         "RestoreProvenanceReceipts: ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts)",
         "RestoreConflictReceipts: ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts)",

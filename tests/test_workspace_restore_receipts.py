@@ -94,6 +94,37 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("!string.IsNullOrWhiteSpace(item.RecoveryHint)", result.stderr)
 
+    def test_verifier_fails_closed_when_restore_api_route_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-api-route-") as temp_dir:
+            temp_root = Path(temp_dir)
+            controller_path = temp_root / "Chummer.Run.Api" / "Controllers" / "CampaignSpineController.cs"
+            controller_path.parent.mkdir(parents=True)
+            source_controller_path = REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "CampaignSpineController.cs"
+            controller_path.write_text(
+                source_controller_path.read_text(encoding="utf-8").replace(
+                    "[HttpGet(\"me/restore\")]",
+                    "[HttpGet(\"me/restore-removed\")]",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignSpineController.cs", result.stderr)
+        self.assertIn("[HttpGet(\"me/restore\")]", result.stderr)
+
     def test_verifier_fails_closed_when_queue_staging_drops_complete_status(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-") as temp_dir:
             temp_root = Path(temp_dir)
