@@ -104,6 +104,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"a7e826d3"', script_text)
         self.assertIn('"d882db69"', script_text)
         self.assertIn('"db4fe453"', script_text)
+        self.assertIn('"57a5b16d"', script_text)
         self.assertIn("commit fcdd1fa5 pins the current M105 workspace proof floor", script_text)
         self.assertIn("commit 021de48a requires the current M105 queue proof guard", script_text)
         self.assertIn("commit 5bf1a11e pins the current M105 workspace queue guard", script_text)
@@ -166,6 +167,7 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit a7e826d3 pins the M105 workspace receipt uniqueness proof floor", script_text)
         self.assertIn("commit d882db69 pins the M105 workspace proof floor guard", script_text)
         self.assertIn("commit db4fe453 tightens M105 served proof route mirroring", script_text)
+        self.assertIn("commit 57a5b16d tightens M105 proof commit citation resolution", script_text)
         self.assertIn("/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
 
     def test_all_registry_and_queue_commit_citations_are_required_to_resolve(self) -> None:
