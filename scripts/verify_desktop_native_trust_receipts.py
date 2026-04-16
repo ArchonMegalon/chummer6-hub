@@ -712,15 +712,17 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
     packages = proof.get("successor_queue_packages")
     proof_package = None
     if isinstance(packages, list):
-        proof_package = next(
-            (
-                item
-                for item in packages
-                if isinstance(item, dict)
-                and item.get("package_id") == PACKAGE_ID
-            ),
-            None,
-        )
+        matching_packages = [
+            item
+            for item in packages
+            if isinstance(item, dict)
+            and item.get("package_id") == PACKAGE_ID
+        ]
+        if len(matching_packages) != 1:
+            errors.append(
+                f"{label} has {len(matching_packages)} successor_queue_packages entries for {PACKAGE_ID}"
+            )
+        proof_package = matching_packages[0] if matching_packages else None
 
     if not isinstance(proof_package, dict):
         errors.append(f"{label} missing successor_queue_packages entry for next90-m102-hub-desktop-native-trust")
@@ -730,11 +732,24 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
             if actual != expected:
                 errors.append(f"{label} proof package has wrong {key}: expected {expected!r}, got {actual!r}")
 
-    receipts = {
-        item.get("receipt_id"): item
-        for item in proof.get("proof_receipts", [])
-        if isinstance(item, dict)
-    }
+    receipt_items = proof.get("proof_receipts", [])
+    if not isinstance(receipt_items, list):
+        errors.append(f"{label} missing list field: proof_receipts")
+        receipt_items = []
+
+    receipts: dict[str, dict] = {}
+    for receipt_id in REQUIRED_PROOF_RECEIPTS:
+        matching_receipts = [
+            item
+            for item in receipt_items
+            if isinstance(item, dict)
+            and item.get("receipt_id") == receipt_id
+        ]
+        if len(matching_receipts) != 1:
+            errors.append(f"{label} has {len(matching_receipts)} proof_receipts entries for {receipt_id}")
+        if matching_receipts:
+            receipts[receipt_id] = matching_receipts[0]
+
     for receipt_id, expected in REQUIRED_PROOF_RECEIPTS.items():
         receipt = receipts.get(receipt_id)
         if not isinstance(receipt, dict):
