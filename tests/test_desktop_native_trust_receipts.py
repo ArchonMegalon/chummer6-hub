@@ -1840,6 +1840,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "e7b5177b",
                 "d72386ee",
                 "fee0655a",
+                "568b8358",
             ],
             verifier._required_resolving_commits(),
         )
