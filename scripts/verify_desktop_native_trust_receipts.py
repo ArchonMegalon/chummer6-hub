@@ -375,6 +375,7 @@ REQUIRED_RESOLVING_COMMITS = [
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
+DEFAULT_SERVED_PROOF_PATH = Path("Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json")
 DEFAULT_QUEUE_STAGING_PATH = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_DESIGN_QUEUE_STAGING_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 DEFAULT_SUCCESSOR_REGISTRY_PATH = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
@@ -400,6 +401,11 @@ def _configured_repo_anchor_root(repo_root: Path) -> Path:
 
 def _proof_path(repo_root: Path) -> Path:
     configured = _configured_path("CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH", DEFAULT_PROOF_PATH)
+    return configured if configured.is_absolute() else repo_root / configured
+
+
+def _served_proof_path(repo_root: Path) -> Path:
+    configured = _configured_path("CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH", DEFAULT_SERVED_PROOF_PATH)
     return configured if configured.is_absolute() else repo_root / configured
 
 
@@ -662,6 +668,93 @@ def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, 
         )
 
 
+def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> None:
+    _verify_json_has_no_forbidden_markers(errors, proof, label)
+
+    proof_routes = proof.get("proof_routes")
+    if not isinstance(proof_routes, list):
+        errors.append(f"{label} missing list field: proof_routes")
+    else:
+        proof_route_set = {item for item in proof_routes if isinstance(item, str)}
+        for required in REQUIRED_TOP_LEVEL_PROOF_ROUTES:
+            if required not in proof_route_set:
+                errors.append(f"{label} proof_routes missing M102 route: {required}")
+
+    journeys_passed = proof.get("journeys_passed")
+    if not isinstance(journeys_passed, list):
+        errors.append(f"{label} missing list field: journeys_passed")
+    else:
+        journey_set = {item for item in journeys_passed if isinstance(item, str)}
+        for required in REQUIRED_TOP_LEVEL_JOURNEYS:
+            if required not in journey_set:
+                errors.append(f"{label} journeys_passed missing M102 journey: {required}")
+
+    packages = proof.get("successor_queue_packages")
+    proof_package = None
+    if isinstance(packages, list):
+        proof_package = next(
+            (
+                item
+                for item in packages
+                if isinstance(item, dict)
+                and item.get("package_id") == PACKAGE_ID
+            ),
+            None,
+        )
+
+    if not isinstance(proof_package, dict):
+        errors.append(f"{label} missing successor_queue_packages entry for next90-m102-hub-desktop-native-trust")
+    else:
+        for key, expected in REQUIRED_PROOF_PACKAGE.items():
+            actual = proof_package.get(key)
+            if actual != expected:
+                errors.append(f"{label} proof package has wrong {key}: expected {expected!r}, got {actual!r}")
+
+    receipts = {
+        item.get("receipt_id"): item
+        for item in proof.get("proof_receipts", [])
+        if isinstance(item, dict)
+    }
+    for receipt_id, expected in REQUIRED_PROOF_RECEIPTS.items():
+        receipt = receipts.get(receipt_id)
+        if not isinstance(receipt, dict):
+            errors.append(f"{label} missing receipt: {receipt_id}")
+            continue
+
+        for key in ("package_id", "milestone_id", "frontier_id", "summary"):
+            if receipt.get(key) != expected[key]:
+                errors.append(f"{label} {receipt_id} has wrong {key}: {receipt.get(key)!r}")
+
+        for key in ("surfaces", "routes"):
+            actual_values = receipt.get(key)
+            if not isinstance(actual_values, list):
+                errors.append(f"{label} {receipt_id} missing list field: {key}")
+                continue
+
+            actual = {item for item in actual_values if isinstance(item, str)}
+            for required in expected[key]:
+                if required not in actual:
+                    errors.append(f"{label} {receipt_id} missing {key[:-1]}: {required}")
+
+
+def _verify_static_proof_file(errors: list[str], path: Path, label: str) -> None:
+    if not path.is_file():
+        errors.append(f"missing {label}: {path}")
+        return
+
+    try:
+        proof = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"{label} is not valid json: {exc}")
+        return
+
+    if not isinstance(proof, dict):
+        errors.append(f"{label} is not a json object")
+        return
+
+    _verify_m102_proof_payload(errors, proof, label)
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     errors: list[str] = []
@@ -685,72 +778,9 @@ def main() -> int:
         except json.JSONDecodeError as exc:
             errors.append(f"proof file is not valid json: {exc}")
         else:
-            _verify_json_has_no_forbidden_markers(errors, proof, "published proof file")
+            _verify_m102_proof_payload(errors, proof, "published proof file")
 
-            proof_routes = proof.get("proof_routes")
-            if not isinstance(proof_routes, list):
-                errors.append("proof missing list field: proof_routes")
-            else:
-                proof_route_set = {item for item in proof_routes if isinstance(item, str)}
-                for required in REQUIRED_TOP_LEVEL_PROOF_ROUTES:
-                    if required not in proof_route_set:
-                        errors.append(f"proof_routes missing M102 route: {required}")
-
-            journeys_passed = proof.get("journeys_passed")
-            if not isinstance(journeys_passed, list):
-                errors.append("proof missing list field: journeys_passed")
-            else:
-                journey_set = {item for item in journeys_passed if isinstance(item, str)}
-                for required in REQUIRED_TOP_LEVEL_JOURNEYS:
-                    if required not in journey_set:
-                        errors.append(f"journeys_passed missing M102 journey: {required}")
-
-            packages = proof.get("successor_queue_packages")
-            proof_package = None
-            if isinstance(packages, list):
-                proof_package = next(
-                    (
-                        item
-                        for item in packages
-                        if isinstance(item, dict)
-                        and item.get("package_id") == PACKAGE_ID
-                    ),
-                    None,
-                )
-
-            if not isinstance(proof_package, dict):
-                errors.append("proof missing successor_queue_packages entry for next90-m102-hub-desktop-native-trust")
-            else:
-                for key, expected in REQUIRED_PROOF_PACKAGE.items():
-                    actual = proof_package.get(key)
-                    if actual != expected:
-                        errors.append(f"proof package has wrong {key}: expected {expected!r}, got {actual!r}")
-
-            receipts = {
-                item.get("receipt_id"): item
-                for item in proof.get("proof_receipts", [])
-                if isinstance(item, dict)
-            }
-            for receipt_id, expected in REQUIRED_PROOF_RECEIPTS.items():
-                receipt = receipts.get(receipt_id)
-                if not isinstance(receipt, dict):
-                    errors.append(f"proof missing receipt: {receipt_id}")
-                    continue
-
-                for key in ("package_id", "milestone_id", "frontier_id", "summary"):
-                    if receipt.get(key) != expected[key]:
-                        errors.append(f"{receipt_id} has wrong {key}: {receipt.get(key)!r}")
-
-                for key in ("surfaces", "routes"):
-                    actual_values = receipt.get(key)
-                    if not isinstance(actual_values, list):
-                        errors.append(f"{receipt_id} missing list field: {key}")
-                        continue
-
-                    actual = {item for item in actual_values if isinstance(item, str)}
-                    for required in expected[key]:
-                        if required not in actual:
-                            errors.append(f"{receipt_id} missing {key[:-1]}: {required}")
+    _verify_static_proof_file(errors, _served_proof_path(repo_root), "served release proof file")
 
     _verify_marker_block(
         errors,
