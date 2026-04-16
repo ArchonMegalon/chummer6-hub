@@ -13,6 +13,8 @@ from pathlib import Path
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "36c25fec"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin M102 desktop trust proof floor"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -586,6 +588,49 @@ def _required_resolving_commits() -> list[str]:
     return commits
 
 
+def _current_local_proof_floor_commit() -> str:
+    return os.environ.get(
+        "CHUMMER_DESKTOP_NATIVE_TRUST_CURRENT_PROOF_FLOOR_COMMIT",
+        CURRENT_LOCAL_PROOF_FLOOR_COMMIT,
+    ).strip()
+
+
+def _verify_current_local_proof_floor(errors: list[str], repo_root: Path) -> None:
+    commit = _current_local_proof_floor_commit()
+    if not commit:
+        errors.append("current M102 desktop-native trust proof floor commit is blank")
+        return
+
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        errors.append(f"current M102 desktop-native trust proof floor does not resolve: {commit}")
+        return
+
+    subject_result = subprocess.run(
+        ["git", "log", "-1", "--format=%s", commit],
+        cwd=repo_root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if subject_result.returncode != 0:
+        errors.append(f"current M102 desktop-native trust proof floor subject is unreadable: {commit}")
+        return
+
+    subject = subject_result.stdout.strip()
+    if subject != CURRENT_LOCAL_PROOF_FLOOR_SUBJECT:
+        errors.append(
+            "current M102 desktop-native trust proof floor has wrong subject: "
+            f"expected {CURRENT_LOCAL_PROOF_FLOOR_SUBJECT!r}, got {subject!r}"
+        )
+
+
 def _extract_proof_commit_ids(values: list[str]) -> set[str]:
     commit_ids: set[str] = set()
     for value in values:
@@ -848,6 +893,7 @@ def main() -> int:
 
     _verify_required_repo_anchor_paths(errors, repo_root)
     _verify_required_commits(errors, repo_root)
+    _verify_current_local_proof_floor(errors, repo_root)
     _verify_canonical_commit_floor_consistency(errors)
     _verify_required_source_markers(errors, repo_root)
 
