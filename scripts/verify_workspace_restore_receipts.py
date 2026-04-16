@@ -656,6 +656,17 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
             f"{path}: package-scoped proof_receipts for {PACKAGE_ID} must be {sorted(expected_receipt_ids)!r}"
         )
     for expected_receipt_id in expected_receipt_ids:
+        global_matching_receipt_count = sum(
+            1
+            for item in payload.get("proof_receipts", [])
+            if isinstance(item, dict)
+            and item.get("receipt_id") == expected_receipt_id
+        )
+        if global_matching_receipt_count != 1:
+            missing.append(
+                f"{path}: proof_receipts must contain exactly one {expected_receipt_id}; found {global_matching_receipt_count}"
+            )
+
         matching_receipt_count = sum(
             1
             for item in payload.get("proof_receipts", [])
