@@ -71,6 +71,13 @@ REQUIRED_SOURCE_MARKERS = {
         "Support follow-through should expose installed build version truth.",
         "Invalid desktop continuation grants should fail closed.",
     ],
+    Path("Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs"): [
+        "Browser_install_link_preserves_app_local_callback_targets",
+        "http://127.0.0.1:47761/install-link/callback?state=desktop",
+        "https://localhost:47762/install-link/callback",
+        "The controller should emit a valid app-local callback URI.",
+        "installLinkTransport=grant_callback",
+    ],
     Path("scripts/ai/verify.sh"): [
         "python3 scripts/verify_desktop_native_trust_receipts.py",
     ],
