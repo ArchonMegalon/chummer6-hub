@@ -113,6 +113,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
     [Theory]
     [InlineData("http://127.0.0.1:47761/install-link/callback?state=desktop", "127.0.0.1", "/install-link/callback")]
+    [InlineData("http://[::1]:47763/install-link/callback?state=desktop", "[::1]", "/install-link/callback")]
     [InlineData("https://localhost:47762/install-link/callback", "localhost", "/install-link/callback")]
     public async Task Browser_install_link_preserves_app_local_callback_targets(string callbackUri, string expectedHost, string expectedPath)
     {

@@ -91,6 +91,94 @@ public sealed class InstallLinkingController : ControllerBase
         }
     }
 
+    [HttpPost("callbacks/exchange")]
+    [ProducesResponseType<ExchangeInstallBrowserCallbackResponseDto>(StatusCodes.Status200OK)]
+    public ActionResult<ExchangeInstallBrowserCallbackResponseDto> ExchangeBrowserCallback([FromBody] ExchangeInstallBrowserCallbackRequestDto? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("browser callback payload is required.");
+        }
+
+        try
+        {
+            return Ok(_installLinking.ExchangeBrowserCallback(request));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/account/access/install-link")]
+    public async Task<IActionResult> BrowserInstallLink(
+        [FromQuery] string? installationId,
+        [FromQuery] string? headId,
+        [FromQuery] string? applicationVersion,
+        [FromQuery] string? releaseChannel,
+        [FromQuery] string? platform,
+        [FromQuery] string? arch,
+        [FromQuery] string? installLinkCallbackUri,
+        CancellationToken cancellationToken)
+    {
+        string returnPath = $"{Request.Path}{Request.QueryString}";
+        try
+        {
+            string? normalizedCallbackUri = NormalizeCallbackUri(installLinkCallbackUri);
+            if (normalizedCallbackUri is null)
+            {
+                return Problem(statusCode: StatusCodes.Status400BadRequest, detail: "install-link callback uri is invalid.");
+            }
+
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            PublicReleaseManifestDto manifest = _releases.LoadManifest();
+            PublicReleaseArtifactDto? artifact = ResolveBrowserCallbackArtifact(manifest, headId, platform, arch);
+            if (artifact is null)
+            {
+                return Problem(statusCode: StatusCodes.Status404NotFound, detail: "no published desktop artifact matches this install.");
+            }
+
+            IssueInstallBrowserCallbackResponseDto issued = _installLinking.IssueBrowserCallback(
+                new IssueInstallBrowserCallbackRequestDto(
+                    InstallationId: installationId ?? string.Empty,
+                    ArtifactId: artifact.Id,
+                    ApplicationVersion: applicationVersion ?? manifest.Version,
+                    ChannelId: releaseChannel ?? manifest.Channel,
+                    HeadId: headId ?? artifact.Head ?? "desktop",
+                    Platform: platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
+                    Arch: arch ?? artifact.Arch ?? "unknown",
+                    CallbackUri: normalizedCallbackUri,
+                    PublicKey: null,
+                    HostLabel: null,
+                    InstallAccessClass: artifact.InstallAccessClass),
+                user.UserId,
+                subject.SubjectId);
+
+            return Redirect(BuildBrowserInstallCallbackRedirectUri(
+                normalizedCallbackUri,
+                issued.Callback.CallbackCode,
+                installationId ?? string.Empty,
+                headId ?? artifact.Head ?? "desktop",
+                applicationVersion ?? manifest.Version,
+                releaseChannel ?? manifest.Channel,
+                platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
+                arch ?? artifact.Arch ?? "unknown"));
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/auth/google/start?next={Uri.EscapeDataString(returnPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpPost("continuation")]
     [ProducesResponseType<DesktopInstallNativeContinuationResponse>(StatusCodes.Status200OK)]
     public ActionResult<DesktopInstallNativeContinuationResponse> ContinueClaimedInstall([FromBody] DesktopInstallNativeContinuationRequest? request)
@@ -296,6 +384,97 @@ public sealed class InstallLinkingController : ControllerBase
                 ["headId"] = installation.HeadId,
                 ["platform"] = installation.Platform,
                 ["arch"] = installation.Arch
+            });
+
+    private static PublicReleaseArtifactDto? ResolveBrowserCallbackArtifact(
+        PublicReleaseManifestDto manifest,
+        string? headId,
+        string? platform,
+        string? arch)
+    {
+        ClaimedInstallationDto probe = new(
+            InstallationId: "browser-callback-probe",
+            ArtifactId: string.Empty,
+            Channel: manifest.Channel,
+            Version: manifest.Version,
+            InstallAccessClass: InstallAccessClasses.AccountRecommended,
+            Status: ClaimedInstallationStates.Active,
+            CreatedAtUtc: DateTimeOffset.UtcNow,
+            UpdatedAtUtc: DateTimeOffset.UtcNow,
+            UserId: null,
+            SubjectId: null,
+            PublicKey: null,
+            ClaimTicketId: null,
+            HeadId: headId,
+            Platform: platform,
+            Arch: arch,
+            HostLabel: null,
+            GrantId: null);
+        return manifest.Downloads
+            .Select(item => new
+            {
+                Artifact = item,
+                Score = ScoreArtifactMatch(item, probe)
+            })
+            .OrderByDescending(static item => item.Score)
+            .ThenBy(static item => item.Artifact.Id, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(static item => item.Score > 0)
+            ?.Artifact;
+    }
+
+    private static string? NormalizeCallbackUri(string? callbackUri)
+    {
+        if (string.IsNullOrWhiteSpace(callbackUri))
+        {
+            return null;
+        }
+
+        if (!Uri.TryCreate(callbackUri.Trim(), UriKind.Absolute, out Uri? parsed))
+        {
+            return null;
+        }
+
+        if (string.Equals(parsed.Scheme, "chummer", StringComparison.OrdinalIgnoreCase))
+        {
+            bool installLinkTarget = string.Equals(parsed.Host, "install-link", StringComparison.OrdinalIgnoreCase)
+                                     && (string.IsNullOrWhiteSpace(parsed.AbsolutePath)
+                                         || string.Equals(parsed.AbsolutePath, "/", StringComparison.Ordinal));
+            return installLinkTarget ? parsed.ToString() : null;
+        }
+
+        bool localhostHttp = (string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
+                              || string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                             && IsAppLocalCallbackHost(parsed.Host);
+        return localhostHttp ? parsed.ToString() : null;
+    }
+
+    private static bool IsAppLocalCallbackHost(string host)
+        => string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+           || (System.Net.IPAddress.TryParse(host, out System.Net.IPAddress? address)
+               && System.Net.IPAddress.IsLoopback(address));
+
+    private static string BuildBrowserInstallCallbackRedirectUri(
+        string callbackUri,
+        string callbackCode,
+        string installationId,
+        string headId,
+        string applicationVersion,
+        string releaseChannel,
+        string platform,
+        string arch)
+        => QueryHelpers.AddQueryString(
+            callbackUri,
+            new Dictionary<string, string?>
+            {
+                ["code"] = callbackCode,
+                ["installationId"] = installationId,
+                ["headId"] = headId,
+                ["applicationVersion"] = applicationVersion,
+                ["releaseChannel"] = releaseChannel,
+                ["platform"] = platform,
+                ["arch"] = arch,
+                ["installLinkMode"] = "browser_callback",
+                ["installLinkTransport"] = "grant_callback"
             });
 
     private static string NormalizeResponseValue(string? value)
