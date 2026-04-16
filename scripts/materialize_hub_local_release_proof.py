@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ def iso_now() -> str:
 def _stable_payload(payload: dict) -> dict:
     stable = dict(payload)
     stable.pop("generated_at", None)
+    stable.pop("generatedAt", None)
     return stable
 
 
@@ -27,6 +29,49 @@ def _load_existing_payload(path: Path) -> dict | None:
     return loaded if isinstance(loaded, dict) else None
 
 
+def _parse_int_env(*names: str, default: int) -> int:
+    for name in names:
+        raw = str(os.environ.get(name) or "").strip()
+        if not raw:
+            continue
+        try:
+            value = int(raw)
+        except ValueError:
+            continue
+        if value >= 0:
+            return value
+    return default
+
+
+def _parse_iso_timestamp(raw_value: str | None) -> dt.datetime | None:
+    if not raw_value:
+        return None
+    normalized = raw_value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = dt.datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(dt.timezone.utc)
+
+
+def _payload_is_fresh(payload: dict, *, max_age_seconds: int, max_future_skew_seconds: int) -> bool:
+    raw_generated_at = str(payload.get("generatedAt") or payload.get("generated_at") or "").strip() or None
+    generated_at = _parse_iso_timestamp(raw_generated_at)
+    if generated_at is None:
+        return False
+
+    age_seconds = int((dt.datetime.now(dt.timezone.utc) - generated_at).total_seconds())
+    if age_seconds < 0:
+        return abs(age_seconds) <= max_future_skew_seconds
+    return age_seconds <= max_age_seconds
+
+
 def main() -> int:
     if len(sys.argv) != 6:
         print(
@@ -37,6 +82,16 @@ def main() -> int:
 
     out_path_text, base_url, compose_file, timeout_seconds, skip_rebuild = sys.argv[1:]
     out_path = Path(out_path_text)
+    proof_max_age_seconds = _parse_int_env(
+        "CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS",
+        "CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
+        default=604800,
+    )
+    proof_max_future_skew_seconds = _parse_int_env(
+        "CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+        "CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+        default=300,
+    )
 
     payload = {
         "contract_name": "chummer6-hub.local_release_proof",
@@ -190,11 +245,21 @@ def main() -> int:
     }
 
     existing_payload = _load_existing_payload(out_path)
-    if existing_payload is not None and _stable_payload(existing_payload) == _stable_payload(payload):
-        print(f"hub local proof unchanged: {out_path}")
+    if (
+        existing_payload is not None
+        and _stable_payload(existing_payload) == _stable_payload(payload)
+        and _payload_is_fresh(
+            existing_payload,
+            max_age_seconds=proof_max_age_seconds,
+            max_future_skew_seconds=proof_max_future_skew_seconds,
+        )
+    ):
+        print(f"hub local proof unchanged and still fresh: {out_path}")
         return 0
 
-    payload["generated_at"] = iso_now()
+    generated_at = iso_now()
+    payload["generated_at"] = generated_at
+    payload["generatedAt"] = generated_at
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
