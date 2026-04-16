@@ -74,11 +74,12 @@ REQUIRED_SOURCE_MARKERS = {
     ],
     Path("Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs"): [
         "Browser_install_link_preserves_app_local_callback_targets",
-        "http://127.0.0.1:47761/install-link/callback?state=desktop",
+        "http://127.0.0.1:47761/install-link/callback?state=desktop&nonce=callback-proof",
         "http://[::1]:47763/install-link/callback?state=desktop",
         "https://localhost:47762/install-link/callback",
         "The controller should emit a valid app-local callback URI.",
         'Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);',
+        'Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);',
         "installLinkTransport=grant_callback",
     ],
     Path("scripts/ai/verify.sh"): [

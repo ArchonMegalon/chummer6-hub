@@ -2003,6 +2003,31 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 errors,
             )
 
+    def test_verifier_fail_closes_app_local_callback_query_context_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != 'Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);'
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs missing marker: "
+                'Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);',
+                errors,
+            )
+
     def test_verifier_fail_closes_top_level_m102_proof_route_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
