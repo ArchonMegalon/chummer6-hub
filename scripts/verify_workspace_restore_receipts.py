@@ -935,7 +935,9 @@ def main() -> int:
         missing.append(f"missing local campaign OS proof: {PROOF_PATH}")
     else:
         try:
-            payload = json.loads(PROOF_PATH.read_text(encoding="utf-8"))
+            proof_text = PROOF_PATH.read_text(encoding="utf-8")
+            reject_forbidden_markers(str(PROOF_PATH), proof_text, FORBIDDEN_PROOF_MARKERS, missing)
+            payload = json.loads(proof_text)
             proof_markers = flatten_required_markers(payload)
         except (json.JSONDecodeError, ValueError) as exc:
             missing.append(f"invalid local campaign OS proof: {PROOF_PATH}: {exc}")
