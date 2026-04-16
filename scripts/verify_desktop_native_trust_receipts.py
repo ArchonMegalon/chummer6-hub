@@ -13,8 +13,8 @@ from pathlib import Path
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
-CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "5917695a"
-CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin M102 current verifier floor"
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "2ded9038"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 app-local callback proof"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -29,8 +29,9 @@ REQUIRED_SOURCE_MARKERS = {
         "NormalizeCallbackUri(installLinkCallbackUri)",
         "string.Equals(parsed.Scheme, \"chummer\", StringComparison.OrdinalIgnoreCase)",
         "string.Equals(parsed.Host, \"install-link\", StringComparison.OrdinalIgnoreCase)",
-        "string.Equals(parsed.Host, \"127.0.0.1\", StringComparison.OrdinalIgnoreCase)",
-        "string.Equals(parsed.Host, \"localhost\", StringComparison.OrdinalIgnoreCase)",
+        "IsAppLocalCallbackHost(parsed.Host)",
+        "System.Net.IPAddress.IsLoopback(address)",
+        "string.Equals(host, \"localhost\", StringComparison.OrdinalIgnoreCase)",
         "[\"installLinkTransport\"] = \"grant_callback\"",
     ],
     Path("Chummer.Run.Api/Services/DesktopInstallRail.cs"): [
@@ -74,6 +75,7 @@ REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs"): [
         "Browser_install_link_preserves_app_local_callback_targets",
         "http://127.0.0.1:47761/install-link/callback?state=desktop",
+        "http://[::1]:47763/install-link/callback?state=desktop",
         "https://localhost:47762/install-link/callback",
         "The controller should emit a valid app-local callback URI.",
         "installLinkTransport=grant_callback",
@@ -166,6 +168,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InstallLinkingController.cs exposes /api/v1/install-linking/continuation for grant-bound claimed desktop installs with current release, update, rollback, and support continuation truth.",
         "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml and /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/Accounts/Account.cshtml make guided setup/app continuation the default and keep claim codes as recovery fallback only.",
         "/docker/chummercomplete/chummer.run-services/scripts/verify_desktop_native_trust_receipts.py fail-closes missing source markers and missing successor proof receipts for desktop_native_claim_and_recovery and support_followthrough:install_truth.",
+        "/docker/chummercomplete/chummer.run-services/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs covers app-local localhost and 127.0.0.1 install-link callbacks so claimed desktop users return to the app-local continuation listener instead of browser-only continuation.",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json carries next90-m102-hub-desktop-native-trust proof receipts for /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
         "/docker/chummercomplete/chummer.run-services commit e27f24c1 tightens desktop-native continuation fallback-posture proof so claimed installs return the same fallback posture used by download and support recovery.",
         "/docker/chummercomplete/chummer.run-services commit e578a519 tightens the completed M102 proof pin so future shards verify the closed package instead of repeating it.",
@@ -250,6 +253,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit af567e58 pins the M102 desktop trust verifier floor.",
         "/docker/chummercomplete/chummer.run-services commit 2620a2f4 requires the M102 desktop trust verifier floor.",
         "/docker/chummercomplete/chummer.run-services commit 5917695a pins the M102 current verifier floor.",
+        "/docker/chummercomplete/chummer.run-services commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -263,6 +267,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml",
         "/docker/chummercomplete/chummer.run-services/scripts/verify_desktop_native_trust_receipts.py",
         "/docker/chummercomplete/chummer.run-services/tests/test_desktop_native_trust_receipts.py",
+        "/docker/chummercomplete/chummer.run-services/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
         "/docker/chummercomplete/chummer.run-services commit e27f24c1 tightens desktop-native continuation fallback-posture proof.",
         "/docker/chummercomplete/chummer.run-services commit e578a519 tightens the completed M102 proof pin.",
@@ -347,6 +352,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit af567e58 pins the M102 desktop trust verifier floor.",
         "/docker/chummercomplete/chummer.run-services commit 2620a2f4 requires the M102 desktop trust verifier floor.",
         "/docker/chummercomplete/chummer.run-services commit 5917695a pins the M102 current verifier floor.",
+        "/docker/chummercomplete/chummer.run-services commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -495,6 +501,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "af567e58",
     "2620a2f4",
     "5917695a",
+    "2ded9038",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
