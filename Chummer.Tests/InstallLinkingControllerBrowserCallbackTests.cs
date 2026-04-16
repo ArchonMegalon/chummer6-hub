@@ -112,7 +112,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
     }
 
     [Theory]
-    [InlineData("http://127.0.0.1:47761/install-link/callback?state=desktop", "127.0.0.1", "/install-link/callback", true)]
+    [InlineData("http://127.0.0.1:47761/install-link/callback?state=desktop&nonce=callback-proof", "127.0.0.1", "/install-link/callback", true)]
     [InlineData("http://[::1]:47763/install-link/callback?state=desktop", "[::1]", "/install-link/callback", true)]
     [InlineData("https://localhost:47762/install-link/callback", "localhost", "/install-link/callback", false)]
     public async Task Browser_install_link_preserves_app_local_callback_targets(
@@ -147,6 +147,10 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         if (expectDesktopState)
         {
             Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);
+            if (callbackUri.Contains("nonce=callback-proof", StringComparison.Ordinal))
+            {
+                Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);
+            }
         }
 
         Assert.Contains("installationId=ins-local-callback", redirect.Url, StringComparison.Ordinal);
