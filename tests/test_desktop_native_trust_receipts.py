@@ -71,6 +71,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit bffcad4d tightens M102 proof timestamp stability so generatedAt-only proof refreshes do not reopen the closed desktop-native trust package.",
     "      - /docker/chummercomplete/chummer.run-services commit 9454feb7 pins M102 timestamp proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit f1513793 pins M102 timestamp proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 7ddbc973 pins M102 current proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -138,6 +139,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit bffcad4d tightens M102 proof timestamp stability so generatedAt-only proof refreshes do not reopen the closed desktop-native trust package.",
     "          - /docker/chummercomplete/chummer.run-services commit 9454feb7 pins M102 timestamp proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit f1513793 pins M102 timestamp proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 7ddbc973 pins M102 current proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1252,6 +1254,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "bffcad4d",
                 "9454feb7",
                 "f1513793",
+                "7ddbc973",
             ],
             verifier._required_resolving_commits(),
         )
