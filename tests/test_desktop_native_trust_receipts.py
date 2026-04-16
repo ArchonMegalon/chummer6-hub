@@ -83,6 +83,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit f3300fd9 pins the M102 supervisor proof guard into the verifier and unit guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 06fa0634 pins the M102 local proof floor guard.",
     "      - /docker/chummercomplete/chummer.run-services commit f23b6dc4 records the M102 proof floor in the verifier.",
+    "      - /docker/chummercomplete/chummer.run-services commit 7cf5461b pins the M102 desktop trust proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore',
@@ -162,6 +163,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit f3300fd9 pins the M102 supervisor proof guard into the verifier and unit guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 06fa0634 pins the M102 local proof floor guard.",
     "          - /docker/chummercomplete/chummer.run-services commit f23b6dc4 records the M102 proof floor in the verifier.",
+    "          - /docker/chummercomplete/chummer.run-services commit 7cf5461b pins the M102 desktop trust proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1652,6 +1654,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "f3300fd9",
                 "06fa0634",
                 "f23b6dc4",
+                "7cf5461b",
             ],
             verifier._required_resolving_commits(),
         )
