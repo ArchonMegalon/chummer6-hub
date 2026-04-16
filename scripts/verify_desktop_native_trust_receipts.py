@@ -471,6 +471,20 @@ def _verify_marker_block(
                 )
 
 
+def _verify_unique_yaml_anchor(errors: list[str], path: Path, anchor: str, label: str) -> None:
+    if not path.is_file():
+        return
+
+    text = path.read_text(encoding="utf-8")
+    count = sum(
+        1
+        for line in text.splitlines()
+        if line.strip() == anchor or line.strip() == f"- {anchor}"
+    )
+    if count != 1:
+        errors.append(f"canonical {label} has {count} rows anchored by: {anchor}")
+
+
 def _extract_yaml_string_list(block: str, key: str) -> list[str] | None:
     lines = block.splitlines()
     for index, line in enumerate(lines):
@@ -785,9 +799,17 @@ def main() -> int:
 
     _verify_static_proof_file(errors, _served_proof_path(repo_root), "served release proof file")
 
+    queue_staging_path = _configured_path("CHUMMER_NEXT90_QUEUE_STAGING_PATH", DEFAULT_QUEUE_STAGING_PATH)
+    design_queue_staging_path = _configured_path("CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH", DEFAULT_DESIGN_QUEUE_STAGING_PATH)
+    successor_registry_path = _configured_path("CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH", DEFAULT_SUCCESSOR_REGISTRY_PATH)
+
+    _verify_unique_yaml_anchor(errors, queue_staging_path, f"package_id: {PACKAGE_ID}", "successor queue staging")
+    _verify_unique_yaml_anchor(errors, design_queue_staging_path, f"package_id: {PACKAGE_ID}", "design successor queue staging")
+    _verify_unique_yaml_anchor(errors, successor_registry_path, "id: 102.1", "successor registry")
+
     _verify_marker_block(
         errors,
-        _configured_path("CHUMMER_NEXT90_QUEUE_STAGING_PATH", DEFAULT_QUEUE_STAGING_PATH),
+        queue_staging_path,
         f"package_id: {PACKAGE_ID}",
         REQUIRED_CANONICAL_QUEUE_MARKERS,
         "successor queue staging",
@@ -796,7 +818,7 @@ def main() -> int:
     )
     _verify_marker_block(
         errors,
-        _configured_path("CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH", DEFAULT_DESIGN_QUEUE_STAGING_PATH),
+        design_queue_staging_path,
         f"package_id: {PACKAGE_ID}",
         REQUIRED_CANONICAL_QUEUE_MARKERS,
         "design successor queue staging",
@@ -805,7 +827,7 @@ def main() -> int:
     )
     _verify_marker_block(
         errors,
-        _configured_path("CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH", DEFAULT_SUCCESSOR_REGISTRY_PATH),
+        successor_registry_path,
         "id: 102.1",
         REQUIRED_CANONICAL_REGISTRY_MARKERS,
         "successor registry",
