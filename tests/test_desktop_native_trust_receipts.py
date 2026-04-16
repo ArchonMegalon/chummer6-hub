@@ -1146,6 +1146,57 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_served_proof_route_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            served_proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(served_proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(served_proof_path.read_text(encoding="utf-8"))
+            proof["proof_routes"] = [
+                route
+                for route in proof["proof_routes"]
+                if route != "/api/v1/install-linking/continuation"
+            ]
+            served_proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(served_proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "served release proof file proof_routes missing M102 route: "
+                "/api/v1/install-linking/continuation",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_missing_canonical_proof_anchor(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             anchor_root = Path(temp_root)
