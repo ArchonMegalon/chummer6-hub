@@ -3407,6 +3407,7 @@ main() {
     log "restoring $project for $rid"
     dotnet restore "$project" \
       -r "$rid" \
+      -p:UseChummerEngineContractsLocalFeed=false \
       -p:ChummerUseLocalCompatibilityTree=true \
       -p:ChummerLocalContractsProject="$CHUMMER_LOCAL_CONTRACTS_PROJECT" \
       -p:ChummerLocalCampaignContractsProject="$CHUMMER_LOCAL_CAMPAIGN_CONTRACTS_PROJECT" \
@@ -3422,6 +3423,7 @@ main() {
       -p:PublishSingleFile=true \
       -p:PublishTrimmed=false \
       -p:IncludeNativeLibrariesForSelfExtract=true \
+      -p:UseChummerEngineContractsLocalFeed=false \
       -p:ChummerUseLocalCompatibilityTree=true \
       -p:ChummerLocalContractsProject="$CHUMMER_LOCAL_CONTRACTS_PROJECT" \
       -p:ChummerLocalCampaignContractsProject="$CHUMMER_LOCAL_CAMPAIGN_CONTRACTS_PROJECT" \

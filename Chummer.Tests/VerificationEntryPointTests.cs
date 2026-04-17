@@ -51,8 +51,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("scripts/generate-parity-checklist.sh", script, StringComparison.Ordinal);
         Assert.Contains("docs/PARITY_CHECKLIST.md", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_PUBLISHED_DIR", script, StringComparison.Ordinal);
-        Assert.Contains("chummer6-ui/.codex-studio/published", script, StringComparison.Ordinal);
-        Assert.Contains("chummer-presentation/.codex-studio/published", script, StringComparison.Ordinal);
+        Assert.Contains("\"$ROOT/../chummer6-ui\"", script, StringComparison.Ordinal);
+        Assert.Contains("FALLBACK_UI_REPO_ROOT=\"$ROOT/../chummer6-ui-finish\"", script, StringComparison.Ordinal);
+        Assert.Contains("LEGACY_UI_REPO_ROOT=\"$ROOT/../chummer-presentation-clean\"", script, StringComparison.Ordinal);
+        Assert.Contains("OLDER_UI_REPO_ROOT=\"$ROOT/../chummer-presentation\"", script, StringComparison.Ordinal);
+        Assert.Contains("LEGACY_UI_PUBLISHED_DIR=\"$LEGACY_UI_REPO_ROOT/.codex-studio/published\"", script, StringComparison.Ordinal);
+        Assert.Contains("OLDER_UI_PUBLISHED_DIR=\"$OLDER_UI_REPO_ROOT/.codex-studio/published\"", script, StringComparison.Ordinal);
         Assert.Contains("resolve_receipt_path", script, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json", script, StringComparison.Ordinal);
         Assert.Contains("DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json", script, StringComparison.Ordinal);
@@ -423,6 +427,7 @@ public sealed class VerificationEntryPointTests
         string wrapperPath = RepoPaths.FromRoot("scripts", "run-mac-release-bootstrap.sh");
         string maintenanceReadmePath = RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "maintenance", "MAC_CODEX_RELEASE_TO_CHUMMER_RUN.md");
         string presentationRunbookPath = RepoPaths.FromRoot("..", "chummer-presentation", "docs", "MAC_CODEX_RELEASE_TO_CHUMMER_RUN.md");
+        string selfHostedRunbookPath = RepoPaths.FromRoot("docs", "SELF_HOSTED_DOWNLOADS_RUNBOOK.md");
         string publicReadmePath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "artifacts", "mac-codex-release-pipeline", "readme.md");
 
         string controller = File.ReadAllText(controllerPath);
@@ -432,6 +437,7 @@ public sealed class VerificationEntryPointTests
         string wrapper = File.ReadAllText(wrapperPath);
         string maintenanceReadme = File.ReadAllText(maintenanceReadmePath);
         string presentationRunbook = File.ReadAllText(presentationRunbookPath);
+        string selfHostedRunbook = File.ReadAllText(selfHostedRunbookPath);
         string publicReadme = File.ReadAllText(publicReadmePath);
 
         Assert.Contains("/downloads/release-upload", controller, StringComparison.Ordinal);
@@ -446,9 +452,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Signed-in release upload", view, StringComparison.Ordinal);
         Assert.Contains("source of truth for release upload in Chummer", view, StringComparison.Ordinal);
-        Assert.Contains("claim code", view, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("recovery-aware verification path", view, StringComparison.Ordinal);
+        Assert.Contains("recovery-only code", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("claim-code return", view, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_TOKEN", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("-p:UseChummerEngineContractsLocalFeed=false", bootstrap, StringComparison.Ordinal);
         Assert.Contains("log_bootstrap_identity", bootstrap, StringComparison.Ordinal);
         Assert.Contains("bootstrap source:", bootstrap, StringComparison.Ordinal);
         Assert.Contains("to_lower_ascii()", bootstrap, StringComparison.Ordinal);
@@ -461,12 +470,14 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("downloads/release-upload", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("run-mac-release-bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
         Assert.DoesNotContain("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/artifacts/mac-codex-release-pipeline/bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
-        Assert.Contains("downloads/release-upload", presentationRunbook, StringComparison.Ordinal);
-        Assert.Contains("run-mac-release-bootstrap.sh", presentationRunbook, StringComparison.Ordinal);
-        Assert.DoesNotContain("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/artifacts/mac-codex-release-pipeline/bootstrap.sh", presentationRunbook, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", selfHostedRunbook, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", selfHostedRunbook, StringComparison.Ordinal);
+        Assert.Contains("hdiutil: create failed - No space left on device", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", publicReadme, StringComparison.Ordinal);
         Assert.Contains("run-mac-release-bootstrap.sh", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", publicReadme, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -589,6 +600,33 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("log_disk_space", bootstrap, StringComparison.Ordinal);
         Assert.Contains("hdiutil create for signed repack", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export TMPDIR=\"$temp_root\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_DESKTOP_INSTALLER_TMPDIR=\"$TMPDIR/desktop-installer\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("temporary packaging root: $TMPDIR", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("desktop installer temp root: $CHUMMER_DESKTOP_INSTALLER_TMPDIR", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("json_generated_at_health()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("generate_hub_local_release_proof()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("generate_ui_localization_release_gate()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("resolve_ui_localization_release_gate_repo()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("allow_remote_release_proof_inputs()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("official_chummer_release_proof_url()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("allow_remote_release_proof_input_for_candidate()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("ui localization release gate generator is using fallback repo", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("/docker/chummercomplete/chummer-presentation", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("Ignoring remote requested release proof because remote proof inputs are disabled by default for non-official endpoints", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("Ignoring remote requested release gate because remote proof inputs are disabled by default for non-official endpoints", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("Cache-Control: no-cache", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("release proof validation failed before build", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("using bootstrap fallback hub local release proof", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("regenerated release proof validated against the current ui localization release gate", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("retrying regenerated release proof against a freshly generated ui localization release gate", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("generated fresh ui localization release gate", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("release proof", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("ui localization release gate", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("companion_runtime", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("scripts/generate-public-promotion-evidence.py", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("bash scripts/publish-download-bundle-http.sh", bootstrap, StringComparison.Ordinal);
     }
@@ -3304,7 +3342,7 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
-    public void NowPageSurfacesCampaignOsLocalProof()
+    public void NowPageKeepsCampaignOsDetailOffPrimaryInstallSurface()
     {
         string serviceCollectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
@@ -3319,8 +3357,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CampaignOsLocalProofService", serviceCollection, StringComparison.Ordinal);
         Assert.Contains("CampaignOsProof: _campaignOsProof.LoadProof()", controller, StringComparison.Ordinal);
         Assert.Contains("CampaignOsLocalProofSnapshot? CampaignOsProof", viewModel, StringComparison.Ordinal);
-        Assert.Contains("Campaign OS local proof", view, StringComparison.Ordinal);
-        Assert.Contains("Source-backed local smoke contract", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Campaign OS", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Source-backed local", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -3360,7 +3398,7 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
-    public void AccountSurfaceReusesSignedInTrustStatusProjection()
+    public void SignedInTrustPanelStaysOnAccountAndContextHeavySurfaces()
     {
         string serviceCollectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
         string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "SignedInTrustStatusService.cs");
@@ -3382,42 +3420,55 @@ public sealed class VerificationEntryPointTests
         string horizonsView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml"));
         string shelfView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml"));
         string featureDetailView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml"));
+        string downloadsView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
         string downloadDispatchView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml"));
         string homeView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml"));
+        string nowView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Now.cshtml"));
         string supportSubmittedView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "SupportSubmitted.cshtml"));
+        string publicCreatorPublicationView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml"));
 
         Assert.Contains("SignedInTrustStatusService", serviceCollection, StringComparison.Ordinal);
         Assert.Contains("Who can get it now", service, StringComparison.Ordinal);
+        Assert.Contains("BuildRecommendedInstallAction(releaseExperience", service, StringComparison.Ordinal);
         Assert.Contains("_signedInTrustStatus.Build", publicController, StringComparison.Ordinal);
         Assert.Contains("_signedInTrustStatus.Build", accountController, StringComparison.Ordinal);
         Assert.Contains("SignedInTrustStatusPanelViewModel? SignedInTrustStatus", viewModel, StringComparison.Ordinal);
         Assert.Contains("SignedInTrustStatusPanelViewModel? SignedInStatus", viewModel, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", accountView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", landingView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", faqView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", storyView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", participateView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", horizonsView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", shelfView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", featureDetailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", horizonsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", shelfView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", featureDetailView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", faqView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", storyView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", participateView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", downloadDispatchView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", homeView, StringComparison.Ordinal);
-        Assert.Contains("_SignedInTrustStatusPanel.cshtml", supportSubmittedView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", nowView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", supportSubmittedView, StringComparison.Ordinal);
+        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", publicCreatorPublicationView, StringComparison.Ordinal);
     }
 
     [Fact]
     public void LandingPageContextualizesGuestPreviewInstallLinks()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "ReleaseSelectionService.cs");
         string landingViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml");
 
         string controller = File.ReadAllText(controllerPath);
+        string service = File.ReadAllText(servicePath);
         string landingView = File.ReadAllText(landingViewPath);
 
         Assert.Contains("var releaseExperience = _releaseSelection.BuildExperience", controller, StringComparison.Ordinal);
+        Assert.Contains("_releaseSelection.BuildPublicPrimaryAction(", controller, StringComparison.Ordinal);
+        Assert.Contains("Request.Headers.UserAgent.ToString()", controller, StringComparison.Ordinal);
+        Assert.Contains("release.Recommended.ActionLabel", service, StringComparison.Ordinal);
+        Assert.Contains("release.Recommended.DispatchHref", service, StringComparison.Ordinal);
         Assert.Contains("guestNeedsInstallGate", landingView, StringComparison.Ordinal);
         Assert.Contains("contextualHeroPrimaryHref", landingView, StringComparison.Ordinal);
-        Assert.Contains("contextualProductProofPrimaryHref", landingView, StringComparison.Ordinal);
+        Assert.Contains("contextualProductPrimaryAction", landingView, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref", landingView, StringComparison.Ordinal);
         Assert.Contains("release.GuestGatePrimaryHref", landingView, StringComparison.Ordinal);
     }
@@ -3460,6 +3511,7 @@ public sealed class VerificationEntryPointTests
         string homeView = File.ReadAllText(homeViewPath);
 
         Assert.Contains("ReleaseExperience: releaseExperience", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildHomePrimaryAction(experience, campaignSpine, installLinking, releaseExperience)", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseExperienceViewModel ReleaseExperience", viewModel, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref(Model.PrimaryAction.Href)", homeView, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref(supportCase.PrimaryActionHref)", homeView, StringComparison.Ordinal);
