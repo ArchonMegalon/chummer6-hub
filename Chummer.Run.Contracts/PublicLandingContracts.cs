@@ -81,8 +81,18 @@ public sealed record PublicReleaseManifestDto(
     DateTimeOffset? ProofGeneratedAt = null,
     string? ProofBaseUrl = null,
     IReadOnlyList<string>? ProofJourneys = null,
-    IReadOnlyList<string>? ProofRoutes = null)
+    IReadOnlyList<string>? ProofRoutes = null,
+    DateTimeOffset? GeneratedAt = null,
+    string? ContractName = "Chummer.Hub.Registry.Contracts")
 {
+    [JsonPropertyName("generated_at")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public DateTimeOffset? GeneratedAtAlias => GeneratedAt;
+
+    [JsonPropertyName("contract_name")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ContractNameAlias => ContractName;
+
     [JsonPropertyName("releaseProof")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PublicReleaseProofDto? ReleaseProof =>
