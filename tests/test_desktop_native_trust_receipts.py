@@ -2227,6 +2227,38 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence
             verifier.REQUIRED_RESOLVING_COMMITS = original_required_commits
 
+    def test_verifier_fail_closes_repo_proof_anchors_outside_allowed_scope(self) -> None:
+        verifier = load_verifier_module()
+        original_queue_proof = list(verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        original_registry_evidence = list(verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        out_of_scope_anchor = "/docker/chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj"
+
+        try:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof + [
+                out_of_scope_anchor
+            ]
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence + [
+                f"{out_of_scope_anchor} should not close the M102 desktop-native trust package."
+            ]
+
+            with tempfile.TemporaryDirectory() as temp_root:
+                repo_root = Path(temp_root)
+                path = repo_root / "Chummer.Play.Contracts/Chummer.Play.Contracts.csproj"
+                path.parent.mkdir(parents=True)
+                path.write_text("<Project />\n", encoding="utf-8")
+
+                errors: list[str] = []
+                verifier._verify_required_repo_anchor_paths(errors, repo_root)
+
+            self.assertIn(
+                "canonical proof anchor is outside the M102 allowed paths: "
+                f"{out_of_scope_anchor}",
+                errors,
+            )
+        finally:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence
+
     def test_verifier_fail_closes_missing_standard_verify_wiring(self) -> None:
         verifier = load_verifier_module()
 

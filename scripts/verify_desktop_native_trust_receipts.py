@@ -440,6 +440,11 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
     ],
 }
 
+ADJACENT_PROOF_ANCHOR_PREFIXES = [
+    "Chummer.Tests",
+    ".codex-studio/published",
+]
+
 FORBIDDEN_PROOF_MARKERS = [
     "/var/lib/codex-fleet",
     "TASK_LOCAL_TELEMETRY",
@@ -783,11 +788,38 @@ def _required_repo_anchor_paths() -> list[Path]:
     return anchors
 
 
+def _proof_anchor_allowed_prefixes() -> list[Path]:
+    prefixes = [Path(value) for value in REQUIRED_CANONICAL_QUEUE_LISTS["allowed_paths"]]
+    prefixes.extend(Path(value) for value in ADJACENT_PROOF_ANCHOR_PREFIXES)
+    return prefixes
+
+
+def _is_relative_to(path: Path, prefix: Path) -> bool:
+    try:
+        path.relative_to(prefix)
+    except ValueError:
+        return False
+
+    return True
+
+
+def _is_allowed_repo_anchor_path(relative_path: Path) -> bool:
+    return any(
+        relative_path == prefix or _is_relative_to(relative_path, prefix)
+        for prefix in _proof_anchor_allowed_prefixes()
+    )
+
+
 def _verify_required_repo_anchor_paths(errors: list[str], repo_root: Path) -> None:
     anchor_root = _configured_repo_anchor_root(repo_root)
     for relative_path in _required_repo_anchor_paths():
         if not (anchor_root / relative_path).exists():
             errors.append(f"canonical proof anchor does not resolve: {ABSOLUTE_REPO_PREFIX}{relative_path}")
+        if not _is_allowed_repo_anchor_path(relative_path):
+            errors.append(
+                "canonical proof anchor is outside the M102 allowed paths: "
+                f"{ABSOLUTE_REPO_PREFIX}{relative_path}"
+            )
 
 
 def _required_resolving_commits() -> list[str]:
