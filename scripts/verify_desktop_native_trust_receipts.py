@@ -859,7 +859,28 @@ def _extract_proof_commit_ids(values: list[str]) -> set[str]:
     return commit_ids
 
 
+def _verify_no_duplicate_proof_commits(errors: list[str], values: list[str], label: str) -> None:
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for value in values:
+        match = COMMIT_PROOF_RE.search(value)
+        if match is None:
+            continue
+
+        commit = match.group(1).lower()
+        if commit in seen:
+            duplicates.add(commit)
+        else:
+            seen.add(commit)
+
+    if duplicates:
+        errors.append(f"M102 canonical {label} proof has duplicate commit citations: {sorted(duplicates)!r}")
+
+
 def _verify_canonical_commit_floor_consistency(errors: list[str]) -> None:
+    _verify_no_duplicate_proof_commits(errors, REQUIRED_CANONICAL_QUEUE_LISTS["proof"], "queue")
+    _verify_no_duplicate_proof_commits(errors, REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"], "registry")
+
     queue_commits = _extract_proof_commit_ids(REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
     registry_commits = _extract_proof_commit_ids(REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
     required_commits = {commit.lower() for commit in REQUIRED_RESOLVING_COMMITS}
