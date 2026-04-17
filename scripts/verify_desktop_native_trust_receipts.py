@@ -922,6 +922,13 @@ def _verify_json_has_no_forbidden_markers(
             errors.append(f"{label} has forbidden active-run proof marker at {path}: {marker}")
 
 
+def _verify_evidence_path_has_no_forbidden_markers(errors: list[str], path: Path, label: str) -> None:
+    folded_path = str(path).casefold()
+    for marker, marker_folded in FORBIDDEN_PROOF_MARKER_MATCHES:
+        if marker_folded in folded_path:
+            errors.append(f"configured {label} path has forbidden active-run proof marker: {marker}")
+
+
 def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, proof_path: Path) -> None:
     materializer_path = repo_root / "scripts" / "materialize_hub_local_release_proof.py"
     if not materializer_path.is_file():
@@ -1125,6 +1132,7 @@ def main() -> int:
     _verify_required_source_markers(errors, repo_root)
 
     proof_path = _proof_path(repo_root)
+    _verify_evidence_path_has_no_forbidden_markers(errors, proof_path, "published proof file")
     if not proof_path.is_file():
         try:
             display_path = proof_path.relative_to(repo_root)
@@ -1141,12 +1149,16 @@ def main() -> int:
             _verify_m102_proof_payload(errors, proof, "published proof file")
 
     served_proof_path = _served_proof_path(repo_root)
+    _verify_evidence_path_has_no_forbidden_markers(errors, served_proof_path, "served release proof file")
     _verify_static_proof_file(errors, served_proof_path, "served release proof file")
     _verify_served_proof_matches_published(errors, proof_path, served_proof_path)
 
     queue_staging_path = _configured_path("CHUMMER_NEXT90_QUEUE_STAGING_PATH", DEFAULT_QUEUE_STAGING_PATH)
     design_queue_staging_path = _configured_path("CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH", DEFAULT_DESIGN_QUEUE_STAGING_PATH)
     successor_registry_path = _configured_path("CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH", DEFAULT_SUCCESSOR_REGISTRY_PATH)
+    _verify_evidence_path_has_no_forbidden_markers(errors, queue_staging_path, "successor queue staging")
+    _verify_evidence_path_has_no_forbidden_markers(errors, design_queue_staging_path, "design successor queue staging")
+    _verify_evidence_path_has_no_forbidden_markers(errors, successor_registry_path, "successor registry")
 
     _verify_unique_yaml_anchor(errors, queue_staging_path, f"package_id: {PACKAGE_ID}", "successor queue staging")
     _verify_unique_yaml_anchor(errors, design_queue_staging_path, f"package_id: {PACKAGE_ID}", "design successor queue staging")
