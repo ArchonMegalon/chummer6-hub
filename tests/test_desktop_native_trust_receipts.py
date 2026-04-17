@@ -130,6 +130,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit e24162d9 requires M102 desktop trust proof citation.",
     "      - /docker/chummercomplete/chummer.run-services commit bb8db39c tightens M102 support install matching.",
+    "      - /docker/chummercomplete/chummer.run-services commit 1d6c686c tightens M102 duplicate proof citations.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -256,6 +257,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit e24162d9 requires M102 desktop trust proof citation.",
     "          - /docker/chummercomplete/chummer.run-services commit bb8db39c tightens M102 support install matching.",
+    "          - /docker/chummercomplete/chummer.run-services commit 1d6c686c tightens M102 duplicate proof citations.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -329,11 +331,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("bb8db39c", verifier._current_local_proof_floor_commit())
+        self.assertEqual("1d6c686c", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "Tighten M102 support install matching",
+            "Tighten M102 duplicate proof citations",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("1d6c686c", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("bb8db39c", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("e24162d9", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("997337a6", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -344,10 +347,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn("41d7ed57", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("cd392a72", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertTrue(
-            any("commit bb8db39c tightens M102 support install matching." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+            any("commit 1d6c686c tightens M102 duplicate proof citations." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         )
         self.assertTrue(
-            any("commit bb8db39c tightens M102 support install matching." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+            any("commit 1d6c686c tightens M102 duplicate proof citations." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
@@ -2099,6 +2102,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "997337a6",
                 "e24162d9",
                 "bb8db39c",
+                "1d6c686c",
             ],
             verifier._required_resolving_commits(),
         )
@@ -2148,20 +2152,20 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
         try:
             verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof + [
-                "/docker/chummercomplete/chummer.run-services commit bb8db39c duplicate proof row."
+                "/docker/chummercomplete/chummer.run-services commit 1d6c686c duplicate proof row."
             ]
             verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence + [
-                "/docker/chummercomplete/chummer.run-services commit bb8db39c duplicate proof row."
+                "/docker/chummercomplete/chummer.run-services commit 1d6c686c duplicate proof row."
             ]
             errors: list[str] = []
             verifier._verify_canonical_commit_floor_consistency(errors)
 
             self.assertIn(
-                "M102 canonical queue proof has duplicate commit citations: ['bb8db39c']",
+                "M102 canonical queue proof has duplicate commit citations: ['1d6c686c']",
                 errors,
             )
             self.assertIn(
-                "M102 canonical registry proof has duplicate commit citations: ['bb8db39c']",
+                "M102 canonical registry proof has duplicate commit citations: ['1d6c686c']",
                 errors,
             )
         finally:
