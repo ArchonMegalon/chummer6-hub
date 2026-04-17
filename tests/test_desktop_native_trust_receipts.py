@@ -116,6 +116,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
     "      - /docker/chummercomplete/chummer.run-services commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
+    "      - /docker/chummercomplete/chummer.run-services commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -228,6 +229,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
     "          - /docker/chummercomplete/chummer.run-services commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
+    "          - /docker/chummercomplete/chummer.run-services commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1975,6 +1977,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "4b9c6919",
                 "ea697985",
                 "e9c87a3f",
+                "d3c74d38",
             ],
             verifier._required_resolving_commits(),
         )
