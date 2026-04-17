@@ -160,6 +160,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "39761fd0",
     "d00cf74c",
     "049e2938",
+    "58edeea6",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -400,6 +401,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 39761fd0 tightens the M105 successor telemetry proof guard so copied remaining-milestone, queue-item, or critical-path summaries cannot close the completed workspace package.",
     "/docker/chummercomplete/chummer.run-services commit d00cf74c tightens the M105 campaign OS proof guard so generated campaign proof cannot cite blocked run-control evidence.",
     "/docker/chummercomplete/chummer.run-services commit 049e2938 pins the M105 campaign proof guard.",
+    "/docker/chummercomplete/chummer.run-services commit 58edeea6 tightens the M105 worker-context field guard so queue proof cannot cite task-local run context fields.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -496,6 +498,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 39761fd0 tightens the M105 successor telemetry proof guard so copied remaining-milestone, queue-item, or critical-path summaries cannot close the completed workspace package.",
     "/docker/chummercomplete/chummer.run-services commit d00cf74c tightens the M105 campaign OS proof guard so generated campaign proof cannot cite blocked run-control evidence.",
     "/docker/chummercomplete/chummer.run-services commit 049e2938 pins the M105 campaign proof guard.",
+    "/docker/chummercomplete/chummer.run-services commit 58edeea6 tightens the M105 worker-context field guard so queue proof cannot cite task-local run context fields.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
