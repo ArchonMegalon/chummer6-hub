@@ -151,6 +151,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit d9f59d4f pins M102 desktop trust current proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit af6a480e proves the M102 native support route receipt.",
     "      - /docker/chummercomplete/chummer.run-services commit a7d27da6 guards the M102 proof package repo.",
+    "      - /docker/chummercomplete/chummer.run-services commit 0bc0c858 tightens the M102 native support proof guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -298,6 +299,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit d9f59d4f pins M102 desktop trust current proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit af6a480e proves the M102 native support route receipt.",
     "          - /docker/chummercomplete/chummer.run-services commit a7d27da6 guards the M102 proof package repo.",
+    "          - /docker/chummercomplete/chummer.run-services commit 0bc0c858 tightens the M102 native support proof guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -371,11 +373,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("a7d27da6", verifier._current_local_proof_floor_commit())
+        self.assertEqual("0bc0c858", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "test(hub): guard M102 proof package repo",
+            "test(hub): tighten M102 native support proof guard",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("0bc0c858", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("a7d27da6", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("af6a480e", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("d9f59d4f", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -412,6 +415,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         )
         self.assertTrue(
             any("commit a7d27da6 guards the M102 proof package repo" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        )
+        self.assertTrue(
+            any("commit 0bc0c858 tightens the M102 native support proof guard" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        )
+        self.assertTrue(
+            any("commit 0bc0c858 tightens the M102 native support proof guard" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -2336,6 +2345,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "d9f59d4f",
                 "af6a480e",
                 "a7d27da6",
+                "0bc0c858",
             ],
             verifier._required_resolving_commits(),
         )
