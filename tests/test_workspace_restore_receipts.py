@@ -425,6 +425,44 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_verifier_fails_closed_when_queue_staging_drops_landed_commit_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-landed-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            queue_path = temp_root / "queue.yaml"
+            design_queue_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_text = source_queue_path.read_text(encoding="utf-8").replace(
+                "      - /docker/chummercomplete/chummer.run-services commit 4d4b3856 emits workspace_restore provenance receipts, entitlement_sync conflict receipts, stale claimed-install receipts, artifact drift receipts, authority planes, recovery hints, and block-continue posture.\n",
+                "",
+                1,
+            )
+            queue_path.write_text(queue_text, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("commit 4d4b3856 emits workspace_restore provenance receipts", result.stderr)
+        self.assertIn("next90-m105-hub-workspace-continuity", result.stderr)
+
     def test_verifier_fails_closed_when_queue_staging_widens_allowed_paths(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-paths-") as temp_dir:
             temp_root = Path(temp_dir)
