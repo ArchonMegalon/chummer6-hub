@@ -332,7 +332,7 @@ def _remove_queue_scope_guard_proof(text: str) -> str:
 
 
 def _remove_telemetry_guard_proof(text: str) -> str:
-    marker = "          - /docker/chummercomplete/chummer.run-services commit e0960698 tightens the M105 workspace telemetry proof guard for copied run-control execution-discipline text.\n"
+    marker = "          - /docker/chummercomplete/chummer.run-services commit dc46a811 tightens the M105 telemetry proof floor so registry and queue proof must retain the current telemetry guard.\n"
     if marker not in text:
         raise AssertionError("missing telemetry guard proof floor")
 
@@ -844,7 +844,7 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("commit e0960698 tightens the M105 workspace telemetry proof guard", result.stderr)
+        self.assertIn("commit dc46a811 tightens the M105 telemetry proof floor", result.stderr)
         self.assertIn("105.1", result.stderr)
 
     def test_verifier_rejects_task_local_telemetry_as_registry_proof(self) -> None:
