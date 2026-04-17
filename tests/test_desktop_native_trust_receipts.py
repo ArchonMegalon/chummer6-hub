@@ -2141,6 +2141,33 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence
             verifier.REQUIRED_RESOLVING_COMMITS = original_required_commits
 
+    def test_verifier_fail_closes_duplicate_canonical_commit_citations(self) -> None:
+        verifier = load_verifier_module()
+        original_queue_proof = list(verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        original_registry_evidence = list(verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+
+        try:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof + [
+                "/docker/chummercomplete/chummer.run-services commit bb8db39c duplicate proof row."
+            ]
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence + [
+                "/docker/chummercomplete/chummer.run-services commit bb8db39c duplicate proof row."
+            ]
+            errors: list[str] = []
+            verifier._verify_canonical_commit_floor_consistency(errors)
+
+            self.assertIn(
+                "M102 canonical queue proof has duplicate commit citations: ['bb8db39c']",
+                errors,
+            )
+            self.assertIn(
+                "M102 canonical registry proof has duplicate commit citations: ['bb8db39c']",
+                errors,
+            )
+        finally:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence
+
     def test_verifier_fail_closes_current_proof_floor_missing_from_canonical_evidence(self) -> None:
         verifier = load_verifier_module()
         original_queue_proof = list(verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
