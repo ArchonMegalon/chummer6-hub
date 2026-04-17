@@ -2121,6 +2121,54 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence
             verifier.REQUIRED_RESOLVING_COMMITS = original_required_commits
 
+    def test_verifier_fail_closes_current_proof_floor_missing_from_canonical_evidence(self) -> None:
+        verifier = load_verifier_module()
+        original_queue_proof = list(verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        original_registry_evidence = list(verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        original_required_commits = list(verifier.REQUIRED_RESOLVING_COMMITS)
+
+        try:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = [
+                value
+                for value in original_queue_proof
+                if "commit 2791f798 tightens M102 support intake installed-build truth." not in value
+            ]
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = [
+                value
+                for value in original_registry_evidence
+                if "commit 2791f798 tightens M102 support intake installed-build truth." not in value
+            ]
+            errors: list[str] = []
+            verifier._verify_current_local_proof_floor(errors, REPO_ROOT)
+
+            self.assertIn(
+                "current M102 desktop-native trust proof floor is missing from canonical queue proof: 2791f798",
+                errors,
+            )
+            self.assertIn(
+                "current M102 desktop-native trust proof floor is missing from canonical registry evidence: 2791f798",
+                errors,
+            )
+
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = list(original_queue_proof)
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = list(original_registry_evidence)
+            verifier.REQUIRED_RESOLVING_COMMITS = [
+                commit
+                for commit in original_required_commits
+                if commit != "2791f798"
+            ]
+            errors = []
+            verifier._verify_current_local_proof_floor(errors, REPO_ROOT)
+
+            self.assertIn(
+                "current M102 desktop-native trust proof floor is not enforced by resolver: 2791f798",
+                errors,
+            )
+        finally:
+            verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof
+            verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence
+            verifier.REQUIRED_RESOLVING_COMMITS = original_required_commits
+
     def test_verifier_fail_closes_missing_standard_verify_wiring(self) -> None:
         verifier = load_verifier_module()
 
