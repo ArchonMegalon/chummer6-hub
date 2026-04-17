@@ -33,7 +33,12 @@ internal static class DesktopInstallRail
         PublicReleaseArtifactDto artifact,
         PublicReleaseManifestDto manifest,
         string? installationId,
-        bool recoveryMode)
+        bool recoveryMode,
+        string? applicationVersion = null,
+        string? releaseChannel = null,
+        string? headId = null,
+        string? platform = null,
+        string? arch = null)
         => QueryHelpers.AddQueryString(
             "/contact",
             new Dictionary<string, string?>
@@ -48,11 +53,13 @@ internal static class DesktopInstallRail
                     ? "The signed-in installer or recovery flow needs help on this device. Continue the fix on the same install rail."
                     : "The signed-in installer, first launch, or update handoff needs help on this device. Continue the fix on the same install rail.",
                 ["installationId"] = installationId,
-                ["applicationVersion"] = manifest.Version,
-                ["releaseChannel"] = manifest.Channel,
-                ["headId"] = artifact.Head,
-                ["platform"] = NormalizeSupportPrefill(artifact.PlatformId) ?? NormalizeSupportPrefill(artifact.Platform),
-                ["arch"] = artifact.Arch,
+                ["applicationVersion"] = NormalizeSupportPrefill(applicationVersion) ?? manifest.Version,
+                ["releaseChannel"] = NormalizeSupportPrefill(releaseChannel) ?? manifest.Channel,
+                ["headId"] = NormalizeSupportPrefill(headId) ?? artifact.Head,
+                ["platform"] = NormalizeSupportPrefill(platform)
+                    ?? NormalizeSupportPrefill(artifact.PlatformId)
+                    ?? NormalizeSupportPrefill(artifact.Platform),
+                ["arch"] = NormalizeSupportPrefill(arch) ?? artifact.Arch,
                 ["recoveryMode"] = recoveryMode ? "true" : "false"
             });
 

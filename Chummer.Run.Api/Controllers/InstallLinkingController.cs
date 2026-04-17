@@ -208,7 +208,16 @@ public sealed class InstallLinkingController : ControllerBase
             ?? supportCases.FirstOrDefault();
         string supportHref = releaseArtifact is null
             ? BuildFallbackSupportHref(installation)
-            : DesktopInstallRail.BuildSupportHref(releaseArtifact, manifest, installation.InstallationId, recoveryMode: false);
+            : DesktopInstallRail.BuildSupportHref(
+                releaseArtifact,
+                manifest,
+                installation.InstallationId,
+                recoveryMode: false,
+                applicationVersion: installation.Version,
+                releaseChannel: installation.Channel,
+                headId: installation.HeadId,
+                platform: installation.Platform,
+                arch: installation.Arch);
 
         return Ok(new DesktopInstallNativeContinuationResponse(
             InstallationId: installation.InstallationId,
