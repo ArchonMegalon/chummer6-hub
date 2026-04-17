@@ -157,6 +157,7 @@ REQUIRED_PROOF_RECEIPTS = {
         ],
         "routes": [
             "/api/v1/install-linking/continuation",
+            "/api/v1/install-linking/continuation/support",
             "/account/support",
             "/contact",
         ],
@@ -166,6 +167,7 @@ REQUIRED_PROOF_RECEIPTS = {
 REQUIRED_TOP_LEVEL_PROOF_ROUTES = [
     "/downloads/install/avalonia-linux-x64-installer/continue.json",
     "/api/v1/install-linking/continuation",
+    "/api/v1/install-linking/continuation/support",
     "/account/access",
     "/account/support",
     "/contact",

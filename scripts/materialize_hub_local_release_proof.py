@@ -169,6 +169,7 @@ def main() -> int:
             "/downloads/install/avalonia-linux-x64-installer",
             "/downloads/install/avalonia-linux-x64-installer/continue.json",
             "/api/v1/install-linking/continuation",
+            "/api/v1/install-linking/continuation/support",
             "/home/access",
             "/account/access",
             "/home/work",
@@ -202,6 +203,7 @@ def main() -> int:
                 "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
                 "routes": [
                     "/api/v1/install-linking/continuation",
+                    "/api/v1/install-linking/continuation/support",
                     "/account/support",
                     "/contact",
                 ],
