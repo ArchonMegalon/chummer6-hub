@@ -653,6 +653,7 @@ FORBIDDEN_PROOF_MARKERS = [
     "active-run helper command",
     "active-run helper commands",
     "operator telemetry",
+    "operator/OODA loop owns telemetry",
     "operator/OODA",
     "operator OODA",
     "supervisor status",
