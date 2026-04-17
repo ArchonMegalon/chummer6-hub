@@ -198,6 +198,58 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("ResolveRestoreConflictResolution", result.stderr)
         self.assertIn("Open account access and resolve this restore receipt", result.stderr)
 
+    def test_verifier_fails_closed_when_blank_conflict_summary_fallback_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-conflict-summary-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace("Summary: ResolveRestoreConflictSummary(receipt),", "Summary: receipt.Summary,")
+                .replace(
+                    "Entitlement sync has a {posture} restore conflict for {subject}.",
+                    "Removed entitlement fallback.",
+                    1,
+                )
+                .replace(
+                    "Workspace restore has a {posture} continuity conflict for {subject}.",
+                    "Removed workspace fallback.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("ResolveRestoreConflictSummary", result.stderr)
+        self.assertIn("Entitlement sync has a {posture} restore conflict", result.stderr)
+        self.assertIn("Workspace restore has a {posture} continuity conflict", result.stderr)
+
     def test_verifier_fails_closed_when_served_release_proof_routes_drift_from_local(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-served-proof-") as temp_dir:
             temp_root = Path(temp_dir)
