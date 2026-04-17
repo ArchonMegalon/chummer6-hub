@@ -423,6 +423,9 @@ REQUIRED_TOP_LEVEL_JOURNEYS = [
 ]
 
 
+NATIVE_INSTALL_LINKING_ROUTE_PREFIX = "/api/v1/install-linking/continuation"
+
+
 REQUIRED_CANONICAL_QUEUE_MARKERS = [
     "title: Unify claim, install, update, and support recovery into one desktop-native flow",
     "task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
@@ -1467,6 +1470,10 @@ def _verify_unique_string_list(errors: list[str], values: list, label: str) -> N
         errors.append(f"{label} has duplicate entries: {', '.join(sorted(duplicates))}")
 
 
+def _is_native_install_linking_route(route: str) -> bool:
+    return route == NATIVE_INSTALL_LINKING_ROUTE_PREFIX or route.startswith(f"{NATIVE_INSTALL_LINKING_ROUTE_PREFIX}/")
+
+
 def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> None:
     _verify_json_has_no_forbidden_markers(errors, proof, label)
 
@@ -1561,6 +1568,10 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
                 )
 
             if key == "routes" and proof_route_set:
+                if not any(_is_native_install_linking_route(route) for route in actual):
+                    errors.append(
+                        f"{label} {receipt_id} routes do not include a grant-bound native install-linking route"
+                    )
                 for route in sorted(actual):
                     if route not in proof_route_set:
                         errors.append(
