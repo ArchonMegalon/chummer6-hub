@@ -319,20 +319,21 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("2791f798", verifier._current_local_proof_floor_commit())
+        self.assertEqual("93e5075a", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "Tighten M102 support intake installed-build truth",
+            "Tighten M102 current proof floor guard",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("93e5075a", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("2791f798", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("bd60fc5a", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("41d7ed57", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("cd392a72", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertTrue(
-            any("commit 2791f798 tightens M102 support intake installed-build truth." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+            any("commit 93e5075a tightens M102 current proof floor guard." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         )
         self.assertTrue(
-            any("commit 2791f798 tightens M102 support intake installed-build truth." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+            any("commit 93e5075a tightens M102 current proof floor guard." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
@@ -2079,6 +2080,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "41d7ed57",
                 "bd60fc5a",
                 "2791f798",
+                "93e5075a",
             ],
             verifier._required_resolving_commits(),
         )
@@ -2131,22 +2133,24 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = [
                 value
                 for value in original_queue_proof
-                if "commit 2791f798 tightens M102 support intake installed-build truth." not in value
+                if f"commit {verifier.CURRENT_LOCAL_PROOF_FLOOR_COMMIT} " not in value
             ]
             verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = [
                 value
                 for value in original_registry_evidence
-                if "commit 2791f798 tightens M102 support intake installed-build truth." not in value
+                if f"commit {verifier.CURRENT_LOCAL_PROOF_FLOOR_COMMIT} " not in value
             ]
             errors: list[str] = []
             verifier._verify_current_local_proof_floor(errors, REPO_ROOT)
 
             self.assertIn(
-                "current M102 desktop-native trust proof floor is missing from canonical queue proof: 2791f798",
+                "current M102 desktop-native trust proof floor is missing from canonical queue proof: "
+                f"{verifier.CURRENT_LOCAL_PROOF_FLOOR_COMMIT}",
                 errors,
             )
             self.assertIn(
-                "current M102 desktop-native trust proof floor is missing from canonical registry evidence: 2791f798",
+                "current M102 desktop-native trust proof floor is missing from canonical registry evidence: "
+                f"{verifier.CURRENT_LOCAL_PROOF_FLOOR_COMMIT}",
                 errors,
             )
 
@@ -2155,13 +2159,14 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.REQUIRED_RESOLVING_COMMITS = [
                 commit
                 for commit in original_required_commits
-                if commit != "2791f798"
+                if commit != verifier.CURRENT_LOCAL_PROOF_FLOOR_COMMIT
             ]
             errors = []
             verifier._verify_current_local_proof_floor(errors, REPO_ROOT)
 
             self.assertIn(
-                "current M102 desktop-native trust proof floor is not enforced by resolver: 2791f798",
+                "current M102 desktop-native trust proof floor is not enforced by resolver: "
+                f"{verifier.CURRENT_LOCAL_PROOF_FLOOR_COMMIT}",
                 errors,
             )
         finally:
