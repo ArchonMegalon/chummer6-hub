@@ -214,6 +214,8 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit 8c718c33 pins the M105 restore conflict proof floor", script_text)
         self.assertIn('"7391fb1c"', script_text)
         self.assertIn("commit 7391fb1c pins the M105 restore conflict proof guard", script_text)
+        self.assertIn('"c8838f8e"', script_text)
+        self.assertIn("commit c8838f8e tightens the M105 local release proof owner metadata", script_text)
         self.assertIn("/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
 
     def test_all_registry_and_queue_commit_citations_are_required_to_resolve(self) -> None:
