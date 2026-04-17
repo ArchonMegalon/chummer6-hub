@@ -98,6 +98,33 @@ internal static class InstallLinkingContinuationVerification
                     FixedVersion: "0.7.1-preview",
                     FixedChannel: "preview",
                     Actor: "hub"));
+            supportCases.Submit(
+                "usr-native",
+                "subject.native",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Different desktop install",
+                    Summary: "Another device should not follow this claimed install.",
+                    Detail: "Support continuation should not attach unrelated install-help cases by reporter alone.",
+                    ReporterEmail: "runner@example.invalid",
+                    InstallationId: "install-other",
+                    ApplicationVersion: "0.7.0-preview",
+                    ReleaseChannel: "preview",
+                    HeadId: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            supportCases.Submit(
+                "usr-native",
+                "subject.native",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Generic preview install help",
+                    Summary: "Channel-only install help should not follow this device.",
+                    Detail: "The continuation rail needs install-specific context before attaching support follow-through.",
+                    ReporterEmail: "runner@example.invalid",
+                    ReleaseChannel: "preview",
+                    Source: SupportCaseSourceKinds.HubAccount));
 
             InstallLinkingController controller = new(
                 identity: null!,
@@ -155,7 +182,7 @@ internal static class InstallLinkingContinuationVerification
 
     private static void SeedClaimedInstall(InstallLinkingStore store)
     {
-        DateTimeOffset now = DateTimeOffset.Parse("2026-04-15T01:00:00Z");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
         lock (store.Gate)
         {
             store.ReceiptsById["receipt-old"] = new DownloadReceiptDto(

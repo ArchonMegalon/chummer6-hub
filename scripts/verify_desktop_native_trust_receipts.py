@@ -24,6 +24,8 @@ REQUIRED_SOURCE_MARKERS = {
         "FallbackPosture: continuation?.FallbackPosture",
         "BuildNativeNextSafeAction(updateAvailable, leadSupportCase, continuation)",
         "ResolveSupportContinuationCases(installation, installSummary, receipt)",
+        "MatchesClaimedInstallTruth(supportCase, installation)",
+        "MatchesOptionalInstallTruth(supportCase.ApplicationVersion, installation.Version",
         "InstalledBuildReceiptId: receipt?.ReceiptId",
         "SupportCases: supportCases",
         "NormalizeCallbackUri(installLinkCallbackUri)",
@@ -70,6 +72,9 @@ REQUIRED_SOURCE_MARKERS = {
         "NeedsInstallUpdate",
         "response.SupportCases[0].InstalledBuildReceiptId",
         "Support follow-through should expose installed build version truth.",
+        "Support continuation should not attach unrelated install-help cases by reporter alone.",
+        "Channel-only install help should not follow this device.",
+        "DateTimeOffset now = DateTimeOffset.UtcNow;",
         "Invalid desktop continuation grants should fail closed.",
     ],
     Path("Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs"): [
