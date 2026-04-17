@@ -356,15 +356,16 @@ public sealed class InstallLinkingController : ControllerBase
         }
 
         bool hasInstallSpecificContext = false;
+        bool hasDeviceSpecificContext = false;
         if (!MatchesOptionalInstallTruth(supportCase.ApplicationVersion, installation.Version, ref hasInstallSpecificContext)
-            || !MatchesOptionalInstallTruth(supportCase.HeadId, installation.HeadId, ref hasInstallSpecificContext)
-            || !MatchesOptionalInstallTruth(supportCase.Platform, installation.Platform, ref hasInstallSpecificContext)
-            || !MatchesOptionalInstallTruth(supportCase.Arch, installation.Arch, ref hasInstallSpecificContext))
+            || !MatchesOptionalDeviceTruth(supportCase.HeadId, installation.HeadId, ref hasInstallSpecificContext, ref hasDeviceSpecificContext)
+            || !MatchesOptionalDeviceTruth(supportCase.Platform, installation.Platform, ref hasInstallSpecificContext, ref hasDeviceSpecificContext)
+            || !MatchesOptionalDeviceTruth(supportCase.Arch, installation.Arch, ref hasInstallSpecificContext, ref hasDeviceSpecificContext))
         {
             return false;
         }
 
-        return hasInstallSpecificContext;
+        return hasInstallSpecificContext && hasDeviceSpecificContext;
     }
 
     private static bool MatchesOptionalInstallTruth(string? supportValue, string? installationValue, ref bool hasInstallSpecificContext)
@@ -375,6 +376,22 @@ public sealed class InstallLinkingController : ControllerBase
         }
 
         hasInstallSpecificContext = true;
+        return string.Equals(supportValue, installationValue, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesOptionalDeviceTruth(
+        string? supportValue,
+        string? installationValue,
+        ref bool hasInstallSpecificContext,
+        ref bool hasDeviceSpecificContext)
+    {
+        if (string.IsNullOrWhiteSpace(supportValue))
+        {
+            return true;
+        }
+
+        hasInstallSpecificContext = true;
+        hasDeviceSpecificContext = true;
         return string.Equals(supportValue, installationValue, StringComparison.OrdinalIgnoreCase);
     }
 
