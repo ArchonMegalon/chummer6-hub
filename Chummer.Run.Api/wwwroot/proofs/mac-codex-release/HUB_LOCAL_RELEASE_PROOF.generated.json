@@ -74,6 +74,7 @@
     "/downloads/install/avalonia-linux-x64-installer",
     "/downloads/install/avalonia-linux-x64-installer/continue.json",
     "/api/v1/install-linking/continuation",
+    "/api/v1/install-linking/continuation/support",
     "/home/access",
     "/account/access",
     "/home/work",
@@ -107,6 +108,7 @@
       "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
       "routes": [
         "/api/v1/install-linking/continuation",
+        "/api/v1/install-linking/continuation/support",
         "/account/support",
         "/contact"
       ],
@@ -149,6 +151,6 @@
       ]
     }
   ],
-  "generated_at": "2026-04-17T03:08:30Z",
-  "generatedAt": "2026-04-17T03:08:30Z"
+  "generated_at": "2026-04-17T11:24:36Z",
+  "generatedAt": "2026-04-17T11:24:36Z"
 }
