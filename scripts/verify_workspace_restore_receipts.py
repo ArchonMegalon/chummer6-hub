@@ -189,6 +189,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "1392cc11",
     "53da9351",
     "f2df11b1",
+    "0fbc8f96",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -471,6 +472,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit dc46a811 tightens the M105 telemetry proof floor so registry and queue proof must retain the current telemetry guard.",
     "/docker/chummercomplete/chummer.run-services commit 53da9351 tightens the M105 proof commit citation guard so registry and queue closure evidence cannot cite unresolved local commits.",
     "/docker/chummercomplete/chummer.run-services commit f2df11b1 pins the M105 proof citation guard floor so future shards verify the current closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit 0fbc8f96 tightens M105 local release proof package-shape guard so extra copied worker metadata cannot keep the completed workspace package green.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -594,6 +596,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit dc46a811 tightens the M105 telemetry proof floor so registry and queue proof must retain the current telemetry guard.",
     "/docker/chummercomplete/chummer.run-services commit 53da9351 tightens the M105 proof commit citation guard so registry and queue closure evidence cannot cite unresolved local commits.",
     "/docker/chummercomplete/chummer.run-services commit f2df11b1 pins the M105 proof citation guard floor so future shards verify the current closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit 0fbc8f96 tightens M105 local release proof package-shape guard so extra copied worker metadata cannot keep the completed workspace package green.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
