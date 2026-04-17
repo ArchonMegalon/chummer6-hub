@@ -1,5 +1,7 @@
 using System.IO;
+using System.Reflection;
 using Chummer.Campaign.Contracts;
+using Chummer.Run.Api.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
@@ -14,9 +16,61 @@ internal static class CampaignSpineRestoreVerification
     {
         VerifyClaimedDeviceRestoreSummariesNameExactPrefetchSet();
         VerifyRestoreConflictReceiptsCaptureStaleClaimAndEntitlementState();
+        VerifyServerPlaneConflictReceiptsRecoverBlankSummaries();
         VerifyRestoreReceiptsSurviveCommunityStoreReload();
         VerifyAftermathArtifactMetadataSurvivesReload();
         return Task.CompletedTask;
+    }
+
+    private static void VerifyServerPlaneConflictReceiptsRecoverBlankSummaries()
+    {
+        MethodInfo projectMethod = typeof(CampaignWorkspaceServerPlaneService).GetMethod(
+            "ProjectRestoreConflictReceipts",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Expected server-plane restore conflict projection method.");
+
+        WorkspaceRestoreConflictReceipt entitlementConflict = new(
+            ReceiptId: "receipt-blank-entitlement",
+            Severity: "attention",
+            Kind: "entitlement_orphan",
+            SubjectId: "grant-orphan",
+            Summary: " ",
+            Resolution: null,
+            ObservedAtUtc: DateTimeOffset.UtcNow,
+            Surface: "entitlement_sync",
+            BlocksContinue: true);
+        WorkspaceRestoreConflictReceipt workspaceConflict = new(
+            ReceiptId: "receipt-blank-workspace",
+            Severity: "warning",
+            Kind: "claimed_installation_stale",
+            SubjectId: "install-stale",
+            Summary: "",
+            Resolution: "Refresh this install before reopening the workspace.",
+            ObservedAtUtc: DateTimeOffset.UtcNow,
+            Surface: "workspace_restore",
+            BlocksContinue: false);
+
+        object? projected = projectMethod.Invoke(
+            null,
+            [new[] { entitlementConflict, workspaceConflict }]);
+        IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> receipts =
+            projected as IReadOnlyList<WorkspaceRestoreConflictReceiptProjection>
+            ?? throw new InvalidOperationException("Expected projected restore conflict receipts.");
+
+        WorkspaceRestoreConflictReceiptProjection entitlementProjection = receipts.Single(item => string.Equals(item.ReceiptId, entitlementConflict.ReceiptId, StringComparison.Ordinal));
+        WorkspaceRestoreConflictReceiptProjection workspaceProjection = receipts.Single(item => string.Equals(item.ReceiptId, workspaceConflict.ReceiptId, StringComparison.Ordinal));
+
+        VerificationAssert.True(
+            entitlementProjection.Summary.Contains("Entitlement sync has a blocking restore conflict", StringComparison.Ordinal)
+                && entitlementProjection.Summary.Contains("grant-orphan", StringComparison.Ordinal),
+            "Entitlement-sync conflict receipts should recover a user-facing summary when source text is blank.");
+        VerificationAssert.True(
+            workspaceProjection.Summary.Contains("Workspace restore has a reviewable continuity conflict", StringComparison.Ordinal)
+                && workspaceProjection.Summary.Contains("install-stale", StringComparison.Ordinal),
+            "Workspace-restore conflict receipts should recover a user-facing summary when source text is blank.");
+        VerificationAssert.True(
+            string.Equals(entitlementProjection.Resolution, "Open account access and resolve this restore receipt before continuing on this workspace.", StringComparison.Ordinal),
+            "Blocking blank-summary conflict receipts should still carry the standard recovery action.");
     }
 
     private static void VerifyClaimedDeviceRestoreSummariesNameExactPrefetchSet()

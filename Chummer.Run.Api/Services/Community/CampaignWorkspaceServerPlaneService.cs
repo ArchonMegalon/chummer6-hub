@@ -552,11 +552,26 @@ public sealed class CampaignWorkspaceServerPlaneService
                 Kind: receipt.Kind,
                 Surface: ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind),
                 SubjectId: receipt.SubjectId,
-                Summary: receipt.Summary,
+                Summary: ResolveRestoreConflictSummary(receipt),
                 Resolution: ResolveRestoreConflictResolution(receipt),
                 ObservedAtUtc: receipt.ObservedAtUtc,
                 BlocksContinue: receipt.BlocksContinue))
             .ToArray();
+
+    private static string ResolveRestoreConflictSummary(WorkspaceRestoreConflictReceipt receipt)
+    {
+        if (!string.IsNullOrWhiteSpace(receipt.Summary))
+        {
+            return receipt.Summary;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        string subject = NormalizeOptional(receipt.SubjectId) ?? "unknown restore subject";
+        string posture = receipt.BlocksContinue ? "blocking" : "reviewable";
+        return string.Equals(surface, "entitlement_sync", StringComparison.Ordinal)
+            ? $"Entitlement sync has a {posture} restore conflict for {subject}."
+            : $"Workspace restore has a {posture} continuity conflict for {subject}.";
+    }
 
     private static string? ResolveRestoreConflictResolution(WorkspaceRestoreConflictReceipt receipt)
     {
@@ -1280,7 +1295,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         cues.AddRange(restoreConflictReceipts.Select(receipt => new ContinuityConflictCue(
             CueId: $"restore-conflict:{workspace.WorkspaceId}:{StableCueId(receipt.ReceiptId)}",
             Severity: NormalizeSeverity(receipt.Severity),
-            Summary: receipt.Summary,
+            Summary: ResolveRestoreConflictSummary(receipt),
             ResolutionAction: NormalizeOptional(receipt.Resolution) ?? $"Review restore evidence for {workspace.CampaignName} before continuing.")));
 
         cues.AddRange(restore.LocalOnlyNotes.Select(summary => new ContinuityConflictCue(
