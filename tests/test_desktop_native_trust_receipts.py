@@ -405,6 +405,45 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn("active-run helper commands", markers)
         self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
 
+    def test_canonical_yaml_block_rejects_encoded_active_run_markers(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                "\n".join(
+                    [
+                        "items:",
+                        "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                        "    package_id: next90-m102-hub-desktop-native-trust",
+                        "    proof:",
+                        "      - TASK%5FLOCAL%5FTELEMETRY.generated.json",
+                        "      - active-run%20helper&#32;commands",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            errors: list[str] = []
+
+            verifier._verify_marker_block(
+                errors,
+                queue_path,
+                "package_id: next90-m102-hub-desktop-native-trust",
+                ["package_id: next90-m102-hub-desktop-native-trust"],
+                "successor queue staging",
+                forbidden_markers=verifier.FORBIDDEN_PROOF_MARKERS,
+            )
+
+        self.assertIn(
+            "canonical successor queue staging block has forbidden active-run proof marker: TASK_LOCAL_TELEMETRY",
+            errors,
+        )
+        self.assertIn(
+            "canonical successor queue staging block has forbidden active-run proof marker: active-run helper commands",
+            errors,
+        )
+
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
