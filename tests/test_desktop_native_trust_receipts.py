@@ -121,6 +121,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
     "      - /docker/chummercomplete/chummer.run-services commit 8e90aac9 pins the M102 app-local callback path proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit b27c5142 pins the M102 app-local proof floor guard.",
+    "      - /docker/chummercomplete/chummer.run-services commit cd392a72 pins the M102 current proof floor guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -238,6 +239,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
     "          - /docker/chummercomplete/chummer.run-services commit 8e90aac9 pins the M102 app-local callback path proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit b27c5142 pins the M102 app-local proof floor guard.",
+    "          - /docker/chummercomplete/chummer.run-services commit cd392a72 pins the M102 current proof floor guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -306,6 +308,22 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn(
             "current M102 desktop-native trust proof floor does not resolve: deadbeef",
             result.stderr,
+        )
+
+    def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
+        verifier = load_verifier_module()
+
+        self.assertEqual("cd392a72", verifier._current_local_proof_floor_commit())
+        self.assertEqual(
+            "Pin M102 current proof floor guard",
+            verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
+        )
+        self.assertIn("cd392a72", verifier.REQUIRED_RESOLVING_COMMITS)
+        self.assertTrue(
+            any("commit cd392a72 pins the M102 current proof floor guard." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        )
+        self.assertTrue(
+            any("commit cd392a72 pins the M102 current proof floor guard." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
@@ -1991,6 +2009,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "8e90aac9",
                 "b27c5142",
                 "bc52177b",
+                "cd392a72",
             ],
             verifier._required_resolving_commits(),
         )
