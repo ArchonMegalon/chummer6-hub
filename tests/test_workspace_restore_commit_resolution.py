@@ -224,6 +224,8 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit 28cfb2be pins the M105 steering proof floor", script_text)
         self.assertIn('"417946f4"', script_text)
         self.assertIn("commit 417946f4 pins the M105 workspace proof floor", script_text)
+        self.assertIn('"e0960698"', script_text)
+        self.assertIn("commit e0960698 tightens the M105 workspace telemetry proof guard", script_text)
         self.assertIn("/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
 
     def test_all_registry_and_queue_commit_citations_are_required_to_resolve(self) -> None:
