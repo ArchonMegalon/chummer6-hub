@@ -798,6 +798,7 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
     require_queue_scope(f"{path}:{PACKAGE_ID}", queue_block, missing)
     reject_forbidden_markers(f"{path}:{PACKAGE_ID}", queue_block, FORBIDDEN_PROOF_MARKERS, missing)
     reject_out_of_scope_proof_paths(f"{path}:{PACKAGE_ID}", queue_block, missing)
+    require_commit_citations_resolve(f"{path}:{PACKAGE_ID}", queue_block, missing)
 
 
 def require_queue_scope(label: str, queue_block: str, missing: list[str]) -> None:
@@ -855,6 +856,20 @@ def reject_out_of_scope_proof_paths(label: str, text: str, missing: list[str]) -
                     f"{label}: proof path must stay inside allowed package roots "
                     f"{', '.join(ALLOWED_PROOF_PATH_PREFIXES)}: {PACKAGE_REPO_ROOT}{relative_path}"
                 )
+
+
+def require_commit_citations_resolve(label: str, text: str, missing: list[str]) -> None:
+    cited_commits = sorted(set(re.findall(r"\bcommit ([0-9a-f]{8})\b", text)))
+    for commit in cited_commits:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}"],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        if result.returncode != 0:
+            missing.append(f"{label}: cited proof commit does not resolve locally: {commit}")
 
 
 def check_local_release_proof(path: Path, missing: list[str]) -> None:
@@ -1242,6 +1257,7 @@ def main() -> int:
                 missing,
             )
             reject_out_of_scope_proof_paths(f"{REGISTRY_PATH}:105.1", registry_block, missing)
+            require_commit_citations_resolve(f"{REGISTRY_PATH}:105.1", registry_block, missing)
 
     check_queue_staging(QUEUE_STAGING_PATH, "fleet queue staging", missing)
     check_queue_staging(DESIGN_QUEUE_STAGING_PATH, "design queue staging", missing)
