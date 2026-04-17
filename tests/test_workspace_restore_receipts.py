@@ -862,6 +862,34 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("successor_queue_package.exit_criterion", result.stderr)
         self.assertIn("successor_queue_packages[next90-m105-hub-workspace-continuity].title", result.stderr)
 
+    def test_verifier_fails_closed_when_release_proof_package_mirror_drifts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-package-mirror-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            payload["successor_queue_package"]["owned_surfaces"] = ["workspace_restore:provenance"]
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "successor_queue_package must mirror successor_queue_packages[next90-m105-hub-workspace-continuity] exactly",
+            result.stderr,
+        )
+        self.assertIn("successor_queue_package.owned_surfaces", result.stderr)
+
     def test_verifier_fails_closed_when_local_release_proof_uses_active_run_telemetry_as_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-release-telemetry-") as temp_dir:
             temp_root = Path(temp_dir)
