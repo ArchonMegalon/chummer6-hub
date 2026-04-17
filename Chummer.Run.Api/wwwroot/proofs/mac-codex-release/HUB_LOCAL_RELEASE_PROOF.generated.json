@@ -5,6 +5,7 @@
     "package_id": "next90-m105-hub-workspace-continuity",
     "milestone_id": 105,
     "frontier_id": 4623636482,
+    "repo": "chummer6-hub",
     "status": "complete",
     "landed_commit": "4d4b3856",
     "title": "Emit provenance and conflict receipts for workspace restore and continuity",
@@ -42,6 +43,7 @@
       "package_id": "next90-m105-hub-workspace-continuity",
       "milestone_id": 105,
       "frontier_id": 4623636482,
+      "repo": "chummer6-hub",
       "status": "complete",
       "landed_commit": "4d4b3856",
       "title": "Emit provenance and conflict receipts for workspace restore and continuity",
@@ -147,6 +149,6 @@
       ]
     }
   ],
-  "generated_at": "2026-04-16T20:20:57Z",
-  "generatedAt": "2026-04-16T20:20:57Z"
+  "generated_at": "2026-04-17T03:08:30Z",
+  "generatedAt": "2026-04-17T03:08:30Z"
 }
