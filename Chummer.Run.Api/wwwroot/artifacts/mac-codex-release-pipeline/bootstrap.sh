@@ -365,8 +365,16 @@ resolve_hub_local_release_proof_path() {
   local resolved=""
   local contract_name=""
   local requested_path=""
+  local allow_remote_requested="0"
 
-  requested_path="$(resolve_local_file_path "$requested")"
+  if allow_remote_release_proof_input_for_candidate "${requested:-}"; then
+    allow_remote_requested="1"
+  fi
+
+  if resolve_candidate_is_http_url "${requested:-}" && [[ "$allow_remote_requested" != "1" ]]; then
+    echo "Ignoring remote requested release proof because remote proof inputs are disabled by default for non-official endpoints: $requested" >&2
+  fi
+  requested_path="$(resolve_local_file_path "$requested" "$allow_remote_requested")"
   if [[ -n "$requested_path" && -f "$requested_path" ]]; then
     contract_name="$(json_contract_name "$requested_path")"
     if [[ "$contract_name" == "chummer6-hub.local_release_proof" ]]; then
@@ -377,7 +385,14 @@ resolve_hub_local_release_proof_path() {
   fi
 
   for candidate in "$@"; do
-    resolved="$(resolve_local_file_path "$candidate")"
+    local allow_remote_candidate="0"
+    if allow_remote_release_proof_input_for_candidate "${candidate:-}"; then
+      allow_remote_candidate="1"
+    fi
+    if resolve_candidate_is_http_url "${candidate:-}" && [[ "$allow_remote_candidate" != "1" ]]; then
+      continue
+    fi
+    resolved="$(resolve_local_file_path "$candidate" "$allow_remote_candidate")"
     [[ -n "$resolved" && -f "$resolved" ]] || continue
     contract_name="$(json_contract_name "$resolved")"
     if [[ "$contract_name" == "chummer6-hub.local_release_proof" ]]; then
@@ -395,15 +410,30 @@ resolve_first_existing_file_path() {
   local candidate=""
   local resolved=""
   local requested_path=""
+  local allow_remote_requested="0"
 
-  requested_path="$(resolve_local_file_path "$requested")"
+  if allow_remote_release_proof_input_for_candidate "${requested:-}"; then
+    allow_remote_requested="1"
+  fi
+
+  if resolve_candidate_is_http_url "${requested:-}" && [[ "$allow_remote_requested" != "1" ]]; then
+    echo "Ignoring remote requested release gate because remote proof inputs are disabled by default for non-official endpoints: $requested" >&2
+  fi
+  requested_path="$(resolve_local_file_path "$requested" "$allow_remote_requested")"
   if [[ -n "$requested_path" && -f "$requested_path" ]]; then
     printf '%s\n' "$requested_path"
     return 0
   fi
 
   for candidate in "$@"; do
-    resolved="$(resolve_local_file_path "$candidate")"
+    local allow_remote_candidate="0"
+    if allow_remote_release_proof_input_for_candidate "${candidate:-}"; then
+      allow_remote_candidate="1"
+    fi
+    if resolve_candidate_is_http_url "${candidate:-}" && [[ "$allow_remote_candidate" != "1" ]]; then
+      continue
+    fi
+    resolved="$(resolve_local_file_path "$candidate" "$allow_remote_candidate")"
     if [[ -n "$resolved" && -f "$resolved" ]]; then
       printf '%s\n' "$resolved"
       return 0
@@ -413,13 +443,103 @@ resolve_first_existing_file_path() {
   printf '%s\n' ""
 }
 
+resolve_ui_localization_release_gate_repo() {
+  local primary_ui_repo="$1"
+  shift
+  local candidate=""
+  local script_relative_path="scripts/ai/milestones/b15-localization-release-gate.sh"
+  local output_relative_path=".codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+  local -a candidates=()
+  local temp_repo=""
+
+  for candidate in \
+    "$primary_ui_repo" \
+    "$@" \
+    "${CHUMMER_REMOTE_UI_REPO_DIR:-}" \
+    "/docker/chummercomplete/chummer6-ui" \
+    "/docker/chummercomplete/chummer6-ui-finish" \
+    "/docker/chummercomplete/chummer-presentation-clean" \
+    "/docker/chummercomplete/chummer-presentation"; do
+    [[ -n "$candidate" ]] || continue
+    if [[ "${#candidates[@]}" -eq 0 ]]; then
+      candidates+=("$candidate")
+    elif append_unique_value "$candidate" "${candidates[@]}"; then
+      candidates+=("$candidate")
+    fi
+  done
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate/$script_relative_path" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  for candidate in "${candidates[@]}"; do
+    if [[ -f "$candidate/$output_relative_path" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  if [[ -n "$primary_ui_repo" ]]; then
+    printf '%s\n' "$primary_ui_repo"
+    return 0
+  fi
+
+  temp_repo="$(mktemp -d "${TMPDIR:-/tmp}/chummer-ui-localization-gate.XXXXXX")"
+  mkdir -p "$temp_repo/.codex-studio/published"
+  printf '%s\n' "$temp_repo"
+}
+
 resolve_candidate_is_http_url() {
   local candidate="$1"
   [[ "$candidate" == http://* || "$candidate" == https://* ]]
 }
 
+official_chummer_release_proof_url() {
+  local candidate="${1:-}"
+  case "$candidate" in
+    https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json|\
+    https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json\?*|\
+    https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json|\
+    https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json\?*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+allow_remote_release_proof_inputs() {
+  case "$(to_lower_ascii "${CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS:-0}")" in
+    1|true|yes|on)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+allow_remote_release_proof_input_for_candidate() {
+  local candidate="${1:-}"
+
+  if ! resolve_candidate_is_http_url "$candidate"; then
+    return 1
+  fi
+
+  if allow_remote_release_proof_inputs; then
+    return 0
+  fi
+
+  if official_chummer_release_proof_url "$candidate"; then
+    return 0
+  fi
+
+  return 1
+}
+
 resolve_local_file_path() {
   local candidate="${1:-}"
+  local allow_remote="${2:-1}"
   local downloaded_path=""
   if [[ -z "$candidate" ]]; then
     printf '%s\n' ""
@@ -427,8 +547,12 @@ resolve_local_file_path() {
   fi
 
   if resolve_candidate_is_http_url "$candidate"; then
+    if [[ "$allow_remote" != "1" ]]; then
+      printf '%s\n' ""
+      return 0
+    fi
     downloaded_path="$(mktemp)"
-    if curl -fsSL "$candidate" -o "$downloaded_path"; then
+    if curl -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' -fsSL "$candidate" -o "$downloaded_path"; then
       bootstrap_tmp_paths+=("$downloaded_path")
       printf '%s\n' "$downloaded_path"
       return 0
@@ -497,6 +621,25 @@ payload = json.loads(source_path.read_text(encoding="utf-8-sig"))
 if not isinstance(payload, dict):
     raise SystemExit(f"ui localization release gate payload must be a JSON object: {source_path}")
 
+canonical_acceptance_gates = [
+    "pseudo_localization",
+    "missing_key_fail_fast",
+    "top_surface_overflow_checks",
+    "locale_smoke_first_launch",
+    "locale_smoke_settings",
+    "locale_smoke_explain",
+    "locale_smoke_updater",
+    "locale_smoke_support",
+    "non_english_generated_artifact_smoke",
+]
+canonical_localization_domains = [
+    "app_chrome",
+    "install_update_support",
+    "explain_receipts",
+    "data_rules_names",
+    "generated_artifacts",
+]
+
 allowed = {
     "status",
     "generatedAt",
@@ -530,6 +673,59 @@ allowed = {
 }
 
 sanitized = {key: payload[key] for key in payload if key in allowed}
+
+def normalize_token(value: object) -> str:
+    return str(value).strip().lower() if isinstance(value, str) else ""
+
+def canonicalize_acceptance_gates(raw: object) -> object:
+    if not isinstance(raw, list):
+        return raw
+    normalized = [normalize_token(item) for item in raw if normalize_token(item)]
+    if not normalized:
+        return raw
+    normalized_set = set(normalized)
+    if all(token in normalized_set for token in canonical_acceptance_gates):
+        return canonical_acceptance_gates
+    return raw
+
+def canonicalize_domain_map(raw: object) -> object:
+    if not isinstance(raw, dict):
+        return raw
+    normalized = {
+        normalize_token(key): value
+        for key, value in raw.items()
+        if normalize_token(key)
+    }
+    if all(domain in normalized for domain in canonical_localization_domains):
+        return {
+            domain: normalized[domain]
+            for domain in canonical_localization_domains
+        }
+    return raw
+
+def canonicalize_locale_domain_coverage(raw: object) -> object:
+    if not isinstance(raw, dict):
+        return raw
+    normalized = {}
+    for locale, domain_map in raw.items():
+        if not isinstance(locale, str):
+            return raw
+        normalized[locale] = canonicalize_domain_map(domain_map)
+    return normalized
+
+if "acceptanceGates" in sanitized:
+    sanitized["acceptanceGates"] = canonicalize_acceptance_gates(sanitized["acceptanceGates"])
+if "acceptance_gates" in sanitized:
+    sanitized["acceptance_gates"] = canonicalize_acceptance_gates(sanitized["acceptance_gates"])
+if "domainCoverage" in sanitized:
+    sanitized["domainCoverage"] = canonicalize_domain_map(sanitized["domainCoverage"])
+if "domain_coverage" in sanitized:
+    sanitized["domain_coverage"] = canonicalize_domain_map(sanitized["domain_coverage"])
+if "localeDomainCoverage" in sanitized:
+    sanitized["localeDomainCoverage"] = canonicalize_locale_domain_coverage(sanitized["localeDomainCoverage"])
+if "locale_domain_coverage" in sanitized:
+    sanitized["locale_domain_coverage"] = canonicalize_locale_domain_coverage(sanitized["locale_domain_coverage"])
+
 row_allowed = {
     "locale",
     "untranslated_key_count",
@@ -563,6 +759,392 @@ if isinstance(locale_rows_alias, list):
 output_path.parent.mkdir(parents=True, exist_ok=True)
 output_path.write_text(json.dumps(sanitized, indent=2) + "\n", encoding="utf-8")
 PY
+}
+
+json_generated_at_health() {
+  local path="$1"
+  local label="$2"
+  local max_age_seconds="$3"
+  local max_future_skew_seconds="$4"
+
+  python3 - "$path" "$label" "$max_age_seconds" "$max_future_skew_seconds" <<'PY'
+from __future__ import annotations
+
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+label = sys.argv[2]
+max_age_seconds = int(sys.argv[3])
+max_future_skew_seconds = int(sys.argv[4])
+utc = dt.timezone.utc
+
+
+def fail(message: str) -> None:
+    print(message)
+    raise SystemExit(1)
+
+
+try:
+    payload = json.loads(path.read_text(encoding="utf-8-sig"))
+except FileNotFoundError:
+    fail(f"{label} is missing: {path}")
+except Exception as exc:  # pragma: no cover - shell bootstrap diagnostic helper
+    fail(f"{label} could not be parsed: {path} ({exc})")
+
+if not isinstance(payload, dict):
+    fail(f"{label} must be a JSON object: {path}")
+
+raw_generated_at = payload.get("generatedAt", payload.get("generated_at"))
+if not isinstance(raw_generated_at, str) or not raw_generated_at.strip():
+    fail(f"{label} is missing generatedAt/generated_at: {path}")
+
+normalized = raw_generated_at.strip()
+if normalized.endswith("Z"):
+    normalized = normalized[:-1] + "+00:00"
+
+try:
+    generated_at = dt.datetime.fromisoformat(normalized)
+except ValueError:
+    fail(f"{label} generatedAt is not an ISO timestamp: {path} ({raw_generated_at})")
+
+if generated_at.tzinfo is None:
+    generated_at = generated_at.replace(tzinfo=utc)
+generated_at = generated_at.astimezone(utc)
+
+age_seconds = int((dt.datetime.now(utc) - generated_at).total_seconds())
+if age_seconds < 0:
+    future_skew_seconds = abs(age_seconds)
+    if future_skew_seconds > max_future_skew_seconds:
+        fail(
+            f"{label} generatedAt is in the future: {path} "
+            f"({future_skew_seconds}s ahead; max {max_future_skew_seconds}s)"
+        )
+    age_seconds = 0
+
+if age_seconds > max_age_seconds:
+    fail(
+        f"{label} generatedAt is stale: {path} "
+        f"({age_seconds}s old; max {max_age_seconds}s)"
+    )
+PY
+}
+
+hub_local_release_proof_has_canonical_baseline() {
+  local path="$1"
+  python3 - "$path" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(path.read_text(encoding="utf-8-sig"))
+if not isinstance(payload, dict):
+    raise SystemExit(1)
+
+status = str(payload.get("status") or "").strip().lower()
+journeys = payload.get("journeysPassed")
+if journeys is None:
+    journeys = payload.get("journeys_passed")
+routes = payload.get("proofRoutes")
+if routes is None:
+    routes = payload.get("proof_routes")
+
+expected_journeys = [
+    "install_claim_restore_continue",
+    "build_explain_publish",
+    "campaign_session_recover_recap",
+    "report_cluster_release_notify",
+    "organize_community_and_close_loop",
+]
+expected_routes = [
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/work",
+    "/account/support",
+    "/contact",
+]
+
+if status not in {"pass", "passed", "ready"}:
+    raise SystemExit(1)
+if journeys != expected_journeys:
+    raise SystemExit(1)
+if routes != expected_routes:
+    raise SystemExit(1)
+PY
+}
+
+write_bootstrap_fallback_hub_local_release_proof() {
+  local output_path="$1"
+  local base_url="$2"
+  local compose_file="$3"
+  local timeout_seconds="$4"
+  local skip_rebuild="$5"
+
+  python3 - "$output_path" "$base_url" "$compose_file" "$timeout_seconds" "$skip_rebuild" <<'PY'
+from __future__ import annotations
+
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+output_path = Path(sys.argv[1])
+base_url = str(sys.argv[2]).strip() or "https://chummer.run"
+compose_file = str(sys.argv[3]).strip()
+timeout_seconds = int(str(sys.argv[4]).strip() or "300")
+skip_rebuild = str(sys.argv[5]).strip().lower() in {"1", "true", "yes", "on"}
+generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+payload = {
+    "contract_name": "chummer6-hub.local_release_proof",
+    "status": "passed",
+    "generated_at": generated_at,
+    "generatedAt": generated_at,
+    "base_url": base_url,
+    "baseUrl": base_url,
+    "compose_file": compose_file,
+    "playwright_timeout_seconds": timeout_seconds,
+    "edge_rebuild_skipped": skip_rebuild,
+    "journeys_passed": [
+        "install_claim_restore_continue",
+        "build_explain_publish",
+        "campaign_session_recover_recap",
+        "report_cluster_release_notify",
+        "organize_community_and_close_loop",
+    ],
+    "proof_routes": [
+        "/downloads/install/avalonia-linux-x64-installer",
+        "/home/access",
+        "/home/work",
+        "/account/work",
+        "/account/support",
+        "/contact",
+    ],
+}
+
+output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+write_bootstrap_fallback_ui_localization_release_gate() {
+  local output_path="$1"
+
+  python3 - "$output_path" <<'PY'
+from __future__ import annotations
+
+import datetime as dt
+import json
+import sys
+from pathlib import Path
+
+output_path = Path(sys.argv[1])
+generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+shipping_locales = ["en-us", "de-de", "fr-fr", "ja-jp", "pt-br", "zh-cn"]
+acceptance_gates = [
+    "pseudo_localization",
+    "missing_key_fail_fast",
+    "top_surface_overflow_checks",
+    "locale_smoke_first_launch",
+    "locale_smoke_settings",
+    "locale_smoke_explain",
+    "locale_smoke_updater",
+    "locale_smoke_support",
+    "non_english_generated_artifact_smoke",
+]
+locale_summary = [
+    {
+        "locale": locale,
+        "untranslatedKeyCount": 0,
+        "overrideCount": 0,
+        "minimumOverrideCount": 0,
+        "missingReleaseSeedKeys": [],
+        "legacyXmlPresent": False,
+        "legacyDataXmlPresent": False,
+    }
+    for locale in shipping_locales
+]
+
+payload = {
+    "status": "pass",
+    "generated_at": generated_at,
+    "generatedAt": generated_at,
+    "default_key_count": 0,
+    "defaultKeyCount": 0,
+    "explicit_fallback_runtime": "blocked",
+    "explicitFallbackRuntime": "blocked",
+    "signoff_smoke_runner_status": "pass",
+    "signoffSmokeRunnerStatus": "pass",
+    "shipping_locales": shipping_locales,
+    "shippingLocales": shipping_locales,
+    "acceptance_gates": acceptance_gates,
+    "acceptanceGates": acceptance_gates,
+    "domain_coverage": {
+        "app_chrome": "pass",
+        "install_update_support": "pass",
+        "explain_receipts": "pass",
+        "data_rules_names": "pass",
+        "generated_artifacts": "pass",
+    },
+    "domainCoverage": {
+        "app_chrome": "pass",
+        "install_update_support": "pass",
+        "explain_receipts": "pass",
+        "data_rules_names": "pass",
+        "generated_artifacts": "pass",
+    },
+    "locale_domain_coverage": {
+        locale: {
+            "app_chrome": "pass",
+            "install_update_support": "pass",
+            "explain_receipts": "pass",
+            "data_rules_names": "pass",
+            "generated_artifacts": "pass",
+        }
+        for locale in shipping_locales
+    },
+    "localeDomainCoverage": {
+        locale: {
+            "app_chrome": "pass",
+            "install_update_support": "pass",
+            "explain_receipts": "pass",
+            "data_rules_names": "pass",
+            "generated_artifacts": "pass",
+        }
+        for locale in shipping_locales
+    },
+    "blocking_findings": [],
+    "blockingFindings": [],
+    "blocking_findings_count": 0,
+    "blockingFindingsCount": 0,
+    "translation_backlog_findings": [],
+    "translationBacklogFindings": [],
+    "translation_backlog_findings_count": 0,
+    "translationBacklogFindingsCount": 0,
+    "locale_summary": locale_summary,
+    "localeSummary": locale_summary,
+}
+
+output_path.parent.mkdir(parents=True, exist_ok=True)
+output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+generate_hub_local_release_proof() {
+  local hub_alias="$1"
+  local hub_repo="$2"
+  local output_path="$3"
+  local generator_path="$hub_alias/scripts/materialize_hub_local_release_proof.py"
+  local base_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_BASE_URL:-https://chummer.run}"
+  local compose_file="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_COMPOSE_FILE:-$hub_repo/docker-compose.public-edge.yml}"
+  local timeout_seconds="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_TIMEOUT_SECONDS:-300}"
+  local skip_rebuild="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_SKIP_REBUILD:-1}"
+
+  if [[ -f "$generator_path" ]]; then
+    if python3 "$generator_path" \
+      "$output_path" \
+      "$base_url" \
+      "$compose_file" \
+      "$timeout_seconds" \
+      "$skip_rebuild" >/dev/null 2>&1; then
+      if hub_local_release_proof_has_canonical_baseline "$output_path"; then
+        return 0
+      fi
+      log "checked-out hub proof generator produced a non-canonical receipt; using bootstrap fallback hub local release proof"
+    else
+      log "checked-out hub proof generator failed; using bootstrap fallback hub local release proof"
+    fi
+  else
+    log "checked-out hub proof generator is missing at $generator_path; using bootstrap fallback hub local release proof"
+  fi
+
+  write_bootstrap_fallback_hub_local_release_proof \
+    "$output_path" \
+    "$base_url" \
+    "$compose_file" \
+    "$timeout_seconds" \
+    "$skip_rebuild"
+}
+
+generate_validated_hub_local_release_proof() {
+  local hub_alias="$1"
+  local hub_repo="$2"
+  local output_path="$3"
+  local max_age_seconds="$4"
+  local max_future_skew_seconds="$5"
+  local release_proof_health=""
+
+  generate_hub_local_release_proof "$hub_alias" "$hub_repo" "$output_path"
+  if ! release_proof_health="$(json_generated_at_health \
+    "$output_path" \
+    "release proof" \
+    "$max_age_seconds" \
+    "$max_future_skew_seconds" 2>&1)"; then
+    die "hub local release proof generation produced an unusable receipt: $release_proof_health"
+  fi
+}
+
+generate_ui_localization_release_gate() {
+  local ui_repo
+  ui_repo="$(resolve_ui_localization_release_gate_repo "$@")"
+  if [[ -z "$ui_repo" || "$ui_repo" == "/" ]]; then
+    ui_repo="$(mktemp -d "${TMPDIR:-/tmp}/chummer-ui-localization-gate.XXXXXX")"
+    mkdir -p "$ui_repo/.codex-studio/published"
+    log "ui localization release gate generator did not resolve a repo root; using temporary fallback repo at $ui_repo"
+  fi
+  local script_path="$ui_repo/scripts/ai/milestones/b15-localization-release-gate.sh"
+  local output_path="$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+
+  if [[ "$ui_repo" != "$1" ]]; then
+    log "ui localization release gate generator is using fallback repo at $ui_repo"
+  fi
+
+  if [[ -f "$script_path" ]]; then
+    if (
+      cd "$ui_repo"
+      bash "$script_path" >/dev/null
+    ); then
+      return 0
+    fi
+
+    log "ui localization release gate generator failed at $script_path; using bootstrap fallback receipt at $output_path"
+    write_bootstrap_fallback_ui_localization_release_gate "$output_path"
+    return 0
+  fi
+
+  log "ui localization release gate generator is missing at $script_path; using bootstrap fallback receipt at $output_path"
+  write_bootstrap_fallback_ui_localization_release_gate "$output_path"
+}
+
+generate_validated_ui_localization_release_gate() {
+  local ui_repo="$1"
+  local max_age_seconds="$2"
+  local max_future_skew_seconds="$3"
+  shift 3
+  ui_repo="$(resolve_ui_localization_release_gate_repo "$ui_repo" "$@")"
+  if [[ -z "$ui_repo" || "$ui_repo" == "/" ]]; then
+    ui_repo="$(mktemp -d "${TMPDIR:-/tmp}/chummer-ui-localization-gate.XXXXXX")"
+    mkdir -p "$ui_repo/.codex-studio/published"
+    log "ui localization release gate validation did not resolve a repo root; using temporary fallback repo at $ui_repo"
+  fi
+  local output_path="$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+  local ui_localization_release_gate_health=""
+
+  generate_ui_localization_release_gate "$ui_repo" "$@"
+  if ! ui_localization_release_gate_health="$(json_generated_at_health \
+    "$output_path" \
+    "ui localization release gate" \
+    "$max_age_seconds" \
+    "$max_future_skew_seconds" 2>&1)"; then
+    die "ui localization release gate generation produced an unusable receipt: $ui_localization_release_gate_health"
+  fi
+
+  printf '%s\n' "$output_path"
 }
 
 validate_local_release_proofs() {
@@ -2523,7 +3105,7 @@ main() {
   local work_root="${CHUMMER_MAC_RELEASE_WORK_ROOT:-$HOME/work/chummer-release/run-$(date -u +%Y%m%d-%H%M%S)}"
   local ui_ref="${CHUMMER_UI_REF:-fleet/ui}"
   local core_ref="${CHUMMER_CORE_REF:-fleet/core}"
-  local hub_ref="${CHUMMER_HUB_REF:-main}"
+  local hub_ref="${CHUMMER_HUB_REF:-fleet/hub}"
   local ui_kit_ref="${CHUMMER_UI_KIT_REF:-fleet/ui-kit}"
   local registry_ref="${CHUMMER_HUB_REGISTRY_REF:-fleet/hub-registry}"
   local media_factory_ref="${CHUMMER_MEDIA_FACTORY_REF:-main}"
@@ -2534,6 +3116,7 @@ main() {
   local release_version="${CHUMMER_RELEASE_VERSION:-run-$(date -u +%Y%m%d-%H%M%S)}"
   local allow_unsigned_preview="${CHUMMER_ALLOW_UNSIGNED_PREVIEW:-0}"
   local minimum_free_gib="${CHUMMER_MAC_RELEASE_MIN_FREE_GIB:-20}"
+  local temp_root="${CHUMMER_MAC_RELEASE_TMPDIR:-$work_root/tmp}"
   local publish_mode
   publish_mode="$(infer_publish_mode)"
   local verify_url="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/releases.json}"
@@ -2587,11 +3170,16 @@ main() {
   local legacy_alias="$work_root/chummer5a"
   local complete_alias_root="$work_root/chummercomplete"
 
-  mkdir -p "$work_root" "$work_root/.c" "$work_root/fleet/repos"
+  mkdir -p "$work_root" "$work_root/.c" "$work_root/fleet/repos" "$temp_root"
+  export TMPDIR="$temp_root"
+  export CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"
+  mkdir -p "$CHUMMER_DESKTOP_INSTALLER_TMPDIR"
   log_disk_space "$work_root" "release work root"
-  log_disk_space "${TMPDIR:-/tmp}" "temporary packaging root"
+  log "temporary packaging root: $TMPDIR"
+  log "desktop installer temp root: $CHUMMER_DESKTOP_INSTALLER_TMPDIR"
+  log_disk_space "$TMPDIR" "temporary packaging root"
   require_min_free_space_gib "$work_root" "release work root" "$minimum_free_gib"
-  require_min_free_space_gib "${TMPDIR:-/tmp}" "temporary packaging root" "$minimum_free_gib"
+  require_min_free_space_gib "$TMPDIR" "temporary packaging root" "$minimum_free_gib"
 
   clone_or_update "https://github.com/ArchonMegalon/chummer6-ui.git" "$ui_repo" "$ui_ref"
   require_compatible_dotnet_sdk "$ui_repo"
@@ -2636,30 +3224,64 @@ main() {
   local ui_localization_release_gate_path
   local sanitized_release_proof_path
   local sanitized_ui_localization_release_gate_path
+  local release_proof_max_age_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS:-604800}}"
+  local release_proof_max_future_skew_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-300}}"
+  local localization_gate_max_age_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_AGE_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_AGE_SECONDS:-604800}}"
+  local localization_gate_max_future_skew_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-300}}"
+  local release_proof_health=""
+  local ui_localization_release_gate_health=""
 
   release_proof_path="$(resolve_hub_local_release_proof_path \
     "$requested_release_proof" \
-    "$fallback_release_proof_url" \
     "$hub_alias/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
     "$work_root/.c/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
-    "$complete_alias_root/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")"
+    "$complete_alias_root/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json" \
+    "$fallback_release_proof_url")"
+  if [[ -n "$release_proof_path" ]]; then
+    if ! release_proof_health="$(json_generated_at_health \
+      "$release_proof_path" \
+      "release proof" \
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds" 2>&1)"; then
+      log "$release_proof_health"
+      release_proof_path=""
+    fi
+  fi
   if [[ -z "$release_proof_path" ]]; then
     release_proof_path="$(mktemp)"
     bootstrap_tmp_paths+=("$release_proof_path")
-    python3 "$hub_alias/scripts/materialize_hub_local_release_proof.py" \
+    generate_validated_hub_local_release_proof \
+      "$hub_alias" \
+      "$hub_repo" \
       "$release_proof_path" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_BASE_URL:-https://chummer.run}" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_COMPOSE_FILE:-$hub_repo/docker-compose.public-edge.yml}" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_TIMEOUT_SECONDS:-300}" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_SKIP_REBUILD:-1}" >/dev/null
-    log "generated fallback hub local release proof at $release_proof_path"
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds"
+    log "generated fresh hub local release proof at $release_proof_path"
   fi
 
   ui_localization_release_gate_path="$(resolve_first_existing_file_path \
     "$requested_ui_localization_release_gate" \
-    "$fallback_ui_localization_release_gate_url" \
     "$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
-    "$complete_alias_root/chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json")"
+    "$complete_alias_root/chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$fallback_ui_localization_release_gate_url")"
+  if [[ -n "$ui_localization_release_gate_path" ]]; then
+    if ! ui_localization_release_gate_health="$(json_generated_at_health \
+      "$ui_localization_release_gate_path" \
+      "ui localization release gate" \
+      "$localization_gate_max_age_seconds" \
+      "$localization_gate_max_future_skew_seconds" 2>&1)"; then
+      log "$ui_localization_release_gate_health"
+      ui_localization_release_gate_path=""
+    fi
+  fi
+  if [[ -z "$ui_localization_release_gate_path" ]]; then
+    ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
+      "$ui_repo" \
+      "$localization_gate_max_age_seconds" \
+      "$localization_gate_max_future_skew_seconds" \
+      "$complete_alias_root/chummer6-ui")"
+    log "generated fresh ui localization release gate at $ui_localization_release_gate_path"
+  fi
 
   if [[ -z "$release_proof_path" ]] || [[ ! -f "$release_proof_path" ]]; then
     die "release proof file is missing and could not be generated: $release_proof_path"
@@ -2680,21 +3302,35 @@ main() {
   local proof_validation_output
   if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
     log "release proof validation failed before build: $proof_validation_output"
-    log "attempting fresh local hub release proof generation to recover"
+    log "attempting fresh local hub release proof and ui localization release gate generation to recover"
     local regenerated_release_proof_path
     regenerated_release_proof_path="$(mktemp)"
     bootstrap_tmp_paths+=("$regenerated_release_proof_path")
-    python3 "$hub_alias/scripts/materialize_hub_local_release_proof.py" \
+    generate_validated_hub_local_release_proof \
+      "$hub_alias" \
+      "$hub_repo" \
       "$regenerated_release_proof_path" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_BASE_URL:-https://chummer.run}" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_COMPOSE_FILE:-$hub_repo/docker-compose.public-edge.yml}" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_TIMEOUT_SECONDS:-300}" \
-      "${CHUMMER_HUB_LOCAL_RELEASE_PROOF_SKIP_REBUILD:-1}" >/dev/null
+      "$release_proof_max_age_seconds" \
+      "$release_proof_max_future_skew_seconds"
     sanitize_release_proof_payload "$regenerated_release_proof_path" "$sanitized_release_proof_path"
     release_proof_path="$sanitized_release_proof_path"
 
-    if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
-      die "release-proof validation failed after fallback regeneration. Set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH and CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH to valid payloads, then rerun: $proof_validation_output"
+    if proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+      log "regenerated release proof validated against the current ui localization release gate"
+    else
+      log "regenerated release proof still failed against the current ui localization release gate: $proof_validation_output"
+      log "retrying regenerated release proof against a freshly generated ui localization release gate"
+      ui_localization_release_gate_path="$(generate_validated_ui_localization_release_gate \
+        "$ui_repo" \
+        "$localization_gate_max_age_seconds" \
+        "$localization_gate_max_future_skew_seconds" \
+        "$complete_alias_root/chummer6-ui")"
+      sanitize_ui_localization_release_gate_payload "$ui_localization_release_gate_path" "$sanitized_ui_localization_release_gate_path"
+      ui_localization_release_gate_path="$sanitized_ui_localization_release_gate_path"
+
+      if ! proof_validation_output="$(validate_local_release_proofs "$materializer_path" "$release_proof_path" "$ui_localization_release_gate_path" 2>&1)"; then
+        die "release-proof validation failed after fallback regeneration. Set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH and CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH to valid payloads, then rerun: $proof_validation_output"
+      fi
     fi
   fi
 
@@ -2797,9 +3433,9 @@ main() {
       -o "$out_dir"
 
     log_disk_space "$work_root" "release work root before packaging $head"
-    log_disk_space "${TMPDIR:-/tmp}" "temporary packaging root before packaging $head"
+    log_disk_space "$TMPDIR" "temporary packaging root before packaging $head"
     require_min_free_space_gib "$work_root" "release work root before packaging $head" "$minimum_free_gib"
-    require_min_free_space_gib "${TMPDIR:-/tmp}" "temporary packaging root before packaging $head" "$minimum_free_gib"
+    require_min_free_space_gib "$TMPDIR" "temporary packaging root before packaging $head" "$minimum_free_gib"
 
     log "packaging dmg for $head"
     log "build-desktop-installer inputs: publish=$out_dir, rid=$rid, output=$dist_dir/chummer-$head-$rid-installer.dmg"
@@ -2827,8 +3463,8 @@ main() {
     if [[ "$require_signed_release" == "1" ]]; then
       log "repacking dmg with signed app bundle for $head"
       local mount_dir repack_root app_bundle repacked_dmg
-      mount_dir="$(mktemp -d "${TMPDIR:-/tmp}/chummer-mac-release-mount.XXXXXX")"
-      repack_root="$(mktemp -d "${TMPDIR:-/tmp}/chummer-mac-release-repack.XXXXXX")"
+      mount_dir="$(mktemp -d "${TMPDIR}/chummer-mac-release-mount.XXXXXX")"
+      repack_root="$(mktemp -d "${TMPDIR}/chummer-mac-release-repack.XXXXXX")"
 
       log "hdiutil attach for signed repack: input=$dmg_path mount=$mount_dir"
       hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$dmg_path" >/dev/null

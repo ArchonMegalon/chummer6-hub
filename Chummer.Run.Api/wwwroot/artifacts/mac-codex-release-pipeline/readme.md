@@ -74,19 +74,19 @@ export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="https://chummer.run/downloads/releas
 export CHUMMER_RELEASE_CHANNEL="preview"
 export CHUMMER_RELEASE_APP="avalonia,blazor-desktop"
 export CHUMMER_RELEASE_RID="osx-arm64"
-export CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL="https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json"
-export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL="https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json"
 export CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK="1"
 export CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS="4"
 export CHUMMER_RELEASE_UPLOAD_RETRY_SLEEP_SECONDS="5"
 export CHUMMER_UI_REF="fleet/ui"
 export CHUMMER_CORE_REF="fleet/core"
-export CHUMMER_HUB_REF="main"
+export CHUMMER_HUB_REF="fleet/hub"
 export CHUMMER_UI_KIT_REF="fleet/ui-kit"
 export CHUMMER_HUB_REGISTRY_REF="fleet/hub-registry"
 export CHUMMER_LEGACY_REF="Docker"
 export CHUMMER_ALLOW_UNSIGNED_PREVIEW="1"
 export CHUMMER_MAC_RELEASE_MIN_FREE_GIB="20"
+export CHUMMER_MAC_RELEASE_TMPDIR="$HOME/chummer-release-tmp"
+export CHUMMER_DESKTOP_INSTALLER_TMPDIR="$CHUMMER_MAC_RELEASE_TMPDIR/desktop-installer"
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE=""      # optional explicit local release-proof JSON path
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH=""      # optional explicit local release-proof JSON path (preferred when precomputed)
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_BASE_URL="https://chummer.run"
@@ -94,18 +94,22 @@ export CHUMMER_HUB_LOCAL_RELEASE_PROOF_COMPOSE_FILE="./docker-compose.public-edg
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_TIMEOUT_SECONDS="300"
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_SKIP_REBUILD="1"
 export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE=""  # optional explicit UI localization gate JSON path
-export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH=""  # optional explicit UI localization gate JSON path (preferred)
-export CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL=""       # optional override for hosted fallback proof URL
-export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL=""   # optional override for hosted fallback UI gate URL
+export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH="/docker/chummercomplete/chummer-presentation-clean/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+export CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS="0" # leave non-official remote proof inputs disabled unless you are explicitly testing a hosted fallback
+export CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL=""        # optional override for hosted fallback proof URL when non-official remote proof inputs are enabled
+export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL=""   # optional override for hosted fallback UI gate URL when non-official remote proof inputs are enabled
 
 Notes:
 
-1. If either proof payload is missing/invalid, the bootstrap now validates both proof contracts before packaging and regenerates only the hub local proof as a fallback.
-2. If local proof files are missing, the script now supports hosted proof URLs via the *_URL variables above and will download them automatically.
+1. The bootstrap validates both proof contracts before packaging and now fails early if a supplied proof is stale, malformed, or missing required freshness fields.
+2. Local proof files are the default path. The official `https://chummer.run/proofs/mac-codex-release/...` proof endpoints are trusted fallback inputs by default; other hosted proof URLs stay disabled unless `CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS=1`.
 3. If your run still fails this validation, export explicit known-good files:
    - `CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH` (from a trusted checked-in or freshly generated hub proof)
    - `CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH` (from a trusted UI localization gate export)
-4. If upload session requests return 4xx/5xx, upload now retries those requests and can fall back to direct multipart promotion when `CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1`.
+4. The hosted bootstrap now defaults temporary packaging work to `$work_root/tmp` and exports `CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"` for `hdiutil`.
+   - Override `CHUMMER_MAC_RELEASE_TMPDIR` when the default workspace volume is not the right disk for temporary DMG work.
+   - Override `CHUMMER_DESKTOP_INSTALLER_TMPDIR` separately only when you intentionally want installer-image temp files on a different volume.
+5. If upload session requests return 4xx/5xx, upload now retries those requests and can fall back to direct multipart promotion when `CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1`.
    - 400/401/403 responses are surfaced immediately with a parsed payload summary and stop-retry guidance.
 ``` 
 
@@ -136,6 +140,8 @@ For macOS signed releases, the promoted artifact will only be visible publicly w
 For an operator-approved unsigned preview upload, set `CHUMMER_ALLOW_UNSIGNED_PREVIEW=1` and keep `CHUMMER_RELEASE_CHANNEL=preview`. That path skips codesign/notarization and uploads a preview DMG with `signingStatus=skipped_preview` and `notarizationStatus=skipped_preview`.
 
 `CHUMMER_MAC_RELEASE_MIN_FREE_GIB` is enforced before clone/build work starts and again before temporary packaging work proceeds.
+
+If a macOS ticket still reports `hdiutil: create failed - No space left on device`, rerun with `CHUMMER_MAC_RELEASE_TMPDIR` pointed at a workspace-backed path on the target SSD and clear old `run-*` directories under the same parent if they are no longer needed.
 
 The same endpoint is platform-agnostic. A Windows bundle that carries the matching startup-smoke and signing proof can promote the Windows installer through the same route.
 
