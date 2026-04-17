@@ -49,6 +49,8 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
     [Theory]
     [InlineData("https://evil.example/install-link")]
     [InlineData("chummer://downloads")]
+    [InlineData("http://127.0.0.1:47761/browser-only/claim?state=desktop")]
+    [InlineData("https://localhost:47762/account/access/install-link")]
     public async Task Browser_install_link_rejects_invalid_callback_uris(string callbackUri)
     {
         using Fixture fixture = new(authenticated: false);

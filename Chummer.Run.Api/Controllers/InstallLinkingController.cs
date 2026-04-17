@@ -14,6 +14,7 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/install-linking")]
 public sealed class InstallLinkingController : ControllerBase
 {
+    private const string AppLocalInstallLinkCallbackPath = "/install-link/callback";
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly InstallLinkingService _installLinking;
@@ -487,7 +488,8 @@ public sealed class InstallLinkingController : ControllerBase
 
         bool localhostHttp = (string.Equals(parsed.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
                               || string.Equals(parsed.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
-                             && IsAppLocalCallbackHost(parsed.Host);
+                             && IsAppLocalCallbackHost(parsed.Host)
+                             && IsAppLocalInstallLinkCallbackPath(parsed.AbsolutePath);
         return localhostHttp ? parsed.ToString() : null;
     }
 
@@ -495,6 +497,9 @@ public sealed class InstallLinkingController : ControllerBase
         => string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
            || (System.Net.IPAddress.TryParse(host, out System.Net.IPAddress? address)
                && System.Net.IPAddress.IsLoopback(address));
+
+    private static bool IsAppLocalInstallLinkCallbackPath(string absolutePath)
+        => string.Equals(absolutePath, AppLocalInstallLinkCallbackPath, StringComparison.Ordinal);
 
     private static string BuildBrowserInstallCallbackRedirectUri(
         string callbackUri,
