@@ -118,6 +118,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
     "      - /docker/chummercomplete/chummer.run-services commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
     "      - /docker/chummercomplete/chummer.run-services commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
+    "      - /docker/chummercomplete/chummer.run-services commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -232,6 +233,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
     "          - /docker/chummercomplete/chummer.run-services commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
     "          - /docker/chummercomplete/chummer.run-services commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
+    "          - /docker/chummercomplete/chummer.run-services commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1981,6 +1983,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "e9c87a3f",
                 "d3c74d38",
                 "6b5679de",
+                "39c0ae8d",
             ],
             verifier._required_resolving_commits(),
         )
