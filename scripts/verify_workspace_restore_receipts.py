@@ -345,6 +345,7 @@ LOCAL_RELEASE_PROOF_PACKAGE: dict[str, object] = {
     ],
     "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture.",
 }
+LOCAL_RELEASE_PROOF_PACKAGE_KEYS = set(LOCAL_RELEASE_PROOF_PACKAGE)
 
 QUEUE_ALLOWED_PATHS = [
     "Chummer.Run.Api",
@@ -899,6 +900,11 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
     if not isinstance(package, dict):
         missing.append(f"{path}: missing successor_queue_package")
     else:
+        if set(package) != LOCAL_RELEASE_PROOF_PACKAGE_KEYS:
+            missing.append(
+                f"{path}: successor_queue_package keys must be exactly "
+                f"{sorted(LOCAL_RELEASE_PROOF_PACKAGE_KEYS)!r}"
+            )
         for key, expected in LOCAL_RELEASE_PROOF_PACKAGE.items():
             if package.get(key) != expected:
                 missing.append(f"{path}: successor_queue_package.{key} must be {expected!r}")
@@ -914,6 +920,11 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
     if not isinstance(closed_package, dict):
         missing.append(f"{path}: successor_queue_packages missing {PACKAGE_ID}")
     else:
+        if set(closed_package) != LOCAL_RELEASE_PROOF_PACKAGE_KEYS:
+            missing.append(
+                f"{path}: successor_queue_packages[{PACKAGE_ID}] keys must be exactly "
+                f"{sorted(LOCAL_RELEASE_PROOF_PACKAGE_KEYS)!r}"
+            )
         if isinstance(package, dict) and package != closed_package:
             missing.append(
                 f"{path}: successor_queue_package must mirror successor_queue_packages[{PACKAGE_ID}] exactly"
