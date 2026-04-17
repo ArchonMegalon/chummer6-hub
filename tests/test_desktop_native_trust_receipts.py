@@ -132,6 +132,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit bb8db39c tightens M102 support install matching.",
     "      - /docker/chummercomplete/chummer.run-services commit 1d6c686c tightens M102 duplicate proof citations.",
     "      - /docker/chummercomplete/chummer.run-services commit 18902a34 pins the M102 duplicate proof citation guard.",
+    "      - /docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -260,6 +261,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit bb8db39c tightens M102 support install matching.",
     "          - /docker/chummercomplete/chummer.run-services commit 1d6c686c tightens M102 duplicate proof citations.",
     "          - /docker/chummercomplete/chummer.run-services commit 18902a34 pins the M102 duplicate proof citation guard.",
+    "          - /docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -333,11 +335,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("18902a34", verifier._current_local_proof_floor_commit())
+        self.assertEqual("72fa2471", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "Pin M102 duplicate proof citation guard",
+            "Tighten M102 proof anchor scope",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("72fa2471", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("18902a34", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("1d6c686c", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("bb8db39c", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -350,10 +353,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn("41d7ed57", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("cd392a72", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertTrue(
-            any("commit 18902a34 pins the M102 duplicate proof citation guard." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+            any("commit 72fa2471 tightens M102 proof anchor scope" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         )
         self.assertTrue(
-            any("commit 18902a34 pins the M102 duplicate proof citation guard." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+            any("commit 72fa2471 tightens M102 proof anchor scope" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
@@ -2107,6 +2110,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "bb8db39c",
                 "1d6c686c",
                 "18902a34",
+                "72fa2471",
             ],
             verifier._required_resolving_commits(),
         )
