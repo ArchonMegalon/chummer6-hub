@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -47,6 +48,7 @@ DESIGN_QUEUE_STAGING_PATH = Path(
         "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
     )
 )
+MATERIALIZER_PATH = ROOT / "scripts" / "materialize_hub_local_release_proof.py"
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
 PACKAGE_TASK = "Make roaming workspace, entitlement replication, stale state, and conflict posture explicit and recoverable."
 LANDED_COMMIT = "4d4b3856"
@@ -911,6 +913,13 @@ def read_release_proof_payload(path: Path, label: str, missing: list[str]) -> di
     return payload
 
 
+def stable_release_payload(payload: dict[str, object]) -> dict[str, object]:
+    stable = dict(payload)
+    stable.pop("generated_at", None)
+    stable.pop("generatedAt", None)
+    return stable
+
+
 def find_closed_package(payload: dict[str, object]) -> dict[str, object] | None:
     packages = payload.get("successor_queue_packages")
     if not isinstance(packages, list):
@@ -976,6 +985,56 @@ def check_served_release_proof_matches_local(missing: list[str]) -> None:
             missing.append(
                 f"{SERVED_RELEASE_PROOF_PATH}: proof_receipts[{receipt_id}] must match {LOCAL_RELEASE_PROOF_PATH}"
             )
+
+
+def check_materializer_matches_local_release_proof(missing: list[str]) -> None:
+    local_payload = read_release_proof_payload(
+        LOCAL_RELEASE_PROOF_PATH,
+        "local release proof",
+        missing,
+    )
+    if local_payload is None:
+        return
+
+    if not MATERIALIZER_PATH.is_file():
+        missing.append(f"missing local release proof materializer: {MATERIALIZER_PATH}")
+        return
+
+    with tempfile.TemporaryDirectory(prefix="workspace-restore-materializer-") as temp_dir:
+        output_path = Path(temp_dir) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(MATERIALIZER_PATH),
+                str(output_path),
+                str(local_payload.get("base_url") or ""),
+                str(local_payload.get("compose_file") or ""),
+                str(local_payload.get("playwright_timeout_seconds") or 0),
+                "true" if local_payload.get("edge_rebuild_skipped") is True else "false",
+            ],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode != 0:
+            missing.append(
+                f"{MATERIALIZER_PATH}: failed to materialize local release proof: {result.stderr or result.stdout}"
+            )
+            return
+
+        generated_payload = read_release_proof_payload(
+            output_path,
+            "materialized local release proof",
+            missing,
+        )
+        if generated_payload is None:
+            return
+
+    if stable_release_payload(generated_payload) != stable_release_payload(local_payload):
+        missing.append(
+            f"{MATERIALIZER_PATH}: materialized proof must match {LOCAL_RELEASE_PROOF_PATH} aside from timestamps"
+        )
 
 
 def check_required_local_commits(missing: list[str]) -> None:
@@ -1060,6 +1119,7 @@ def main() -> int:
     check_local_release_proof(LOCAL_RELEASE_PROOF_PATH, missing)
     check_local_release_proof(SERVED_RELEASE_PROOF_PATH, missing)
     check_served_release_proof_matches_local(missing)
+    check_materializer_matches_local_release_proof(missing)
     check_required_local_commits(missing)
     check_standard_verify_entrypoint(missing)
 

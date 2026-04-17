@@ -223,6 +223,37 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("package-scoped proof_receipts", result.stderr)
         self.assertIn("non-canonical receipt_id", result.stderr)
 
+    def test_verifier_fails_closed_when_materializer_no_longer_reproduces_committed_release_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-materializer-drift-") as temp_dir:
+            temp_root = Path(temp_dir)
+            local_proof_path = temp_root / "local-proof.json"
+            served_proof_path = temp_root / "served-proof.json"
+            source_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_proof_path.read_text(encoding="utf-8"))
+            for receipt in payload["proof_receipts"]:
+                if receipt.get("receipt_id") == "workspace_restore:provenance":
+                    receipt["materializer_drift_probe"] = True
+                    break
+            local_proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            served_proof_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(local_proof_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_SERVED_RELEASE_PROOF"] = str(served_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("materialized proof must match", result.stderr)
+        self.assertIn("materialize_hub_local_release_proof.py", result.stderr)
+
     def test_verifier_fails_closed_when_receipt_observation_stability_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-lifecycle-") as temp_dir:
             temp_root = Path(temp_dir)
