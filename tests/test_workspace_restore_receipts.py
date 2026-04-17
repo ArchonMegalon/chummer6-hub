@@ -30,8 +30,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         script_text = verify_script.read_text(encoding="utf-8")
 
         self.assertIn("python3 scripts/verify_workspace_restore_receipts.py", script_text)
+        self.assertIn("python3 scripts/verify_workspace_restore_queue_identity.py", script_text)
         self.assertIn(
-            "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py",
+            "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py tests/test_workspace_restore_queue_identity.py",
             script_text,
         )
 

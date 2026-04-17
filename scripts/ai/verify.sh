@@ -2320,7 +2320,8 @@ mv "$visual_receipt_backup" "$visual_receipt_path"
 python3 scripts/verify_desktop_native_trust_receipts.py
 python3 -m unittest tests/test_desktop_native_trust_receipts.py
 python3 scripts/verify_workspace_restore_receipts.py
-python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py
+python3 scripts/verify_workspace_restore_queue_identity.py
+python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py tests/test_workspace_restore_queue_identity.py
 python3 scripts/verify_artifact_factory_orchestration.py
 python3 -m unittest tests/test_artifact_factory_orchestration.py
 

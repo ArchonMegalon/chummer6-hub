@@ -307,7 +307,8 @@ PROOF_MARKERS = [
 
 STANDARD_VERIFY_MARKERS = [
     "python3 scripts/verify_workspace_restore_receipts.py",
-    "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py",
+    "python3 scripts/verify_workspace_restore_queue_identity.py",
+    "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py tests/test_workspace_restore_queue_identity.py",
 ]
 
 LOCAL_RELEASE_PROOF_RECEIPTS: dict[str, dict[str, object]] = {
