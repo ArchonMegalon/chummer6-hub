@@ -563,6 +563,37 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 m105_package["owned_surfaces"],
             )
 
+    def test_proof_payload_fail_closes_browser_only_receipt_routes(self) -> None:
+        verifier = load_verifier_module()
+        proof_receipts = []
+        for receipt_id, expected in verifier.REQUIRED_PROOF_RECEIPTS.items():
+            proof_receipts.append(
+                {
+                    "receipt_id": receipt_id,
+                    "package_id": expected["package_id"],
+                    "milestone_id": expected["milestone_id"],
+                    "frontier_id": expected["frontier_id"],
+                    "summary": expected["summary"],
+                    "surfaces": list(expected["surfaces"]),
+                    "routes": ["/account/access"] if receipt_id == "desktop_native_claim_and_recovery" else list(expected["routes"]),
+                }
+            )
+
+        proof = {
+            "proof_routes": list(verifier.REQUIRED_TOP_LEVEL_PROOF_ROUTES),
+            "journeys_passed": list(verifier.REQUIRED_TOP_LEVEL_JOURNEYS),
+            "successor_queue_packages": [dict(verifier.REQUIRED_PROOF_PACKAGE)],
+            "proof_receipts": proof_receipts,
+        }
+        errors: list[str] = []
+
+        verifier._verify_m102_proof_payload(errors, proof, "mutated proof")
+
+        self.assertIn(
+            "mutated proof desktop_native_claim_and_recovery routes do not include a grant-bound native install-linking route",
+            errors,
+        )
+
     def test_verifier_fail_closes_successor_queue_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
