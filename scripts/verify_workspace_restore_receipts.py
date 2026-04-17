@@ -177,6 +177,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "bbfe3722",
     "9d1fe095",
     "2f85eb13",
+    "8c718c33",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -445,6 +446,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit bbfe3722 tightens the M105 package receipt metadata guard so wrong-frontier package receipts cannot sit beside the closed workspace continuity receipts.",
     "/docker/chummercomplete/chummer.run-services commit 9d1fe095 tightens the M105 release-proof package mirror guard so top-level and package-list closure metadata cannot drift.",
     "/docker/chummercomplete/chummer.run-services commit 2f85eb13 hardens M105 restore conflict recovery receipts so blocking server-plane conflicts keep an actionable resolution fallback.",
+    "/docker/chummercomplete/chummer.run-services commit 8c718c33 pins the M105 restore conflict proof floor so future shards verify the latest recovery-receipt guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -556,6 +558,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit bbfe3722 tightens the M105 package receipt metadata guard so wrong-frontier package receipts cannot sit beside the closed workspace continuity receipts.",
     "/docker/chummercomplete/chummer.run-services commit 9d1fe095 tightens the M105 release-proof package mirror guard so top-level and package-list closure metadata cannot drift.",
     "/docker/chummercomplete/chummer.run-services commit 2f85eb13 hardens M105 restore conflict recovery receipts so blocking server-plane conflicts keep an actionable resolution fallback.",
+    "/docker/chummercomplete/chummer.run-services commit 8c718c33 pins the M105 restore conflict proof floor so future shards verify the latest recovery-receipt guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
