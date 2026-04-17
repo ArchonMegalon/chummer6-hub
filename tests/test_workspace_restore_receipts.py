@@ -932,6 +932,42 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("workspace_restore:provenance", result.stderr)
         self.assertIn("entitlement_sync:conflict_receipts", result.stderr)
 
+    def test_verifier_fails_closed_when_local_release_proof_adds_wrong_frontier_package_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-wrong-frontier-receipt-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            payload["proof_receipts"].append(
+                {
+                    "receipt_id": "workspace_restore:wrong_frontier_receipt",
+                    "package_id": "next90-m105-hub-workspace-continuity",
+                    "milestone_id": 105,
+                    "frontier_id": 1,
+                    "routes": ["/home/work"],
+                    "surfaces": ["workspace_restore:provenance"],
+                    "summary": "Wrong-frontier package receipt must not count as closed M105 continuity proof.",
+                }
+            )
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof_receipts with package_id next90-m105-hub-workspace-continuity", result.stderr)
+        self.assertIn("milestone 105 and frontier 4623636482", result.stderr)
+        self.assertIn("non-canonical package metadata", result.stderr)
+
     def test_verifier_fails_closed_when_local_release_proof_duplicates_closed_package(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-release-duplicate-package-") as temp_dir:
             temp_root = Path(temp_dir)

@@ -835,6 +835,11 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
         and item.get("milestone_id") == MILESTONE_ID
         and item.get("frontier_id") == FRONTIER_ID
     ]
+    package_id_receipts = [
+        item
+        for item in proof_receipt_list
+        if item.get("package_id") == PACKAGE_ID
+    ]
     package_receipt_ids = {
         item.get("receipt_id")
         for item in package_scoped_receipts
@@ -850,6 +855,23 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
             f"{path}: package-scoped proof_receipts for {PACKAGE_ID} must contain only "
             f"{sorted(expected_receipt_ids)!r}; found {len(package_scoped_receipts)} row(s)"
         )
+    if len(package_id_receipts) != len(expected_receipt_ids):
+        missing.append(
+            f"{path}: proof_receipts with package_id {PACKAGE_ID} must be exactly "
+            f"{sorted(expected_receipt_ids)!r} at milestone {MILESTONE_ID} and frontier {FRONTIER_ID}; "
+            f"found {len(package_id_receipts)} row(s)"
+        )
+    for item in package_id_receipts:
+        receipt_id = item.get("receipt_id")
+        if (
+            receipt_id not in expected_receipt_ids
+            or item.get("milestone_id") != MILESTONE_ID
+            or item.get("frontier_id") != FRONTIER_ID
+        ):
+            missing.append(
+                f"{path}: proof_receipts with package_id {PACKAGE_ID} contains "
+                f"non-canonical package metadata for receipt_id {receipt_id!r}"
+            )
     for item in package_scoped_receipts:
         receipt_id = item.get("receipt_id")
         if receipt_id not in expected_receipt_ids:
