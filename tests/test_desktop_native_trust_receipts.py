@@ -135,7 +135,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
     "      - /docker/chummercomplete/chummer.run-services commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
     "      - /docker/chummercomplete/chummer.run-services commit 438861f0 pins the M102 receipt matching proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 17044a9f pins the current M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 4238a88a pins the current M102 desktop trust proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -267,7 +267,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
     "          - /docker/chummercomplete/chummer.run-services commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
     "          - /docker/chummercomplete/chummer.run-services commit 438861f0 pins the M102 receipt matching proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 17044a9f pins the current M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 4238a88a pins the current M102 desktop trust proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -341,11 +341,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("17044a9f", verifier._current_local_proof_floor_commit())
+        self.assertEqual("4238a88a", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "Pin current M102 desktop trust proof floor",
+            "Pin M102 current desktop trust proof floor",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("4238a88a", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("17044a9f", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("438861f0", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("c791e657", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -362,11 +363,38 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn("41d7ed57", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("cd392a72", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertTrue(
-            any("commit 17044a9f pins the current M102 desktop trust proof floor" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+            any("commit 4238a88a pins the current M102 desktop trust proof floor" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         )
         self.assertTrue(
-            any("commit 17044a9f pins the current M102 desktop trust proof floor" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+            any("commit 4238a88a pins the current M102 desktop trust proof floor" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
+
+    def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
+        verifier = load_verifier_module()
+
+        markers = verifier._forbidden_markers_in_text(
+            "ACTIVE RUN HELPER output from task local telemetry, "
+            "active_run_handoff.generated.md, and run ooda design supervisor until quiet"
+        )
+
+        self.assertIn("active-run helper", markers)
+        self.assertIn("task-local telemetry", markers)
+        self.assertIn("ACTIVE_RUN_HANDOFF", markers)
+        self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
+        self.assertNotIn("remaining milestones", markers)
+
+    def test_forbidden_active_run_marker_matching_decodes_encoded_text(self) -> None:
+        verifier = load_verifier_module()
+
+        markers = verifier._forbidden_markers_in_text(
+            "TASK%5FLOCAL%5FTELEMETRY and "
+            "active-run%20helper&#32;commands with "
+            "run%5Fooda%5Fdesign%5Fsupervisor%5Funtil%5Fquiet"
+        )
+
+        self.assertIn("TASK_LOCAL_TELEMETRY", markers)
+        self.assertIn("active-run helper commands", markers)
+        self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
 
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -2123,6 +2151,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "c791e657",
                 "438861f0",
                 "17044a9f",
+                "4238a88a",
             ],
             verifier._required_resolving_commits(),
         )
