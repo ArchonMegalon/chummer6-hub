@@ -191,6 +191,38 @@ def _duplicate_package_row(text: str) -> str:
     return text[:end] + "\n" + package_block + text[end:]
 
 
+def _append_extra_allowed_path(text: str) -> str:
+    package_marker = f"    package_id: {PACKAGE_ID}\n"
+    package_index = text.find(package_marker)
+    if package_index == -1:
+        raise AssertionError(f"missing package row for {PACKAGE_ID}")
+
+    marker = "    allowed_paths:\n      - Chummer.Run.Api\n      - scripts\n      - tests\n"
+    path_index = text.find(marker, package_index)
+    if path_index == -1:
+        raise AssertionError("missing canonical allowed_paths block")
+
+    return text[:path_index] + marker + "      - docs\n" + text[path_index + len(marker):]
+
+
+def _append_extra_owned_surface(text: str) -> str:
+    package_marker = f"    package_id: {PACKAGE_ID}\n"
+    package_index = text.find(package_marker)
+    if package_index == -1:
+        raise AssertionError(f"missing package row for {PACKAGE_ID}")
+
+    marker = (
+        "    owned_surfaces:\n"
+        "      - workspace_restore:provenance\n"
+        "      - entitlement_sync:conflict_receipts\n"
+    )
+    surface_index = text.find(marker, package_index)
+    if surface_index == -1:
+        raise AssertionError("missing canonical owned_surfaces block")
+
+    return text[:surface_index] + marker + "      - workspace_restore:unowned_surface\n" + text[surface_index + len(marker):]
+
+
 def _remove_current_queue_frontier_proof(text: str) -> str:
     marker = "          - /docker/chummercomplete/chummer.run-services commit e0d2bff6 pins the M105 workspace queue-frontier guard proof.\n"
     if marker not in text:
@@ -631,6 +663,60 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("expected exactly one queue package block", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
+    def test_verifier_rejects_widened_queue_allowed_paths(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-wide-paths-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                _append_extra_allowed_path(source_queue_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("allowed_paths must be exactly", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
+    def test_verifier_rejects_widened_queue_owned_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-wide-surfaces-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                _append_extra_owned_surface(source_queue_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("owned_surfaces must be exactly", result.stderr)
         self.assertIn(PACKAGE_ID, result.stderr)
 
 

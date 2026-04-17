@@ -320,6 +320,17 @@ LOCAL_RELEASE_PROOF_PACKAGE: dict[str, object] = {
     "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture.",
 }
 
+QUEUE_ALLOWED_PATHS = [
+    "Chummer.Run.Api",
+    "scripts",
+    "tests",
+]
+
+QUEUE_OWNED_SURFACES = [
+    "workspace_restore:provenance",
+    "entitlement_sync:conflict_receipts",
+]
+
 REGISTRY_MARKERS = [
     "id: 105.1",
     "owner: chummer6-hub",
@@ -624,6 +635,22 @@ def count_queue_package_blocks(text: str) -> int:
     return text.count(f"    package_id: {PACKAGE_ID}\n")
 
 
+def extract_queue_scalar_list(block: str, section_name: str) -> list[str] | None:
+    marker = f"    {section_name}:\n"
+    start = block.find(marker)
+    if start == -1:
+        return None
+
+    values: list[str] = []
+    for line in block[start + len(marker):].splitlines():
+        if line.startswith("    ") and not line.startswith("      - "):
+            break
+        if line.startswith("      - "):
+            values.append(line.removeprefix("      - ").strip())
+
+    return values
+
+
 def require_markers(label: str, text: str, markers: list[str], missing: list[str]) -> None:
     for marker in markers:
         if marker not in text:
@@ -663,8 +690,19 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
         missing.append(f"{path}: expected exactly one queue package block for {PACKAGE_ID}; found {package_block_count}")
 
     require_markers(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
+    require_queue_scope(f"{path}:{PACKAGE_ID}", queue_block, missing)
     reject_forbidden_markers(f"{path}:{PACKAGE_ID}", queue_block, FORBIDDEN_PROOF_MARKERS, missing)
     reject_out_of_scope_proof_paths(f"{path}:{PACKAGE_ID}", queue_block, missing)
+
+
+def require_queue_scope(label: str, queue_block: str, missing: list[str]) -> None:
+    allowed_paths = extract_queue_scalar_list(queue_block, "allowed_paths")
+    if allowed_paths != QUEUE_ALLOWED_PATHS:
+        missing.append(f"{label}: allowed_paths must be exactly {QUEUE_ALLOWED_PATHS!r}")
+
+    owned_surfaces = extract_queue_scalar_list(queue_block, "owned_surfaces")
+    if owned_surfaces != QUEUE_OWNED_SURFACES:
+        missing.append(f"{label}: owned_surfaces must be exactly {QUEUE_OWNED_SURFACES!r}")
 
 
 def check_queue_staging_blocks_match(missing: list[str]) -> None:
