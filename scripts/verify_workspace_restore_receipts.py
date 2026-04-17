@@ -175,6 +175,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "121f3571",
     "3d77bb73",
     "bbfe3722",
+    "9d1fe095",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -439,6 +440,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 121f3571 pins the M105 workspace materializer proof floor so future shards verify the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 3d77bb73 tightens the M105 active-run handoff transcript guard so copied prompt, model, and stderr-tail fields cannot close the completed workspace package.",
     "/docker/chummercomplete/chummer.run-services commit bbfe3722 tightens the M105 package receipt metadata guard so wrong-frontier package receipts cannot sit beside the closed workspace continuity receipts.",
+    "/docker/chummercomplete/chummer.run-services commit 9d1fe095 tightens the M105 release-proof package mirror guard so top-level and package-list closure metadata cannot drift.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -548,6 +550,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 121f3571 pins the M105 workspace materializer proof floor so future shards verify the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services commit 3d77bb73 tightens the M105 active-run handoff transcript guard so copied prompt, model, and stderr-tail fields cannot close the completed workspace package.",
     "/docker/chummercomplete/chummer.run-services commit bbfe3722 tightens the M105 package receipt metadata guard so wrong-frontier package receipts cannot sit beside the closed workspace continuity receipts.",
+    "/docker/chummercomplete/chummer.run-services commit 9d1fe095 tightens the M105 release-proof package mirror guard so top-level and package-list closure metadata cannot drift.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
