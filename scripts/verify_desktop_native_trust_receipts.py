@@ -535,6 +535,7 @@ REQUIRED_PROOF_PACKAGE = {
     "package_id": PACKAGE_ID,
     "milestone_id": 102,
     "frontier_id": FRONTIER_ID,
+    "repo": "chummer6-hub",
     "status": "complete",
     "landed_commit": LANDED_COMMIT,
     "title": "Unify claim, install, update, and support recovery into one desktop-native flow",

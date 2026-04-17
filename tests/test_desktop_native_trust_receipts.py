@@ -1840,6 +1840,65 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_generated_package_repo_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"materializer stderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            m102_package = next(
+                item
+                for item in proof["successor_queue_packages"]
+                if item["package_id"] == "next90-m102-hub-desktop-native-trust"
+            )
+            m102_package["repo"] = "fleet"
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(VERIFY_SCRIPT),
+                ],
+                cwd=REPO_ROOT,
+                env={
+                    **os.environ,
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "proof package has wrong repo: expected 'chummer6-hub', got 'fleet'",
+                result.stderr,
+            )
+            self.assertIn(
+                "published HUB_LOCAL_RELEASE_PROOF.generated.json drifts from scripts/materialize_hub_local_release_proof.py",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_weakened_desktop_native_receipt_summary(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
