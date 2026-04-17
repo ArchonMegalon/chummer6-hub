@@ -1011,6 +1011,12 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
                 if required not in actual:
                     errors.append(f"{label} {receipt_id} missing {key[:-1]}: {required}")
 
+            if actual_values != expected[key]:
+                errors.append(
+                    f"{label} {receipt_id} has wrong {key}: "
+                    f"expected {expected[key]!r}, got {actual_values!r}"
+                )
+
             if key == "routes" and proof_route_set:
                 for route in sorted(actual):
                     if route not in proof_route_set:
