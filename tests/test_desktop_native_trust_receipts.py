@@ -833,6 +833,69 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn("canonical successor queue staging block has wrong proof", result.stderr)
 
+    def test_verifier_fail_closes_successor_queue_mirror_block_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            design_queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.design.generated.yaml"
+            registry_path = Path(temp_root) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            complete_queue = "\n".join(
+                [
+                    "items:",
+                    "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                    "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
+                    "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
+                    "    milestone_id: 102",
+                    "    wave: W6",
+                    "    repo: chummer6-hub",
+                    "    status: complete",
+                    "    landed_commit: 160af58f",
+                    *QUEUE_PROOF_LINES,
+                    "    allowed_paths:",
+                    "      - Chummer.Run.Api",
+                    "      - scripts",
+                    "      - tests",
+                    "    owned_surfaces:",
+                    "      - desktop_native_claim_and_recovery",
+                    "      - support_followthrough:install_truth",
+                ]
+            )
+            queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            design_queue_path.write_text(
+                complete_queue.replace(
+                    "    landed_commit: 160af58f\n",
+                    "    landed_commit: 160af58f\n"
+                    "    mirror_only_note: stale queue mirror evidence must not close this package\n",
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            registry_path.write_text(
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_NEXT90_QUEUE_STAGING_PATH": str(queue_path),
+                    "CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH": str(design_queue_path),
+                    "CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH": str(registry_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "Fleet successor queue staging block for next90-m102-hub-desktop-native-trust "
+                "drifts from the design-owned successor queue source",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_successor_registry_evidence_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
