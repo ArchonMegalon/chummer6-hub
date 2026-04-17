@@ -553,10 +553,22 @@ public sealed class CampaignWorkspaceServerPlaneService
                 Surface: ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind),
                 SubjectId: receipt.SubjectId,
                 Summary: receipt.Summary,
-                Resolution: receipt.Resolution,
+                Resolution: ResolveRestoreConflictResolution(receipt),
                 ObservedAtUtc: receipt.ObservedAtUtc,
                 BlocksContinue: receipt.BlocksContinue))
             .ToArray();
+
+    private static string? ResolveRestoreConflictResolution(WorkspaceRestoreConflictReceipt receipt)
+    {
+        if (!string.IsNullOrWhiteSpace(receipt.Resolution))
+        {
+            return receipt.Resolution;
+        }
+
+        return receipt.BlocksContinue
+            ? "Open account access and resolve this restore receipt before continuing on this workspace."
+            : null;
+    }
 
     private static GmOperationsReadinessSummary BuildGmOperationsReadiness(
         CampaignWorkspaceProjection workspace,

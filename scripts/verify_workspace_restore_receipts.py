@@ -221,6 +221,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "RestoreProvenanceReceipts: ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts)",
         "RestoreConflictReceipts: ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts)",
         "ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind)",
+        "Resolution: ResolveRestoreConflictResolution(receipt)",
+        "Open account access and resolve this restore receipt before continuing on this workspace.",
         "IsEntitlementRestoreKind(kind)",
     ],
     "scripts/materialize_hub_local_release_proof.py": [
