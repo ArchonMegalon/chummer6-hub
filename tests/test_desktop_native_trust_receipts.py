@@ -112,6 +112,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
     "      - /docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit aadffb5b pins the M102 callback query proof guard.",
+    "      - /docker/chummercomplete/chummer.run-services commit a7a5ecea tightens M102 desktop trust callback proof.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -220,6 +221,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
     "          - /docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit aadffb5b pins the M102 callback query proof guard.",
+    "          - /docker/chummercomplete/chummer.run-services commit a7a5ecea tightens M102 desktop trust callback proof.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -1849,6 +1851,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "568b8358",
                 "e0bcd91d",
                 "aadffb5b",
+                "a7a5ecea",
             ],
             verifier._required_resolving_commits(),
         )
