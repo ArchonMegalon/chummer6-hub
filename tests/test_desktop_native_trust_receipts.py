@@ -127,6 +127,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit 2791f798 tightens M102 support intake installed-build truth.",
     "      - /docker/chummercomplete/chummer.run-services commit 93e5075a tightens M102 current proof floor guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 894dbedd pins M102 current proof floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -250,6 +251,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit 2791f798 tightens M102 support intake installed-build truth.",
     "          - /docker/chummercomplete/chummer.run-services commit 93e5075a tightens M102 current proof floor guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 894dbedd pins M102 current proof floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -329,6 +331,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
         self.assertIn("894dbedd", verifier.REQUIRED_RESOLVING_COMMITS)
+        self.assertIn("997337a6", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("93e5075a", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("2791f798", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("bd60fc5a", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -2087,6 +2090,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "2791f798",
                 "93e5075a",
                 "894dbedd",
+                "997337a6",
             ],
             verifier._required_resolving_commits(),
         )
