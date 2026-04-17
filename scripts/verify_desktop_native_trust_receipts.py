@@ -182,6 +182,8 @@ REQUIRED_CANONICAL_QUEUE_MARKERS = [
     "repo: chummer6-hub",
     "status: complete",
     f"landed_commit: {LANDED_COMMIT}",
+    "completion_action: verify_closed_package_only",
+    "do_not_reopen_reason: M102 chummer6-hub desktop-native trust is complete; future shards must verify this receipt, registry row, queue row, and design-queue row instead of reopening the claim/install/update/rollback/support continuation package.",
 ]
 
 REQUIRED_CANONICAL_REGISTRY_MARKERS = [
