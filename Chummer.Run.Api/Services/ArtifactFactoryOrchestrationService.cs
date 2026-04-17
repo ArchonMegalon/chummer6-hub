@@ -40,6 +40,41 @@ public sealed record ArtifactFactoryJobLaunchResult(
     IReadOnlyList<ArtifactFactoryOutputBinding> OutputBindings,
     ArtifactFactoryMediaRequest MediaFactoryRequest);
 
+public sealed record ArtifactFactoryJobBatchLaunchRequest(
+    string BatchId,
+    string RequestedBy,
+    IReadOnlyList<ArtifactFactoryJobLaunchRequest> Jobs,
+    IReadOnlyList<string>? RequiredFamilies = null);
+
+public sealed record ArtifactFactorySourcePackBatchLaunchRequest(
+    string BatchId,
+    string RequestedBy,
+    IReadOnlyList<ApprovedArtifactSourcePack> SourcePacks,
+    IReadOnlyList<ArtifactFactoryFamilyFormatOverride>? RequestedFormats = null,
+    string? Audience = null,
+    string? Locale = null,
+    IReadOnlyList<string>? RequiredFamilies = null);
+
+public sealed record ArtifactFactoryFamilyFormatOverride(
+    string Family,
+    IReadOnlyList<string> Formats);
+
+public sealed record ArtifactFactoryJobBatchLaunchResult(
+    string BatchId,
+    string State,
+    string RequestedBy,
+    DateTimeOffset QueuedAtUtc,
+    int JobCount,
+    IReadOnlyList<string> Families,
+    IReadOnlyList<string> RecipeIds,
+    IReadOnlyList<string> RequiredFamilies,
+    IReadOnlyList<string> JobIds,
+    IReadOnlyList<string> SourcePackIds,
+    IReadOnlyList<string> RequiredReceiptRefs,
+    IReadOnlyList<string> PublicProofShelfRefs,
+    IReadOnlyList<ArtifactFactoryJobLaunchResult> Jobs,
+    IReadOnlyList<ArtifactFactoryMediaRequest> MediaFactoryRequests);
+
 public sealed record ArtifactFactoryMediaRequest(
     string ContractName,
     string RecipeId,
@@ -67,6 +102,20 @@ public sealed record ArtifactFactoryMediaSourcePack(
     string? SupportCaseId,
     string? PublicationId,
     string? PublicShelfRef);
+
+public sealed record ArtifactFactoryRecipeCatalogResult(
+    string ContractName,
+    string RecipeVersion,
+    IReadOnlyList<ArtifactFactoryRecipeDefinition> Recipes);
+
+public sealed record ArtifactFactoryRecipeDefinition(
+    string Family,
+    string RecipeId,
+    IReadOnlyList<string> AllowedSourceKinds,
+    IReadOnlyList<string> DefaultFormats,
+    IReadOnlyList<string> AllowedFormats,
+    IReadOnlyList<string> RequiredReceiptPrefixes,
+    string RequiredAnchorDescription);
 
 public sealed class ArtifactFactoryOrchestrationService
 {
@@ -120,6 +169,321 @@ public sealed class ArtifactFactoryOrchestrationService
                 RequiredAnchorDescription: "a publication id or public proof shelf ref")
         };
 
+    public ArtifactFactoryRecipeCatalogResult ListRecipes()
+    {
+        ArtifactFactoryRecipeDefinition[] recipes = Recipes
+            .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(static item => new ArtifactFactoryRecipeDefinition(
+                Family: item.Key,
+                RecipeId: item.Value.RecipeId,
+                AllowedSourceKinds: item.Value.AllowedSourceKinds.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+                DefaultFormats: item.Value.DefaultFormats.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+                AllowedFormats: item.Value.AllowedFormats.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+                RequiredReceiptPrefixes: item.Value.RequiredReceiptPrefixes.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+                RequiredAnchorDescription: item.Value.RequiredAnchorDescription))
+            .ToArray();
+
+        return new ArtifactFactoryRecipeCatalogResult(
+            ContractName: ContractName,
+            RecipeVersion: RecipeVersion,
+            Recipes: recipes);
+    }
+
+    public ArtifactFactoryJobBatchLaunchResult LaunchJobs(ArtifactFactoryJobBatchLaunchRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.BatchId))
+        {
+            throw new InvalidDataException("batchId is required.");
+        }
+
+        RejectUnsafeBatchId(request.BatchId);
+
+        string requestedBy = NormalizeRequestedBy(request.RequestedBy);
+
+        if (request.Jobs is null || request.Jobs.Count == 0)
+        {
+            throw new InvalidDataException("at least one artifact factory job is required.");
+        }
+
+        List<ArtifactFactoryJobLaunchResult> jobs = new(request.Jobs.Count);
+        HashSet<string> jobIds = new(StringComparer.OrdinalIgnoreCase);
+        foreach (ArtifactFactoryJobLaunchRequest jobRequest in request.Jobs)
+        {
+            if (jobRequest is null)
+            {
+                throw new InvalidDataException($"batch '{request.BatchId.Trim()}' contains an empty artifact factory job request.");
+            }
+
+            ArtifactFactoryJobLaunchRequest normalizedRequest;
+            if (string.IsNullOrWhiteSpace(jobRequest.RequestedBy))
+            {
+                normalizedRequest = jobRequest with { RequestedBy = requestedBy };
+            }
+            else
+            {
+                string jobRequestedBy = NormalizeRequestedBy(jobRequest.RequestedBy);
+                if (!string.Equals(jobRequestedBy, requestedBy, StringComparison.Ordinal))
+                {
+                    throw new InvalidDataException(
+                        $"artifact factory batch '{request.BatchId.Trim()}' job requestedBy '{jobRequestedBy}' must match batch requestedBy '{requestedBy}'.");
+                }
+
+                normalizedRequest = jobRequest with { RequestedBy = jobRequestedBy };
+            }
+
+            ArtifactFactoryJobLaunchResult job = LaunchJob(normalizedRequest);
+            if (!jobIds.Add(job.JobId))
+            {
+                throw new InvalidDataException($"duplicate artifact factory job '{job.JobId}' is not allowed in batch '{request.BatchId.Trim()}'.");
+            }
+
+            jobs.Add(job);
+        }
+
+        string[] families = jobs
+            .Select(static job => job.Family)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] requiredFamilies = NormalizeRequiredBatchFamilies(request.RequiredFamilies);
+        string[] missingRequiredFamilies = requiredFamilies
+            .Where(required => !families.Contains(required, StringComparer.OrdinalIgnoreCase))
+            .ToArray();
+        if (missingRequiredFamilies.Length > 0)
+        {
+            throw new InvalidDataException(
+                $"artifact factory batch '{request.BatchId.Trim()}' is missing required recipe family job(s): {string.Join(", ", missingRequiredFamilies)}.");
+        }
+
+        string[] receiptRefs = jobs
+            .SelectMany(static job => job.RequiredReceiptRefs)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] recipeIds = jobs
+            .Select(static job => job.RecipeId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] publicProofShelfRefs = jobs
+            .SelectMany(static job => job.PublicProofShelfRefs)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] sourcePackIds = jobs
+            .SelectMany(static job => job.SourcePackIds)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        ArtifactFactoryJobLaunchResult[] orderedJobs = jobs
+            .OrderBy(static job => job.JobId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return new ArtifactFactoryJobBatchLaunchResult(
+            BatchId: request.BatchId.Trim(),
+            State: "queued",
+            RequestedBy: requestedBy,
+            QueuedAtUtc: DateTimeOffset.UtcNow,
+            JobCount: jobs.Count,
+            Families: families,
+            RecipeIds: recipeIds,
+            RequiredFamilies: requiredFamilies,
+            JobIds: orderedJobs.Select(static job => job.JobId).ToArray(),
+            SourcePackIds: sourcePackIds,
+            RequiredReceiptRefs: receiptRefs,
+            PublicProofShelfRefs: publicProofShelfRefs,
+            Jobs: orderedJobs,
+            MediaFactoryRequests: orderedJobs.Select(static job => job.MediaFactoryRequest).ToArray());
+    }
+
+    public ArtifactFactoryJobBatchLaunchResult LaunchSourcePackBatch(ArtifactFactorySourcePackBatchLaunchRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.BatchId))
+        {
+            throw new InvalidDataException("source-pack batchId is required.");
+        }
+
+        RejectUnsafeBatchId(request.BatchId);
+
+        if (request.SourcePacks is null || request.SourcePacks.Count == 0)
+        {
+            throw new InvalidDataException("at least one approved source pack is required for artifact factory source-pack batch launch.");
+        }
+
+        ValidateSourcePackBatchSourcePacks(request.SourcePacks);
+
+        string[] requiredFamilies = NormalizeRequiredBatchFamilies(request.RequiredFamilies);
+        IReadOnlyDictionary<string, IReadOnlyList<string>> requestedFormatsByFamily = NormalizeFamilyFormatOverrides(request.RequestedFormats);
+        ArtifactFactoryJobLaunchRequest[] jobs = requiredFamilies
+            .Select(family => BuildJobFromApprovedSourcePackBatch(request, family, requestedFormatsByFamily))
+            .ToArray();
+
+        return LaunchJobs(new ArtifactFactoryJobBatchLaunchRequest(
+            BatchId: request.BatchId,
+            RequestedBy: request.RequestedBy,
+            Jobs: jobs,
+            RequiredFamilies: requiredFamilies));
+    }
+
+    private static ArtifactFactoryJobLaunchRequest BuildJobFromApprovedSourcePackBatch(
+        ArtifactFactorySourcePackBatchLaunchRequest request,
+        string family,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> requestedFormatsByFamily)
+    {
+        ArtifactFactoryRecipe recipe = Recipes[family];
+        ApprovedArtifactSourcePack[] sourcePacks = request.SourcePacks
+            .Where(sourcePack => sourcePack is not null && SourcePackCanFeedRecipe(sourcePack, recipe))
+            .ToArray();
+        if (sourcePacks.Length == 0)
+        {
+            throw new InvalidDataException(
+                $"artifact factory source-pack batch '{request.BatchId.Trim()}' has no approved source packs matching required recipe family '{family}'.");
+        }
+
+        requestedFormatsByFamily.TryGetValue(family, out IReadOnlyList<string>? requestedFormats);
+        return new ArtifactFactoryJobLaunchRequest(
+            Family: family,
+            RequestedBy: request.RequestedBy,
+            SourcePacks: sourcePacks,
+            RequestedFormats: requestedFormats,
+            Audience: request.Audience,
+            Locale: request.Locale);
+    }
+
+    private static bool SourcePackCanFeedRecipe(ApprovedArtifactSourcePack sourcePack, ArtifactFactoryRecipe recipe)
+    {
+        string sourcePackKind = NormalizeToken(sourcePack.SourcePackKind);
+        return sourcePackKind.Length > 0
+            && recipe.AllowedSourceKinds.Contains(sourcePackKind, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static void ValidateSourcePackBatchSourcePacks(IReadOnlyList<ApprovedArtifactSourcePack> sourcePacks)
+    {
+        HashSet<string> sourcePackIds = new(StringComparer.OrdinalIgnoreCase);
+        foreach (ApprovedArtifactSourcePack? sourcePack in sourcePacks)
+        {
+            if (sourcePack is null)
+            {
+                throw new InvalidDataException("artifact factory source-pack batch contains an empty approved source pack.");
+            }
+
+            if (string.IsNullOrWhiteSpace(sourcePack.SourcePackId))
+            {
+                throw new InvalidDataException("sourcePackId is required for every source-pack batch pack.");
+            }
+
+            RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.SourcePackId, "sourcePackId");
+            RejectUnsafeSourcePackId(sourcePack.SourcePackId);
+
+            string normalizedSourcePackId = sourcePack.SourcePackId.Trim();
+            if (!sourcePackIds.Add(normalizedSourcePackId))
+            {
+                throw new InvalidDataException($"duplicate source pack id '{normalizedSourcePackId}' is not allowed in source-pack batch.");
+            }
+
+            if (!string.Equals(sourcePack.ApprovalState?.Trim(), "approved", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException($"source pack '{normalizedSourcePackId}' is not approved for source-pack batch launch.");
+            }
+
+            if (string.IsNullOrWhiteSpace(sourcePack.ProvenanceRef))
+            {
+                throw new InvalidDataException($"source pack '{normalizedSourcePackId}' is missing provenanceRef.");
+            }
+
+            RejectProviderSpecificRef(normalizedSourcePackId, sourcePack.ProvenanceRef, "provenanceRef");
+            foreach (string evidenceRef in sourcePack.EvidenceRefs ?? Array.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(evidenceRef))
+                {
+                    continue;
+                }
+
+                RejectProviderSpecificRef(normalizedSourcePackId, evidenceRef, "evidenceRef");
+                RejectNonLocalPublicShelfEvidenceRef(normalizedSourcePackId, evidenceRef);
+            }
+
+            if (!string.IsNullOrWhiteSpace(sourcePack.PublicShelfRef))
+            {
+                RejectProviderSpecificRef(normalizedSourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
+                RejectNonLocalPublicShelfRef(normalizedSourcePackId, sourcePack.PublicShelfRef, "publicShelfRef");
+            }
+
+            RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.ReleaseArtifactId, "releaseArtifactId");
+            RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.SupportCaseId, "supportCaseId");
+            RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.PublicationId, "publicationId");
+        }
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> NormalizeFamilyFormatOverrides(
+        IReadOnlyList<ArtifactFactoryFamilyFormatOverride>? requestedFormats)
+    {
+        Dictionary<string, IReadOnlyList<string>> formatsByFamily = new(StringComparer.OrdinalIgnoreCase);
+        if (requestedFormats is null || requestedFormats.Count == 0)
+        {
+            return formatsByFamily;
+        }
+
+        foreach (ArtifactFactoryFamilyFormatOverride? overrideRequest in requestedFormats)
+        {
+            if (overrideRequest is null)
+            {
+                throw new InvalidDataException("artifact factory source-pack batch contains an empty requested format override.");
+            }
+
+            string family = NormalizeToken(overrideRequest.Family);
+            RejectProviderSpecificRef("source-pack-batch", family, "requestedFormatFamily");
+            RejectUnsafeJobToken(family, "requestedFormatFamily", allowComma: false);
+            if (!Recipes.ContainsKey(family))
+            {
+                throw new InvalidDataException($"artifact factory source-pack batch requested formats for unsupported recipe family '{family}'.");
+            }
+
+            if (!formatsByFamily.TryAdd(family, overrideRequest.Formats))
+            {
+                throw new InvalidDataException($"artifact factory source-pack batch contains duplicate requested formats for recipe family '{family}'.");
+            }
+        }
+
+        return formatsByFamily;
+    }
+
+    private static string[] NormalizeRequiredBatchFamilies(IReadOnlyList<string>? requiredFamilies)
+    {
+        if (requiredFamilies is null || requiredFamilies.Count == 0)
+        {
+            return Recipes.Keys
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        string[] families = requiredFamilies
+            .Select(NormalizeToken)
+            .Where(static item => item.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (families.Length == 0)
+        {
+            throw new InvalidDataException("artifact factory batch required recipe families cannot be empty.");
+        }
+
+        foreach (string family in families)
+        {
+            RejectProviderSpecificRef("batch-request", family, "requiredFamily");
+            RejectUnsafeJobToken(family, "requiredFamily", allowComma: false);
+            if (!Recipes.ContainsKey(family))
+            {
+                throw new InvalidDataException($"artifact factory batch requires unsupported recipe family '{family}'.");
+            }
+        }
+
+        return families;
+    }
+
     public ArtifactFactoryJobLaunchResult LaunchJob(ArtifactFactoryJobLaunchRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -134,10 +498,7 @@ public sealed class ArtifactFactoryOrchestrationService
             throw new InvalidDataException($"artifact job family '{request.Family}' is not supported.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.RequestedBy))
-        {
-            throw new InvalidDataException("requestedBy is required.");
-        }
+        string requestedBy = NormalizeRequestedBy(request.RequestedBy);
 
         if (request.SourcePacks is null || request.SourcePacks.Count == 0)
         {
@@ -148,8 +509,13 @@ public sealed class ArtifactFactoryOrchestrationService
         List<string> requiredReceiptRefs = new();
         List<string> publicProofShelfRefs = new();
         HashSet<string> sourcePackIds = new(StringComparer.OrdinalIgnoreCase);
-        foreach (ApprovedArtifactSourcePack sourcePack in request.SourcePacks)
+        foreach (ApprovedArtifactSourcePack? sourcePack in request.SourcePacks)
         {
+            if (sourcePack is null)
+            {
+                throw new InvalidDataException("artifact factory job contains an empty approved source pack.");
+            }
+
             ValidateSourcePack(sourcePack, family, recipe);
             string normalizedSourcePackId = sourcePack.SourcePackId.Trim();
             if (!sourcePackIds.Add(normalizedSourcePackId))
@@ -183,7 +549,12 @@ public sealed class ArtifactFactoryOrchestrationService
             }
             else if (!string.IsNullOrWhiteSpace(sourcePack.SupportCaseId))
             {
-                publicProofShelfRefs.Add($"/account/support/{Uri.EscapeDataString(sourcePack.SupportCaseId.Trim())}");
+                string supportCaseId = Uri.EscapeDataString(sourcePack.SupportCaseId.Trim());
+                publicProofShelfRefs.Add($"/account/support/{supportCaseId}");
+                if (family.Equals("fix", StringComparison.OrdinalIgnoreCase))
+                {
+                    publicProofShelfRefs.Add($"/account/fix-followthrough/{supportCaseId}");
+                }
             }
             else if (!string.IsNullOrWhiteSpace(sourcePack.PublicationId))
             {
@@ -194,7 +565,7 @@ public sealed class ArtifactFactoryOrchestrationService
         ValidateRecipeAnchors(family, request.SourcePacks, recipe);
 
         string[] missingReceiptPrefixes = recipe.RequiredReceiptPrefixes
-            .Where(prefix => !requiredReceiptRefs.Any(receipt => receipt.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            .Where(prefix => !requiredReceiptRefs.Any(receipt => ReceiptRefMatchesRequiredPrefix(receipt, prefix)))
             .ToArray();
         if (missingReceiptPrefixes.Length > 0)
         {
@@ -203,8 +574,8 @@ public sealed class ArtifactFactoryOrchestrationService
         }
 
         string[] outputFormats = NormalizeOutputFormats(request.RequestedFormats, recipe);
-        string audience = NormalizeOptional(request.Audience) ?? "public-proof-shelf";
-        string locale = NormalizeOptional(request.Locale) ?? "en-US";
+        string audience = NormalizeAudience(request.Audience);
+        string locale = NormalizeLocale(request.Locale);
         string jobId = BuildJobId(family, sourcePacks, outputFormats, audience, locale);
         string[] receiptRefs = requiredReceiptRefs.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         ArtifactFactoryOutputBinding[] outputBindings = BuildOutputBindings(family, jobId, sourcePacks, outputFormats);
@@ -217,7 +588,7 @@ public sealed class ArtifactFactoryOrchestrationService
             Family: family,
             RecipeId: recipe.RecipeId,
             RecipeVersion: RecipeVersion,
-            RequestedBy: request.RequestedBy.Trim(),
+            RequestedBy: requestedBy,
             Audience: audience,
             Locale: locale,
             QueuedAtUtc: DateTimeOffset.UtcNow,
@@ -243,6 +614,9 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             throw new InvalidDataException("sourcePackId is required for every source pack.");
         }
+
+        RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.SourcePackId, "sourcePackId");
+        RejectUnsafeSourcePackId(sourcePack.SourcePackId);
 
         if (string.IsNullOrWhiteSpace(sourcePack.SourcePackKind))
         {
@@ -325,6 +699,13 @@ public sealed class ArtifactFactoryOrchestrationService
             : [$"provenance:{sourcePack.ProvenanceRef.Trim()}"];
     }
 
+    private static bool ReceiptRefMatchesRequiredPrefix(string receiptRef, string requiredPrefix)
+    {
+        string normalizedReceiptRef = receiptRef.Trim();
+        return normalizedReceiptRef.Equals(requiredPrefix, StringComparison.OrdinalIgnoreCase)
+            || normalizedReceiptRef.StartsWith($"{requiredPrefix}:", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static void RejectProviderSpecificRef(string sourcePackId, string value, string fieldName)
     {
         string normalized = value.Trim();
@@ -332,16 +713,18 @@ public sealed class ArtifactFactoryOrchestrationService
         string prefix = separatorIndex >= 0
             ? normalized[..separatorIndex].Trim()
             : string.Empty;
-        if (ProviderSpecificRefPrefixes.Contains(prefix))
-        {
-            throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has provider-specific {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
-        }
-
         if (IsAbsoluteHttpRef(normalized) || IsUriLikeExternalRef(normalized, fieldName))
         {
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has external absolute URI {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
+        }
+
+        if (ProviderSpecificRefPrefixes.Contains(normalized)
+            || ProviderSpecificRefPrefixes.Contains(prefix)
+            || (!IsExternalPublicShelfEvidenceRef(normalized, fieldName) && ContainsProviderSpecificToken(normalized)))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has provider-specific {fieldName} '{value}'; artifact factory jobs must launch from approved source-pack receipts instead of one-off provider flows.");
         }
     }
 
@@ -367,15 +750,66 @@ public sealed class ArtifactFactoryOrchestrationService
         return Math.Min(colonIndex, slashIndex);
     }
 
+    private static bool ContainsProviderSpecificToken(string normalized)
+    {
+        string lower = normalized.ToLowerInvariant();
+        foreach (string providerToken in ProviderSpecificRefPrefixes)
+        {
+            string token = providerToken.ToLowerInvariant();
+            if (ContainsDelimitedToken(lower, token))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsDelimitedToken(string value, string token)
+    {
+        int startIndex = 0;
+        while (startIndex < value.Length)
+        {
+            int index = value.IndexOf(token, startIndex, StringComparison.Ordinal);
+            if (index < 0)
+            {
+                return false;
+            }
+
+            int endIndex = index + token.Length;
+            if (IsProviderTokenBoundary(value, index - 1)
+                && IsProviderTokenBoundary(value, endIndex))
+            {
+                return true;
+            }
+
+            startIndex = index + 1;
+        }
+
+        return false;
+    }
+
+    private static bool IsProviderTokenBoundary(string value, int index)
+        => index < 0
+            || index >= value.Length
+            || value[index] is ':' or '/' or '\\' or '-' or '_' or '.';
+
     private static bool IsAbsoluteHttpRef(string normalized)
         => Uri.TryCreate(normalized, UriKind.Absolute, out Uri? uri)
             && (uri.Scheme.Equals(Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase)
                 || uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
 
     private static bool IsUriLikeExternalRef(string normalized, string fieldName)
-        => !(fieldName.Equals("evidenceRef", StringComparison.Ordinal)
-                && normalized.StartsWith("public-shelf:", StringComparison.OrdinalIgnoreCase))
+        => !IsPublicShelfEvidenceRef(normalized, fieldName)
             && normalized.Contains("://", StringComparison.Ordinal);
+
+    private static bool IsPublicShelfEvidenceRef(string normalized, string fieldName)
+        => fieldName.Equals("evidenceRef", StringComparison.Ordinal)
+            && normalized.StartsWith("public-shelf:", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsExternalPublicShelfEvidenceRef(string normalized, string fieldName)
+        => IsPublicShelfEvidenceRef(normalized, fieldName)
+            && !normalized["public-shelf:".Length..].TrimStart().StartsWith("/", StringComparison.Ordinal);
 
     private static void RejectNonLocalPublicShelfEvidenceRef(string sourcePackId, string evidenceRef)
     {
@@ -430,6 +864,8 @@ public sealed class ArtifactFactoryOrchestrationService
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has public proof shelf {fieldName} '{value}' outside recipe {family} shelf routes; artifact factory bundle refs must stay on approved release, support, fix, or publication shelves.");
         }
+
+        RejectRecipeShelfAnchorShape(sourcePackId, family, publicShelfRef, fieldName);
     }
 
     private static void RejectUnsafePublicShelfRef(string sourcePackId, string publicShelfRef, string fieldName)
@@ -448,7 +884,86 @@ public sealed class ArtifactFactoryOrchestrationService
                 throw new InvalidDataException(
                     $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must not contain traversal or encoded path separators.");
             }
+
+            if (!IsStablePublicShelfSegment(decodedSegment))
+            {
+                throw new InvalidDataException(
+                    $"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public proof shelf segment characters.");
+            }
         }
+    }
+
+    private static void RejectReleaseBundleShelfAnchorShape(string sourcePackId, string publicShelfRef, string fieldName)
+    {
+        string[] allowedReleasePrefixes = ["/downloads/install/", "/artifacts/release-bundles/"];
+        string? matchingPrefix = allowedReleasePrefixes.FirstOrDefault(prefix => publicShelfRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        string releaseArtifactId = matchingPrefix is null
+            ? string.Empty
+            : publicShelfRef[matchingPrefix.Length..].Trim('/');
+
+        if (string.IsNullOrWhiteSpace(releaseArtifactId)
+            || releaseArtifactId.Contains('/', StringComparison.Ordinal)
+            || releaseArtifactId.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe release public proof shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.");
+        }
+    }
+
+    private static void RejectRecipeShelfAnchorShape(string sourcePackId, string family, string publicShelfRef, string fieldName)
+    {
+        if (family.Equals("release", StringComparison.OrdinalIgnoreCase))
+        {
+            RejectReleaseBundleShelfAnchorShape(sourcePackId, publicShelfRef, fieldName);
+            return;
+        }
+
+        if (family.Equals("publication", StringComparison.OrdinalIgnoreCase)
+            && !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/publications/", allowBundlesSuffix: true))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe publication public proof shelf {fieldName} '{publicShelfRef}'; publication bundle anchors must resolve to one publication segment with an optional bundles shelf.");
+        }
+
+        if (family.Equals("support", StringComparison.OrdinalIgnoreCase)
+            && !HasAnyResourceShelfAnchorShape(publicShelfRef, ["/account/support/", "/account/support-packets/"], allowBundlesSuffix: false))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe support public proof shelf {fieldName} '{publicShelfRef}'; support bundle anchors must resolve to exactly one support case segment.");
+        }
+
+        if (family.Equals("fix", StringComparison.OrdinalIgnoreCase)
+            && !HasAnyResourceShelfAnchorShape(
+                publicShelfRef,
+                ["/account/support/", "/account/fix-followthrough/", "/downloads/install/", "/artifacts/release-bundles/"],
+                allowBundlesSuffix: false))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe fix public proof shelf {fieldName} '{publicShelfRef}'; fix bundle anchors must resolve to exactly one support case or release artifact segment.");
+        }
+    }
+
+    private static bool HasAnyResourceShelfAnchorShape(string publicShelfRef, IReadOnlyList<string> prefixes, bool allowBundlesSuffix)
+        => prefixes.Any(prefix => HasResourceShelfAnchorShape(publicShelfRef, prefix, allowBundlesSuffix));
+
+    private static bool HasResourceShelfAnchorShape(string publicShelfRef, string prefix, bool allowBundlesSuffix)
+    {
+        if (!publicShelfRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string remainder = publicShelfRef[prefix.Length..].Trim('/');
+        if (string.IsNullOrWhiteSpace(remainder))
+        {
+            return false;
+        }
+
+        string[] segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length == 1
+            || (allowBundlesSuffix
+                && segments.Length == 2
+                && segments[1].Equals("bundles", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void RejectUnsafePublicPathId(string sourcePackId, string? value, string fieldName)
@@ -457,6 +972,8 @@ public sealed class ArtifactFactoryOrchestrationService
         {
             return;
         }
+
+        RejectProviderSpecificRef(sourcePackId, value, fieldName);
 
         string pathId = value.Trim();
         if (pathId.Contains('?', StringComparison.Ordinal)
@@ -470,11 +987,148 @@ public sealed class ArtifactFactoryOrchestrationService
 
         string decoded = Uri.UnescapeDataString(pathId);
         if (decoded is "." or ".."
+            || decoded.Contains(':', StringComparison.Ordinal)
             || decoded.Contains('/', StringComparison.Ordinal)
             || decoded.Contains('\\', StringComparison.Ordinal))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must not contain traversal or encoded path separators.");
+                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must not contain traversal, encoded provider delimiters, or encoded path separators.");
+        }
+
+        if (!IsStablePublicShelfSegment(decoded))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must use stable public proof shelf segment characters.");
+        }
+    }
+
+    private static void RejectUnsafeSourcePackId(string sourcePackId)
+    {
+        string normalized = sourcePackId.Trim();
+        if (normalized.Contains('?', StringComparison.Ordinal)
+            || normalized.Contains('#', StringComparison.Ordinal)
+            || normalized.Contains('/', StringComparison.Ordinal)
+            || normalized.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"source pack id '{sourcePackId}' is unsafe; approved source-pack ids must be stable receipt ids, not provider paths.");
+        }
+
+        string decoded = Uri.UnescapeDataString(normalized);
+        if (decoded is "." or ".."
+            || decoded.Contains(':', StringComparison.Ordinal)
+            || decoded.Contains('/', StringComparison.Ordinal)
+            || decoded.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"source pack id '{sourcePackId}' is unsafe; approved source-pack ids must not contain traversal, encoded provider delimiters, or encoded path separators.");
+        }
+
+        if (!IsStablePublicShelfSegment(decoded))
+        {
+            throw new InvalidDataException(
+                $"source pack id '{sourcePackId}' is unsafe; approved source-pack ids must use stable receipt segment characters.");
+        }
+    }
+
+    private static bool IsStablePublicShelfSegment(string value)
+        => value.Length > 0
+            && value.All(static character =>
+                char.IsLetterOrDigit(character)
+                || character is '-' or '_' or '.');
+
+    private static void RejectUnsafeBatchId(string batchId)
+    {
+        string normalized = batchId.Trim();
+        if (normalized.Contains('?', StringComparison.Ordinal)
+            || normalized.Contains('#', StringComparison.Ordinal)
+            || normalized.Contains('/', StringComparison.Ordinal)
+            || normalized.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"artifact factory batch id '{batchId}' is unsafe; batch ids must be stable orchestration receipt ids, not provider paths.");
+        }
+
+        string decoded = Uri.UnescapeDataString(normalized);
+        if (decoded is "." or ".."
+            || decoded.Contains(':', StringComparison.Ordinal)
+            || decoded.Contains('/', StringComparison.Ordinal)
+            || decoded.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"artifact factory batch id '{batchId}' is unsafe; batch ids must not contain traversal, encoded provider delimiters, or encoded path separators.");
+        }
+
+        if (!IsStablePublicShelfSegment(decoded))
+        {
+            throw new InvalidDataException(
+                $"artifact factory batch id '{batchId}' is unsafe; batch ids must use stable orchestration receipt segment characters.");
+        }
+    }
+
+    private static string NormalizeAudience(string? value)
+    {
+        string audience = NormalizeOptional(value) ?? "public-proof-shelf";
+        RejectProviderSpecificRef("job-request", audience, "audience");
+        RejectUnsafeJobToken(audience, "audience", allowComma: true);
+        return audience;
+    }
+
+    private static string NormalizeRequestedBy(string? value)
+    {
+        string requestedBy = NormalizeOptional(value) ?? throw new InvalidDataException("requestedBy is required.");
+        RejectProviderSpecificRef("job-request", requestedBy, "requestedBy");
+        RejectUnsafeJobToken(requestedBy, "requestedBy", allowComma: false);
+        return requestedBy;
+    }
+
+    private static string NormalizeLocale(string? value)
+    {
+        string locale = NormalizeOptional(value) ?? "en-US";
+        RejectProviderSpecificRef("job-request", locale, "locale");
+        RejectUnsafeJobToken(locale, "locale", allowComma: false);
+        return locale;
+    }
+
+    private static void RejectUnsafeJobToken(string value, string fieldName, bool allowComma)
+    {
+        string normalized = value.Trim();
+        if (normalized.Length == 0)
+        {
+            throw new InvalidDataException($"artifact factory {fieldName} is required.");
+        }
+
+        if (normalized.Contains('?', StringComparison.Ordinal)
+            || normalized.Contains('#', StringComparison.Ordinal)
+            || normalized.Contains(':', StringComparison.Ordinal)
+            || normalized.Contains('/', StringComparison.Ordinal)
+            || normalized.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"artifact factory {fieldName} '{value}' is unsafe; job metadata must be stable source-pack tokens, not provider paths or URIs.");
+        }
+
+        string decoded = Uri.UnescapeDataString(normalized);
+        if (decoded is "." or ".."
+            || decoded.Contains(':', StringComparison.Ordinal)
+            || decoded.Contains('/', StringComparison.Ordinal)
+            || decoded.Contains('\\', StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                $"artifact factory {fieldName} '{value}' is unsafe; job metadata must not contain traversal or encoded path separators.");
+        }
+
+        foreach (char character in normalized)
+        {
+            if (char.IsLetterOrDigit(character)
+                || character is '-' or '_' or '.'
+                || (allowComma && character == ','))
+            {
+                continue;
+            }
+
+            throw new InvalidDataException(
+                $"artifact factory {fieldName} '{value}' is unsafe; job metadata must use stable token characters.");
         }
     }
 
@@ -486,6 +1140,12 @@ public sealed class ArtifactFactoryOrchestrationService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        foreach (string format in formats)
+        {
+            RejectProviderSpecificRef("job-request", format, "outputFormat");
+            RejectUnsafeJobToken(format, "outputFormat", allowComma: false);
+        }
+
         if (formats.Length == 0)
         {
             throw new InvalidDataException("at least one output format is required.");
@@ -624,6 +1284,12 @@ public sealed class ArtifactFactoryOrchestrationService
                 && TryBuildReleaseBundleRefFromDownloadShelfRef(shelfRef, out string? releaseBundleRef))
             {
                 return releaseBundleRef;
+            }
+
+            if (family.Equals("release", StringComparison.OrdinalIgnoreCase)
+                && shelfRef.StartsWith("/artifacts/release-bundles/", StringComparison.OrdinalIgnoreCase))
+            {
+                return shelfRef;
             }
 
             return shelfRef.EndsWith("/bundles", StringComparison.OrdinalIgnoreCase)
