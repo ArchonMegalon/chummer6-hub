@@ -155,6 +155,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit c8ec0c6a tightens the M102 handoff proof guard.",
     "      - /docker/chummercomplete/chummer.run-services commit e08468e2 pins the M102 handoff proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit 9e7d12ef guards M102 proof receipts against browser-only route closure.",
+    "      - /docker/chummercomplete/chummer.run-services commit 554cd159 pins M102 native receipt proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -306,6 +307,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit c8ec0c6a tightens the M102 handoff proof guard.",
     "          - /docker/chummercomplete/chummer.run-services commit e08468e2 pins the M102 handoff proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit 9e7d12ef guards M102 proof receipts against browser-only route closure.",
+    "          - /docker/chummercomplete/chummer.run-services commit 554cd159 pins M102 native receipt proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -379,11 +381,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("9e7d12ef", verifier._current_local_proof_floor_commit())
+        self.assertEqual("554cd159", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "test(hub): guard M102 native receipt routes",
+            "test(hub): pin M102 native receipt proof floor",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("554cd159", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("9e7d12ef", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("e08468e2", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("c8ec0c6a", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -442,6 +445,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         )
         self.assertTrue(
             any("commit 9e7d12ef guards M102 proof receipts against browser-only route closure" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        )
+        self.assertTrue(
+            any("commit 554cd159 pins M102 native receipt proof floor" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        )
+        self.assertTrue(
+            any("commit 554cd159 pins M102 native receipt proof floor" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -2469,6 +2478,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "c8ec0c6a",
                 "e08468e2",
                 "9e7d12ef",
+                "554cd159",
             ],
             verifier._required_resolving_commits(),
         )
@@ -2689,6 +2699,32 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn(
                 "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
                 "InstalledBuildReceiptId: receipt?.ReceiptId",
+                errors,
+            )
+
+    def test_verifier_fail_closes_native_support_route_receipt_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker
+                        != "Native route receipt: support {NativeSupportHref}; update {NativeUpdateHref}; rollback {NativeRollbackHref}; recovery {NativeRecoveryHref}; account, downloads, and public support links are human fallback only."
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
+                "Native route receipt: support {NativeSupportHref}; update {NativeUpdateHref}; rollback {NativeRollbackHref}; recovery {NativeRecoveryHref}; account, downloads, and public support links are human fallback only.",
                 errors,
             )
 
