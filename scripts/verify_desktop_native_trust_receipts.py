@@ -818,6 +818,17 @@ def _verify_current_local_proof_floor(errors: list[str], repo_root: Path) -> Non
             f"expected {CURRENT_LOCAL_PROOF_FLOOR_SUBJECT!r}, got {subject!r}"
         )
 
+    commit = commit.lower()
+    queue_commits = _extract_proof_commit_ids(REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+    registry_commits = _extract_proof_commit_ids(REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+    required_commits = {item.lower() for item in REQUIRED_RESOLVING_COMMITS}
+    if commit not in queue_commits:
+        errors.append(f"current M102 desktop-native trust proof floor is missing from canonical queue proof: {commit}")
+    if commit not in registry_commits:
+        errors.append(f"current M102 desktop-native trust proof floor is missing from canonical registry evidence: {commit}")
+    if commit not in required_commits:
+        errors.append(f"current M102 desktop-native trust proof floor is not enforced by resolver: {commit}")
+
 
 def _extract_proof_commit_ids(values: list[str]) -> set[str]:
     commit_ids: set[str] = set()
