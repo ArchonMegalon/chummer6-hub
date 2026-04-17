@@ -317,6 +317,7 @@ public sealed class ArtifactFactoryOrchestrationService
 
         string[] requiredFamilies = NormalizeRequiredBatchFamilies(request.RequiredFamilies);
         IReadOnlyDictionary<string, IReadOnlyList<string>> requestedFormatsByFamily = NormalizeFamilyFormatOverrides(request.RequestedFormats);
+        RejectRequestedFormatOverridesOutsideRequiredFamilies(request.BatchId, requestedFormatsByFamily, requiredFamilies);
         ArtifactFactoryJobLaunchRequest[] jobs = requiredFamilies
             .Select(family => BuildJobFromApprovedSourcePackBatch(request, family, requestedFormatsByFamily))
             .ToArray();
@@ -449,6 +450,22 @@ public sealed class ArtifactFactoryOrchestrationService
         }
 
         return formatsByFamily;
+    }
+
+    private static void RejectRequestedFormatOverridesOutsideRequiredFamilies(
+        string batchId,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> requestedFormatsByFamily,
+        IReadOnlyList<string> requiredFamilies)
+    {
+        string[] extraFamilies = requestedFormatsByFamily.Keys
+            .Where(family => !requiredFamilies.Contains(family, StringComparer.OrdinalIgnoreCase))
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (extraFamilies.Length > 0)
+        {
+            throw new InvalidDataException(
+                $"artifact factory source-pack batch '{batchId.Trim()}' requested formats for family/families not required by the batch: {string.Join(", ", extraFamilies)}.");
+        }
     }
 
     private static string[] NormalizeRequiredBatchFamilies(IReadOnlyList<string>? requiredFamilies)
