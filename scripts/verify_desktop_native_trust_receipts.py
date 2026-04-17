@@ -924,6 +924,7 @@ def _verify_unique_string_list(errors: list[str], values: list, label: str) -> N
 def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> None:
     _verify_json_has_no_forbidden_markers(errors, proof, label)
 
+    proof_route_set: set[str] = set()
     proof_routes = proof.get("proof_routes")
     if not isinstance(proof_routes, list):
         errors.append(f"{label} missing list field: proof_routes")
@@ -1006,6 +1007,13 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
             for required in expected[key]:
                 if required not in actual:
                     errors.append(f"{label} {receipt_id} missing {key[:-1]}: {required}")
+
+            if key == "routes" and proof_route_set:
+                for route in sorted(actual):
+                    if route not in proof_route_set:
+                        errors.append(
+                            f"{label} {receipt_id} route is not listed in top-level proof_routes: {route}"
+                        )
 
 
 def _verify_static_proof_file(errors: list[str], path: Path, label: str) -> None:
