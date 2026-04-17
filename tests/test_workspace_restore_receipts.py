@@ -1322,6 +1322,36 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("continue-blocking conflicts", receipt_by_id["entitlement_sync:conflict_receipts"]["summary"])
         self.assertIn("recoverable receipts", receipt_by_id["entitlement_sync:conflict_receipts"]["summary"])
 
+    def test_verifier_fails_closed_when_campaign_os_proof_is_not_passed_smoke_contract(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-campaign-proof-status-") as temp_dir:
+            temp_root = Path(temp_dir)
+            campaign_proof_path = temp_root / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            source_campaign_proof_path = (
+                REPO_ROOT / ".codex-studio" / "published" / "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json"
+            )
+            payload = json.loads(source_campaign_proof_path.read_text(encoding="utf-8"))
+            payload["status"] = "failed"
+            payload["proof_kind"] = "copied_marker_snapshot"
+            payload["source_file"] = "TASK_LOCAL_TELEMETRY.generated.json"
+            campaign_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_PROOF"] = str(campaign_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("status must be passed", result.stderr)
+        self.assertIn("proof_kind must be source_backed_local_smoke_contract", result.stderr)
+        self.assertIn("source_file must be tests/RunServicesSmoke/Program.cs", result.stderr)
+
     def test_verifier_fails_closed_when_local_release_proof_points_at_wrong_frontier(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-release-frontier-") as temp_dir:
             temp_root = Path(temp_dir)
