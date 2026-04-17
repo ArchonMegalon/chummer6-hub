@@ -59,6 +59,22 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
+    public void ReleaseManifestKeepsGeneratedTimestampAliases()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.ReleaseManifest();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        string payload = JsonSerializer.Serialize(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using JsonDocument document = JsonDocument.Parse(payload);
+        Assert.Equal("Chummer.Hub.Registry.Contracts", document.RootElement.GetProperty("contractName").GetString());
+        Assert.Equal("Chummer.Hub.Registry.Contracts", document.RootElement.GetProperty("contract_name").GetString());
+        Assert.Equal("2026-04-02T16:15:00+00:00", document.RootElement.GetProperty("generatedAt").GetString());
+        Assert.Equal("2026-04-02T16:15:00+00:00", document.RootElement.GetProperty("generated_at").GetString());
+    }
+
+    [Fact]
     public async Task AccountRequiredMacArtifactDownloadAcceptsClaimCodeWithoutBrowserSession()
     {
         using Fixture fixture = new();
@@ -117,7 +133,7 @@ public sealed class DownloadsCompatibilityControllerTests
         IActionResult result = await fixture.Controller.DownloadResolvedArtifactFile("avalonia-osx-x64-installer", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 
@@ -133,7 +149,7 @@ public sealed class DownloadsCompatibilityControllerTests
         IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-installer.exe", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 
@@ -276,6 +292,33 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WindowsProofInstallersCatalogFallsBackToPublishedInstallerShelf()
+    {
+        using Fixture fixture = new();
+        string downloadsRoot = fixture.Configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]!;
+        string proofPath = Path.Combine(fixture.ProofRoot, "chummer-avalonia-win-x64-installer.exe");
+        string publishedInstallerPath = Path.Combine(downloadsRoot, "files", "chummer-avalonia-win-x64-installer.exe");
+
+        File.Delete(proofPath);
+        WriteEmbeddedPayloadInstaller(publishedInstallerPath, "avalonia");
+
+        IActionResult result = fixture.Controller.WindowsProofInstallers();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        string payload = JsonSerializer.Serialize(ok.Value);
+        Assert.Contains("\"status\":\"proof_only\"", payload, StringComparison.Ordinal);
+        Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+    }
+
+    private static void WriteEmbeddedPayloadInstaller(string path, string head)
+    {
+        File.WriteAllBytes(
+            path,
+            System.Text.Encoding.UTF8.GetBytes(
+                $"stub-{head}-binary\0ChummerInstaller.Payload.zip\0Samples/Legacy/Soma-Career.chum5\0tail"));
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -298,6 +341,7 @@ public sealed class DownloadsCompatibilityControllerTests
                 {
                   "version": "run-test",
                   "channel": "preview",
+                  "generatedAt": "2026-04-02T16:15:00Z",
                   "publishedAt": "2026-04-02T16:14:30Z",
                   "proofStatus": "passed",
                   "proofRoutes": [
@@ -342,6 +386,7 @@ public sealed class DownloadsCompatibilityControllerTests
                   "product": "chummer",
                   "channelId": "preview",
                   "version": "run-test",
+                  "generatedAt": "2026-04-02T16:15:00Z",
                   "publishedAt": "2026-04-02T16:14:30Z",
                   "status": "published",
                   "artifacts": [

@@ -38,6 +38,33 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.Equal(["/downloads"], manifest.ProofRoutes);
     }
 
+    [Theory]
+    [InlineData("pass")]
+    [InlineData("ready")]
+    public void LoadManifestNormalizesRegistryProofAliasesToPassed(string proofStatus)
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestWithProofStatus(proofStatus);
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("passed", manifest.ProofStatus);
+    }
+
+    [Theory]
+    [InlineData("pass")]
+    [InlineData("ready")]
+    public void LoadManifestNormalizesLocalProofAliasesToPassed(string proofStatus)
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifest(includeProof: false);
+        fixture.WriteLocalProof(proofStatus, "http://127.0.0.1:8091");
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("passed", manifest.ProofStatus);
+    }
+
     [Fact]
     public void ManifestSerializationKeepsLegacyReleaseProofObject()
     {
@@ -113,6 +140,66 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.DoesNotContain(manifest.Downloads, item => string.Equals(item.Id, "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public void LoadManifestPreservesTopLevelGeneratedTimestampFromCanonicalRegistryManifest()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["contractName"] = "Chummer.Hub.Registry.Contracts",
+            ["contract_name"] = "Chummer.Hub.Registry.Contracts",
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260416-212019",
+            ["generatedAt"] = "2026-04-16T21:23:00Z",
+            ["publishedAt"] = "2026-04-16T21:21:44Z",
+            ["status"] = "published",
+            ["artifacts"] = new[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-osx-arm64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "macos",
+                    ["arch"] = "arm64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop macOS ARM64 Installer",
+                    ["fileName"] = "chummer-avalonia-osx-arm64-installer.dmg",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    ["sha256"] = "mac123",
+                    ["sizeBytes"] = 987654321L,
+                    ["installAccessClass"] = "account_required"
+                }
+            }
+        });
+
+        var manifest = fixture.CreateService().LoadManifest();
+        Assert.Equal(DateTimeOffset.Parse("2026-04-16T21:23:00Z"), manifest.GeneratedAt);
+
+        string json = JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using JsonDocument document = JsonDocument.Parse(json);
+        Assert.Equal("Chummer.Hub.Registry.Contracts", document.RootElement.GetProperty("contractName").GetString());
+        Assert.Equal("Chummer.Hub.Registry.Contracts", document.RootElement.GetProperty("contract_name").GetString());
+        Assert.Equal("2026-04-16T21:23:00+00:00", document.RootElement.GetProperty("generatedAt").GetString());
+        Assert.Equal("2026-04-16T21:23:00+00:00", document.RootElement.GetProperty("generated_at").GetString());
+    }
+
+    [Fact]
+    public void LoadManifestDefaultsContractNameWhenSourceManifestOmitsIt()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifest(includeProof: false);
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("Chummer.Hub.Registry.Contracts", manifest.ContractName);
+
+        string json = JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using JsonDocument document = JsonDocument.Parse(json);
+        Assert.Equal("Chummer.Hub.Registry.Contracts", document.RootElement.GetProperty("contractName").GetString());
+        Assert.Equal("Chummer.Hub.Registry.Contracts", document.RootElement.GetProperty("contract_name").GetString());
+    }
+
     private sealed class PublicReleaseManifestFixture : IDisposable
     {
         private readonly string _root;
@@ -177,15 +264,40 @@ public sealed class PublicReleaseManifestServiceTests
 
             if (includeProof)
             {
-                payload["releaseProof"] = new Dictionary<string, object?>
-                {
-                    ["status"] = "registry-passed",
-                    ["generatedAt"] = "2026-03-28T21:00:00Z",
-                    ["baseUrl"] = "https://registry.chummer.run",
-                    ["journeysPassed"] = new[] { "registry_journey" },
-                    ["proofRoutes"] = new[] { "/downloads" }
-                };
+                payload["releaseProof"] = BuildRegistryProof("registry-passed");
             }
+
+            WriteRegistryManifestRaw(payload);
+        }
+
+        public void WriteRegistryManifestWithProofStatus(string proofStatus)
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["product"] = "chummer",
+                ["channelId"] = "docker",
+                ["version"] = "1.0.0-preview",
+                ["publishedAt"] = "2026-03-25T15:23:09Z",
+                ["status"] = "published",
+                ["artifacts"] = new[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["artifactId"] = "avalonia-linux-x64-installer",
+                        ["head"] = "avalonia",
+                        ["platform"] = "linux",
+                        ["arch"] = "x64",
+                        ["kind"] = "installer",
+                        ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                        ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                        ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                        ["sha256"] = "abc123",
+                        ["sizeBytes"] = 123456789L,
+                        ["installAccessClass"] = "account_required"
+                    }
+                },
+                ["releaseProof"] = BuildRegistryProof(proofStatus)
+            };
 
             WriteRegistryManifestRaw(payload);
         }
@@ -204,7 +316,7 @@ public sealed class PublicReleaseManifestServiceTests
             WriteRegistryManifestRaw(payload);
         }
 
-        private void WriteRegistryManifestRaw(Dictionary<string, object?> payload)
+        public void WriteRegistryManifestRaw(Dictionary<string, object?> payload)
         {
             var manifestPath = Path.Combine(_downloadsRoot, "RELEASE_CHANNEL.generated.json");
             File.WriteAllText(manifestPath, JsonSerializer.Serialize(payload));
@@ -226,6 +338,16 @@ public sealed class PublicReleaseManifestServiceTests
                     ["proof_routes"] = new[] { "/downloads/install/avalonia-linux-x64-installer", "/account/support" }
                 }));
         }
+
+        private static Dictionary<string, object?> BuildRegistryProof(string status)
+            => new()
+            {
+                ["status"] = status,
+                ["generatedAt"] = "2026-03-28T21:00:00Z",
+                ["baseUrl"] = "https://registry.chummer.run",
+                ["journeysPassed"] = new[] { "registry_journey" },
+                ["proofRoutes"] = new[] { "/downloads" }
+            };
 
         public void Dispose()
         {

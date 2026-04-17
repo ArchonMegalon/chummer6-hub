@@ -7,6 +7,7 @@ namespace Chummer.Run.Api.Services;
 public sealed class PublicReleaseManifestService
 {
     private const string DefaultRoot = "/downloads-source";
+    private const string DefaultManifestContractName = "Chummer.Hub.Registry.Contracts";
     private const string DefaultLocalProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
     private const string RegistryCurrentUrlKey = "CHUMMER_RELEASE_REGISTRY_CURRENT_URL";
     private const string RegistryBaseUrlKey = "CHUMMER_HUB_REGISTRY_BASE_URL";
@@ -59,7 +60,8 @@ public sealed class PublicReleaseManifestService
                 Source: "fallback",
                 Status: "unpublished",
                 Message: "No published desktop builds are available yet.",
-                HasFallbackSource: false));
+                HasFallbackSource: false,
+                GeneratedAt: DateTimeOffset.UtcNow));
         }
 
         return ApplyLocalReleaseProofFallback(LoadReleaseManifest(manifestPath));
@@ -176,7 +178,7 @@ public sealed class PublicReleaseManifestService
         var proofPath = ResolveLocalReleaseProofPath();
         if (string.IsNullOrWhiteSpace(proofPath) || !File.Exists(proofPath))
         {
-            return manifest;
+            return EnsureContractName(manifest);
         }
 
         try
@@ -188,25 +190,32 @@ public sealed class PublicReleaseManifestService
             var parsed = JsonSerializer.Deserialize<LocalReleaseProof>(File.ReadAllText(proofPath), options);
             if (parsed is null || !string.Equals(parsed.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal))
             {
-                return manifest;
+                return EnsureContractName(manifest);
             }
 
             var proofJourneys = manifest.ProofJourneys is { Count: > 0 } ? manifest.ProofJourneys : parsed.JourneysPassed;
             var proofRoutes = manifest.ProofRoutes is { Count: > 0 } ? manifest.ProofRoutes : parsed.ProofRoutes;
-            return manifest with
+            return EnsureContractName(manifest with
             {
-                ProofStatus = string.IsNullOrWhiteSpace(manifest.ProofStatus) ? parsed.Status : manifest.ProofStatus,
+                ProofStatus = string.IsNullOrWhiteSpace(manifest.ProofStatus)
+                    ? NormalizeProofStatus(parsed.Status)
+                    : NormalizeProofStatus(manifest.ProofStatus),
                 ProofGeneratedAt = manifest.ProofGeneratedAt ?? parsed.GeneratedAt,
                 ProofBaseUrl = string.IsNullOrWhiteSpace(manifest.ProofBaseUrl) ? parsed.BaseUrl : manifest.ProofBaseUrl,
                 ProofJourneys = proofJourneys,
                 ProofRoutes = proofRoutes
-            };
+            });
         }
         catch
         {
-            return manifest;
+            return EnsureContractName(manifest);
         }
     }
+
+    private static PublicReleaseManifestDto EnsureContractName(PublicReleaseManifestDto manifest)
+        => string.IsNullOrWhiteSpace(manifest.ContractName)
+            ? manifest with { ContractName = DefaultManifestContractName }
+            : manifest;
 
     private string ResolveRegistryManifestPath(string downloadsRoot)
         => _configuration["CHUMMER_RELEASE_REGISTRY_MANIFEST_FILE"]?.Trim() is { Length: > 0 } configured
@@ -268,7 +277,8 @@ public sealed class PublicReleaseManifestService
                 Source: "manifest",
                 Status: "manifest-error",
                 Message: "Release manifest exists but could not be parsed.",
-                HasFallbackSource: false);
+                HasFallbackSource: false,
+                GeneratedAt: DateTimeOffset.UtcNow);
         }
 
         var status = parsed.Downloads.Count > 0
@@ -325,7 +335,8 @@ public sealed class PublicReleaseManifestService
                 Source: source,
                 Status: "manifest-error",
                 Message: "Registry release manifest exists but could not be parsed.",
-                HasFallbackSource: false);
+                HasFallbackSource: false,
+                GeneratedAt: DateTimeOffset.UtcNow);
         }
 
         var downloads = (parsed.Artifacts ?? [])
@@ -370,17 +381,39 @@ public sealed class PublicReleaseManifestService
             SupportabilitySummary: parsed.SupportabilitySummary,
             KnownIssueSummary: parsed.KnownIssueSummary,
             FixAvailabilitySummary: parsed.FixAvailabilitySummary,
-            ProofStatus: parsed.ReleaseProof?.Status,
+            ProofStatus: NormalizeProofStatus(parsed.ReleaseProof?.Status),
             ProofGeneratedAt: parsed.ReleaseProof?.GeneratedAt,
             ProofBaseUrl: parsed.ReleaseProof?.BaseUrl,
             ProofJourneys: parsed.ReleaseProof?.JourneysPassed,
-            ProofRoutes: parsed.ReleaseProof?.ProofRoutes);
+            ProofRoutes: parsed.ReleaseProof?.ProofRoutes,
+            GeneratedAt: parsed.GeneratedAt,
+            ContractName: string.IsNullOrWhiteSpace(parsed.ContractName)
+                ? (string.IsNullOrWhiteSpace(parsed.ContractNameAlias) ? DefaultManifestContractName : parsed.ContractNameAlias)
+                : parsed.ContractName);
+    }
+
+    private static string? NormalizeProofStatus(string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status))
+        {
+            return null;
+        }
+
+        return status.Trim().ToLowerInvariant() switch
+        {
+            "pass" => "passed",
+            "ready" => "passed",
+            _ => status.Trim()
+        };
     }
 
     private sealed record RegistryReleaseChannelManifest(
+        string? ContractName,
+        [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
         string? Product,
         string? ChannelId,
         string? Version,
+        DateTimeOffset? GeneratedAt,
         DateTimeOffset? PublishedAt,
         string? Status,
         string? Message,
