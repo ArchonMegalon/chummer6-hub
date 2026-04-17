@@ -2345,6 +2345,63 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_expanded_m102_receipt_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            receipt = next(
+                item
+                for item in proof["proof_receipts"]
+                if item["receipt_id"] == "desktop_native_claim_and_recovery"
+            )
+            receipt["routes"].append("/account/support")
+            receipt["surfaces"].append("support_case_install_readiness")
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "published proof file desktop_native_claim_and_recovery has wrong surfaces: ",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file desktop_native_claim_and_recovery has wrong routes: ",
+                result.stderr,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
