@@ -318,12 +318,55 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     private static bool IsInstallContinuationCase(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
-        => string.Equals(supportCase.InstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase)
-           || string.Equals(supportCase.Kind, SupportCaseKinds.InstallHelp, StringComparison.OrdinalIgnoreCase)
-           || (!string.IsNullOrWhiteSpace(supportCase.ReleaseChannel)
-               && string.Equals(supportCase.ReleaseChannel, installation.Channel, StringComparison.OrdinalIgnoreCase)
-               && (string.IsNullOrWhiteSpace(supportCase.HeadId)
-                   || string.Equals(supportCase.HeadId, installation.HeadId, StringComparison.OrdinalIgnoreCase)));
+    {
+        if (string.Equals(supportCase.InstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(supportCase.InstallationId))
+        {
+            return false;
+        }
+
+        if (!string.Equals(supportCase.Kind, SupportCaseKinds.InstallHelp, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return MatchesClaimedInstallTruth(supportCase, installation);
+    }
+
+    private static bool MatchesClaimedInstallTruth(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
+    {
+        if (string.IsNullOrWhiteSpace(supportCase.ReleaseChannel)
+            || !string.Equals(supportCase.ReleaseChannel, installation.Channel, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        bool hasInstallSpecificContext = false;
+        if (!MatchesOptionalInstallTruth(supportCase.ApplicationVersion, installation.Version, ref hasInstallSpecificContext)
+            || !MatchesOptionalInstallTruth(supportCase.HeadId, installation.HeadId, ref hasInstallSpecificContext)
+            || !MatchesOptionalInstallTruth(supportCase.Platform, installation.Platform, ref hasInstallSpecificContext)
+            || !MatchesOptionalInstallTruth(supportCase.Arch, installation.Arch, ref hasInstallSpecificContext))
+        {
+            return false;
+        }
+
+        return hasInstallSpecificContext;
+    }
+
+    private static bool MatchesOptionalInstallTruth(string? supportValue, string? installationValue, ref bool hasInstallSpecificContext)
+    {
+        if (string.IsNullOrWhiteSpace(supportValue))
+        {
+            return true;
+        }
+
+        hasInstallSpecificContext = true;
+        return string.Equals(supportValue, installationValue, StringComparison.OrdinalIgnoreCase);
+    }
 
     private static DownloadReceiptDto? ResolveLatestReceipt(
         InstallLinkingSummaryDto installSummary,
