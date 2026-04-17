@@ -2,19 +2,21 @@
 from __future__ import annotations
 
 import json
+import html
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 from pathlib import Path
 
 
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
-CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "17044a9f"
-CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin current M102 desktop trust proof floor"
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "4238a88a"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin M102 current desktop trust proof floor"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -308,7 +310,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
         "/docker/chummercomplete/chummer.run-services commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
         "/docker/chummercomplete/chummer.run-services commit 438861f0 pins the M102 receipt matching proof floor.",
-        "/docker/chummercomplete/chummer.run-services commit 17044a9f pins the current M102 desktop trust proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit 4238a88a pins the current M102 desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -437,7 +439,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
         "/docker/chummercomplete/chummer.run-services commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
         "/docker/chummercomplete/chummer.run-services commit 438861f0 pins the M102 receipt matching proof floor.",
-        "/docker/chummercomplete/chummer.run-services commit 17044a9f pins the current M102 desktop trust proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit 4238a88a pins the current M102 desktop trust proof floor.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -486,6 +488,10 @@ FORBIDDEN_PROOF_MARKERS = [
 ]
 FORBIDDEN_PROOF_MARKER_MATCHES = [
     (marker, marker.casefold())
+    for marker in FORBIDDEN_PROOF_MARKERS
+]
+FORBIDDEN_PROOF_MARKER_NORMALIZED_MATCHES = [
+    (marker, re.sub(r"[^a-z0-9]+", "", marker.casefold()))
     for marker in FORBIDDEN_PROOF_MARKERS
 ]
 
@@ -623,6 +629,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "c791e657",
     "438861f0",
     "17044a9f",
+    "4238a88a",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
@@ -1014,6 +1021,46 @@ def _materializer_args_from_payload(payload: dict) -> list[str]:
     ]
 
 
+def _forbidden_marker_text_variants(value: str) -> list[str]:
+    html_decoded = html.unescape(value)
+    url_decoded = urllib.parse.unquote(value)
+    html_then_url_decoded = urllib.parse.unquote(html_decoded)
+    url_then_html_decoded = html.unescape(url_decoded)
+    variants = [
+        value,
+        html_decoded,
+        url_decoded,
+        html_then_url_decoded,
+        url_then_html_decoded,
+    ]
+    return list(dict.fromkeys(variants))
+
+
+def _normalize_forbidden_marker_text(value: str) -> str:
+    normalized_variants = (
+        re.sub(r"[^a-z0-9]+", "", variant.casefold())
+        for variant in _forbidden_marker_text_variants(value)
+    )
+    return " ".join(dict.fromkeys(normalized_variants))
+
+
+def _forbidden_markers_in_text(value: str) -> list[str]:
+    folded_value = "\n".join(variant.casefold() for variant in _forbidden_marker_text_variants(value))
+    normalized_value = _normalize_forbidden_marker_text(value)
+    matches: list[str] = []
+    for marker, marker_folded in FORBIDDEN_PROOF_MARKER_MATCHES:
+        if marker_folded in folded_value:
+            matches.append(marker)
+
+    for marker, marker_normalized in FORBIDDEN_PROOF_MARKER_NORMALIZED_MATCHES:
+        if marker in matches or not marker_normalized:
+            continue
+        if marker_normalized in normalized_value:
+            matches.append(marker)
+
+    return matches
+
+
 def _verify_json_has_no_forbidden_markers(
     errors: list[str],
     value: object,
@@ -1033,17 +1080,13 @@ def _verify_json_has_no_forbidden_markers(
     if not isinstance(value, str):
         return
 
-    folded_value = value.casefold()
-    for marker, marker_folded in FORBIDDEN_PROOF_MARKER_MATCHES:
-        if marker_folded in folded_value:
-            errors.append(f"{label} has forbidden active-run proof marker at {path}: {marker}")
+    for marker in _forbidden_markers_in_text(value):
+        errors.append(f"{label} has forbidden active-run proof marker at {path}: {marker}")
 
 
 def _verify_evidence_path_has_no_forbidden_markers(errors: list[str], path: Path, label: str) -> None:
-    folded_path = str(path).casefold()
-    for marker, marker_folded in FORBIDDEN_PROOF_MARKER_MATCHES:
-        if marker_folded in folded_path:
-            errors.append(f"configured {label} path has forbidden active-run proof marker: {marker}")
+    for marker in _forbidden_markers_in_text(str(path)):
+        errors.append(f"configured {label} path has forbidden active-run proof marker: {marker}")
 
 
 def _verify_materialized_proof_reproducible(errors: list[str], repo_root: Path, proof_path: Path) -> None:
