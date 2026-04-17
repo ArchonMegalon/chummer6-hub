@@ -125,6 +125,18 @@ internal static class InstallLinkingContinuationVerification
                     ReporterEmail: "runner@example.invalid",
                     ReleaseChannel: "preview",
                     Source: SupportCaseSourceKinds.HubAccount));
+            supportCases.Submit(
+                "usr-native",
+                "subject.native",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Generic preview build help",
+                    Summary: "Version-only install help should not follow this device.",
+                    Detail: "The continuation rail needs a claimed install id or device tuple before attaching support follow-through.",
+                    ReporterEmail: "runner@example.invalid",
+                    ApplicationVersion: "0.7.0-preview",
+                    ReleaseChannel: "preview",
+                    Source: SupportCaseSourceKinds.HubAccount));
 
             InstallLinkingController controller = new(
                 identity: null!,
