@@ -580,6 +580,22 @@ QUEUE_STAGING_MARKERS = [
     "entitlement_sync:conflict_receipts",
 ]
 
+REGISTRY_REQUIRED_SCALARS = [
+    "        owner: chummer6-hub\n",
+    "        status: complete\n",
+    f"        landed_commit: {LANDED_COMMIT}\n",
+]
+
+QUEUE_REQUIRED_SCALARS = [
+    f"    package_id: {PACKAGE_ID}\n",
+    f"    frontier_id: {FRONTIER_ID}\n",
+    "    milestone_id: 105\n",
+    "    wave: W8\n",
+    "    repo: chummer6-hub\n",
+    "    status: complete\n",
+    f"    landed_commit: {LANDED_COMMIT}\n",
+]
+
 FORBIDDEN_PROOF_MARKERS = [
     "TASK_LOCAL_TELEMETRY",
     "TASK_LOCAL_TELEMETRY.generated.json",
@@ -702,6 +718,19 @@ def require_markers(label: str, text: str, markers: list[str], missing: list[str
             missing.append(f"{label}: {marker}")
 
 
+def require_exact_scalar_lines(label: str, text: str, scalar_lines: list[str], missing: list[str]) -> None:
+    lines = text.splitlines()
+    for scalar_line in scalar_lines:
+        count = text.count(scalar_line)
+        if count != 1:
+            missing.append(f"{label}: expected exactly one {scalar_line.strip()!r}; found {count}")
+
+        scalar_key = scalar_line.lstrip().split(":", 1)[0]
+        key_count = sum(1 for line in lines if line.lstrip().startswith(f"{scalar_key}:"))
+        if key_count != 1:
+            missing.append(f"{label}: expected exactly one scalar key {scalar_key!r}; found {key_count}")
+
+
 def flatten_required_markers(payload: dict[str, object]) -> set[str]:
     raw_markers = payload.get("required_markers")
     if not isinstance(raw_markers, dict):
@@ -735,6 +764,7 @@ def check_queue_staging(path: Path, label: str, missing: list[str]) -> None:
         missing.append(f"{path}: expected exactly one queue package block for {PACKAGE_ID}; found {package_block_count}")
 
     require_markers(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_STAGING_MARKERS, missing)
+    require_exact_scalar_lines(f"{path}:{PACKAGE_ID}", queue_block, QUEUE_REQUIRED_SCALARS, missing)
     require_queue_scope(f"{path}:{PACKAGE_ID}", queue_block, missing)
     reject_forbidden_markers(f"{path}:{PACKAGE_ID}", queue_block, FORBIDDEN_PROOF_MARKERS, missing)
     reject_out_of_scope_proof_paths(f"{path}:{PACKAGE_ID}", queue_block, missing)
@@ -1168,6 +1198,7 @@ def main() -> int:
             missing.append(f"{REGISTRY_PATH}: missing registry task block for 105.1")
         else:
             require_markers(f"{REGISTRY_PATH}:105.1", registry_block, REGISTRY_MARKERS, missing)
+            require_exact_scalar_lines(f"{REGISTRY_PATH}:105.1", registry_block, REGISTRY_REQUIRED_SCALARS, missing)
             reject_forbidden_markers(
                 f"{REGISTRY_PATH}:105.1",
                 registry_block,
