@@ -153,7 +153,8 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.Equal("0.7.1-preview", response.CurrentReleaseVersion, "Continuation should include current release truth.");
             VerificationAssert.True(response.FallbackPosture.Contains("Claim codes are a recovery fallback", StringComparison.Ordinal), "Continuation should expose fallback posture so desktop, support, and download surfaces agree.");
             VerificationAssert.True(response.SupportHref.Contains("installationId=install-native", StringComparison.Ordinal), "Support continuation should carry installation identity.");
-            VerificationAssert.True(response.SupportHref.Contains("applicationVersion=0.7.1-preview", StringComparison.Ordinal), "Support continuation should carry current release version truth.");
+            VerificationAssert.True(response.SupportHref.Contains("applicationVersion=0.7.0-preview", StringComparison.Ordinal), "Support continuation should prefill the affected installed build.");
+            VerificationAssert.True(response.CurrentReleaseVersion == "0.7.1-preview", "Support continuation response should still carry current release version truth.");
             VerificationAssert.True(response.RollbackAction.Contains("previous installed copy", StringComparison.OrdinalIgnoreCase), "Continuation should keep rollback on the previous installed copy.");
             VerificationAssert.Equal(1, response.SupportCases.Count, "Continuation should carry linked support-case follow-through.");
             VerificationAssert.Equal("install-native", response.SupportCases[0].InstallationId, "Support follow-through should stay bound to the same claimed install.");
