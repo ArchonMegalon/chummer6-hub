@@ -137,6 +137,38 @@ internal static class InstallLinkingContinuationVerification
                     ApplicationVersion: "0.7.0-preview",
                     ReleaseChannel: "preview",
                     Source: SupportCaseSourceKinds.HubAccount));
+            supportCases.Submit(
+                "usr-native",
+                "subject.native",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Stale same install help",
+                    Summary: "Same install id with a different installed build should not follow this device.",
+                    Detail: "Support continuation should reject contradictory install truth even when the case cites the claimed install id.",
+                    ReporterEmail: "runner@example.invalid",
+                    InstallationId: "install-native",
+                    ApplicationVersion: "0.6.9-preview",
+                    ReleaseChannel: "preview",
+                    HeadId: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            supportCases.Submit(
+                "usr-native",
+                "subject.native",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Wrong platform same install help",
+                    Summary: "Same install id with a different desktop platform should not follow this device.",
+                    Detail: "Support continuation should reject contradictory device truth even when the case cites the claimed install id.",
+                    ReporterEmail: "runner@example.invalid",
+                    InstallationId: "install-native",
+                    ApplicationVersion: "0.7.0-preview",
+                    ReleaseChannel: "preview",
+                    HeadId: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Source: SupportCaseSourceKinds.HubAccount));
 
             InstallLinkingController controller = new(
                 identity: null!,

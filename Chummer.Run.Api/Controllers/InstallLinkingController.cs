@@ -331,7 +331,7 @@ public sealed class InstallLinkingController : ControllerBase
     {
         if (string.Equals(supportCase.InstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase))
         {
-            return true;
+            return MatchesClaimedInstallTruthWhenPresent(supportCase, installation);
         }
 
         if (!string.IsNullOrWhiteSpace(supportCase.InstallationId))
@@ -346,6 +346,17 @@ public sealed class InstallLinkingController : ControllerBase
 
         return MatchesClaimedInstallTruth(supportCase, installation);
     }
+
+    private static bool MatchesClaimedInstallTruthWhenPresent(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
+        => MatchesOptionalTruth(supportCase.ReleaseChannel, installation.Channel)
+           && MatchesOptionalTruth(supportCase.ApplicationVersion, installation.Version)
+           && MatchesOptionalTruth(supportCase.HeadId, installation.HeadId)
+           && MatchesOptionalTruth(supportCase.Platform, installation.Platform)
+           && MatchesOptionalTruth(supportCase.Arch, installation.Arch);
+
+    private static bool MatchesOptionalTruth(string? supportValue, string? installationValue)
+        => string.IsNullOrWhiteSpace(supportValue)
+           || string.Equals(supportValue, installationValue, StringComparison.OrdinalIgnoreCase);
 
     private static bool MatchesClaimedInstallTruth(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
     {
