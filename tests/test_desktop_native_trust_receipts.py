@@ -145,6 +145,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit ebfaaf36 pins the M102 closed queue proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit 38eb0769 pins M102 current proof floor.",
     "      - /docker/chummercomplete/chummer.run-services commit ed611d1a tightens M102 support install truth matching.",
+    "      - /docker/chummercomplete/chummer.run-services commit d9d6c9a0 pins M102 support truth proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -286,6 +287,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit ebfaaf36 pins the M102 closed queue proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit 38eb0769 pins M102 current proof floor.",
     "          - /docker/chummercomplete/chummer.run-services commit ed611d1a tightens M102 support install truth matching.",
+    "          - /docker/chummercomplete/chummer.run-services commit d9d6c9a0 pins M102 support truth proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -359,11 +361,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("ed611d1a", verifier._current_local_proof_floor_commit())
+        self.assertEqual("d9d6c9a0", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "Tighten M102 support install truth matching",
+            "Pin M102 support truth proof floor",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("d9d6c9a0", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("ed611d1a", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("38eb0769", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("ebfaaf36", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -390,10 +393,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn("41d7ed57", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("cd392a72", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertTrue(
-            any("commit ed611d1a tightens M102 support install truth matching" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+            any("commit d9d6c9a0 pins M102 support truth proof floor" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         )
         self.assertTrue(
-            any("commit ed611d1a tightens M102 support install truth matching" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+            any("commit d9d6c9a0 pins M102 support truth proof floor" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -2253,6 +2256,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "ebfaaf36",
                 "38eb0769",
                 "ed611d1a",
+                "d9d6c9a0",
             ],
             verifier._required_resolving_commits(),
         )
