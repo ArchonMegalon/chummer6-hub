@@ -241,6 +241,36 @@ def _append_extra_owned_surface(text: str) -> str:
     return text[:surface_index] + marker + "      - workspace_restore:unowned_surface\n" + text[surface_index + len(marker):]
 
 
+def _append_conflicting_queue_status(text: str) -> str:
+    package_marker = f"    package_id: {PACKAGE_ID}\n"
+    package_index = text.find(package_marker)
+    if package_index == -1:
+        raise AssertionError(f"missing package row for {PACKAGE_ID}")
+
+    status_marker = "    status: complete\n"
+    status_index = text.find(status_marker, package_index)
+    if status_index == -1:
+        raise AssertionError("missing canonical completed status")
+
+    insert_at = status_index + len(status_marker)
+    return text[:insert_at] + "    status: in_progress\n" + text[insert_at:]
+
+
+def _append_conflicting_registry_status(text: str) -> str:
+    task_marker = "      - id: 105.1\n"
+    task_index = text.find(task_marker)
+    if task_index == -1:
+        raise AssertionError("missing registry task block for 105.1")
+
+    status_marker = "        status: complete\n"
+    status_index = text.find(status_marker, task_index)
+    if status_index == -1:
+        raise AssertionError("missing canonical completed status")
+
+    insert_at = status_index + len(status_marker)
+    return text[:insert_at] + "        status: in_progress\n" + text[insert_at:]
+
+
 def _remove_current_queue_frontier_proof(text: str) -> str:
     marker = "          - /docker/chummercomplete/chummer.run-services commit e0d2bff6 pins the M105 workspace queue-frontier guard proof.\n"
     if marker not in text:
@@ -607,6 +637,33 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
         self.assertIn("commit e0d2bff6 pins the M105 workspace queue-frontier guard proof", result.stderr)
         self.assertIn("105.1", result.stderr)
 
+    def test_verifier_rejects_conflicting_registry_completion_status(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-status-") as temp_dir:
+            registry_path = Path(temp_dir) / "registry.yaml"
+            source_registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            registry_path.write_text(
+                _append_conflicting_registry_status(source_registry_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected exactly one scalar key 'status'; found 2", result.stderr)
+        self.assertIn("105.1", result.stderr)
+
     def test_verifier_fails_closed_when_registry_drops_package_scoped_receipt_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-receipt-proof-") as temp_dir:
             registry_path = Path(temp_dir) / "registry.yaml"
@@ -746,6 +803,33 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("expected exactly one queue package block", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
+    def test_verifier_rejects_conflicting_queue_completion_status(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-status-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                _append_conflicting_queue_status(source_queue_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected exactly one scalar key 'status'; found 2", result.stderr)
         self.assertIn(PACKAGE_ID, result.stderr)
 
     def test_verifier_rejects_widened_queue_allowed_paths(self) -> None:
