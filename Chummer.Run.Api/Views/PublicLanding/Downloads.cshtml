@@ -9,8 +9,11 @@
     var platformShelfNotice = !string.IsNullOrWhiteSpace(release.PlatformShelfNoticeSummary);
     var requestedPlatformUnavailable = platformShelfNotice && !release.RequestedPlatformHasPublicDownload;
     var deviceLabel = release.RequestedPlatformLabel ?? "this device";
+    var windowsProofInstallers = Model.WindowsProofInstallers ?? Array.Empty<WindowsProofInstallerRecord>();
+    var hasWindowsProofRail = windowsProofInstallers.Count > 0;
+    var requestedWindowsUnavailable = requestedPlatformUnavailable && string.Equals(deviceLabel, "Windows", StringComparison.OrdinalIgnoreCase);
     var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0;
-    var hasAdvancedPanels = hasAdvancedDownloads || release.PlatformAvailability.Count > 0 || Model.TrustPulse is not null || Model.SignedInStatus is not null;
+    var hasAdvancedPanels = hasAdvancedDownloads || hasWindowsProofRail || release.PlatformAvailability.Count > 0;
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)
@@ -43,20 +46,22 @@
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Downloads</p>
-        <h1 class="page-title">Download Chummer</h1>
+        <h1 class="page-title">Install Chummer</h1>
         <p class="page-copy">
             @(requestedPlatformUnavailable
-                ? $"This browser looks like {deviceLabel}, but that platform is not on the current public shelf."
-                : $"This browser looks like {deviceLabel}. The button below is selected for that platform.")
+                ? $"This browser looks like {deviceLabel}, but that platform is not on the current public shelf yet."
+                : $"This browser looks like {deviceLabel}. Start with the recommended build for that platform.")
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
-                ? release.PlatformShelfNoticeSummary
+                ? requestedWindowsUnavailable && hasWindowsProofRail
+                    ? "Windows is still in preview rollout. If you need the current preview installer, open the Windows section below."
+                    : release.PlatformShelfNoticeSummary
                 : recommendedUsesMacSetupScript
-                        ? "On macOS, the default path is the signed-in install handoff. It gives you one Terminal command for your personalized install."
+                        ? "On macOS, the default path is the signed-in setup handoff. It gives you one Terminal command for this install."
                     : guestGateRequired
                         ? release.GuestGateSummary
-                        : "Advanced builds, manual packages, and release details stay collapsed underneath.")
+                        : "Other platforms, manual packages, and technical detail stay collapsed underneath.")
         </p>
     </div>
 </section>
@@ -103,6 +108,10 @@ else
                     {
                         <a class="button-like button-like--primary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                         <a class="button-like button-like--secondary" href="#platform-shelf">See other platforms</a>
+                        @if (requestedWindowsUnavailable && hasWindowsProofRail)
+                        {
+                            <a class="button-like button-like--ghost" href="#windows-proof-rail">Open Windows preview build</a>
+                        }
                     }
                     else if (guestGateRequired)
                     {
@@ -114,37 +123,27 @@ else
                         <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
                         @if (!Model.Chrome.Authenticated)
                         {
-                            <a class="button-like button-like--secondary" href="/login?next=@Uri.EscapeDataString("/downloads")">Already have an account? Sign in</a>
+                            <a class="button-like button-like--secondary" href="/auth/google/start?next=%2Fdownloads">Already have an account? Sign in</a>
                         }
-                    else
-                    {
-                        <a class="button-like button-like--secondary" href="/downloads/release-upload">Release upload handoff</a>
-                        <a class="button-like button-like--secondary" href="/account/access">Open Devices and access</a>
                     }
-                }
                 </div>
                 @if (!requestedPlatformUnavailable)
                 {
                     <p class="downloads-inline-note">
                         @(recommendedUsesMacSetupScript
-                            ? "Open the Mac install handoff, copy the Terminal command, and run it in Terminal."
+                            ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
                             : "After install, open Chummer and use Load Demo Runner to inspect the bundled Soma-Career.chum5 sample before starting blank.")
                     </p>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--ghost" href="/now">Current release proof</a>
+                        <a class="button-like button-like--ghost" href="/now">What works today</a>
                         <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
                         <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     </div>
-                    <p class="muted-copy">Proof, known issues, and install help stay attached to this same release rail before you commit this machine.</p>
+                    <p class="muted-copy">Known issues and install help stay nearby. Deeper release evidence lives on the status pages, not in front of the install button.</p>
+                    <p class="muted-copy">Release notes and known issues are both tied to this surface, so install confidence stays truthful even while release shelves evolve.</p>
                 }
                 @if (hasAdvancedPanels)
                 {
-                    @if (Model.Chrome.Authenticated)
-                    {
-                        <p class="downloads-inline-note">
-                            Signed-in release producer? Open the <a href="/downloads/release-upload">release upload handoff</a> to get a single-copy Mac bootstrap command that carries an upload token and promotes directly to the live shelf.
-                        </p>
-                    }
                     <p class="downloads-advanced-link">
                         <a class="inline-link" href="#advanced-downloads">Advanced download options</a>
                     </p>
@@ -178,18 +177,22 @@ else
                         <div class="stacked-actions">
                             <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                             <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                            <a class="button-like button-like--ghost" href="/now">Open current release</a>
+                            <a class="button-like button-like--ghost" href="/status">Open status</a>
                         </div>
                     </div>
 
                     <div class="downloads-advanced-group">
-                        <h3 class="downloads-subheading">Release notes, known issues, and requirements</h3>
-                        <p class="muted-copy">Use the release rail for proof details, known issues, and platform requirements before install support routing.</p>
+                        <h3 class="downloads-subheading">Need more detail?</h3>
+                        <p class="muted-copy">Use Status when you want platform readiness, the current caution, and the technical release trail without crowding the main install decision.</p>
+                        <div class="stacked-actions">
+                            <a class="button-like button-like--ghost" href="/status">Open status</a>
+                            <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+                        </div>
                     </div>
 
                     @if (release.PlatformAvailability.Count > 0)
                     {
-                        <div class="downloads-advanced-group">
+                        <div class="downloads-advanced-group" id="platform-shelf">
                             <h3 class="downloads-subheading">Platform shelf</h3>
                             <div class="downloads-platform-grid">
                                 @foreach (var platform in release.PlatformAvailability)
@@ -204,6 +207,34 @@ else
                                         {
                                             <a class="button-like button-like--ghost" href="@platformOption.DispatchHref">@platformOption.ActionLabel</a>
                                         }
+                                    </article>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    @if (hasWindowsProofRail)
+                    {
+                        <div class="downloads-advanced-group" id="windows-proof-rail">
+                            <h3 class="downloads-subheading">Windows preview build</h3>
+                            <p class="muted-copy">Windows installers are available here while the main Windows shelf catches up to this build.</p>
+                            <div class="evidence-row-list">
+                                @foreach (var proofInstaller in windowsProofInstallers)
+                                {
+                                    var headLabel = string.Equals(proofInstaller.Head, "blazor-desktop", StringComparison.OrdinalIgnoreCase)
+                                        ? "Blazor Desktop"
+                                        : "Avalonia Desktop";
+                                    <article class="evidence-row evidence-row--download">
+                                        <div class="evidence-row__copy">
+                                            <h3>@headLabel Windows x64 installer</h3>
+                                            <p>Windows preview installer. Use this when you need the current Windows build directly from chummer.run before it moves onto the main Windows shelf.</p>
+                                        </div>
+                                        <div class="download-row__meta">
+                                            <span class="platform-pill">Preview build</span>
+                                            <span class="muted-copy">Windows x64</span>
+                                            <code class="mono-receipt">SHA @proofInstaller.Sha256[..Math.Min(proofInstaller.Sha256.Length, 16)]...</code>
+                                        </div>
+                                        <a class="button-like button-like--ghost" href="/downloads/install/@Uri.EscapeDataString(proofInstaller.ArtifactId)">Open preview installer</a>
                                     </article>
                                 }
                             </div>
@@ -283,21 +314,6 @@ else
                         </div>
                     }
 
-                    @if (Model.TrustPulse is not null)
-                    {
-                        <div class="downloads-advanced-group">
-                            <h3 class="downloads-subheading">Release truth</h3>
-                            @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-                        </div>
-                    }
-
-                    @if (Model.SignedInStatus is not null)
-                    {
-                        <div class="downloads-advanced-group">
-                            <h3 class="downloads-subheading">Signed-in install status</h3>
-                            @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-                        </div>
-                    }
                 </div>
             </details>
         </section>
