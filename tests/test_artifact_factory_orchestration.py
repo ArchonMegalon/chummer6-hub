@@ -15,6 +15,7 @@ SOURCE_FILES = [
     "scripts/ai/verify.sh",
     "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
     "Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+    "Chummer.Run.Api/Controllers/PublicLandingController.cs",
     "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
     "Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
     "tests/test_artifact_factory_orchestration.py",
@@ -67,6 +68,995 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("/artifacts/release-bundles/", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_launcher_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "public ArtifactFactoryJobBatchLaunchResult LaunchJobs(ArtifactFactoryJobBatchLaunchRequest request)",
+                    "public ArtifactFactoryJobBatchLaunchResult LaunchJobBatchRemoved(ArtifactFactoryJobBatchLaunchRequest request)",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("LaunchJobs(ArtifactFactoryJobBatchLaunchRequest request)", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_recipe_ids_are_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-recipe-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "    IReadOnlyList<string> RecipeIds,\n",
+                    "",
+                ).replace(
+                    "        string[] recipeIds = jobs\n"
+                    "            .Select(static job => job.RecipeId)\n"
+                    "            .Distinct(StringComparer.OrdinalIgnoreCase)\n"
+                    "            .Order(StringComparer.OrdinalIgnoreCase)\n"
+                    "            .ToArray();\n",
+                    "",
+                ).replace(
+                    "            RecipeIds: recipeIds,\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RecipeIds", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_source_pack_ids_are_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-source-pack-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "    IReadOnlyList<string> SourcePackIds,\n",
+                    "",
+                ).replace(
+                    "        string[] sourcePackIds = jobs\n"
+                    "            .SelectMany(static job => job.SourcePackIds)\n"
+                    "            .Distinct(StringComparer.OrdinalIgnoreCase)\n"
+                    "            .Order(StringComparer.OrdinalIgnoreCase)\n"
+                    "            .ToArray();\n",
+                    "",
+                ).replace(
+                    "            SourcePackIds: sourcePackIds,\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("SourcePackIds", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_endpoint_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-endpoint-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            controller_path = temp_root / "Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs"
+            controller_text = controller_path.read_text(encoding="utf-8")
+            controller_path.write_text(
+                controller_text.replace(
+                    '[HttpPost("/api/internal/artifact-factory/job-batches")]',
+                    '[HttpPost("/api/internal/artifact-factory/batches-removed")]',
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("/api/internal/artifact-factory/job-batches", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_endpoint_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-batch-endpoint-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            controller_path = temp_root / "Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs"
+            controller_text = controller_path.read_text(encoding="utf-8")
+            controller_path.write_text(
+                controller_text.replace(
+                    '[HttpPost("/api/internal/artifact-factory/source-pack-batches")]',
+                    '[HttpPost("/api/internal/artifact-factory/source-pack-batches-removed")]',
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("/api/internal/artifact-factory/source-pack-batches", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_launcher_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-batch-service-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "public ArtifactFactoryJobBatchLaunchResult LaunchSourcePackBatch(ArtifactFactorySourcePackBatchLaunchRequest request)",
+                    "public ArtifactFactoryJobBatchLaunchResult LaunchSourcePackBatchRemoved(ArtifactFactorySourcePackBatchLaunchRequest request)",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("LaunchSourcePackBatch(ArtifactFactorySourcePackBatchLaunchRequest request)", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_id_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-batch-id-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        if (string.IsNullOrWhiteSpace(request.BatchId))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\"source-pack batchId is required.\");\n"
+                    "        }\n\n"
+                    "        RejectUnsafeBatchId(request.BatchId);\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("source-pack batchId is required", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_preflight_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-batch-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        ValidateSourcePackBatchSourcePacks(request.SourcePacks);\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ValidateSourcePackBatchSourcePacks", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_stable_segment_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-id-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "\n        if (!IsStablePublicShelfSegment(decoded))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"artifact factory batch id '{batchId}' is unsafe; batch ids must use stable orchestration receipt segment characters.\");\n"
+                    "        }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("batch ids must use stable orchestration receipt segment characters", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_stable_segment_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-id-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "\n        if (!IsStablePublicShelfSegment(decoded))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"source pack id '{sourcePackId}' is unsafe; approved source-pack ids must use stable receipt segment characters.\");\n"
+                    "        }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("approved source-pack ids must use stable receipt segment characters", result.stderr)
+
+    def test_verifier_fails_closed_when_public_shelf_stable_segment_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-public-shelf-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "\n            if (!IsStablePublicShelfSegment(decodedSegment))\n"
+                    "            {\n"
+                    "                throw new InvalidDataException(\n"
+                    "                    $\"source pack '{sourcePackId}' has unsafe public proof shelf {fieldName} '{publicShelfRef}'; artifact factory bundle refs must use stable public proof shelf segment characters.\");\n"
+                    "            }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("artifact factory bundle refs must use stable public proof shelf segment characters", result.stderr)
+
+    def test_verifier_fails_closed_when_recipe_catalog_endpoint_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-recipe-endpoint-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            controller_path = temp_root / "Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs"
+            controller_text = controller_path.read_text(encoding="utf-8")
+            controller_path.write_text(
+                controller_text.replace(
+                    '[HttpGet("/api/internal/artifact-factory/recipes")]',
+                    '[HttpGet("/api/internal/artifact-factory/recipes-removed")]',
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("/api/internal/artifact-factory/recipes", result.stderr)
+
+    def test_verifier_fails_closed_when_recipe_catalog_contract_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-recipe-catalog-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "public ArtifactFactoryRecipeCatalogResult ListRecipes()",
+                    "public ArtifactFactoryRecipeCatalogResult ListRecipeCatalogRemoved()",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ListRecipes", result.stderr)
+
+    def test_verifier_fails_closed_when_release_bundle_public_route_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-release-route-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            controller_path = temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"
+            controller_text = controller_path.read_text(encoding="utf-8")
+            controller_path.write_text(
+                controller_text.replace(
+                    '[HttpGet("/artifacts/release-bundles/{releaseArtifactId}")]',
+                    '[HttpGet("/artifacts/release-proof-missing/{releaseArtifactId}")]',
+                ).replace(
+                    'contractName = "chummer.run.public_proof_shelf.release_bundle.v1"',
+                    'contractName = "chummer.run.public_proof_shelf.release_bundle.removed.v1"',
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("/artifacts/release-bundles/{releaseArtifactId}", result.stderr)
+        self.assertIn("chummer.run.public_proof_shelf.release_bundle.v1", result.stderr)
+
+    def test_verifier_fails_closed_when_release_bundle_format_route_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-release-format-route-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            controller_path = temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"
+            controller_text = controller_path.read_text(encoding="utf-8")
+            controller_path.write_text(
+                controller_text.replace(
+                    '[HttpGet("/artifacts/release-bundles/{releaseArtifactId}/{format}")]',
+                    '[HttpGet("/artifacts/release-bundles/{releaseArtifactId}/format-removed/{format}")]',
+                ).replace(
+                    "publicProofShelfRef = normalizedFormat is null ? bundleRef : outputRefs[normalizedFormat]",
+                    "publicProofShelfRef = bundleRef",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("/artifacts/release-bundles/{releaseArtifactId}/{format}", result.stderr)
+        self.assertIn("outputRefs[normalizedFormat]", result.stderr)
+
+    def test_verifier_fails_closed_when_audience_locale_normalization_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-job-token-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        string audience = NormalizeAudience(request.Audience);\n"
+                    "        string locale = NormalizeLocale(request.Locale);\n",
+                    "        string audience = NormalizeOptional(request.Audience) ?? \"public-proof-shelf\";\n"
+                    "        string locale = NormalizeOptional(request.Locale) ?? \"en-US\";\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("NormalizeAudience", result.stderr)
+        self.assertIn("NormalizeLocale", result.stderr)
+
+    def test_verifier_fails_closed_when_job_token_safety_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-job-token-guard-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "\n    private static void RejectUnsafeJobToken(string value, string fieldName, bool allowComma)\n"
+                    "    {\n"
+                    "        string normalized = value.Trim();\n"
+                    "        if (normalized.Length == 0)\n"
+                    "        {\n"
+                    "            throw new InvalidDataException($\"artifact factory {fieldName} is required.\");\n"
+                    "        }\n\n"
+                    "        if (normalized.Contains('?', StringComparison.Ordinal)\n"
+                    "            || normalized.Contains('#', StringComparison.Ordinal)\n"
+                    "            || normalized.Contains(':', StringComparison.Ordinal)\n"
+                    "            || normalized.Contains('/', StringComparison.Ordinal)\n"
+                    "            || normalized.Contains('\\\\', StringComparison.Ordinal))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"artifact factory {fieldName} '{value}' is unsafe; job metadata must be stable source-pack tokens, not provider paths or URIs.\");\n"
+                    "        }\n\n"
+                    "        string decoded = Uri.UnescapeDataString(normalized);\n"
+                    "        if (decoded is \".\" or \"..\"\n"
+                    "            || decoded.Contains(':', StringComparison.Ordinal)\n"
+                    "            || decoded.Contains('/', StringComparison.Ordinal)\n"
+                    "            || decoded.Contains('\\\\', StringComparison.Ordinal))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"artifact factory {fieldName} '{value}' is unsafe; job metadata must not contain traversal or encoded path separators.\");\n"
+                    "        }\n\n"
+                    "        foreach (char character in normalized)\n"
+                    "        {\n"
+                    "            if (char.IsLetterOrDigit(character)\n"
+                    "                || character is '-' or '_' or '.'\n"
+                    "                || (allowComma && character == ','))\n"
+                    "            {\n"
+                    "                continue;\n"
+                    "            }\n\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"artifact factory {fieldName} '{value}' is unsafe; job metadata must use stable token characters.\");\n"
+                    "        }\n"
+                    "    }\n",
+                    "",
+                ).replace(
+                    "        RejectUnsafeJobToken(audience, \"audience\", allowComma: true);\n",
+                    "",
+                ).replace(
+                    "        RejectUnsafeJobToken(locale, \"locale\", allowComma: false);\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RejectUnsafeJobToken", result.stderr)
+
+    def test_verifier_fails_closed_when_requested_by_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-requested-by-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        string requestedBy = NormalizeRequestedBy(request.RequestedBy);\n",
+                    "",
+                    1,
+                ).replace(
+                    "                ? jobRequest with { RequestedBy = requestedBy }\n",
+                    "                ? jobRequest with { RequestedBy = request.RequestedBy.Trim() }\n",
+                ).replace(
+                    "            RequestedBy: requestedBy,\n",
+                    "            RequestedBy: request.RequestedBy.Trim(),\n",
+                    1,
+                ).replace(
+                    "\n    private static string NormalizeRequestedBy(string? value)\n"
+                    "    {\n"
+                    "        string requestedBy = NormalizeOptional(value) ?? throw new InvalidDataException(\"requestedBy is required.\");\n"
+                    "        RejectProviderSpecificRef(\"job-request\", requestedBy, \"requestedBy\");\n"
+                    "        RejectUnsafeJobToken(requestedBy, \"requestedBy\", allowComma: false);\n"
+                    "        return requestedBy;\n"
+                    "    }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("NormalizeRequestedBy", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_requested_by_consistency_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-requester-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            ArtifactFactoryJobLaunchRequest normalizedRequest;\n"
+                    "            if (string.IsNullOrWhiteSpace(jobRequest.RequestedBy))\n"
+                    "            {\n"
+                    "                normalizedRequest = jobRequest with { RequestedBy = requestedBy };\n"
+                    "            }\n"
+                    "            else\n"
+                    "            {\n"
+                    "                string jobRequestedBy = NormalizeRequestedBy(jobRequest.RequestedBy);\n"
+                    "                if (!string.Equals(jobRequestedBy, requestedBy, StringComparison.Ordinal))\n"
+                    "                {\n"
+                    "                    throw new InvalidDataException(\n"
+                    "                        $\"artifact factory batch '{request.BatchId.Trim()}' job requestedBy '{jobRequestedBy}' must match batch requestedBy '{requestedBy}'.\");\n"
+                    "                }\n\n"
+                    "                normalizedRequest = jobRequest with { RequestedBy = jobRequestedBy };\n"
+                    "            }\n\n",
+                    "            ArtifactFactoryJobLaunchRequest normalizedRequest = string.IsNullOrWhiteSpace(jobRequest.RequestedBy)\n"
+                    "                ? jobRequest with { RequestedBy = requestedBy }\n"
+                    "                : jobRequest;\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must match batch requestedBy", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_media_requests_are_not_sorted_with_jobs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-order-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        ArtifactFactoryJobLaunchResult[] orderedJobs = jobs\n"
+                    "            .OrderBy(static job => job.JobId, StringComparer.OrdinalIgnoreCase)\n"
+                    "            .ToArray();\n\n",
+                    "",
+                ).replace(
+                    "            JobIds: orderedJobs.Select(static job => job.JobId).ToArray(),\n",
+                    "            JobIds: jobs.Select(static job => job.JobId).Order(StringComparer.OrdinalIgnoreCase).ToArray(),\n",
+                ).replace(
+                    "            Jobs: orderedJobs,\n"
+                    "            MediaFactoryRequests: orderedJobs.Select(static job => job.MediaFactoryRequest).ToArray());\n",
+                    "            Jobs: jobs.OrderBy(static job => job.JobId, StringComparer.OrdinalIgnoreCase).ToArray(),\n"
+                    "            MediaFactoryRequests: jobs.Select(static job => job.MediaFactoryRequest).ToArray());\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("orderedJobs", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_required_families_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-required-families-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        string[] requiredFamilies = NormalizeRequiredBatchFamilies(request.RequiredFamilies);\n"
+                    "        string[] missingRequiredFamilies = requiredFamilies\n"
+                    "            .Where(required => !families.Contains(required, StringComparer.OrdinalIgnoreCase))\n"
+                    "            .ToArray();\n"
+                    "        if (missingRequiredFamilies.Length > 0)\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"artifact factory batch '{request.BatchId.Trim()}' is missing required recipe family job(s): {string.Join(\", \", missingRequiredFamilies)}.\");\n"
+                    "        }\n\n",
+                    "        string[] requiredFamilies = [];\n",
+                ).replace(
+                    "\n    private static string[] NormalizeRequiredBatchFamilies(IReadOnlyList<string>? requiredFamilies)\n"
+                    "    {\n"
+                    "        if (requiredFamilies is null || requiredFamilies.Count == 0)\n"
+                    "        {\n"
+                    "            return [];\n"
+                    "        }\n\n"
+                    "        string[] families = requiredFamilies\n"
+                    "            .Select(NormalizeToken)\n"
+                    "            .Where(static item => item.Length > 0)\n"
+                    "            .Distinct(StringComparer.OrdinalIgnoreCase)\n"
+                    "            .Order(StringComparer.OrdinalIgnoreCase)\n"
+                    "            .ToArray();\n"
+                    "        foreach (string family in families)\n"
+                    "        {\n"
+                    "            RejectProviderSpecificRef(\"batch-request\", family, \"requiredFamily\");\n"
+                    "            RejectUnsafeJobToken(family, \"requiredFamily\", allowComma: false);\n"
+                    "            if (!Recipes.ContainsKey(family))\n"
+                    "            {\n"
+                    "                throw new InvalidDataException($\"artifact factory batch requires unsupported recipe family '{family}'.\");\n"
+                    "            }\n"
+                    "        }\n\n"
+                    "        return families;\n"
+                    "    }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing required recipe family job(s)", result.stderr)
+
+    def test_verifier_fails_closed_when_blank_required_families_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-blank-required-families-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        if (families.Length == 0)\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\"artifact factory batch required recipe families cannot be empty.\");\n"
+                    "        }\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required recipe families cannot be empty", result.stderr)
+
+    def test_verifier_fails_closed_when_batch_required_families_result_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-required-families-result-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "    IReadOnlyList<string> RequiredFamilies,\n",
+                    "",
+                ).replace(
+                    "            RequiredFamilies: requiredFamilies,\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RequiredFamilies", result.stderr)
+
+    def test_verifier_fails_closed_when_default_complete_batch_set_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-default-batch-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            return Recipes.Keys\n"
+                    "                .Order(StringComparer.OrdinalIgnoreCase)\n"
+                    "                .ToArray();\n",
+                    "            return [];\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("return Recipes.Keys", result.stderr)
 
     def test_verifier_fails_closed_when_download_shelf_release_bundle_remap_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-release-shelf-proof-") as temp_dir:
@@ -123,6 +1113,150 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("TryBuildReleaseBundleRefFromDownloadShelfRef", result.stderr)
+
+    def test_verifier_fails_closed_when_release_bundle_shelf_passthrough_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-release-bundle-shelf-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            if (family.Equals(\"release\", StringComparison.OrdinalIgnoreCase)\n"
+                    "                && shelfRef.StartsWith(\"/artifacts/release-bundles/\", StringComparison.OrdinalIgnoreCase))\n"
+                    "            {\n"
+                    "                return shelfRef;\n"
+                    "            }\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("/artifacts/release-bundles/", result.stderr)
+
+    def test_verifier_fails_closed_when_release_bundle_anchor_shape_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-release-anchor-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        if (family.Equals(\"release\", StringComparison.OrdinalIgnoreCase))\n"
+                    "        {\n"
+                    "            RejectReleaseBundleShelfAnchorShape(sourcePackId, publicShelfRef, fieldName);\n"
+                    "        }\n",
+                    "",
+                ).replace(
+                    "\n    private static void RejectReleaseBundleShelfAnchorShape(string sourcePackId, string publicShelfRef, string fieldName)\n"
+                    "    {\n"
+                    "        string[] allowedReleasePrefixes = [\"/downloads/install/\", \"/artifacts/release-bundles/\"];\n"
+                    "        string? matchingPrefix = allowedReleasePrefixes.FirstOrDefault(prefix => publicShelfRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));\n"
+                    "        string releaseArtifactId = matchingPrefix is null\n"
+                    "            ? string.Empty\n"
+                    "            : publicShelfRef[matchingPrefix.Length..].Trim('/');\n\n"
+                    "        if (string.IsNullOrWhiteSpace(releaseArtifactId)\n"
+                    "            || releaseArtifactId.Contains('/', StringComparison.Ordinal)\n"
+                    "            || releaseArtifactId.Contains('\\\\', StringComparison.Ordinal))\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe release public proof shelf {fieldName} '{publicShelfRef}'; release bundle anchors must resolve to exactly one release artifact segment.\");\n"
+                    "        }\n"
+                    "    }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RejectReleaseBundleShelfAnchorShape", result.stderr)
+
+    def test_verifier_fails_closed_when_non_release_shelf_anchor_shape_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-non-release-anchor-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "\n    private static bool HasAnyResourceShelfAnchorShape(string publicShelfRef, IReadOnlyList<string> prefixes, bool allowBundlesSuffix)\n"
+                    "        => prefixes.Any(prefix => HasResourceShelfAnchorShape(publicShelfRef, prefix, allowBundlesSuffix));\n\n"
+                    "    private static bool HasResourceShelfAnchorShape(string publicShelfRef, string prefix, bool allowBundlesSuffix)\n"
+                    "    {\n"
+                    "        if (!publicShelfRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))\n"
+                    "        {\n"
+                    "            return false;\n"
+                    "        }\n\n"
+                    "        string remainder = publicShelfRef[prefix.Length..].Trim('/');\n"
+                    "        if (string.IsNullOrWhiteSpace(remainder))\n"
+                    "        {\n"
+                    "            return false;\n"
+                    "        }\n\n"
+                    "        string[] segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries);\n"
+                    "        return segments.Length == 1\n"
+                    "            || (allowBundlesSuffix\n"
+                    "                && segments.Length == 2\n"
+                    "                && segments[1].Equals(\"bundles\", StringComparison.OrdinalIgnoreCase));\n"
+                    "    }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("HasResourceShelfAnchorShape", result.stderr)
 
     def test_verifier_fails_closed_when_output_shelf_refs_are_not_exposed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-output-shelf-proof-") as temp_dir:
@@ -240,11 +1374,12 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "        }\n\n"
                     "        string decoded = Uri.UnescapeDataString(pathId);\n"
                     "        if (decoded is \".\" or \"..\"\n"
+                    "            || decoded.Contains(':', StringComparison.Ordinal)\n"
                     "            || decoded.Contains('/', StringComparison.Ordinal)\n"
                     "            || decoded.Contains('\\\\', StringComparison.Ordinal))\n"
                     "        {\n"
                     "            throw new InvalidDataException(\n"
-                    "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must not contain traversal or encoded path separators.\");\n"
+                    "                $\"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must not contain traversal, encoded provider delimiters, or encoded path separators.\");\n"
                     "        }\n"
                     "    }\n",
                     "",
@@ -266,6 +1401,78 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("RejectUnsafePublicPathId", result.stderr)
+
+    def test_verifier_fails_closed_when_public_path_id_provider_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-path-id-provider-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        RejectProviderSpecificRef(sourcePackId, value, fieldName);\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RejectProviderSpecificRef(sourcePackId, value, fieldName)", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_id_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-id-boundary-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    '        RejectProviderSpecificRef(sourcePack.SourcePackId, sourcePack.SourcePackId, "sourcePackId");\n'
+                    "        RejectUnsafeSourcePackId(sourcePack.SourcePackId);\n\n",
+                    "",
+                ).replace(
+                    "private static void RejectUnsafeSourcePackId(string sourcePackId)",
+                    "private static void RemovedRejectUnsafeSourcePackId(string sourcePackId)",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RejectUnsafeSourcePackId", result.stderr)
 
     def test_verifier_fails_closed_when_external_absolute_uri_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-external-uri-proof-") as temp_dir:
@@ -294,9 +1501,13 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                     "",
                 ).replace(
                     "\n    private static bool IsUriLikeExternalRef(string normalized, string fieldName)\n"
-                    "        => !(fieldName.Equals(\"evidenceRef\", StringComparison.Ordinal)\n"
-                    "                && normalized.StartsWith(\"public-shelf:\", StringComparison.OrdinalIgnoreCase))\n"
+                    "        => !IsPublicShelfEvidenceRef(normalized, fieldName)\n"
                     "            && normalized.Contains(\"://\", StringComparison.Ordinal);\n",
+                    "",
+                ).replace(
+                    "\n    private static bool IsPublicShelfEvidenceRef(string normalized, string fieldName)\n"
+                    "        => fieldName.Equals(\"evidenceRef\", StringComparison.Ordinal)\n"
+                    "            && normalized.StartsWith(\"public-shelf:\", StringComparison.OrdinalIgnoreCase);\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -316,6 +1527,151 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("IsUriLikeExternalRef", result.stderr)
+
+    def test_verifier_fails_closed_when_exact_provider_token_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-exact-provider-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        if (ProviderSpecificRefPrefixes.Contains(normalized)\n"
+                    "            || ProviderSpecificRefPrefixes.Contains(prefix)\n",
+                    "        if (ProviderSpecificRefPrefixes.Contains(prefix)\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ProviderSpecificRefPrefixes.Contains(normalized)", result.stderr)
+
+    def test_verifier_fails_closed_when_provider_token_segment_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-provider-segment-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            || ProviderSpecificRefPrefixes.Contains(prefix)\n"
+                    "            || (!IsExternalPublicShelfEvidenceRef(normalized, fieldName) && ContainsProviderSpecificToken(normalized)))\n",
+                    "            || ProviderSpecificRefPrefixes.Contains(prefix))\n",
+                ).replace(
+                    "\n    private static bool ContainsProviderSpecificToken(string normalized)\n"
+                    "    {\n"
+                    "        string lower = normalized.ToLowerInvariant();\n"
+                    "        foreach (string providerToken in ProviderSpecificRefPrefixes)\n"
+                    "        {\n"
+                    "            string token = providerToken.ToLowerInvariant();\n"
+                    "            if (ContainsDelimitedToken(lower, token))\n"
+                    "            {\n"
+                    "                return true;\n"
+                    "            }\n"
+                    "        }\n\n"
+                    "        return false;\n"
+                    "    }\n\n"
+                    "    private static bool ContainsDelimitedToken(string value, string token)\n"
+                    "    {\n"
+                    "        int startIndex = 0;\n"
+                    "        while (startIndex < value.Length)\n"
+                    "        {\n"
+                    "            int index = value.IndexOf(token, startIndex, StringComparison.Ordinal);\n"
+                    "            if (index < 0)\n"
+                    "            {\n"
+                    "                return false;\n"
+                    "            }\n\n"
+                    "            int endIndex = index + token.Length;\n"
+                    "            if (IsProviderTokenBoundary(value, index - 1)\n"
+                    "                && IsProviderTokenBoundary(value, endIndex))\n"
+                    "            {\n"
+                    "                return true;\n"
+                    "            }\n\n"
+                    "            startIndex = index + 1;\n"
+                    "        }\n\n"
+                    "        return false;\n"
+                    "    }\n\n"
+                    "    private static bool IsProviderTokenBoundary(string value, int index)\n"
+                    "        => index < 0\n"
+                    "            || index >= value.Length\n"
+                    "            || value[index] is ':' or '/' or '\\\\' or '-' or '_' or '.';\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ContainsProviderSpecificToken", result.stderr)
+
+    def test_verifier_fails_closed_when_external_public_shelf_boundary_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-public-shelf-boundary-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "\n    private static bool IsExternalPublicShelfEvidenceRef(string normalized, string fieldName)\n"
+                    "        => IsPublicShelfEvidenceRef(normalized, fieldName)\n"
+                    "            && !normalized[\"public-shelf:\".Length..].TrimStart().StartsWith(\"/\", StringComparison.Ordinal);\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("IsExternalPublicShelfEvidenceRef", result.stderr)
 
     def test_verifier_fails_closed_when_duplicate_source_pack_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-proof-") as temp_dir:
@@ -354,6 +1710,85 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("normalizedSourcePackId", result.stderr)
+
+    def test_verifier_fails_closed_when_null_source_pack_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-null-source-pack-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            if (sourcePack is null)\n"
+                    "            {\n"
+                    "                throw new InvalidDataException(\"artifact factory job contains an empty approved source pack.\");\n"
+                    "            }\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("empty approved source pack", result.stderr)
+
+    def test_verifier_fails_closed_when_receipt_prefix_boundary_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-receipt-prefix-boundary-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "            .Where(prefix => !requiredReceiptRefs.Any(receipt => ReceiptRefMatchesRequiredPrefix(receipt, prefix)))\n",
+                    "            .Where(prefix => !requiredReceiptRefs.Any(receipt => receipt.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))\n",
+                ).replace(
+                    "\n    private static bool ReceiptRefMatchesRequiredPrefix(string receiptRef, string requiredPrefix)\n"
+                    "    {\n"
+                    "        string normalizedReceiptRef = receiptRef.Trim();\n"
+                    "        return normalizedReceiptRef.Equals(requiredPrefix, StringComparison.OrdinalIgnoreCase)\n"
+                    "            || normalizedReceiptRef.StartsWith($\"{requiredPrefix}:\", StringComparison.OrdinalIgnoreCase);\n"
+                    "    }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ReceiptRefMatchesRequiredPrefix", result.stderr)
 
     def test_verifier_fails_closed_when_normalized_duplicate_source_pack_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-normalized-source-pack-proof-") as temp_dir:
