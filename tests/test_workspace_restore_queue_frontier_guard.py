@@ -118,6 +118,24 @@ def _append_task_local_telemetry_field_name_proof(text: str) -> str:
     )
 
 
+def _append_successor_frontier_detail_proof(text: str) -> str:
+    package_marker = f"    package_id: {PACKAGE_ID}\n"
+    package_index = text.find(package_marker)
+    if package_index == -1:
+        raise AssertionError(f"missing package row for {PACKAGE_ID}")
+
+    proof_index = text.find("    proof:\n", package_index)
+    if proof_index == -1:
+        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
+
+    insert_at = proof_index + len("    proof:\n")
+    return (
+        text[:insert_at]
+        + "      - Successor frontier detail says polling disabled and status query unsupported.\n"
+        + text[insert_at:]
+    )
+
+
 def _append_registry_task_local_telemetry_proof(text: str) -> str:
     task_marker = "      - id: 105.1\n"
     task_index = text.find(task_marker)
@@ -337,6 +355,35 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden active-run proof marker: status_query_supported", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
+    def test_verifier_rejects_successor_frontier_detail_phrasing_as_queue_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-frontier-detail-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                _append_successor_frontier_detail_proof(source_queue_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: successor frontier detail", result.stderr)
+        self.assertIn("forbidden active-run proof marker: polling disabled", result.stderr)
+        self.assertIn("forbidden active-run proof marker: status query", result.stderr)
         self.assertIn(PACKAGE_ID, result.stderr)
 
     def test_verifier_rejects_blocked_ooda_helper_command_names_as_queue_proof(self) -> None:
