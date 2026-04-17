@@ -1199,7 +1199,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "      - /VAR/LIB/CODEX-FLEET/chummer_design_supervisor/shard-1/active_run_handoff.generated.md\n"
                     "      - active-run helper commands run_ooda_design_supervisor_until_quiet.py output\n"
                     "      - supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled\n"
-                    "      - task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff\n",
+                    "      - task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff\n"
+                    "      - Run id 20260417T194405Z-shard-1 selected account acct-chatgpt-core selected model gpt-5.4 prompt path /tmp/prompt.txt recent stderr tail\n",
                 )
                 + "\n",
                 encoding="utf-8",
@@ -1295,6 +1296,26 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             self.assertIn(
                 "canonical successor queue staging block has forbidden active-run proof marker: shard runtime handoff",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: Run id",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: Selected account",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: Selected model",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: Prompt path",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: Recent stderr tail",
                 result.stderr,
             )
 
@@ -1395,6 +1416,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "          - Task_Local_Telemetry.generated.json Active-Run Helper Commands output from ooda_design_supervisor.py and the operator/OODA loop",
                         "          - Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
                         "          - Task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff",
+                        "          - Run id 20260417T194405Z-shard-1 selected account acct-chatgpt-core selected model gpt-5.4 prompt path /tmp/prompt.txt recent stderr tail",
                     ]
                 )
                 + "\n",
@@ -1490,6 +1512,26 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             self.assertIn(
                 "canonical successor registry block has forbidden active-run proof marker: shard runtime handoff",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: Run id",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: Selected account",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: Selected model",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: Prompt path",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: Recent stderr tail",
                 result.stderr,
             )
 
@@ -2004,6 +2046,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "Operator Telemetry helper output",
                 "Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
                 "Task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff",
+                "Run id 20260417T194405Z-shard-1 selected account acct-chatgpt-core selected model gpt-5.4 prompt path /tmp/prompt.txt recent stderr tail",
             ]
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
@@ -2098,6 +2141,31 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn(
                 "published proof file has forbidden active-run proof marker "
                 "at $.proof_receipts[1].evidence[3]: shard runtime handoff",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[4]: Run id",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[4]: Selected account",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[4]: Selected model",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[4]: Prompt path",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[4]: Recent stderr tail",
                 result.stderr,
             )
 
