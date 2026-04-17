@@ -319,6 +319,7 @@ LOCAL_RELEASE_PROOF_PACKAGE: dict[str, object] = {
     "package_id": PACKAGE_ID,
     "milestone_id": MILESTONE_ID,
     "frontier_id": FRONTIER_ID,
+    "repo": "chummer6-hub",
     "status": "complete",
     "landed_commit": LANDED_COMMIT,
     "title": "Emit provenance and conflict receipts for workspace restore and continuity",
