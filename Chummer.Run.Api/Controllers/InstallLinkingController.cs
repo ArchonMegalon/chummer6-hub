@@ -400,11 +400,23 @@ public sealed class InstallLinkingController : ControllerBase
         ClaimedInstallationDto installation,
         PublicReleaseArtifactDto? releaseArtifact)
         => installSummary.RecentReceipts
-            .Where(item => string.Equals(item.ArtifactId, installation.ArtifactId, StringComparison.OrdinalIgnoreCase)
-                           || (releaseArtifact is not null && string.Equals(item.ArtifactId, releaseArtifact.Id, StringComparison.OrdinalIgnoreCase))
-                           || MatchesReceiptDeviceTruth(item, installation))
+            .Where(item => MatchesInstalledBuildReceiptTruth(item, installation, releaseArtifact))
             .OrderByDescending(static item => item.IssuedAtUtc)
             .FirstOrDefault();
+
+    private static bool MatchesInstalledBuildReceiptTruth(
+        DownloadReceiptDto receipt,
+        ClaimedInstallationDto installation,
+        PublicReleaseArtifactDto? releaseArtifact)
+    {
+        if (!MatchesReceiptDeviceTruth(receipt, installation))
+        {
+            return false;
+        }
+
+        return string.Equals(receipt.ArtifactId, installation.ArtifactId, StringComparison.OrdinalIgnoreCase)
+               || (releaseArtifact is not null && string.Equals(receipt.ArtifactId, releaseArtifact.Id, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static bool MatchesReceiptDeviceTruth(DownloadReceiptDto receipt, ClaimedInstallationDto installation)
         => string.Equals(receipt.Channel, installation.Channel, StringComparison.OrdinalIgnoreCase)
