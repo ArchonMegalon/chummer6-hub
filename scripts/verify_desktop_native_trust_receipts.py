@@ -644,6 +644,27 @@ def _verify_unique_yaml_anchor(errors: list[str], path: Path, anchor: str, label
         errors.append(f"canonical {label} has {count} rows anchored by: {anchor}")
 
 
+def _verify_queue_mirror_block_matches(
+    errors: list[str],
+    queue_path: Path,
+    design_queue_path: Path,
+) -> None:
+    if not queue_path.is_file() or not design_queue_path.is_file():
+        return
+
+    anchor = f"package_id: {PACKAGE_ID}"
+    queue_block = _extract_yaml_block(queue_path.read_text(encoding="utf-8"), anchor)
+    design_queue_block = _extract_yaml_block(design_queue_path.read_text(encoding="utf-8"), anchor)
+    if queue_block is None or design_queue_block is None:
+        return
+
+    if queue_block != design_queue_block:
+        errors.append(
+            "Fleet successor queue staging block for next90-m102-hub-desktop-native-trust "
+            "drifts from the design-owned successor queue source"
+        )
+
+
 def _extract_yaml_string_list(block: str, key: str) -> list[str] | None:
     lines = block.splitlines()
     for index, line in enumerate(lines):
@@ -1099,6 +1120,7 @@ def main() -> int:
     _verify_unique_yaml_anchor(errors, queue_staging_path, f"package_id: {PACKAGE_ID}", "successor queue staging")
     _verify_unique_yaml_anchor(errors, design_queue_staging_path, f"package_id: {PACKAGE_ID}", "design successor queue staging")
     _verify_unique_yaml_anchor(errors, successor_registry_path, "id: 102.1", "successor registry")
+    _verify_queue_mirror_block_matches(errors, queue_staging_path, design_queue_staging_path)
 
     _verify_marker_block(
         errors,
