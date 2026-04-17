@@ -814,6 +814,10 @@ def check_local_release_proof(path: Path, missing: list[str]) -> None:
     if not isinstance(closed_package, dict):
         missing.append(f"{path}: successor_queue_packages missing {PACKAGE_ID}")
     else:
+        if isinstance(package, dict) and package != closed_package:
+            missing.append(
+                f"{path}: successor_queue_package must mirror successor_queue_packages[{PACKAGE_ID}] exactly"
+            )
         for key, expected in LOCAL_RELEASE_PROOF_PACKAGE.items():
             if closed_package.get(key) != expected:
                 missing.append(f"{path}: successor_queue_packages[{PACKAGE_ID}].{key} must be {expected!r}")
