@@ -10,6 +10,11 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_workspace_restore_receipts.py"
 PACKAGE_ID = "next90-m105-hub-workspace-continuity"
+DO_NOT_REOPEN_REASON = (
+    "M105 chummer6-hub workspace continuity is complete; future shards must verify the workspace "
+    "restore receipt, registry row, queue row, and design-queue row instead of reopening the "
+    "workspace restore and entitlement conflict receipt package."
+)
 
 
 def _remove_package_frontier_id(text: str) -> str:
@@ -290,6 +295,28 @@ def _append_conflicting_queue_status(text: str) -> str:
 
     insert_at = status_index + len(status_marker)
     return text[:insert_at] + "    status: in_progress\n" + text[insert_at:]
+
+
+def _remove_queue_completion_action(text: str) -> str:
+    package_marker = f"    package_id: {PACKAGE_ID}\n"
+    package_index = text.find(package_marker)
+    if package_index == -1:
+        raise AssertionError(f"missing package row for {PACKAGE_ID}")
+
+    marker = "    completion_action: verify_closed_package_only\n"
+    action_index = text.find(marker, package_index)
+    if action_index == -1:
+        raise AssertionError("missing queue completion action")
+
+    return text[:action_index] + text[action_index + len(marker):]
+
+
+def _replace_queue_do_not_reopen_reason(text: str) -> str:
+    marker = f"    do_not_reopen_reason: {DO_NOT_REOPEN_REASON}\n"
+    if marker not in text:
+        raise AssertionError("missing queue do-not-reopen reason")
+
+    return text.replace(marker, "    do_not_reopen_reason: copied closed-package reason\n", 1)
 
 
 def _append_conflicting_registry_status(text: str) -> str:
@@ -959,6 +986,61 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("expected exactly one scalar key 'status'; found 2", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
+    def test_verifier_requires_closed_package_queue_action(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-action-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                _remove_queue_completion_action(source_queue_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("completion_action: verify_closed_package_only", result.stderr)
+        self.assertIn(PACKAGE_ID, result.stderr)
+
+    def test_verifier_requires_package_specific_do_not_reopen_reason(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-reason-") as temp_dir:
+            queue_path = Path(temp_dir) / "fleet-queue.yaml"
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_path.write_text(
+                _replace_queue_do_not_reopen_reason(source_queue_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("do_not_reopen_reason", result.stderr)
+        self.assertIn("workspace restore and entitlement conflict receipt package", result.stderr)
         self.assertIn(PACKAGE_ID, result.stderr)
 
     def test_verifier_rejects_widened_queue_allowed_paths(self) -> None:

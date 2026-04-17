@@ -55,6 +55,12 @@ LANDED_COMMIT = "4d4b3856"
 FRONTIER_ID = 4623636482
 MILESTONE_ID = 105
 PACKAGE_REPO_ROOT = "/docker/chummercomplete/chummer.run-services/"
+COMPLETION_ACTION = "verify_closed_package_only"
+DO_NOT_REOPEN_REASON = (
+    "M105 chummer6-hub workspace continuity is complete; future shards must verify the workspace "
+    "restore receipt, registry row, queue row, and design-queue row instead of reopening the "
+    "workspace restore and entitlement conflict receipt package."
+)
 ALLOWED_PROOF_PATH_PREFIXES = (
     "Chummer.Run.Api/",
     "scripts/",
@@ -502,6 +508,8 @@ QUEUE_STAGING_MARKERS = [
     "milestone_id: 105",
     "repo: chummer6-hub",
     "status: complete",
+    f"completion_action: {COMPLETION_ACTION}",
+    f"do_not_reopen_reason: {DO_NOT_REOPEN_REASON}",
     f"landed_commit: {LANDED_COMMIT}",
     f"/docker/chummercomplete/chummer.run-services commit {LANDED_COMMIT} emits workspace_restore provenance receipts",
     "/docker/chummercomplete/chummer.run-services commit 5796e220 wires the M105 workspace restore verifier into scripts/ai/verify.sh so standard Hub verification runs the closed-package guard.",
@@ -641,6 +649,8 @@ QUEUE_REQUIRED_SCALARS = [
     "    wave: W8\n",
     "    repo: chummer6-hub\n",
     "    status: complete\n",
+    f"    completion_action: {COMPLETION_ACTION}\n",
+    f"    do_not_reopen_reason: {DO_NOT_REOPEN_REASON}\n",
     f"    landed_commit: {LANDED_COMMIT}\n",
 ]
 
