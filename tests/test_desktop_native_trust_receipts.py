@@ -1990,6 +1990,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "39c0ae8d",
                 "8e90aac9",
                 "b27c5142",
+                "bc52177b",
             ],
             verifier._required_resolving_commits(),
         )
