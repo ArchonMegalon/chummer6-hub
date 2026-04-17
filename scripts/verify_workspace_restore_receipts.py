@@ -163,6 +163,8 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "58edeea6",
     "586ad535",
     "54d3756f",
+    "c6f0439e",
+    "db056eb5",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -406,6 +408,8 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 58edeea6 tightens the M105 worker-context field guard so queue proof cannot cite task-local run context fields.",
     "/docker/chummercomplete/chummer.run-services commit 586ad535 tightens the M105 successor handoff proof guard so completed-package proof cannot cite copied handoff-context run fields.",
     "/docker/chummercomplete/chummer.run-services commit 54d3756f tightens the M105 successor prompt proof guard so copied successor frontier id, assigned package, and execution-rule fields cannot close the completed workspace package.",
+    "/docker/chummercomplete/chummer.run-services commit c6f0439e pins the M105 successor handoff proof floor so future shards verify the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit db056eb5 pins the M105 successor prompt proof floor so future shards verify the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -505,6 +509,8 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer.run-services commit 58edeea6 tightens the M105 worker-context field guard so queue proof cannot cite task-local run context fields.",
     "/docker/chummercomplete/chummer.run-services commit 586ad535 tightens the M105 successor handoff proof guard so completed-package proof cannot cite copied handoff-context run fields.",
     "/docker/chummercomplete/chummer.run-services commit 54d3756f tightens the M105 successor prompt proof guard so copied successor frontier id, assigned package, and execution-rule fields cannot close the completed workspace package.",
+    "/docker/chummercomplete/chummer.run-services commit c6f0439e pins the M105 successor handoff proof floor so future shards verify the latest closed-package guard.",
+    "/docker/chummercomplete/chummer.run-services commit db056eb5 pins the M105 successor prompt proof floor so future shards verify the latest closed-package guard.",
     "/docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer.run-services/scripts/ai/verify.sh",
