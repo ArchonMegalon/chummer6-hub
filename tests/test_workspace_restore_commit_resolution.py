@@ -231,6 +231,8 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"1392cc11"', script_text)
         self.assertIn('"0fbc8f96"', script_text)
         self.assertIn("commit 0fbc8f96 tightens M105 local release proof package-shape guard", script_text)
+        self.assertIn('"87115e9c"', script_text)
+        self.assertIn("commit 87115e9c pins the M105 workspace proof package-shape guard", script_text)
         self.assertIn("/docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
 
     def test_all_registry_and_queue_commit_citations_are_required_to_resolve(self) -> None:
