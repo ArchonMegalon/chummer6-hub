@@ -715,15 +715,17 @@ def _verify_marker_block(
             errors.append(f"canonical {label} block missing marker: {marker}")
 
     if forbidden_markers is not None:
-        block_folded = block.casefold()
         marker_matches = (
-            FORBIDDEN_PROOF_MARKER_MATCHES
+            _forbidden_markers_in_text(block)
             if forbidden_markers == FORBIDDEN_PROOF_MARKERS
-            else [(marker, marker.casefold()) for marker in forbidden_markers]
+            else [
+                marker
+                for marker in forbidden_markers
+                if marker.casefold() in block.casefold()
+            ]
         )
-        for marker, marker_folded in marker_matches:
-            if marker_folded in block_folded:
-                errors.append(f"canonical {label} block has forbidden active-run proof marker: {marker}")
+        for marker in marker_matches:
+            errors.append(f"canonical {label} block has forbidden active-run proof marker: {marker}")
 
     if required_lists is not None:
         for key, expected_values in required_lists.items():
