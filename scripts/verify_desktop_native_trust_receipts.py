@@ -1043,6 +1043,22 @@ def _verify_static_proof_file(errors: list[str], path: Path, label: str) -> None
     _verify_m102_proof_payload(errors, proof, label)
 
 
+def _verify_served_proof_matches_published(errors: list[str], proof_path: Path, served_proof_path: Path) -> None:
+    if not proof_path.is_file() or not served_proof_path.is_file():
+        return
+
+    published = _stable_json_payload(proof_path, errors, "published proof file")
+    served = _stable_json_payload(served_proof_path, errors, "served release proof file")
+    if published is None or served is None:
+        return
+
+    if served != published:
+        errors.append(
+            "served HUB_LOCAL_RELEASE_PROOF.generated.json drifts from "
+            "published HUB_LOCAL_RELEASE_PROOF.generated.json for next90-m102-hub-desktop-native-trust"
+        )
+
+
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     errors: list[str] = []
@@ -1069,7 +1085,9 @@ def main() -> int:
         else:
             _verify_m102_proof_payload(errors, proof, "published proof file")
 
-    _verify_static_proof_file(errors, _served_proof_path(repo_root), "served release proof file")
+    served_proof_path = _served_proof_path(repo_root)
+    _verify_static_proof_file(errors, served_proof_path, "served release proof file")
+    _verify_served_proof_matches_published(errors, proof_path, served_proof_path)
 
     queue_staging_path = _configured_path("CHUMMER_NEXT90_QUEUE_STAGING_PATH", DEFAULT_QUEUE_STAGING_PATH)
     design_queue_staging_path = _configured_path("CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH", DEFAULT_DESIGN_QUEUE_STAGING_PATH)
