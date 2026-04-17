@@ -402,11 +402,16 @@ public sealed class InstallLinkingController : ControllerBase
         => installSummary.RecentReceipts
             .Where(item => string.Equals(item.ArtifactId, installation.ArtifactId, StringComparison.OrdinalIgnoreCase)
                            || (releaseArtifact is not null && string.Equals(item.ArtifactId, releaseArtifact.Id, StringComparison.OrdinalIgnoreCase))
-                           || (string.Equals(item.Channel, installation.Channel, StringComparison.OrdinalIgnoreCase)
-                               && string.Equals(item.Version, installation.Version, StringComparison.OrdinalIgnoreCase)
-                               && string.Equals(item.Head, installation.HeadId, StringComparison.OrdinalIgnoreCase)))
+                           || MatchesReceiptDeviceTruth(item, installation))
             .OrderByDescending(static item => item.IssuedAtUtc)
             .FirstOrDefault();
+
+    private static bool MatchesReceiptDeviceTruth(DownloadReceiptDto receipt, ClaimedInstallationDto installation)
+        => string.Equals(receipt.Channel, installation.Channel, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(receipt.Version, installation.Version, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(receipt.Head, installation.HeadId, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(receipt.Platform, installation.Platform, StringComparison.OrdinalIgnoreCase)
+           && string.Equals(receipt.Arch, installation.Arch, StringComparison.OrdinalIgnoreCase);
 
     private static bool IsUpdateAvailable(ClaimedInstallationDto installation, PublicReleaseManifestDto manifest, PublicReleaseArtifactDto? releaseArtifact)
     {

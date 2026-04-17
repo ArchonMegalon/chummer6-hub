@@ -161,6 +161,7 @@ internal static class InstallLinkingContinuationVerification
 
             VerificationAssert.Equal("install-native", response.InstallationId, "Continuation should stay bound to the claimed install.");
             VerificationAssert.True(string.Equals(response.InstalledBuildReceiptId, "receipt-old", StringComparison.Ordinal), "Continuation should cite the installed build receipt.");
+            VerificationAssert.True(response.InstalledBuildReceiptId != "receipt-other-platform", "Continuation should not attach a newer receipt from another desktop platform.");
             VerificationAssert.True(response.UpdateAvailable, "Continuation should mark a newer release as update-available.");
             VerificationAssert.Equal("0.7.1-preview", response.CurrentReleaseVersion, "Continuation should include current release truth.");
             VerificationAssert.True(response.FallbackPosture.Contains("Claim codes are a recovery fallback", StringComparison.Ordinal), "Continuation should expose fallback posture so desktop, support, and download surfaces agree.");
@@ -216,6 +217,25 @@ internal static class InstallLinkingContinuationVerification
                 SubjectId: "subject.native",
                 ClaimTicketId: "ticket-native",
                 ClaimCode: "AAAAA-BBBBB-CCCCC-DDDDD",
+                ClaimTicketExpiresAtUtc: now.AddHours(1));
+            store.ReceiptsById["receipt-other-platform"] = new DownloadReceiptDto(
+                ReceiptId: "receipt-other-platform",
+                ArtifactId: "avalonia-win-x64-installer",
+                ArtifactLabel: "windows",
+                FileName: "chummer-avalonia-win-x64-installer.exe",
+                DownloadUrl: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                Channel: "preview",
+                Version: "0.7.0-preview",
+                Head: "avalonia",
+                Platform: "windows",
+                Arch: "x64",
+                Kind: "installer",
+                InstallAccessClass: InstallAccessClasses.AccountRequired,
+                IssuedAtUtc: now.AddHours(-1),
+                UserId: "usr-native",
+                SubjectId: "subject.native",
+                ClaimTicketId: "ticket-other-platform",
+                ClaimCode: "ZZZZZ-YYYYY-XXXXX-WWWWW",
                 ClaimTicketExpiresAtUtc: now.AddHours(1));
             store.InstallationsById["install-native"] = new ClaimedInstallationDto(
                 InstallationId: "install-native",
