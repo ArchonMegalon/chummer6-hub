@@ -1205,6 +1205,12 @@ def main() -> int:
             proof_text = PROOF_PATH.read_text(encoding="utf-8")
             reject_forbidden_markers(str(PROOF_PATH), proof_text, FORBIDDEN_PROOF_MARKERS, missing)
             payload = json.loads(proof_text)
+            if payload.get("status") != "passed":
+                missing.append(f"{PROOF_PATH}: status must be passed")
+            if payload.get("proof_kind") != "source_backed_local_smoke_contract":
+                missing.append(f"{PROOF_PATH}: proof_kind must be source_backed_local_smoke_contract")
+            if payload.get("source_file") != "tests/RunServicesSmoke/Program.cs":
+                missing.append(f"{PROOF_PATH}: source_file must be tests/RunServicesSmoke/Program.cs")
             proof_markers = flatten_required_markers(payload)
         except (json.JSONDecodeError, ValueError) as exc:
             missing.append(f"invalid local campaign OS proof: {PROOF_PATH}: {exc}")
