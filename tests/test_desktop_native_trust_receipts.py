@@ -123,6 +123,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer.run-services commit b27c5142 pins the M102 app-local proof floor guard.",
     "      - /docker/chummercomplete/chummer.run-services commit cd392a72 pins the M102 current proof floor guard.",
     "      - /docker/chummercomplete/chummer.run-services commit 41d7ed57 pins the M102 current desktop trust floor.",
+    "      - /docker/chummercomplete/chummer.run-services commit bd60fc5a tightens M102 active-run evidence path guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -242,6 +243,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer.run-services commit b27c5142 pins the M102 app-local proof floor guard.",
     "          - /docker/chummercomplete/chummer.run-services commit cd392a72 pins the M102 current proof floor guard.",
     "          - /docker/chummercomplete/chummer.run-services commit 41d7ed57 pins the M102 current desktop trust floor.",
+    "          - /docker/chummercomplete/chummer.run-services commit bd60fc5a tightens M102 active-run evidence path guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -315,18 +317,19 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("41d7ed57", verifier._current_local_proof_floor_commit())
+        self.assertEqual("bd60fc5a", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "Pin M102 current desktop trust floor",
+            "Tighten M102 active-run evidence path guard",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("bd60fc5a", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("41d7ed57", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("cd392a72", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertTrue(
-            any("commit 41d7ed57 pins the M102 current desktop trust floor." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+            any("commit bd60fc5a tightens M102 active-run evidence path guard." in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         )
         self.assertTrue(
-            any("commit 41d7ed57 pins the M102 current desktop trust floor." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+            any("commit bd60fc5a tightens M102 active-run evidence path guard." in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_materializer_publishes_m102_desktop_native_trust_receipts(self) -> None:
@@ -2071,6 +2074,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "bc52177b",
                 "cd392a72",
                 "41d7ed57",
+                "bd60fc5a",
             ],
             verifier._required_resolving_commits(),
         )
