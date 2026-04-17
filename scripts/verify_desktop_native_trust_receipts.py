@@ -32,6 +32,8 @@ REQUIRED_SOURCE_MARKERS = {
         "string.Equals(parsed.Scheme, \"chummer\", StringComparison.OrdinalIgnoreCase)",
         "string.Equals(parsed.Host, \"install-link\", StringComparison.OrdinalIgnoreCase)",
         "IsAppLocalCallbackHost(parsed.Host)",
+        "IsAppLocalInstallLinkCallbackPath(parsed.AbsolutePath)",
+        "AppLocalInstallLinkCallbackPath = \"/install-link/callback\"",
         "System.Net.IPAddress.IsLoopback(address)",
         "string.Equals(host, \"localhost\", StringComparison.OrdinalIgnoreCase)",
         "[\"installLinkTransport\"] = \"grant_callback\"",
@@ -80,7 +82,9 @@ REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs"): [
         "Browser_install_link_preserves_app_local_callback_targets",
         "http://127.0.0.1:47761/install-link/callback?state=desktop&nonce=callback-proof",
+        "http://127.0.0.1:47761/browser-only/claim?state=desktop",
         "http://[::1]:47763/install-link/callback?state=desktop",
+        "https://localhost:47762/account/access/install-link",
         "https://localhost:47762/install-link/callback",
         "The controller should emit a valid app-local callback URI.",
         'Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);',
