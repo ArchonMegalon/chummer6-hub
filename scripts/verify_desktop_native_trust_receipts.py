@@ -13,8 +13,8 @@ from pathlib import Path
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
-CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "894dbedd"
-CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Pin M102 current proof floor"
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "e24162d9"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Require M102 desktop trust proof citation"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -292,6 +292,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 93e5075a tightens M102 current proof floor guard.",
         "/docker/chummercomplete/chummer.run-services commit 894dbedd pins M102 current proof floor.",
         "/docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit e24162d9 requires M102 desktop trust proof citation.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -413,6 +414,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer.run-services commit 93e5075a tightens M102 current proof floor guard.",
         "/docker/chummercomplete/chummer.run-services commit 894dbedd pins M102 current proof floor.",
         "/docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
+        "/docker/chummercomplete/chummer.run-services commit e24162d9 requires M102 desktop trust proof citation.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -585,6 +587,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "93e5075a",
     "894dbedd",
     "997337a6",
+    "e24162d9",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
