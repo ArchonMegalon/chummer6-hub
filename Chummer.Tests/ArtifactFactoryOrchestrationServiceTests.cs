@@ -1280,6 +1280,52 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchSourcePackBatchRejectsFormatOverridesOutsideRequiredFamilies()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
+            BatchId: "next90-m107-source-pack-format-drift",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-linux-x64-installer"),
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "publication-pack-redmond-brief",
+                    SourcePackKind: "creator_publication",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "publication:redmond-brief:v3",
+                    EvidenceRefs:
+                    [
+                        "publication:redmond-brief:v3",
+                        "moderation:approved:redmond-brief",
+                        "public-shelf:/artifacts/publications/redmond-brief"
+                    ],
+                    PublicationId: "redmond-brief")
+            ],
+            RequestedFormats:
+            [
+                new ArtifactFactoryFamilyFormatOverride("release", ["packet"]),
+                new ArtifactFactoryFamilyFormatOverride("publication", ["caption"])
+            ],
+            RequiredFamilies: ["release"])));
+
+        Assert.Contains("requested formats for family/families not required", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("publication", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchSourcePackBatchRejectsDuplicatePackIdsBeforeFamilySelection()
     {
         ArtifactFactoryOrchestrationService service = new();

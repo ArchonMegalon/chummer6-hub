@@ -365,6 +365,57 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ValidateSourcePackBatchSourcePacks", result.stderr)
 
+    def test_verifier_fails_closed_when_source_pack_batch_format_scope_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-format-scope-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        RejectRequestedFormatOverridesOutsideRequiredFamilies(request.BatchId, requestedFormatsByFamily, requiredFamilies);\n",
+                    "",
+                ).replace(
+                    "\n    private static void RejectRequestedFormatOverridesOutsideRequiredFamilies(\n"
+                    "        string batchId,\n"
+                    "        IReadOnlyDictionary<string, IReadOnlyList<string>> requestedFormatsByFamily,\n"
+                    "        IReadOnlyList<string> requiredFamilies)\n"
+                    "    {\n"
+                    "        string[] extraFamilies = requestedFormatsByFamily.Keys\n"
+                    "            .Where(family => !requiredFamilies.Contains(family, StringComparer.OrdinalIgnoreCase))\n"
+                    "            .Order(StringComparer.OrdinalIgnoreCase)\n"
+                    "            .ToArray();\n"
+                    "        if (extraFamilies.Length > 0)\n"
+                    "        {\n"
+                    "            throw new InvalidDataException(\n"
+                    "                $\"artifact factory source-pack batch '{batchId.Trim()}' requested formats for family/families not required by the batch: {string.Join(\", \", extraFamilies)}.\");\n"
+                    "        }\n"
+                    "    }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("RejectRequestedFormatOverridesOutsideRequiredFamilies", result.stderr)
+
     def test_verifier_fails_closed_when_batch_stable_segment_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-id-proof-") as temp_dir:
             temp_root = Path(temp_dir)
