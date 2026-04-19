@@ -5679,7 +5679,7 @@ echo "Help: ${HELP_URL}"
         [
             new("CHUMMER_UI_REF", "main", "CHUMMER_UI_EXPECTED_COMMIT", "8e57095ad0688754c74e9d8aa911f01f6895902f"),
             new("CHUMMER_CORE_REF", "main", "CHUMMER_CORE_EXPECTED_COMMIT", "ae55923f1cb6c8fdf40748f7e2600815be123e1e"),
-            new("CHUMMER_HUB_REF", "main", "CHUMMER_HUB_EXPECTED_COMMIT", "ec42f0ce1c8cf239d3bd578ecacb3bc21c9dbb47"),
+            new("CHUMMER_HUB_REF", "release-upload-hub-proof-routes-20260419", "CHUMMER_HUB_EXPECTED_COMMIT", "5dcde8a9746ecb2f02c70e8181be662f198af84d"),
             new("CHUMMER_UI_KIT_REF", "fleet/ui-kit", "CHUMMER_UI_KIT_EXPECTED_COMMIT", "2ef502630a2d1cd20350f9b0f134af0bac0fe863"),
             new("CHUMMER_HUB_REGISTRY_REF", "main", "CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT", "85f6c1bdb5054b3fccea1d9115d20a1c6b5cd959"),
             new("CHUMMER_MEDIA_FACTORY_REF", "main", "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT", "e16286ca8c9bad84ff217466c72721ebcdbf48b5"),
