@@ -547,8 +547,11 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(IsBrowserRailHrefForVerification("\\account\\support\\case-123"), "Native support action sanitizer should treat Windows-style account support paths as browser rails.");
             VerificationAssert.True(IsBrowserRailHrefForVerification("%5Cdownloads%5Cinstall%5Ccurrent"), "Native support action sanitizer should treat encoded Windows-style download paths as browser rails.");
             VerificationAssert.True(!IsBrowserRailHrefForVerification("/api/v1/install-linking/continuation"), "Native support action sanitizer should keep grant-bound API continuation URLs native.");
+            VerificationAssert.True(!IsBrowserRailHrefForVerification("https://chummer.run/api/v1/install-linking/continuation/update"), "Native support action sanitizer should keep trusted absolute grant-bound API continuation URLs native.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://unexpected.example/support/case-123"), "Native support action sanitizer should fail closed when support presentation returns an unexpected external action.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://unexpected.example/api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving absolute native-looking actions.");
+            VerificationAssert.Equal("/api/v1/install-linking/continuation/update", BuildNativeSupportCaseActionHrefForVerification("https://chummer.run/api/v1/install-linking/continuation/update"), "Native support action sanitizer should preserve trusted absolute Hub-native update actions.");
+            VerificationAssert.Equal("/api/v1/install-linking/continuation/support", BuildNativeSupportCaseActionHrefForVerification("http://127.0.0.1:47761/api/v1/install-linking/continuation/support", reporterActionNeeded: true), "Native support action sanitizer should preserve trusted app-local native support actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("//api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving scheme-relative native-looking actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("///api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving repeated-slash native-looking actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving bare relative native-looking actions.");
@@ -586,6 +589,49 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(!staleReceiptLabelCase.Detail.Contains("receiptId=stale-receipt", StringComparison.Ordinal), "Native support case should not persist stale receipt ids from desktop requested-action hints.");
             VerificationAssert.True(!staleReceiptLabelCase.Detail.Contains("installedBuildReceiptId=stale-installed-receipt", StringComparison.Ordinal), "Native support case should not persist stale installed-build receipt ids from desktop requested-action hints.");
             VerificationAssert.True(!staleReceiptLabelCase.Detail.Contains("installationId=wrong-install", StringComparison.Ordinal), "Native support case should not persist stale install identity from desktop requested-action hints.");
+
+            ActionResult<DesktopInstallNativeSupportResponse> fragmentSecretSupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app fragment secret label",
+                    Summary: "The app sent install-link secrets in the requested-action fragment while filing native support.",
+                    Detail: "Desktop payload included fragment-carried install-link continuation state.",
+                    RequestedActionHref: "/install-link/callback#state=desktop&accessToken=fragment-access-token&grantId=fragment-grant&claimCode=fragment-claim&receiptId=fragment-receipt&installedBuildReceiptId=fragment-installed-receipt&installationId=fragment-install"));
+            ObjectResult fragmentSecretAccepted = fragmentSecretSupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with fragment-carried secrets.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, fragmentSecretAccepted.StatusCode ?? 0, "Native support continuation should still file support when the desktop requested action carries fragment secrets.");
+            DesktopInstallNativeSupportResponse fragmentSecretSupport = fragmentSecretAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed fragment-secret response.");
+            SupportCaseProjection? fragmentSecretCase = supportCases.GetForReporter(fragmentSecretSupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(fragmentSecretCase is not null, "Native support continuation should create the fragment-secret support case.");
+            VerificationAssert.True(fragmentSecretCase!.Detail.Contains("#state=desktop&accessToken=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact reserved fragment secrets from the desktop requested action.");
+            VerificationAssert.True(!fragmentSecretCase.Detail.Contains("fragment-access-token", StringComparison.Ordinal), "Native support case should not persist fragment access tokens from desktop requested-action hints.");
+            VerificationAssert.True(!fragmentSecretCase.Detail.Contains("fragment-grant", StringComparison.Ordinal), "Native support case should not persist fragment grant ids from desktop requested-action hints.");
+            VerificationAssert.True(!fragmentSecretCase.Detail.Contains("fragment-claim", StringComparison.Ordinal), "Native support case should not persist fragment claim codes from desktop requested-action hints.");
+            VerificationAssert.True(!fragmentSecretCase.Detail.Contains("fragment-receipt", StringComparison.Ordinal), "Native support case should not persist fragment receipt ids from desktop requested-action hints.");
+            VerificationAssert.True(!fragmentSecretCase.Detail.Contains("fragment-installed-receipt", StringComparison.Ordinal), "Native support case should not persist fragment installed-build receipt ids from desktop requested-action hints.");
+            VerificationAssert.True(!fragmentSecretCase.Detail.Contains("fragment-install", StringComparison.Ordinal), "Native support case should not persist fragment install identity from desktop requested-action hints.");
+
+            ActionResult<DesktopInstallNativeSupportResponse> mixedQueryAndFragmentSupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app mixed query and fragment label",
+                    Summary: "The app kept desktop listener state in query while fragment-carried install-link secrets were present.",
+                    Detail: "Desktop payload mixed listener state and fragment-carried install-link continuation state.",
+                    RequestedActionHref: "/install-link/callback?state=desktop&nonce=query-proof#accessToken=fragment-access-token&grantId=fragment-grant&claimCode=fragment-claim"));
+            ObjectResult mixedQueryAndFragmentAccepted = mixedQueryAndFragmentSupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with mixed query and fragment continuation state.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, mixedQueryAndFragmentAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop listener query state and fragment secrets arrive together.");
+            DesktopInstallNativeSupportResponse mixedQueryAndFragmentSupport = mixedQueryAndFragmentAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed mixed-query-and-fragment response.");
+            SupportCaseProjection? mixedQueryAndFragmentCase = supportCases.GetForReporter(mixedQueryAndFragmentSupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(mixedQueryAndFragmentCase is not null, "Native support continuation should create the mixed-query-and-fragment support case.");
+            VerificationAssert.True(mixedQueryAndFragmentCase!.Detail.Contains("/install-link/callback?state=desktop&nonce=query-proof#accessToken=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should preserve app-local listener query state while redacting fragment-carried install-link secrets.");
+            VerificationAssert.True(!mixedQueryAndFragmentCase.Detail.Contains("fragment-access-token", StringComparison.Ordinal), "Native support case should not persist fragment access tokens when query state is also present.");
+            VerificationAssert.True(!mixedQueryAndFragmentCase.Detail.Contains("fragment-grant", StringComparison.Ordinal), "Native support case should not persist fragment grant ids when query state is also present.");
+            VerificationAssert.True(!mixedQueryAndFragmentCase.Detail.Contains("fragment-claim", StringComparison.Ordinal), "Native support case should not persist fragment claim codes when query state is also present.");
 
             ActionResult<DesktopInstallNativeContinuationResponse> unauthorizedResult = controller.ContinueClaimedInstall(
                 new DesktopInstallNativeContinuationRequest("install-native", "wrong-token"));

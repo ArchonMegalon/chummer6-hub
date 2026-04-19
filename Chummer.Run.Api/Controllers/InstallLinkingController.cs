@@ -574,21 +574,63 @@ public sealed class InstallLinkingController : ControllerBase
 
     private static string RedactNativeRequestedActionHref(string href)
     {
-        if (!Uri.TryCreate(href, UriKind.Absolute, out Uri? parsedUri)
+        bool absoluteInput = Uri.TryCreate(href, UriKind.Absolute, out Uri? parsedUri);
+        if (!absoluteInput
             && !Uri.TryCreate($"https://chummer.run{(href.StartsWith("/", StringComparison.Ordinal) ? href : $"/{href}")}", UriKind.Absolute, out parsedUri))
         {
             return href;
         }
 
-        Uri absoluteUri = parsedUri;
-        if (string.IsNullOrEmpty(absoluteUri.Query))
+        if (parsedUri is null)
         {
             return href;
         }
 
+        Uri absoluteUri = parsedUri;
+        string sanitizedQuery = SanitizeInstallLinkSecretQueryComponent(
+            absoluteUri.Query,
+            prefix: "?",
+            out bool queryRedacted);
+        string sanitizedFragment = SanitizeInstallLinkSecretQueryComponent(
+            absoluteUri.Fragment,
+            prefix: "#",
+            out bool fragmentRedacted);
+
+        if (!queryRedacted && !fragmentRedacted)
+        {
+            return href;
+        }
+
+        string pathAndQuery = absoluteUri.AbsolutePath;
+        if (!string.IsNullOrEmpty(sanitizedQuery))
+        {
+            pathAndQuery = $"{pathAndQuery}{sanitizedQuery}";
+        }
+
+        string fragment = fragmentRedacted
+            ? sanitizedFragment
+            : absoluteUri.Fragment;
+        if (absoluteInput)
+        {
+            return $"{absoluteUri.Scheme}://{absoluteUri.Authority}{pathAndQuery}{fragment}";
+        }
+
+        return $"{pathAndQuery}{fragment}";
+    }
+
+    private static string SanitizeInstallLinkSecretQueryComponent(string component, string prefix, out bool redacted)
+    {
+        redacted = false;
+        if (string.IsNullOrEmpty(component)
+            || !component.StartsWith(prefix, StringComparison.Ordinal)
+            || component.Length == prefix.Length
+            || !component.Contains('=', StringComparison.Ordinal))
+        {
+            return component;
+        }
+
         Dictionary<string, string?> sanitizedQuery = new(StringComparer.OrdinalIgnoreCase);
-        bool redacted = false;
-        foreach (var item in QueryHelpers.ParseQuery(absoluteUri.Query))
+        foreach (var item in QueryHelpers.ParseQuery(component.Replace(prefix, "?", StringComparison.Ordinal)))
         {
             if (InstallLinkCallbackReservedQueryKeys.Contains(item.Key))
             {
@@ -602,13 +644,16 @@ public sealed class InstallLinkingController : ControllerBase
 
         if (!redacted)
         {
-            return href;
+            return component;
         }
 
-        string pathAndQuery = QueryHelpers.AddQueryString(absoluteUri.AbsolutePath, sanitizedQuery);
-        return Uri.TryCreate(href, UriKind.Absolute, out _)
-            ? $"{absoluteUri.Scheme}://{absoluteUri.Authority}{pathAndQuery}{absoluteUri.Fragment}"
-            : $"{pathAndQuery}{absoluteUri.Fragment}";
+        string sanitized = QueryHelpers.AddQueryString(string.Empty, sanitizedQuery);
+        if (string.IsNullOrEmpty(sanitized))
+        {
+            return string.Empty;
+        }
+
+        return $"{prefix}{sanitized.TrimStart('?')}";
     }
 
     private static string AppendNativeRouteReceiptDetail(string detail)
@@ -815,7 +860,16 @@ public sealed class InstallLinkingController : ControllerBase
             return null;
         }
 
-        if (!trimmed.StartsWith("/", StringComparison.Ordinal))
+        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absoluteUri))
+        {
+            if (!IsTrustedNativeInstallRailAbsoluteUri(absoluteUri))
+            {
+                return null;
+            }
+
+            trimmed = absoluteUri.AbsolutePath;
+        }
+        else if (!trimmed.StartsWith("/", StringComparison.Ordinal))
         {
             return null;
         }
@@ -847,6 +901,16 @@ public sealed class InstallLinkingController : ControllerBase
             ? NativeRollbackHref
             : null;
     }
+
+    private static bool IsTrustedNativeInstallRailAbsoluteUri(Uri absoluteUri)
+        => (string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
+           && IsTrustedNativeInstallRailHost(absoluteUri.Host);
+
+    private static bool IsTrustedNativeInstallRailHost(string host)
+        => string.Equals(host, "chummer.run", StringComparison.OrdinalIgnoreCase)
+           || string.Equals(host, "www.chummer.run", StringComparison.OrdinalIgnoreCase)
+           || IsAppLocalCallbackHost(host);
 
     private static bool ContainsEncodedPathSeparator(string href)
         => href.Contains("%2f", StringComparison.OrdinalIgnoreCase)
