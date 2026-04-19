@@ -88,6 +88,71 @@
       "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture."
     }
   ],
+  "successor_queue_packages_by_id": {
+    "next90-m102-hub-desktop-native-trust": {
+      "package_id": "next90-m102-hub-desktop-native-trust",
+      "milestone_id": 102,
+      "frontier_id": 2897065929,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M102 chummer6-hub desktop-native trust is complete; future shards must verify this receipt, registry row, queue row, and design-queue row instead of reopening the claim/install/update/rollback/support continuation package.",
+      "landed_commit": "160af58f",
+      "title": "Unify claim, install, update, and support recovery into one desktop-native flow",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "desktop_native_claim_and_recovery",
+        "support_followthrough:install_truth"
+      ],
+      "exit_criterion": "Claim, update, rollback, recovery, and support followthrough happen from the installer or app, not as browser ritual."
+    },
+    "next90-m107-hub-artifact-factory": {
+      "package_id": "next90-m107-hub-artifact-factory",
+      "milestone_id": 107,
+      "frontier_id": 1421219975,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M107 chummer6-hub artifact factory orchestration is complete; future shards must verify this receipt, registry row, Fleet queue row, and design queue row instead of reopening the artifact-factory orchestration and public proof shelf release-bundles package.",
+      "landed_commit": "b9e6b52e",
+      "title": "Stand up artifact-factory orchestration for release, support, and publication bundles",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "artifact_factory:orchestration",
+        "public_proof_shelf:release_bundles"
+      ],
+      "exit_criterion": "Release, fix, support, and publication explainers can ship as approved video, audio, preview, and packet bundles from the same underlying release and support truth."
+    },
+    "next90-m105-hub-workspace-continuity": {
+      "package_id": "next90-m105-hub-workspace-continuity",
+      "milestone_id": 105,
+      "frontier_id": 4623636482,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M105 chummer6-hub workspace continuity is complete; future shards must verify the workspace restore receipt, registry row, queue row, and design-queue row instead of reopening the workspace restore and entitlement conflict receipt package.",
+      "landed_commit": "4d4b3856",
+      "title": "Emit provenance and conflict receipts for workspace restore and continuity",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "workspace_restore:provenance",
+        "entitlement_sync:conflict_receipts"
+      ],
+      "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture."
+    }
+  },
   "base_url": "https://chummer.run",
   "compose_file": "docker-compose.yml",
   "playwright_timeout_seconds": 120,
@@ -199,6 +264,6 @@
       ]
     }
   ],
-  "generated_at": "2026-04-19T05:11:30Z",
-  "generatedAt": "2026-04-19T05:11:30Z"
+  "generated_at": "2026-04-19T10:26:33Z",
+  "generatedAt": "2026-04-19T10:26:33Z"
 }

@@ -1610,6 +1610,29 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
             if actual != expected:
                 errors.append(f"{label} proof package has wrong {key}: expected {expected!r}, got {actual!r}")
 
+    package_index = proof.get("successor_queue_packages_by_id")
+    indexed_package = None
+    if not isinstance(package_index, dict):
+        errors.append(f"{label} missing object field: successor_queue_packages_by_id")
+    else:
+        indexed_package = package_index.get(PACKAGE_ID)
+        if not isinstance(indexed_package, dict):
+            errors.append(
+                f"{label} missing successor_queue_packages_by_id entry for next90-m102-hub-desktop-native-trust"
+            )
+        else:
+            for key, expected in REQUIRED_PROOF_PACKAGE.items():
+                actual = indexed_package.get(key)
+                if actual != expected:
+                    errors.append(
+                        f"{label} indexed proof package has wrong {key}: expected {expected!r}, got {actual!r}"
+                    )
+
+    if isinstance(proof_package, dict) and isinstance(indexed_package, dict) and indexed_package != proof_package:
+        errors.append(
+            f"{label} successor_queue_packages_by_id[{PACKAGE_ID}] must mirror successor_queue_packages[{PACKAGE_ID}] exactly"
+        )
+
     if isinstance(packages, list):
         for item in packages:
             if not isinstance(item, dict):
