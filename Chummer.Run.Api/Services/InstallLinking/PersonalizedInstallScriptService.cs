@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Chummer.Run.Api.Services.InstallLinking;
 
@@ -20,6 +21,8 @@ public sealed record PersonalizedInstallScriptLinkDto(
     string Status,
     string? UserId = null,
     string? SubjectId = null,
+    string? RenderedScript = null,
+    string? RenderedScriptSha256 = null,
     DateTimeOffset? ConsumedAtUtc = null);
 
 public enum PersonalizedInstallScriptConsumeStatus
@@ -55,12 +58,22 @@ public sealed class PersonalizedInstallScriptService
         string artifactId,
         IEnumerable<string>? allowedArtifactIds,
         string? userId,
-        string? subjectId)
+        string? subjectId,
+        string? renderedScript = null,
+        string? renderedScriptSha256 = null)
     {
         string normalizedArtifactId = NormalizeRequired(artifactId, nameof(artifactId));
         string[] normalizedAllowedArtifactIds = NormalizeAllowedArtifactIds(normalizedArtifactId, allowedArtifactIds);
         string? normalizedUserId = NormalizeOptional(userId);
         string? normalizedSubjectId = NormalizeOptional(subjectId);
+        string? normalizedRenderedScript = NormalizeOptional(renderedScript);
+        string? normalizedRenderedScriptSha256 = NormalizeOptional(renderedScriptSha256);
+        if (normalizedRenderedScriptSha256 is null && normalizedRenderedScript is not null)
+        {
+            normalizedRenderedScriptSha256 = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(normalizedRenderedScript)))
+                .ToLowerInvariant();
+        }
         if (normalizedUserId is null && normalizedSubjectId is null)
         {
             throw new ArgumentException("personalized install script requires a user id or subject id.");
@@ -76,7 +89,9 @@ public sealed class PersonalizedInstallScriptService
             ExpiresAtUtc: now.Add(_scriptLifetime),
             Status: PersonalizedInstallScriptStates.Pending,
             UserId: normalizedUserId,
-            SubjectId: normalizedSubjectId);
+            SubjectId: normalizedSubjectId,
+            RenderedScript: normalizedRenderedScript,
+            RenderedScriptSha256: normalizedRenderedScriptSha256);
 
         lock (_store.Gate)
         {

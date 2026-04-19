@@ -8,6 +8,22 @@ namespace Chummer.Tests;
 public sealed class ReleaseUploadTicketServiceTests
 {
     [Fact]
+    public void IssueUsesExtendedDefaultLifetime()
+    {
+        using TicketFixture fixture = new(configureLifetime: false);
+        ReleaseUploadTicketIssueResult issued = fixture.Service.Issue(new AuthenticatedHubSubject(
+            SubjectId: "subject-archon",
+            DisplayName: "Archon",
+            Email: "archon@example.com",
+            Roles: ["operator"],
+            AccessToken: "token"));
+
+        TimeSpan lifetime = issued.Claims.ExpiresAtUtc - issued.Claims.IssuedAtUtc;
+
+        Assert.Equal(TimeSpan.FromHours(12), lifetime);
+    }
+
+    [Fact]
     public void IssueAndValidateRoundTripsClaims()
     {
         using TicketFixture fixture = new();
@@ -49,15 +65,18 @@ public sealed class ReleaseUploadTicketServiceTests
     {
         private readonly string _root;
 
-        public TicketFixture()
+        public TicketFixture(bool configureLifetime = true)
         {
             _root = Path.Combine(Path.GetTempPath(), "release-upload-ticket-tests", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_root);
+            var settings = new Dictionary<string, string?>();
+            if (configureLifetime)
+            {
+                settings["CHUMMER_RELEASE_UPLOAD_TICKET_LIFETIME_MINUTES"] = "45";
+            }
+
             var configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["CHUMMER_RELEASE_UPLOAD_TICKET_LIFETIME_MINUTES"] = "45"
-                })
+                .AddInMemoryCollection(settings)
                 .Build();
             IDataProtectionProvider provider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
             Service = new ReleaseUploadTicketService(provider, configuration);

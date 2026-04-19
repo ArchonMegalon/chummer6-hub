@@ -17,7 +17,7 @@ public sealed record ReleaseUploadTicketIssueResult(
 public sealed class ReleaseUploadTicketService
 {
     private const string Purpose = "chummer.run.release-upload-ticket.v1";
-    private static readonly TimeSpan DefaultLifetime = TimeSpan.FromMinutes(90);
+    private static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(12);
     private readonly IDataProtector _protector;
     private readonly TimeSpan _ticketLifetime;
 

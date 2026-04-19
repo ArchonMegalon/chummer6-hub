@@ -106,6 +106,31 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void PersonalizedMacBootstrapScriptReturnsStoredRenderedScriptWhenPresent()
+    {
+        using Fixture fixture = new();
+        const string renderedScript = "#!/usr/bin/env bash\nprintf 'ok\\n'";
+        var issue = fixture.PersonalizedInstallScripts.IssueMacScript(
+            "avalonia-osx-arm64-installer",
+            ["avalonia-osx-arm64-installer"],
+            "user-archon",
+            "subject-archon",
+            renderedScript);
+
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+
+        IActionResult result = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal(renderedScript, Encoding.UTF8.GetString(file.FileContents));
+    }
+
+    [Fact]
     public async Task BootstrapScriptRejectsInvalidInstallTicketWithoutRedirectingToLogin()
     {
         using Fixture fixture = new();

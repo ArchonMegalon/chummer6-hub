@@ -152,6 +152,18 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertNotIn("mapfile -t", uploader_text)
         self.assertNotIn("readarray -t", uploader_text)
 
+    def test_verify_release_manifest_scripts_guard_empty_verify_args_for_macos_bash(self):
+        script_paths = [
+            REPO_ROOT / "scripts" / "verify-releases-manifest.sh",
+            REPO_ROOT.parent / "chummer-presentation" / "scripts" / "verify-releases-manifest.sh",
+        ]
+
+        for script_path in script_paths:
+            self.assertTrue(script_path.exists(), msg=f"missing expected manifest verifier: {script_path}")
+            script_text = script_path.read_text(encoding="utf-8")
+            self.assertIn('if [[ "${#VERIFY_ARGS[@]}" -gt 0 ]]; then', script_text)
+            self.assertIn('python3 "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$TARGET"', script_text)
+
     def test_release_publish_scripts_keep_macos_artifact_gate_behavior(self):
         run_services_gate_paths = {
             REPO_ROOT / "scripts" / "generate-releases-manifest.sh",
