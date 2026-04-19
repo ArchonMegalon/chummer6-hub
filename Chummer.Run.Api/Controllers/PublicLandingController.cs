@@ -267,7 +267,8 @@ public sealed class PublicLandingController : Controller
             string renderedBootstrap = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath));
             string command = BuildReleaseUploadBootstrapCommand(
                 bootstrapUrl,
-                ComputeSha256Hex(renderedBootstrap));
+                ComputeSha256Hex(renderedBootstrap),
+                ticket.Ticket);
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     "Release upload handoff",
@@ -276,7 +277,7 @@ public sealed class PublicLandingController : Controller
                     user.DisplayName,
                     user.Email),
                 Heading: "Signed-in release upload handoff",
-                Summary: "This page mints a short-lived upload handoff code, keeps it off the command line, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
+                Summary: "This page mints a short-lived upload handoff code, embeds it directly into the signed-in bootstrap command, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
                 Command: command,
                 HandoffCode: ticket.Ticket,
                 BootstrapUrl: bootstrapUrl,
@@ -5648,21 +5649,22 @@ echo "Help: ${HELP_URL}"
     private static string SingleQuoteShellLiteral(string value)
         => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
 
-    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl, string bootstrapSha256)
+    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl, string bootstrapSha256, string uploadTicket)
     {
         return "set -euo pipefail; " +
-            "export CHUMMER_RELEASE_CHANNEL='preview'; " +
-            "export CHUMMER_ALLOW_UNSIGNED_PREVIEW='1'; " +
-            "export CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0'; " +
-            "export CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0'; " +
-            "export CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0'; " +
-            "export CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4'; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
             "trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
             "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
             "ACTUAL_BOOTSTRAP_SHA256=\"$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \"$TMP_BOOTSTRAP_SCRIPT\")\"; " +
             "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
-            "export CHUMMER_BOOTSTRAP_EXPECTED_SHA256=" + SingleQuoteShellValue(bootstrapSha256) + "; " +
+            "CHUMMER_RELEASE_UPLOAD_TICKET=" + SingleQuoteShellValue(uploadTicket) + " " +
+            "CHUMMER_RELEASE_CHANNEL='preview' " +
+            "CHUMMER_ALLOW_UNSIGNED_PREVIEW='1' " +
+            "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0' " +
+            "CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0' " +
+            "CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0' " +
+            "CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4' " +
+            "CHUMMER_BOOTSTRAP_EXPECTED_SHA256=" + SingleQuoteShellValue(bootstrapSha256) + " " +
             "bash \"$TMP_BOOTSTRAP_SCRIPT\"";
     }
 

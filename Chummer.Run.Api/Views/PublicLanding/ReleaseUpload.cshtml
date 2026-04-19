@@ -11,7 +11,7 @@
         <div class="recommended-download__copy">
             <span class="tag">Mac Codex one-liner</span>
             <h2>Run this in your mac release shell</h2>
-            <p>The command clones repos, builds the osx-arm64 desktop artifact, runs startup smoke checks, publishes the signed upload bundle, and prints the install handoff plus any recovery-only fallback the setup flow asks for during launch verification.</p>
+            <p>The command clones repos, builds the osx-arm64 desktop artifact, runs startup smoke checks, publishes the signed upload bundle, and already carries the current short-lived upload handoff code so it can continue without stopping for an auth prompt.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -19,6 +19,7 @@
                     <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadCommandButton">Copy command</button>
                     <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open bootstrap script</a>
                 </div>
+                <p class="status-copy">This command includes the current signed-in handoff code. Treat the copied shell line, your clipboard, and shell history as sensitive until the ticket expires.</p>
                 <p class="status-copy" id="releaseUploadCommandNotice" hidden></p>
             </div>
         </div>
@@ -29,8 +30,8 @@
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
             <span class="tag">Signed-in handoff</span>
-            <h2>Paste this only when the bootstrap asks</h2>
-            <p>This handoff code expires @expires and stays off shell history because the bootstrap reads it interactively.</p>
+            <h2>Current handoff code, if you need to replace the embedded one</h2>
+            <p>The command above already embeds this handoff code. Keep it only for manual retry, comparison, or recovery while the ticket remains valid through @expires.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Handoff code</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadHandoffCode">@Model.HandoffCode</pre>

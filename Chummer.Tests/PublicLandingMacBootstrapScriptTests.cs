@@ -266,7 +266,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
-    public void ReleaseUploadBootstrapCommandPinsDigestAndKeepsTicketOffCommandLine()
+    public void ReleaseUploadBootstrapCommandPinsDigestAndEmbedsTheCurrentHandoffCode()
     {
         MethodInfo buildMethod = typeof(PublicLandingController).GetMethod(
             "BuildReleaseUploadBootstrapCommand",
@@ -275,15 +275,18 @@ public sealed class PublicLandingMacBootstrapScriptTests
 
         string command = (string)(buildMethod.Invoke(
             obj: null,
-            parameters: ["https://chummer.run/downloads/release-upload/bootstrap.sh", "abc123"]) ?? throw new InvalidOperationException("command build returned null"));
+            parameters: ["https://chummer.run/downloads/release-upload/bootstrap.sh", "abc123", "ticket-123"]) ?? throw new InvalidOperationException("command build returned null"));
 
         Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256='abc123'", command, StringComparison.Ordinal);
         Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET='ticket-123'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0'", command, StringComparison.Ordinal);
-        Assert.DoesNotContain("ticket=", command, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("bootstrap.sh?ticket=", command, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("apiToken=", command, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN=", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_RELEASE_UPLOAD_TICKET=", command, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='1'", command, StringComparison.Ordinal);
     }
 
