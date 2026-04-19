@@ -266,7 +266,7 @@ public sealed class PublicReleaseManifestService
         };
 
         var json = File.ReadAllText(manifestPath);
-        var parsed = JsonSerializer.Deserialize<PublicReleaseManifestDto>(json, options);
+        var parsed = LoadStoredCompatibilityManifestPayload(json, options);
         if (parsed is null)
         {
             return new PublicReleaseManifestDto(
@@ -389,7 +389,57 @@ public sealed class PublicReleaseManifestService
             GeneratedAt: parsed.GeneratedAt,
             ContractName: string.IsNullOrWhiteSpace(parsed.ContractName)
                 ? (string.IsNullOrWhiteSpace(parsed.ContractNameAlias) ? DefaultManifestContractName : parsed.ContractNameAlias)
-                : parsed.ContractName);
+                : parsed.ContractName)
+        {
+            ProofUiLocalizationReleaseGate = parsed.ReleaseProof?.UiLocalizationReleaseGate is JsonElement uiLocalizationReleaseGate
+                ? uiLocalizationReleaseGate.Clone()
+                : null,
+            DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
+                ? desktopTupleCoverage.Clone()
+                : null
+        };
+    }
+
+    private static PublicReleaseManifestDto? LoadStoredCompatibilityManifestPayload(string json, JsonSerializerOptions options)
+    {
+        CompatibilityReleaseManifest? parsed = JsonSerializer.Deserialize<CompatibilityReleaseManifest>(json, options);
+        if (parsed is null)
+        {
+            return null;
+        }
+
+        return new PublicReleaseManifestDto(
+            Version: parsed.Version ?? "unpublished",
+            Channel: parsed.Channel ?? parsed.ChannelId ?? "preview",
+            PublishedAt: parsed.PublishedAt ?? DateTimeOffset.UtcNow,
+            Downloads: parsed.Downloads ?? [],
+            Source: parsed.Source ?? "manifest",
+            Status: parsed.Status ?? "published",
+            Message: parsed.Message,
+            HasFallbackSource: parsed.HasFallbackSource,
+            RolloutState: parsed.RolloutState,
+            RolloutReason: parsed.RolloutReason,
+            SupportabilityState: parsed.SupportabilityState,
+            SupportabilitySummary: parsed.SupportabilitySummary,
+            KnownIssueSummary: parsed.KnownIssueSummary,
+            FixAvailabilitySummary: parsed.FixAvailabilitySummary,
+            ProofStatus: NormalizeProofStatus(parsed.ReleaseProof?.Status),
+            ProofGeneratedAt: parsed.ReleaseProof?.GeneratedAt,
+            ProofBaseUrl: parsed.ReleaseProof?.BaseUrl,
+            ProofJourneys: parsed.ReleaseProof?.JourneysPassed,
+            ProofRoutes: parsed.ReleaseProof?.ProofRoutes,
+            GeneratedAt: parsed.GeneratedAt ?? parsed.GeneratedAtAlias,
+            ContractName: string.IsNullOrWhiteSpace(parsed.ContractName)
+                ? parsed.ContractNameAlias
+                : parsed.ContractName)
+        {
+            ProofUiLocalizationReleaseGate = parsed.ReleaseProof?.UiLocalizationReleaseGate is JsonElement uiLocalizationReleaseGate
+                ? uiLocalizationReleaseGate.Clone()
+                : null,
+            DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
+                ? desktopTupleCoverage.Clone()
+                : null
+        };
     }
 
     private static string? NormalizeProofStatus(string? status)
@@ -424,6 +474,7 @@ public sealed class PublicReleaseManifestService
         string? KnownIssueSummary,
         string? FixAvailabilitySummary,
         RegistryReleaseProof? ReleaseProof,
+        JsonElement? DesktopTupleCoverage,
         IReadOnlyList<RegistryReleaseArtifact>? Artifacts);
 
     private sealed record RegistryReleaseProof(
@@ -431,7 +482,39 @@ public sealed class PublicReleaseManifestService
         DateTimeOffset? GeneratedAt,
         string? BaseUrl,
         IReadOnlyList<string>? JourneysPassed,
-        IReadOnlyList<string>? ProofRoutes);
+        IReadOnlyList<string>? ProofRoutes,
+        JsonElement? UiLocalizationReleaseGate);
+
+    private sealed record CompatibilityReleaseManifest(
+        string? Version,
+        string? Channel,
+        string? ChannelId,
+        DateTimeOffset? PublishedAt,
+        IReadOnlyList<PublicReleaseArtifactDto>? Downloads,
+        string? Source,
+        string? Status,
+        string? Message,
+        bool HasFallbackSource,
+        string? RolloutState,
+        string? RolloutReason,
+        string? SupportabilityState,
+        string? SupportabilitySummary,
+        string? KnownIssueSummary,
+        string? FixAvailabilitySummary,
+        CompatibilityReleaseProof? ReleaseProof,
+        DateTimeOffset? GeneratedAt,
+        [property: JsonPropertyName("generated_at")] DateTimeOffset? GeneratedAtAlias,
+        string? ContractName,
+        [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
+        JsonElement? DesktopTupleCoverage);
+
+    private sealed record CompatibilityReleaseProof(
+        string? Status,
+        DateTimeOffset? GeneratedAt,
+        string? BaseUrl,
+        IReadOnlyList<string>? JourneysPassed,
+        IReadOnlyList<string>? ProofRoutes,
+        JsonElement? UiLocalizationReleaseGate);
 
     private sealed record RegistryReleaseArtifact(
         string? ArtifactId,

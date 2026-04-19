@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Chummer.Run.Contracts.PublicSurface;
@@ -101,13 +102,22 @@ public sealed record PublicReleaseManifestDto(
         && string.IsNullOrWhiteSpace(ProofBaseUrl)
         && (ProofJourneys is null || ProofJourneys.Count == 0)
         && (ProofRoutes is null || ProofRoutes.Count == 0)
+        && ProofUiLocalizationReleaseGate is null
             ? null
             : new(
                 Status: ProofStatus,
                 GeneratedAt: ProofGeneratedAt,
                 BaseUrl: ProofBaseUrl,
                 JourneysPassed: ProofJourneys,
-                ProofRoutes: ProofRoutes);
+                ProofRoutes: ProofRoutes,
+                UiLocalizationReleaseGate: ProofUiLocalizationReleaseGate);
+
+    [JsonPropertyName("desktopTupleCoverage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? DesktopTupleCoverage { get; init; }
+
+    [JsonIgnore]
+    public JsonElement? ProofUiLocalizationReleaseGate { get; init; }
 }
 
 public sealed record PublicReleaseProofDto(
@@ -115,7 +125,9 @@ public sealed record PublicReleaseProofDto(
     DateTimeOffset? GeneratedAt,
     string? BaseUrl,
     IReadOnlyList<string>? JourneysPassed,
-    IReadOnlyList<string>? ProofRoutes);
+    IReadOnlyList<string>? ProofRoutes,
+    [property: JsonPropertyName("uiLocalizationReleaseGate")]
+    JsonElement? UiLocalizationReleaseGate = null);
 
 public sealed record PublicFeatureCardDto(
     string Id,

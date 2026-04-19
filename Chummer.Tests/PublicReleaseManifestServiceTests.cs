@@ -185,6 +185,59 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestPreservesDesktopTupleCoverageFromCanonicalRegistryManifest()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["contractName"] = "Chummer.Hub.Registry.Contracts",
+            ["contract_name"] = "Chummer.Hub.Registry.Contracts",
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260419-201110",
+            ["generatedAt"] = "2026-04-19T20:14:00Z",
+            ["publishedAt"] = "2026-04-19T20:14:00Z",
+            ["status"] = "published",
+            ["desktopTupleCoverage"] = new Dictionary<string, object?>
+            {
+                ["requiredPlatformIds"] = new[] { "linux", "windows" },
+                ["missingPlatformIds"] = Array.Empty<string>(),
+                ["missingHeadPlatformPairs"] = Array.Empty<string>(),
+                ["missingRidPlatformTuples"] = Array.Empty<string>()
+            },
+            ["artifacts"] = new[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-osx-arm64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "macos",
+                    ["arch"] = "arm64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop macOS ARM64 Installer",
+                    ["fileName"] = "chummer-avalonia-osx-arm64-installer.dmg",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    ["sha256"] = "mac123",
+                    ["sizeBytes"] = 987654321L,
+                    ["installAccessClass"] = "account_required"
+                }
+            }
+        });
+
+        var manifest = fixture.CreateService().LoadManifest();
+        JsonElement coverage = Assert.IsType<JsonElement>(manifest.DesktopTupleCoverage);
+        Assert.Equal(JsonValueKind.Object, coverage.ValueKind);
+        Assert.Equal("linux", coverage.GetProperty("requiredPlatformIds")[0].GetString());
+        Assert.Equal("windows", coverage.GetProperty("requiredPlatformIds")[1].GetString());
+
+        string json = JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement serializedCoverage = document.RootElement.GetProperty("desktopTupleCoverage");
+        Assert.Equal("linux", serializedCoverage.GetProperty("requiredPlatformIds")[0].GetString());
+        Assert.Equal("windows", serializedCoverage.GetProperty("requiredPlatformIds")[1].GetString());
+    }
+
+    [Fact]
     public void LoadManifestDefaultsContractNameWhenSourceManifestOmitsIt()
     {
         using var fixture = new PublicReleaseManifestFixture();
