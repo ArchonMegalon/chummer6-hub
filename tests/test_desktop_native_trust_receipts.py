@@ -114,7 +114,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer6-hub commit aadffb5b pins the M102 callback query proof guard.",
     "      - /docker/chummercomplete/chummer6-hub commit a7a5ecea tightens M102 desktop trust callback proof.",
     "      - /docker/chummercomplete/chummer6-hub commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
-    "      - /docker/chummercomplete/chummer6-hub commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
+    "      - /docker/chummercomplete/chummer6-hub verifier keeps M102 native receipt routes explicit while top-level proof_routes stays aligned with canonical registry flagship routes.",
     "      - /docker/chummercomplete/chummer6-hub commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
     "      - /docker/chummercomplete/chummer6-hub commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
     "      - /docker/chummercomplete/chummer6-hub commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
@@ -176,7 +176,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml and /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml make guided setup/app continuation the default and keep claim codes as recovery fallback only.",
     "          - /docker/chummercomplete/chummer6-hub/scripts/verify_desktop_native_trust_receipts.py fail-closes missing source markers and missing successor proof receipts for desktop_native_claim_and_recovery and support_followthrough:install_truth.",
     "          - /docker/chummercomplete/chummer6-hub/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs covers app-local localhost and 127.0.0.1 install-link callbacks so claimed desktop users return to the app-local continuation listener instead of browser-only continuation.",
-    "          - /docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json carries next90-m102-hub-desktop-native-trust proof receipts for /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
+    "          - /docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json keeps canonical flagship proof_routes on the registry surface while the M102 proof receipts carry /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
     "          - /docker/chummercomplete/chummer6-hub commit e27f24c1 tightens desktop-native continuation fallback-posture proof so claimed installs return the same fallback posture used by download and support recovery.",
     "          - /docker/chummercomplete/chummer6-hub commit e578a519 tightens the completed M102 proof pin so future shards verify the closed package instead of repeating it.",
     "          - /docker/chummercomplete/chummer6-hub commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
@@ -269,7 +269,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer6-hub commit aadffb5b pins the M102 callback query proof guard.",
     "          - /docker/chummercomplete/chummer6-hub commit a7a5ecea tightens M102 desktop trust callback proof.",
     "          - /docker/chummercomplete/chummer6-hub commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
-    "          - /docker/chummercomplete/chummer6-hub commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
+    "          - /docker/chummercomplete/chummer6-hub verifier keeps M102 native receipt routes explicit while top-level proof_routes stays aligned with canonical registry flagship routes.",
     "          - /docker/chummercomplete/chummer6-hub commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
     "          - /docker/chummercomplete/chummer6-hub commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
     "          - /docker/chummercomplete/chummer6-hub commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
@@ -570,9 +570,17 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn("/api/v1/install-linking/continuation", proof)
             payload = json.loads(proof)
             self.assertEqual("chummer6-hub", payload["package_repo"])
-            self.assertIn("/downloads/install/avalonia-linux-x64-installer/continue.json", payload["proof_routes"])
-            self.assertIn("/api/v1/install-linking/continuation", payload["proof_routes"])
-            self.assertIn("/account/access", payload["proof_routes"])
+            self.assertEqual(
+                [
+                    "/downloads/install/avalonia-linux-x64-installer",
+                    "/home/access",
+                    "/home/work",
+                    "/account/work",
+                    "/account/support",
+                    "/contact",
+                ],
+                payload["proof_routes"],
+            )
             m102_package = next(
                 item
                 for item in payload["successor_queue_packages"]
@@ -2658,7 +2666,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             proof["proof_routes"] = [
                 route
                 for route in proof["proof_routes"]
-                if route != "/api/v1/install-linking/continuation"
+                if route != "/home/access"
             ]
             served_proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
@@ -2676,8 +2684,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn(
-                "served release proof file proof_routes missing M102 route: "
-                "/api/v1/install-linking/continuation",
+                "served release proof file proof_routes missing canonical flagship route: "
+                "/home/access",
                 result.stderr,
             )
 
@@ -3308,7 +3316,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             proof["proof_routes"] = [
                 item
                 for item in proof["proof_routes"]
-                if item != "/api/v1/install-linking/continuation"
+                if item != "/home/access"
             ]
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
@@ -3325,7 +3333,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
 
             self.assertNotEqual(0, result.returncode)
-            self.assertIn("proof_routes missing M102 route: /api/v1/install-linking/continuation", result.stderr)
+            self.assertIn("proof_routes missing canonical flagship route: /home/access", result.stderr)
 
     def test_verifier_fail_closes_receipt_route_outside_top_level_proof_shelf(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -3375,8 +3383,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn(
-                "published proof file desktop_native_claim_and_recovery route is not listed "
-                "in top-level proof_routes: /account/access/browser-only-claim",
+                "published proof file desktop_native_claim_and_recovery has wrong routes:",
                 result.stderr,
             )
 
@@ -3405,7 +3412,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
 
             proof = json.loads(proof_path.read_text(encoding="utf-8"))
-            proof["proof_routes"].append("/API/V1/INSTALL-LINKING/CONTINUATION")
+            proof["proof_routes"].append("/HOME/ACCESS")
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
             result = subprocess.run(
@@ -3423,7 +3430,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn(
                 "published proof file proof_routes has duplicate entries: "
-                "/API/V1/INSTALL-LINKING/CONTINUATION",
+                "/HOME/ACCESS",
                 result.stderr,
             )
 

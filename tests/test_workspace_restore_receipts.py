@@ -1277,7 +1277,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             served_payload["proof_routes"] = [
                 route
                 for route in payload["proof_routes"]
-                if route != "/api/v1/install-linking/continuation"
+                if route != "/home/access"
             ]
             served_proof_path.write_text(json.dumps(served_payload, indent=2), encoding="utf-8")
 

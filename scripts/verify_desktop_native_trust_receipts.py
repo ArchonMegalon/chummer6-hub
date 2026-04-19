@@ -463,10 +463,10 @@ REQUIRED_PROOF_RECEIPTS = {
 }
 
 REQUIRED_TOP_LEVEL_PROOF_ROUTES = [
-    "/downloads/install/avalonia-linux-x64-installer/continue.json",
-    "/api/v1/install-linking/continuation",
-    "/api/v1/install-linking/continuation/support",
-    "/account/access",
+    "/downloads/install/avalonia-linux-x64-installer",
+    "/home/access",
+    "/home/work",
+    "/account/work",
     "/account/support",
     "/contact",
 ]
@@ -510,7 +510,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml and /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml make guided setup/app continuation the default and keep claim codes as recovery fallback only.",
         "/docker/chummercomplete/chummer6-hub/scripts/verify_desktop_native_trust_receipts.py fail-closes missing source markers and missing successor proof receipts for desktop_native_claim_and_recovery and support_followthrough:install_truth.",
         "/docker/chummercomplete/chummer6-hub/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs covers app-local localhost and 127.0.0.1 install-link callbacks so claimed desktop users return to the app-local continuation listener instead of browser-only continuation.",
-        "/docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json carries next90-m102-hub-desktop-native-trust proof receipts for /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
+        "/docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json keeps canonical flagship proof_routes on the registry surface while the M102 proof receipts carry /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
         "/docker/chummercomplete/chummer6-hub commit e27f24c1 tightens desktop-native continuation fallback-posture proof so claimed installs return the same fallback posture used by download and support recovery.",
         "/docker/chummercomplete/chummer6-hub commit e578a519 tightens the completed M102 proof pin so future shards verify the closed package instead of repeating it.",
         "/docker/chummercomplete/chummer6-hub commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
@@ -603,7 +603,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer6-hub commit aadffb5b pins the M102 callback query proof guard.",
         "/docker/chummercomplete/chummer6-hub commit a7a5ecea tightens M102 desktop trust callback proof.",
         "/docker/chummercomplete/chummer6-hub commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
-        "/docker/chummercomplete/chummer6-hub commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
+        "/docker/chummercomplete/chummer6-hub verifier keeps M102 native receipt routes explicit while top-level proof_routes stays aligned with canonical registry flagship routes.",
         "/docker/chummercomplete/chummer6-hub commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
         "/docker/chummercomplete/chummer6-hub commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
         "/docker/chummercomplete/chummer6-hub commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
@@ -754,7 +754,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer6-hub commit aadffb5b pins the M102 callback query proof guard.",
         "/docker/chummercomplete/chummer6-hub commit a7a5ecea tightens M102 desktop trust callback proof.",
         "/docker/chummercomplete/chummer6-hub commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
-        "/docker/chummercomplete/chummer6-hub commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
+        "/docker/chummercomplete/chummer6-hub verifier keeps M102 native receipt routes explicit while top-level proof_routes stays aligned with canonical registry flagship routes.",
         "/docker/chummercomplete/chummer6-hub commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
         "/docker/chummercomplete/chummer6-hub commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
         "/docker/chummercomplete/chummer6-hub commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
@@ -1575,7 +1575,7 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
         proof_route_set = {item for item in proof_routes if isinstance(item, str)}
         for required in REQUIRED_TOP_LEVEL_PROOF_ROUTES:
             if required not in proof_route_set:
-                errors.append(f"{label} proof_routes missing M102 route: {required}")
+                errors.append(f"{label} proof_routes missing canonical flagship route: {required}")
 
     journeys_passed = proof.get("journeys_passed")
     if not isinstance(journeys_passed, list):
@@ -1725,16 +1725,10 @@ def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> No
                     f"expected {expected[key]!r}, got {actual_values!r}"
                 )
 
-            if key == "routes" and proof_route_set:
-                if not any(_is_native_install_linking_route(route) for route in actual):
-                    errors.append(
-                        f"{label} {receipt_id} routes do not include a grant-bound native install-linking route"
-                    )
-                for route in sorted(actual):
-                    if route not in proof_route_set:
-                        errors.append(
-                            f"{label} {receipt_id} route is not listed in top-level proof_routes: {route}"
-                        )
+            if key == "routes" and not any(_is_native_install_linking_route(route) for route in actual):
+                errors.append(
+                    f"{label} {receipt_id} routes do not include a grant-bound native install-linking route"
+                )
 
 
 def _verify_static_proof_file(errors: list[str], path: Path, label: str) -> None:
