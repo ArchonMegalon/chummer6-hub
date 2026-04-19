@@ -260,7 +260,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_UI_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='b083274da75415e4952d6c6c33853efb9fa1b2e2'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='b083274d885e1279eaeb054ed9f29515cb770cf5'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_HUB_REF='release-upload-hub-proof-routes-20260419'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_HUB_EXPECTED_COMMIT='5dcde8a9746ecb2f02c70e8181be662f198af84d'", script, StringComparison.Ordinal);
     }
