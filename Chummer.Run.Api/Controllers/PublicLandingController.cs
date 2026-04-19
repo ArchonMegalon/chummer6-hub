@@ -361,9 +361,10 @@ public sealed class PublicLandingController : Controller
                 ? null
                 : _installLinking.IssueDownload(manifest, artifact, user.UserId, subject.SubjectId);
             var personalizedMacInstallScript = bootstrapScriptDownload && string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal)
-                ? _personalizedInstallScripts.IssueMacScript(
-                    artifact.Id,
-                    guidedBootstrapArtifacts.Select(candidate => candidate.Id),
+                ? IssuePersonalizedMacInstallScript(
+                    manifest,
+                    artifact,
+                    guidedBootstrapArtifacts,
                     user.UserId,
                     subject.SubjectId)
                 : null;
@@ -414,6 +415,13 @@ public sealed class PublicLandingController : Controller
                     BuildAbsoluteUrl(
                         BuildBootstrapScriptPath(artifact.Id, bootstrapPlatform!),
                         QueryString.Create("ticket", bootstrapTicket.Ticket)))
+                : bootstrapScriptDownload
+                    && personalizedMacInstallScript is not null
+                    && string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal)
+                    ? BuildBootstrapInstallCommand(
+                        bootstrapPlatform,
+                        BuildAbsoluteUrl(bootstrapScriptPath!),
+                        personalizedMacInstallScript.Link.RenderedScriptSha256)
                 : bootstrapScriptDownload && bootstrapScriptPath is not null
                     ? BuildBootstrapInstallCommand(
                         bootstrapPlatform,
@@ -657,12 +665,14 @@ public sealed class PublicLandingController : Controller
             consume.Link.UserId,
             consume.Link.SubjectId);
 
-        string script = RenderMacInstallBootstrapScript(
-            scriptArtifacts,
-            BuildAbsoluteUrl("/"),
-            BuildAbsoluteUrl("/account/access"),
-            BuildAbsoluteUrl("/downloads"),
-            BuildAbsoluteUrl("/help"));
+        string script = !string.IsNullOrWhiteSpace(consume.Link.RenderedScript)
+            ? consume.Link.RenderedScript
+            : RenderMacInstallBootstrapScript(
+                scriptArtifacts,
+                BuildAbsoluteUrl("/"),
+                BuildAbsoluteUrl("/account/access"),
+                BuildAbsoluteUrl("/downloads"),
+                BuildAbsoluteUrl("/help"));
 
         Response.Headers["Cache-Control"] = "private, no-store";
         return File(
@@ -3132,8 +3142,71 @@ public sealed class PublicLandingController : Controller
             _ => BuildMacBootstrapTerminalCommand(bootstrapUrl)
         };
 
-    internal static string BuildMacBootstrapTerminalCommand(string bootstrapUrl)
-        => $"set -o pipefail; curl -fsSL {SingleQuoteShellValue(bootstrapUrl)} | /bin/bash";
+    internal static string BuildBootstrapInstallCommand(string? platform, string bootstrapUrl, string? bootstrapSha256)
+        => platform switch
+        {
+            "windows" => BuildBootstrapInstallCommand(platform, bootstrapUrl),
+            "linux" => BuildMacBootstrapTerminalCommand(bootstrapUrl, bootstrapSha256),
+            _ => BuildMacBootstrapTerminalCommand(bootstrapUrl, bootstrapSha256)
+        };
+
+    internal static string BuildMacBootstrapTerminalCommand(string bootstrapUrl, string? bootstrapSha256 = null)
+    {
+        var builder = new StringBuilder();
+        builder.Append("set -euo pipefail; ");
+        builder.Append("TMP_BOOTSTRAP_SCRIPT=\"$(mktemp \\\"${TMPDIR:-/tmp}/chummer-install.XXXXXX\\\")\"; ");
+        builder.Append("trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; ");
+        builder.Append("curl -fsSL ").Append(SingleQuoteShellValue(bootstrapUrl)).Append(" -o \"$TMP_BOOTSTRAP_SCRIPT\"; ");
+        if (!string.IsNullOrWhiteSpace(bootstrapSha256))
+        {
+            builder.Append("ACTUAL_BOOTSTRAP_SHA256=\"$(shasum -a 256 \"$TMP_BOOTSTRAP_SCRIPT\" | awk '{print $1}')\"; ");
+            builder.Append("[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == ")
+                .Append(SingleQuoteShellValue(bootstrapSha256))
+                .Append(" ]] || { echo 'Bootstrap digest mismatch; re-open the signed-in downloads handoff and copy a fresh install command.' >&2; exit 1; }; ");
+        }
+
+        builder.Append("/bin/bash \"$TMP_BOOTSTRAP_SCRIPT\"");
+        return builder.ToString();
+    }
+
+    private PersonalizedInstallScriptIssueResult IssuePersonalizedMacInstallScript(
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto primaryArtifact,
+        IReadOnlyList<PublicReleaseArtifactDto> guidedArtifacts,
+        string? userId,
+        string? subjectId)
+    {
+        GuidedBootstrapArtifact[] scriptArtifacts = guidedArtifacts
+            .Select(candidate => new GuidedBootstrapArtifact(
+                ArtifactId: candidate.Id,
+                HeadId: candidate.Head ?? string.Empty,
+                Title: BuildGuidedBootstrapArtifactTitle(candidate),
+                ShortLabel: BuildGuidedBootstrapShortLabel(candidate),
+                DownloadUrl: string.Empty,
+                ClaimUrl: string.Empty,
+                Sha256: candidate.Sha256,
+                PackageName: candidate.FileName ?? Path.GetFileName(candidate.Url),
+                Architecture: candidate.Arch,
+                LaunchAfterInstall: string.Equals(candidate.Id, primaryArtifact.Id, StringComparison.OrdinalIgnoreCase),
+                InstallFolderName: ResolveGuidedBootstrapInstallFolderName(candidate),
+                ExecutableName: ResolveGuidedBootstrapExecutableName(candidate),
+                LauncherName: ResolveGuidedBootstrapLauncherName(candidate),
+                DesktopEntryName: ResolveGuidedBootstrapDesktopEntryName(candidate)))
+            .ToArray();
+        string renderedScript = RenderMacInstallBootstrapScript(
+            BuildMacInstallBootstrapArtifacts(manifest, scriptArtifacts, userId, subjectId),
+            BuildAbsoluteUrl("/"),
+            BuildAbsoluteUrl("/account/access"),
+            BuildAbsoluteUrl("/downloads"),
+            BuildAbsoluteUrl("/help"));
+        return _personalizedInstallScripts.IssueMacScript(
+            primaryArtifact.Id,
+            guidedArtifacts.Select(candidate => candidate.Id),
+            userId,
+            subjectId,
+            renderedScript,
+            ComputeSha256Hex(renderedScript));
+    }
 
     private MacInstallBootstrapArtifact[] BuildMacInstallBootstrapArtifacts(
         PublicReleaseManifestDto manifest,
@@ -5676,7 +5749,7 @@ echo "Help: ${HELP_URL}"
     private static IReadOnlyList<ReleaseUploadBootstrapRepoPin> GetReleaseUploadBootstrapRepoPins()
         =>
         [
-            new("CHUMMER_UI_REF", "main", "CHUMMER_UI_EXPECTED_COMMIT", "b083274d885e1279eaeb054ed9f29515cb770cf5"),
+            new("CHUMMER_UI_REF", "main", "CHUMMER_UI_EXPECTED_COMMIT", "f64cf15223b11f7a6da4b76f7ac4bb0ac14a5988"),
             new("CHUMMER_CORE_REF", "main", "CHUMMER_CORE_EXPECTED_COMMIT", "ae55923f1cb6c8fdf40748f7e2600815be123e1e"),
             new("CHUMMER_HUB_REF", "release-upload-hub-proof-routes-20260419", "CHUMMER_HUB_EXPECTED_COMMIT", "5dcde8a9746ecb2f02c70e8181be662f198af84d"),
             new("CHUMMER_UI_KIT_REF", "fleet/ui-kit", "CHUMMER_UI_KIT_EXPECTED_COMMIT", "2ef502630a2d1cd20350f9b0f134af0bac0fe863"),

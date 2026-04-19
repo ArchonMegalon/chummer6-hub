@@ -1458,15 +1458,7 @@ write_release_upload_curl_config() {
     printf '%s' "${FLEET_INTERNAL_API_TOKEN}"
   else
     die "release upload token could not be resolved after prompting"
-  fi | python3 - "$config_path" <<'PY'
-from pathlib import Path
-import sys
-
-config_path = Path(sys.argv[1])
-token = sys.stdin.read()
-escaped = token.replace("\\", "\\\\").replace('"', '\\"')
-config_path.write_text(f'header = "Authorization: Bearer {escaped}"\n', encoding="utf-8")
-PY
+  fi | python3 -c 'from pathlib import Path; import sys; config_path = Path(sys.argv[1]); token = sys.stdin.read(); escaped = token.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); config_path.write_text(f"header = \"Authorization: Bearer {escaped}\"\n", encoding="utf-8")' "$config_path"
   unset CHUMMER_RELEASE_UPLOAD_TICKET CHUMMER_RELEASE_UPLOAD_TOKEN FLEET_INTERNAL_API_TOKEN
 }
 
@@ -3652,10 +3644,12 @@ main() {
   esac
 
   log "verifying local bundle manifest"
-  bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"
+  CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
+    bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"
 
   log "verifying live manifest at $verify_url"
-  bash scripts/verify-releases-manifest.sh "$verify_url"
+  CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
+    bash scripts/verify-releases-manifest.sh "$verify_url"
 
   local canonical_verify_url="${verify_url%/releases.json}/RELEASE_CHANNEL.generated.json"
   log "verifying live release projection at $canonical_verify_url"

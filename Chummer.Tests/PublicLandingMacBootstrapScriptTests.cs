@@ -232,14 +232,29 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
-    public void BuildMacBootstrapTerminalCommandUsesPipefailCurlAndBash()
+    public void BuildMacBootstrapTerminalCommandDownloadsToATempFileBeforeExecution()
     {
         string command = PublicLandingController.BuildMacBootstrapTerminalCommand(
             "https://chummer.run/install-abc123def456.sh");
 
-        Assert.Equal(
-            "set -o pipefail; curl -fsSL 'https://chummer.run/install-abc123def456.sh' | /bin/bash",
-            command);
+        Assert.Contains("set -euo pipefail", command, StringComparison.Ordinal);
+        Assert.Contains("TMP_BOOTSTRAP_SCRIPT", command, StringComparison.Ordinal);
+        Assert.Contains("curl -fsSL 'https://chummer.run/install-abc123def456.sh' -o \"$TMP_BOOTSTRAP_SCRIPT\"", command, StringComparison.Ordinal);
+        Assert.Contains("/bin/bash \"$TMP_BOOTSTRAP_SCRIPT\"", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("| /bin/bash", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildMacBootstrapTerminalCommandPinsDigestWhenProvided()
+    {
+        string command = PublicLandingController.BuildMacBootstrapTerminalCommand(
+            "https://chummer.run/install-abc123def456.sh",
+            "abc123");
+
+        Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
+        Assert.Contains("shasum -a 256", command, StringComparison.Ordinal);
+        Assert.Contains("'abc123'", command, StringComparison.Ordinal);
+        Assert.Contains("Bootstrap digest mismatch; re-open the signed-in downloads handoff and copy a fresh install command.", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -260,7 +275,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_UI_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='b083274d885e1279eaeb054ed9f29515cb770cf5'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='f64cf15223b11f7a6da4b76f7ac4bb0ac14a5988'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_HUB_REF='release-upload-hub-proof-routes-20260419'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_HUB_EXPECTED_COMMIT='5dcde8a9746ecb2f02c70e8181be662f198af84d'", script, StringComparison.Ordinal);
     }
@@ -397,8 +412,10 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("request_common=(", template, StringComparison.Ordinal);
         Assert.Contains("\"--config\"", template, StringComparison.Ordinal);
         Assert.Contains("write_release_upload_curl_config()", template, StringComparison.Ordinal);
-        Assert.Contains("header = \"Authorization: Bearer", template, StringComparison.Ordinal);
+        Assert.Contains("Authorization: Bearer {escaped}", template, StringComparison.Ordinal);
         Assert.Contains("token = sys.stdin.read()", template, StringComparison.Ordinal);
+        Assert.Contains("python3 -c", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("python3 - \"$config_path\" <<'PY'", template, StringComparison.Ordinal);
         Assert.DoesNotContain("token = sys.argv[2]", template, StringComparison.Ordinal);
         Assert.DoesNotContain("local upload_token=\"$3\"", template, StringComparison.Ordinal);
         Assert.Contains("local keep_upload_response=\"${CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE:-0}\"", template, StringComparison.Ordinal);
@@ -406,6 +423,9 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0", template, StringComparison.Ordinal);
         Assert.Contains("local fallback_release_proof_url=\"${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}\"", template, StringComparison.Ordinal);
         Assert.Contains("local fallback_ui_localization_release_gate_url=\"${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}\"", template, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \\", template, StringComparison.Ordinal);
+        Assert.Contains("bash scripts/verify-releases-manifest.sh \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
+        Assert.Contains("bash scripts/verify-releases-manifest.sh \"$verify_url\"", template, StringComparison.Ordinal);
     }
 
     [Fact]
