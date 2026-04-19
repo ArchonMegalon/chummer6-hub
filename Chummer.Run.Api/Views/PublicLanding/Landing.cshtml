@@ -197,7 +197,6 @@
         }
         @if (Model.SignedInStatus is not null)
         {
-            @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
             <article class="app-action-card">
                 <span class="tag">Return rail</span>
                 <h2>@(starterFirstPlayableSession?.Label ?? "First session proof")</h2>
