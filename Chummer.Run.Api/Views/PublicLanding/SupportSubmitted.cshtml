@@ -48,7 +48,6 @@
 
 @if (Model.SignedInStatus is not null)
 {
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
     <section class="release-footnote">
         <p class="muted-copy">Who can get it now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm access.")</p>
     </section>
