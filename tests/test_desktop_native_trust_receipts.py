@@ -578,6 +578,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 for item in payload["successor_queue_packages"]
                 if item["package_id"] == "next90-m102-hub-desktop-native-trust"
             )
+            self.assertEqual(
+                m102_package,
+                payload["successor_queue_packages_by_id"]["next90-m102-hub-desktop-native-trust"],
+            )
             self.assertEqual("complete", m102_package["status"])
             self.assertEqual("160af58f", m102_package["landed_commit"])
             self.assertEqual(
@@ -623,6 +627,9 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             "proof_routes": list(verifier.REQUIRED_TOP_LEVEL_PROOF_ROUTES),
             "journeys_passed": list(verifier.REQUIRED_TOP_LEVEL_JOURNEYS),
             "successor_queue_packages": [dict(verifier.REQUIRED_PROOF_PACKAGE)],
+            "successor_queue_packages_by_id": {
+                verifier.PACKAGE_ID: dict(verifier.REQUIRED_PROOF_PACKAGE),
+            },
             "proof_receipts": proof_receipts,
         }
         errors: list[str] = []
@@ -1903,6 +1910,54 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
             self.assertIn(
                 "published HUB_LOCAL_RELEASE_PROOF.generated.json drifts from scripts/materialize_hub_local_release_proof.py",
+                result.stderr,
+            )
+
+    def test_verifier_fail_closes_generated_m102_package_index_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof["successor_queue_packages_by_id"]["next90-m102-hub-desktop-native-trust"]["landed_commit"] = "stale"
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("indexed proof package has wrong landed_commit", result.stderr)
+            self.assertIn(
+                "successor_queue_packages_by_id[next90-m102-hub-desktop-native-trust] must mirror "
+                "successor_queue_packages[next90-m102-hub-desktop-native-trust] exactly",
                 result.stderr,
             )
 
