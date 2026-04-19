@@ -279,7 +279,6 @@ public sealed class PublicLandingController : Controller
                 Heading: "Signed-in release upload handoff",
                 Summary: "This page mints a short-lived upload handoff code, embeds it directly into the signed-in bootstrap command, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
                 Command: command,
-                HandoffCode: ticket.Ticket,
                 BootstrapUrl: bootstrapUrl,
                 TicketExpiresAtUtc: ticket.Claims.ExpiresAtUtc,
                 UploadUrl: BuildAbsoluteUrl("/api/internal/releases/bundles"),

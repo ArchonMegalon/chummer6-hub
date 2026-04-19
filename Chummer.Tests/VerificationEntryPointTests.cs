@@ -451,14 +451,13 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("ReleaseUploadTicketService", controller, StringComparison.Ordinal);
         Assert.Contains("embeds it directly into the signed-in bootstrap command", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
-        Assert.Contains("HandoffCode", viewModel, StringComparison.Ordinal);
         Assert.Contains("Signed-in release upload", view, StringComparison.Ordinal);
         Assert.Contains("source of truth for release upload in Chummer", view, StringComparison.Ordinal);
         Assert.Contains("recovery-aware verification path", view, StringComparison.Ordinal);
         Assert.Contains("recovery-only code", view, StringComparison.Ordinal);
         Assert.Contains("already carries the current short-lived upload handoff code", view, StringComparison.Ordinal);
         Assert.Contains("includes the current signed-in handoff code", view, StringComparison.Ordinal);
-        Assert.Contains("already embeds this handoff code", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current handoff code", view, StringComparison.Ordinal);
         Assert.DoesNotContain("claim-code return", view, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_TOKEN", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET", bootstrap, StringComparison.Ordinal);
