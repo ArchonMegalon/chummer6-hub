@@ -121,6 +121,8 @@ public sealed class DesktopInstallRailTests
         Assert.Contains("Recovery fallback only", receipt.FallbackPosture, StringComparison.Ordinal);
         Assert.Contains("desktop app update lane", receipt.UpdateAction, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("previous installed copy", receipt.RollbackAction, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("claimed install continuation rail", receipt.RollbackAction, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Devices and access", receipt.RollbackAction, StringComparison.Ordinal);
         Assert.Contains("claim, build, channel, fallback, and recovery context", receipt.SupportContinuation, StringComparison.OrdinalIgnoreCase);
     }
 }
