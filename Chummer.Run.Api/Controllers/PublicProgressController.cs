@@ -326,7 +326,7 @@ public sealed class PublicProgressController : ControllerBase
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName);
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName, user.Email);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {

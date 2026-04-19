@@ -247,6 +247,11 @@ public sealed class PublicLandingController : Controller
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            if (!ReleaseUploadAccessPolicy.CanAccess(subject.Email))
+            {
+                return NotFound();
+            }
+
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var ticket = _releaseUploadTickets.Issue(subject);
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
@@ -268,7 +273,8 @@ public sealed class PublicLandingController : Controller
                     "Release upload handoff",
                     "Mint a short-lived upload handoff code and hand a digest-pinned bootstrap command to the Mac or Windows release runner.",
                     currentPath,
-                    user.DisplayName),
+                    user.DisplayName,
+                    user.Email),
                 Heading: "Signed-in release upload handoff",
                 Summary: "This page mints a short-lived upload handoff code, keeps it off the command line, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
                 Command: command,
@@ -414,7 +420,7 @@ public sealed class PublicLandingController : Controller
                         BuildAbsoluteUrl(bootstrapScriptPath))
                 : null;
             var model = new DownloadDispatchPageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Download handoff", "Start the installer download and keep the install linked to this account from the first launch.", "/downloads", user.DisplayName),
+                Chrome: _chrome.BuildAuthenticatedChrome("Download handoff", "Start the installer download and keep the install linked to this account from the first launch.", "/downloads", user.DisplayName, user.Email),
                 Eyebrow: "Signed-in download",
                 Heading: bootstrapScriptDownload
                     ? BuildDispatchHeading(release.SignedInDispatchHeading, bootstrapPlatform)
@@ -1236,7 +1242,7 @@ public sealed class PublicLandingController : Controller
             ? null
             : _workspaceServerPlane.GetWorkspaceServerPlane(user, campaignSpine.Workspaces[0].WorkspaceId, installLinking);
         var model = new HomePageViewModel(
-            Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
+            Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
             CurrentSection: selectedSection,
             Sections: BuildHomeSections(selectedSection),
             Surface: surface,
@@ -2825,7 +2831,7 @@ public sealed class PublicLandingController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName);
+            return _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName, user.Email);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -5613,6 +5619,7 @@ echo "Help: ${HELP_URL}"
         string scriptBody = template.StartsWith("#!/usr/bin/env bash", StringComparison.Ordinal)
             ? template["#!/usr/bin/env bash".Length..].TrimStart('\r', '\n')
             : template;
+        IReadOnlyList<ReleaseUploadBootstrapRepoPin> pinnedRepos = GetReleaseUploadBootstrapRepoPins();
         StringBuilder builder = new();
         builder.AppendLine("#!/usr/bin/env bash");
         builder.AppendLine("# Signed-in release upload always targets the live chummer.run shelf.");
@@ -5620,6 +5627,17 @@ echo "Help: ${HELP_URL}"
         builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"");
         builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=\"https://chummer.run/api/internal/releases/upload-sessions\"");
         builder.AppendLine("export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'");
+        foreach (ReleaseUploadBootstrapRepoPin pin in pinnedRepos)
+        {
+            builder.Append("export ")
+                .Append(pin.RefVariable)
+                .Append('=')
+                .AppendLine(SingleQuoteShellValue(pin.RefValue));
+            builder.Append("export ")
+                .Append(pin.ExpectedCommitVariable)
+                .Append('=')
+                .AppendLine(SingleQuoteShellValue(pin.ExpectedCommit));
+        }
         builder.AppendLine(scriptBody);
         return builder.ToString();
     }
@@ -5635,7 +5653,9 @@ echo "Help: ${HELP_URL}"
         return "set -euo pipefail; " +
             "export CHUMMER_RELEASE_CHANNEL='preview'; " +
             "export CHUMMER_ALLOW_UNSIGNED_PREVIEW='1'; " +
-            "export CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='1'; " +
+            "export CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0'; " +
+            "export CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0'; " +
+            "export CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0'; " +
             "export CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4'; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
             "trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
@@ -5651,6 +5671,18 @@ echo "Help: ${HELP_URL}"
         byte[] bytes = Encoding.UTF8.GetBytes(value);
         return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
+
+    private static IReadOnlyList<ReleaseUploadBootstrapRepoPin> GetReleaseUploadBootstrapRepoPins()
+        =>
+        [
+            new("CHUMMER_UI_REF", "main", "CHUMMER_UI_EXPECTED_COMMIT", "8e57095ad0688754c74e9d8aa911f01f6895902f"),
+            new("CHUMMER_CORE_REF", "main", "CHUMMER_CORE_EXPECTED_COMMIT", "ae55923f1cb6c8fdf40748f7e2600815be123e1e"),
+            new("CHUMMER_HUB_REF", "main", "CHUMMER_HUB_EXPECTED_COMMIT", "ec42f0ce1c8cf239d3bd578ecacb3bc21c9dbb47"),
+            new("CHUMMER_UI_KIT_REF", "fleet/ui-kit", "CHUMMER_UI_KIT_EXPECTED_COMMIT", "2ef502630a2d1cd20350f9b0f134af0bac0fe863"),
+            new("CHUMMER_HUB_REGISTRY_REF", "main", "CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT", "85f6c1bdb5054b3fccea1d9115d20a1c6b5cd959"),
+            new("CHUMMER_MEDIA_FACTORY_REF", "main", "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT", "e16286ca8c9bad84ff217466c72721ebcdbf48b5"),
+            new("CHUMMER_LEGACY_REF", "Docker", "CHUMMER_LEGACY_EXPECTED_COMMIT", "0b8636d5a852e375409bf565b9ac9b4180ba4524")
+        ];
 
     internal sealed record MacInstallBootstrapArtifact(
         string ArtifactId,
@@ -5687,4 +5719,10 @@ echo "Help: ${HELP_URL}"
         string BootstrapTicket,
         string? UserId,
         string? SubjectId);
+
+    private sealed record ReleaseUploadBootstrapRepoPin(
+        string RefVariable,
+        string RefValue,
+        string ExpectedCommitVariable,
+        string ExpectedCommit);
 }

@@ -135,7 +135,7 @@ public sealed class AccountsController : Controller
                 ? null
                 : _creatorPublicationRegistry.GetOrCreatePublicationLane(user, selectedCreatorPublication, selectedCreatorPublicationWorkspace);
             var model = new AccountPageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName),
+                Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
                 CurrentSection: selectedSection,
                 CoreSections: BuildAccountCoreSections(selectedSection),
                 SecondarySections: BuildAccountSecondarySections(selectedSection),

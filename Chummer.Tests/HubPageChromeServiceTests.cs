@@ -160,4 +160,53 @@ public sealed class HubPageChromeServiceTests
             }
         }
     }
+
+    [Fact]
+    public void BuildAuthenticatedChromeOmitsBuildForNonOwnerEmail()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildAuthenticatedChrome(
+            "Home",
+            "Signed-in shell.",
+            "/home",
+            "Other User",
+            "someone@example.com");
+
+        Assert.DoesNotContain(
+            chrome.HeaderActions,
+            action => string.Equals(action.Href, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BuildAuthenticatedChromeIncludesBuildForReleaseUploadOwner()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildAuthenticatedChrome(
+            "Home",
+            "Signed-in shell.",
+            "/home",
+            "Tibor",
+            ReleaseUploadAccessPolicy.AllowedEmail);
+
+        var buildAction = Assert.Single(
+            chrome.HeaderActions,
+            action => string.Equals(action.Href, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("Build", buildAction.Label);
+    }
 }

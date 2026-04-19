@@ -259,6 +259,10 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN='", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"", script, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_REF='main'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='8e57095ad0688754c74e9d8aa911f01f6895902f'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REF='main'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_EXPECTED_COMMIT='ec42f0ce1c8cf239d3bd578ecacb3bc21c9dbb47'", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -275,8 +279,12 @@ public sealed class PublicLandingMacBootstrapScriptTests
 
         Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256='abc123'", command, StringComparison.Ordinal);
         Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0'", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0'", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0'", command, StringComparison.Ordinal);
         Assert.DoesNotContain("ticket=", command, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN=", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='1'", command, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -360,6 +368,41 @@ public sealed class PublicLandingMacBootstrapScriptTests
             "ui localization release gate generator is missing at $script_path; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or restore the gate script",
             template,
             StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReleaseUploadBootstrapTemplatePinsCheckedOutRefsAndKeepsUploadAuthOutOfCurlArgv()
+    {
+        string templatePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Chummer.Run.Api",
+            "wwwroot",
+            "artifacts",
+            "mac-codex-release-pipeline",
+            "bootstrap.sh"));
+
+        string template = File.ReadAllText(templatePath);
+
+        Assert.Contains("verify_checkout_expected_commit", template, StringComparison.Ordinal);
+        Assert.Contains("local expected_commit=\"${4:-}\"", template, StringComparison.Ordinal);
+        Assert.Contains("local ui_expected_commit=\"${CHUMMER_UI_EXPECTED_COMMIT:-}\"", template, StringComparison.Ordinal);
+        Assert.Contains("umask 077", template, StringComparison.Ordinal);
+        Assert.Contains("request_common=(", template, StringComparison.Ordinal);
+        Assert.Contains("\"--config\"", template, StringComparison.Ordinal);
+        Assert.Contains("write_release_upload_curl_config()", template, StringComparison.Ordinal);
+        Assert.Contains("header = \"Authorization: Bearer", template, StringComparison.Ordinal);
+        Assert.Contains("token = sys.stdin.read()", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("token = sys.argv[2]", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("local upload_token=\"$3\"", template, StringComparison.Ordinal);
+        Assert.Contains("local keep_upload_response=\"${CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE:-0}\"", template, StringComparison.Ordinal);
+        Assert.Contains("removed sensitive release upload response file", template, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0", template, StringComparison.Ordinal);
+        Assert.Contains("local fallback_release_proof_url=\"${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}\"", template, StringComparison.Ordinal);
+        Assert.Contains("local fallback_ui_localization_release_gate_url=\"${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}\"", template, StringComparison.Ordinal);
     }
 
     [Fact]
