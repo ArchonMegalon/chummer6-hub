@@ -12,8 +12,9 @@ resolve_ui_repo_root() {
   fi
   local candidate
   for candidate in \
-    "$ROOT/../chummer6-ui-finish" \
     "$ROOT/../chummer6-ui" \
+    "$ROOT/../chummer6-ui-finish" \
+    "$ROOT/../chummer-presentation-clean" \
     "$ROOT/../chummer-presentation"
   do
     if [[ -d "$candidate" ]]; then
@@ -21,7 +22,7 @@ resolve_ui_repo_root() {
       return 0
     fi
   done
-  echo "$ROOT/../chummer6-ui-finish"
+  echo "$ROOT/../chummer6-ui"
 }
 
 resolve_ui_repo_file() {
@@ -30,7 +31,8 @@ resolve_ui_repo_file() {
   for candidate in \
     "$UI_REPO_ROOT/$relative_path" \
     "$FALLBACK_UI_REPO_ROOT/$relative_path" \
-    "$LEGACY_UI_REPO_ROOT/$relative_path"
+    "$LEGACY_UI_REPO_ROOT/$relative_path" \
+    "$OLDER_UI_REPO_ROOT/$relative_path"
   do
     if [[ -f "$candidate" ]]; then
       echo "$candidate"
@@ -41,11 +43,13 @@ resolve_ui_repo_file() {
 }
 
 UI_REPO_ROOT="$(resolve_ui_repo_root)"
-FALLBACK_UI_REPO_ROOT="$ROOT/../chummer6-ui"
-LEGACY_UI_REPO_ROOT="$ROOT/../chummer-presentation"
+FALLBACK_UI_REPO_ROOT="$ROOT/../chummer6-ui-finish"
+LEGACY_UI_REPO_ROOT="$ROOT/../chummer-presentation-clean"
+OLDER_UI_REPO_ROOT="$ROOT/../chummer-presentation"
 DEFAULT_UI_PUBLISHED_DIR="$UI_REPO_ROOT/.codex-studio/published"
 FALLBACK_UI_PUBLISHED_DIR="$FALLBACK_UI_REPO_ROOT/.codex-studio/published"
-LEGACY_UI_PUBLISHED_DIR="$ROOT/../chummer-presentation/.codex-studio/published"
+LEGACY_UI_PUBLISHED_DIR="$LEGACY_UI_REPO_ROOT/.codex-studio/published"
+OLDER_UI_PUBLISHED_DIR="$OLDER_UI_REPO_ROOT/.codex-studio/published"
 UI_PUBLISHED_DIR="${CHUMMER_UI_PUBLISHED_DIR:-$DEFAULT_UI_PUBLISHED_DIR}"
 SR4_WORKFLOW_LEDGER_PATH="${CHUMMER_UI_SR4_WORKFLOW_LEDGER_PATH:-$(resolve_ui_repo_file "docs/SR4_WORKFLOW_PARITY_LEDGER.json")}"
 SR6_WORKFLOW_LEDGER_PATH="${CHUMMER_UI_SR6_WORKFLOW_LEDGER_PATH:-$(resolve_ui_repo_file "docs/SR6_WORKFLOW_PARITY_LEDGER.json")}"
@@ -56,7 +60,8 @@ resolve_receipt_path() {
   for candidate in \
     "$UI_PUBLISHED_DIR/$file_name" \
     "$FALLBACK_UI_PUBLISHED_DIR/$file_name" \
-    "$LEGACY_UI_PUBLISHED_DIR/$file_name"
+    "$LEGACY_UI_PUBLISHED_DIR/$file_name" \
+    "$OLDER_UI_PUBLISHED_DIR/$file_name"
   do
     if [[ -f "$candidate" ]]; then
       echo "$candidate"
@@ -1681,6 +1686,10 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         path=path,
     )
     expected_required_tests = (
+        "Opening_mainframe_preserves_chummer5a_successor_workbench_posture",
+        "Runtime_backed_file_menu_preserves_working_open_save_import_routes",
+        "Master_index_is_a_first_class_runtime_backed_workbench_route",
+        "Character_roster_is_a_first_class_runtime_backed_workbench_route",
         "Desktop_shell_preserves_chummer5a_familiarity_cues",
         "Desktop_shell_preserves_classic_dense_three_pane_workbench_posture",
         "Theme_tokens_preserve_chummer5a_palette_and_readability",

@@ -1,5 +1,6 @@
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
+using Microsoft.AspNetCore.Http;
 
 namespace Chummer.Run.Api.Services;
 
@@ -9,17 +10,20 @@ public sealed class HubPageChromeService
     private readonly PublicNavigationService _navigation;
     private readonly PublicReleaseManifestService _releases;
     private readonly ReleaseSelectionService _releaseSelection;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
     public HubPageChromeService(
         PublicLandingService landing,
         PublicNavigationService navigation,
         PublicReleaseManifestService releases,
-        ReleaseSelectionService releaseSelection)
+        ReleaseSelectionService releaseSelection,
+        IHttpContextAccessor httpContextAccessor)
     {
         _landing = landing;
         _navigation = navigation;
         _releases = releases;
         _releaseSelection = releaseSelection;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     public SiteChromeViewModel BuildPublicChrome(string title, string description, string currentPath)
@@ -73,7 +77,8 @@ public sealed class HubPageChromeService
 
     private static string BuildContextualSignInHref(string normalizedCurrentPath, string fallbackHref)
     {
-        if (normalizedCurrentPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase))
+        if (normalizedCurrentPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
+            || normalizedCurrentPath.StartsWith("/participate", StringComparison.OrdinalIgnoreCase))
         {
             return $"/auth/google/start?next={Uri.EscapeDataString(normalizedCurrentPath)}";
         }
@@ -139,7 +144,8 @@ public sealed class HubPageChromeService
     private SiteChromeActionViewModel BuildPublicPrimaryCta()
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var action = _releaseSelection.BuildPublicPrimaryAction(manifest, authenticated: false);
+        var userAgent = _httpContextAccessor.HttpContext?.Request.Headers.UserAgent.ToString() ?? string.Empty;
+        var action = _releaseSelection.BuildPublicPrimaryAction(manifest, userAgent, authenticated: false);
         return new SiteChromeActionViewModel(action.Label, action.Href, action.Emphasis);
     }
 

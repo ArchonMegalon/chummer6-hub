@@ -81,7 +81,7 @@ public sealed class PublicActionResolver
             }
 
             var normalized = PublicRouteCatalog.NormalizeRoute(candidate!);
-            if (!allowedRoutes.Contains(normalized))
+            if (!PublicRouteCatalog.Contains(normalized, allowedRoutes))
             {
                 throw new InvalidOperationException($"public feature card '{card.Id}' points at missing route '{candidate}'.");
             }
@@ -130,10 +130,10 @@ public sealed class PublicActionResolver
             "featured_artifacts" when string.Equals(card.Badge, "Available today", StringComparison.OrdinalIgnoreCase) => "Open the live artifact",
             "featured_artifacts" => "Inspect the preview concept",
             "coming_next" => "Read the concept page",
-            "whats_real_now" when string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) => "Inspect the live proof",
-            "whats_real_now" => "See the preview proof",
+            "whats_real_now" when string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) => "See what works now",
+            "whats_real_now" => "See current preview",
             "choose_your_lane" => "See the lane fit",
-            "participate" when href.Contains("/participate/codex", StringComparison.OrdinalIgnoreCase) => "Open guided contribution",
+            "participate" when href.Contains("/participate/codex", StringComparison.OrdinalIgnoreCase) => "Authorize Codex access",
             "participate" when href.Contains("/account/settings", StringComparison.OrdinalIgnoreCase) || href.Contains("#beta-interest", StringComparison.OrdinalIgnoreCase) => "Join beta waitlist",
             "participate" when href.Contains("/signup", StringComparison.OrdinalIgnoreCase) => "Create account to continue",
             "participate" when href.Contains("/login", StringComparison.OrdinalIgnoreCase) => "Sign in to continue",

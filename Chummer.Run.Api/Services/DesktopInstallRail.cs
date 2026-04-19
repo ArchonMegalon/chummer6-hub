@@ -38,7 +38,8 @@ internal static class DesktopInstallRail
         string? releaseChannel = null,
         string? headId = null,
         string? platform = null,
-        string? arch = null)
+        string? arch = null,
+        string? installedBuildReceiptId = null)
         => QueryHelpers.AddQueryString(
             "/contact",
             new Dictionary<string, string?>
@@ -49,9 +50,7 @@ internal static class DesktopInstallRail
                 ["summary"] = recoveryMode
                     ? "Setup entered recovery or needed a relink step during install."
                     : "Install, first launch, or update follow-through needs help on this device.",
-                ["detail"] = recoveryMode
-                    ? "The signed-in installer or recovery flow needs help on this device. Continue the fix on the same install rail."
-                    : "The signed-in installer, first launch, or update handoff needs help on this device. Continue the fix on the same install rail.",
+                ["detail"] = BuildSupportDetail(recoveryMode, installedBuildReceiptId),
                 ["installationId"] = installationId,
                 ["applicationVersion"] = NormalizeSupportPrefill(applicationVersion) ?? manifest.Version,
                 ["releaseChannel"] = NormalizeSupportPrefill(releaseChannel) ?? manifest.Channel,
@@ -60,7 +59,33 @@ internal static class DesktopInstallRail
                     ?? NormalizeSupportPrefill(artifact.PlatformId)
                     ?? NormalizeSupportPrefill(artifact.Platform),
                 ["arch"] = NormalizeSupportPrefill(arch) ?? artifact.Arch,
+                ["installedBuildReceiptId"] = NormalizeSupportPrefill(installedBuildReceiptId),
                 ["recoveryMode"] = recoveryMode ? "true" : "false"
+            });
+
+    internal static string BuildAccountSupportHref(
+        string? installationId,
+        string? applicationVersion,
+        string? releaseChannel,
+        string? headId,
+        string? platform,
+        string? arch,
+        string? installedBuildReceiptId = null)
+        => QueryHelpers.AddQueryString(
+            "/account/support",
+            new Dictionary<string, string?>
+            {
+                ["kind"] = SupportCaseKinds.InstallHelp,
+                ["title"] = "Install help for claimed desktop install",
+                ["summary"] = "Install, update, rollback, or support follow-through needs help on this linked device.",
+                ["detail"] = BuildAccountSupportDetail(installedBuildReceiptId),
+                ["installationId"] = NormalizeSupportPrefill(installationId),
+                ["applicationVersion"] = NormalizeSupportPrefill(applicationVersion),
+                ["releaseChannel"] = NormalizeSupportPrefill(releaseChannel),
+                ["headId"] = NormalizeSupportPrefill(headId),
+                ["platform"] = NormalizeSupportPrefill(platform),
+                ["arch"] = NormalizeSupportPrefill(arch),
+                ["installedBuildReceiptId"] = NormalizeSupportPrefill(installedBuildReceiptId)
             });
 
     internal static DesktopInstallRailContext ResolveSupportIntakeRail(string? artifactId, bool recoveryMode)
@@ -113,6 +138,26 @@ internal static class DesktopInstallRail
             : string.IsNullOrWhiteSpace(artifact.Head)
                 ? artifact.Platform
                 : $"{artifact.Platform} {artifact.Head}";
+
+    private static string BuildSupportDetail(bool recoveryMode, string? installedBuildReceiptId)
+    {
+        string baseDetail = recoveryMode
+            ? "The signed-in installer or recovery flow needs help on this device. Continue the fix on the same install rail."
+            : "The signed-in installer, first launch, or update handoff needs help on this device. Continue the fix on the same install rail.";
+        string? receiptId = NormalizeSupportPrefill(installedBuildReceiptId);
+        return receiptId is null
+            ? baseDetail
+            : $"{baseDetail}\n\nInstalled build receipt: {receiptId}";
+    }
+
+    private static string BuildAccountSupportDetail(string? installedBuildReceiptId)
+    {
+        const string baseDetail = "The desktop app requested continuation help from its claimed install rail. Keep the fix, update, rollback, and verification on this same linked install.";
+        string? receiptId = NormalizeSupportPrefill(installedBuildReceiptId);
+        return receiptId is null
+            ? baseDetail
+            : $"{baseDetail}\n\nInstalled build receipt: {receiptId}";
+    }
 
     private static string? NormalizeSupportPrefill(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

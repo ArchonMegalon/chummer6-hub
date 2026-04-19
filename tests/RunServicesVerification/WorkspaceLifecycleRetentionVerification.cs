@@ -134,7 +134,23 @@ internal static class WorkspaceLifecycleRetentionVerification
                     Surface: "workspace_restore",
                     Summary: "Restore packet retains the claimed install lane.",
                     Proof: "artifact:avalonia-linux",
-                    ObservedAtUtc: baselineObservedAtUtc)
+                    ObservedAtUtc: baselineObservedAtUtc),
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: " ",
+                    Kind: null!,
+                    SubjectId: "",
+                    Surface: "entitlement_sync",
+                    Summary: "Entitlement restore provenance is recoverable even without a source receipt id.",
+                    Proof: null,
+                    ObservedAtUtc: baselineObservedAtUtc.AddMinutes(1)),
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: "restore-provenance:rotating-source-id:old",
+                    Kind: "entitlement_replication_stale_claim",
+                    SubjectId: "grant-rotating",
+                    Surface: "entitlement_sync",
+                    Summary: "Rotating source ids should still preserve first observation by semantic receipt identity.",
+                    Proof: "grant-rotating",
+                    ObservedAtUtc: baselineObservedAtUtc.AddMinutes(2))
             ],
             ConflictReceipts =
             [
@@ -145,7 +161,27 @@ internal static class WorkspaceLifecycleRetentionVerification
                     SubjectId: "install-01",
                     Summary: "Restore snapshot has no reconnectable artifact receipt.",
                     Resolution: "Refresh install linking before continuing.",
-                    ObservedAtUtc: baselineObservedAtUtc)
+                    ObservedAtUtc: baselineObservedAtUtc),
+                new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: null!,
+                    Severity: "blocking",
+                    Kind: null!,
+                    SubjectId: " ",
+                    Summary: "Entitlement restore conflict is recoverable even without a source receipt id.",
+                    Resolution: "Open account access before continuing.",
+                    ObservedAtUtc: baselineObservedAtUtc.AddMinutes(1),
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true),
+                new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: "restore-conflict:rotating-source-id:old",
+                    Severity: "blocking",
+                    Kind: "entitlement_replication_stale_claim",
+                    SubjectId: "grant-rotating",
+                    Summary: "Rotating source ids should still preserve first conflict observation by semantic receipt identity.",
+                    Resolution: "Refresh entitlement replication before continuing.",
+                    ObservedAtUtc: baselineObservedAtUtc.AddMinutes(2),
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true)
             ]
         };
 
@@ -154,11 +190,15 @@ internal static class WorkspaceLifecycleRetentionVerification
             GeneratedAtUtc = DateTimeOffset.UtcNow,
             ProvenanceReceipts =
             [
-                existing.ProvenanceReceipts![0] with { ObservedAtUtc = DateTimeOffset.UtcNow }
+                existing.ProvenanceReceipts![0] with { ObservedAtUtc = DateTimeOffset.UtcNow },
+                existing.ProvenanceReceipts![1] with { ObservedAtUtc = DateTimeOffset.UtcNow },
+                existing.ProvenanceReceipts![2] with { ObservedAtUtc = DateTimeOffset.UtcNow }
             ],
             ConflictReceipts =
             [
-                existing.ConflictReceipts![0] with { ObservedAtUtc = DateTimeOffset.UtcNow }
+                existing.ConflictReceipts![0] with { ObservedAtUtc = DateTimeOffset.UtcNow },
+                existing.ConflictReceipts![1] with { ObservedAtUtc = DateTimeOffset.UtcNow },
+                existing.ConflictReceipts![2] with { ObservedAtUtc = DateTimeOffset.UtcNow }
             ]
         };
 
@@ -176,6 +216,55 @@ internal static class WorkspaceLifecycleRetentionVerification
             existing.ConflictReceipts![0].ObservedAtUtc.ToString("O"),
             finalized.ConflictReceipts![0].ObservedAtUtc.ToString("O"),
             "Unchanged restore projections should preserve conflict receipt observation timestamps.");
+        VerificationAssert.Equal(
+            existing.ProvenanceReceipts![1].ObservedAtUtc.ToString("O"),
+            finalized.ProvenanceReceipts![1].ObservedAtUtc.ToString("O"),
+            "Unchanged restore projections should preserve blank-id provenance receipt observation timestamps by recovered semantic identity.");
+        VerificationAssert.Equal(
+            existing.ConflictReceipts![1].ObservedAtUtc.ToString("O"),
+            finalized.ConflictReceipts![1].ObservedAtUtc.ToString("O"),
+            "Unchanged restore projections should preserve blank-id conflict receipt observation timestamps by recovered semantic identity.");
+
+        DateTimeOffset rotatedFinalizeAtUtc = DateTimeOffset.UtcNow.AddMinutes(3);
+        WorkspaceRestoreProjection rotatedCandidate = existing with
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            ProvenanceReceipts =
+            [
+                existing.ProvenanceReceipts![0],
+                existing.ProvenanceReceipts![1],
+                existing.ProvenanceReceipts![2] with
+                {
+                    ReceiptId = "restore-provenance:rotating-source-id:new",
+                    ObservedAtUtc = DateTimeOffset.UtcNow
+                }
+            ],
+            ConflictReceipts =
+            [
+                existing.ConflictReceipts![0],
+                existing.ConflictReceipts![1],
+                existing.ConflictReceipts![2] with
+                {
+                    ReceiptId = "restore-conflict:rotating-source-id:new",
+                    ObservedAtUtc = DateTimeOffset.UtcNow
+                }
+            ]
+        };
+
+        WorkspaceRestoreProjection rotatedFinalized = lifecycle.FinalizeRestoreProjection(existing, rotatedCandidate, rotatedFinalizeAtUtc);
+
+        VerificationAssert.Equal(
+            rotatedFinalizeAtUtc.ToString("O"),
+            rotatedFinalized.GeneratedAtUtc.ToString("O"),
+            "Restore projections should advance the generated timestamp when source receipt ids rotate.");
+        VerificationAssert.Equal(
+            existing.ProvenanceReceipts![2].ObservedAtUtc.ToString("O"),
+            rotatedFinalized.ProvenanceReceipts![2].ObservedAtUtc.ToString("O"),
+            "Restore projections should preserve provenance receipt observation timestamps when source receipt ids rotate but semantic identity is stable.");
+        VerificationAssert.Equal(
+            existing.ConflictReceipts![2].ObservedAtUtc.ToString("O"),
+            rotatedFinalized.ConflictReceipts![2].ObservedAtUtc.ToString("O"),
+            "Restore projections should preserve conflict receipt observation timestamps when source receipt ids rotate but semantic identity is stable.");
     }
 
     private static string ResolveRepoRoot()

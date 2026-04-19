@@ -18,14 +18,9 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command missing: $1"
 }
 
-log_bootstrap_identity() {
-  local source_path="${BASH_SOURCE[0]:-}"
-  [[ -n "$source_path" ]] || return 0
-
-  local digest=""
-  if [[ -r "$source_path" ]]; then
-    digest="$(
-      python3 - "$source_path" <<'PY'
+file_sha256() {
+  local path="$1"
+  python3 - "$path" <<'PY'
 from __future__ import annotations
 
 import hashlib
@@ -35,7 +30,15 @@ from pathlib import Path
 path = Path(sys.argv[1])
 print(hashlib.sha256(path.read_bytes()).hexdigest())
 PY
-    )" || digest=""
+}
+
+log_bootstrap_identity() {
+  local source_path="${BASH_SOURCE[0]:-}"
+  [[ -n "$source_path" ]] || return 0
+
+  local digest=""
+  if [[ -r "$source_path" ]]; then
+    digest="$(file_sha256 "$source_path" 2>/dev/null || true)"
   fi
 
   if [[ -n "$digest" ]]; then
@@ -43,6 +46,19 @@ PY
   else
     log "bootstrap source: $source_path"
   fi
+}
+
+verify_bootstrap_integrity() {
+  local expected_sha256="${CHUMMER_BOOTSTRAP_EXPECTED_SHA256:-}"
+  local source_path="${BASH_SOURCE[0]:-}"
+  [[ -n "$expected_sha256" ]] || return 0
+  [[ -n "$source_path" && -r "$source_path" ]] || die "bootstrap integrity check requested but bootstrap source is unreadable"
+
+  local actual_sha256
+  actual_sha256="$(file_sha256 "$source_path" 2>/dev/null || true)"
+  [[ -n "$actual_sha256" ]] || die "bootstrap integrity check requested but sha256 could not be computed"
+  [[ "$actual_sha256" == "$expected_sha256" ]] || die "bootstrap integrity check failed: expected sha256 $expected_sha256 but found $actual_sha256"
+  log "bootstrap integrity verified: sha256=${actual_sha256}"
 }
 
 free_space_kib() {
@@ -450,7 +466,6 @@ resolve_ui_localization_release_gate_repo() {
   local script_relative_path="scripts/ai/milestones/b15-localization-release-gate.sh"
   local output_relative_path=".codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
   local -a candidates=()
-  local temp_repo=""
 
   for candidate in \
     "$primary_ui_repo" \
@@ -487,9 +502,7 @@ resolve_ui_localization_release_gate_repo() {
     return 0
   fi
 
-  temp_repo="$(mktemp -d "${TMPDIR:-/tmp}/chummer-ui-localization-gate.XXXXXX")"
-  mkdir -p "$temp_repo/.codex-studio/published"
-  printf '%s\n' "$temp_repo"
+  printf '%s\n' ""
 }
 
 resolve_candidate_is_http_url() {
@@ -880,159 +893,11 @@ PY
 }
 
 write_bootstrap_fallback_hub_local_release_proof() {
-  local output_path="$1"
-  local base_url="$2"
-  local compose_file="$3"
-  local timeout_seconds="$4"
-  local skip_rebuild="$5"
-
-  python3 - "$output_path" "$base_url" "$compose_file" "$timeout_seconds" "$skip_rebuild" <<'PY'
-from __future__ import annotations
-
-import datetime as dt
-import json
-import sys
-from pathlib import Path
-
-output_path = Path(sys.argv[1])
-base_url = str(sys.argv[2]).strip() or "https://chummer.run"
-compose_file = str(sys.argv[3]).strip()
-timeout_seconds = int(str(sys.argv[4]).strip() or "300")
-skip_rebuild = str(sys.argv[5]).strip().lower() in {"1", "true", "yes", "on"}
-generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-payload = {
-    "contract_name": "chummer6-hub.local_release_proof",
-    "status": "passed",
-    "generated_at": generated_at,
-    "generatedAt": generated_at,
-    "base_url": base_url,
-    "baseUrl": base_url,
-    "compose_file": compose_file,
-    "playwright_timeout_seconds": timeout_seconds,
-    "edge_rebuild_skipped": skip_rebuild,
-    "journeys_passed": [
-        "install_claim_restore_continue",
-        "build_explain_publish",
-        "campaign_session_recover_recap",
-        "report_cluster_release_notify",
-        "organize_community_and_close_loop",
-    ],
-    "proof_routes": [
-        "/downloads/install/avalonia-linux-x64-installer",
-        "/home/access",
-        "/home/work",
-        "/account/work",
-        "/account/support",
-        "/contact",
-    ],
-}
-
-output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-PY
+  die "bootstrap synthetic hub local release-proof fallback is disabled; fix the checked-out generator or set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH"
 }
 
 write_bootstrap_fallback_ui_localization_release_gate() {
-  local output_path="$1"
-
-  python3 - "$output_path" <<'PY'
-from __future__ import annotations
-
-import datetime as dt
-import json
-import sys
-from pathlib import Path
-
-output_path = Path(sys.argv[1])
-generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-shipping_locales = ["en-us", "de-de", "fr-fr", "ja-jp", "pt-br", "zh-cn"]
-acceptance_gates = [
-    "pseudo_localization",
-    "missing_key_fail_fast",
-    "top_surface_overflow_checks",
-    "locale_smoke_first_launch",
-    "locale_smoke_settings",
-    "locale_smoke_explain",
-    "locale_smoke_updater",
-    "locale_smoke_support",
-    "non_english_generated_artifact_smoke",
-]
-locale_summary = [
-    {
-        "locale": locale,
-        "untranslatedKeyCount": 0,
-        "overrideCount": 0,
-        "minimumOverrideCount": 0,
-        "missingReleaseSeedKeys": [],
-        "legacyXmlPresent": False,
-        "legacyDataXmlPresent": False,
-    }
-    for locale in shipping_locales
-]
-
-payload = {
-    "status": "pass",
-    "generated_at": generated_at,
-    "generatedAt": generated_at,
-    "default_key_count": 0,
-    "defaultKeyCount": 0,
-    "explicit_fallback_runtime": "blocked",
-    "explicitFallbackRuntime": "blocked",
-    "signoff_smoke_runner_status": "pass",
-    "signoffSmokeRunnerStatus": "pass",
-    "shipping_locales": shipping_locales,
-    "shippingLocales": shipping_locales,
-    "acceptance_gates": acceptance_gates,
-    "acceptanceGates": acceptance_gates,
-    "domain_coverage": {
-        "app_chrome": "pass",
-        "install_update_support": "pass",
-        "explain_receipts": "pass",
-        "data_rules_names": "pass",
-        "generated_artifacts": "pass",
-    },
-    "domainCoverage": {
-        "app_chrome": "pass",
-        "install_update_support": "pass",
-        "explain_receipts": "pass",
-        "data_rules_names": "pass",
-        "generated_artifacts": "pass",
-    },
-    "locale_domain_coverage": {
-        locale: {
-            "app_chrome": "pass",
-            "install_update_support": "pass",
-            "explain_receipts": "pass",
-            "data_rules_names": "pass",
-            "generated_artifacts": "pass",
-        }
-        for locale in shipping_locales
-    },
-    "localeDomainCoverage": {
-        locale: {
-            "app_chrome": "pass",
-            "install_update_support": "pass",
-            "explain_receipts": "pass",
-            "data_rules_names": "pass",
-            "generated_artifacts": "pass",
-        }
-        for locale in shipping_locales
-    },
-    "blocking_findings": [],
-    "blockingFindings": [],
-    "blocking_findings_count": 0,
-    "blockingFindingsCount": 0,
-    "translation_backlog_findings": [],
-    "translationBacklogFindings": [],
-    "translation_backlog_findings_count": 0,
-    "translationBacklogFindingsCount": 0,
-    "locale_summary": locale_summary,
-    "localeSummary": locale_summary,
-}
-
-output_path.parent.mkdir(parents=True, exist_ok=True)
-output_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-PY
+  die "bootstrap synthetic UI localization release-gate fallback is disabled; fix the checked-out gate or set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH"
 }
 
 generate_hub_local_release_proof() {
@@ -1055,20 +920,13 @@ generate_hub_local_release_proof() {
       if hub_local_release_proof_has_canonical_baseline "$output_path"; then
         return 0
       fi
-      log "checked-out hub proof generator produced a non-canonical receipt; using bootstrap fallback hub local release proof"
+      die "checked-out hub proof generator produced a non-canonical receipt at $output_path; fix the generator or set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH"
     else
-      log "checked-out hub proof generator failed; using bootstrap fallback hub local release proof"
+      die "checked-out hub proof generator failed at $generator_path; fix the generator or set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH"
     fi
   else
-    log "checked-out hub proof generator is missing at $generator_path; using bootstrap fallback hub local release proof"
+    die "checked-out hub proof generator is missing at $generator_path; set CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH or restore the generator"
   fi
-
-  write_bootstrap_fallback_hub_local_release_proof \
-    "$output_path" \
-    "$base_url" \
-    "$compose_file" \
-    "$timeout_seconds" \
-    "$skip_rebuild"
 }
 
 generate_validated_hub_local_release_proof() {
@@ -1093,9 +951,7 @@ generate_ui_localization_release_gate() {
   local ui_repo
   ui_repo="$(resolve_ui_localization_release_gate_repo "$@")"
   if [[ -z "$ui_repo" || "$ui_repo" == "/" ]]; then
-    ui_repo="$(mktemp -d "${TMPDIR:-/tmp}/chummer-ui-localization-gate.XXXXXX")"
-    mkdir -p "$ui_repo/.codex-studio/published"
-    log "ui localization release gate generator did not resolve a repo root; using temporary fallback repo at $ui_repo"
+    die "ui localization release gate repo root could not be resolved; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or run from a checkout with scripts/ai/milestones/b15-localization-release-gate.sh"
   fi
   local script_path="$ui_repo/scripts/ai/milestones/b15-localization-release-gate.sh"
   local output_path="$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
@@ -1112,13 +968,10 @@ generate_ui_localization_release_gate() {
       return 0
     fi
 
-    log "ui localization release gate generator failed at $script_path; using bootstrap fallback receipt at $output_path"
-    write_bootstrap_fallback_ui_localization_release_gate "$output_path"
-    return 0
+    die "ui localization release gate generator failed at $script_path; fix the gate or set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH"
   fi
 
-  log "ui localization release gate generator is missing at $script_path; using bootstrap fallback receipt at $output_path"
-  write_bootstrap_fallback_ui_localization_release_gate "$output_path"
+  die "ui localization release gate generator is missing at $script_path; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or restore the gate script"
 }
 
 generate_validated_ui_localization_release_gate() {
@@ -1128,9 +981,7 @@ generate_validated_ui_localization_release_gate() {
   shift 3
   ui_repo="$(resolve_ui_localization_release_gate_repo "$ui_repo" "$@")"
   if [[ -z "$ui_repo" || "$ui_repo" == "/" ]]; then
-    ui_repo="$(mktemp -d "${TMPDIR:-/tmp}/chummer-ui-localization-gate.XXXXXX")"
-    mkdir -p "$ui_repo/.codex-studio/published"
-    log "ui localization release gate validation did not resolve a repo root; using temporary fallback repo at $ui_repo"
+    die "ui localization release gate validation could not resolve a repo root; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or run from a checkout with the gate script"
   fi
   local output_path="$ui_repo/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
   local ui_localization_release_gate_health=""
@@ -1542,7 +1393,7 @@ infer_publish_mode() {
     return
   fi
 
-  if [[ -n "${CHUMMER_RELEASE_UPLOAD_URL:-}" || -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" ]]; then
+  if [[ -n "${CHUMMER_RELEASE_UPLOAD_URL:-}" || -n "$(release_upload_token_value)" ]]; then
     printf 'http'
     return
   fi
@@ -1560,13 +1411,47 @@ infer_publish_mode() {
   printf 'http'
 }
 
+release_upload_token_value() {
+  if [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" ]]; then
+    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TOKEN}"
+    return
+  fi
+  if [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
+    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TICKET}"
+    return
+  fi
+  if [[ -n "${FLEET_INTERNAL_API_TOKEN:-}" ]]; then
+    printf '%s' "${FLEET_INTERNAL_API_TOKEN}"
+    return
+  fi
+  printf '%s' ""
+}
+
+prompt_for_release_upload_ticket() {
+  if [[ ! -t 0 ]]; then
+    return 1
+  fi
+
+  printf 'Paste the signed-in release upload handoff code (input hidden): ' >&2
+  IFS= read -r -s CHUMMER_RELEASE_UPLOAD_TICKET || return 1
+  printf '\n' >&2
+  export CHUMMER_RELEASE_UPLOAD_TICKET
+  [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]
+}
+
+ensure_release_upload_token() {
+  [[ -n "$(release_upload_token_value)" ]] && return 0
+  prompt_for_release_upload_ticket && [[ -n "$(release_upload_token_value)" ]] && return 0
+  die "set CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"
+}
+
 validate_publish_mode() {
   local publish_mode="$1"
   local upload_url="$2"
 
   case "$publish_mode" in
     http)
-      [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-${FLEET_INTERNAL_API_TOKEN:-}}" ]] || die "set CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"
+      ensure_release_upload_token
       [[ -n "$upload_url" ]] || die "set CHUMMER_RELEASE_UPLOAD_URL for HTTP release promotion"
       ;;
     filesystem)
@@ -2631,7 +2516,6 @@ upload_release_bundle_http() {
   local last_request_status=""
   local session_json session_id files_url chunks_url complete_url
   local file_path relative_path file_size
-  local token_preview="${upload_token:0:10}..."
   local -a request_common=(
     "-H"
     "Authorization: Bearer ${upload_token}"
@@ -2708,7 +2592,7 @@ upload_release_bundle_http() {
         log "  guidance: retry the command after correcting payload inputs; this is usually not a transient network issue."
         ;;
       401|403)
-        log "  guidance: authorization/authentication failure. confirm the token in CHUMMER_RELEASE_UPLOAD_TOKEN (or api token) is current."
+        log "  guidance: authorization/authentication failure. confirm the signed-in handoff code in CHUMMER_RELEASE_UPLOAD_TICKET (or CHUMMER_RELEASE_UPLOAD_TOKEN / api token) is current."
         log "  guidance: if this is a signed release token, re-issue with release-upload flow and rerun."
         ;;
       500|502|503|504)
@@ -3021,7 +2905,6 @@ PY
     die "release upload payload has no files."
   fi
 
-  log "staged upload token: ${token_preview}"
   log "staged upload endpoint: ${sessions_url}"
   local file_size_total=0
   for file_path in "${upload_files[@]}"; do
@@ -3097,6 +2980,7 @@ main() {
   ensure_dotnet_resolver
   require_cmd python3
   log_bootstrap_identity
+  verify_bootstrap_integrity
   require_cmd jq
   require_cmd curl
   require_cmd hdiutil
@@ -3703,7 +3587,7 @@ main() {
       upload_release_bundle_http \
         "$publish_bundle_dir" \
         "$upload_url" \
-        "${CHUMMER_RELEASE_UPLOAD_TOKEN:-${FLEET_INTERNAL_API_TOKEN:-}}" \
+        "$(release_upload_token_value)" \
         "$response_path"
       ;;
     filesystem)
@@ -3738,7 +3622,14 @@ main() {
     log "public downloads url: $(jq -r '.downloadsUrl // empty' "$response_path")"
     jq -r '.installDispatchUrls[]? | "install handoff: " + .' "$response_path"
     jq -r '.directFileUrls[]? | "direct file: " + .' "$response_path"
-    jq -r '.signedInInstallClaims[]? | "claim code: " + .artifactId + " -> " + .claimCode + " (dispatch: " + .installDispatchUrl + ")"' "$response_path"
+    if is_true "${CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS:-0}"; then
+      jq -r '.signedInInstallClaims[]? | "claim code: " + .artifactId + " -> " + .claimCode + " (dispatch: " + .installDispatchUrl + ")"' "$response_path"
+    else
+      jq -r '.signedInInstallClaims[]? | "signed-in install claim recorded for " + .artifactId + " (dispatch: " + .installDispatchUrl + ")"' "$response_path"
+      if jq -e '.signedInInstallClaims | length > 0' "$response_path" >/dev/null 2>&1; then
+        log "claim codes are stored in $response_path; rerun with CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS=1 to print them."
+      fi
+    fi
   fi
 
   log "done"

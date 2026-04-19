@@ -309,7 +309,7 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         ReleaseOptionViewModel recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
         Assert.Equal("avalonia-osx-arm64-installer", recommended.Artifact.Id);
-        Assert.Equal("Open Mac install command", recommended.ActionLabel);
+        Assert.Equal("Install on Mac", recommended.ActionLabel);
         Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
         Assert.True(experience.RequestedPlatformHasPublicDownload);
         Assert.Null(experience.PlatformShelfNoticeTitle);

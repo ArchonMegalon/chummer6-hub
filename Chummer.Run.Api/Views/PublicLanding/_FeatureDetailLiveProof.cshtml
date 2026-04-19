@@ -2,14 +2,14 @@
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Use and verify this proof</p>
-        <h2 class="editorial-title">What this live artifact shows, who it helps, and what to check next</h2>
-        <p class="editorial-copy">Live proof pages should help you use the product surface immediately, then verify the evidence markers before you leave for support.</p>
+        <p class="eyebrow">Use this live surface</p>
+        <h2 class="editorial-title">What this live artifact does, who it helps, and where to go next</h2>
+        <p class="editorial-copy">Live artifact pages should help you use the product surface immediately, then point you to the right next step before you leave for support.</p>
     </div>
     <div class="role-matrix__grid">
         <article class="role-matrix__cell">
             <span class="tag">Use it now</span>
-            <p>Start from the live product surface attached to this artifact, then use support only if the proof path stops being enough to move forward.</p>
+            <p>Start from the live product surface attached to this artifact, then use support only if the surface stops being enough to move forward.</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Pain))
         {
@@ -40,7 +40,7 @@
     <section class="trust-rail-section">
         <div class="editorial-block__lead">
             <p class="eyebrow">Verification markers</p>
-            <h2 class="editorial-title">Keep these cues in view before you assume the proof is complete</h2>
+            <h2 class="editorial-title">Keep these cues in view before you assume the route is complete</h2>
         </div>
         <div class="trust-claim__microproof">
             @foreach (var item in Model.MicroProof)
@@ -55,21 +55,21 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Start from the live surface</h3>
-            <p>Use the product action first, not the gallery card. Live proof pages should move you into the working surface before they send you to any secondary reading.</p>
+            <p>Use the product action first, not the gallery card. Live artifact pages should move you into the working surface before they send you to any secondary reading.</p>
         </div>
         <a class="inline-link" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Check release posture</h3>
-            <p>Proof is stronger when it sits next to the current release notes, known issues, and update posture instead of being read in isolation.</p>
+            <h3>Use the current release context</h3>
+            <p>This is easier to trust when it sits next to current release notes, known issues, and update status instead of being read in isolation.</p>
         </div>
-        <a class="inline-link" href="/now">Open current release</a>
+        <a class="inline-link" href="/now">Open what works today</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Escalate only when proof stops being enough</h3>
-            <p>If the route, install, or result still looks wrong after you follow the live path, support is the next honest lane.</p>
+            <h3>Escalate only when the surface stops being enough</h3>
+            <p>If the route, install, or result still looks wrong after you follow the live path, support is the next step.</p>
         </div>
         <a class="inline-link" href="/contact#support-intake">Open support</a>
     </article>

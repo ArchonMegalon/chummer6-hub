@@ -3,16 +3,87 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PRESENTATION_ROOT="${CHUMMER_PRESENTATION_ROOT:-/docker/chummercomplete/chummer-presentation}"
+
+resolve_ui_repo_root() {
+  local explicit_root="${CHUMMER_PRESENTATION_ROOT:-}"
+  if [[ -n "$explicit_root" ]]; then
+    echo "$explicit_root"
+    return 0
+  fi
+
+  local candidate
+  for candidate in \
+    "/docker/chummercomplete/chummer6-ui" \
+    "/docker/chummercomplete/chummer6-ui-finish" \
+    "/docker/chummercomplete/chummer-presentation-clean" \
+    "/docker/chummercomplete/chummer-presentation" \
+    "$REPO_ROOT/../chummer6-ui" \
+    "$REPO_ROOT/../chummer6-ui-finish" \
+    "$REPO_ROOT/../chummer-presentation-clean" \
+    "$REPO_ROOT/../chummer-presentation"
+  do
+    if [[ -d "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  echo "/docker/chummercomplete/chummer6-ui"
+}
+
+resolve_ui_localization_release_gate_source() {
+  local explicit_path="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_SOURCE:-}"
+  if [[ -n "$explicit_path" ]]; then
+    echo "$explicit_path"
+    return 0
+  fi
+
+  local candidate
+  for candidate in \
+    "$PRESENTATION_ROOT/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "/docker/chummercomplete/chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "/docker/chummercomplete/chummer6-ui-finish/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "/docker/chummercomplete/chummer-presentation-clean/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "/docker/chummercomplete/chummer-presentation/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$REPO_ROOT/../chummer6-ui/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$REPO_ROOT/../chummer6-ui-finish/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$REPO_ROOT/../chummer-presentation-clean/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json" \
+    "$REPO_ROOT/../chummer-presentation/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+  do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  echo "$PRESENTATION_ROOT/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json"
+}
+
+PRESENTATION_ROOT="$(resolve_ui_repo_root)"
 OUTPUT_ROOT="${1:-$REPO_ROOT/Chummer.Portal/downloads}"
 
+resolve_ui_downloads_path() {
+  local relative_path="$1"
+  local candidate
+  for candidate in \
+    "$PRESENTATION_ROOT/Docker/Downloads/$relative_path" \
+    "$PRESENTATION_ROOT/Chummer.Portal/downloads/$relative_path"
+  do
+    if [[ -e "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  echo "$PRESENTATION_ROOT/Docker/Downloads/$relative_path"
+}
+
 RUNSERVICES_SOURCE_FILES_ROOT="${CHUMMER_RUNSERVICES_SOURCE_FILES_ROOT:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/files}"
-PRESENTATION_FILES_ROOT="${CHUMMER_PRESENTATION_FILES_ROOT:-$PRESENTATION_ROOT/Chummer.Portal/downloads/files}"
-PRESENTATION_STARTUP_SMOKE_ROOT="${CHUMMER_PRESENTATION_STARTUP_SMOKE_ROOT:-$PRESENTATION_ROOT/Chummer.Portal/downloads/startup-smoke}"
-PRESENTATION_RELEASE_CHANNEL_PATH="${CHUMMER_PRESENTATION_RELEASE_CHANNEL_PATH:-$PRESENTATION_ROOT/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json}"
+PRESENTATION_FILES_ROOT="${CHUMMER_PRESENTATION_FILES_ROOT:-$(resolve_ui_downloads_path "files")}"
+PRESENTATION_STARTUP_SMOKE_ROOT="${CHUMMER_PRESENTATION_STARTUP_SMOKE_ROOT:-$(resolve_ui_downloads_path "startup-smoke")}"
+PRESENTATION_RELEASE_CHANNEL_PATH="${CHUMMER_PRESENTATION_RELEASE_CHANNEL_PATH:-$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")}"
 PRESENTATION_RELEASE_EVIDENCE_SOURCE="${CHUMMER_PRESENTATION_RELEASE_EVIDENCE_SOURCE:-$PRESENTATION_ROOT/Docker/Downloads/release-evidence/public-promotion.json}"
 RELEASE_PROOF_SOURCE="${CHUMMER_RUN_LOCAL_RELEASE_PROOF_SOURCE:-$REPO_ROOT/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
-UI_LOCALIZATION_RELEASE_GATE_SOURCE="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_SOURCE:-/docker/chummercomplete/chummer6-ui-finish/.codex-studio/published/UI_LOCALIZATION_RELEASE_GATE.generated.json}"
+UI_LOCALIZATION_RELEASE_GATE_SOURCE="$(resolve_ui_localization_release_gate_source)"
 STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-172800}"
 
 if [[ ! -d "$RUNSERVICES_SOURCE_FILES_ROOT" ]]; then
@@ -55,7 +126,7 @@ cp "$RUNSERVICES_SOURCE_FILES_ROOT"/chummer-* "$combined_files_root"/
 cp "$PRESENTATION_FILES_ROOT"/chummer-* "$combined_files_root"/
 
 if [[ -d "$PRESENTATION_STARTUP_SMOKE_ROOT" ]]; then
-  find "$PRESENTATION_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*-osx-arm64.receipt.json' -print0 \
+  find "$PRESENTATION_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \
     | while IFS= read -r -d '' receipt_path; do
         cp "$receipt_path" "$combined_startup_smoke_root"/
       done

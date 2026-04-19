@@ -122,6 +122,209 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
         self.assertIn("proof.json", result.stderr)
 
+    def test_verifier_fails_closed_when_registry_drops_queue_identity_exit_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-") as temp_dir:
+            temp_root = Path(temp_dir)
+            registry_path = temp_root / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            source_registry_path = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
+            registry_text = source_registry_path.read_text(encoding="utf-8").replace(
+                "          - python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py tests/test_workspace_restore_queue_identity.py exits 0.\n",
+                "",
+                1,
+            )
+            registry_path.write_text(registry_text, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml", result.stderr)
+        self.assertIn(
+            "python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py tests/test_workspace_restore_queue_identity.py exits 0.",
+            result.stderr,
+        )
+
+    def test_verifier_fails_closed_when_contract_drops_lead_subject_marker(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-lead-subject-") as temp_dir:
+            temp_root = Path(temp_dir)
+            contract_path = temp_root / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.parent.mkdir(parents=True)
+            source_contract_path = REPO_ROOT / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.write_text(
+                source_contract_path.read_text(encoding="utf-8").replace(
+                    "    string LeadSubjectId,\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneContracts.cs", result.stderr)
+        self.assertIn("string LeadSubjectId,", result.stderr)
+
+    def test_verifier_fails_closed_when_contract_drops_lead_observation_markers(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-lead-observed-") as temp_dir:
+            temp_root = Path(temp_dir)
+            contract_path = temp_root / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.parent.mkdir(parents=True)
+            source_contract_path = REPO_ROOT / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.write_text(
+                source_contract_path.read_text(encoding="utf-8")
+                .replace("    DateTimeOffset LeadObservedAtUtc,\n", "", 1)
+                .replace("    int StaleOrDriftProvenanceReceiptCount,\n", "", 1),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneContracts.cs", result.stderr)
+        self.assertIn("DateTimeOffset LeadObservedAtUtc,", result.stderr)
+        self.assertIn("int StaleOrDriftProvenanceReceiptCount,", result.stderr)
+
+    def test_verifier_fails_closed_when_contract_drops_surface_count_markers(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-counts-") as temp_dir:
+            temp_root = Path(temp_dir)
+            contract_path = temp_root / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.parent.mkdir(parents=True)
+            source_contract_path = REPO_ROOT / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.write_text(
+                source_contract_path.read_text(encoding="utf-8")
+                .replace("    int WorkspaceRestoreProvenanceCount,\n", "", 1)
+                .replace("    int EntitlementSyncConflictCount,\n", "", 1)
+                .replace("    int RefreshBeforeContinueCount,\n", "", 1)
+                .replace("    int BlockingConflictCount);\n", ")\n", 1),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneContracts.cs", result.stderr)
+        self.assertIn("int WorkspaceRestoreProvenanceCount,", result.stderr)
+        self.assertIn("int EntitlementSyncConflictCount,", result.stderr)
+        self.assertIn("int RefreshBeforeContinueCount,", result.stderr)
+        self.assertIn("int BlockingConflictCount);", result.stderr)
+
+    def test_verifier_fails_closed_when_entitlement_sync_status_reverts_to_restore_generic_defaults(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-entitlement-status-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace("RestoreReceiptStatusScope.EntitlementSync", "RestoreReceiptStatusScope.Restore")
+                .replace("entitlement_sync_review_required", "restore_review_required", 1)
+                .replace("entitlement-sync provenance", "provenance", 1)
+                .replace("entitlement-sync conflict", "conflict", 1)
+                .replace("entitlement replication posture", "restore posture", 1)
+                .replace(
+                    "Open account access and review entitlement sync receipts before trusting this device.",
+                    "Review the restore rail before continuing from another device.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8")
+                .replace("VerifyEntitlementSyncReceiptStatusUsesStandaloneScopeDefaults();", "", 1)
+                .replace(
+                    "Standalone entitlement sync status should default to entitlement-scoped lead receipt identity instead of workspace-restore fallback values.",
+                    "Removed entitlement sync standalone scope assertion.",
+                    1,
+                )
+                .replace(
+                    "Standalone entitlement sync status should default to the account-access recovery lane when no receipts have been minted yet.",
+                    "Removed entitlement sync fallback route assertion.",
+                    1,
+                )
+                .replace(
+                    "Standalone entitlement sync status summary should name entitlement-sync receipts and entitlement replication posture instead of generic restore wording.",
+                    "Removed entitlement sync summary assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("RestoreReceiptStatusScope.EntitlementSync", result.stderr)
+        self.assertIn("entitlement_sync_review_required", result.stderr)
+        self.assertIn("entitlement replication posture", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("VerifyEntitlementSyncReceiptStatusUsesStandaloneScopeDefaults", result.stderr)
+
     def test_verifier_fails_closed_when_restore_api_route_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-api-route-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -199,6 +402,140 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("ResolveRestoreConflictResolution", result.stderr)
         self.assertIn("Open account access and resolve this restore receipt", result.stderr)
 
+    def test_verifier_fails_closed_when_next_action_resolution_recovery_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-next-action-resolution-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace(
+                    "ResolutionAction: ResolveRestoreConflictResolution(receipt) ?? $\"Review restore evidence for {workspace.CampaignName} before continuing.\"",
+                    "ResolutionAction: NormalizeOptional(receipt.Resolution) ?? $\"Review restore evidence for {workspace.CampaignName} before continuing.\"",
+                    1,
+                )
+                .replace(
+                    "Summary: ResolveRestoreConflictResolution(blockingRestoreConflict)\n                    ?? \"Review the restore and entitlement receipts before you continue this shared campaign on another device.\",",
+                    "Summary: NormalizeOptional(blockingRestoreConflict.Resolution)\n                    ?? \"Review the restore and entitlement receipts before you continue this shared campaign on another device.\",",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(source_verification_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("ResolveRestoreConflictResolution", result.stderr)
+        self.assertIn("blockingRestoreConflict", result.stderr)
+
+    def test_verifier_fails_closed_when_receipt_conflict_priority_can_be_hidden_by_summary_overflow(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-conflict-priority-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            source_text = source_service_path.read_text(encoding="utf-8")
+            old_block = (
+                "        IReadOnlyList<WorkspaceRestoreConflictReceipt> restoreConflictReceipts = restore.ConflictReceipts\n"
+                "            ?? Array.Empty<WorkspaceRestoreConflictReceipt>();\n"
+                "        ContinuityConflictCue[] restoreReceiptCues = OrderRestoreConflictReceiptsForRecovery(restoreConflictReceipts)\n"
+                "            .Select(receipt => new ContinuityConflictCue(\n"
+                "                CueId: $\"restore-conflict:{workspace.WorkspaceId}:{StableCueId(ResolveRestoreConflictReceiptId(receipt))}\",\n"
+                "                Severity: NormalizeSeverity(receipt.Severity, IsRestoreConflictContinueBlocking(receipt)),\n"
+                "                Summary: ResolveRestoreConflictSummary(receipt),\n"
+                "                ResolutionAction: ResolveRestoreConflictResolution(receipt) ?? $\"Review restore evidence for {workspace.CampaignName} before continuing.\"))\n"
+                "            .ToArray();\n\n"
+                "        List<ContinuityConflictCue> cues = restoreReceiptCues.ToList();\n"
+                "        cues.AddRange(restore.ConflictSummaries\n"
+            )
+            new_block = (
+                "        List<ContinuityConflictCue> cues = restore.ConflictSummaries\n"
+                "            .Select(summary => new ContinuityConflictCue(\n"
+                "                CueId: $\"conflict:{workspace.WorkspaceId}:{StableCueId(summary)}\",\n"
+                "                Severity: \"warning\",\n"
+                "                Summary: summary,\n"
+                "                ResolutionAction: $\"Resolve restore review before you reopen {workspace.CampaignName} on another device.\"))\n"
+                "            .ToList();\n\n"
+                "        IReadOnlyList<WorkspaceRestoreConflictReceipt> restoreConflictReceipts = restore.ConflictReceipts\n"
+                "            ?? Array.Empty<WorkspaceRestoreConflictReceipt>();\n"
+                "        cues.AddRange(restoreConflictReceipts.Select(receipt => new ContinuityConflictCue(\n"
+            )
+            service_path.write_text(source_text.replace(old_block, new_block, 1), encoding="utf-8")
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8")
+                .replace("VerifyServerPlanePrioritizesReceiptBackedConflictsOverSummaryOverflow();", "", 1)
+                .replace(
+                    "Receipt-backed blocking restore conflicts should be prioritized before generic conflict summaries so the six-cue continuity cap cannot hide recoverable entitlement receipts.",
+                    "Removed receipt-priority assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("OrderRestoreConflictReceiptsForRecovery(restoreConflictReceipts)", result.stderr)
+        self.assertIn("List<ContinuityConflictCue> cues = restoreReceiptCues.ToList();", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("VerifyServerPlanePrioritizesReceiptBackedConflictsOverSummaryOverflow", result.stderr)
+
     def test_verifier_fails_closed_when_blank_conflict_summary_fallback_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-conflict-summary-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -251,6 +588,492 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("Entitlement sync has a {posture} restore conflict", result.stderr)
         self.assertIn("Workspace restore has a {posture} continuity conflict", result.stderr)
 
+    def test_verifier_fails_closed_when_blank_conflict_identity_recovery_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-conflict-identity-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace("ReceiptId: ResolveRestoreConflictReceiptId(receipt),", "ReceiptId: receipt.ReceiptId,", 1)
+                .replace("Severity: ResolveRestoreConflictSeverity(receipt),", "Severity: receipt.Severity,", 1)
+                .replace("Kind: ResolveRestoreConflictKind(receipt),", "Kind: receipt.Kind,", 1)
+                .replace("SubjectId: ResolveRestoreConflictSubject(receipt),", "SubjectId: receipt.SubjectId,", 1),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8")
+                .replace("VerifyServerPlaneConflictReceiptsRecoverBlankIdentityFields();", "", 1)
+                .replace(
+                    "Blank blocking entitlement restore conflicts should recover the account access route.",
+                    "Removed recovery route assertion.",
+                    1,
+                )
+                .replace(
+                    "Blank blocking restore conflict projections should expose a blocked-until-resolved continue posture.",
+                    "Removed continue posture assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("ResolveRestoreConflictReceiptId", result.stderr)
+        self.assertIn("ResolveRestoreConflictSeverity", result.stderr)
+        self.assertIn("ResolveRestoreConflictKind", result.stderr)
+        self.assertIn("ResolveRestoreConflictSubject", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("VerifyServerPlaneConflictReceiptsRecoverBlankIdentityFields", result.stderr)
+
+    def test_verifier_fails_closed_when_blank_provenance_identity_recovery_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-provenance-identity-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace("ReceiptId: ResolveRestoreProvenanceReceiptId(receipt),", "ReceiptId: receipt.ReceiptId,", 1)
+                .replace("Kind: ResolveRestoreProvenanceKind(receipt),", "Kind: receipt.Kind,", 1)
+                .replace("SubjectId: ResolveRestoreProvenanceSubject(receipt),", "SubjectId: receipt.SubjectId,", 1)
+                .replace("Summary: ResolveRestoreProvenanceSummary(receipt),", "Summary: receipt.Summary,", 1)
+                .replace("Proof: ResolveRestoreProvenanceProof(receipt),", "Proof: receipt.Proof,", 1),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8").replace(
+                    "VerifyServerPlaneProvenanceReceiptsRecoverBlankIdentityFields();",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("ResolveRestoreProvenanceReceiptId", result.stderr)
+        self.assertIn("ResolveRestoreProvenanceKind", result.stderr)
+        self.assertIn("ResolveRestoreProvenanceSubject", result.stderr)
+        self.assertIn("ResolveRestoreProvenanceSummary", result.stderr)
+        self.assertIn("ResolveRestoreProvenanceProof", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("VerifyServerPlaneProvenanceReceiptsRecoverBlankIdentityFields", result.stderr)
+
+    def test_verifier_fails_closed_when_recoverable_provenance_priority_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-provenance-priority-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace(".OrderByDescending(ResolveRestoreProvenanceProjectionPriority)\n", "", 1)
+                .replace(
+                    "private static int ResolveRestoreProvenanceProjectionPriority(WorkspaceRestoreProvenanceReceipt receipt)",
+                    "private static int RemovedRestoreProvenanceProjectionPriority(WorkspaceRestoreProvenanceReceipt receipt)",
+                    1,
+                )
+                .replace(
+                    "string.Equals(continuePosture, \"refresh_before_continue\", StringComparison.Ordinal)",
+                    "string.Equals(continuePosture, \"safe_to_continue_with_receipt\", StringComparison.Ordinal)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8")
+                .replace("VerifyServerPlanePrioritizesRecoverableProvenanceReceipts();", "", 1)
+                .replace(
+                    "Recoverable stale and artifact-drift provenance receipts should sort before routine restore inventory so the account restore cap cannot hide them.",
+                    "Removed recoverable provenance priority assertion.",
+                    1,
+                )
+                .replace(
+                    "Recoverable provenance recovery receipts should keep refresh-before-continue posture at the top of the restore recovery list.",
+                    "Removed recoverable provenance recovery priority assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("ResolveRestoreProvenanceProjectionPriority", result.stderr)
+        self.assertIn("refresh_before_continue", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("VerifyServerPlanePrioritizesRecoverableProvenanceReceipts", result.stderr)
+
+    def test_verifier_fails_closed_when_stale_provenance_next_action_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-provenance-action-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace(
+                    "private static IEnumerable<WorkspaceRestoreProvenanceReceipt> OrderRestoreProvenanceReceiptsForRecovery",
+                    "private static IEnumerable<WorkspaceRestoreProvenanceReceipt> RemovedRestoreProvenanceReceiptsForRecovery",
+                    1,
+                )
+                .replace("Label: \"Refresh restore receipts\"", "Label: \"Open shared campaign view\"", 1)
+                .replace(
+                    "Summary: ResolveRestoreProvenanceRecoveryHint(staleRestoreProvenance)",
+                    "Summary: workspace.NextSafeAction ?? \"Open the shared campaign view.\"",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8")
+                .replace("VerifyServerPlaneNextSafeActionSurfacesRecoverableProvenance();", "", 1)
+                .replace(
+                    "Recoverable stale provenance should become the workspace next-safe action even when no conflict receipt has been emitted.",
+                    "Removed recoverable provenance next-action assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("OrderRestoreProvenanceReceiptsForRecovery", result.stderr)
+        self.assertIn("Refresh restore receipts", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("VerifyServerPlaneNextSafeActionSurfacesRecoverableProvenance", result.stderr)
+
+    def test_verifier_fails_closed_when_conflict_recovery_route_posture_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-conflict-posture-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8")
+                .replace("RecoveryRoute: ResolveRestoreConflictRecoveryRoute(receipt),", "RecoveryRoute: \"/account/work\",", 1)
+                .replace("RecoveryHint: ResolveRestoreConflictRecoveryHint(receipt),", "RecoveryHint: \"generic hint\",", 1)
+                .replace("ContinuePosture: ResolveRestoreConflictContinuePosture(receipt),", "ContinuePosture: \"review_before_continue\",", 1)
+                .replace("blocked_until_receipt_resolved", "removed_blocking_posture", 1),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8")
+                .replace("VerifyServerPlaneConflictReceiptsRecoverBlankIdentityFields();", "", 1)
+                .replace(
+                    "Blank blocking entitlement restore conflicts should recover the account access route.",
+                    "Removed recovery route assertion.",
+                    1,
+                )
+                .replace(
+                    "Blank blocking entitlement restore conflicts should recover a concrete account-access recovery hint.",
+                    "Removed recovery hint assertion.",
+                    1,
+                )
+                .replace(
+                    "Blank blocking restore conflict projections should expose a blocked-until-resolved continue posture.",
+                    "Removed continue posture assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("ResolveRestoreConflictRecoveryRoute", result.stderr)
+        self.assertIn("ResolveRestoreConflictRecoveryHint", result.stderr)
+        self.assertIn("ResolveRestoreConflictContinuePosture", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("Blank blocking entitlement restore conflicts should recover the account access route", result.stderr)
+        self.assertIn("Blank blocking entitlement restore conflicts should recover a concrete account-access recovery hint", result.stderr)
+
+    def test_verifier_fails_closed_when_blocking_conflict_severity_can_stay_soft(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-blocking-severity-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8").replace(
+                    "        if (IsRestoreConflictContinueBlocking(receipt))\n"
+                    "        {\n"
+                    "            return \"blocking\";\n"
+                    "        }\n\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8").replace(
+                    "Blocking restore conflict receipts should project blocking severity even when source severity was softer.",
+                    "Removed blocking severity projection assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("return \"blocking\";", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("Blocking restore conflict receipts should project blocking severity", result.stderr)
+
+    def test_verifier_fails_closed_when_artifact_drift_conflict_download_recovery_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-artifact-drift-route-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = (
+                temp_root
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "CampaignWorkspaceServerPlaneService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8").replace(
+                    "return IsArtifactRestoreKind(receipt.Kind)\n                ? \"/downloads\"\n                : \"/account/access\";",
+                    "return \"/account/access\";",
+                ),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8").replace(
+                    "Artifact-drift conflict receipts should recover through the downloads rail that owns release artifact truth.",
+                    "Removed artifact-drift downloads recovery assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneService.cs", result.stderr)
+        self.assertIn("? \"/downloads\"", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("Artifact-drift conflict receipts should recover through the downloads rail", result.stderr)
+
+    def test_verifier_fails_closed_when_account_receipt_observation_time_is_hidden(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-account-observed-") as temp_dir:
+            temp_root = Path(temp_dir)
+            view_path = temp_root / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
+            view_path.parent.mkdir(parents=True)
+            source_view_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
+            view_path.write_text(
+                source_view_path.read_text(encoding="utf-8").replace(
+                    'Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")',
+                    "Observation time hidden.",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Chummer.Run.Api/Views/Accounts/Account.cshtml", result.stderr)
+        self.assertIn('Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")', result.stderr)
+
     def test_verifier_fails_closed_when_served_release_proof_routes_drift_from_local(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-served-proof-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -284,6 +1107,35 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("proof_routes must match", result.stderr)
         self.assertIn("served-proof.json", result.stderr)
+
+    def test_verifier_fails_closed_when_local_release_proof_drops_package_scoped_receipt_route(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-proof-route-gap-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            payload["proof_routes"] = [
+                route
+                for route in payload["proof_routes"]
+                if route != "/account/work"
+            ]
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof_routes missing package-scoped receipt route /account/work", result.stderr)
+        self.assertIn("workspace_restore:provenance", result.stderr)
 
     def test_verifier_fails_closed_when_release_proof_contains_untracked_package_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-untracked-receipt-") as temp_dir:
@@ -390,6 +1242,43 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("WorkspaceLifecyclePolicyService.cs", result.stderr)
         self.assertIn("NormalizeReceiptObservations", result.stderr)
 
+    def test_verifier_fails_closed_when_changed_restore_resets_existing_receipt_observations(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-lifecycle-changed-") as temp_dir:
+            temp_root = Path(temp_dir)
+            service_path = temp_root / "Chummer.Run.Api" / "Services" / "Community" / "WorkspaceLifecyclePolicyService.cs"
+            service_path.parent.mkdir(parents=True)
+            source_service_path = (
+                REPO_ROOT
+                / "Chummer.Run.Api"
+                / "Services"
+                / "Community"
+                / "WorkspaceLifecyclePolicyService.cs"
+            )
+            service_path.write_text(
+                source_service_path.read_text(encoding="utf-8").replace(
+                    "stableCandidate with { GeneratedAtUtc = now }",
+                    "candidate with { GeneratedAtUtc = now }",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("WorkspaceLifecyclePolicyService.cs", result.stderr)
+        self.assertIn("stableCandidate with { GeneratedAtUtc = now }", result.stderr)
+
     def test_verifier_fails_closed_when_queue_staging_drops_complete_status(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -492,7 +1381,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer.run-services commit 4d4b3856 emits workspace_restore provenance receipts, entitlement_sync conflict receipts, stale claimed-install receipts, artifact drift receipts, authority planes, recovery hints, and block-continue posture.\n",
+                "      - /docker/chummercomplete/chummer6-hub commit 4d4b3856 emits workspace_restore provenance receipts, entitlement_sync conflict receipts, stale claimed-install receipts, artifact drift receipts, authority planes, recovery hints, and block-continue posture.\n",
                 "",
                 1,
             )
@@ -581,9 +1470,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py\n",
-                "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs\n"
-                "      - /docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py\n",
+                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
+                "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs\n"
+                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -620,9 +1509,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py\n",
-                "      - Review also cites /docker/chummercomplete/chummer.run-services/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs as proof.\n"
-                "      - /docker/chummercomplete/chummer.run-services/scripts/verify_workspace_restore_receipts.py\n",
+                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
+                "      - Review also cites /docker/chummercomplete/chummer6-hub/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs as proof.\n"
+                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -644,6 +1533,44 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("proof path must stay inside allowed package roots", result.stderr)
         self.assertIn("Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs", result.stderr)
+
+    def test_verifier_fails_closed_when_queue_proof_uses_legacy_repo_root(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-legacy-proof-root-") as temp_dir:
+            temp_root = Path(temp_dir)
+            queue_path = temp_root / "queue.yaml"
+            design_queue_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            source_queue_path = Path(
+                "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            )
+            queue_text = source_queue_path.read_text(encoding="utf-8").replace(
+                "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+                "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+                1,
+            )
+            queue_path.write_text(queue_text, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING"] = str(design_queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("proof citation must use current repo root", result.stderr)
+        self.assertIn("/docker/chummercomplete/chummer.run-services/", result.stderr)
 
     def test_verifier_fails_closed_when_queue_staging_drops_dotnet_restore_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-dotnet-") as temp_dir:
@@ -736,7 +1663,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
             )
             registry_text = source_registry_path.read_text(encoding="utf-8").replace(
-                "          - /docker/chummercomplete/chummer.run-services commit b39147dc tightens the workspace restore verifier so Hub local release proof must retain the next90-m105-hub-workspace-continuity package, frontier id 4623636482, /home/work and /account/work routes, and both workspace_restore:provenance and entitlement_sync:conflict_receipts receipts.\n",
+                "          - /docker/chummercomplete/chummer6-hub commit b39147dc tightens the workspace restore verifier so Hub local release proof must retain the next90-m105-hub-workspace-continuity package, frontier id 4623636482, /home/work and /account/work routes, and both workspace_restore:provenance and entitlement_sync:conflict_receipts receipts.\n",
                 "",
                 1,
             )
@@ -817,8 +1744,8 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
             )
             registry_text = source_registry_path.read_text(encoding="utf-8").replace(
-                "          - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
-                "          - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
+                "          - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
+                "          - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
                 "          - /var/lib/codex-fleet/chummer_design_supervisor/shard-5/ACTIVE_RUN_HANDOFF.generated.md\n",
                 1,
             )
@@ -855,9 +1782,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
             )
             registry_text = source_registry_path.read_text(encoding="utf-8").replace(
-                "          - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
-                "          - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
-                "          - /docker/chummercomplete/chummer.run-services commit 00000000 is unresolved closure proof and must fail.\n",
+                "          - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
+                "          - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
+                "          - /docker/chummercomplete/chummer6-hub commit 00000000 is unresolved closure proof and must fail.\n",
                 1,
             )
             registry_path.write_text(registry_text, encoding="utf-8")
@@ -894,8 +1821,8 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
-                "      - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
+                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
+                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
                 "      - TASK_LOCAL_TELEMETRY.generated.json active-run helper output\n",
                 1,
             )
@@ -929,9 +1856,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
-                "      - /docker/chummercomplete/chummer.run-services commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
-                "      - /docker/chummercomplete/chummer.run-services commit 00000000 is unresolved closure proof and must fail.\n",
+                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
+                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
+                "      - /docker/chummercomplete/chummer6-hub commit 00000000 is unresolved closure proof and must fail.\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -1073,6 +2000,37 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("successor_queue_package.exit_criterion", result.stderr)
         self.assertIn("successor_queue_packages[next90-m105-hub-workspace-continuity].title", result.stderr)
+
+    def test_verifier_fails_closed_when_local_release_proof_loses_closed_package_action_reason(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-release-closeout-") as temp_dir:
+            temp_root = Path(temp_dir)
+            release_proof_path = temp_root / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            source_release_proof_path = REPO_ROOT / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            payload = json.loads(source_release_proof_path.read_text(encoding="utf-8"))
+            payload["successor_queue_package"].pop("completion_action", None)
+            for package in payload["successor_queue_packages"]:
+                if package.get("package_id") == "next90-m105-hub-workspace-continuity":
+                    package["do_not_reopen_reason"] = "copied closeout reason"
+            release_proof_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_LOCAL_RELEASE_PROOF"] = str(release_proof_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("successor_queue_package.completion_action", result.stderr)
+        self.assertIn(
+            "successor_queue_packages[next90-m105-hub-workspace-continuity].do_not_reopen_reason",
+            result.stderr,
+        )
 
     def test_verifier_fails_closed_when_local_release_proof_loses_owner_repo(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-release-repo-") as temp_dir:
@@ -1423,12 +2381,22 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertEqual(105, package["milestone_id"])
         self.assertEqual(4623636482, package["frontier_id"])
         self.assertEqual("complete", package["status"])
+        self.assertEqual("verify_closed_package_only", package["completion_action"])
+        self.assertIn("future shards must verify the workspace restore receipt", package["do_not_reopen_reason"])
         self.assertEqual("4d4b3856", package["landed_commit"])
         self.assertEqual(["Chummer.Run.Api", "scripts", "tests"], package["allowed_paths"])
         self.assertEqual(
             ["workspace_restore:provenance", "entitlement_sync:conflict_receipts"],
             package["owned_surfaces"],
         )
+
+        closed_package = next(
+            package_item
+            for package_item in payload["successor_queue_packages"]
+            if package_item["package_id"] == "next90-m105-hub-workspace-continuity"
+        )
+        self.assertEqual("verify_closed_package_only", closed_package["completion_action"])
+        self.assertEqual(package["do_not_reopen_reason"], closed_package["do_not_reopen_reason"])
 
         receipt_by_id = {
             receipt["receipt_id"]: receipt

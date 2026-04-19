@@ -51,9 +51,12 @@ Current known external-tool inventory includes:
 * BrowserAct
 * Browserly
 * Crezlo Tours
+* Deftform
 * Documentation.AI
+* FacePop
 * First Book ai
 * Invoiless
+* Lunacal
 * MarkupGo
 * MetaSurvey
 * Mootion
@@ -91,6 +94,16 @@ Current horizon-facing posture:
 * `runsite` - explorable location artifacts may use `Crezlo Tours`, `AvoMap`, and `PeekShot`; orientation-host clips may use `vidBoard`; optional narration may use `Soundmadeseen`; bounded capture/reference packets may use `Browserly`
 * `runbook-press` - long-form authoring and export may use `First Book ai`, `MarkupGo`, and `Documentation.AI`; campaign primer and module explainer videos may use `vidBoard`; narrated companion assets may use `Soundmadeseen`; bounded candidate voice or reference capture may use `Unmixr AI` and `Browserly`
 * `table-pulse` - post-session coaching packets may use `Nonverbia` as the primary analysis lane, `hedy.ai` as the bounded session-structure and debrief helper lane, with later bounded player-safe recap / GM-private debrief video from `vidBoard`, plus bounded narrated/report outputs from `Soundmadeseen`, `Unmixr AI`, `MarkupGo`, and `PeekShot`
+
+## Public trust and concierge posture
+
+Public trust surfaces may consume owned LTDs only through bounded public-concierge lanes that route into first-party Chummer truth.
+
+Current public-surface posture:
+
+* Hub-owned public trust surfaces such as `/downloads`, `/now`, public help entry pages, artifact pages, creator pages, and tokenized invite pages that expose no private truth may use `FacePop` as a bounded public concierge or trust-widget lane
+* public intake or guided escalation may use `Deftform` for structured intake and `Lunacal` for human booking only when Chummer-owned fallback paths and receipt mirroring remain intact
+* public concierge flows may use `vidBoard`, `MarkupGo`, `PeekShot`, and `Soundmadeseen` as sibling explainer and artifact lanes, but those companions remain downstream of Chummer-owned release, support, invite, and publication truth
 
 ## Classification model
 
@@ -134,6 +147,16 @@ Examples:
 * support/help desks
 * review inboxes
 * release dashboards
+
+### Class C1 - Public trust / concierge widgets
+
+These are bounded public-surface widgets that humanize first contact and route visitors into Chummer-owned truth paths without becoming truth themselves.
+
+Examples:
+
+* optional concierge greetings on `/downloads` or `/now`
+* public booking wrappers for setup or creator consult lanes
+* moderated testimonial capture on public proof or follow-up pages
 
 ### Class D - Research / eval / prompt-tooling integrations
 
@@ -200,9 +223,31 @@ Anything that re-enters Chummer from an external tool must carry:
 
 Every integration must be disableable without corrupting product truth.
 
-### Rule 5 - no client-side vendor coupling
+### Rule 5 - no client-side vendor coupling on authenticated or truth-bearing surfaces
 
-No browser, mobile, or desktop repo may embed vendor credentials or call vendor SDKs directly.
+No browser, mobile, or desktop repo may embed vendor credentials or rely on vendor SDKs on authenticated, truth-bearing, or runtime-critical surfaces.
+
+This includes:
+
+* signed-in home surfaces
+* campaign workspace
+* support case views
+* install/update flows
+* crash/bug submission forms
+* desktop/mobile runtime UX
+* admin/operator surfaces
+
+### Rule 5a - public concierge widget exception
+
+A bounded external widget may appear on a Hub-owned public surface only when all of the following are true:
+
+* the surface is public, low-risk, and not the owner of canonical truth
+* the widget is optional and removable via kill switch
+* the widget has a graceful first-party fallback path
+* no vendor secret or private access token is exposed client-side
+* the widget does not become the system of record for support, install, auth, publication, or campaign truth
+* every meaningful submission or route result is mirrored back into Chummer-owned receipts or first-party destinations
+* accessibility and locale review are complete
 
 ### Rule 6 - archive is not canon
 
@@ -224,6 +269,44 @@ The first support plane must work without a chat assistant or support widget.
 
 Crash reporting, structured bug reporting, and lightweight feedback must be first-class Chummer-owned flows before any support assistant becomes user-facing.
 No new AppSumo LTD is required or assumed for the core crash path.
+
+### Rule 9a - concierge widgets may route to support; they may not replace support
+
+A public concierge widget may:
+
+* help the user choose between help paths
+* route to Deftform or Hub support intake
+* route to Lunacal for human escalation
+* show a short human greeting or explainer
+
+A public concierge widget may not:
+
+* claim to resolve support cases itself
+* become the support ticket or case record
+* hide the first-party support path
+* block access to first-party support when disabled
+
+## Allowed and forbidden public concierge surfaces
+
+Allowed:
+
+* public landing pages
+* `/downloads`
+* `/now`
+* public help entry pages
+* public artifact and creator pages
+* tokenized invite pages that expose no private truth
+
+Forbidden:
+
+* desktop app
+* mobile app
+* signed-in home
+* authenticated campaign workspace
+* updater dialogs
+* claim-code entry forms
+* case timeline and support-thread views
+* admin, governor, or operator surfaces
 
 ## Repo ownership
 

@@ -95,6 +95,7 @@ def main() -> int:
 
     payload = {
         "contract_name": "chummer6-hub.local_release_proof",
+        "package_repo": "chummer6-hub",
         "status": "passed",
         "successor_queue_package": {
             "package_id": "next90-m105-hub-workspace-continuity",
@@ -102,6 +103,8 @@ def main() -> int:
             "frontier_id": 4623636482,
             "repo": "chummer6-hub",
             "status": "complete",
+            "completion_action": "verify_closed_package_only",
+            "do_not_reopen_reason": "M105 chummer6-hub workspace continuity is complete; future shards must verify the workspace restore receipt, registry row, queue row, and design-queue row instead of reopening the workspace restore and entitlement conflict receipt package.",
             "landed_commit": "4d4b3856",
             "title": "Emit provenance and conflict receipts for workspace restore and continuity",
             "allowed_paths": [
@@ -122,6 +125,8 @@ def main() -> int:
                 "frontier_id": 2897065929,
                 "repo": "chummer6-hub",
                 "status": "complete",
+                "completion_action": "verify_closed_package_only",
+                "do_not_reopen_reason": "M102 chummer6-hub desktop-native trust is complete; future shards must verify this receipt, registry row, queue row, and design-queue row instead of reopening the claim/install/update/rollback/support continuation package.",
                 "landed_commit": "160af58f",
                 "title": "Unify claim, install, update, and support recovery into one desktop-native flow",
                 "allowed_paths": [
@@ -136,11 +141,34 @@ def main() -> int:
                 "exit_criterion": "Claim, update, rollback, recovery, and support followthrough happen from the installer or app, not as browser ritual.",
             },
             {
+                "package_id": "next90-m107-hub-artifact-factory",
+                "milestone_id": 107,
+                "frontier_id": 1421219975,
+                "repo": "chummer6-hub",
+                "status": "complete",
+                "completion_action": "verify_closed_package_only",
+                "do_not_reopen_reason": "M107 chummer6-hub artifact factory orchestration is complete; future shards must verify this receipt, registry row, Fleet queue row, and design queue row instead of reopening the artifact-factory orchestration and public proof shelf release-bundles package.",
+                "landed_commit": "b9e6b52e",
+                "title": "Stand up artifact-factory orchestration for release, support, and publication bundles",
+                "allowed_paths": [
+                    "Chummer.Run.Api",
+                    "scripts",
+                    "tests",
+                ],
+                "owned_surfaces": [
+                    "artifact_factory:orchestration",
+                    "public_proof_shelf:release_bundles",
+                ],
+                "exit_criterion": "Release, fix, support, and publication explainers can ship as approved video, audio, preview, and packet bundles from the same underlying release and support truth.",
+            },
+            {
                 "package_id": "next90-m105-hub-workspace-continuity",
                 "milestone_id": 105,
                 "frontier_id": 4623636482,
                 "repo": "chummer6-hub",
                 "status": "complete",
+                "completion_action": "verify_closed_package_only",
+                "do_not_reopen_reason": "M105 chummer6-hub workspace continuity is complete; future shards must verify the workspace restore receipt, registry row, queue row, and design-queue row instead of reopening the workspace restore and entitlement conflict receipt package.",
                 "landed_commit": "4d4b3856",
                 "title": "Emit provenance and conflict receipts for workspace restore and continuity",
                 "allowed_paths": [
@@ -169,6 +197,8 @@ def main() -> int:
         "proof_routes": [
             "/downloads/install/avalonia-linux-x64-installer",
             "/downloads/install/avalonia-linux-x64-installer/continue.json",
+            "/artifacts/release-bundles/avalonia-linux-x64-installer",
+            "/artifacts/release-bundles/avalonia-linux-x64-installer/preview_card",
             "/api/v1/install-linking/continuation",
             "/api/v1/install-linking/continuation/support",
             "/home/access",
@@ -212,6 +242,23 @@ def main() -> int:
                     "support_followthrough:install_truth",
                     "support_case_install_readiness",
                     "desktop_update_rollback_recovery",
+                ],
+            },
+            {
+                "receipt_id": "public_proof_shelf:release_bundles",
+                "package_id": "next90-m107-hub-artifact-factory",
+                "milestone_id": 107,
+                "frontier_id": 1421219975,
+                "summary": "Approved release source packs now launch recipe-backed artifact jobs whose preview, caption, packet, audio, and video outputs bind onto stable public release-bundle shelf refs instead of one-off provider flows.",
+                "routes": [
+                    "/downloads/install/avalonia-linux-x64-installer",
+                    "/artifacts/release-bundles/avalonia-linux-x64-installer",
+                    "/artifacts/release-bundles/avalonia-linux-x64-installer/preview_card",
+                ],
+                "surfaces": [
+                    "artifact_factory:orchestration",
+                    "public_proof_shelf:release_bundles",
+                    "build_explain_publish",
                 ],
             },
             {

@@ -240,6 +240,69 @@ horizons:
   free_later_intent: Long-run intent is broader access after editorial, narration, and provenance loops become cheaper and safer to operate at scale.
   recognition_eligible: true
   owner_handoff_gate: Registry manifests and media receipts must survive format changes before the studio is promoted beyond horizon.
+- id: black-ledger
+  title: BLACK LEDGER
+  status: horizon
+  family: campaign_world_state
+  canon_doc: products/chummer/horizons/black-ledger.md
+  public_guide:
+    enabled: false
+    order: 85
+  pain_label: I need campaign tension that continues across crews and seasons without turning everyone into one shared simulation.
+  wow_promise: Campaigns can consume persistent city pressure, mission markets, and consequence narratives without discarding table autonomy.
+  table_scene: A GM curates a job packet built from city pressures, then adopts it to a run with explicit approvals and receipts.
+  build_path:
+    intent: eventual_product_lane
+    current_state: horizon
+    next_state: bounded_research
+  owning_repos:
+  - chummer6-hub
+  - chummer6-core
+  - chummer6-ui
+  - chummer6-mobile
+  - chummer6-media-factory
+  - chummer6-hub-registry
+  - executive-assistant
+  milestone_family: H3
+  release_blocking: false
+  foundations:
+  - C0
+  - C1
+  - D0
+  - D1
+  - D2
+  - E2b
+  - F1
+  tool_posture:
+    promoted:
+    - vidBoard
+    - MarkupGo
+    - PeekShot
+    - Soundmadeseen
+    - MetaSurvey
+    bounded:
+    - Unmixr AI
+    - BrowserAct
+    - ApproveThis
+    - Browserly
+    - Documentation.AI
+  success_signals:
+  - GM-only pilots can adopt job packets without semantic confusion between campaign and world objects.
+  - World-linked offers and modifiers stay explicit, explainable, and receipt-backed.
+  - campaign and world consequences can be previewed before becoming campaign-owned truth.
+  artifact_types:
+  - city ticker
+  - district heat snapshot
+  - mission packet brief
+  - mission briefing reel
+  - season recap packet
+  public_signal_eligible: false
+  access_posture: booster_first
+  resource_burden: high
+  booster_nudge: World-state effects, city-tied artifacts, and authority transitions should start behind GM-only pilots before any player-facing seat mode.
+  free_later_intent: Long-run intent is broad community access after operator seams, authority policy, and publication safety prove stable.
+  recognition_eligible: false
+  owner_handoff_gate: Keep campaign truth and world truth separate; GM or organizer authority must be explicit before shared-city scale features are promoted.
 - id: runsite
   title: RUNSITE
   status: horizon

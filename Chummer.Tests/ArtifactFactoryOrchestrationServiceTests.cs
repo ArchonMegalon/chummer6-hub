@@ -38,6 +38,31 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void SharedReleaseBundleFormatsStayAlignedWithReleaseRecipeCatalog()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryRecipeCatalogResult catalog = service.ListRecipes();
+        ArtifactFactoryRecipeDefinition releaseRecipe = Assert.Single(
+            catalog.Recipes,
+            recipe => string.Equals(recipe.Family, "release", StringComparison.Ordinal));
+
+        Assert.Equal(
+            releaseRecipe.AllowedFormats.Order(StringComparer.OrdinalIgnoreCase).ToArray(),
+            ArtifactFactoryOrchestrationService.GetReleaseBundleFormats());
+    }
+
+    [Fact]
+    public void GetAllowedFormatsRejectsUnsupportedRecipeFamily()
+    {
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(
+            () => ArtifactFactoryOrchestrationService.GetAllowedFormats("operator"));
+
+        Assert.Contains("not supported", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("operator", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LaunchJobBuildsReleaseRecipeFromApprovedSourcePacks()
     {
         ArtifactFactoryOrchestrationService service = new();
@@ -78,6 +103,36 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
         Assert.Equal(result.OutputBindings, result.MediaFactoryRequest.OutputBindings);
         Assert.Contains(result.MediaFactoryRequest.RequiredReceiptRefs, receipt => receipt.StartsWith("promotion:", StringComparison.Ordinal));
         Assert.DoesNotContain(result.MediaFactoryRequest.RequiredReceiptRefs, receipt => receipt.Contains("provider", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LaunchSourcePackBatchReturnsRecipeContractMetadata()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobBatchLaunchResult result = service.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
+            BatchId: "next90-m107-artifact-factory-wave",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-linux-x64-installer")
+            ],
+            RequiredFamilies: ["release"]));
+
+        Assert.Equal("chummer.run.artifact_factory.recipe_job.v1", result.ContractName);
+        Assert.Equal("2026-04-15", result.RecipeVersion);
+        Assert.Equal(["release-proof-shelf-bundle"], result.RecipeIds);
     }
 
     [Fact]
@@ -1280,6 +1335,46 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchSourcePackBatchInfersLaunchableFamiliesWhenRequiredFamiliesAreOmitted()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobBatchLaunchResult result = service.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
+            BatchId: "next90-m107-source-pack-inferred",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-linux-x64-installer"),
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "support-pack-11709",
+                    SourcePackKind: "support_case",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "support-case:11709",
+                    EvidenceRefs: ["support:11709", "privacy:redacted", "install:preview"],
+                    SupportCaseId: "11709")
+            ]));
+
+        Assert.Equal(["release", "support"], result.RequiredFamilies);
+        Assert.Equal(["release", "support"], result.Families);
+        Assert.DoesNotContain("publication", result.RequiredFamilies);
+        Assert.DoesNotContain("fix", result.RequiredFamilies);
+        Assert.Contains(result.Jobs, job => string.Equals(job.Family, "release", StringComparison.Ordinal));
+        Assert.Contains(result.Jobs, job => string.Equals(job.Family, "support", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Jobs, job => string.Equals(job.Family, "fix", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void LaunchSourcePackBatchRejectsFormatOverridesOutsideRequiredFamilies()
     {
         ArtifactFactoryOrchestrationService service = new();
@@ -1323,6 +1418,70 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
 
         Assert.Contains("requested formats for family/families not required", ex.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("publication", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchSourcePackBatchRejectsEmptyRequestedFormatOverride()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
+            BatchId: "next90-m107-source-pack-empty-format-override",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-linux-x64-installer")
+            ],
+            RequestedFormats:
+            [
+                new ArtifactFactoryFamilyFormatOverride("release", [])
+            ],
+            RequiredFamilies: ["release"])));
+
+        Assert.Contains("requested formats for recipe family 'release' must include at least one format", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LaunchSourcePackBatchRejectsNullRequestedFormatOverrideList()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
+            BatchId: "next90-m107-source-pack-null-format-override",
+            RequestedBy: "fleet.release",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "release-pack-20260415",
+                    SourcePackKind: "desktop_release",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "release-channel:preview:run-20260415",
+                    EvidenceRefs:
+                    [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer"
+                    ],
+                    ReleaseArtifactId: "avalonia-linux-x64-installer")
+            ],
+            RequestedFormats:
+            [
+                new ArtifactFactoryFamilyFormatOverride("release", null!)
+            ],
+            RequiredFamilies: ["release"])));
+
+        Assert.Contains("requested formats for recipe family 'release' must include at least one format", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

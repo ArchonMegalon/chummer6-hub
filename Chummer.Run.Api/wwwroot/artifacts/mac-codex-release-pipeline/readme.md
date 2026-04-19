@@ -4,13 +4,13 @@ Purpose: let a Codex session running on a Mac build a public-ready desktop artif
 
 ## Preferred operator entry points
 
-Signed-in zero-touch path:
+Signed-in prompt-safe path:
 
 1. Open `https://chummer.run/downloads/release-upload`
 2. Copy the generated one-liner
 3. Paste it into the Mac shell
 
-That signed-in handoff is the source of truth for live publication because it bakes in the short-lived upload ticket and always serves the current hosted bootstrap.
+That signed-in handoff is the source of truth for live publication because it serves the current hosted bootstrap, pins the bootstrap digest in the one-liner, and keeps the short-lived upload handoff code off the command line.
 
 Public bootstrap path:
 
@@ -39,7 +39,7 @@ The hosted/bootstrap entry points above now:
 8. uploads the full bundle to `https://chummer.run/api/internal/releases/bundles`
    - on any 400/401/403 upload response, the script prints parsed `Problem+JSON` fields plus `x-request-id` and actionable remediation hints.
 9. verifies the promoted public shelf and prints the live `/downloads/install/{artifactId}` handoff URLs
-10. prints signed-in claim codes for promoted artifacts when the upload ran with a signed-in release-upload ticket
+10. records signed-in claim-code handoffs in the upload response and redacts them from stdout unless you explicitly opt in to print them
 11. logs the executing bootstrap source path and SHA-256 so drift is visible in the transcript
 
 ## What the bootstrap expects
@@ -54,16 +54,15 @@ Before running it, the Mac environment should already have:
 6. `curl`
 7. Apple signing identity in the keychain for signed public-ready releases
 8. `xcrun notarytool` credentials stored in a keychain profile for signed public-ready releases
-9. a release-upload token that is allowed to call the internal promotion endpoint
+9. a signed-in release-upload handoff code or an explicit upload token that is allowed to call the internal promotion endpoint
 
 ## Minimum environment variables
 
-At minimum:
+At minimum for signed public-ready releases:
 
 ```bash
 export CHUMMER_APP_SIGN_IDENTITY="Developer ID Application: YOUR ORG (TEAMID)"
 export CHUMMER_NOTARY_PROFILE="chummer-notary"
-export CHUMMER_RELEASE_UPLOAD_TOKEN="..."
 ```
 
 Optional overrides:
@@ -71,6 +70,8 @@ Optional overrides:
 ```bash
 export CHUMMER_RELEASE_UPLOAD_URL="https://chummer.run/api/internal/releases/bundles"
 export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="https://chummer.run/downloads/releases.json"
+export CHUMMER_RELEASE_UPLOAD_TICKET=""                # optional interactive handoff code override for non-prompted runs
+export CHUMMER_RELEASE_UPLOAD_TOKEN=""                 # optional explicit bearer token for CI or non-interactive runs
 export CHUMMER_RELEASE_CHANNEL="preview"
 export CHUMMER_RELEASE_APP="avalonia,blazor-desktop"
 export CHUMMER_RELEASE_RID="osx-arm64"
@@ -102,14 +103,16 @@ export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL=""   # optional override for hos
 Notes:
 
 1. The bootstrap validates both proof contracts before packaging and now fails early if a supplied proof is stale, malformed, or missing required freshness fields.
-2. Local proof files are the default path. The official `https://chummer.run/proofs/mac-codex-release/...` proof endpoints are trusted fallback inputs by default; other hosted proof URLs stay disabled unless `CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS=1`.
-3. If your run still fails this validation, export explicit known-good files:
+2. The signed-in one-liner pins the hosted bootstrap SHA-256 before execution. Refresh the handoff page instead of bypassing the digest check.
+3. The signed-in handoff code is copied separately and pasted only when the bootstrap prompts for it, so it never lands in shell history or in the fetched bootstrap file.
+4. Local proof files are the default path. The official `https://chummer.run/proofs/mac-codex-release/...` proof endpoints are trusted fallback inputs by default; other hosted proof URLs stay disabled unless `CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS=1`.
+5. If your run still fails this validation, export explicit known-good files:
    - `CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH` (from a trusted checked-in or freshly generated hub proof)
    - `CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH` (from a trusted UI localization gate export)
-4. The hosted bootstrap now defaults temporary packaging work to `$work_root/tmp` and exports `CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"` for `hdiutil`.
+6. The hosted bootstrap now defaults temporary packaging work to `$work_root/tmp` and exports `CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"` for `hdiutil`.
    - Override `CHUMMER_MAC_RELEASE_TMPDIR` when the default workspace volume is not the right disk for temporary DMG work.
    - Override `CHUMMER_DESKTOP_INSTALLER_TMPDIR` separately only when you intentionally want installer-image temp files on a different volume.
-5. If upload session requests return 4xx/5xx, upload now retries those requests and can fall back to direct multipart promotion when `CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1`.
+7. If upload session requests return 4xx/5xx, upload now retries those requests and can fall back to direct multipart promotion when `CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1`.
    - 400/401/403 responses are surfaced immediately with a parsed payload summary and stop-retry guidance.
 ``` 
 

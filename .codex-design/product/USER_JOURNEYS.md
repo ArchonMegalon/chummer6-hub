@@ -70,6 +70,7 @@ Canonical detail:
 * `journeys/recover-from-sync-conflict.md`
 * `journeys/run-a-campaign-and-return.md`
 * `CAMPAIGN_SPINE_AND_CREW_MODEL.md`
+* `WORLD_STATE_AND_MISSION_MARKET_MODEL.md`
 
 ## Publish
 
@@ -86,6 +87,7 @@ Canonical detail:
 
 * `journeys/publish-a-grounded-artifact.md`
 * `CHARACTER_LIFECYCLE_AND_LIVING_DOSSIER.md`
+* `WORLD_STATE_AND_MISSION_MARKET_MODEL.md`
 
 ## Improve
 

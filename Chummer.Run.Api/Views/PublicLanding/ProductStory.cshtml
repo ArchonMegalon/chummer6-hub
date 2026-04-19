@@ -24,8 +24,8 @@
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
         <p class="eyebrow">Product</p>
-        <h1 class="page-title">One product for rules truth, living dossiers, and session return.</h1>
-        <p class="page-copy">Chummer is the account-aware Shadowrun companion that keeps rules truth, table continuity, and product support in one accountable front door.</p>
+        <h1 class="page-title">One place for builds, explanations, and campaign return.</h1>
+        <p class="page-copy">Chummer helps you build a runner, understand the decisions, and return to a campaign without losing context.</p>
     </div>
     @if (leadAsset is not null)
     {
@@ -34,16 +34,6 @@
         </div>
     }
 </section>
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
 
 <section class="role-matrix">
     <div class="editorial-block__lead">
@@ -54,23 +44,23 @@
     <div class="role-matrix__grid">
         <article class="role-matrix__cell">
             <span class="tag">What it is</span>
-            <h3>A Shadowrun companion with one front door</h3>
-            <p>It keeps release health, proof, sign-in, and help on one product surface instead of sending you across separate tools for basic answers.</p>
+            <h3>A Shadowrun desktop and campaign companion</h3>
+            <p>It keeps runner building, explanation, installs, and recovery on one product surface instead of sending you across separate tools for basic answers.</p>
         </article>
         <article class="role-matrix__cell">
             <span class="tag">Where it fits</span>
-            <h3>Between build truth and table continuity</h3>
-            <p>Use it when character prep, rules answers, and the next session return all need to stay attached to the same runner and table context.</p>
+            <h3>Between character creation and the next session</h3>
+            <p>Use it when character prep, rules answers, and campaign return all need to stay attached to the same runner and table context.</p>
         </article>
         <article class="role-matrix__cell">
             <span class="tag">Why it is different</span>
-            <h3>Proof, release, and help stay attached</h3>
+            <h3>Explanation, release, and help stay attached</h3>
             <p>The rule answer, current build, and recovery path stay attached instead of turning into separate detective work later.</p>
         </article>
         <article class="role-matrix__cell">
             <span class="tag">Who it helps</span>
-            <h3>Players, GMs, and creators on one rules truth</h3>
-            <p>Each lane uses a different slice of the product, but the release shelf, explanation trail, and support path stay shared across the table.</p>
+            <h3>Players, GMs, and returning groups</h3>
+            <p>Each lane uses a different slice of the product, but the shared rules context, explanation trail, and support path stay aligned across the table.</p>
         </article>
     </div>
 </section>
@@ -82,3 +72,12 @@
         Need help instead? <a class="inline-link" href="/help">Open the help hub</a>.
     </p>
 </section>
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}

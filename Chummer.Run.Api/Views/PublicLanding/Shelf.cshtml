@@ -89,19 +89,9 @@
     {
         "personal" => "Keep the account-side runner and return artifacts visible without losing the shared record they already ride on.",
         "campaign" => "Stay on the shared crew and continuity rail for campaign-owned artifacts, prep packets, and aftermath or replay follow-through.",
-        "creator" => "Inspect only the creator-linked lineage, trust ranking, discoverability, and next-step posture for published or publication-ready artifacts.",
-        _ => "When you are signed in, the artifact shelf keeps your live aftermath, replay, and linked creator-publication record on the same governed rail instead of splitting them into separate artifact stories."
+        "creator" => "Inspect only the creator-linked lineage, trust ranking, availability, and next step for published or publication-ready artifacts.",
+        _ => "When you are signed in, the artifact shelf keeps your live aftermath, replay, and linked creator-publication record together instead of splitting them into separate artifact stories."
     };
-}
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
 
 <section class="section-band">
@@ -121,6 +111,14 @@
         }
     </div>
     @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+    @if (Model.SignedInStatus is not null)
+    {
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    }
+    @if (Model.TrustPulse is not null)
+    {
+        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+    }
     @if (Model.Chrome.Authenticated && (signedInRecapShelf.Length > 0 || signedInCreatorPublications.Length > 0))
     {
         var selectedArtifactViewTitle = ArtifactViewTitle(selectedSignedInArtifactView);
@@ -155,7 +153,7 @@
                         @if (!string.IsNullOrWhiteSpace(item.TrustBand))
                         {
                             <span>@HumanizeStatus(item.TrustBand, "Draft")</span>
-                            <span>@(item.Discoverable ? "Eligible now" : "Still bounded")</span>
+                            <span>@(item.Discoverable ? "Ready now" : "Limited release")</span>
                         }
                     </div>
                     @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
@@ -229,7 +227,7 @@
                     <div class="trust-claim__microproof">
                         <span>@HumanizeStatus(publication.Visibility, "Shared")</span>
                         <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
-                        <span>@(publication.Discoverable ? "Eligible now" : "Still bounded")</span>
+                        <span>@(publication.Discoverable ? "Ready now" : "Limited release")</span>
                     </div>
                     <p class="muted-copy"><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
                     <p class="muted-copy"><strong>Discovery:</strong> @publication.DiscoverySummary</p>
@@ -279,13 +277,13 @@
         <div class="editorial-block__lead" id="governed-creator-discovery">
             <p class="eyebrow">Governed publication discovery</p>
             <h2 class="editorial-title">Published shared publications</h2>
-            <p class="editorial-copy">These campaign, primer, dossier, recap, replay, and run-module outputs are live because the same governed account rail carried them through review, publication, lineage, and trust posture instead of inventing a public shadow state.</p>
+            <p class="editorial-copy">These campaign, primer, dossier, recap, replay, and run-module outputs are live because they made it through review, publication, lineage, and moderation on one consistent account path.</p>
         </div>
         <section class="trust-rail-section" id="creator-packet-comparison">
             <div class="editorial-block__lead">
                 <p class="eyebrow">Compare at a glance</p>
                 <h2 class="editorial-title">How live publications differ</h2>
-                <p class="editorial-copy">Compare provenance, trust ranking, lineage, moderation, and return posture here before you open every detail page one by one.</p>
+                <p class="editorial-copy">Compare provenance, trust ranking, lineage, moderation, and return notes here before you open every detail page one by one.</p>
             </div>
             <div class="trust-rail-list">
                 @foreach (var publication in rankedPublicCreatorPublications)
@@ -323,13 +321,13 @@
             @foreach (var publication in rankedPublicCreatorPublications)
             {
                 <article class="shelf-item">
-                    <span class="tag">Governed publication discovery</span>
+                    <span class="tag">Shared publication</span>
                     <h2>@publication.Title</h2>
                     <p>@publication.Summary</p>
                     <div class="trust-claim__microproof">
                         <span>@HumanizeStatus(publication.PublicationStatus, "Published")</span>
                         <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
-                        <span>@(publication.Discoverable ? "Eligible now" : "Still bounded")</span>
+                        <span>@(publication.Discoverable ? "Ready now" : "Limited release")</span>
                     </div>
                     <p class="muted-copy"><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
                     <p class="muted-copy"><strong>Discovery:</strong> @publication.DiscoverySummary</p>
@@ -362,7 +360,7 @@
     {
         <div class="editorial-block__lead" id="live-artifacts">
             <p class="eyebrow">@PublicSurfaceStatus.AvailableToday</p>
-            <h2 class="editorial-title">Current proof surfaces</h2>
+            <h2 class="editorial-title">Current usable surfaces</h2>
             <p class="editorial-copy">These are the artifacts you can use or inspect against the current preview today.</p>
         </div>
         <div class="shelf-stack">
@@ -382,7 +380,7 @@
                     </div>
                     @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
                     {
-                        <p class="muted-copy"><strong>What this verifies:</strong> @card.Card.Payoff</p>
+                        <p class="muted-copy"><strong>What this shows:</strong> @card.Card.Payoff</p>
                     }
                     @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote) || !string.IsNullOrWhiteSpace(card.Card.Payoff))
                     {
@@ -397,8 +395,8 @@
     {
         <div class="editorial-block__lead" id="preview-artifacts">
             <p class="eyebrow">@PublicSurfaceStatus.PreviewInProgress</p>
-            <h2 class="editorial-title">Proof surfaces still moving in preview</h2>
-            <p class="editorial-copy">These stay visible so you can compare future-facing artifact work against what is already live today.</p>
+            <h2 class="editorial-title">Preview surfaces still opening</h2>
+            <p class="editorial-copy">These stay visible so you can compare future-facing artifact work against what is already usable today.</p>
         </div>
         <div class="shelf-stack">
             @foreach (var card in previewItems)

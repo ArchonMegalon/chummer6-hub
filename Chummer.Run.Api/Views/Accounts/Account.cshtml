@@ -88,7 +88,14 @@
     var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
     var selectedSupportCase = Model.SelectedSupportCase;
     var selectedSupportCaseSummary = Model.SelectedSupportCaseSummary;
-    var selectedSupportInstallationId = selectedSupportCase?.InstallationId;
+    var supportQuery = Context.Request.Query;
+    var supportCaseDefaultKind = supportQuery.TryGetValue("kind", out var supportKindValues) ? supportKindValues.ToString() : string.Empty;
+    var supportCaseDefaultTitle = supportQuery.TryGetValue("title", out var supportTitleValues) ? supportTitleValues.ToString() : string.Empty;
+    var supportCaseDefaultSummary = supportQuery.TryGetValue("summary", out var supportSummaryValues) ? supportSummaryValues.ToString() : string.Empty;
+    var supportCaseDefaultDetail = supportQuery.TryGetValue("detail", out var supportDetailValues) ? supportDetailValues.ToString() : string.Empty;
+    var selectedSupportInstallationId = selectedSupportCase?.InstallationId
+        ?? (supportQuery.TryGetValue("installationId", out var supportInstallationValues) ? supportInstallationValues.ToString() : null);
+    var entitlementSyncReceipts = Model.EntitlementSyncReceipts;
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
     var selectedWorkspacePortableExchangeNotice = selectedWorkspaceServerPlane?.DecisionNotices.FirstOrDefault(notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.OrdinalIgnoreCase));
@@ -146,7 +153,7 @@
     else if (leadInstallation is not null)
     {
         installRailHeading = "This linked install is your default return rail";
-        installRailSummary = "Use Devices & access for relinking, guided update follow-through, and support closure on the same copy. Keep recovery boring by staying on one linked install rail instead of starting a fresh browser ritual.";
+        installRailSummary = "Continue claim, update, rollback, recovery, and support follow-through from the claimed desktop install first. Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
@@ -191,6 +198,19 @@
             "approved" => "Campaign-approved",
             "self_service" => "Sandbox",
             _ => HumanizeStatus(environment.ApprovalState, "Review")
+        };
+
+    static bool IsNavigableAccountRoute(string? route)
+        => !string.IsNullOrWhiteSpace(route) && route.StartsWith("/", StringComparison.Ordinal);
+
+    static string DescribeRecoveryRouteAction(string? route)
+        => route switch
+        {
+            "/account/access" => "Open account access",
+            "/account/work" => "Open shared campaign view",
+            "/downloads" => "Open downloads",
+            _ when IsNavigableAccountRoute(route) => $"Open {route}",
+            _ => "Review this route"
         };
 
     static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
@@ -275,7 +295,7 @@
         {
             "intent_created" => "Record consent to continue this lane.",
             "consented" => "Start device authorization from the participation flow.",
-            "pending_auth" => "Open ChatGPT verification and enter the one-time code.",
+            "pending_auth" => "Open the ChatGPT verification page for your OpenAI account and enter the one-time code.",
             "fleet_lane_created" => "Wait for activation confirmation before assigning work.",
             "lane_pending" => "Keep this lane open while activation completes.",
             "waiting_for_slot" => "Stay on this rail and retry for a fresh code if authorization expires.",
@@ -739,9 +759,9 @@
                     <div class="field">
                         <label for="supportCaseKind">Case type</label>
                         <select id="supportCaseKind">
-                            <option value="bug_report">Bug report</option>
-                            <option value="feedback">Feedback</option>
-                            <option value="install_help">Install or update help</option>
+                            <option value="bug_report" selected="@(string.Equals(supportCaseDefaultKind, "bug_report", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Bug report</option>
+                            <option value="feedback" selected="@(string.Equals(supportCaseDefaultKind, "feedback", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Feedback</option>
+                            <option value="install_help" selected="@(string.Equals(supportCaseDefaultKind, "install_help", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Install or update help</option>
                         </select>
                     </div>
                     <div class="field">
@@ -756,21 +776,22 @@
                                     data-channel="@installation.Channel"
                                     data-head="@installation.HeadId"
                                     data-platform="@installation.Platform"
-                                    data-arch="@installation.Arch">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
+                                    data-arch="@installation.Arch"
+                                    selected="@(string.Equals(selectedSupportInstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@((installation.HostLabel ?? installation.InstallationId) + $" · {installation.Version} · {installation.Channel}")</option>
                             }
                         </select>
                     </div>
                     <div class="field">
                         <label for="supportCaseTitle">Short title</label>
-                        <input id="supportCaseTitle" maxlength="160" placeholder="Update prompt was unclear on Linux" />
+                        <input id="supportCaseTitle" maxlength="160" placeholder="Update prompt was unclear on Linux" value="@supportCaseDefaultTitle" />
                     </div>
                     <div class="field">
                         <label for="supportCaseSummary">One-line summary</label>
-                        <input id="supportCaseSummary" maxlength="280" placeholder="The updater offered a restart but did not explain what was staged." />
+                        <input id="supportCaseSummary" maxlength="280" placeholder="The updater offered a restart but did not explain what was staged." value="@supportCaseDefaultSummary" />
                     </div>
                     <div class="field">
                         <label for="supportCaseDetail">What happened</label>
-                        <textarea id="supportCaseDetail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and anything that would help route the fix."></textarea>
+                        <textarea id="supportCaseDetail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and anything that would help route the fix.">@supportCaseDefaultDetail</textarea>
                     </div>
                     <div class="field">
                         <label for="supportCaseAttachments">Attachments</label>
@@ -889,7 +910,152 @@
                         <span>Cross-device recovery</span>
                         <strong>@(restoreArtifactCount == 0 && restoreEntitlementCount == 0 ? "Ready to seed" : $"{restoreArtifactCount} artifacts · {restoreEntitlementCount} entitlements")</strong>
                     </div>
+                    @if (entitlementSyncReceipts is not null)
+                    {
+                        <div class="settings-summary-row">
+                            <span>Entitlement receipt posture</span>
+                            <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.ContinuePosture, "Review before continuing")</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Entitlement recovery route</span>
+                            <strong>@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute</strong>
+                        </div>
+                        <div class="settings-summary-row">
+                            <span>Blocking sync conflicts</span>
+                            <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
+                        </div>
+                    }
                 </div>
+                @if (entitlementSyncReceipts is not null)
+                {
+                    <details class="details-drawer">
+                        <summary>Entitlement sync receipts</summary>
+                        <div class="settings-summary-list">
+                            <div class="settings-summary-row">
+                                <span>Status summary</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.Summary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Lead receipt</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadReceiptId</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Lead subject</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadSubjectId</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Lead authority</span>
+                                <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.LeadAuthority, "hub_entitlement_ledger")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Lead recovery hint</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadRecoveryHint</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Recovery summary</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.RecoverySummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Lead observed</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.LeadObservedAtUtc.UtcDateTime.ToString("u")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Latest receipt observed</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Entitlement provenance receipts</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncProvenanceCount</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Entitlement conflict receipts</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.EntitlementSyncConflictCount</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Stale or drift provenance</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.StaleOrDriftProvenanceReceiptCount</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Safe-with-receipt provenance</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.SafeToContinueWithReceiptCount</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Refresh-before-continue receipts</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.RefreshBeforeContinueCount</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Blocking conflict receipts</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
+                            </div>
+                        </div>
+                        @if (IsNavigableAccountRoute(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute))
+                        {
+                            <p class="muted-copy">
+                                <a href="@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute)</a>
+                            </p>
+                        }
+                        @if (entitlementSyncReceipts.ProvenanceRecoveryReceipts.Count == 0)
+                        {
+                            <p class="muted-copy">No entitlement-sync provenance receipts are attached to this account right now.</p>
+                        }
+                        else
+                        {
+                            <ul class="muted-copy">
+                                @foreach (var receipt in entitlementSyncReceipts.ProvenanceRecoveryReceipts.Take(4))
+                                {
+                                    <li>
+                                        <strong>@HumanizeStatus(receipt.Kind, "receipt"):</strong>
+                                        @receipt.Summary
+                                        <span>Authority: @HumanizeStatus(receipt.Authority, "hub_entitlement_ledger")</span>
+                                        <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                        <span>State: @HumanizeStatus(receipt.StalenessPosture, "Current receipt")</span>
+                                        <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable with receipt")</span>
+                                        <span>Recovery route: @receipt.RecoveryRoute</span>
+                                        @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
+                                        {
+                                            <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
+                                        }
+                                        <span>@receipt.RecoveryHint</span>
+                                        <span>@receipt.RecoverySummary</span>
+                                        <span>@HumanizeStatus(receipt.ContinuePosture, "Safe to continue with receipt")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        @if (entitlementSyncReceipts.ConflictReceipts.Count == 0)
+                        {
+                            <p class="muted-copy">No entitlement-sync conflict receipts are active for this account right now.</p>
+                        }
+                        else
+                        {
+                            <ul class="muted-copy">
+                                @foreach (var receipt in entitlementSyncReceipts.ConflictReceipts.Take(4))
+                                {
+                                    <li>
+                                        <strong>@HumanizeStatus(receipt.Severity, "Warning") / @HumanizeStatus(receipt.Kind, "receipt"):</strong>
+                                        @receipt.Summary
+                                        <span>Authority: @HumanizeStatus(receipt.Authority, "hub_entitlement_ledger")</span>
+                                        <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                        <span>Conflict posture: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
+                                        <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by account access")</span>
+                                        <span>Recovery route: @receipt.RecoveryRoute</span>
+                                        @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
+                                        {
+                                            <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
+                                        }
+                                        <span>@receipt.RecoveryHint</span>
+                                        <span>@receipt.RecoverySummary</span>
+                                        <span>@HumanizeStatus(receipt.ContinuePosture, receipt.BlocksContinue ? "Continue blocked" : "Review before continuing")</span>
+                                        @if (receipt.BlocksContinue)
+                                        {
+                                            <span>Continue is blocked until this receipt is resolved.</span>
+                                        }
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </details>
+                }
                 @if (Model.InstallLinking.RecentReceipts.Count == 0)
                 {
                     <p class="muted-copy">No account-linked downloads yet. Start from the recommended installer while signed in if you want this account attached to the next copy you install.</p>
@@ -1274,6 +1440,14 @@
                                         <span>Restore conflict receipts</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "No active conflicts" : $"{selectedWorkspaceServerPlane.RestoreConflictReceipts.Count} receipts")</strong>
                                     </div>
+                                    <div class="settings-summary-row">
+                                        <span>Restore receipt posture</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Review before continuing")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Restore recovery route</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
+                                    </div>
                                     @if (selectedWorkspacePortableExchangeNotice is not null)
                                     {
                                         <div class="settings-summary-row">
@@ -1622,12 +1796,100 @@
                                 <summary>Restore provenance and conflict receipts</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
+                                        <span>Restore receipt status</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.Summary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Staleness posture</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.StalenessPosture, "Current receipts")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Conflict posture</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ConflictPosture, "No active conflicts")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Recoverability posture</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverabilityPosture, "Recoverable with receipts")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Continue posture</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Safe to continue with receipt")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead receipt</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadReceiptId</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead surface</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSurface, "workspace_restore")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead authority</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadAuthority, "hub_campaign_spine_projection")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead kind</span>
+                                        <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadKind, "restore_review")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead subject</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Recovery route</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
+                                        @if (IsNavigableAccountRoute(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute))
+                                        {
+                                            <a href="@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)</a>
+                                        }
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Lead recovery hint</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadRecoveryHint</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Recovery summary</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Workspace restore provenance</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.WorkspaceRestoreProvenanceCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Entitlement sync provenance</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.EntitlementSyncProvenanceCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
                                         <span>Provenance receipts</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count.ToString())</strong>
                                     </div>
                                     <div class="settings-summary-row">
+                                        <span>Workspace restore conflicts</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.WorkspaceRestoreConflictCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Entitlement sync conflicts</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.EntitlementSyncConflictCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
                                         <span>Conflict receipts</span>
                                         <strong>@(selectedWorkspaceServerPlane.RestoreConflictReceipts.Count == 0 ? "None" : selectedWorkspaceServerPlane.RestoreConflictReceipts.Count.ToString())</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Safe-with-receipt provenance</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.SafeToContinueWithReceiptCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Refresh-before-continue receipts</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RefreshBeforeContinueCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Review-before-continue conflicts</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.ReviewBeforeContinueConflictCount</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Blocking conflict receipts</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.BlockingConflictCount</strong>
                                     </div>
                                 </div>
                                 @if (selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0)
@@ -1639,6 +1901,7 @@
                                     <ul class="muted-copy">
                                         @foreach (var receipt in selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Take(6))
                                         {
+                                            var recovery = selectedWorkspaceServerPlane.RestoreProvenanceRecoveryReceipts.FirstOrDefault(item => string.Equals(item.ReceiptId, receipt.ReceiptId, StringComparison.Ordinal));
                                             <li>
                                                 <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Kind, "receipt"):</strong>
                                                 @receipt.Summary
@@ -1650,9 +1913,22 @@
                                                 {
                                                     <span>Proof: @receipt.Proof</span>
                                                 }
+                                                <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 @if (!string.IsNullOrWhiteSpace(receipt.RecoveryHint))
                                                 {
                                                     <span>@receipt.RecoveryHint</span>
+                                                }
+                                                @if (recovery is not null)
+                                                {
+                                                    <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current receipt")</span>
+                                                    <span>Recoverability: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable with receipt")</span>
+                                                    <span>Recovery route: @recovery.RecoveryRoute</span>
+                                                    @if (IsNavigableAccountRoute(recovery.RecoveryRoute))
+                                                    {
+                                                        <span><a href="@recovery.RecoveryRoute">@DescribeRecoveryRouteAction(recovery.RecoveryRoute)</a></span>
+                                                    }
+                                                    <span>@recovery.RecoverySummary</span>
+                                                    <span>@HumanizeStatus(recovery.ContinuePosture, "Safe to continue with receipt")</span>
                                                 }
                                             </li>
                                         }
@@ -1667,7 +1943,22 @@
                                                 <strong>@HumanizeStatus(receipt.Surface, "workspace_restore") / @HumanizeStatus(receipt.Severity, "Warning"):</strong>
                                                 @receipt.Summary
                                                 <span>@HumanizeStatus(receipt.Kind, "receipt").</span>
-                                                <span>@(receipt.BlocksContinue ? "Continue is blocked until this receipt is resolved." : "Review before continuing.")</span>
+                                                <span>Authority: @HumanizeStatus(receipt.Authority, "hub")</span>
+                                                <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                                <span>Conflict posture: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
+                                                <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by workspace review")</span>
+                                                <span>Recovery route: @receipt.RecoveryRoute</span>
+                                                @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
+                                                {
+                                                    <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
+                                                }
+                                                <span>@receipt.RecoveryHint</span>
+                                                <span>@receipt.RecoverySummary</span>
+                                                @if (receipt.BlocksContinue)
+                                                {
+                                                    <span>Continue is blocked until this receipt is resolved.</span>
+                                                }
+                                                <span>@HumanizeStatus(receipt.ContinuePosture, receipt.BlocksContinue ? "Continue blocked" : "Review before continuing")</span>
                                                 <span>@(string.IsNullOrWhiteSpace(receipt.Resolution) ? "Review restore evidence before continuing." : receipt.Resolution)</span>
                                             </li>
                                         }

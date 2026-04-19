@@ -94,7 +94,7 @@ public sealed class WorkspaceLifecyclePolicyService
         };
         return ContentEquals(existing, stableCandidate)
             ? existing
-            : candidate with { GeneratedAtUtc = now };
+            : stableCandidate with { GeneratedAtUtc = now };
     }
 
     private static IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? NormalizeReceiptObservations(
@@ -106,16 +106,10 @@ public sealed class WorkspaceLifecyclePolicyService
             return null;
         }
 
-        Dictionary<string, DateTimeOffset> existingObservedById = (existing ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
-            .Where(static item => !string.IsNullOrWhiteSpace(item.ReceiptId))
-            .GroupBy(static item => item.ReceiptId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                static group => group.Key,
-                static group => group.First().ObservedAtUtc,
-                StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, DateTimeOffset> existingObservedById = BuildProvenanceObservationMap(existing);
 
         return candidate
-            .Select(item => existingObservedById.TryGetValue(item.ReceiptId, out DateTimeOffset observedAtUtc)
+            .Select(item => TryResolveExistingObservation(existingObservedById, ResolveProvenanceReceiptObservationKeys(item), out DateTimeOffset observedAtUtc)
                 ? item with { ObservedAtUtc = observedAtUtc }
                 : item)
             .ToArray();
@@ -130,20 +124,134 @@ public sealed class WorkspaceLifecyclePolicyService
             return null;
         }
 
-        Dictionary<string, DateTimeOffset> existingObservedById = (existing ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
-            .Where(static item => !string.IsNullOrWhiteSpace(item.ReceiptId))
-            .GroupBy(static item => item.ReceiptId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                static group => group.Key,
-                static group => group.First().ObservedAtUtc,
-                StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, DateTimeOffset> existingObservedById = BuildConflictObservationMap(existing);
 
         return candidate
-            .Select(item => existingObservedById.TryGetValue(item.ReceiptId, out DateTimeOffset observedAtUtc)
+            .Select(item => TryResolveExistingObservation(existingObservedById, ResolveConflictReceiptObservationKeys(item), out DateTimeOffset observedAtUtc)
                 ? item with { ObservedAtUtc = observedAtUtc }
                 : item)
             .ToArray();
     }
+
+    private static Dictionary<string, DateTimeOffset> BuildProvenanceObservationMap(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? existing)
+    {
+        Dictionary<string, DateTimeOffset> observedByKey = new(StringComparer.OrdinalIgnoreCase);
+        foreach (WorkspaceRestoreProvenanceReceipt receipt in existing ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
+        {
+            AddObservationKeys(observedByKey, ResolveProvenanceReceiptObservationKeys(receipt), receipt.ObservedAtUtc);
+        }
+
+        return observedByKey;
+    }
+
+    private static Dictionary<string, DateTimeOffset> BuildConflictObservationMap(
+        IReadOnlyList<WorkspaceRestoreConflictReceipt>? existing)
+    {
+        Dictionary<string, DateTimeOffset> observedByKey = new(StringComparer.OrdinalIgnoreCase);
+        foreach (WorkspaceRestoreConflictReceipt receipt in existing ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
+        {
+            AddObservationKeys(observedByKey, ResolveConflictReceiptObservationKeys(receipt), receipt.ObservedAtUtc);
+        }
+
+        return observedByKey;
+    }
+
+    private static void AddObservationKeys(
+        Dictionary<string, DateTimeOffset> observedByKey,
+        IEnumerable<string> keys,
+        DateTimeOffset observedAtUtc)
+    {
+        foreach (string key in keys)
+        {
+            observedByKey.TryAdd(key, observedAtUtc);
+        }
+    }
+
+    private static bool TryResolveExistingObservation(
+        IReadOnlyDictionary<string, DateTimeOffset> observedByKey,
+        IEnumerable<string> keys,
+        out DateTimeOffset observedAtUtc)
+    {
+        foreach (string key in keys)
+        {
+            if (observedByKey.TryGetValue(key, out observedAtUtc))
+            {
+                return true;
+            }
+        }
+
+        observedAtUtc = default;
+        return false;
+    }
+
+    private static IEnumerable<string> ResolveProvenanceReceiptObservationKeys(WorkspaceRestoreProvenanceReceipt receipt)
+        => ResolveReceiptObservationKeys(
+            receipt.ReceiptId,
+            receipt.Surface,
+            receipt.Kind,
+            receipt.SubjectId,
+            workspaceDefaultKind: "workspace_restore_provenance",
+            entitlementDefaultKind: "entitlement_restore_provenance",
+            suffix: "provenance");
+
+    private static IEnumerable<string> ResolveConflictReceiptObservationKeys(WorkspaceRestoreConflictReceipt receipt)
+        => ResolveReceiptObservationKeys(
+            receipt.ReceiptId,
+            receipt.Surface,
+            receipt.Kind,
+            receipt.SubjectId,
+            workspaceDefaultKind: "workspace_restore_conflict",
+            entitlementDefaultKind: "entitlement_restore_conflict",
+            suffix: "conflict");
+
+    private static IEnumerable<string> ResolveReceiptObservationKeys(
+        string? receiptId,
+        string? surface,
+        string? kind,
+        string? subjectId,
+        string workspaceDefaultKind,
+        string entitlementDefaultKind,
+        string suffix)
+    {
+        string? normalizedReceiptId = NormalizeOptional(receiptId);
+        if (normalizedReceiptId is not null)
+        {
+            yield return $"id:{normalizedReceiptId}";
+        }
+
+        string normalizedSurface = ResolveReceiptSurface(surface, kind);
+        string normalizedKind = NormalizeReceiptToken(NormalizeOptional(kind)
+            ?? (string.Equals(normalizedSurface, "entitlement_sync", StringComparison.Ordinal)
+                ? entitlementDefaultKind
+                : workspaceDefaultKind));
+        string normalizedSubject = NormalizeReceiptToken(NormalizeOptional(subjectId) ?? "unknown restore subject");
+        yield return $"{normalizedSurface}:{normalizedKind}:{normalizedSubject}:{suffix}";
+    }
+
+    private static string ResolveReceiptSurface(string? surface, string? kind)
+    {
+        string? normalizedSurface = NormalizeOptional(surface);
+        if (normalizedSurface is not null)
+        {
+            return NormalizeReceiptToken(normalizedSurface);
+        }
+
+        string normalizedKind = NormalizeOptional(kind) ?? string.Empty;
+        return normalizedKind.Contains("entitlement", StringComparison.OrdinalIgnoreCase)
+            ? "entitlement_sync"
+            : "workspace_restore";
+    }
+
+    private static string NormalizeReceiptToken(string value)
+        => string.Join(
+            "_",
+            value.Trim()
+                .ToLowerInvariant()
+                .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static bool ContentEquals<T>(T left, T right)
         => string.Equals(

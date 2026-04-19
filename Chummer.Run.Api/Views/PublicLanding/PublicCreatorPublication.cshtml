@@ -32,13 +32,13 @@
 
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
-        <p class="eyebrow">Governed publication discovery</p>
+        <p class="eyebrow">Public shared publication</p>
         <h1 class="page-title">@Model.Publication.Title</h1>
         <p class="page-copy">@Model.Publication.Summary</p>
         <div class="trust-claim__microproof">
             <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
             <span>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</span>
-            <span>@(Model.Publication.Discoverable ? "Eligible now" : "Still bounded")</span>
+            <span>@(Model.Publication.Discoverable ? "Ready now" : "Limited release")</span>
         </div>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>
@@ -47,21 +47,11 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Public shared publication</p>
+        <p class="eyebrow">Shared publication</p>
         <h2 class="editorial-title">Why this publication is live</h2>
-        <p class="editorial-copy">This page keeps discovery, trust, comparison, lineage, moderation, and next-step posture on the same governed public route.</p>
+        <p class="editorial-copy">This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.</p>
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">

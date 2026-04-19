@@ -242,6 +242,43 @@ public sealed class PublicLandingMacBootstrapScriptTests
             command);
     }
 
+    [Fact]
+    public void ReleaseUploadBootstrapWrapperDoesNotForceHostedProofOverridesOrEmbedSecrets()
+    {
+        MethodInfo renderMethod = typeof(PublicLandingController).GetMethod(
+            "RenderReleaseUploadBootstrapScript",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("missing RenderReleaseUploadBootstrapScript");
+
+        string script = (string)(renderMethod.Invoke(
+            obj: null,
+            parameters: ["#!/usr/bin/env bash\nprintf 'ok\\n'\n"]) ?? throw new InvalidOperationException("wrapper render returned null"));
+
+        Assert.DoesNotContain("CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN='", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"", script, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ReleaseUploadBootstrapCommandPinsDigestAndKeepsTicketOffCommandLine()
+    {
+        MethodInfo buildMethod = typeof(PublicLandingController).GetMethod(
+            "BuildReleaseUploadBootstrapCommand",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("missing BuildReleaseUploadBootstrapCommand");
+
+        string command = (string)(buildMethod.Invoke(
+            obj: null,
+            parameters: ["https://chummer.run/downloads/release-upload/bootstrap.sh", "abc123"]) ?? throw new InvalidOperationException("command build returned null"));
+
+        Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256='abc123'", command, StringComparison.Ordinal);
+        Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("ticket=", command, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN=", command, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(nameof(PublicLandingController.ReleaseUploadBootstrapScript))]
     [InlineData(nameof(PublicLandingController.DownloadDispatchBootstrapScript))]
@@ -287,7 +324,46 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
-    public void ResolveGuidedBootstrapArtifactsIncludesMatchingWindowsDesktopHeadsForTheAccessClass()
+    public void ReleaseUploadBootstrapTemplateFailsClosedWhenLocalizationGateGeneratorScriptIsMissing()
+    {
+        string templatePath = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "Chummer.Run.Api",
+            "wwwroot",
+            "artifacts",
+            "mac-codex-release-pipeline",
+            "bootstrap.sh"));
+
+        string template = File.ReadAllText(templatePath);
+
+        Assert.Contains(
+            "write_bootstrap_fallback_ui_localization_release_gate",
+            template,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "bootstrap synthetic UI localization release-gate fallback is disabled",
+            template,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ui localization release gate repo root could not be resolved",
+            template,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ui localization release gate generator failed at $script_path; fix the gate or set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH",
+            template,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ui localization release gate generator is missing at $script_path; set CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH or restore the gate script",
+            template,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResolveGuidedBootstrapArtifactsKeepsGuidedInstallPathOnPlatformWithoutDroppingFallbackHead()
     {
         PublicReleaseManifestDto manifest = new(
             Version: "run-20260403-150000",
@@ -367,7 +443,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
                     Title: "Avalonia Desktop Windows x64 Installer",
                     ShortLabel: "Chummer Avalonia (x64)",
                     DownloadUrl: "https://chummer.run/downloads/file/avalonia-win-x64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/avalonia-win-x64-installer/claim.json?ticket=T-1",
+                    ClaimUrl: "https://chummer.run/downloads/install/avalonia-win-x64-installer/continue.json?ticket=T-1",
                     Sha256: "sha-a",
                     PackageName: "chummer-avalonia-win-x64-installer.exe",
                     Architecture: "x64",
@@ -382,7 +458,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
                     Title: "Blazor Desktop Windows x64 Installer",
                     ShortLabel: "Chummer Blazor Desktop (x64)",
                     DownloadUrl: "https://chummer.run/downloads/file/blazor-desktop-win-x64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/blazor-desktop-win-x64-installer/claim.json?ticket=T-1",
+                    ClaimUrl: "https://chummer.run/downloads/install/blazor-desktop-win-x64-installer/continue.json?ticket=T-1",
                     Sha256: "sha-b",
                     PackageName: "chummer-blazor-desktop-win-x64-installer.exe",
                     Architecture: "x64",
@@ -432,7 +508,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
                     Title: "Avalonia Desktop Linux x64 Installer",
                     ShortLabel: "Chummer Avalonia (x64)",
                     DownloadUrl: "https://chummer.run/downloads/file/avalonia-linux-x64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/avalonia-linux-x64-installer/claim.json?ticket=T-1",
+                    ClaimUrl: "https://chummer.run/downloads/install/avalonia-linux-x64-installer/continue.json?ticket=T-1",
                     Sha256: "sha-a",
                     PackageName: "chummer-avalonia-linux-x64-installer.deb",
                     Architecture: "x64",
@@ -447,7 +523,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
                     Title: "Blazor Desktop Linux x64 Installer",
                     ShortLabel: "Chummer Blazor Desktop (x64)",
                     DownloadUrl: "https://chummer.run/downloads/file/blazor-desktop-linux-x64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/blazor-desktop-linux-x64-installer/claim.json?ticket=T-1",
+                    ClaimUrl: "https://chummer.run/downloads/install/blazor-desktop-linux-x64-installer/continue.json?ticket=T-1",
                     Sha256: "sha-b",
                     PackageName: "chummer-blazor-desktop-linux-x64-installer.deb",
                     Architecture: "x64",

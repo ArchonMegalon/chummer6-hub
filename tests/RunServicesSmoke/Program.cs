@@ -666,6 +666,10 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var supportPresentation = new SupportCasePresentationService();
     var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
+    var entitlementsController = new EntitlementsController(accounts, identityClient, entitlements, installLinking, rewards, workspaceServerPlane)
+    {
+        ControllerContext = AuthenticatedControllerContext("subject-token")
+    };
     var accountController = new AccountsController(accounts, identityClient, identityLinks, experience, installLinking, supportCases, supportPresentation, campaignSpine, workspaceServerPlane, creatorPublicationRegistry, chrome, google, releases, releaseSelection, privacyBoundaries, signedInTrustStatus, loggerFactory.CreateLogger<AccountsController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
@@ -677,6 +681,17 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var currentAccount = await accountController.GetMe("subject.demo", CancellationToken.None);
     var currentAccountResult = currentAccount.Result as OkObjectResult;
     Assert(currentAccountResult?.Value is HubUserDto { UserId: not null }, "authenticated account endpoints should allow matching subjects.");
+    var entitlementResult = await entitlementsController.GetMine("subject.demo", CancellationToken.None);
+    var entitlementPayload = (entitlementResult.Result as OkObjectResult)?.Value as EntitlementAccountProjection ?? entitlementResult.Value;
+    Assert(entitlementPayload is not null && entitlementPayload.Entitlements.Count >= 1, "entitlements api should keep the signed-in entitlement list available.");
+    Assert(entitlementPayload!.SyncReceipts.ProvenanceReceipts.Count >= 1, "entitlements api should expose entitlement-sync provenance receipts alongside grants.");
+    Assert(entitlementPayload.SyncReceipts.ProvenanceReceipts.All(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)), "entitlements api should isolate entitlement-sync provenance receipts instead of mixing workspace-only restore items.");
+    Assert(entitlementPayload.SyncReceipts.ProvenanceRecoveryReceipts.Any(item => string.Equals(item.RecoveryRoute, "/account/access", StringComparison.Ordinal)), "entitlements api should expose recoverable account-access provenance routes for entitlement replay.");
+    Assert(entitlementPayload.SyncReceipts.ConflictReceipts.Count >= 1, "entitlements api should expose explicit entitlement-sync conflict receipts when restore continuity drifts.");
+    Assert(entitlementPayload.SyncReceipts.ConflictReceipts.All(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)), "entitlements api should isolate entitlement-sync conflict receipts on the standalone entitlements surface.");
+    Assert(entitlementPayload.SyncReceipts.ConflictReceipts.Any(item => item.BlocksContinue && !string.IsNullOrWhiteSpace(item.RecoveryHint)), "entitlements api should keep blocking entitlement-sync conflicts recoverable on the standalone entitlements surface.");
+    Assert(entitlementPayload.SyncReceipts.ReceiptStatus.EntitlementSyncConflictCount == entitlementPayload.SyncReceipts.ConflictReceipts.Count, "entitlements api should summarize the standalone entitlement conflict count without dropping receipts.");
+    Assert(entitlementPayload.SyncReceipts.ReceiptStatus.WorkspaceRestoreConflictCount == 0, "entitlements api should keep workspace-only restore conflicts out of the standalone entitlement summary.");
 
     var emailLink = identityLinks.LinkEmail(new LinkEmailIdentityRequest(
         SubjectId: "subject.demo",
@@ -1781,7 +1796,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var navigation = new PublicNavigationService(canon, routes);
     var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
-    var chrome = new HubPageChromeService(landing, navigation, releases, releaseSelection);
+    var chrome = new HubPageChromeService(landing, navigation, releases, releaseSelection, new HttpContextAccessor());
     var weeklyPulseArtifact = new WeeklyProductPulseArtifactService(configuration, loggerFactory.CreateLogger<WeeklyProductPulseArtifactService>());
     var progress = new PublicProgressService(configuration, weeklyPulseArtifact, loggerFactory.CreateLogger<PublicProgressService>());
     var trustContent = new PublicTrustContentService(canon, routes);
@@ -2192,6 +2207,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadDispatchSource.Contains("canonical", StringComparison.OrdinalIgnoreCase), "download handoff should avoid canonical jargon on the customer-facing surface.");
     Assert(!downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should stay focused on install handoff controls instead of duplicating the broader signed-in trust panel.");
     Assert(downloadDispatchSource.Contains("Current release", StringComparison.Ordinal), "download handoff should still expose current release posture directly on the handoff card.");
+    Assert(downloadDispatchSource.Contains("Automatic account linking is the default path.", StringComparison.Ordinal), "download handoff should explicitly keep automatic linking as the default and reserve claim codes for recovery fallback.");
+    Assert(downloadDispatchSource.Contains("Support follow-through stays on the same install rail", StringComparison.Ordinal), "download handoff should keep support recovery on the same install rail instead of splitting it into a separate browser ritual.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
     Assert(supportSubmittedSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
@@ -2200,7 +2217,29 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.VerificationSummary", StringComparison.Ordinal), "support confirmation should surface fix-verification guidance directly from the tracked case.");
     Assert(supportSubmittedSource.Contains("@Model.TrackedCaseSummary.ReleaseProgressSummary", StringComparison.Ordinal), "support confirmation should surface the release-lane summary directly from the tracked case.");
     Assert(accountSource.Contains("Recent install handoffs", StringComparison.Ordinal), "account access should describe recent downloads as install handoffs instead of raw receipts.");
+    Assert(accountSource.Contains("Current install rail", StringComparison.Ordinal), "account access should lead with one current install rail instead of only counts and fallback ledgers.");
+    Assert(accountSource.Contains("Recovery codes stay below as a fallback, not the first instruction.", StringComparison.Ordinal), "account access should explicitly demote recovery codes beneath the primary install rail guidance.");
+    Assert(accountSource.Contains("This linked install is your default return rail", StringComparison.Ordinal), "account access should present the linked install as the default return rail when claim and support continuity already exist.");
     Assert(accountSource.Contains("Finish on another device", StringComparison.Ordinal), "account access should describe pending claim codes as the remaining device handoff step.");
+    Assert(accountSource.Contains("Recovery mode only", StringComparison.Ordinal), "account access should mark pending claim codes as recovery-only fallback instead of the primary install path.");
+    Assert(accountSource.Contains("Do not redeem claim codes in a browser tab.", StringComparison.Ordinal), "account access should steer claim-code use back into in-app recovery instead of browser ritual.");
+    Assert(accountSource.Contains("Entitlement sync receipts", StringComparison.Ordinal), "account access should expose a dedicated entitlement-sync receipt drawer instead of leaving recovery posture buried in the API.");
+    Assert(accountSource.Contains("@entitlementSyncReceipts.ReceiptStatus.RecoverySummary", StringComparison.Ordinal), "account access should render the entitlement-sync recovery summary instead of hiding it behind raw counts.");
+    Assert(accountSource.Contains("DescribeRecoveryRouteAction(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute)", StringComparison.Ordinal), "account access should render a direct recovery action for the standalone entitlement-sync lead receipt.");
+    Assert(accountSource.Contains("@entitlementSyncReceipts.ReceiptStatus.LatestReceiptObservedAtUtc.UtcDateTime.ToString(\"u\")", StringComparison.Ordinal), "account access should surface the latest entitlement-sync receipt observation timestamp.");
+    Assert(accountSource.Contains("Continue is blocked until this receipt is resolved.", StringComparison.Ordinal), "account access should make blocking entitlement-sync conflicts explicit on the device surface.");
+    Assert(accountSource.Contains("Restore provenance receipts", StringComparison.Ordinal), "account work should keep restore provenance receipt counts visible on the selected workspace card.");
+    Assert(accountSource.Contains("Restore conflict receipts", StringComparison.Ordinal), "account work should keep restore conflict receipt counts visible on the selected workspace card.");
+    Assert(accountSource.Contains("Restore receipt posture", StringComparison.Ordinal), "account work should surface one restore receipt posture summary on the selected workspace card.");
+    Assert(accountSource.Contains("Restore receipt status", StringComparison.Ordinal), "account work should render a restore receipt status summary in the dedicated restore drawer.");
+    Assert(accountSource.Contains("@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoverySummary", StringComparison.Ordinal), "account work should render the restore receipt recovery summary instead of leaving recoverability implicit.");
+    Assert(accountSource.Contains("DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)", StringComparison.Ordinal), "account work should expose a direct recovery-route action for the lead restore receipt instead of leaving the route as inert text.");
+    Assert(accountSource.Contains("Restore provenance and conflict receipts", StringComparison.Ordinal), "account work should expose a dedicated restore provenance/conflict receipt drawer on the selected workspace card.");
+    Assert(accountSource.Contains("Authority: @HumanizeStatus(receipt.Authority, \"hub\")", StringComparison.Ordinal), "account work should render restore receipt authority instead of hiding which plane issued the continuity proof.");
+    Assert(accountSource.Contains("@receipt.RecoveryHint", StringComparison.Ordinal), "account work should render the concrete restore recovery hint on provenance receipts.");
+    Assert(accountSource.Contains("DescribeRecoveryRouteAction(recovery.RecoveryRoute)", StringComparison.Ordinal), "account work should render a direct recovery action for each provenance recovery receipt.");
+    Assert(accountSource.Contains("DescribeRecoveryRouteAction(receipt.RecoveryRoute)", StringComparison.Ordinal), "account work should render a direct recovery action for each conflict receipt.");
+    Assert(accountSource.Contains("Continue is blocked until this receipt is resolved.", StringComparison.Ordinal), "account work should render the blocking-state copy for restore conflict receipts.");
     Assert(accountSource.Contains("Outcome:", StringComparison.Ordinal), "account build-path details should surface the next progression outcome rather than only the variant headline.");
     Assert(accountSource.Contains("Closure:", StringComparison.Ordinal), "account build-path details should surface support-closure truth instead of leaving the new rail data unused.");
     Assert(accountSource.Contains("Planner coverage", StringComparison.Ordinal), "account build-path details should surface planner-coverage truth instead of leaving follow-through grounding implicit.");
@@ -2744,10 +2783,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var dispatchView = await authenticatedLandingController.DownloadDispatchPage("smoke-poc-linux-x64", CancellationToken.None) as ViewResult;
     var dispatchModel = dispatchView?.Model as DownloadDispatchPageViewModel;
     Assert(dispatchModel is not null && string.Equals(dispatchModel.DownloadHref, "/downloads/file/smoke-poc-linux-x64", StringComparison.Ordinal), "signed-in download handoff should expose the canonical file route.");
-    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimExchangeUrl), "signed-in download handoff should expose a private claim-exchange route.");
+    Assert(!string.IsNullOrWhiteSpace(dispatchModel?.ClaimExchangeUrl) && dispatchModel.ClaimExchangeUrl!.EndsWith("/continue.json", StringComparison.Ordinal), "signed-in download handoff should expose a private continuation route for install recovery.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Heading), "signed-in download handoff should expose a non-empty heading.");
     Assert(!string.IsNullOrWhiteSpace(dispatchModel?.Summary), "signed-in download handoff should expose a non-empty summary.");
     Assert(dispatchModel?.Steps.Count > 0, "signed-in download handoff should expose the signed-in install steps.");
+    Assert(dispatchModel?.SupportHref.Contains("/contact?", StringComparison.Ordinal) == true, "signed-in download handoff should project install-aware support follow-through on the same rail.");
     Assert(dispatchModel?.TrustPulse is not null, "signed-in download handoff should keep the weekly public trust pulse visible.");
     Assert(dispatchModel?.SignedInStatus is not null, "signed-in download handoff should project the shared signed-in trust status.");
     var publicContactPageMethod = typeof(PublicLandingController).GetMethods()
@@ -3038,9 +3078,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(emailitRequests.Any(item => item.Body.Contains("Award: Denied", StringComparison.Ordinal) && item.Body.Contains("No implementation is planned for this report.", StringComparison.Ordinal)), "rejected audited-decision mail should include the Denied award and the no-implementation explanation.");
     Assert(emailitRequests.Any(item => item.Body.Contains("Award: Clad Feedbacker", StringComparison.Ordinal) && item.Body.Contains("Within the next preview drop.", StringComparison.Ordinal)), "audited-decision mail should include the award and ETA text.");
     Assert(emailitRequests.Any(item =>
-        item.Body.Contains("Please test it on the affected linked install", StringComparison.Ordinal)
+        item.Body.Contains("Open the affected claimed desktop install first", StringComparison.Ordinal)
         && item.Body.Contains("https://chummer.run/downloads", StringComparison.Ordinal)
-        && item.Body.Contains("Linked install rail:", StringComparison.Ordinal)), "fix-available mail should ask the reporter to test the linked install and include the download plus install rail routes.");
+        && item.Body.Contains("Browser fallback for relink or recovery:", StringComparison.Ordinal)), "fix-available mail should keep the claimed desktop install as the primary verification lane and include the browser fallback route.");
     Assert(emailitRequests.All(item => string.Equals(item.Authorization, "emailit-smoke-token", StringComparison.Ordinal)), "Emailit sends should use the configured provider token.");
     Assert(emailitRequests.All(item => !string.IsNullOrWhiteSpace(item.IdempotencyKey)), "Emailit sends should carry an idempotency key.");
 
@@ -3227,6 +3267,71 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(workspaceServerPlanePayload.DecisionNotices.Any(item => string.Equals(item.Kind, "portable_exchange", StringComparison.Ordinal)), "campaign spine server plane api should surface a first-class portable exchange notice.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("Prefetch inventory:", StringComparison.Ordinal), "campaign spine server plane api should make restore prefetch inventory explicit.");
     Assert(workspaceServerPlanePayload.CampaignSummary.RestoreSummary.Contains("bounded offline use", StringComparison.Ordinal), "campaign spine server plane api should keep restore posture tied to bounded offline use.");
+    Assert(workspaceServerPlanePayload.RestoreProvenanceReceipts.Count == restorePayload!.ProvenanceReceipts.Count, "campaign spine server plane api should preserve restore provenance receipts without dropping account restore evidence.");
+    Assert(workspaceServerPlanePayload.RestoreProvenanceRecoveryReceipts.Count == restorePayload.ProvenanceReceipts.Count, "campaign spine server plane api should expose a recovery cue for every restore provenance receipt.");
+    Assert(workspaceServerPlanePayload.RestoreConflictReceipts.Count == restorePayload.ConflictReceipts.Count, "campaign spine server plane api should preserve restore conflict receipts without dropping continuity conflict evidence.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.RestoreReceiptStatus.Summary), "campaign spine server plane api should expose one restore-receipt status summary instead of only raw receipt lists.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.RestoreReceiptStatus.LeadReceiptId), "campaign spine server plane api should expose the lead restore receipt id.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.RestoreReceiptStatus.LeadSubjectId), "campaign spine server plane api should expose the lead restore receipt subject.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.RestoreReceiptStatus.LeadAuthority), "campaign spine server plane api should expose the lead restore receipt authority.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.RestoreReceiptStatus.LeadRecoveryHint), "campaign spine server plane api should expose the lead restore recovery hint.");
+    Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.RestoreReceiptStatus.RecoveryRoute), "campaign spine server plane api should surface the lead restore recovery route.");
+    Assert(workspaceServerPlanePayload.RestoreReceiptStatus.LeadObservedAtUtc > DateTimeOffset.MinValue, "campaign spine server plane api should expose when the lead restore receipt was observed.");
+    Assert(workspaceServerPlanePayload.RestoreReceiptStatus.LatestReceiptObservedAtUtc >= workspaceServerPlanePayload.RestoreReceiptStatus.LeadObservedAtUtc, "campaign spine server plane api should expose the freshest restore-receipt observation timestamp.");
+    Assert(workspaceServerPlanePayload.RestoreReceiptStatus.StaleOrDriftProvenanceReceiptCount > 0, "campaign spine server plane api should count stale-or-drift provenance receipts explicitly.");
+    Assert(workspaceServerPlanePayload.RestoreReceiptStatus.CurrentProvenanceReceiptCount >= 0, "campaign spine server plane api should expose current provenance receipt counts even when every receipt is stale.");
+    Assert(workspaceServerPlanePayload.RestoreReceiptStatus.SafeToContinueWithReceiptCount > 0, "campaign spine server plane api should count safe-with-receipt provenance cues explicitly.");
+    Assert(workspaceServerPlanePayload.RestoreReceiptStatus.ReviewBeforeContinueConflictCount >= 0, "campaign spine server plane api should expose review-before-continue conflict counts even when every conflict is blocking.");
+    Assert(
+        string.Equals(workspaceServerPlanePayload.RestoreReceiptStatus.ContinuePosture, "blocked_until_receipt_resolved", StringComparison.Ordinal)
+            || string.Equals(workspaceServerPlanePayload.RestoreReceiptStatus.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal)
+            || string.Equals(workspaceServerPlanePayload.RestoreReceiptStatus.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal),
+        "campaign spine server plane api should expose an explicit continue posture on the restore receipt status summary.");
+    Assert(workspaceServerPlanePayload.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal)), "campaign spine server plane api should keep workspace-restore provenance receipts explicit on the bounded workspace projection.");
+    Assert(workspaceServerPlanePayload.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)), "campaign spine server plane api should keep entitlement-sync provenance receipts explicit on the bounded workspace projection.");
+    Assert(
+        workspaceServerPlanePayload.RestoreProvenanceReceipts.Any(item =>
+            string.Equals(item.Kind, "active_entitlement", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Authority, "hub_entitlement_ledger", StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(item.RecoveryHint)),
+        "campaign spine server plane api should carry authority-backed entitlement provenance with a concrete recovery hint.");
+    Assert(
+        workspaceServerPlanePayload.RestoreProvenanceRecoveryReceipts.Any(item =>
+            string.Equals(item.RecoveryRoute, "/account/access", StringComparison.Ordinal)
+            && (string.Equals(item.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal)
+                || string.Equals(item.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal))),
+        "campaign spine server plane api should expose recoverable provenance cues with account-access routes and continue posture.");
+    Assert(workspaceServerPlanePayload.RestoreConflictReceipts.All(item => !string.IsNullOrWhiteSpace(item.Surface)), "campaign spine server plane api should project a concrete surface on every restore conflict receipt.");
+    Assert(
+        workspaceServerPlanePayload.RestoreConflictReceipts
+            .Where(item => !string.IsNullOrWhiteSpace(item.Kind) && item.Kind.StartsWith("entitlement_", StringComparison.OrdinalIgnoreCase))
+            .All(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)),
+        "campaign spine server plane api should classify entitlement conflict receipts under the entitlement-sync surface.");
+    Assert(
+        workspaceServerPlanePayload.RestoreConflictReceipts.Any(item =>
+            item.BlocksContinue
+            && string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)),
+        "campaign spine server plane api should keep at least one blocking restore conflict explicitly tied to entitlement sync when replay drift exists.");
+    Assert(
+        workspaceServerPlanePayload.RestoreConflictReceipts
+            .Where(static item => item.BlocksContinue)
+            .All(static item => !string.IsNullOrWhiteSpace(item.RecoveryHint)),
+        "campaign spine server plane api should attach a concrete recovery hint to every blocking restore conflict receipt.");
+    Assert(
+        workspaceServerPlanePayload.RestoreConflictReceipts.Any(item =>
+            string.Equals(item.Kind, "entitlement_artifact_drift", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)
+            && item.BlocksContinue),
+        "campaign spine server plane api should emit a blocking entitlement artifact drift receipt when claimed install metadata outruns the replayable artifact receipt.");
+    if (workspaceServerPlanePayload.RestoreConflictReceipts.Any(static item => item.BlocksContinue))
+    {
+        Assert(string.Equals(workspaceServerPlanePayload.NextSafeAction.Label, "Review restore receipts", StringComparison.Ordinal), "campaign spine server plane api should turn blocking restore conflicts into an explicit restore-review next action.");
+        Assert(string.Equals(workspaceServerPlanePayload.NextSafeAction.SourceKind, "restore", StringComparison.Ordinal), "campaign spine server plane api should classify restore-driven next actions under the restore source kind.");
+    }
+    Assert(
+        workspaceServerPlanePayload.RestoreConflictReceipts.Count == 0
+            || workspaceServerPlanePayload.ContinuityConflicts.Any(item => item.CueId.Contains("restore-conflict:", StringComparison.Ordinal)),
+        "campaign spine server plane api should carry restore conflict receipts into continuity conflict cues when conflict evidence exists.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.WorkspaceState.Status), "campaign spine server plane api should expose one bounded visible workspace state.");
     Assert(!string.IsNullOrWhiteSpace(workspaceServerPlanePayload.WorkspaceState.Label), "campaign spine server plane api should expose a customer-facing workspace-state label.");
     Assert(workspaceServerPlanePayload.WorkspaceState.EvidenceLines.Count >= 1, "campaign spine server plane api should attach evidence lines to the bounded workspace state.");
@@ -3611,6 +3716,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(accountAccessModel?.Chrome.Title, "Account · Devices & access", StringComparison.Ordinal), "account access route should project its own chrome title.");
     Assert(accountAccessModel?.SignedInTrustStatus is not null, "account access route should keep the install-specific trust panel visible on the device surface.");
     Assert(accountAccessModel?.SignedInTrustStatus?.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)) == true, "account access route should keep the current access posture visible next to linked-install details.");
+    Assert(accountAccessModel?.EntitlementSyncReceipts is not null, "account access route should project standalone entitlement-sync receipts next to devices and access posture.");
+    Assert(accountAccessModel?.EntitlementSyncReceipts?.ProvenanceRecoveryReceipts.Count >= 1, "account access route should keep entitlement-sync provenance recovery cues visible.");
+    Assert(accountAccessModel?.EntitlementSyncReceipts?.ConflictReceipts.Any(item => item.BlocksContinue && string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)) == true, "account access route should keep blocking entitlement-sync conflicts explicit and scoped.");
+    Assert(!string.IsNullOrWhiteSpace(accountAccessModel?.EntitlementSyncReceipts?.ReceiptStatus.RecoverySummary), "account access route should project the entitlement-sync recovery summary.");
+    Assert(accountAccessModel?.EntitlementSyncReceipts?.ReceiptStatus.LatestReceiptObservedAtUtc >= accountAccessModel?.EntitlementSyncReceipts?.ReceiptStatus.LeadObservedAtUtc, "account access route should keep the latest entitlement-sync receipt observation timestamp visible.");
     var accountWorkspaceDetailPage = await accountController.AccountPage(section: null, caseId: null, cancellationToken: CancellationToken.None, workspaceId: workspaceId) as ViewResult;
     var accountWorkspaceDetailModel = accountWorkspaceDetailPage?.Model as AccountPageViewModel;
     Assert(string.Equals(accountWorkspaceDetailModel?.CurrentSection, "work", StringComparison.Ordinal), "account workspace detail route should land inside the work section.");
@@ -3623,6 +3733,56 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.SupportClosures.Count >= 1, "account workspace detail route should expose support-closure cues from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Count >= 1, "account workspace detail route should expose bounded decision notices from the workspace server plane.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.DecisionNotices.Any(item => string.Equals(item.Kind, "portable_exchange", StringComparison.Ordinal)) == true, "account workspace detail route should keep portable exchange visible on the bounded workspace server plane.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Count == restorePayload!.ProvenanceReceipts.Count, "account workspace detail route should project restore provenance receipts from the same restore packet.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceRecoveryReceipts.Count == restorePayload.ProvenanceReceipts.Count, "account workspace detail route should project recovery cues for every restore provenance receipt.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts.Count == restorePayload.ConflictReceipts.Count, "account workspace detail route should project restore conflict receipts from the same restore packet.");
+    Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreReceiptStatus.LeadReceiptId), "account workspace detail route should keep the lead restore receipt id visible on the selected workspace.");
+    Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreReceiptStatus.LeadSubjectId), "account workspace detail route should keep the lead restore receipt subject visible on the selected workspace.");
+    Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreReceiptStatus.LeadAuthority), "account workspace detail route should keep the lead restore receipt authority visible on the selected workspace.");
+    Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreReceiptStatus.LeadRecoveryHint), "account workspace detail route should keep the lead restore recovery hint visible on the selected workspace.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreReceiptStatus.SafeToContinueWithReceiptCount > 0, "account workspace detail route should keep safe-with-receipt provenance counts explicit on the selected workspace.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreReceiptStatus.ReviewBeforeContinueConflictCount >= 0, "account workspace detail route should keep review-before-continue conflict counts explicit on the selected workspace.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal)) == true, "account workspace detail route should keep workspace-restore provenance explicit.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Any(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)) == true, "account workspace detail route should keep entitlement-sync provenance explicit.");
+    Assert(
+        accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceReceipts.Any(item =>
+            string.Equals(item.Kind, "active_entitlement", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Authority, "hub_entitlement_ledger", StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(item.RecoveryHint)) == true,
+        "account workspace detail route should keep authority-backed entitlement provenance and recovery hints visible on the selected workspace.");
+    Assert(
+        accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreProvenanceRecoveryReceipts.Any(item =>
+            string.Equals(item.RecoveryRoute, "/account/access", StringComparison.Ordinal)
+            && (string.Equals(item.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal)
+                || string.Equals(item.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal))) == true,
+        "account workspace detail route should keep provenance recovery routes and continue posture visible on the selected workspace.");
+    Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts.All(item => !string.IsNullOrWhiteSpace(item.Surface)) == true, "account workspace detail route should keep surface classification on every restore conflict receipt.");
+    Assert(
+        accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts
+            .Where(item => !string.IsNullOrWhiteSpace(item.Kind) && item.Kind.StartsWith("entitlement_", StringComparison.OrdinalIgnoreCase))
+            .All(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)) == true,
+        "account workspace detail route should keep entitlement conflict receipts on the entitlement-sync surface.");
+    Assert(
+        accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts.Any(item =>
+            item.BlocksContinue
+            && string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)) == true,
+        "account workspace detail route should keep blocking entitlement-sync restore conflicts visible on the selected workspace.");
+    Assert(
+        accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts
+            .Where(static item => item.BlocksContinue)
+            .All(static item => !string.IsNullOrWhiteSpace(item.RecoveryHint)) == true,
+        "account workspace detail route should keep concrete recovery hints on blocking restore conflict receipts.");
+    Assert(
+        accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts.Any(item =>
+            string.Equals(item.Kind, "entitlement_artifact_drift", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)
+            && item.BlocksContinue) == true,
+        "account workspace detail route should keep blocking artifact-drift receipts visible on the selected workspace.");
+    if (accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RestoreConflictReceipts.Any(static item => item.BlocksContinue) == true)
+    {
+        Assert(string.Equals(accountWorkspaceDetailModel.SelectedWorkspaceServerPlane.NextSafeAction.Label, "Review restore receipts", StringComparison.Ordinal), "account workspace detail route should turn blocking restore conflicts into an explicit restore-review next action.");
+        Assert(string.Equals(accountWorkspaceDetailModel.SelectedWorkspaceServerPlane.NextSafeAction.SourceKind, "restore", StringComparison.Ordinal), "account workspace detail route should classify restore-driven next actions under the restore source kind.");
+    }
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.RuleEnvironmentHealth.Count >= 1, "account workspace detail route should expose rule-environment health cues from the workspace server plane.");
     Assert(!string.IsNullOrWhiteSpace(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.Label), "account workspace detail route should expose one bounded workspace-state label.");
     Assert(accountWorkspaceDetailModel?.SelectedWorkspaceServerPlane?.WorkspaceState.EvidenceLines.Count >= 1, "account workspace detail route should expose evidence for the bounded workspace state.");
@@ -6400,7 +6560,7 @@ HubPageChromeService CreateChromeService(IConfiguration configuration, ILoggerFa
     var navigation = new PublicNavigationService(canon, routes);
     var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
-    return new HubPageChromeService(landing, navigation, releases, releaseSelection);
+    return new HubPageChromeService(landing, navigation, releases, releaseSelection, new HttpContextAccessor());
 }
 
 HubGoogleAuthService CreateGoogleService(

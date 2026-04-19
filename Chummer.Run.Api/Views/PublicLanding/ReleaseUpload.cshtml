@@ -25,6 +25,24 @@
     </article>
 </section>
 
+<section class="recommended-download" id="release-upload-handoff">
+    <article class="recommended-download__card">
+        <div class="recommended-download__copy">
+            <span class="tag">Signed-in handoff</span>
+            <h2>Paste this only when the bootstrap asks</h2>
+            <p>This handoff code expires @expires and stays off shell history because the bootstrap reads it interactively.</p>
+            <div class="code-panel">
+                <div class="code-panel__label">Handoff code</div>
+                <pre class="code-panel__value mono-receipt" id="releaseUploadHandoffCode">@Model.HandoffCode</pre>
+                <div class="stacked-actions">
+                    <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadHandoffCodeButton">Copy handoff code</button>
+                </div>
+                <p class="status-copy" id="releaseUploadHandoffCodeNotice" hidden></p>
+            </div>
+        </div>
+    </article>
+</section>
+
 <section class="release-stage">
     <div class="release-stage__lead">
         <p class="eyebrow">Signed-in release upload</p>
@@ -84,6 +102,9 @@
   const copyButton = document.getElementById("copyReleaseUploadCommandButton");
   const commandValue = document.getElementById("releaseUploadCommand");
   const notice = document.getElementById("releaseUploadCommandNotice");
+  const handoffCopyButton = document.getElementById("copyReleaseUploadHandoffCodeButton");
+  const handoffValue = document.getElementById("releaseUploadHandoffCode");
+  const handoffNotice = document.getElementById("releaseUploadHandoffCodeNotice");
 
   if (copyButton && commandValue && ui?.copyToClipboard) {
     copyButton.addEventListener("click", async () => {
@@ -92,6 +113,17 @@
         ui.setNotice(notice, "Release upload command copied.");
       } catch (error) {
         ui.setNotice(notice, ui.describeError(error, "Release upload command copy failed. Copy it manually from the command panel."), true);
+      }
+    });
+  }
+
+  if (handoffCopyButton && handoffValue && ui?.copyToClipboard) {
+    handoffCopyButton.addEventListener("click", async () => {
+      try {
+        await ui.copyToClipboard(handoffValue.textContent || "", handoffCopyButton, "Copied");
+        ui.setNotice(handoffNotice, "Release upload handoff code copied.");
+      } catch (error) {
+        ui.setNotice(handoffNotice, ui.describeError(error, "Release upload handoff code copy failed. Copy it manually from the code panel."), true);
       }
     });
   }

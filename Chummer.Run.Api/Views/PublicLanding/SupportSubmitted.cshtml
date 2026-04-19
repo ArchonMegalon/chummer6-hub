@@ -29,16 +29,6 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">What happens next</p>
@@ -55,6 +45,18 @@
         }
     </div>
 </section>
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    <section class="release-footnote">
+        <p class="muted-copy">Who can get it now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm access.")</p>
+    </section>
+}
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
 
 @if (Model.TrackedCaseSummary is not null)
 {
@@ -73,7 +75,7 @@
         </article>
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>Follow-up lane</h3>
+                <h3>Follow-up</h3>
                 <p>@Model.TrackedCaseSummary.FollowUpLaneSummary</p>
             </div>
         </article>
@@ -91,7 +93,7 @@
         </article>
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
-                <h3>Release lane</h3>
+                <h3>Release status</h3>
                 <p>@Model.TrackedCaseSummary.ReleaseProgressSummary</p>
             </div>
         </article>
@@ -102,18 +104,6 @@
                     <h3>Affected install</h3>
                     <p>@Model.TrackedCaseSummary.AffectedInstallSummary</p>
                 </div>
-            </article>
-        }
-        @if (Model.SignedInStatus is not null)
-        {
-            <article class="compact-rail__item">
-                <div class="compact-rail__copy">
-                    <h3>Signed-in trust snapshot</h3>
-                    <p><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm the live access posture.")</p>
-                    <p><strong>Fix availability:</strong> @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the current release to confirm the tracked fix lane.")</p>
-                    <p><strong>Current caution:</strong> @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the current release to confirm the current caution lane.")</p>
-                </div>
-                <a class="inline-link" href="#signed-in-trust-status">Review trust snapshot</a>
             </article>
         }
     </section>

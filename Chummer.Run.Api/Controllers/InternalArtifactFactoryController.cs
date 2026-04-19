@@ -19,6 +19,19 @@ public sealed class InternalArtifactFactoryController : ControllerBase
         _configuration = configuration;
     }
 
+    [HttpGet("/api/internal/artifact-factory/recipes")]
+    [ProducesResponseType<ArtifactFactoryRecipeCatalogResult>(StatusCodes.Status200OK)]
+    public ActionResult<ArtifactFactoryRecipeCatalogResult> ListRecipes()
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        return Ok(_orchestration.ListRecipes());
+    }
+
     [HttpPost("/api/internal/artifact-factory/jobs")]
     [IgnoreAntiforgeryToken]
     [ProducesResponseType<ArtifactFactoryJobLaunchResult>(StatusCodes.Status200OK)]
@@ -50,6 +63,74 @@ public sealed class InternalArtifactFactoryController : ControllerBase
                 "Artifact factory job rejected",
                 ex.Message,
                 "https://chummer.run/problems/artifact-factory/rejected");
+        }
+    }
+
+    [HttpPost("/api/internal/artifact-factory/job-batches")]
+    [IgnoreAntiforgeryToken]
+    [ProducesResponseType<ArtifactFactoryJobBatchLaunchResult>(StatusCodes.Status200OK)]
+    public ActionResult<ArtifactFactoryJobBatchLaunchResult> LaunchJobBatch([FromBody] ArtifactFactoryJobBatchLaunchRequest? request)
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        if (request is null)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Artifact factory batch rejected",
+                "job batch request is required.",
+                "https://chummer.run/problems/artifact-factory/missing-batch-request");
+        }
+
+        try
+        {
+            return Ok(_orchestration.LaunchJobs(request));
+        }
+        catch (InvalidDataException ex)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Artifact factory batch rejected",
+                ex.Message,
+                "https://chummer.run/problems/artifact-factory/batch-rejected");
+        }
+    }
+
+    [HttpPost("/api/internal/artifact-factory/source-pack-batches")]
+    [IgnoreAntiforgeryToken]
+    [ProducesResponseType<ArtifactFactoryJobBatchLaunchResult>(StatusCodes.Status200OK)]
+    public ActionResult<ArtifactFactoryJobBatchLaunchResult> LaunchSourcePackBatch([FromBody] ArtifactFactorySourcePackBatchLaunchRequest? request)
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        if (request is null)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Artifact factory source-pack batch rejected",
+                "source-pack batch request is required.",
+                "https://chummer.run/problems/artifact-factory/missing-source-pack-batch-request");
+        }
+
+        try
+        {
+            return Ok(_orchestration.LaunchSourcePackBatch(request));
+        }
+        catch (InvalidDataException ex)
+        {
+            return BuildProblem(
+                StatusCodes.Status400BadRequest,
+                "Artifact factory source-pack batch rejected",
+                ex.Message,
+                "https://chummer.run/problems/artifact-factory/source-pack-batch-rejected");
         }
     }
 

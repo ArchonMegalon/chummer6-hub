@@ -14,149 +14,149 @@ VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify_desktop_native_trust_receipts.py
 PROOF_SCRIPT = REPO_ROOT / "scripts" / "materialize_hub_local_release_proof.py"
 QUEUE_PROOF_LINES = [
     "    proof:",
-    "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InstallLinkingController.cs",
-    "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/DesktopInstallRail.cs",
-    "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Support/SupportCasePresentationService.cs",
-    "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml",
-    "      - /docker/chummercomplete/chummer.run-services/scripts/verify_desktop_native_trust_receipts.py",
-    "      - /docker/chummercomplete/chummer.run-services/tests/test_desktop_native_trust_receipts.py",
-    "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs",
-    "      - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
-    "      - /docker/chummercomplete/chummer.run-services commit e27f24c1 tightens desktop-native continuation fallback-posture proof.",
-    "      - /docker/chummercomplete/chummer.run-services commit e578a519 tightens the completed M102 proof pin.",
-    "      - /docker/chummercomplete/chummer.run-services commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
-    "      - /docker/chummercomplete/chummer.run-services commit 266d526b pins the M102 queue proof hardening commit.",
-    "      - /docker/chummercomplete/chummer.run-services commit 6ea510c8 pins the M102 telemetry guard proof evidence.",
-    "      - /docker/chummercomplete/chummer.run-services commit 7a825c73 pins the M102 desktop trust guard evidence.",
-    "      - /docker/chummercomplete/chummer.run-services commit aff39474 pins the M102 desktop trust latest guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 38d50742 pins the M102 desktop trust proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit b9404a4c pins the M102 desktop trust latest proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit e6ae11a7 pins the M102 desktop trust guard closure.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4c542b50 pins the latest M102 desktop trust closure guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 02bed909 pins the M102 desktop trust closure guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 2017cdfe requires the latest M102 desktop trust proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 24432002 tightens the current M102 desktop trust proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4afd6c3e pins the current M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit d99d080e pins the M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit b5b25e98 tightens M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit d7cb9d6e pins M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit ec81b660 pins M102 desktop trust current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit b2d5cbfc tightens M102 generated proof hygiene.",
-    "      - /docker/chummercomplete/chummer.run-services commit 5eac0f47 pins M102 desktop trust current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 91514d42 pins M102 desktop trust proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit f7031d74 pins M102 desktop trust guard floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit f169b4a0 requires the current M102 desktop trust guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit b473e033 pins the current M102 desktop trust guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 782fa007 requires the current M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 26817b22 pins M102 desktop trust current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 6cf10549 pins M102 desktop trust 268 proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit de9653ee pins M102 desktop trust latest proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 3760ef63 tightens M102 active-run proof marker matching so queue, registry, and generated proof evidence reject helper references regardless of casing.",
-    "      - /docker/chummercomplete/chummer.run-services commit 0337eeb5 pins the M102 active-run casing proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit ad21e50f pins the M102 active-run casing proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 51c46e74 pins the M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit ed3989d9 pins the M102 desktop trust proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 653b23f0 tightens M102 desktop trust proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 1a1c5615 pins M102 desktop trust current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit ed689925 pins M102 desktop trust latest proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 461e3709 pins M102 desktop trust current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 171c2de0 tightens M102 blocked run-helper proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 73f1ee9a pins M102 desktop trust proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 74dff34c tightens M102 forbidden command evidence guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit aea02326 pins the M102 forbidden command proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 2330a11c pins the current M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 99a03a04 pins the M102 current desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 0dca4b42 pins the M102 landed proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 2c351c92 pins M102 landed proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 575daa11 pins M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit bffcad4d tightens M102 proof timestamp stability so generatedAt-only proof refreshes do not reopen the closed desktop-native trust package.",
-    "      - /docker/chummercomplete/chummer.run-services commit 9454feb7 pins M102 timestamp proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit f1513793 pins M102 timestamp proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 7ddbc973 pins M102 current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 01800bd9 pins M102 current desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit c9bbf63c tightens M102 served proof shelf route guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
-    "      - /docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4fa19f0c pins M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 6f468ee9 tightens M102 worker-state proof guard so run-state helper output cannot close desktop-native trust evidence.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4ed1f541 pins the M102 supervisor proof guard floor so future shards verify the current completed-package guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit f3300fd9 pins the M102 supervisor proof guard into the verifier and unit guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 06fa0634 pins the M102 local proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit f23b6dc4 records the M102 proof floor in the verifier.",
-    "      - /docker/chummercomplete/chummer.run-services commit 7cf5461b pins the M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit cae283e9 requires the current M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit e908400b pins the M102 current desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 1870132d pins the latest M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 6b811ca2 pins the latest M102 desktop trust guard floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit b7107364 pins the M102 desktop trust guard floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit f49c64a9 pins the M102 current desktop trust guard floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 512f3569 pins the M102 current desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit ff9c3313 pins the M102 latest desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit de158f6b tightens M102 worker-context proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 8a542230 pins the M102 worker-context proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 74c3b75b pins the M102 worker-context proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 76b350fc tightens M102 materialized proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit d3b19c88 pins the M102 materialized proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 39af99da pins the M102 materialized proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 7d86f38e pins the current M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit c0c4dca1 records the M102 desktop trust proof citation.",
-    "      - /docker/chummercomplete/chummer.run-services commit 42a3d5a4 pins the M102 desktop trust citation floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit af567e58 pins the M102 desktop trust verifier floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 2620a2f4 requires the M102 desktop trust verifier floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 5917695a pins the M102 current verifier floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
-    "      - /docker/chummercomplete/chummer.run-services commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
-    "      - /docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
-    "      - /docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
-    "      - /docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit aadffb5b pins the M102 callback query proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit a7a5ecea tightens M102 desktop trust callback proof.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
-    "      - /docker/chummercomplete/chummer.run-services commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
-    "      - /docker/chummercomplete/chummer.run-services commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
-    "      - /docker/chummercomplete/chummer.run-services commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
-    "      - /docker/chummercomplete/chummer.run-services commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
-    "      - /docker/chummercomplete/chummer.run-services commit 8e90aac9 pins the M102 app-local callback path proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit b27c5142 pins the M102 app-local proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit cd392a72 pins the M102 current proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 41d7ed57 pins the M102 current desktop trust floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit bd60fc5a tightens M102 active-run evidence path guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 2791f798 tightens M102 support intake installed-build truth.",
-    "      - /docker/chummercomplete/chummer.run-services commit 93e5075a tightens M102 current proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 894dbedd pins M102 current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit e24162d9 requires M102 desktop trust proof citation.",
-    "      - /docker/chummercomplete/chummer.run-services commit bb8db39c tightens M102 support install matching.",
-    "      - /docker/chummercomplete/chummer.run-services commit 1d6c686c tightens M102 duplicate proof citations.",
-    "      - /docker/chummercomplete/chummer.run-services commit 18902a34 pins the M102 duplicate proof citation guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
-    "      - /docker/chummercomplete/chummer.run-services commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
-    "      - /docker/chummercomplete/chummer.run-services commit 438861f0 pins the M102 receipt matching proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4238a88a pins the current M102 desktop trust proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit b8a03984 tightens M102 encoded active-run proof marker guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 6961320a tightens M102 installed-build receipt truth.",
-    "      - /docker/chummercomplete/chummer.run-services commit aceef790 pins the M102 installed-build receipt proof.",
-    "      - /docker/chummercomplete/chummer.run-services commit 5f9621c3 tightens M102 encoded proof marker guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4e8eb4c1 pins the M102 encoded proof marker guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit 4bede125 tightens M102 closed queue proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit ebfaaf36 pins the M102 closed queue proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 38eb0769 pins M102 current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit ed611d1a tightens M102 support install truth matching.",
-    "      - /docker/chummercomplete/chummer.run-services commit d9d6c9a0 pins M102 support truth proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit a01d80ab pins M102 support truth proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit a766e82c pins M102 desktop trust proof floor guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit d9f59d4f pins M102 desktop trust current proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit af6a480e proves the M102 native support route receipt.",
-    "      - /docker/chummercomplete/chummer.run-services commit a7d27da6 guards the M102 proof package repo.",
-    "      - /docker/chummercomplete/chummer.run-services commit 0bc0c858 tightens the M102 native support proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit c8ec0c6a tightens the M102 handoff proof guard.",
-    "      - /docker/chummercomplete/chummer.run-services commit e08468e2 pins the M102 handoff proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit 9e7d12ef guards M102 proof receipts against browser-only route closure.",
-    "      - /docker/chummercomplete/chummer.run-services commit 554cd159 pins M102 native receipt proof floor.",
-    "      - /docker/chummercomplete/chummer.run-services commit d0876445 pins M102 current native proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InstallLinkingController.cs",
+    "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/DesktopInstallRail.cs",
+    "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Support/SupportCasePresentationService.cs",
+    "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml",
+    "      - /docker/chummercomplete/chummer6-hub/scripts/verify_desktop_native_trust_receipts.py",
+    "      - /docker/chummercomplete/chummer6-hub/tests/test_desktop_native_trust_receipts.py",
+    "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs",
+    "      - /docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
+    "      - /docker/chummercomplete/chummer6-hub commit e27f24c1 tightens desktop-native continuation fallback-posture proof.",
+    "      - /docker/chummercomplete/chummer6-hub commit e578a519 tightens the completed M102 proof pin.",
+    "      - /docker/chummercomplete/chummer6-hub commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
+    "      - /docker/chummercomplete/chummer6-hub commit 266d526b pins the M102 queue proof hardening commit.",
+    "      - /docker/chummercomplete/chummer6-hub commit 6ea510c8 pins the M102 telemetry guard proof evidence.",
+    "      - /docker/chummercomplete/chummer6-hub commit 7a825c73 pins the M102 desktop trust guard evidence.",
+    "      - /docker/chummercomplete/chummer6-hub commit aff39474 pins the M102 desktop trust latest guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 38d50742 pins the M102 desktop trust proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit b9404a4c pins the M102 desktop trust latest proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit e6ae11a7 pins the M102 desktop trust guard closure.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4c542b50 pins the latest M102 desktop trust closure guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 02bed909 pins the M102 desktop trust closure guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 2017cdfe requires the latest M102 desktop trust proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 24432002 tightens the current M102 desktop trust proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4afd6c3e pins the current M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit d99d080e pins the M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit b5b25e98 tightens M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit d7cb9d6e pins M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit ec81b660 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit b2d5cbfc tightens M102 generated proof hygiene.",
+    "      - /docker/chummercomplete/chummer6-hub commit 5eac0f47 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 91514d42 pins M102 desktop trust proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit f7031d74 pins M102 desktop trust guard floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit f169b4a0 requires the current M102 desktop trust guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit b473e033 pins the current M102 desktop trust guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 782fa007 requires the current M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 26817b22 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 6cf10549 pins M102 desktop trust 268 proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit de9653ee pins M102 desktop trust latest proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 3760ef63 tightens M102 active-run proof marker matching so queue, registry, and generated proof evidence reject helper references regardless of casing.",
+    "      - /docker/chummercomplete/chummer6-hub commit 0337eeb5 pins the M102 active-run casing proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit ad21e50f pins the M102 active-run casing proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 51c46e74 pins the M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit ed3989d9 pins the M102 desktop trust proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 653b23f0 tightens M102 desktop trust proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 1a1c5615 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit ed689925 pins M102 desktop trust latest proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 461e3709 pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 171c2de0 tightens M102 blocked run-helper proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 73f1ee9a pins M102 desktop trust proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 74dff34c tightens M102 forbidden command evidence guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit aea02326 pins the M102 forbidden command proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 2330a11c pins the current M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 99a03a04 pins the M102 current desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 0dca4b42 pins the M102 landed proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 2c351c92 pins M102 landed proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 575daa11 pins M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit bffcad4d tightens M102 proof timestamp stability so generatedAt-only proof refreshes do not reopen the closed desktop-native trust package.",
+    "      - /docker/chummercomplete/chummer6-hub commit 9454feb7 pins M102 timestamp proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit f1513793 pins M102 timestamp proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 7ddbc973 pins M102 current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 01800bd9 pins M102 current desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit c9bbf63c tightens M102 served proof shelf route guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
+    "      - /docker/chummercomplete/chummer6-hub commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4fa19f0c pins M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 6f468ee9 tightens M102 worker-state proof guard so run-state helper output cannot close desktop-native trust evidence.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4ed1f541 pins the M102 supervisor proof guard floor so future shards verify the current completed-package guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit f3300fd9 pins the M102 supervisor proof guard into the verifier and unit guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 06fa0634 pins the M102 local proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit f23b6dc4 records the M102 proof floor in the verifier.",
+    "      - /docker/chummercomplete/chummer6-hub commit 7cf5461b pins the M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit cae283e9 requires the current M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit e908400b pins the M102 current desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 1870132d pins the latest M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 6b811ca2 pins the latest M102 desktop trust guard floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit b7107364 pins the M102 desktop trust guard floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit f49c64a9 pins the M102 current desktop trust guard floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 512f3569 pins the M102 current desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit ff9c3313 pins the M102 latest desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit de158f6b tightens M102 worker-context proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 8a542230 pins the M102 worker-context proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 74c3b75b pins the M102 worker-context proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 76b350fc tightens M102 materialized proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit d3b19c88 pins the M102 materialized proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 39af99da pins the M102 materialized proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 7d86f38e pins the current M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit c0c4dca1 records the M102 desktop trust proof citation.",
+    "      - /docker/chummercomplete/chummer6-hub commit 42a3d5a4 pins the M102 desktop trust citation floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit af567e58 pins the M102 desktop trust verifier floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 2620a2f4 requires the M102 desktop trust verifier floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 5917695a pins the M102 current verifier floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
+    "      - /docker/chummercomplete/chummer6-hub commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
+    "      - /docker/chummercomplete/chummer6-hub commit d72386ee pins the M102 loopback callback proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
+    "      - /docker/chummercomplete/chummer6-hub commit 568b8358 tightens M102 app-local callback query-context proof.",
+    "      - /docker/chummercomplete/chummer6-hub commit e0bcd91d pins the M102 callback query proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit aadffb5b pins the M102 callback query proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit a7a5ecea tightens M102 desktop trust callback proof.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
+    "      - /docker/chummercomplete/chummer6-hub commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
+    "      - /docker/chummercomplete/chummer6-hub commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
+    "      - /docker/chummercomplete/chummer6-hub commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
+    "      - /docker/chummercomplete/chummer6-hub commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
+    "      - /docker/chummercomplete/chummer6-hub commit 8e90aac9 pins the M102 app-local callback path proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit b27c5142 pins the M102 app-local proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit cd392a72 pins the M102 current proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 41d7ed57 pins the M102 current desktop trust floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit bd60fc5a tightens M102 active-run evidence path guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 2791f798 tightens M102 support intake installed-build truth.",
+    "      - /docker/chummercomplete/chummer6-hub commit 93e5075a tightens M102 current proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 894dbedd pins M102 current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 997337a6 pins M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit e24162d9 requires M102 desktop trust proof citation.",
+    "      - /docker/chummercomplete/chummer6-hub commit bb8db39c tightens M102 support install matching.",
+    "      - /docker/chummercomplete/chummer6-hub commit 1d6c686c tightens M102 duplicate proof citations.",
+    "      - /docker/chummercomplete/chummer6-hub commit 18902a34 pins the M102 duplicate proof citation guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
+    "      - /docker/chummercomplete/chummer6-hub commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
+    "      - /docker/chummercomplete/chummer6-hub commit 438861f0 pins the M102 receipt matching proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4238a88a pins the current M102 desktop trust proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit b8a03984 tightens M102 encoded active-run proof marker guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 6961320a tightens M102 installed-build receipt truth.",
+    "      - /docker/chummercomplete/chummer6-hub commit aceef790 pins the M102 installed-build receipt proof.",
+    "      - /docker/chummercomplete/chummer6-hub commit 5f9621c3 tightens M102 encoded proof marker guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4e8eb4c1 pins the M102 encoded proof marker guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit 4bede125 tightens M102 closed queue proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit ebfaaf36 pins the M102 closed queue proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 38eb0769 pins M102 current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit ed611d1a tightens M102 support install truth matching.",
+    "      - /docker/chummercomplete/chummer6-hub commit d9d6c9a0 pins M102 support truth proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit a01d80ab pins M102 support truth proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit a766e82c pins M102 desktop trust proof floor guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit d9f59d4f pins M102 desktop trust current proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit af6a480e proves the M102 native support route receipt.",
+    "      - /docker/chummercomplete/chummer6-hub commit a7d27da6 guards the M102 proof package repo.",
+    "      - /docker/chummercomplete/chummer6-hub commit 0bc0c858 tightens the M102 native support proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit c8ec0c6a tightens the M102 handoff proof guard.",
+    "      - /docker/chummercomplete/chummer6-hub commit e08468e2 pins the M102 handoff proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 9e7d12ef guards M102 proof receipts against browser-only route closure.",
+    "      - /docker/chummercomplete/chummer6-hub commit 554cd159 pins M102 native receipt proof floor.",
+    "      - /docker/chummercomplete/chummer6-hub commit 8e0a630e pins M102 current proof floor guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -167,153 +167,154 @@ REGISTRY_102_1_LINES = [
     "    work_tasks:",
     "      - id: 102.1",
     "        owner: chummer6-hub",
+    "        title: Unify account, claim, install, and support-case recovery into one desktop-native continuation flow.",
     "        status: complete",
     "        landed_commit: 160af58f",
     "        evidence:",
-    "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InstallLinkingController.cs exposes /api/v1/install-linking/continuation for grant-bound claimed desktop installs with current release, update, rollback, and support continuation truth.",
-    "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml and /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/Accounts/Account.cshtml make guided setup/app continuation the default and keep claim codes as recovery fallback only.",
-    "          - /docker/chummercomplete/chummer.run-services/scripts/verify_desktop_native_trust_receipts.py fail-closes missing source markers and missing successor proof receipts for desktop_native_claim_and_recovery and support_followthrough:install_truth.",
-    "          - /docker/chummercomplete/chummer.run-services/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs covers app-local localhost and 127.0.0.1 install-link callbacks so claimed desktop users return to the app-local continuation listener instead of browser-only continuation.",
-    "          - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json carries next90-m102-hub-desktop-native-trust proof receipts for /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
-    "          - /docker/chummercomplete/chummer.run-services commit e27f24c1 tightens desktop-native continuation fallback-posture proof so claimed installs return the same fallback posture used by download and support recovery.",
-    "          - /docker/chummercomplete/chummer.run-services commit e578a519 tightens the completed M102 proof pin so future shards verify the closed package instead of repeating it.",
-    "          - /docker/chummercomplete/chummer.run-services commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
-    "          - /docker/chummercomplete/chummer.run-services commit 266d526b pins the M102 queue proof hardening commit so stale queue proof cannot keep the package green.",
-    "          - /docker/chummercomplete/chummer.run-services commit 6ea510c8 pins the M102 telemetry guard proof evidence so future shards verify the latest closed-package guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 7a825c73 pins the M102 desktop trust guard evidence into the verifier and unit guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit aff39474 pins the M102 desktop trust latest guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 38d50742 pins the M102 desktop trust proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit b9404a4c pins the M102 desktop trust latest proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit e6ae11a7 pins the M102 desktop trust guard closure.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4c542b50 pins the latest M102 desktop trust closure guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 02bed909 pins the M102 desktop trust closure guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 2017cdfe requires the latest M102 desktop trust proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 24432002 tightens the current M102 desktop trust proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4afd6c3e pins the current M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit d99d080e pins the M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit b5b25e98 tightens M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit d7cb9d6e pins M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit ec81b660 pins M102 desktop trust current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit b2d5cbfc tightens M102 generated proof hygiene.",
-    "          - /docker/chummercomplete/chummer.run-services commit 5eac0f47 pins M102 desktop trust current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 91514d42 pins M102 desktop trust proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit f7031d74 pins M102 desktop trust guard floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit f169b4a0 requires the current M102 desktop trust guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit b473e033 pins the current M102 desktop trust guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 782fa007 requires the current M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 26817b22 pins M102 desktop trust current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 6cf10549 pins M102 desktop trust 268 proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit de9653ee pins M102 desktop trust latest proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 3760ef63 tightens M102 active-run proof marker matching so queue, registry, and generated proof evidence reject helper references regardless of casing.",
-    "          - /docker/chummercomplete/chummer.run-services commit 0337eeb5 pins the M102 active-run casing proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit ad21e50f pins the M102 active-run casing proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 51c46e74 pins the M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit ed3989d9 pins the M102 desktop trust proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 653b23f0 tightens M102 desktop trust proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 1a1c5615 pins M102 desktop trust current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit ed689925 pins M102 desktop trust latest proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 461e3709 pins M102 desktop trust current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 171c2de0 tightens M102 blocked run-helper proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 73f1ee9a pins M102 desktop trust proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 74dff34c tightens M102 forbidden command evidence guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit aea02326 pins the M102 forbidden command proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 2330a11c pins the current M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 99a03a04 pins the M102 current desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 0dca4b42 pins the M102 landed proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 2c351c92 pins M102 landed proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 575daa11 pins M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit bffcad4d tightens M102 proof timestamp stability so generatedAt-only proof refreshes do not reopen the closed desktop-native trust package.",
-    "          - /docker/chummercomplete/chummer.run-services commit 9454feb7 pins M102 timestamp proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit f1513793 pins M102 timestamp proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 7ddbc973 pins M102 current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 01800bd9 pins M102 current desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit c9bbf63c tightens M102 served proof shelf route guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
-    "          - /docker/chummercomplete/chummer.run-services commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4fa19f0c pins M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 6f468ee9 tightens M102 worker-state proof guard so run-state helper output cannot close desktop-native trust evidence.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4ed1f541 pins the M102 supervisor proof guard floor so future shards verify the current completed-package guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit f3300fd9 pins the M102 supervisor proof guard into the verifier and unit guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 06fa0634 pins the M102 local proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit f23b6dc4 records the M102 proof floor in the verifier.",
-    "          - /docker/chummercomplete/chummer.run-services commit 7cf5461b pins the M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit cae283e9 requires the current M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit e908400b pins the M102 current desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 1870132d pins the latest M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 6b811ca2 pins the latest M102 desktop trust guard floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit b7107364 pins the M102 desktop trust guard floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit f49c64a9 pins the M102 current desktop trust guard floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 512f3569 pins the M102 current desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit ff9c3313 pins the M102 latest desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit de158f6b tightens M102 worker-context proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 8a542230 pins the M102 worker-context proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 74c3b75b pins the M102 worker-context proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 76b350fc tightens M102 materialized proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit d3b19c88 pins the M102 materialized proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 39af99da pins the M102 materialized proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 7d86f38e pins the current M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit c0c4dca1 records the M102 desktop trust proof citation.",
-    "          - /docker/chummercomplete/chummer.run-services commit 42a3d5a4 pins the M102 desktop trust citation floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit af567e58 pins the M102 desktop trust verifier floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 2620a2f4 requires the M102 desktop trust verifier floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 5917695a pins the M102 current verifier floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
-    "          - /docker/chummercomplete/chummer.run-services commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
-    "          - /docker/chummercomplete/chummer.run-services commit d72386ee pins the M102 loopback callback proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
-    "          - /docker/chummercomplete/chummer.run-services commit 568b8358 tightens M102 app-local callback query-context proof.",
-    "          - /docker/chummercomplete/chummer.run-services commit e0bcd91d pins the M102 callback query proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit aadffb5b pins the M102 callback query proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit a7a5ecea tightens M102 desktop trust callback proof.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
-    "          - /docker/chummercomplete/chummer.run-services commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
-    "          - /docker/chummercomplete/chummer.run-services commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
-    "          - /docker/chummercomplete/chummer.run-services commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
-    "          - /docker/chummercomplete/chummer.run-services commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
-    "          - /docker/chummercomplete/chummer.run-services commit 8e90aac9 pins the M102 app-local callback path proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit b27c5142 pins the M102 app-local proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit cd392a72 pins the M102 current proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 41d7ed57 pins the M102 current desktop trust floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit bd60fc5a tightens M102 active-run evidence path guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 2791f798 tightens M102 support intake installed-build truth.",
-    "          - /docker/chummercomplete/chummer.run-services commit 93e5075a tightens M102 current proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 894dbedd pins M102 current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 997337a6 pins M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit e24162d9 requires M102 desktop trust proof citation.",
-    "          - /docker/chummercomplete/chummer.run-services commit bb8db39c tightens M102 support install matching.",
-    "          - /docker/chummercomplete/chummer.run-services commit 1d6c686c tightens M102 duplicate proof citations.",
-    "          - /docker/chummercomplete/chummer.run-services commit 18902a34 pins the M102 duplicate proof citation guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
-    "          - /docker/chummercomplete/chummer.run-services commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
-    "          - /docker/chummercomplete/chummer.run-services commit 438861f0 pins the M102 receipt matching proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4238a88a pins the current M102 desktop trust proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit b8a03984 tightens M102 encoded active-run proof marker guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 6961320a tightens M102 installed-build receipt truth.",
-    "          - /docker/chummercomplete/chummer.run-services commit aceef790 pins the M102 installed-build receipt proof.",
-    "          - /docker/chummercomplete/chummer.run-services commit 5f9621c3 tightens M102 encoded proof marker guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4e8eb4c1 pins the M102 encoded proof marker guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit 4bede125 tightens M102 closed queue proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit ebfaaf36 pins the M102 closed queue proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 38eb0769 pins M102 current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit ed611d1a tightens M102 support install truth matching.",
-    "          - /docker/chummercomplete/chummer.run-services commit d9d6c9a0 pins M102 support truth proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit a01d80ab pins M102 support truth proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit a766e82c pins M102 desktop trust proof floor guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit d9f59d4f pins M102 desktop trust current proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit af6a480e proves the M102 native support route receipt.",
-    "          - /docker/chummercomplete/chummer.run-services commit a7d27da6 guards the M102 proof package repo.",
-    "          - /docker/chummercomplete/chummer.run-services commit 0bc0c858 tightens the M102 native support proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit c8ec0c6a tightens the M102 handoff proof guard.",
-    "          - /docker/chummercomplete/chummer.run-services commit e08468e2 pins the M102 handoff proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit 9e7d12ef guards M102 proof receipts against browser-only route closure.",
-    "          - /docker/chummercomplete/chummer.run-services commit 554cd159 pins M102 native receipt proof floor.",
-    "          - /docker/chummercomplete/chummer.run-services commit d0876445 pins M102 current native proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InstallLinkingController.cs exposes /api/v1/install-linking/continuation for grant-bound claimed desktop installs with current release, update, rollback, and support continuation truth.",
+    "          - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml and /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml make guided setup/app continuation the default and keep claim codes as recovery fallback only.",
+    "          - /docker/chummercomplete/chummer6-hub/scripts/verify_desktop_native_trust_receipts.py fail-closes missing source markers and missing successor proof receipts for desktop_native_claim_and_recovery and support_followthrough:install_truth.",
+    "          - /docker/chummercomplete/chummer6-hub/Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs covers app-local localhost and 127.0.0.1 install-link callbacks so claimed desktop users return to the app-local continuation listener instead of browser-only continuation.",
+    "          - /docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json carries next90-m102-hub-desktop-native-trust proof receipts for /downloads/install/avalonia-linux-x64-installer/continue.json, /api/v1/install-linking/continuation, /account/access, /account/support, and /contact.",
+    "          - /docker/chummercomplete/chummer6-hub commit e27f24c1 tightens desktop-native continuation fallback-posture proof so claimed installs return the same fallback posture used by download and support recovery.",
+    "          - /docker/chummercomplete/chummer6-hub commit e578a519 tightens the completed M102 proof pin so future shards verify the closed package instead of repeating it.",
+    "          - /docker/chummercomplete/chummer6-hub commit 9fcec2a0 fail-closes M102 queue and registry proof when active-run telemetry helper output is cited as package evidence.",
+    "          - /docker/chummercomplete/chummer6-hub commit 266d526b pins the M102 queue proof hardening commit so stale queue proof cannot keep the package green.",
+    "          - /docker/chummercomplete/chummer6-hub commit 6ea510c8 pins the M102 telemetry guard proof evidence so future shards verify the latest closed-package guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 7a825c73 pins the M102 desktop trust guard evidence into the verifier and unit guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit aff39474 pins the M102 desktop trust latest guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 38d50742 pins the M102 desktop trust proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit b9404a4c pins the M102 desktop trust latest proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit e6ae11a7 pins the M102 desktop trust guard closure.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4c542b50 pins the latest M102 desktop trust closure guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 02bed909 pins the M102 desktop trust closure guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 2017cdfe requires the latest M102 desktop trust proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 24432002 tightens the current M102 desktop trust proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4afd6c3e pins the current M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit d99d080e pins the M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit b5b25e98 tightens M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit d7cb9d6e pins M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit ec81b660 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit b2d5cbfc tightens M102 generated proof hygiene.",
+    "          - /docker/chummercomplete/chummer6-hub commit 5eac0f47 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 91514d42 pins M102 desktop trust proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit f7031d74 pins M102 desktop trust guard floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit f169b4a0 requires the current M102 desktop trust guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit b473e033 pins the current M102 desktop trust guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 782fa007 requires the current M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 26817b22 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 6cf10549 pins M102 desktop trust 268 proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit de9653ee pins M102 desktop trust latest proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 3760ef63 tightens M102 active-run proof marker matching so queue, registry, and generated proof evidence reject helper references regardless of casing.",
+    "          - /docker/chummercomplete/chummer6-hub commit 0337eeb5 pins the M102 active-run casing proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit ad21e50f pins the M102 active-run casing proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 51c46e74 pins the M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit ed3989d9 pins the M102 desktop trust proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 653b23f0 tightens M102 desktop trust proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 1a1c5615 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit ed689925 pins M102 desktop trust latest proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 461e3709 pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 171c2de0 tightens M102 blocked run-helper proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 73f1ee9a pins M102 desktop trust proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 74dff34c tightens M102 forbidden command evidence guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit aea02326 pins the M102 forbidden command proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 2330a11c pins the current M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 99a03a04 pins the M102 current desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 0dca4b42 pins the M102 landed proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 2c351c92 pins M102 landed proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 575daa11 pins M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit bffcad4d tightens M102 proof timestamp stability so generatedAt-only proof refreshes do not reopen the closed desktop-native trust package.",
+    "          - /docker/chummercomplete/chummer6-hub commit 9454feb7 pins M102 timestamp proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit f1513793 pins M102 timestamp proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 7ddbc973 pins M102 current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 01800bd9 pins M102 current desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit c9bbf63c tightens M102 served proof shelf route guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 2f7ed420 tightens M102 duplicate package-row proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 15c5f0e5 tightens M102 generated proof uniqueness so duplicate package or receipt rows fail closed.",
+    "          - /docker/chummercomplete/chummer6-hub commit a270dcd0 tightens M102 desktop callback proof so app-local install-link callbacks cannot drift back to browser-only continuation.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4fa19f0c pins M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 6f468ee9 tightens M102 worker-state proof guard so run-state helper output cannot close desktop-native trust evidence.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4ed1f541 pins the M102 supervisor proof guard floor so future shards verify the current completed-package guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit f3300fd9 pins the M102 supervisor proof guard into the verifier and unit guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 06fa0634 pins the M102 local proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit f23b6dc4 records the M102 proof floor in the verifier.",
+    "          - /docker/chummercomplete/chummer6-hub commit 7cf5461b pins the M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit cae283e9 requires the current M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit e908400b pins the M102 current desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 1870132d pins the latest M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 6b811ca2 pins the latest M102 desktop trust guard floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit b7107364 pins the M102 desktop trust guard floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit f49c64a9 pins the M102 current desktop trust guard floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 512f3569 pins the M102 current desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit ff9c3313 pins the M102 latest desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit de158f6b tightens M102 worker-context proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 8a542230 pins the M102 worker-context proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 74c3b75b pins the M102 worker-context proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 76b350fc tightens M102 materialized proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit d3b19c88 pins the M102 materialized proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 39af99da pins the M102 materialized proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 7d86f38e pins the current M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit c0c4dca1 records the M102 desktop trust proof citation.",
+    "          - /docker/chummercomplete/chummer6-hub commit 42a3d5a4 pins the M102 desktop trust citation floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit af567e58 pins the M102 desktop trust verifier floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 2620a2f4 requires the M102 desktop trust verifier floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 5917695a pins the M102 current verifier floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 2ded9038 tightens M102 app-local callback proof so localhost and 127.0.0.1 install-link callbacks stay desktop-native.",
+    "          - /docker/chummercomplete/chummer6-hub commit e7b5177b tightens M102 loopback callback proof so IPv6 app-local install-link callbacks stay desktop-native.",
+    "          - /docker/chummercomplete/chummer6-hub commit d72386ee pins the M102 loopback callback proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit fee0655a tightens M102 app-local callback state proof so the desktop listener's state query survives grant callback continuation.",
+    "          - /docker/chummercomplete/chummer6-hub commit 568b8358 tightens M102 app-local callback query-context proof.",
+    "          - /docker/chummercomplete/chummer6-hub commit e0bcd91d pins the M102 callback query proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit aadffb5b pins the M102 callback query proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit a7a5ecea tightens M102 desktop trust callback proof.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4b9c6919 pins the M102 desktop trust callback proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit ea697985 tightens M102 receipt route proof so receipt routes must be served by top-level proof_routes.",
+    "          - /docker/chummercomplete/chummer6-hub commit e9c87a3f tightens M102 served proof parity so the public proof shelf cannot drift from canonical published proof.",
+    "          - /docker/chummercomplete/chummer6-hub commit d3c74d38 tightens M102 queue mirror proof so Fleet and design-owned successor queue rows cannot drift apart.",
+    "          - /docker/chummercomplete/chummer6-hub commit 6b5679de tightens M102 support continuation filtering so reporter-level install-help cases cannot attach to the wrong claimed desktop install.",
+    "          - /docker/chummercomplete/chummer6-hub commit 39c0ae8d tightens M102 app-local callback path proof so claimed desktop callbacks cannot drift to arbitrary localhost browser routes.",
+    "          - /docker/chummercomplete/chummer6-hub commit 8e90aac9 pins the M102 app-local callback path proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit b27c5142 pins the M102 app-local proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit cd392a72 pins the M102 current proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 41d7ed57 pins the M102 current desktop trust floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit bd60fc5a tightens M102 active-run evidence path guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 2791f798 tightens M102 support intake installed-build truth.",
+    "          - /docker/chummercomplete/chummer6-hub commit 93e5075a tightens M102 current proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 894dbedd pins M102 current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 997337a6 pins M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit e24162d9 requires M102 desktop trust proof citation.",
+    "          - /docker/chummercomplete/chummer6-hub commit bb8db39c tightens M102 support install matching.",
+    "          - /docker/chummercomplete/chummer6-hub commit 1d6c686c tightens M102 duplicate proof citations.",
+    "          - /docker/chummercomplete/chummer6-hub commit 18902a34 pins the M102 duplicate proof citation guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 72fa2471 tightens M102 proof anchor scope so canonical closure evidence cannot cite existing files outside the package allowed paths.",
+    "          - /docker/chummercomplete/chummer6-hub commit c791e657 tightens M102 install receipt matching so support continuation cannot attach a newer receipt from another desktop platform.",
+    "          - /docker/chummercomplete/chummer6-hub commit 438861f0 pins the M102 receipt matching proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4238a88a pins the current M102 desktop trust proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit b8a03984 tightens M102 encoded active-run proof marker guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 6961320a tightens M102 installed-build receipt truth.",
+    "          - /docker/chummercomplete/chummer6-hub commit aceef790 pins the M102 installed-build receipt proof.",
+    "          - /docker/chummercomplete/chummer6-hub commit 5f9621c3 tightens M102 encoded proof marker guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4e8eb4c1 pins the M102 encoded proof marker guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit 4bede125 tightens M102 closed queue proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit ebfaaf36 pins the M102 closed queue proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 38eb0769 pins M102 current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit ed611d1a tightens M102 support install truth matching.",
+    "          - /docker/chummercomplete/chummer6-hub commit d9d6c9a0 pins M102 support truth proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit a01d80ab pins M102 support truth proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit a766e82c pins M102 desktop trust proof floor guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit d9f59d4f pins M102 desktop trust current proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit af6a480e proves the M102 native support route receipt.",
+    "          - /docker/chummercomplete/chummer6-hub commit a7d27da6 guards the M102 proof package repo.",
+    "          - /docker/chummercomplete/chummer6-hub commit 0bc0c858 tightens the M102 native support proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit c8ec0c6a tightens the M102 handoff proof guard.",
+    "          - /docker/chummercomplete/chummer6-hub commit e08468e2 pins the M102 handoff proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 9e7d12ef guards M102 proof receipts against browser-only route closure.",
+    "          - /docker/chummercomplete/chummer6-hub commit 554cd159 pins M102 native receipt proof floor.",
+    "          - /docker/chummercomplete/chummer6-hub commit 8e0a630e pins M102 current proof floor guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
-ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer.run-services/"
+ABSOLUTE_REPO_PREFIX = "/docker/chummercomplete/chummer6-hub/"
 
 
 def load_verifier_module():
@@ -383,12 +384,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("d0876445", verifier._current_local_proof_floor_commit())
+        self.assertEqual("8e0a630e", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "test(hub): pin M102 current native proof floor",
+            "test(hub): pin M102 current proof floor guard",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
-        self.assertIn("d0876445", verifier.REQUIRED_RESOLVING_COMMITS)
+        self.assertIn("8e0a630e", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("554cd159", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("9e7d12ef", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("e08468e2", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -456,10 +457,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             any("commit 554cd159 pins M102 native receipt proof floor" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
         self.assertTrue(
-            any("commit d0876445 pins M102 current native proof floor" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+            any("commit 8e0a630e pins M102 current proof floor guard" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         )
         self.assertTrue(
-            any("commit d0876445 pins M102 current native proof floor" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+            any("commit 8e0a630e pins M102 current proof floor guard" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -467,13 +468,21 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
         markers = verifier._forbidden_markers_in_text(
             "ACTIVE RUN HELPER output from task local telemetry, "
-            "active_run_handoff.generated.md, and run ooda design supervisor until quiet"
+            "active_run_handoff.generated.md, run ooda design supervisor until quiet, "
+            "current steering focus with profile focus owner focus text focus, "
+            "assigned successor queue package, and execution rules inside this run"
         )
 
         self.assertIn("active-run helper", markers)
         self.assertIn("task-local telemetry", markers)
         self.assertIn("ACTIVE_RUN_HANDOFF", markers)
         self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
+        self.assertIn("current steering focus", markers)
+        self.assertIn("profile focus", markers)
+        self.assertIn("owner focus", markers)
+        self.assertIn("text focus", markers)
+        self.assertIn("assigned successor queue package", markers)
+        self.assertIn("execution rules inside this run", markers)
         self.assertNotIn("remaining milestones", markers)
 
     def test_forbidden_active_run_marker_matching_decodes_encoded_text(self) -> None:
@@ -558,6 +567,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn("support_followthrough:install_truth", proof)
             self.assertIn("/api/v1/install-linking/continuation", proof)
             payload = json.loads(proof)
+            self.assertEqual("chummer6-hub", payload["package_repo"])
             self.assertIn("/downloads/install/avalonia-linux-x64-installer/continue.json", payload["proof_routes"])
             self.assertIn("/api/v1/install-linking/continuation", payload["proof_routes"])
             self.assertIn("/account/access", payload["proof_routes"])
@@ -607,6 +617,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
 
         proof = {
+            "package_repo": verifier.REQUIRED_PROOF_PACKAGE_REPO,
             "proof_routes": list(verifier.REQUIRED_TOP_LEVEL_PROOF_ROUTES),
             "journeys_passed": list(verifier.REQUIRED_TOP_LEVEL_JOURNEYS),
             "successor_queue_packages": [dict(verifier.REQUIRED_PROOF_PACKAGE)],
@@ -875,6 +886,70 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn("canonical successor queue staging block missing marker: frontier_id: 2897065929", result.stderr)
 
+    def test_verifier_fail_closes_successor_queue_eta_status_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            design_queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.design.generated.yaml"
+            registry_path = Path(temp_root) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            complete_queue = "\n".join(
+                [
+                    "items:",
+                    "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                    "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
+                    "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
+                    "    milestone_id: 102",
+                    "    wave: W6",
+                    "    repo: chummer6-hub",
+                    "    status: complete",
+                    "    landed_commit: 160af58f",
+                    "    completion_action: verify_closed_package_only",
+                    "    do_not_reopen_reason: M102 chummer6-hub desktop-native trust is complete; future shards must verify this receipt, registry row, queue row, and design-queue row instead of reopening the claim/install/update/rollback/support continuation package.",
+                    *QUEUE_PROOF_LINES,
+                    "    allowed_paths:",
+                    "      - Chummer.Run.Api",
+                    "      - scripts",
+                    "      - tests",
+                    "    owned_surfaces:",
+                    "      - desktop_native_claim_and_recovery",
+                    "      - support_followthrough:install_truth",
+                ]
+            )
+            eta_drift_queue = complete_queue.replace(
+                "    frontier_id: 2897065929\n",
+                "    frontier_id: 2897065929\n    eta: 5.6d-2w\n",
+            )
+            queue_path.write_text(eta_drift_queue + "\n", encoding="utf-8")
+            design_queue_path.write_text(eta_drift_queue + "\n", encoding="utf-8")
+            registry_path.write_text(
+                "\n".join(REGISTRY_102_1_LINES) + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_NEXT90_QUEUE_STAGING_PATH": str(queue_path),
+                    "CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH": str(design_queue_path),
+                    "CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH": str(registry_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: eta",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical design successor queue staging block has forbidden active-run proof marker: eta",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_duplicate_successor_queue_rows(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
@@ -993,6 +1068,67 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("canonical successor registry has 2 rows anchored by: id: 102.1", result.stderr)
+
+    def test_verifier_fail_closes_successor_registry_title_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            design_queue_path = Path(temp_root) / "NEXT_90_DAY_QUEUE_STAGING.design.generated.yaml"
+            registry_path = Path(temp_root) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            complete_queue = "\n".join(
+                [
+                    "items:",
+                    "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                    "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
+                    "    package_id: next90-m102-hub-desktop-native-trust",
+                    "    frontier_id: 2897065929",
+                    "    milestone_id: 102",
+                    "    wave: W6",
+                    "    repo: chummer6-hub",
+                    "    status: complete",
+                    "    landed_commit: 160af58f",
+                    "    completion_action: verify_closed_package_only",
+                    "    do_not_reopen_reason: M102 chummer6-hub desktop-native trust is complete; future shards must verify this receipt, registry row, queue row, and design-queue row instead of reopening the claim/install/update/rollback/support continuation package.",
+                    *QUEUE_PROOF_LINES,
+                    "    allowed_paths:",
+                    "      - Chummer.Run.Api",
+                    "      - scripts",
+                    "      - tests",
+                    "    owned_surfaces:",
+                    "      - desktop_native_claim_and_recovery",
+                    "      - support_followthrough:install_truth",
+                ]
+            )
+            queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
+            registry_path.write_text(
+                "\n".join(REGISTRY_102_1_LINES).replace(
+                    "        title: Unify account, claim, install, and support-case recovery into one desktop-native continuation flow.",
+                    "        title: Reopen browser claim fallback whenever install proof looks stale.",
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_NEXT90_QUEUE_STAGING_PATH": str(queue_path),
+                    "CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH": str(design_queue_path),
+                    "CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH": str(registry_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "canonical successor registry block missing marker: "
+                "title: Unify account, claim, install, and support-case recovery into one desktop-native continuation flow.",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_successor_queue_scope_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -1270,7 +1406,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "      - active-run helper commands run_ooda_design_supervisor_until_quiet.py output\n"
                     "      - supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled\n"
                     "      - task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff\n"
-                    "      - Run id 20260417T194405Z-shard-1 selected account acct-chatgpt-core selected model gpt-5.4 prompt path /tmp/prompt.txt recent stderr tail\n",
+                    "      - Run id 20260417T194405Z-shard-1 selected account acct-chatgpt-core selected model gpt-5.4 prompt path /tmp/prompt.txt recent stderr tail\n"
+                    "      - current steering focus with profile focus, owner focus, text focus, assigned successor queue package, execution rules inside this run, and operator/OODA loop owns telemetry\n",
                 )
                 + "\n",
                 encoding="utf-8",
@@ -1388,6 +1525,34 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "canonical successor queue staging block has forbidden active-run proof marker: Recent stderr tail",
                 result.stderr,
             )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: current steering focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: profile focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: owner focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: text focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: assigned successor queue package",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: execution rules inside this run",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor queue staging block has forbidden active-run proof marker: operator/OODA loop",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_active_run_evidence_path_override(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -1487,6 +1652,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "          - Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
                         "          - Task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff",
                         "          - Run id 20260417T194405Z-shard-1 selected account acct-chatgpt-core selected model gpt-5.4 prompt path /tmp/prompt.txt recent stderr tail",
+                        "          - Current steering focus with profile focus, owner focus, text focus, assigned successor queue package, execution rules inside this run, and operator/OODA loop owns telemetry",
                     ]
                 )
                 + "\n",
@@ -1604,6 +1770,30 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "canonical successor registry block has forbidden active-run proof marker: Recent stderr tail",
                 result.stderr,
             )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: current steering focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: profile focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: owner focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: text focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: assigned successor queue package",
+                result.stderr,
+            )
+            self.assertIn(
+                "canonical successor registry block has forbidden active-run proof marker: execution rules inside this run",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_generated_proof_package_scope_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -1647,6 +1837,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 env={
                     **dict(os.environ),
                     "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
                 },
             )
 
@@ -1870,6 +2061,62 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_generated_receipt_package_orphan(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            orphan_receipt = next(
+                item
+                for item in proof["proof_receipts"]
+                if item["receipt_id"] == "support_followthrough:install_truth"
+            )
+            orphan_receipt["package_id"] = "next90-m999-hub-orphaned-receipt"
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "published proof file receipt 'support_followthrough:install_truth' references package_id "
+                "not listed in successor_queue_packages: next90-m999-hub-orphaned-receipt",
+                result.stderr,
+            )
+            self.assertIn(
+                "published HUB_LOCAL_RELEASE_PROOF.generated.json drifts from scripts/materialize_hub_local_release_proof.py",
+                result.stderr,
+            )
+
     def test_verifier_allows_generated_at_timestamp_only_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -1970,6 +2217,62 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_top_level_package_without_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(
+                0,
+                materialize.returncode,
+                msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}",
+            )
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof["successor_queue_package"]["package_id"] = "next90-m999-hub-unproven-top-level"
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn(
+                "published proof file top-level successor_queue_package package_id is not listed in "
+                "successor_queue_packages: next90-m999-hub-unproven-top-level",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file top-level successor_queue_package package_id has no proof_receipts: "
+                "next90-m999-hub-unproven-top-level",
+                result.stderr,
+            )
+            self.assertIn(
+                "published HUB_LOCAL_RELEASE_PROOF.generated.json drifts from scripts/materialize_hub_local_release_proof.py",
+                result.stderr,
+            )
+
     def test_verifier_fail_closes_generated_package_repo_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -1995,12 +2298,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
 
             proof = json.loads(proof_path.read_text(encoding="utf-8"))
-            m102_package = next(
-                item
-                for item in proof["successor_queue_packages"]
-                if item["package_id"] == "next90-m102-hub-desktop-native-trust"
-            )
-            m102_package["repo"] = "fleet"
+            proof["package_repo"] = "fleet"
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
             result = subprocess.run(
@@ -2021,7 +2319,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn(
-                "proof package has wrong repo: expected 'chummer6-hub', got 'fleet'",
+                "published proof file has wrong package_repo: expected 'chummer6-hub', got 'fleet'",
                 result.stderr,
             )
             self.assertIn(
@@ -2117,6 +2415,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "Supervisor status query output with status_query_supported=false, polling_disabled=true, and polling disabled",
                 "Task-local telemetry first_commands and frontier_briefs with remaining milestones, remaining queue items, critical path, successor frontier detail, and shard runtime handoff",
                 "Run id 20260417T194405Z-shard-1 selected account acct-chatgpt-core selected model gpt-5.4 prompt path /tmp/prompt.txt recent stderr tail",
+                "Current steering focus with profile focus, owner focus, text focus, assigned successor queue package, execution rules inside this run, and operator/OODA loop owns telemetry",
             ]
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
@@ -2238,6 +2537,41 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "at $.proof_receipts[1].evidence[4]: Recent stderr tail",
                 result.stderr,
             )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[5]: current steering focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[5]: profile focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[5]: owner focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[5]: text focus",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[5]: assigned successor queue package",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[5]: execution rules inside this run",
+                result.stderr,
+            )
+            self.assertIn(
+                "published proof file has forbidden active-run proof marker "
+                "at $.proof_receipts[1].evidence[5]: operator/OODA loop",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_served_proof_route_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -2317,7 +2651,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertIn(
                 "canonical proof anchor does not resolve: "
-                "/docker/chummercomplete/chummer.run-services/tests/test_desktop_native_trust_receipts.py",
+                "/docker/chummercomplete/chummer6-hub/tests/test_desktop_native_trust_receipts.py",
                 result.stderr,
             )
 
@@ -2488,7 +2822,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "e08468e2",
                 "9e7d12ef",
                 "554cd159",
-                "d0876445",
+                "8e0a630e",
             ],
             verifier._required_resolving_commits(),
         )
@@ -2538,10 +2872,10 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
         try:
             verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof + [
-                "/docker/chummercomplete/chummer.run-services commit 1d6c686c duplicate proof row."
+                "/docker/chummercomplete/chummer6-hub commit 1d6c686c duplicate proof row."
             ]
             verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"] = original_registry_evidence + [
-                "/docker/chummercomplete/chummer.run-services commit 1d6c686c duplicate proof row."
+                "/docker/chummercomplete/chummer6-hub commit 1d6c686c duplicate proof row."
             ]
             errors: list[str] = []
             verifier._verify_canonical_commit_floor_consistency(errors)
@@ -2613,7 +2947,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         verifier = load_verifier_module()
         original_queue_proof = list(verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
         original_registry_evidence = list(verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
-        out_of_scope_anchor = "/docker/chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj"
+        out_of_scope_anchor = "/docker/chummercomplete/chummer6-hub/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj"
 
         try:
             verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"] = original_queue_proof + [
@@ -2674,7 +3008,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     markers = [
                         marker
                         for marker in markers
-                        if marker != "instead of starting a fresh browser ritual."
+                        if marker != "Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual."
                     ]
                 path.write_text("\n".join(markers) + "\n", encoding="utf-8")
 
@@ -2683,7 +3017,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertIn(
                 "Chummer.Run.Api/Views/Accounts/Account.cshtml missing marker: "
-                "instead of starting a fresh browser ritual.",
+                "Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual.",
                 errors,
             )
 

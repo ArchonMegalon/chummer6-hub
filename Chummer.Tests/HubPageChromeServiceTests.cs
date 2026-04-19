@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
@@ -6,6 +7,24 @@ namespace Chummer.Tests;
 
 public sealed class HubPageChromeServiceTests
 {
+    private static HubPageChromeService CreateService(IConfiguration configuration, string userAgent = "")
+    {
+        var canon = new PublicCanonFileLoader(configuration);
+        var routes = new PublicRouteCatalogService(canon);
+        var context = new DefaultHttpContext();
+        if (!string.IsNullOrWhiteSpace(userAgent))
+        {
+            context.Request.Headers.UserAgent = userAgent;
+        }
+
+        return new HubPageChromeService(
+            new PublicLandingService(canon, new PublicActionResolver()),
+            new PublicNavigationService(canon, routes),
+            new PublicReleaseManifestService(configuration),
+            new ReleaseSelectionService(canon),
+            new HttpContextAccessor { HttpContext = context });
+    }
+
     [Fact]
     public void BuildPublicChromeUsesGoogleStartForDownloadsHeaderSignIn()
     {
@@ -16,18 +35,30 @@ public sealed class HubPageChromeServiceTests
             })
             .Build();
 
-        var canon = new PublicCanonFileLoader(configuration);
-        var routes = new PublicRouteCatalogService(canon);
-        var service = new HubPageChromeService(
-            new PublicLandingService(canon, new PublicActionResolver()),
-            new PublicNavigationService(canon, routes),
-            new PublicReleaseManifestService(configuration),
-            new ReleaseSelectionService(canon));
+        var service = CreateService(configuration);
 
         var chrome = service.BuildPublicChrome("Downloads", "Install the current preview.", "/downloads");
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
         Assert.Equal("/auth/google/start?next=%2Fdownloads", signIn.Href);
+    }
+
+    [Fact]
+    public void BuildPublicChromeUsesGoogleStartForParticipateHeaderSignIn()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildPublicChrome("Participate", "Authorize Codex access.", "/participate");
+
+        var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
+        Assert.Equal("/auth/google/start?next=%2Fparticipate", signIn.Href);
     }
 
     [Fact]
@@ -40,13 +71,7 @@ public sealed class HubPageChromeServiceTests
             })
             .Build();
 
-        var canon = new PublicCanonFileLoader(configuration);
-        var routes = new PublicRouteCatalogService(canon);
-        var service = new HubPageChromeService(
-            new PublicLandingService(canon, new PublicActionResolver()),
-            new PublicNavigationService(canon, routes),
-            new PublicReleaseManifestService(configuration),
-            new ReleaseSelectionService(canon));
+        var service = CreateService(configuration);
 
         var chrome = service.BuildPublicChrome("Sign in", "Continue into account surfaces.", "/login");
 
@@ -64,17 +89,75 @@ public sealed class HubPageChromeServiceTests
             })
             .Build();
 
-        var canon = new PublicCanonFileLoader(configuration);
-        var routes = new PublicRouteCatalogService(canon);
-        var service = new HubPageChromeService(
-            new PublicLandingService(canon, new PublicActionResolver()),
-            new PublicNavigationService(canon, routes),
-            new PublicReleaseManifestService(configuration),
-            new ReleaseSelectionService(canon));
+        var service = CreateService(configuration);
 
         var chrome = service.BuildPublicChrome("Auth", "Provider handoff.", "/auth/google/start");
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
         Assert.Equal("/login?next=/home", signIn.Href);
+    }
+
+    [Fact]
+    public void BuildPublicChromeUsesContextualDirectInstallRouteWhenGuestInstallIsAllowed()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "hub-chrome-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(root, "releases.json"),
+                """
+                {
+                  "version": "run-20260416-chrome",
+                  "channel": "preview",
+                  "publishedAt": "2026-04-16T09:00:00Z",
+                  "downloads": [
+                    {
+                      "id": "avalonia-win-x64-installer",
+                      "platform": "Avalonia Desktop Windows x64 Installer",
+                      "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                      "sha256": "win-direct",
+                      "sizeBytes": 202,
+                      "head": "avalonia",
+                      "platformId": "win-x64",
+                      "arch": "x64",
+                      "kind": "installer",
+                      "fileName": "chummer-avalonia-win-x64-installer.exe",
+                      "installAccessClass": "open_public"
+                    }
+                  ],
+                  "proofStatus": "passed",
+                  "proofRoutes": [
+                    "/downloads/get/avalonia-win-x64-installer"
+                  ]
+                }
+                """);
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
+                    ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = root
+                })
+                .Build();
+
+            var service = CreateService(configuration, "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            var chrome = service.BuildPublicChrome("FAQ", "Install answers.", "/faq");
+
+            Assert.NotNull(chrome.PublicPrimaryCta);
+            Assert.Equal("Install Chummer on Windows", chrome.PublicPrimaryCta!.Label);
+            Assert.Equal("/downloads/get/avalonia-win-x64-installer", chrome.PublicPrimaryCta.Href);
+
+            var primary = Assert.Single(chrome.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal("Install Chummer on Windows", primary.Label);
+            Assert.Equal("/downloads/get/avalonia-win-x64-installer", primary.Href);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
     }
 }

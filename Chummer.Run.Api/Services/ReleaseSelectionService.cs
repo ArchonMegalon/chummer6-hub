@@ -76,7 +76,7 @@ public sealed class ReleaseSelectionService
             ? "/downloads"
             : BuildSignupDispatchHref(recommended);
         var guestGateSignInHref = recommended is null
-            ? "/login?next=/downloads"
+            ? "/auth/google/start?next=%2Fdownloads"
             : recommendedUsesMacBootstrap && !authenticated
                 ? BuildGoogleDispatchHref(recommended)
                 : BuildLoginDispatchHref(recommended);
@@ -120,17 +120,18 @@ public sealed class ReleaseSelectionService
             SystemRequirements: RequirementsFor(experience, recommended, requestedPlatform, shelfNotice is not null));
     }
 
-    public PublicLandingActionDto BuildPublicPrimaryAction(PublicReleaseManifestDto manifest, bool authenticated)
+    public PublicLandingActionDto BuildPublicPrimaryAction(PublicReleaseManifestDto manifest, string userAgent, bool authenticated)
     {
-        var release = BuildExperience(manifest, string.Empty, authenticated);
+        var release = BuildExperience(manifest, userAgent, authenticated);
         if (manifest.Downloads.Count == 0)
         {
             return new PublicLandingActionDto(release.NoBuildPrimaryLabel, release.NoBuildPrimaryHref, "primary");
         }
 
-        if (authenticated || HasGuestReadableDownloads(manifest))
+        if (release.Recommended is not null
+            && (authenticated || !release.Recommended.RequiresAccount))
         {
-            return new PublicLandingActionDto(release.PublicPreviewPrimaryLabel, release.PublicPreviewPrimaryHref, "primary");
+            return new PublicLandingActionDto(release.Recommended.ActionLabel, release.Recommended.DispatchHref, "primary");
         }
 
         return new PublicLandingActionDto(release.GuestGatePrimaryLabel, release.GuestGatePrimaryHref, "primary");
@@ -253,7 +254,7 @@ public sealed class ReleaseSelectionService
         => $"/signup?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
 
     private static string BuildLoginDispatchHref(PublicReleaseArtifactDto artifact)
-        => $"/login?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
+        => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
 
     private static string BuildGoogleDispatchHref(PublicReleaseArtifactDto artifact)
         => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
@@ -403,8 +404,8 @@ public sealed class ReleaseSelectionService
             return authenticated
                 ? "Open the Mac install handoff. It gives you one Terminal command, verifies the published DMG digest, and confirms the selected apps wrote a linked install receipt successfully."
                 : string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                    ? "Create an account for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps."
-                    : "Sign in for the Mac install command. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps.";
+                ? "Create an account for the Mac guided installer. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps."
+                    : "Sign in for the Mac guided installer. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps.";
         }
 
         if (authenticated)
@@ -429,34 +430,34 @@ public sealed class ReleaseSelectionService
     {
         if (authenticated && UsesWindowsBootstrapFlow(download))
         {
-            return "Open Windows install command";
+            return "Install on Windows";
         }
 
         if (authenticated && UsesLinuxBootstrapFlow(download))
         {
-            return "Open Linux install command";
+            return "Install on Linux";
         }
 
         if (UsesMacBootstrapFlow(download))
         {
             if (authenticated)
             {
-                return "Open Mac install command";
+                return "Install on Mac";
             }
 
             return string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Create account for Mac install command"
-                : "Sign in for Mac install command";
+                ? "Create account to install on Mac"
+                : "Sign in to install on Mac";
         }
 
         if (authenticated)
         {
-            return "Start signed-in download";
+            return IsInstaller(download) ? "Install now" : "Download package";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return recommended ? "Create account to get preview" : "Create account to download";
+            return recommended ? "Create account to install" : "Create account to download";
         }
 
         return recommended ? RecommendedActionLabel(download) : AlternativeActionLabel(download);
@@ -464,12 +465,12 @@ public sealed class ReleaseSelectionService
 
     private static string RecommendedActionLabel(PublicReleaseArtifactDto download)
         => IsInstaller(download)
-            ? $"Download Chummer for {PlatformLabel(download)}"
-            : $"Download Chummer preview for {PlatformLabel(download)}";
+            ? $"Install Chummer on {PlatformLabel(download)}"
+            : $"Download Chummer package for {PlatformLabel(download)}";
 
     private static string AlternativeActionLabel(PublicReleaseArtifactDto download)
         => IsInstaller(download)
-            ? $"Download {HeadLabel(download)}"
+            ? $"Install {HeadLabel(download)}"
             : $"Download {PlatformLabel(download)} package";
 
     private static string OptionTitle(PublicReleaseArtifactDto download, bool recommended)

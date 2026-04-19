@@ -3,23 +3,21 @@
     ViewData["Title"] = "Participate";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
+    var codexHref = Model.Chrome.Authenticated
+        ? "/participate/codex"
+        : "/auth/google/start?next=%2Fparticipate%2Fcodex";
 }
 
 <section class="release-footnote">
     <p class="eyebrow">Participate</p>
     <h1 class="page-title">Choose how to participate</h1>
-    <p class="page-copy">Public bug reports stay open. Suggestions, beta follow-up, and guided contribution use the account path when you want the next step attached to you.</p>
+    <p class="page-copy">Report a problem in public, or sign in and explicitly let Chummer use your OpenAI account in ChatGPT for temporary Codex access.</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@codexHref">@(Model.Chrome.Authenticated ? "Authorize Codex access" : "Sign in to authorize Codex")</a>
+        <a class="button-like button-like--secondary" href="/contact">Report a problem</a>
+    </div>
+    <p class="muted-copy">Authorization is optional, revocable, and does not count as contribution credit by itself.</p>
 </section>
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
 
 <section class="editorial-block editorial-block--lanes">
     <div class="lane-strip-list">
@@ -27,7 +25,7 @@
             <div class="lane-strip__copy">
                 <span class="tag">Public</span>
                 <h2>Public feedback</h2>
-                <p>Report a problem without an account, then stop there unless you want tracked follow-up.</p>
+                <p>Report a problem, missing feature, or broken installer without creating an account first.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.PublicLane)
                     {
@@ -48,9 +46,9 @@
 
         <article class="lane-strip">
             <div class="lane-strip__copy">
-                <span class="tag tag--amber">Signed in</span>
-                <h2>Signed-in participation</h2>
-                <p>Use the signed-in path when you want a tracked suggestion, beta follow-up, or a bounded contribution flow.</p>
+                <span class="tag tag--amber">Account required</span>
+                <h2>Guided Codex participation</h2>
+                <p>Use the signed-in path when you want tracked beta follow-up or want to grant temporary Codex access with your OpenAI account in ChatGPT.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)
                     {

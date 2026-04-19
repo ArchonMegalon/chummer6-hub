@@ -17,6 +17,7 @@
 * leaderboards, quests, badges, and community-side entitlement views
 * the `chummer.run` public landing, proof shelf, public status, and signed-in home overlays
 * registry-backed downloads, channel selection, and install guidance UX
+* public concierge wrapper routes, structured intake handoff, booking handoff, and trust-surface telemetry on Hub-owned public pages
 * optional entitlement brokering for gated desktop channels
 * support intake, ticket threads, and private case truth
 * product-control packet truth, closure notices, and health/decision projections
@@ -100,6 +101,7 @@ Hub owns support-case truth, knowledge/help surfaces, and human escalation.
 
 It does not replace the native client crash path.
 Crash recovery starts in `chummer6-ui`; hosted support truth starts here.
+Public concierge may route into help, support pre-intake, or human escalation, but support-case truth remains first-party Hub state and fallback help paths must stay available when the widget is disabled.
 
 If a support assistant is approved later, it lands on Hub/help surfaces after the crash, bug-report, feedback, and human-escalation lanes are already real.
 

@@ -66,14 +66,14 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound(new
             {
                 status = "missing",
-                message = "No staged Windows proof installers are available right now."
+                message = "No staged Windows preview installers are available right now."
             });
         }
 
         return Ok(new
         {
             status = "proof_only",
-            message = "These Windows installers are published for manual proof only. They are not on the promoted public shelf until current Windows startup-smoke evidence exists for the active release head.",
+            message = "These Windows installers are published as preview builds only. They are not on the main Windows shelf until the latest Windows startup checks are refreshed for the active release head.",
             downloads = installers.Select(static installer => new
             {
                 installer.FileName,
@@ -303,7 +303,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     }
 
     private static string BuildInstallLoginHref(string encodedArtifactId)
-        => $"/login?next={Uri.EscapeDataString($"/downloads/install/{encodedArtifactId}")}";
+        => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{encodedArtifactId}")}";
 
     private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveManifestArtifact(string artifactId)
     {

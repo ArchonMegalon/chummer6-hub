@@ -8,14 +8,17 @@ namespace Chummer.Run.Api.Services.InstallLinking;
 public sealed class InstallLinkingService
 {
     private static readonly TimeSpan DefaultClaimTicketLifetime = TimeSpan.FromDays(1);
+    private static readonly TimeSpan DefaultBrowserCallbackLifetime = TimeSpan.FromMinutes(15);
     private static readonly TimeSpan GrantLifetime = TimeSpan.FromDays(30);
     private readonly InstallLinkingStore _store;
     private readonly TimeSpan _claimTicketLifetime;
+    private readonly TimeSpan _browserCallbackLifetime;
 
     public InstallLinkingService(InstallLinkingStore store, IConfiguration configuration)
     {
         _store = store;
         _claimTicketLifetime = ResolveClaimTicketLifetime(configuration);
+        _browserCallbackLifetime = ResolveBrowserCallbackLifetime(configuration);
     }
 
     public DownloadDispatchResult IssueDownload(
@@ -80,6 +83,7 @@ public sealed class InstallLinkingService
         {
             var now = DateTimeOffset.UtcNow;
             ExpireTicketsLocked(now);
+            ExpireBrowserCallbacksLocked(now);
             ExpireGrantsLocked(now);
             var receipts = _store.ReceiptsById.Values
                 .Where(item => MatchesIdentity(item.UserId, item.SubjectId, normalizedUserId, normalizedSubjectId))
@@ -104,7 +108,14 @@ public sealed class InstallLinkingService
                 .OrderByDescending(static item => item.IssuedAtUtc)
                 .Take(Math.Max(1, maxItems))
                 .ToArray();
-            return new InstallLinkingSummaryDto(receipts, tickets, installations, grants);
+            var callbacks = _store.BrowserCallbacksById.Values
+                .Where(item => string.Equals(item.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase))
+                .Where(item => item.ExpiresAtUtc > now)
+                .Where(item => MatchesIdentity(item.UserId, item.SubjectId, normalizedUserId, normalizedSubjectId))
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .Take(Math.Max(1, maxItems))
+                .ToArray();
+            return new InstallLinkingSummaryDto(receipts, tickets, installations, grants, callbacks);
         }
     }
 
@@ -256,6 +267,134 @@ public sealed class InstallLinkingService
         }
     }
 
+    public IssueInstallBrowserCallbackResponseDto IssueBrowserCallback(
+        IssueInstallBrowserCallbackRequestDto request,
+        string? userId,
+        string? subjectId)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string? normalizedInstallationId = NormalizeOptional(request.InstallationId)
+            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "installation id is required.");
+        string? normalizedArtifactId = NormalizeOptional(request.ArtifactId)
+            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "artifact id is required.");
+        string? normalizedCallbackUri = NormalizeOptional(request.CallbackUri)
+            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "callback uri is required.");
+        string? normalizedUserId = NormalizeOptional(userId);
+        string? normalizedSubjectId = NormalizeOptional(subjectId);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            ExpireBrowserCallbacksLocked(now);
+            ExpireGrantsLocked(now);
+
+            _store.InstallationsById.TryGetValue(normalizedInstallationId, out ClaimedInstallationDto? existingInstallation);
+            EnsureInstallationIdentityAvailable(existingInstallation, normalizedUserId, normalizedSubjectId);
+
+            InstallBrowserCallbackDto callback = FindReusableBrowserCallbackLocked(
+                    normalizedInstallationId,
+                    normalizedUserId,
+                    normalizedSubjectId,
+                    normalizedCallbackUri,
+                    now)
+                ?? CreateBrowserCallbackLocked(request with
+                {
+                    InstallationId = normalizedInstallationId,
+                    ArtifactId = normalizedArtifactId,
+                    CallbackUri = normalizedCallbackUri
+                }, normalizedUserId, normalizedSubjectId, now);
+
+            _store.BrowserCallbacksById[callback.CallbackId] = callback;
+            _store.PersistLocked();
+            return new IssueInstallBrowserCallbackResponseDto(
+                Callback: callback,
+                AlreadyClaimed: existingInstallation is not null
+                    && string.Equals(existingInstallation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase),
+                Installation: existingInstallation);
+        }
+    }
+
+    public ExchangeInstallBrowserCallbackResponseDto ExchangeBrowserCallback(ExchangeInstallBrowserCallbackRequestDto request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        string? normalizedCallbackCode = NormalizeBrowserCallbackCode(request.CallbackCode)
+            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "callback code is required.");
+        string? normalizedInstallationId = NormalizeOptional(request.InstallationId)
+            ?? throw new InstallLinkingOperationException(StatusCodes.Status400BadRequest, "installation id is required.");
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+
+        lock (_store.Gate)
+        {
+            ExpireBrowserCallbacksLocked(now);
+            ExpireGrantsLocked(now);
+
+            InstallBrowserCallbackDto? callback = FindBrowserCallbackByCodeLocked(normalizedCallbackCode);
+            if (callback is null)
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status404NotFound, "browser callback was not found.");
+            }
+
+            if (string.Equals(callback.Status, InstallBrowserCallbackStates.Revoked, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was revoked.");
+            }
+
+            if (string.Equals(callback.Status, InstallBrowserCallbackStates.Expired, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback expired before it could be completed.");
+            }
+
+            if (!string.Equals(callback.InstallationId, normalizedInstallationId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback is already bound to another installation.");
+            }
+
+            _store.InstallationsById.TryGetValue(normalizedInstallationId, out ClaimedInstallationDto? existingInstallation);
+            EnsureInstallationIdentityAvailable(existingInstallation, callback.UserId, callback.SubjectId);
+
+            if (string.Equals(callback.Status, InstallBrowserCallbackStates.Redeemed, StringComparison.OrdinalIgnoreCase))
+            {
+                if (existingInstallation is null)
+                {
+                    throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "browser callback was redeemed but the installation record is missing.");
+                }
+
+                ClaimedInstallationDto refreshedInstallation = UpsertInstallationLocked(existingInstallation, callback, request, now);
+                InstallationGrantDto grant = FindReusableGrantLocked(refreshedInstallation.InstallationId, now)
+                    ?? CreateGrantLocked(refreshedInstallation, now);
+                refreshedInstallation = refreshedInstallation with
+                {
+                    GrantId = grant.GrantId,
+                    UpdatedAtUtc = now
+                };
+                _store.InstallationsById[refreshedInstallation.InstallationId] = refreshedInstallation;
+                _store.GrantsById[grant.GrantId] = grant;
+                _store.PersistLocked();
+                return new ExchangeInstallBrowserCallbackResponseDto(callback, refreshedInstallation, grant, AlreadyClaimed: true);
+            }
+
+            ClaimedInstallationDto installation = UpsertInstallationLocked(existingInstallation, callback, request, now);
+            InstallationGrantDto issuedGrant = CreateGrantLocked(installation, now);
+            installation = installation with
+            {
+                GrantId = issuedGrant.GrantId,
+                UpdatedAtUtc = now
+            };
+            callback = callback with
+            {
+                Status = InstallBrowserCallbackStates.Redeemed
+            };
+
+            _store.InstallationsById[installation.InstallationId] = installation;
+            _store.BrowserCallbacksById[callback.CallbackId] = callback;
+            _store.GrantsById[issuedGrant.GrantId] = issuedGrant;
+            _store.PersistLocked();
+            return new ExchangeInstallBrowserCallbackResponseDto(callback, installation, issuedGrant, AlreadyClaimed: false);
+        }
+    }
+
     public ClaimedInstallationDto? ResolveInstallationForGrant(string? installationId, string? accessToken)
     {
         string? normalizedInstallationId = NormalizeOptional(installationId);
@@ -342,9 +481,28 @@ public sealed class InstallLinkingService
             .OrderByDescending(static item => item.CreatedAtUtc)
             .FirstOrDefault();
 
+    private InstallBrowserCallbackDto? FindReusableBrowserCallbackLocked(
+        string installationId,
+        string? userId,
+        string? subjectId,
+        string callbackUri,
+        DateTimeOffset now)
+        => _store.BrowserCallbacksById.Values
+            .Where(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase))
+            .Where(item => string.Equals(item.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase))
+            .Where(item => item.ExpiresAtUtc > now)
+            .Where(item => MatchesIdentity(item.UserId, item.SubjectId, userId, subjectId))
+            .Where(item => string.Equals(item.CallbackUri, callbackUri, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.CreatedAtUtc)
+            .FirstOrDefault();
+
     private InstallClaimTicketDto? FindTicketByClaimCodeLocked(string normalizedClaimCode)
         => _store.ClaimTicketsById.Values
             .FirstOrDefault(item => string.Equals(NormalizeClaimCode(item.ClaimCode), normalizedClaimCode, StringComparison.Ordinal));
+
+    private InstallBrowserCallbackDto? FindBrowserCallbackByCodeLocked(string normalizedCallbackCode)
+        => _store.BrowserCallbacksById.Values
+            .FirstOrDefault(item => string.Equals(NormalizeBrowserCallbackCode(item.CallbackCode), normalizedCallbackCode, StringComparison.Ordinal));
 
     private InstallClaimTicketDto CreateClaimTicketLocked(
         PublicReleaseManifestDto manifest,
@@ -369,7 +527,40 @@ public sealed class InstallLinkingService
             SubjectId: subjectId);
     }
 
+    private InstallBrowserCallbackDto CreateBrowserCallbackLocked(
+        IssueInstallBrowserCallbackRequestDto request,
+        string? userId,
+        string? subjectId,
+        DateTimeOffset now)
+    {
+        var expiresAtUtc = now.Add(_browserCallbackLifetime);
+        return new InstallBrowserCallbackDto(
+            CallbackId: NewId("ibc"),
+            CallbackCode: NewCallbackCode(),
+            InstallationId: NormalizeOptional(request.InstallationId) ?? string.Empty,
+            ArtifactId: NormalizeOptional(request.ArtifactId) ?? string.Empty,
+            Channel: NormalizeOptional(request.ChannelId) ?? "preview",
+            Version: NormalizeOptional(request.ApplicationVersion) ?? "unknown",
+            InstallAccessClass: NormalizeAccessClass(request.InstallAccessClass),
+            Status: InstallBrowserCallbackStates.Pending,
+            CreatedAtUtc: now,
+            ExpiresAtUtc: expiresAtUtc,
+            UserId: userId,
+            SubjectId: subjectId,
+            PublicKey: NormalizeOptional(request.PublicKey),
+            HeadId: NormalizeOptional(request.HeadId),
+            Platform: NormalizeOptional(request.Platform),
+            Arch: NormalizeOptional(request.Arch),
+            HostLabel: NormalizeOptional(request.HostLabel),
+            CallbackUri: NormalizeOptional(request.CallbackUri));
+    }
+
     private static void EnsureInstallationIdentityAvailable(ClaimedInstallationDto? existingInstallation, InstallClaimTicketDto ticket)
+    {
+        EnsureInstallationIdentityAvailable(existingInstallation, ticket.UserId, ticket.SubjectId);
+    }
+
+    private static void EnsureInstallationIdentityAvailable(ClaimedInstallationDto? existingInstallation, string? userId, string? subjectId)
     {
         if (existingInstallation is null)
         {
@@ -377,11 +568,11 @@ public sealed class InstallLinkingService
         }
 
         bool sameUser = string.IsNullOrWhiteSpace(existingInstallation.UserId)
-            || string.IsNullOrWhiteSpace(ticket.UserId)
-            || string.Equals(existingInstallation.UserId, ticket.UserId, StringComparison.OrdinalIgnoreCase);
+            || string.IsNullOrWhiteSpace(userId)
+            || string.Equals(existingInstallation.UserId, userId, StringComparison.OrdinalIgnoreCase);
         bool sameSubject = string.IsNullOrWhiteSpace(existingInstallation.SubjectId)
-            || string.IsNullOrWhiteSpace(ticket.SubjectId)
-            || string.Equals(existingInstallation.SubjectId, ticket.SubjectId, StringComparison.OrdinalIgnoreCase);
+            || string.IsNullOrWhiteSpace(subjectId)
+            || string.Equals(existingInstallation.SubjectId, subjectId, StringComparison.OrdinalIgnoreCase);
         if (!sameUser || !sameSubject)
         {
             throw new InstallLinkingOperationException(StatusCodes.Status409Conflict, "installation is already linked to another account.");
@@ -415,6 +606,40 @@ public sealed class InstallLinkingService
             SubjectId: ticket.SubjectId,
             PublicKey: publicKey,
             ClaimTicketId: ticket.TicketId,
+            HeadId: headId,
+            Platform: platform,
+            Arch: arch,
+            HostLabel: hostLabel,
+            GrantId: existingInstallation?.GrantId);
+    }
+
+    private ClaimedInstallationDto UpsertInstallationLocked(
+        ClaimedInstallationDto? existingInstallation,
+        InstallBrowserCallbackDto callback,
+        ExchangeInstallBrowserCallbackRequestDto request,
+        DateTimeOffset now)
+    {
+        string version = NormalizeOptional(request.ApplicationVersion) ?? callback.Version;
+        string channelId = NormalizeOptional(request.ChannelId) ?? callback.Channel;
+        string headId = NormalizeOptional(request.HeadId) ?? callback.HeadId ?? existingInstallation?.HeadId ?? "desktop";
+        string platform = NormalizeOptional(request.Platform) ?? callback.Platform ?? existingInstallation?.Platform ?? "unknown";
+        string arch = NormalizeOptional(request.Arch) ?? callback.Arch ?? existingInstallation?.Arch ?? "unknown";
+        string? publicKey = NormalizeOptional(request.PublicKey) ?? callback.PublicKey ?? existingInstallation?.PublicKey;
+        string? hostLabel = NormalizeOptional(request.HostLabel) ?? callback.HostLabel ?? existingInstallation?.HostLabel;
+
+        return new ClaimedInstallationDto(
+            InstallationId: NormalizeOptional(request.InstallationId) ?? existingInstallation?.InstallationId ?? callback.InstallationId,
+            ArtifactId: callback.ArtifactId,
+            Channel: channelId,
+            Version: version,
+            InstallAccessClass: NormalizeAccessClass(callback.InstallAccessClass),
+            Status: ClaimedInstallationStates.Active,
+            CreatedAtUtc: existingInstallation?.CreatedAtUtc ?? now,
+            UpdatedAtUtc: now,
+            UserId: callback.UserId,
+            SubjectId: callback.SubjectId,
+            PublicKey: publicKey,
+            ClaimTicketId: existingInstallation?.ClaimTicketId,
             HeadId: headId,
             Platform: platform,
             Arch: arch,
@@ -482,6 +707,30 @@ public sealed class InstallLinkingService
             }
 
             _store.ClaimTicketsById[ticket.TicketId] = ticket with { Status = InstallClaimTicketStates.Expired };
+            dirty = true;
+        }
+
+        if (dirty)
+        {
+            _store.PersistLocked();
+        }
+    }
+
+    private void ExpireBrowserCallbacksLocked(DateTimeOffset now)
+    {
+        var dirty = false;
+        foreach (InstallBrowserCallbackDto callback in _store.BrowserCallbacksById.Values.ToArray())
+        {
+            if (!string.Equals(callback.Status, InstallBrowserCallbackStates.Pending, StringComparison.OrdinalIgnoreCase)
+                || callback.ExpiresAtUtc > now)
+            {
+                continue;
+            }
+
+            _store.BrowserCallbacksById[callback.CallbackId] = callback with
+            {
+                Status = InstallBrowserCallbackStates.Expired
+            };
             dirty = true;
         }
 
@@ -563,6 +812,18 @@ public sealed class InstallLinkingService
         return DefaultClaimTicketLifetime;
     }
 
+    private static TimeSpan ResolveBrowserCallbackLifetime(IConfiguration configuration)
+    {
+        string? configuredMinutes = configuration["CHUMMER_INSTALL_BROWSER_CALLBACK_LIFETIME_MINUTES"];
+        if (int.TryParse(configuredMinutes, out int minutes))
+        {
+            minutes = Math.Clamp(minutes, 5, 24 * 60);
+            return TimeSpan.FromMinutes(minutes);
+        }
+
+        return DefaultBrowserCallbackLifetime;
+    }
+
     private static string NewId(string prefix)
         => $"{prefix}-{Guid.NewGuid():N}"[..Math.Min(prefix.Length + 13, prefix.Length + 1 + 12)];
 
@@ -571,6 +832,15 @@ public sealed class InstallLinkingService
         var bytes = RandomNumberGenerator.GetBytes(10);
         var hex = Convert.ToHexString(bytes);
         return $"{hex[..5]}-{hex[5..10]}-{hex[10..15]}-{hex[15..20]}";
+    }
+
+    private static string NewCallbackCode()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(18);
+        return Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace("+", "-", StringComparison.Ordinal)
+            .Replace("/", "_", StringComparison.Ordinal);
     }
 
     private static string NewAccessToken()
@@ -592,6 +862,9 @@ public sealed class InstallLinkingService
 
         return string.Concat(normalized.Where(char.IsLetterOrDigit)).ToUpperInvariant();
     }
+
+    private static string? NormalizeBrowserCallbackCode(string? value)
+        => NormalizeOptional(value);
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

@@ -60,6 +60,8 @@ public sealed record ArtifactFactoryFamilyFormatOverride(
     IReadOnlyList<string> Formats);
 
 public sealed record ArtifactFactoryJobBatchLaunchResult(
+    string ContractName,
+    string RecipeVersion,
     string BatchId,
     string State,
     string RequestedBy,
@@ -189,6 +191,22 @@ public sealed class ArtifactFactoryOrchestrationService
             Recipes: recipes);
     }
 
+    public static IReadOnlyList<string> GetAllowedFormats(string family)
+    {
+        string normalizedFamily = NormalizeToken(family);
+        if (!Recipes.TryGetValue(normalizedFamily, out ArtifactFactoryRecipe? recipe))
+        {
+            throw new InvalidDataException($"artifact job family '{family}' is not supported.");
+        }
+
+        return recipe.AllowedFormats
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public static IReadOnlyList<string> GetReleaseBundleFormats()
+        => GetAllowedFormats("release");
+
     public ArtifactFactoryJobBatchLaunchResult LaunchJobs(ArtifactFactoryJobBatchLaunchRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -282,6 +300,8 @@ public sealed class ArtifactFactoryOrchestrationService
             .ToArray();
 
         return new ArtifactFactoryJobBatchLaunchResult(
+            ContractName: ContractName,
+            RecipeVersion: RecipeVersion,
             BatchId: request.BatchId.Trim(),
             State: "queued",
             RequestedBy: requestedBy,
@@ -315,7 +335,9 @@ public sealed class ArtifactFactoryOrchestrationService
 
         ValidateSourcePackBatchSourcePacks(request.SourcePacks);
 
-        string[] requiredFamilies = NormalizeRequiredBatchFamilies(request.RequiredFamilies);
+        string[] requiredFamilies = request.RequiredFamilies is { Count: > 0 }
+            ? NormalizeRequiredBatchFamilies(request.RequiredFamilies)
+            : InferLaunchableFamiliesFromApprovedSourcePacks(request);
         IReadOnlyDictionary<string, IReadOnlyList<string>> requestedFormatsByFamily = NormalizeFamilyFormatOverrides(request.RequestedFormats);
         RejectRequestedFormatOverridesOutsideRequiredFamilies(request.BatchId, requestedFormatsByFamily, requiredFamilies);
         ArtifactFactoryJobLaunchRequest[] jobs = requiredFamilies
@@ -327,6 +349,41 @@ public sealed class ArtifactFactoryOrchestrationService
             RequestedBy: request.RequestedBy,
             Jobs: jobs,
             RequiredFamilies: requiredFamilies));
+    }
+
+    private ArtifactFactoryJobLaunchRequest? TryBuildJobFromApprovedSourcePackBatch(
+        ArtifactFactorySourcePackBatchLaunchRequest request,
+        string family,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> requestedFormatsByFamily)
+    {
+        try
+        {
+            ArtifactFactoryJobLaunchRequest job = BuildJobFromApprovedSourcePackBatch(request, family, requestedFormatsByFamily);
+            _ = LaunchJob(job);
+            return job;
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
+    }
+
+    private string[] InferLaunchableFamiliesFromApprovedSourcePacks(ArtifactFactorySourcePackBatchLaunchRequest request)
+    {
+        Dictionary<string, IReadOnlyList<string>> noFormatOverrides = new(StringComparer.OrdinalIgnoreCase);
+        string[] launchableFamilies = Recipes.Keys
+            .Select(family => TryBuildJobFromApprovedSourcePackBatch(request, family, noFormatOverrides))
+            .Where(static job => job is not null)
+            .Select(static job => job!.Family)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (launchableFamilies.Length == 0)
+        {
+            throw new InvalidDataException(
+                "artifact factory source-pack batch has no approved source packs matching any supported recipe family.");
+        }
+
+        return launchableFamilies;
     }
 
     private static ArtifactFactoryJobLaunchRequest BuildJobFromApprovedSourcePackBatch(
@@ -441,6 +498,12 @@ public sealed class ArtifactFactoryOrchestrationService
             if (!Recipes.ContainsKey(family))
             {
                 throw new InvalidDataException($"artifact factory source-pack batch requested formats for unsupported recipe family '{family}'.");
+            }
+
+            if (overrideRequest.Formats is not { Count: > 0 })
+            {
+                throw new InvalidDataException(
+                    $"artifact factory source-pack batch requested formats for recipe family '{family}' must include at least one format.");
             }
 
             if (!formatsByFamily.TryAdd(family, overrideRequest.Formats))

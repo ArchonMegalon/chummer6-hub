@@ -254,7 +254,7 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: true);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Open Mac install command", recommended.ActionLabel);
+        Assert.Equal("Install on Mac", recommended.ActionLabel);
         Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
         Assert.Contains("one Terminal command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
@@ -303,7 +303,7 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", authenticated: true);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Open Windows install command", recommended.ActionLabel);
+        Assert.Equal("Install on Windows", recommended.ActionLabel);
         Assert.Equal("/downloads/install/avalonia-win-x64-installer", recommended.DispatchHref);
         Assert.Contains("short-lived PowerShell command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Auto select", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
@@ -349,7 +349,7 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: true);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Open Linux install command", recommended.ActionLabel);
+        Assert.Equal("Install on Linux", recommended.ActionLabel);
         Assert.Equal("/downloads/install/avalonia-linux-x64-installer", recommended.DispatchHref);
         Assert.Contains("short-lived shell command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Auto select", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
@@ -394,7 +394,7 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: false);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Create account for Mac install command", recommended.ActionLabel);
+        Assert.Equal("Create account to install on Mac", recommended.ActionLabel);
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
         Assert.StartsWith("/signup?next=", recommended.DispatchHref, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);
