@@ -2676,6 +2676,27 @@ upload_release_bundle_http() {
     jq . "$payload_path"
   }
 
+  log_release_upload_response() {
+    local payload_path="$1"
+    if ! jq -e . "$payload_path" >/dev/null 2>&1; then
+      cat "$payload_path"
+      return 0
+    fi
+    jq '
+      if (.signedInInstallClaims? | type) == "array" then
+        .signedInInstallClaims |= map(
+          if type == "object" and has("claimCode") then
+            .claimCode = "[redacted]"
+          else
+            .
+          end
+        )
+      else
+        .
+      end
+    ' "$payload_path"
+  }
+
   post_form_request() {
     local output_path="$1"
     local label="$2"
@@ -2791,7 +2812,7 @@ PY
       return 22
     fi
 
-    log_json_or_text "$direct_response"
+    log_release_upload_response "$direct_response"
     rm -f "$direct_bundle"
     return 0
   }
@@ -2991,7 +3012,7 @@ PY
     return 0
   fi
 
-  log_json_or_text "$response_path"
+  log_release_upload_response "$response_path"
   rm -f "$session_json"
 }
 

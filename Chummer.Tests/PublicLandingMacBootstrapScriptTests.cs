@@ -415,6 +415,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("Authorization: Bearer {escaped}", template, StringComparison.Ordinal);
         Assert.Contains("token = sys.stdin.read()", template, StringComparison.Ordinal);
         Assert.Contains("python3 -c", template, StringComparison.Ordinal);
+        Assert.Contains("log_release_upload_response()", template, StringComparison.Ordinal);
+        Assert.Contains(".claimCode = \"[redacted]\"", template, StringComparison.Ordinal);
         Assert.DoesNotContain("python3 - \"$config_path\" <<'PY'", template, StringComparison.Ordinal);
         Assert.DoesNotContain("token = sys.argv[2]", template, StringComparison.Ordinal);
         Assert.DoesNotContain("local upload_token=\"$3\"", template, StringComparison.Ordinal);
@@ -426,6 +428,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \\", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$verify_url\"", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("log_json_or_text \"$response_path\"", template, StringComparison.Ordinal);
     }
 
     [Fact]

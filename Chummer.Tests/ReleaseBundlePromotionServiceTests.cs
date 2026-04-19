@@ -317,6 +317,132 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Contains(experience.Alternatives, item => item.Artifact.Id == "blazor-desktop-osx-arm64-installer");
     }
 
+    [Fact]
+    public async Task PromoteAsyncRefreshesMergedDesktopTupleCoverageWhenNewPlatformCompletesTheShelf()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+
+        string initialBundle = fixture.CreateBundle(
+            version: "run-20260419-190000",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false),
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+        await fixture.PromoteAsync(initialBundle);
+
+        string macBundle = fixture.CreateBundle(
+            version: "run-20260419-201110",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        await fixture.PromoteAsync(macBundle);
+
+        using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
+        JsonElement coverage = compatibility.RootElement.GetProperty("desktopTupleCoverage");
+        Assert.True(coverage.GetProperty("complete").GetBoolean());
+        Assert.Empty(coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
+            .EnumerateArray()
+            .ToArray());
+        string[] promotedTupleIds = coverage.GetProperty("promotedInstallerTuples")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("tupleId").GetString()!)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToArray();
+        Assert.Equal(
+            ["avalonia:linux:linux-x64", "avalonia:macos:osx-arm64", "avalonia:windows:win-x64"],
+            promotedTupleIds);
+        Assert.Equal("promoted_preview", compatibility.RootElement.GetProperty("rolloutState").GetString());
+        Assert.Equal("preview_supported", compatibility.RootElement.GetProperty("supportabilityState").GetString());
+    }
+
+    [Fact]
+    public async Task PromoteAsyncFiltersExternalProofRequestsAgainstMergedShelfCoverage()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+
+        string initialBundle = fixture.CreateBundle(
+            version: "run-20260419-180000",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-linux-x64-installer",
+                    Head: "avalonia",
+                    Platform: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    Bytes: "linux"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false)
+            ]);
+        await fixture.PromoteAsync(initialBundle);
+
+        string macBundle = fixture.CreateBundle(
+            version: "run-20260419-201110",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        await fixture.PromoteAsync(macBundle);
+
+        using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
+        JsonElement coverage = compatibility.RootElement.GetProperty("desktopTupleCoverage");
+        string[] missingTupleIds = coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
+            .EnumerateArray()
+            .Select(item => item.GetString()!)
+            .ToArray();
+        Assert.Equal(["avalonia:win-x64:windows"], missingTupleIds);
+        Assert.Empty(coverage.GetProperty("externalProofRequests")
+            .EnumerateArray()
+            .ToArray());
+    }
+
     private sealed class ReleaseBundlePromotionFixture : IDisposable
     {
         private readonly string _root;

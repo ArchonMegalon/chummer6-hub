@@ -30,6 +30,34 @@ public sealed class ReleaseBundlePromotionService
     private const string CanonicalManifestName = "RELEASE_CHANNEL.generated.json";
     private const string PromotionEvidenceRelativePath = "release-evidence/public-promotion.json";
     private const string PublicBaseUrlKey = "GOOGLE_OIDC_REDIRECT_URI";
+    private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
+    private static readonly string[] RequiredDesktopHeads = ["avalonia"];
+    private static readonly string[] DesktopRouteTruthHeads = ["avalonia", "blazor-desktop"];
+    private static readonly IReadOnlyDictionary<string, string> DesktopRouteRoles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["avalonia"] = "primary",
+        ["blazor-desktop"] = "fallback"
+    };
+    private static readonly IReadOnlyDictionary<string, string> AppLabels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["avalonia"] = "Avalonia Desktop",
+        ["blazor-desktop"] = "Blazor Desktop"
+    };
+    private static readonly IReadOnlyDictionary<string, string[]> DefaultRequiredDesktopPlatformRids = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["linux"] = ["linux-x64"],
+        ["windows"] = ["win-x64"],
+        ["macos"] = ["osx-arm64"]
+    };
+    private static readonly IReadOnlyDictionary<string, (string Platform, string Arch)> RidToPlatformArch = new Dictionary<string, (string Platform, string Arch)>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["linux-x64"] = ("linux", "x64"),
+        ["linux-arm64"] = ("linux", "arm64"),
+        ["win-x64"] = ("windows", "x64"),
+        ["win-arm64"] = ("windows", "arm64"),
+        ["osx-arm64"] = ("macos", "arm64"),
+        ["osx-x64"] = ("macos", "x64")
+    };
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true,
@@ -152,6 +180,9 @@ public sealed class ReleaseBundlePromotionService
 
         PublicReleaseManifestDto mergedCompatibilityManifest = MergeCompatibilityManifest(existingCompatibilityManifest, incomingCompatibilityManifest);
         JsonObject mergedCanonicalManifest = MergeCanonicalManifest(existingCanonicalManifest, incomingCanonicalManifest);
+        (mergedCompatibilityManifest, mergedCanonicalManifest) = NormalizeMergedShelfProjection(
+            mergedCompatibilityManifest,
+            mergedCanonicalManifest);
 
         string filesDestinationRoot = Path.Combine(downloadsRoot, "files");
         Directory.CreateDirectory(filesDestinationRoot);
@@ -372,7 +403,41 @@ public sealed class ReleaseBundlePromotionService
 
     private static PublicReleaseManifestDto LoadCompatibilityManifest(string manifestPath)
     {
-        PublicReleaseManifestDto? manifest = JsonSerializer.Deserialize<PublicReleaseManifestDto>(File.ReadAllText(manifestPath), JsonOptions);
+        CompatibilityManifestPayload? parsed = JsonSerializer.Deserialize<CompatibilityManifestPayload>(File.ReadAllText(manifestPath), JsonOptions);
+        PublicReleaseManifestDto? manifest = parsed is null
+            ? null
+            : new PublicReleaseManifestDto(
+                Version: parsed.Version ?? "unpublished",
+                Channel: parsed.Channel ?? parsed.ChannelId ?? "preview",
+                PublishedAt: parsed.PublishedAt ?? DateTimeOffset.UtcNow,
+                Downloads: parsed.Downloads ?? [],
+                Source: parsed.Source ?? "manifest",
+                Status: parsed.Status ?? "published",
+                Message: parsed.Message,
+                HasFallbackSource: parsed.HasFallbackSource,
+                RolloutState: parsed.RolloutState,
+                RolloutReason: parsed.RolloutReason,
+                SupportabilityState: parsed.SupportabilityState,
+                SupportabilitySummary: parsed.SupportabilitySummary,
+                KnownIssueSummary: parsed.KnownIssueSummary,
+                FixAvailabilitySummary: parsed.FixAvailabilitySummary,
+                ProofStatus: parsed.ReleaseProof?.Status,
+                ProofGeneratedAt: parsed.ReleaseProof?.GeneratedAt,
+                ProofBaseUrl: parsed.ReleaseProof?.BaseUrl,
+                ProofJourneys: parsed.ReleaseProof?.JourneysPassed,
+                ProofRoutes: parsed.ReleaseProof?.ProofRoutes,
+                GeneratedAt: parsed.GeneratedAt ?? parsed.GeneratedAtAlias,
+                ContractName: string.IsNullOrWhiteSpace(parsed.ContractName)
+                    ? parsed.ContractNameAlias
+                    : parsed.ContractName)
+            {
+                ProofUiLocalizationReleaseGate = parsed.ReleaseProof?.UiLocalizationReleaseGate is JsonElement uiLocalizationReleaseGate
+                    ? uiLocalizationReleaseGate.Clone()
+                    : null,
+                DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
+                    ? desktopTupleCoverage.Clone()
+                    : null
+            };
         return manifest ?? throw new InvalidDataException($"compatibility release manifest could not be parsed: {manifestPath}");
     }
 
@@ -676,6 +741,923 @@ public sealed class ReleaseBundlePromotionService
         return merged;
     }
 
+    private static (PublicReleaseManifestDto CompatibilityManifest, JsonObject CanonicalManifest) NormalizeMergedShelfProjection(
+        PublicReleaseManifestDto mergedCompatibilityManifest,
+        JsonObject mergedCanonicalManifest)
+    {
+        JsonArray mergedArtifacts = mergedCanonicalManifest["artifacts"] as JsonArray ?? [];
+        JsonObject coverage = BuildDesktopTupleCoverage(
+            mergedArtifacts,
+            mergedCompatibilityManifest.DesktopTupleCoverage,
+            channelStatus: mergedCompatibilityManifest.Status,
+            rolloutState: mergedCompatibilityManifest.RolloutState,
+            rolloutReason: mergedCompatibilityManifest.RolloutReason,
+            knownIssueSummary: mergedCompatibilityManifest.KnownIssueSummary);
+
+        bool desktopCoverageComplete = DesktopTupleCoverageIsComplete(coverage);
+        string proofStatus = ExtractProofStatus(mergedCanonicalManifest);
+        IReadOnlyList<string> proofJourneys = ExtractProofJourneys(mergedCanonicalManifest);
+        bool proofPassed = ProofPassed(proofStatus);
+        string rolloutState = DeriveRolloutState(
+            mergedCompatibilityManifest.Channel,
+            mergedCompatibilityManifest.Status,
+            proofPassed,
+            desktopCoverageComplete);
+        string rolloutReason = DeriveRolloutReason(
+            mergedCompatibilityManifest.Channel,
+            mergedCompatibilityManifest.Status,
+            proofPassed,
+            desktopCoverageComplete,
+            coverage);
+        string supportabilityState = DeriveSupportabilityState(
+            mergedCompatibilityManifest.Status,
+            proofPassed,
+            desktopCoverageComplete);
+        string supportabilitySummary = DeriveSupportabilitySummary(
+            mergedCompatibilityManifest.Status,
+            proofPassed,
+            desktopCoverageComplete,
+            coverage,
+            proofJourneys);
+        string knownIssueSummary = DeriveKnownIssueSummary(
+            mergedCompatibilityManifest.Channel,
+            mergedCompatibilityManifest.Status,
+            proofPassed,
+            desktopCoverageComplete,
+            coverage,
+            proofJourneys);
+        string fixAvailabilitySummary = DeriveFixAvailabilitySummary(
+            mergedCompatibilityManifest.Status,
+            proofPassed,
+            desktopCoverageComplete);
+
+        PublicReleaseManifestDto normalizedCompatibilityManifest = mergedCompatibilityManifest with
+        {
+            RolloutState = rolloutState,
+            RolloutReason = rolloutReason,
+            SupportabilityState = supportabilityState,
+            SupportabilitySummary = supportabilitySummary,
+            KnownIssueSummary = knownIssueSummary,
+            FixAvailabilitySummary = fixAvailabilitySummary,
+            DesktopTupleCoverage = JsonSerializer.SerializeToElement(coverage, JsonOptions)
+        };
+
+        JsonObject normalizedCanonicalManifest = mergedCanonicalManifest.DeepClone().AsObject();
+        normalizedCanonicalManifest["desktopTupleCoverage"] = coverage.DeepClone();
+        normalizedCanonicalManifest["rolloutState"] = rolloutState;
+        normalizedCanonicalManifest["rolloutReason"] = rolloutReason;
+        normalizedCanonicalManifest["supportabilityState"] = supportabilityState;
+        normalizedCanonicalManifest["supportabilitySummary"] = supportabilitySummary;
+        normalizedCanonicalManifest["knownIssueSummary"] = knownIssueSummary;
+        normalizedCanonicalManifest["fixAvailabilitySummary"] = fixAvailabilitySummary;
+
+        return (normalizedCompatibilityManifest, normalizedCanonicalManifest);
+    }
+
+    private static JsonObject BuildDesktopTupleCoverage(
+        JsonArray artifacts,
+        JsonElement? sourceCoverageElement,
+        string? channelStatus,
+        string? rolloutState,
+        string? rolloutReason,
+        string? knownIssueSummary)
+    {
+        JsonObject? sourceCoverage = sourceCoverageElement is JsonElement coverageElement
+            && coverageElement.ValueKind == JsonValueKind.Object
+            ? JsonNode.Parse(coverageElement.GetRawText())?.AsObject()
+            : null;
+
+        List<CanonicalArtifactState> artifactRows = ExtractCanonicalArtifactRows(artifacts);
+        List<Dictionary<string, string>> promotedInstallerTuples = [];
+        HashSet<string> promotedHeadTokens = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> promotedPlatformTokens = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> promotedPairs = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> promotedPlatformHeadRidTuples = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, List<string>> promotedPlatformHeads = RequiredDesktopPlatforms.ToDictionary(
+            static platform => platform,
+            static _ => new List<string>(),
+            StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, HashSet<string>> promotedPlatformHeadsSeen = RequiredDesktopPlatforms.ToDictionary(
+            static platform => platform,
+            static _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (CanonicalArtifactState artifact in artifactRows)
+        {
+            if (!RequiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
+                || !IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
+            {
+                continue;
+            }
+
+            string tupleId = $"{artifact.Head}:{artifact.Platform}:{artifact.Rid}";
+            promotedInstallerTuples.Add(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["tupleId"] = tupleId,
+                ["head"] = artifact.Head,
+                ["platform"] = artifact.Platform,
+                ["rid"] = artifact.Rid,
+                ["arch"] = artifact.Arch,
+                ["kind"] = artifact.Kind,
+                ["artifactId"] = artifact.ArtifactId
+            });
+            if (!string.IsNullOrWhiteSpace(artifact.Head))
+            {
+                promotedHeadTokens.Add(artifact.Head);
+                promotedPairs.Add($"{artifact.Head}:{artifact.Platform}");
+                if (promotedPlatformHeadsSeen[artifact.Platform].Add(artifact.Head))
+                {
+                    promotedPlatformHeads[artifact.Platform].Add(artifact.Head);
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(artifact.Head) && !string.IsNullOrWhiteSpace(artifact.Rid))
+            {
+                promotedPlatformHeadRidTuples.Add($"{artifact.Head}:{artifact.Rid}:{artifact.Platform}");
+            }
+
+            promotedPlatformTokens.Add(artifact.Platform);
+        }
+
+        promotedInstallerTuples = promotedInstallerTuples
+            .OrderBy(static row => row["platform"], StringComparer.Ordinal)
+            .ThenBy(static row => row["head"], StringComparer.Ordinal)
+            .ThenBy(static row => row["rid"], StringComparer.Ordinal)
+            .ThenBy(static row => row["artifactId"], StringComparer.Ordinal)
+            .ToList();
+        foreach (string platform in RequiredDesktopPlatforms)
+        {
+            promotedPlatformHeads[platform] = promotedPlatformHeads[platform]
+                .OrderBy(static value => value, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        List<string> missingRequiredPlatforms = RequiredDesktopPlatforms
+            .Where(platform => !promotedPlatformTokens.Contains(platform))
+            .ToList();
+        List<string> missingRequiredHeads = RequiredDesktopHeads
+            .Where(head => !promotedHeadTokens.Contains(head))
+            .ToList();
+        List<string> missingRequiredPlatformHeadPairs = RequiredDesktopPlatforms
+            .SelectMany(platform => RequiredDesktopHeads.Select(head => $"{head}:{platform}"))
+            .Where(pair => !promotedPairs.Contains(pair))
+            .ToList();
+
+        Dictionary<string, HashSet<string>> promotedRidsByPlatform = RequiredDesktopPlatforms.ToDictionary(
+            static platform => platform,
+            static _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (string tupleId in promotedPlatformHeadRidTuples)
+        {
+            string[] parts = tupleId.Split(':', 3, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 3 && promotedRidsByPlatform.TryGetValue(parts[2], out HashSet<string>? ridSet))
+            {
+                ridSet.Add(parts[1]);
+            }
+        }
+
+        List<string> requiredDesktopPlatformHeadRidTuples = RequiredDesktopPlatforms
+            .SelectMany(platform =>
+            {
+                IEnumerable<string> rids = DefaultRequiredDesktopPlatformRids.TryGetValue(platform, out string[]? requiredRids)
+                    && requiredRids.Length > 0
+                        ? requiredRids
+                        : promotedRidsByPlatform.GetValueOrDefault(platform, []).OrderBy(static value => value, StringComparer.Ordinal);
+                return RequiredDesktopHeads.SelectMany(head =>
+                    rids.Where(static rid => !string.IsNullOrWhiteSpace(rid))
+                        .Select(rid => $"{head}:{rid}:{platform}"));
+            })
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        List<string> promotedDesktopPlatformHeadRidTuples = promotedPlatformHeadRidTuples
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToList();
+        HashSet<string> promotedTupleSet = new(promotedDesktopPlatformHeadRidTuples, StringComparer.OrdinalIgnoreCase);
+        List<string> missingRequiredPlatformHeadRidTuples = requiredDesktopPlatformHeadRidTuples
+            .Where(tupleId => !promotedTupleSet.Contains(tupleId))
+            .ToList();
+        HashSet<string> missingTupleSet = new(missingRequiredPlatformHeadRidTuples, StringComparer.OrdinalIgnoreCase);
+
+        JsonObject coverage = new()
+        {
+            ["requiredDesktopPlatforms"] = JsonSerializer.SerializeToNode(RequiredDesktopPlatforms, JsonOptions),
+            ["requiredDesktopHeads"] = JsonSerializer.SerializeToNode(RequiredDesktopHeads, JsonOptions),
+            ["promotedInstallerTuples"] = JsonSerializer.SerializeToNode(promotedInstallerTuples, JsonOptions),
+            ["promotedPlatformHeads"] = JsonSerializer.SerializeToNode(promotedPlatformHeads, JsonOptions),
+            ["requiredDesktopPlatformHeadRidTuples"] = JsonSerializer.SerializeToNode(requiredDesktopPlatformHeadRidTuples, JsonOptions),
+            ["promotedPlatformHeadRidTuples"] = JsonSerializer.SerializeToNode(promotedDesktopPlatformHeadRidTuples, JsonOptions),
+            ["missingRequiredPlatforms"] = JsonSerializer.SerializeToNode(missingRequiredPlatforms, JsonOptions),
+            ["missingRequiredHeads"] = JsonSerializer.SerializeToNode(missingRequiredHeads, JsonOptions),
+            ["missingRequiredPlatformHeadPairs"] = JsonSerializer.SerializeToNode(missingRequiredPlatformHeadPairs, JsonOptions),
+            ["missingRequiredPlatformHeadRidTuples"] = JsonSerializer.SerializeToNode(missingRequiredPlatformHeadRidTuples, JsonOptions),
+            ["externalProofRequests"] = FilterExternalProofRequests(sourceCoverage, missingTupleSet),
+            ["desktopRouteTruth"] = JsonSerializer.SerializeToNode(
+                BuildDesktopRouteTruth(
+                    artifactRows,
+                    NormalizeToken(channelStatus),
+                    NormalizeToken(rolloutState),
+                    rolloutReason?.Trim() ?? string.Empty,
+                    knownIssueSummary?.Trim() ?? string.Empty),
+                JsonOptions),
+            ["complete"] = missingRequiredPlatforms.Count == 0
+                && missingRequiredHeads.Count == 0
+                && missingRequiredPlatformHeadPairs.Count == 0
+                && missingRequiredPlatformHeadRidTuples.Count == 0
+        };
+
+        return coverage;
+    }
+
+    private static JsonArray FilterExternalProofRequests(JsonObject? sourceCoverage, HashSet<string> missingTupleIds)
+    {
+        JsonArray filtered = [];
+        if (missingTupleIds.Count == 0)
+        {
+            return filtered;
+        }
+
+        if (sourceCoverage?["externalProofRequests"] is not JsonArray requests)
+        {
+            return filtered;
+        }
+
+        foreach (JsonNode? node in requests)
+        {
+            if (node is not JsonObject request)
+            {
+                continue;
+            }
+
+            string tupleId = NormalizeToken(GetJsonString(request["tupleId"]));
+            if (string.IsNullOrWhiteSpace(tupleId) || !missingTupleIds.Contains(tupleId))
+            {
+                continue;
+            }
+
+            filtered.Add(request.DeepClone());
+        }
+
+        return filtered;
+    }
+
+    private static List<Dictionary<string, string>> BuildDesktopRouteTruth(
+        IReadOnlyList<CanonicalArtifactState> artifacts,
+        string channelStatus,
+        string rolloutState,
+        string rolloutReason,
+        string knownIssueSummary)
+    {
+        Dictionary<string, CanonicalArtifactState> promotedByPlatformHeadRid = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, HashSet<string>> requiredRidsByPlatform = RequiredDesktopPlatforms.ToDictionary(
+            static platform => platform,
+            static platform => new HashSet<string>(
+                DefaultRequiredDesktopPlatformRids.TryGetValue(platform, out string[]? rids) ? rids : [],
+                StringComparer.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
+
+        foreach (CanonicalArtifactState artifact in artifacts)
+        {
+            if (!RequiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
+                || !DesktopRouteTruthHeads.Contains(artifact.Head, StringComparer.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(artifact.Rid)
+                || !IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
+            {
+                continue;
+            }
+
+            requiredRidsByPlatform[artifact.Platform].Add(artifact.Rid);
+            string key = $"{artifact.Platform}|{artifact.Head}|{artifact.Rid}";
+            if (!promotedByPlatformHeadRid.TryGetValue(key, out CanonicalArtifactState? current)
+                || CompareArtifactSelectionKey(artifact, current) < 0)
+            {
+                promotedByPlatformHeadRid[key] = artifact;
+            }
+        }
+
+        List<Dictionary<string, string>> rows = [];
+        foreach (string platform in RequiredDesktopPlatforms)
+        {
+            IEnumerable<string> rids = requiredRidsByPlatform.TryGetValue(platform, out HashSet<string>? ridSet)
+                ? ridSet.OrderBy(static value => value, StringComparer.Ordinal)
+                : Enumerable.Empty<string>();
+            foreach (string rid in rids)
+            {
+                foreach (string head in DesktopRouteTruthHeads)
+                {
+                    promotedByPlatformHeadRid.TryGetValue($"{platform}|{head}|{rid}", out CanonicalArtifactState? artifact);
+                    string routeRole = DesktopRouteRoles[head];
+                    string arch = artifact?.Arch
+                        ?? (RidToPlatformArch.TryGetValue(rid, out (string Platform, string Arch) platformArch) ? platformArch.Arch : string.Empty);
+                    string artifactId = artifact?.ArtifactId ?? string.Empty;
+                    bool promoted = artifact is not null;
+                    string tupleLabel = $"{platform}/{rid}";
+                    string routeTupleLabel = $"{head}:{platform}:{rid}";
+                    string fallbackRouteTupleLabel = $"blazor-desktop:{platform}:{rid}";
+                    (string RevokeState, string RevokeReason) revoke = DesktopRouteRevokePosture(
+                        artifact,
+                        channelStatus,
+                        rolloutState,
+                        rolloutReason,
+                        knownIssueSummary);
+                    string revokeReason = revoke.RevokeState == "revoked"
+                        ? $"Registry revoke marker is active for {routeTupleLabel}: {revoke.RevokeReason}"
+                        : $"No registry revoke marker is active for {routeTupleLabel}.";
+
+                    string promotionState;
+                    string promotionReasonCode;
+                    string promotionReason;
+                    string installPosture;
+                    string installPostureReason;
+                    if (promoted)
+                    {
+                        promotionState = "promoted";
+                        promotionReasonCode = "installer_smoke_and_release_proof_passed";
+                        string promotionSubject = DesktopRoutePromotionSubject(head);
+                        promotionReason = routeRole == "primary"
+                            ? $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted because the flagship head is present on the registry shelf and passed independent startup-smoke and release-proof gates for this channel."
+                            : $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted for recovery/manual routing because it is present on the registry shelf and passed the current startup-smoke and release-proof gates for this channel.";
+                        installPosture = "installer_first";
+                        installPostureReason = $"Promoted installer media is present for {AppLabels[head]} tuple {routeTupleLabel} on {tupleLabel}.";
+                    }
+                    else
+                    {
+                        promotionState = "proof_required";
+                        promotionReasonCode = "missing_artifact_or_startup_smoke_proof";
+                        string promotionSubject = DesktopRoutePromotionSubject(head);
+                        promotionReason = routeRole == "primary"
+                            ? $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is not promoted until the flagship head has matching artifact bytes and fresh startup-smoke proof for this channel."
+                            : $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is retained for recovery/manual routing on {tupleLabel} but is not promoted until matching artifact bytes and fresh startup-smoke proof are present.";
+                        installPosture = "proof_capture_required";
+                        installPostureReason = $"Do not present {routeTupleLabel} as installable until the missing tuple proof is captured.";
+                    }
+
+                    string parityPosture;
+                    string updateEligibility;
+                    string updateEligibilityReason;
+                    string rollbackState;
+                    string rollbackReasonCode;
+                    string rollbackReason;
+                    if (routeRole == "primary")
+                    {
+                        parityPosture = "flagship_primary";
+                        if (promoted)
+                        {
+                            updateEligibility = "eligible";
+                            updateEligibilityReason = $"Primary-route {AppLabels[head]} tuple {routeTupleLabel} is promoted for {tupleLabel}.";
+                        }
+                        else
+                        {
+                            updateEligibility = "blocked_missing_proof";
+                            updateEligibilityReason = $"Primary-route updates are blocked until {routeTupleLabel} is promoted.";
+                        }
+
+                        promotedByPlatformHeadRid.TryGetValue($"{platform}|blazor-desktop|{rid}", out CanonicalArtifactState? fallbackArtifact);
+                        bool fallbackRevoked = DesktopRouteArtifactIsRevoked(fallbackArtifact);
+                        bool fallbackPromoted = fallbackArtifact is not null && !fallbackRevoked;
+                        if (fallbackPromoted)
+                        {
+                            rollbackState = "fallback_available";
+                            rollbackReasonCode = "promoted_fallback_available";
+                            rollbackReason = $"A promoted fallback route {fallbackRouteTupleLabel} exists for primary route {routeTupleLabel} on {tupleLabel}.";
+                        }
+                        else if (fallbackRevoked)
+                        {
+                            (string _, string FallbackRevokeReason) = DesktopRouteRevokePosture(
+                                fallbackArtifact,
+                                channelStatus,
+                                rolloutState,
+                                rolloutReason,
+                                knownIssueSummary);
+                            string fallbackRevokeReason = $"Registry revoke marker is active for {fallbackRouteTupleLabel}: {FallbackRevokeReason}";
+                            rollbackState = "manual_recovery_required";
+                            rollbackReasonCode = "fallback_revoked_for_tuple";
+                            rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is revoked for {tupleLabel}, so primary route {routeTupleLabel} requires manual recovery: {fallbackRevokeReason}";
+                        }
+                        else
+                        {
+                            rollbackState = "manual_recovery_required";
+                            rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
+                            rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is not promoted for {tupleLabel} because matching artifact bytes and fresh startup-smoke proof are still required; primary route {routeTupleLabel} therefore requires manual recovery.";
+                        }
+                    }
+                    else
+                    {
+                        parityPosture = "explicit_fallback";
+                        if (promoted)
+                        {
+                            updateEligibility = "manual_fallback";
+                            updateEligibilityReason = $"Fallback {AppLabels[head]} tuple {routeTupleLabel} is promoted for {tupleLabel} recovery/manual selection, not automatic primary updates.";
+                            rollbackState = "fallback_available";
+                            rollbackReasonCode = "fallback_promoted_for_recovery";
+                            rollbackReason = $"Fallback {AppLabels[head]} tuple {routeTupleLabel} is promoted for {tupleLabel} rollback or recovery routing.";
+                        }
+                        else
+                        {
+                            updateEligibility = "blocked_missing_proof";
+                            updateEligibilityReason = $"Fallback route {routeTupleLabel} is not update-eligible until promoted.";
+                            rollbackState = "fallback_not_promoted";
+                            rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
+                            rollbackReason = $"Fallback route {routeTupleLabel} needs artifact and startup-smoke proof before rollback use.";
+                        }
+                    }
+
+                    if (revoke.RevokeState == "revoked")
+                    {
+                        string routeRoleLabel = routeRole == "primary" ? "primary-route" : "fallback";
+                        promotionState = "revoked";
+                        promotionReasonCode = "registry_revoke_marker_active";
+                        promotionReason = $"Registry revoke truth blocks {routeRoleLabel} promotion for {routeTupleLabel}: {revokeReason}";
+                        updateEligibility = "blocked_revoked";
+                        updateEligibilityReason = $"Updates are blocked because {routeTupleLabel} is revoked in registry truth: {revokeReason}";
+                        rollbackState = "revoked";
+                        rollbackReasonCode = "registry_revoke_marker_active";
+                        rollbackReason = $"Do not use {routeTupleLabel} for rollback while its registry revoke marker is active: {revokeReason}";
+                        installPosture = "revoked";
+                        installPostureReason = $"Do not present {routeTupleLabel} as installable while revoked: {revokeReason}";
+                    }
+
+                    rows.Add(new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["tupleId"] = routeTupleLabel,
+                        ["head"] = head,
+                        ["platform"] = platform,
+                        ["rid"] = rid,
+                        ["arch"] = arch,
+                        ["artifactId"] = artifactId,
+                        ["routeRole"] = routeRole,
+                        ["routeRoleReasonCode"] = DesktopRouteRoleReasonCode(head),
+                        ["routeRoleReason"] = DesktopRouteRoleReason(head, platform, rid),
+                        ["promotionState"] = promotionState,
+                        ["promotionReasonCode"] = promotionReasonCode,
+                        ["promotionReason"] = promotionReason,
+                        ["parityPosture"] = parityPosture,
+                        ["updateEligibility"] = updateEligibility,
+                        ["updateEligibilityReason"] = updateEligibilityReason,
+                        ["rollbackState"] = rollbackState,
+                        ["rollbackReasonCode"] = rollbackReasonCode,
+                        ["rollbackReason"] = rollbackReason,
+                        ["revokeState"] = revoke.RevokeState,
+                        ["revokeReasonCode"] = revoke.RevokeState == "revoked"
+                            ? "registry_revoke_marker_active"
+                            : "no_registry_revoke_marker",
+                        ["revokeReason"] = revokeReason,
+                        ["installPosture"] = installPosture,
+                        ["installPostureReason"] = installPostureReason,
+                        ["publicInstallRoute"] = $"/downloads/install/{head}-{rid}-installer"
+                    });
+                }
+            }
+        }
+
+        return rows
+            .OrderBy(static row => row["platform"], StringComparer.Ordinal)
+            .ThenBy(static row => row["head"], StringComparer.Ordinal)
+            .ThenBy(static row => row["rid"], StringComparer.Ordinal)
+            .ThenBy(static row => row["tupleId"], StringComparer.Ordinal)
+            .ToList();
+    }
+
+    private static string DeriveRolloutState(string? channel, string? status, bool proofPassed, bool desktopCoverageComplete)
+    {
+        string normalizedStatus = NormalizeToken(status);
+        if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
+        {
+            return "unpublished";
+        }
+
+        if (!desktopCoverageComplete)
+        {
+            return "coverage_incomplete";
+        }
+
+        string normalizedChannel = NormalizeToken(channel);
+        if (proofPassed)
+        {
+            return normalizedChannel is "preview" or "docker"
+                ? "promoted_preview"
+                : normalizedChannel;
+        }
+
+        return normalizedChannel == "preview"
+            ? "promoted_preview"
+            : normalizedChannel;
+    }
+
+    private static string DeriveRolloutReason(
+        string? channel,
+        string? status,
+        bool proofPassed,
+        bool desktopCoverageComplete,
+        JsonObject coverage)
+    {
+        string normalizedStatus = NormalizeToken(status);
+        if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
+        {
+            return "No published artifact shelf exists yet.";
+        }
+
+        if (!desktopCoverageComplete)
+        {
+            return "Current shelf is published, but promotion stays blocked because "
+                + DesktopTupleCoverageGapSummary(coverage)
+                + ".";
+        }
+
+        if (proofPassed)
+        {
+            return "Current release shelf was exercised by the local docker release proof harness before publication.";
+        }
+
+        return string.Equals(NormalizeToken(channel), "preview", StringComparison.Ordinal)
+            ? "Current preview shelf is published, but release proof should be re-run before widening trust claims."
+            : "Current release shelf is published.";
+    }
+
+    private static string DeriveSupportabilityState(string? status, bool proofPassed, bool desktopCoverageComplete)
+    {
+        string normalizedStatus = NormalizeToken(status);
+        if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
+        {
+            return "unpublished";
+        }
+
+        if (!desktopCoverageComplete)
+        {
+            return "review_required";
+        }
+
+        return proofPassed
+            ? "preview_supported"
+            : "review_required";
+    }
+
+    private static string DeriveSupportabilitySummary(
+        string? status,
+        bool proofPassed,
+        bool desktopCoverageComplete,
+        JsonObject coverage,
+        IReadOnlyList<string>? proofJourneys)
+    {
+        string normalizedStatus = NormalizeToken(status);
+        if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
+        {
+            return "No published channel support posture exists because no release shelf is live.";
+        }
+
+        if (!desktopCoverageComplete)
+        {
+            return "Treat the current shelf as review-required because "
+                + DesktopTupleCoverageGapSummary(coverage)
+                + ".";
+        }
+
+        if (!proofPassed)
+        {
+            return "Treat the current shelf as review-required until release proof and support closure checks pass.";
+        }
+
+        List<string> journeys = proofJourneys?
+            .Select(NormalizeToken)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToList()
+            ?? [];
+        if (journeys.Count == 0)
+        {
+            return "Local release proof passed for the current shelf.";
+        }
+
+        List<string> proofNotes = [];
+        if (journeys.Contains("install_claim_restore_continue", StringComparer.Ordinal))
+        {
+            proofNotes.Add("Claimed-device restore and bounded offline prefetch stayed grounded on the current shelf.");
+        }
+
+        if (journeys.Contains("report_cluster_release_notify", StringComparer.Ordinal))
+        {
+            proofNotes.Add("Clustered release notification stayed grounded on the current shelf.");
+        }
+
+        if (journeys.Contains("organize_community_and_close_loop", StringComparer.Ordinal))
+        {
+            proofNotes.Add("Community organizer closure stayed grounded on the current shelf.");
+        }
+
+        string noteSuffix = proofNotes.Count > 0
+            ? " " + string.Join(" ", proofNotes)
+            : string.Empty;
+        return $"Local release proof passed for: {string.Join(", ", journeys)}.{noteSuffix}";
+    }
+
+    private static string DeriveKnownIssueSummary(
+        string? channel,
+        string? status,
+        bool proofPassed,
+        bool desktopCoverageComplete,
+        JsonObject coverage,
+        IReadOnlyList<string>? proofJourneys)
+    {
+        string normalizedStatus = NormalizeToken(status);
+        if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
+        {
+            return "No active channel issues are published because the shelf is still empty.";
+        }
+
+        if (!desktopCoverageComplete)
+        {
+            return "Known issue: " + DesktopTupleCoverageGapSummary(coverage) + ".";
+        }
+
+        if (!proofPassed)
+        {
+            return $"The {NormalizeToken(channel)} shelf is visible, but known-issue review should stay front-and-center until proof is refreshed.";
+        }
+
+        List<string> journeys = proofJourneys?
+            .Select(NormalizeToken)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToList()
+            ?? [];
+        List<string> proofNotes = [];
+        if (journeys.Contains("install_claim_restore_continue", StringComparer.Ordinal))
+        {
+            proofNotes.Add("claimed-device recovery");
+        }
+
+        if (journeys.Contains("report_cluster_release_notify", StringComparer.Ordinal))
+        {
+            proofNotes.Add("clustered release notification");
+        }
+
+        if (journeys.Contains("organize_community_and_close_loop", StringComparer.Ordinal))
+        {
+            proofNotes.Add("community closure");
+        }
+
+        string proofNoteClause = proofNotes.Count > 0
+            ? ", " + string.Join(", ", proofNotes)
+            : string.Empty;
+        return "Preview caveats still apply, but the current shelf has recent install"
+            + proofNoteClause
+            + ", bounded offline prefetch, and support proof instead of only manifest presence.";
+    }
+
+    private static string DeriveFixAvailabilitySummary(string? status, bool proofPassed, bool desktopCoverageComplete)
+    {
+        string normalizedStatus = NormalizeToken(status);
+        if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
+        {
+            return "Fix notices should stay pending until a published shelf exists.";
+        }
+
+        if (!desktopCoverageComplete)
+        {
+            return "Do not send fixed notices until required desktop tuple coverage is complete for the promoted shelf.";
+        }
+
+        return proofPassed
+            ? "Only send fixed notices after the affected install can receive the published channel artifact now on the shelf."
+            : "Verify fix availability against the live channel artifact before closing support loops.";
+    }
+
+    private static bool DesktopTupleCoverageIsComplete(JsonObject coverage)
+        => ToJsonStringList(coverage["missingRequiredPlatforms"]).Count == 0
+            && ToJsonStringList(coverage["missingRequiredHeads"]).Count == 0
+            && ToJsonStringList(coverage["missingRequiredPlatformHeadPairs"]).Count == 0
+            && ToJsonStringList(coverage["missingRequiredPlatformHeadRidTuples"]).Count == 0;
+
+    private static string DesktopTupleCoverageGapSummary(JsonObject? coverage)
+    {
+        if (coverage is null)
+        {
+            return "required desktop tuple coverage is unavailable";
+        }
+
+        List<string> details = [];
+        List<string> missingPlatforms = ToJsonStringList(coverage["missingRequiredPlatforms"]);
+        List<string> missingHeads = ToJsonStringList(coverage["missingRequiredHeads"]);
+        List<string> missingPairs = ToJsonStringList(coverage["missingRequiredPlatformHeadPairs"]);
+        List<string> missingTuples = ToJsonStringList(coverage["missingRequiredPlatformHeadRidTuples"]);
+        if (missingPlatforms.Count > 0)
+        {
+            details.Add("platforms: " + string.Join(", ", missingPlatforms));
+        }
+
+        if (missingHeads.Count > 0)
+        {
+            details.Add("heads: " + string.Join(", ", missingHeads));
+        }
+
+        if (missingPairs.Count > 0)
+        {
+            details.Add("pairs: " + string.Join(", ", missingPairs));
+        }
+
+        if (missingTuples.Count > 0)
+        {
+            details.Add("tuples: " + string.Join(", ", missingTuples));
+        }
+
+        return details.Count == 0
+            ? "required desktop tuple coverage is complete"
+            : "required desktop tuple coverage is incomplete (" + string.Join("; ", details) + ")";
+    }
+
+    private static bool ProofPassed(string? proofStatus)
+        => string.Equals(NormalizeToken(proofStatus), "passed", StringComparison.Ordinal);
+
+    private static string ExtractProofStatus(JsonObject manifest)
+        => NormalizeToken(GetJsonString((manifest["releaseProof"] as JsonObject)?["status"]));
+
+    private static IReadOnlyList<string> ExtractProofJourneys(JsonObject manifest)
+        => ToJsonStringList((manifest["releaseProof"] as JsonObject)?["journeysPassed"])
+            .Select(NormalizeToken)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .ToArray();
+
+    private static (string RevokeState, string RevokeReason) DesktopRouteRevokePosture(
+        CanonicalArtifactState? artifact,
+        string channelStatus,
+        string rolloutState,
+        string rolloutReason,
+        string knownIssueSummary)
+    {
+        if (string.Equals(channelStatus, "revoked", StringComparison.Ordinal)
+            || string.Equals(rolloutState, "revoked", StringComparison.Ordinal))
+        {
+            string reason = !string.IsNullOrWhiteSpace(rolloutReason)
+                ? rolloutReason
+                : !string.IsNullOrWhiteSpace(knownIssueSummary)
+                    ? knownIssueSummary
+                    : "The release channel is revoked for this desktop tuple.";
+            return ("revoked", reason);
+        }
+
+        if (DesktopRouteArtifactIsRevoked(artifact))
+        {
+            string reason = artifact?.RevokeReason
+                ?? artifact?.ArtifactRolloutReason
+                ?? artifact?.CompatibilityReason
+                ?? artifact?.ArtifactKnownIssueSummary
+                ?? knownIssueSummary;
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                reason = "The artifact registry state is revoked for this desktop tuple.";
+            }
+
+            return ("revoked", reason);
+        }
+
+        return ("not_revoked", "No registry revoke marker is active for this channel tuple.");
+    }
+
+    private static bool DesktopRouteArtifactIsRevoked(CanonicalArtifactState? artifact)
+        => artifact is not null
+            && (
+                string.Equals(artifact.ArtifactStatus, "revoked", StringComparison.Ordinal)
+                || string.Equals(artifact.ArtifactRolloutState, "revoked", StringComparison.Ordinal)
+                || string.Equals(artifact.CompatibilityState, "revoked", StringComparison.Ordinal)
+            );
+
+    private static int CompareArtifactSelectionKey(CanonicalArtifactState left, CanonicalArtifactState right)
+    {
+        int revokedComparison = (DesktopRouteArtifactIsRevoked(left) ? 1 : 0)
+            .CompareTo(DesktopRouteArtifactIsRevoked(right) ? 1 : 0);
+        if (revokedComparison != 0)
+        {
+            return revokedComparison;
+        }
+
+        return string.Compare(left.ArtifactId, right.ArtifactId, StringComparison.Ordinal);
+    }
+
+    private static string DesktopRouteRoleReason(string head, string platform, string rid)
+    {
+        string tupleLabel = string.IsNullOrWhiteSpace(rid) ? platform : $"{platform}/{rid}";
+        string routeTupleLabel = string.IsNullOrWhiteSpace(rid) ? $"{head}:{platform}" : $"{head}:{platform}:{rid}";
+        if (string.Equals(DesktopRouteRoles[head], "primary", StringComparison.Ordinal))
+        {
+            return $"{AppLabels[head]} route {routeTupleLabel} is the flagship desktop route for {tupleLabel} and must carry independent startup-smoke proof before promotion.";
+        }
+
+        return $"{AppLabels[head]} route {routeTupleLabel} is retained as an explicit fallback route for {tupleLabel}; it cannot satisfy the primary-route promise.";
+    }
+
+    private static string DesktopRouteRoleReasonCode(string head)
+        => string.Equals(DesktopRouteRoles[head], "primary", StringComparison.Ordinal)
+            ? "primary_flagship_head"
+            : "fallback_recovery_head";
+
+    private static string DesktopRoutePromotionSubject(string head)
+        => string.Equals(DesktopRouteRoles[head], "primary", StringComparison.Ordinal)
+            ? $"Primary-route {AppLabels[head]}"
+            : $"Fallback {AppLabels[head]}";
+
+    private static bool IsDesktopInstallMedia(string platform, string kind)
+        => string.Equals(platform, "macos", StringComparison.Ordinal)
+            ? kind is "installer" or "dmg" or "pkg"
+            : string.Equals(kind, "installer", StringComparison.Ordinal);
+
+    private static List<CanonicalArtifactState> ExtractCanonicalArtifactRows(JsonArray artifacts)
+    {
+        List<CanonicalArtifactState> rows = [];
+        foreach (JsonNode? node in artifacts)
+        {
+            if (node is not JsonObject artifact)
+            {
+                continue;
+            }
+
+            string rid = NormalizeToken(GetJsonString(artifact["rid"]));
+            string platform = NormalizePlatformToken(GetJsonString(artifact["platform"]));
+            if (string.IsNullOrWhiteSpace(platform)
+                && RidToPlatformArch.TryGetValue(rid, out (string Platform, string Arch) platformArch))
+            {
+                platform = platformArch.Platform;
+            }
+
+            string arch = NormalizeToken(GetJsonString(artifact["arch"]));
+            if (string.IsNullOrWhiteSpace(arch)
+                && RidToPlatformArch.TryGetValue(rid, out (string Platform, string Arch) archMapping))
+            {
+                arch = archMapping.Arch;
+            }
+            if (string.IsNullOrWhiteSpace(rid))
+            {
+                rid = InferRid(platform, arch);
+            }
+
+            rows.Add(new CanonicalArtifactState(
+                ArtifactId: NormalizeToken(GetJsonString(artifact["artifactId"]) ?? GetJsonString(artifact["id"])),
+                Head: NormalizeToken(GetJsonString(artifact["head"])),
+                Platform: platform,
+                Rid: rid,
+                Arch: arch,
+                Kind: NormalizeToken(GetJsonString(artifact["kind"])),
+                ArtifactStatus: NormalizeToken(GetJsonString(artifact["status"])),
+                ArtifactRolloutState: NormalizeToken(GetJsonString(artifact["rolloutState"]) ?? GetJsonString(artifact["rollout_state"])),
+                ArtifactRolloutReason: (GetJsonString(artifact["rolloutReason"]) ?? GetJsonString(artifact["rollout_reason"]) ?? string.Empty).Trim(),
+                RevokeReason: (GetJsonString(artifact["revokeReason"]) ?? GetJsonString(artifact["revoke_reason"]) ?? string.Empty).Trim(),
+                CompatibilityState: NormalizeToken(GetJsonString(artifact["compatibilityState"]) ?? GetJsonString(artifact["compatibility_state"])),
+                CompatibilityReason: (GetJsonString(artifact["compatibilityReason"]) ?? GetJsonString(artifact["compatibility_reason"]) ?? string.Empty).Trim(),
+                ArtifactKnownIssueSummary: (GetJsonString(artifact["knownIssueSummary"]) ?? GetJsonString(artifact["known_issue_summary"]) ?? string.Empty).Trim()));
+        }
+
+        return rows;
+    }
+
+    private static string NormalizeToken(string? value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().ToLowerInvariant();
+
+    private static string NormalizePlatformToken(string? value)
+    {
+        string normalized = NormalizeToken(value);
+        return normalized switch
+        {
+            "win" => "windows",
+            "osx" => "macos",
+            _ => normalized
+        };
+    }
+
+    private static string InferRid(string platform, string arch)
+        => platform switch
+        {
+            "windows" when string.Equals(arch, "arm64", StringComparison.Ordinal) => "win-arm64",
+            "windows" => "win-x64",
+            "macos" when string.Equals(arch, "x64", StringComparison.Ordinal) => "osx-x64",
+            "macos" => "osx-arm64",
+            "linux" when string.Equals(arch, "arm64", StringComparison.Ordinal) => "linux-arm64",
+            "linux" => "linux-x64",
+            _ => string.Empty
+        };
+
+    private static string? GetJsonString(JsonNode? node)
+        => node switch
+        {
+            null => null,
+            JsonValue value => value.TryGetValue<string>(out string? stringValue)
+                ? stringValue
+                : value.ToJsonString().Trim('"'),
+            _ => node.ToJsonString()
+        };
+
+    private static List<string> ToJsonStringList(JsonNode? node)
+    {
+        if (node is not JsonArray array)
+        {
+            return [];
+        }
+
+        return array
+            .Select(GetJsonString)
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Select(static value => value!.Trim())
+            .ToList();
+    }
+
     private static JsonArray MergeArrayById(JsonArray? existingArray, JsonArray? incomingArray, string idProperty)
     {
         JsonArray merged = new();
@@ -878,6 +1860,52 @@ public sealed class ReleaseBundlePromotionService
         ReleaseSelectionService releaseSelection = new(new PublicCanonFileLoader(_configuration));
         return releaseSelection.ApplyAccessPolicy(liveCompatibilityManifest);
     }
+
+    private sealed record CanonicalArtifactState(
+        string ArtifactId,
+        string Head,
+        string Platform,
+        string Rid,
+        string Arch,
+        string Kind,
+        string ArtifactStatus,
+        string ArtifactRolloutState,
+        string ArtifactRolloutReason,
+        string RevokeReason,
+        string CompatibilityState,
+        string CompatibilityReason,
+        string ArtifactKnownIssueSummary);
+
+    private sealed record CompatibilityManifestPayload(
+        string? Version,
+        string? Channel,
+        string? ChannelId,
+        DateTimeOffset? PublishedAt,
+        IReadOnlyList<PublicReleaseArtifactDto>? Downloads,
+        string? Source,
+        string? Status,
+        string? Message,
+        bool HasFallbackSource,
+        string? RolloutState,
+        string? RolloutReason,
+        string? SupportabilityState,
+        string? SupportabilitySummary,
+        string? KnownIssueSummary,
+        string? FixAvailabilitySummary,
+        CompatibilityProofPayload? ReleaseProof,
+        DateTimeOffset? GeneratedAt,
+        [property: JsonPropertyName("generated_at")] DateTimeOffset? GeneratedAtAlias,
+        string? ContractName,
+        [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
+        JsonElement? DesktopTupleCoverage);
+
+    private sealed record CompatibilityProofPayload(
+        string? Status,
+        DateTimeOffset? GeneratedAt,
+        string? BaseUrl,
+        IReadOnlyList<string>? JourneysPassed,
+        IReadOnlyList<string>? ProofRoutes,
+        JsonElement? UiLocalizationReleaseGate);
 
     private sealed record CanonicalArtifactRecord(
         [property: JsonPropertyName("artifactId")] string ArtifactId,
