@@ -26,6 +26,62 @@ OWNED_SURFACES = [
     "workspace_restore:provenance",
     "entitlement_sync:conflict_receipts",
 ]
+FORBIDDEN_PROOF_MARKERS = [
+    "TASK_LOCAL_TELEMETRY",
+    "TASK_LOCAL_TELEMETRY.generated.json",
+    "ACTIVE_RUN_HANDOFF",
+    "ACTIVE_RUN_HANDOFF.generated.md",
+    "task-local telemetry",
+    "shard runtime handoff",
+    "Shard Runtime Handoff",
+    "Recent stderr tail",
+    "Prompt path:",
+    "Selected account:",
+    "Selected model:",
+    "Open milestone ids:",
+    "successor-wave telemetry",
+    "frontier_briefs",
+    "successor frontier detail",
+    "successor frontier ids",
+    "assigned successor queue package",
+    "current steering focus",
+    "profile focus",
+    "owner focus",
+    "text focus",
+    "focus_profiles",
+    "focus_owners",
+    "focus_texts",
+    "eta: 5.6d-2w",
+    "eta 5.6d-2w",
+    "execution rules inside this run",
+    "required order",
+    "first_commands",
+    "polling_disabled",
+    "polling disabled",
+    "runtime_handoff_path",
+    "status_query_supported",
+    "status query",
+    "successor_queue_path",
+    "successor_registry_path",
+    "remaining milestones",
+    "remaining queue items",
+    "critical path",
+    "active-run helper",
+    "active-run helper command",
+    "active-run helper commands",
+    "operator telemetry",
+    "operator/OODA loop owns telemetry",
+    "operator/OODA",
+    "operator OODA",
+    "supervisor status",
+    "supervisor eta",
+    "status helper",
+    "eta helper",
+    "design_supervisor_ooda",
+    "ooda_design_supervisor.py",
+    "run_ooda_design_supervisor_until_quiet",
+    "/var/lib/codex-fleet",
+]
 
 
 QUEUE_PATHS = [
@@ -93,6 +149,13 @@ def extract_scalar_list(block: str, key: str) -> list[str]:
     return values
 
 
+def reject_forbidden_markers(path: Path, block: str, missing: list[str]) -> None:
+    normalized_block = block.casefold()
+    for marker in FORBIDDEN_PROOF_MARKERS:
+        if marker.casefold() in normalized_block:
+            missing.append(f"{path}: forbidden active-run proof marker: {marker}")
+
+
 def check_queue(path: Path, missing: list[str]) -> None:
     text = read_text(path, missing)
     if not text:
@@ -114,6 +177,7 @@ def check_queue(path: Path, missing: list[str]) -> None:
         return
 
     package_block = package_blocks[0]
+    reject_forbidden_markers(path, package_block, missing)
     if title_blocks and title_blocks[0] != package_block:
         missing.append(f"{path}: title row for {TITLE!r} must be the {PACKAGE_ID} package row")
     if frontier_blocks and frontier_blocks[0] != package_block:
