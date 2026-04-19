@@ -235,11 +235,11 @@ public sealed class PublicLandingMacBootstrapScriptTests
     public void BuildMacBootstrapTerminalCommandDownloadsToATempFileBeforeExecution()
     {
         string command = PublicLandingController.BuildMacBootstrapTerminalCommand(
-            "https://chummer.run/install-abc123def456.sh");
+            "https://chummer.run/install-abc123def456-0123456789abcdef.sh");
 
         Assert.Contains("set -euo pipefail", command, StringComparison.Ordinal);
         Assert.Contains("TMP_BOOTSTRAP_SCRIPT", command, StringComparison.Ordinal);
-        Assert.Contains("curl -fsSL 'https://chummer.run/install-abc123def456.sh' -o \"$TMP_BOOTSTRAP_SCRIPT\"", command, StringComparison.Ordinal);
+        Assert.Contains("curl -fsSL 'https://chummer.run/install-abc123def456-0123456789abcdef.sh' -o \"$TMP_BOOTSTRAP_SCRIPT\"", command, StringComparison.Ordinal);
         Assert.Contains("/bin/bash \"$TMP_BOOTSTRAP_SCRIPT\"", command, StringComparison.Ordinal);
         Assert.DoesNotContain("| /bin/bash", command, StringComparison.Ordinal);
     }
@@ -248,13 +248,21 @@ public sealed class PublicLandingMacBootstrapScriptTests
     public void BuildMacBootstrapTerminalCommandPinsDigestWhenProvided()
     {
         string command = PublicLandingController.BuildMacBootstrapTerminalCommand(
-            "https://chummer.run/install-abc123def456.sh",
+            "https://chummer.run/install-abc123def456-0123456789abcdef.sh",
             "abc123");
 
         Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
         Assert.Contains("shasum -a 256", command, StringComparison.Ordinal);
         Assert.Contains("'abc123'", command, StringComparison.Ordinal);
         Assert.Contains("Bootstrap digest mismatch; re-open the signed-in downloads handoff and copy a fresh install command.", command, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildPersonalizedMacBootstrapScriptPathIncludesRenderedDigestWhenAvailable()
+    {
+        string path = PublicLandingController.BuildPersonalizedMacBootstrapScriptPath("abc123def456", "0123456789ABCDEF");
+
+        Assert.Equal("/install-abc123def456-0123456789abcdef.sh", path);
     }
 
     [Fact]
@@ -421,6 +429,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.DoesNotContain("token = sys.argv[2]", template, StringComparison.Ordinal);
         Assert.DoesNotContain("local upload_token=\"$3\"", template, StringComparison.Ordinal);
         Assert.Contains("local keep_upload_response=\"${CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE:-0}\"", template, StringComparison.Ordinal);
+        Assert.Contains("BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH=\"$response_path\"", template, StringComparison.Ordinal);
+        Assert.Contains("BOOTSTRAP_KEEP_UPLOAD_RESPONSE=\"$keep_upload_response\"", template, StringComparison.Ordinal);
         Assert.Contains("removed sensitive release upload response file", template, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0", template, StringComparison.Ordinal);
         Assert.Contains("local fallback_release_proof_url=\"${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}\"", template, StringComparison.Ordinal);
@@ -428,6 +438,10 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \\", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$verify_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("curl --fail-with-body -sS \"$compatibility_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("curl --fail-with-body -sS \"$canonical_url\"", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("curl --fail-with-body -fsS \"$compatibility_url\"", template, StringComparison.Ordinal);
+        Assert.DoesNotContain("curl --fail-with-body -fsS \"$canonical_url\"", template, StringComparison.Ordinal);
         Assert.DoesNotContain("log_json_or_text \"$response_path\"", template, StringComparison.Ordinal);
     }
 

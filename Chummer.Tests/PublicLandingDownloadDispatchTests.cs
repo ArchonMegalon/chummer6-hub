@@ -73,7 +73,7 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
-    public async Task PersonalizedMacBootstrapScriptConsumesSingleUseLinkAndEmbedsClaimCodes()
+    public async Task PersonalizedMacBootstrapScriptCanBeFetchedRepeatedlyAndEmbedsClaimCodes()
     {
         using Fixture fixture = new();
         var issue = fixture.PersonalizedInstallScripts.IssueMacScript(
@@ -89,7 +89,7 @@ public sealed class PublicLandingDownloadDispatchTests
         fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
         fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
 
-        IActionResult first = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId);
+        IActionResult first = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId, issue.Link.RenderedScriptSha256);
 
         var file = Assert.IsType<FileContentResult>(first);
         string script = Encoding.UTF8.GetString(file.FileContents);
@@ -99,10 +99,10 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains("claimCode=", script, StringComparison.Ordinal);
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
 
-        IActionResult second = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId);
+        IActionResult second = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId, issue.Link.RenderedScriptSha256);
 
-        var gone = Assert.IsType<ObjectResult>(second);
-        Assert.Equal(StatusCodes.Status410Gone, gone.StatusCode);
+        var secondFile = Assert.IsType<FileContentResult>(second);
+        Assert.Contains("CLAIM_CODES", Encoding.UTF8.GetString(secondFile.FileContents), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -124,10 +124,31 @@ public sealed class PublicLandingDownloadDispatchTests
         fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
         fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
 
-        IActionResult result = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId);
+        IActionResult result = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId, issue.Link.RenderedScriptSha256);
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal(renderedScript, Encoding.UTF8.GetString(file.FileContents));
+    }
+
+    [Fact]
+    public void PersonalizedMacBootstrapScriptRejectsMismatchedDigestPath()
+    {
+        using Fixture fixture = new();
+        var issue = fixture.PersonalizedInstallScripts.IssueMacScript(
+            "avalonia-osx-arm64-installer",
+            ["avalonia-osx-arm64-installer"],
+            "user-archon",
+            "subject-archon",
+            "#!/usr/bin/env bash\nprintf 'ok\\n'");
+
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId, "deadbeef");
+
+        Assert.IsType<NotFoundResult>(result);
     }
 
     [Fact]

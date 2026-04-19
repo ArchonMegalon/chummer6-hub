@@ -32,6 +32,7 @@ public enum PersonalizedInstallScriptConsumeStatus
     Expired = 2,
     Revoked = 3,
     Success = 4,
+    DigestMismatch = 5,
 }
 
 public sealed record PersonalizedInstallScriptIssueResult(
@@ -151,6 +152,54 @@ public sealed class PersonalizedInstallScriptService
             _store.PersonalizedInstallScriptsById[consumed.ScriptId] = consumed;
             _store.PersistLocked();
             return new PersonalizedInstallScriptConsumeResult(PersonalizedInstallScriptConsumeStatus.Success, consumed);
+        }
+    }
+
+    public PersonalizedInstallScriptConsumeResult Resolve(string? scriptId, string? expectedRenderedScriptSha256 = null)
+    {
+        string? normalizedScriptId = NormalizeOptional(scriptId);
+        if (normalizedScriptId is null)
+        {
+            return new PersonalizedInstallScriptConsumeResult(PersonalizedInstallScriptConsumeStatus.Missing, null);
+        }
+
+        string? normalizedExpectedRenderedScriptSha256 = NormalizeOptional(expectedRenderedScriptSha256)?.ToLowerInvariant();
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            ExpireLinksLocked(now);
+            if (!_store.PersonalizedInstallScriptsById.TryGetValue(normalizedScriptId, out PersonalizedInstallScriptLinkDto? link))
+            {
+                return new PersonalizedInstallScriptConsumeResult(PersonalizedInstallScriptConsumeStatus.Missing, null);
+            }
+
+            if (string.Equals(link.Status, PersonalizedInstallScriptStates.Revoked, StringComparison.OrdinalIgnoreCase))
+            {
+                return new PersonalizedInstallScriptConsumeResult(PersonalizedInstallScriptConsumeStatus.Revoked, link);
+            }
+
+            if (string.Equals(link.Status, PersonalizedInstallScriptStates.Expired, StringComparison.OrdinalIgnoreCase)
+                || link.ExpiresAtUtc <= now)
+            {
+                if (!string.Equals(link.Status, PersonalizedInstallScriptStates.Expired, StringComparison.OrdinalIgnoreCase))
+                {
+                    link = link with { Status = PersonalizedInstallScriptStates.Expired };
+                    _store.PersonalizedInstallScriptsById[link.ScriptId] = link;
+                    _store.PersistLocked();
+                }
+
+                return new PersonalizedInstallScriptConsumeResult(PersonalizedInstallScriptConsumeStatus.Expired, link);
+            }
+
+            string? actualRenderedScriptSha256 = NormalizeOptional(link.RenderedScriptSha256)?.ToLowerInvariant();
+            if (normalizedExpectedRenderedScriptSha256 is not null
+                && !string.Equals(actualRenderedScriptSha256, normalizedExpectedRenderedScriptSha256, StringComparison.Ordinal))
+            {
+                return new PersonalizedInstallScriptConsumeResult(PersonalizedInstallScriptConsumeStatus.DigestMismatch, link);
+            }
+
+            return new PersonalizedInstallScriptConsumeResult(PersonalizedInstallScriptConsumeStatus.Success, link);
         }
     }
 

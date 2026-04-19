@@ -380,7 +380,9 @@ public sealed class PublicLandingController : Controller
                 : QueryString.Create("ticket", bootstrapTicket.Ticket);
             var bootstrapScriptPath = bootstrapScriptDownload && bootstrapPlatform is not null
                 ? string.Equals(bootstrapPlatform, "macos", StringComparison.Ordinal)
-                    ? BuildPersonalizedMacBootstrapScriptPath(personalizedMacInstallScript!.ScriptId)
+                    ? BuildPersonalizedMacBootstrapScriptPath(
+                        personalizedMacInstallScript!.ScriptId,
+                        personalizedMacInstallScript.Link.RenderedScriptSha256)
                     : BuildBootstrapScriptPath(artifact.Id, bootstrapPlatform)
                 : null;
             var bootstrapScriptHref = bootstrapScriptPath is null
@@ -601,25 +603,32 @@ public sealed class PublicLandingController : Controller
     }
 
     [HttpGet("/install-{scriptId}.sh")]
+    [HttpGet("/install-{scriptId}-{renderedScriptSha256}.sh")]
     [Produces("text/x-shellscript", "application/problem+json")]
-    public IActionResult DownloadDispatchPersonalizedMacBootstrapScript([FromRoute] string scriptId)
+    public IActionResult DownloadDispatchPersonalizedMacBootstrapScript(
+        [FromRoute] string scriptId,
+        [FromRoute] string? renderedScriptSha256 = null)
     {
-        PersonalizedInstallScriptConsumeResult consume = _personalizedInstallScripts.Consume(scriptId);
+        PersonalizedInstallScriptConsumeResult consume = _personalizedInstallScripts.Resolve(scriptId, renderedScriptSha256);
         if (consume.Status != PersonalizedInstallScriptConsumeStatus.Success || consume.Link is null)
         {
             Response.Headers["Cache-Control"] = "private, no-store";
+            if (consume.Status == PersonalizedInstallScriptConsumeStatus.DigestMismatch)
+            {
+                return NotFound();
+            }
+
             return StatusCode(
                 StatusCodes.Status410Gone,
                 new
                 {
                     error = consume.Status switch
                     {
-                        PersonalizedInstallScriptConsumeStatus.Consumed => "install_command_already_used",
                         PersonalizedInstallScriptConsumeStatus.Expired => "install_command_expired",
                         PersonalizedInstallScriptConsumeStatus.Revoked => "install_command_revoked",
                         _ => "install_command_unavailable",
                     },
-                    message = "The install command expired or was already used. Re-open the signed-in downloads handoff and copy a fresh install command."
+                    message = "The install command expired or is no longer available. Re-open the signed-in downloads handoff and copy a fresh install command."
                 });
         }
 
@@ -2987,8 +2996,10 @@ public sealed class PublicLandingController : Controller
             _ => throw new InvalidOperationException($"unsupported bootstrap platform '{platform}'.")
         };
 
-    internal static string BuildPersonalizedMacBootstrapScriptPath(string scriptId)
-        => $"/install-{Uri.EscapeDataString(scriptId)}.sh";
+    internal static string BuildPersonalizedMacBootstrapScriptPath(string scriptId, string? renderedScriptSha256 = null)
+        => string.IsNullOrWhiteSpace(renderedScriptSha256)
+            ? $"/install-{Uri.EscapeDataString(scriptId)}.sh"
+            : $"/install-{Uri.EscapeDataString(scriptId)}-{Uri.EscapeDataString(renderedScriptSha256.Trim().ToLowerInvariant())}.sh";
 
     private static string? BuildBootstrapCommandLabel(string? platform)
         => platform switch
@@ -3025,7 +3036,7 @@ public sealed class PublicLandingController : Controller
     private static string? BuildBootstrapCommandNote(string? platform)
         => platform switch
         {
-            "macos" => "It streams a single-use, short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
+            "macos" => "It streams a short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             "windows" => "It streams a short-lived PowerShell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Start menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             "linux" => "It streams a short-lived shell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the applications menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             _ => null
@@ -3061,7 +3072,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapFallbackDownloadLabel(string? platform)
         => platform switch
         {
-            "macos" => "Download one-time setup script",
+            "macos" => "Download setup script",
             "windows" => "Download setup script fallback",
             "linux" => "Download setup script fallback",
             _ => "Download setup script fallback"
@@ -3089,7 +3100,7 @@ public sealed class PublicLandingController : Controller
         {
             "windows" => "The guided Windows setup assistant is the default linked-install path. Use the raw installer fallback only for support-directed recovery.",
             "linux" => "The shell command keeps the published Debian packages unchanged while streaming a short-lived guided setup assistant that can attach the install relationship to this account from the first launch.",
-            _ => "macOS can quarantine a downloaded unsigned .command and label it as damaged. The single-use Terminal command avoids that by streaming the same short-lived setup assistant directly into bash while keeping the published DMGs unchanged."
+            _ => "macOS can quarantine a downloaded unsigned .command and label it as damaged. The signed Terminal command avoids that by streaming the same short-lived setup assistant directly into bash while keeping the published DMGs unchanged."
         };
 
     private static IReadOnlyList<string> BuildBootstrapSteps(string? platform)
@@ -3112,7 +3123,7 @@ public sealed class PublicLandingController : Controller
             ],
             _ =>
             [
-                "Copy the single-use Terminal install command below and paste it into Terminal.",
+                "Copy the signed Terminal install command below and paste it into Terminal.",
                 "The Mac setup assistant offers Auto select for the matching Apple Silicon or Intel builds on this Mac, lets you switch to manual selection when you want different heads, asks whether to use /Applications or ~/Applications, whether to leave quick access in Applications only or add Desktop links, whether to open Chummer when it finishes, and then verifies that linking actually completed.",
                 "Terminal then shows staged progress while it downloads the selected DMGs, verifies their published SHA-256 digests, mounts them, and installs the app bundles with a staged swap instead of a delete-first replace.",
                 "Each selected app is started once through a short-lived environment handoff so it is already linked to this account the next time you open it."
