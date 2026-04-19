@@ -248,6 +248,82 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("int RefreshBeforeContinueCount,", result.stderr)
         self.assertIn("int BlockingConflictCount);", result.stderr)
 
+    def test_verifier_fails_closed_when_contract_drops_explicit_receipt_summary_markers(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-explicit-summaries-") as temp_dir:
+            temp_root = Path(temp_dir)
+            contract_path = temp_root / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.parent.mkdir(parents=True)
+            source_contract_path = REPO_ROOT / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.write_text(
+                source_contract_path.read_text(encoding="utf-8")
+                .replace("    string ProvenanceSummary,\n", "", 1)
+                .replace("    string ConflictSummary,\n", "", 1)
+                .replace("    string RecoveryActionLabel,\n", "", 1),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneContracts.cs", result.stderr)
+        self.assertIn("string ProvenanceSummary,", result.stderr)
+        self.assertIn("string ConflictSummary,", result.stderr)
+        self.assertIn("string RecoveryActionLabel,", result.stderr)
+
+    def test_verifier_fails_closed_when_surface_breakdown_contracts_are_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-breakdown-") as temp_dir:
+            temp_root = Path(temp_dir)
+            workspace_contract_path = temp_root / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            workspace_contract_path.parent.mkdir(parents=True)
+            source_workspace_contract_path = REPO_ROOT / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            workspace_contract_path.write_text(
+                source_workspace_contract_path.read_text(encoding="utf-8")
+                .replace("    IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> RestoreReceiptSurfaces,\n", "", 1)
+                .replace("public sealed record WorkspaceRestoreReceiptSurfaceProjection(\n", "", 1),
+                encoding="utf-8",
+            )
+
+            entitlement_contract_path = temp_root / "Chummer.Run.Api" / "Contracts" / "EntitlementSyncContracts.cs"
+            entitlement_contract_path.parent.mkdir(parents=True, exist_ok=True)
+            source_entitlement_contract_path = REPO_ROOT / "Chummer.Run.Api" / "Contracts" / "EntitlementSyncContracts.cs"
+            entitlement_contract_path.write_text(
+                source_entitlement_contract_path.read_text(encoding="utf-8").replace(
+                    "    IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> ReceiptSurfaces,\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneContracts.cs", result.stderr)
+        self.assertIn("IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> RestoreReceiptSurfaces,", result.stderr)
+        self.assertIn("public sealed record WorkspaceRestoreReceiptSurfaceProjection(", result.stderr)
+        self.assertIn("EntitlementSyncContracts.cs", result.stderr)
+        self.assertIn("IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> ReceiptSurfaces,", result.stderr)
+
     def test_verifier_fails_closed_when_entitlement_sync_status_reverts_to_restore_generic_defaults(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-entitlement-status-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -1073,6 +1149,120 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Chummer.Run.Api/Views/Accounts/Account.cshtml", result.stderr)
         self.assertIn('Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")', result.stderr)
+
+    def test_verifier_fails_closed_when_surface_recovery_hint_is_hidden(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-recovery-hint-") as temp_dir:
+            temp_root = Path(temp_dir)
+            (temp_root / ".git").symlink_to(REPO_ROOT / ".git", target_is_directory=True)
+            (temp_root / ".codex-studio").symlink_to(REPO_ROOT / ".codex-studio", target_is_directory=True)
+            (temp_root / "Chummer.Campaign.Contracts").symlink_to(REPO_ROOT / "Chummer.Campaign.Contracts", target_is_directory=True)
+            (temp_root / "Chummer.Tests").symlink_to(REPO_ROOT / "Chummer.Tests", target_is_directory=True)
+            (temp_root / "scripts").symlink_to(REPO_ROOT / "scripts", target_is_directory=True)
+            (temp_root / "tests").symlink_to(REPO_ROOT / "tests", target_is_directory=True)
+
+            run_api_root = temp_root / "Chummer.Run.Api"
+            (run_api_root / "Contracts").mkdir(parents=True)
+            (run_api_root / "Controllers").mkdir(parents=True)
+            (run_api_root / "Services" / "Community").mkdir(parents=True)
+            (run_api_root / "Views" / "Accounts").mkdir(parents=True)
+            (run_api_root / "wwwroot" / "proofs" / "mac-codex-release").mkdir(parents=True)
+
+            for relative_path in [
+                Path("Contracts/CampaignWorkspaceServerPlaneContracts.cs"),
+                Path("Contracts/EntitlementSyncContracts.cs"),
+                Path("Controllers/CampaignSpineController.cs"),
+                Path("Services/Community/CampaignSpineService.cs"),
+                Path("Services/Community/CampaignWorkspaceServerPlaneService.cs"),
+                Path("Services/Community/WorkspaceLifecyclePolicyService.cs"),
+            ]:
+                (run_api_root / relative_path).symlink_to(REPO_ROOT / "Chummer.Run.Api" / relative_path)
+
+            (run_api_root / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json").symlink_to(
+                REPO_ROOT / "Chummer.Run.Api" / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            )
+
+            source_view_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
+            view_path = run_api_root / "Views" / "Accounts" / "Account.cshtml"
+            view_path.write_text(
+                source_view_path.read_text(encoding="utf-8").replace(
+                    "surface.Status.LeadRecoveryHint",
+                    '"surface recovery hint hidden"',
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Chummer.Run.Api/Views/Accounts/Account.cshtml", result.stderr)
+        self.assertIn("surface.Status.LeadRecoveryHint", result.stderr)
+
+    def test_verifier_fails_closed_when_surface_recovery_summary_is_hidden(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-recovery-summary-") as temp_dir:
+            temp_root = Path(temp_dir)
+            (temp_root / ".git").symlink_to(REPO_ROOT / ".git", target_is_directory=True)
+            (temp_root / ".codex-studio").symlink_to(REPO_ROOT / ".codex-studio", target_is_directory=True)
+            (temp_root / "Chummer.Campaign.Contracts").symlink_to(REPO_ROOT / "Chummer.Campaign.Contracts", target_is_directory=True)
+            (temp_root / "Chummer.Tests").symlink_to(REPO_ROOT / "Chummer.Tests", target_is_directory=True)
+            (temp_root / "scripts").symlink_to(REPO_ROOT / "scripts", target_is_directory=True)
+            (temp_root / "tests").symlink_to(REPO_ROOT / "tests", target_is_directory=True)
+
+            run_api_root = temp_root / "Chummer.Run.Api"
+            (run_api_root / "Contracts").mkdir(parents=True)
+            (run_api_root / "Controllers").mkdir(parents=True)
+            (run_api_root / "Services" / "Community").mkdir(parents=True)
+            (run_api_root / "Views" / "Accounts").mkdir(parents=True)
+            (run_api_root / "wwwroot" / "proofs" / "mac-codex-release").mkdir(parents=True)
+
+            for relative_path in [
+                Path("Contracts/CampaignWorkspaceServerPlaneContracts.cs"),
+                Path("Contracts/EntitlementSyncContracts.cs"),
+                Path("Controllers/CampaignSpineController.cs"),
+                Path("Services/Community/CampaignSpineService.cs"),
+                Path("Services/Community/CampaignWorkspaceServerPlaneService.cs"),
+                Path("Services/Community/WorkspaceLifecyclePolicyService.cs"),
+            ]:
+                (run_api_root / relative_path).symlink_to(REPO_ROOT / "Chummer.Run.Api" / relative_path)
+
+            (run_api_root / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json").symlink_to(
+                REPO_ROOT / "Chummer.Run.Api" / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            )
+
+            source_view_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
+            view_path = run_api_root / "Views" / "Accounts" / "Account.cshtml"
+            view_path.write_text(
+                source_view_path.read_text(encoding="utf-8").replace(
+                    "@surface.Status.RecoverySummary",
+                    '"surface recovery summary hidden"',
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Chummer.Run.Api/Views/Accounts/Account.cshtml", result.stderr)
+        self.assertIn("@surface.Status.RecoverySummary", result.stderr)
 
     def test_verifier_fails_closed_when_served_release_proof_routes_drift_from_local(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-served-proof-") as temp_dir:

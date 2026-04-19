@@ -7,6 +7,7 @@ namespace Chummer.Run.Api.Contracts;
 
 public sealed record EntitlementSyncReceiptProjection(
     WorkspaceRestoreReceiptStatusProjection ReceiptStatus,
+    IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> ReceiptSurfaces,
     IReadOnlyList<WorkspaceRestoreProvenanceReceipt> ProvenanceReceipts,
     IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> ProvenanceRecoveryReceipts,
     IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> ConflictReceipts,

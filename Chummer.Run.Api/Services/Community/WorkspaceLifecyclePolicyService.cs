@@ -164,7 +164,17 @@ public sealed class WorkspaceLifecyclePolicyService
     {
         foreach (string key in keys)
         {
-            observedByKey.TryAdd(key, observedAtUtc);
+            if (observedByKey.TryGetValue(key, out DateTimeOffset existingObservedAtUtc))
+            {
+                if (observedAtUtc < existingObservedAtUtc)
+                {
+                    observedByKey[key] = observedAtUtc;
+                }
+
+                continue;
+            }
+
+            observedByKey[key] = observedAtUtc;
         }
     }
 

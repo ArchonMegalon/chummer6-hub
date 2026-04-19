@@ -335,7 +335,7 @@ def _append_conflicting_registry_status(text: str) -> str:
 
 
 def _remove_current_queue_frontier_proof(text: str) -> str:
-    marker = "          - /docker/chummercomplete/chummer.run-services commit e0d2bff6 pins the M105 workspace queue-frontier guard proof.\n"
+    marker = "          - /docker/chummercomplete/chummer6-hub commit e0d2bff6 pins the M105 workspace queue-frontier guard proof.\n"
     if marker not in text:
         raise AssertionError("missing current queue-frontier proof floor")
 
@@ -343,7 +343,7 @@ def _remove_current_queue_frontier_proof(text: str) -> str:
 
 
 def _remove_package_scoped_receipt_proof(text: str) -> str:
-    marker = "      - /docker/chummercomplete/chummer.run-services commit 9f425d04 tightens M105 package-scoped receipt proof so untracked workspace continuity receipt rows cannot hide beside the canonical receipts.\n"
+    marker = "          - /docker/chummercomplete/chummer6-hub commit 9f425d04 tightens M105 package-scoped receipt proof so untracked workspace continuity receipt rows cannot hide beside the canonical receipts.\n"
     if marker not in text:
         raise AssertionError("missing package-scoped receipt proof floor")
 
@@ -351,7 +351,7 @@ def _remove_package_scoped_receipt_proof(text: str) -> str:
 
 
 def _remove_queue_scope_guard_proof(text: str) -> str:
-    marker = "          - /docker/chummercomplete/chummer.run-services commit 3b854764 tightens the M105 workspace queue scope guard so completed-package proof cannot widen allowed paths or owned surfaces.\n"
+    marker = "          - /docker/chummercomplete/chummer6-hub commit 3b854764 tightens the M105 workspace queue scope guard so completed-package proof cannot widen allowed paths or owned surfaces.\n"
     if marker not in text:
         raise AssertionError("missing queue scope guard proof floor")
 
@@ -359,7 +359,7 @@ def _remove_queue_scope_guard_proof(text: str) -> str:
 
 
 def _remove_telemetry_guard_proof(text: str) -> str:
-    marker = "          - /docker/chummercomplete/chummer.run-services commit dc46a811 tightens the M105 telemetry proof floor so registry and queue proof must retain the current telemetry guard.\n"
+    marker = "          - /docker/chummercomplete/chummer6-hub commit dc46a811 tightens the M105 telemetry proof floor so registry and queue proof must retain the current telemetry guard.\n"
     if marker not in text:
         raise AssertionError("missing telemetry guard proof floor")
 
@@ -909,9 +909,9 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
             )
             queue_path.write_text(
                 source_queue_path.read_text(encoding="utf-8").replace(
-                    "      - /docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py\n",
-                    "      - /docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py\n"
-                    "      - /docker/chummercomplete/chummer.run-services/tests/test_workspace_restore_queue_frontier_guard.py\n",
+                    "      - /docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py\n",
+                    "      - /docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py\n"
+                    "      - /docker/chummercomplete/chummer6-hub/tests/test_workspace_restore_queue_frontier_guard.py\n",
                     1,
                 ),
                 encoding="utf-8",

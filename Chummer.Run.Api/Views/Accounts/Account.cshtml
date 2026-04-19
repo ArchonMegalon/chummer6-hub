@@ -936,6 +936,14 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.Summary</strong>
                             </div>
                             <div class="settings-summary-row">
+                                <span>Provenance summary</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.ProvenanceSummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
+                                <span>Conflict summary</span>
+                                <strong>@entitlementSyncReceipts.ReceiptStatus.ConflictSummary</strong>
+                            </div>
+                            <div class="settings-summary-row">
                                 <span>Lead receipt</span>
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.LeadReceiptId</strong>
                             </div>
@@ -988,10 +996,34 @@
                                 <strong>@entitlementSyncReceipts.ReceiptStatus.BlockingConflictCount</strong>
                             </div>
                         </div>
+                        @if (entitlementSyncReceipts.ReceiptSurfaces.Count > 0)
+                        {
+                            <ul class="muted-copy">
+                                @foreach (var surface in entitlementSyncReceipts.ReceiptSurfaces)
+                                {
+                                    <li>
+                                        <strong>@surface.Label:</strong> @surface.Status.Summary
+                                        <span>Lead: @surface.Status.LeadReceiptId</span>
+                                        <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_entitlement_ledger")</span>
+                                        <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
+                                        <span>Latest receipt observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                        <span>Recovery route: @surface.Status.RecoveryRoute</span>
+                                        <span>@surface.Status.RecoverySummary</span>
+                                        <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
+                                        <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
+                                        @if (IsNavigableAccountRoute(surface.Status.RecoveryRoute))
+                                        {
+                                            <span><a href="@surface.Status.RecoveryRoute">@DescribeRecoveryRouteAction(surface.Status.RecoveryRoute)</a></span>
+                                        }
+                                        <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue with receipt")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
                         @if (IsNavigableAccountRoute(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute))
                         {
                             <p class="muted-copy">
-                                <a href="@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute)</a>
+                                <a href="@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute">@entitlementSyncReceipts.ReceiptStatus.RecoveryActionLabel</a>
                             </p>
                         }
                         @if (entitlementSyncReceipts.ProvenanceRecoveryReceipts.Count == 0)
@@ -1800,6 +1832,14 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.Summary</strong>
                                     </div>
                                     <div class="settings-summary-row">
+                                        <span>Provenance summary</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.ProvenanceSummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Conflict summary</span>
+                                        <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.ConflictSummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
                                         <span>Staleness posture</span>
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.StalenessPosture, "Current receipts")</strong>
                                     </div>
@@ -1840,7 +1880,7 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
                                         @if (IsNavigableAccountRoute(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute))
                                         {
-                                            <a href="@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)</a>
+                                            <a href="@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute">@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryActionLabel</a>
                                         }
                                     </div>
                                     <div class="settings-summary-row">
@@ -1892,6 +1932,30 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.BlockingConflictCount</strong>
                                     </div>
                                 </div>
+                                @if (selectedWorkspaceServerPlane.RestoreReceiptSurfaces.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var surface in selectedWorkspaceServerPlane.RestoreReceiptSurfaces)
+                                        {
+                                            <li>
+                                                <strong>@surface.Label:</strong> @surface.Status.Summary
+                                                <span>Lead: @surface.Status.LeadReceiptId</span>
+                                                <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_campaign_spine_projection")</span>
+                                                <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
+                                                <span>Latest receipt observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
+                                                <span>Recovery route: @surface.Status.RecoveryRoute</span>
+                                                <span>@surface.Status.RecoverySummary</span>
+                                                <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
+                                                <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
+                                                @if (IsNavigableAccountRoute(surface.Status.RecoveryRoute))
+                                                {
+                                                    <span><a href="@surface.Status.RecoveryRoute">@DescribeRecoveryRouteAction(surface.Status.RecoveryRoute)</a></span>
+                                                }
+                                                <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue with receipt")</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
                                 @if (selectedWorkspaceServerPlane.RestoreProvenanceReceipts.Count == 0)
                                 {
                                     <p class="muted-copy">No restore provenance receipts are attached to this workspace yet.</p>

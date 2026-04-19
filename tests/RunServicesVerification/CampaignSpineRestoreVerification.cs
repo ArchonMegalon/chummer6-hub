@@ -26,6 +26,7 @@ internal static class CampaignSpineRestoreVerification
         VerifyServerPlaneRestoreReceiptStatusFallsBackToRecoverableProvenanceLead();
         VerifyEntitlementSyncReceiptStatusUsesStandaloneScopeDefaults();
         VerifyEntitlementSyncProjectionStaysExplicitAndRecoverable();
+        VerifyRestoreReceiptSurfaceBreakdownsStayExplicitAndRecoverable();
         VerifyServerPlaneProvenanceReceiptsRecoverBlankIdentityFields();
         VerifyServerPlaneConflictReceiptsRecoverBlankSummaries();
         VerifyServerPlaneConflictReceiptsRecoverBlankIdentityFields();
@@ -37,6 +38,125 @@ internal static class CampaignSpineRestoreVerification
         VerifyRestoreReceiptsSurviveCommunityStoreReload();
         VerifyAftermathArtifactMetadataSurvivesReload();
         return Task.CompletedTask;
+    }
+
+    private static void VerifyRestoreReceiptSurfaceBreakdownsStayExplicitAndRecoverable()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "run-services-verification", "campaign-spine-restore-surface-breakdown", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+                    ["CHUMMER_WORKSPACE_RESTORE_RETENTION_DAYS"] = "30"
+                })
+                .Build();
+
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            WorkspaceLifecyclePolicyService lifecycle = new(configuration);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            CampaignWorkspaceServerPlaneService workspaceServerPlane = new(
+                campaignSpine,
+                new SupportCaseService(store),
+                new SupportCasePresentationService());
+
+            HubUserDto user = accounts.EnsureUser("subject.restore.surface", "Surface Restore", "restore-surface@example.invalid");
+            CampaignWorkspaceProjection workspace = campaignSpine.GetStarterWorkspace(user)
+                ?? throw new InvalidOperationException("Expected a starter workspace.");
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+
+            WorkspaceRestoreProjection restore = new(
+                RestoreId: "restore-surface-breakdown",
+                UserId: user.UserId,
+                RecentDossiers: [],
+                RecentCampaigns: [],
+                RecentRuleEnvironments: [],
+                RecentArtifacts: [],
+                Entitlements: [],
+                ClaimedDevices: [],
+                ConflictSummaries: [],
+                LocalOnlyNotes: [],
+                GeneratedAtUtc: now,
+                ProvenanceReceipts:
+                [
+                    new WorkspaceRestoreProvenanceReceipt(
+                        ReceiptId: "workspace-current-receipt",
+                        Kind: "restore_inventory_snapshot",
+                        SubjectId: workspace.WorkspaceId,
+                        Surface: "workspace_restore",
+                        Summary: "Workspace restore inventory is current.",
+                        Proof: "workspace-inventory",
+                        ObservedAtUtc: now.AddMinutes(2)),
+                    new WorkspaceRestoreProvenanceReceipt(
+                        ReceiptId: "entitlement-drift-receipt",
+                        Kind: "entitlement_artifact_drift",
+                        SubjectId: "artifact-preview-linux",
+                        Surface: "entitlement_sync",
+                        Summary: "Entitlement replay points at a stale release artifact.",
+                        Proof: "artifact-preview-linux",
+                        ObservedAtUtc: now.AddMinutes(1))
+                ],
+                ConflictReceipts:
+                [
+                    new WorkspaceRestoreConflictReceipt(
+                        ReceiptId: "entitlement-duplicate-grant",
+                        Severity: "blocking",
+                        Kind: "entitlement_replication_duplicate_grant",
+                        SubjectId: "grant-preview-linux",
+                        Summary: "Duplicate entitlement grant receipts are active for this install.",
+                        Resolution: null,
+                        ObservedAtUtc: now,
+                        Surface: "entitlement_sync",
+                        BlocksContinue: true)
+                ]);
+
+            lock (store.Gate)
+            {
+                store.WorkspacesByUserId[user.UserId] = [workspace];
+                store.RestoreByUserId[user.UserId] = restore;
+                store.PersistLocked();
+            }
+
+            CampaignWorkspaceServerPlaneProjection serverPlane = workspaceServerPlane.GetWorkspaceServerPlane(user, workspace.WorkspaceId)
+                ?? throw new InvalidOperationException("Expected workspace server plane.");
+            EntitlementSyncReceiptProjection entitlementProjection = workspaceServerPlane.GetEntitlementSyncReceiptProjection(user);
+
+            VerificationAssert.True(
+                serverPlane.RestoreReceiptSurfaces.Count == 2
+                    && serverPlane.RestoreReceiptSurfaces.Any(item =>
+                        string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal)
+                        && string.Equals(item.Status.LeadReceiptId, "workspace-current-receipt", StringComparison.Ordinal)
+                        && !string.IsNullOrWhiteSpace(item.Status.LeadRecoveryHint)
+                        && item.Status.SafeToContinueWithReceiptCount == 1
+                        && string.Equals(item.Status.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal))
+                    && serverPlane.RestoreReceiptSurfaces.Any(item =>
+                        string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)
+                        && string.Equals(item.Status.LeadReceiptId, "entitlement-duplicate-grant", StringComparison.Ordinal)
+                        && item.Status.LeadRecoveryHint.Contains("account access", StringComparison.OrdinalIgnoreCase)
+                        && item.Status.RefreshBeforeContinueCount == 1
+                        && item.Status.BlockingConflictCount == 1
+                        && string.Equals(item.Status.RecoveryRoute, "/account/access", StringComparison.Ordinal)
+                        && string.Equals(item.Status.ContinuePosture, "blocked_until_receipt_resolved", StringComparison.Ordinal)),
+                "Workspace server plane should emit explicit per-surface receipt posture for workspace restore provenance and entitlement-sync conflict recovery.");
+            VerificationAssert.True(
+                entitlementProjection.ReceiptSurfaces.Count == 1
+                    && string.Equals(entitlementProjection.ReceiptSurfaces[0].Surface, "entitlement_sync", StringComparison.Ordinal)
+                    && string.Equals(entitlementProjection.ReceiptSurfaces[0].Status.LeadReceiptId, entitlementProjection.ReceiptStatus.LeadReceiptId, StringComparison.Ordinal)
+                    && !string.IsNullOrWhiteSpace(entitlementProjection.ReceiptSurfaces[0].Status.LeadRecoveryHint)
+                    && entitlementProjection.ReceiptSurfaces[0].Status.BlockingConflictCount == entitlementProjection.ConflictReceipts.Count,
+                "Standalone entitlement sync projection should keep its receipt-surface breakdown explicit and aligned with the filtered conflict receipt set.");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
     }
 
     private static void VerifyServerPlaneProvenanceReceiptsExposeRecoveryPosture()
@@ -508,9 +628,18 @@ internal static class CampaignSpineRestoreVerification
                 && string.Equals(status.RecoverabilityPosture, "recoverable_by_download_refresh_before_continue", StringComparison.Ordinal),
             "Restore receipt status should surface the lead recovery route and recoverability posture from the highest-priority blocking receipt.");
         VerificationAssert.True(
+            status.ProvenanceSummary.Contains("Restore provenance keeps 2 receipt(s) explicit", StringComparison.Ordinal)
+                && status.ProvenanceSummary.Contains("1 workspace restore, 1 entitlement sync", StringComparison.Ordinal)
+                && status.ConflictSummary.Contains("Restore conflicts keep 1 receipt(s) explicit", StringComparison.Ordinal)
+                && status.ConflictSummary.Contains("1 entitlement sync, 1 blocking", StringComparison.Ordinal),
+            "Restore receipt status should expose dedicated provenance and conflict summaries so callers do not have to reverse-engineer the mixed status summary.");
+        VerificationAssert.True(
             status.LeadRecoveryHint.Contains("signed-in download or install rail", StringComparison.Ordinal)
                 && status.LeadRecoveryHint.Contains("install-artifact", StringComparison.Ordinal),
             "Restore receipt status should expose the lead recovery hint instead of forcing callers to infer it from the raw receipt list.");
+        VerificationAssert.True(
+            string.Equals(status.RecoveryActionLabel, "Open downloads", StringComparison.Ordinal),
+            "Restore receipt status should expose a direct recovery action label for the lead recovery route.");
         VerificationAssert.True(
             status.LeadObservedAtUtc == conflictReceipts[0].ObservedAtUtc
                 && status.LatestReceiptObservedAtUtc == conflictReceipts[0].ObservedAtUtc,
@@ -585,6 +714,7 @@ internal static class CampaignSpineRestoreVerification
             string.Equals(status.RecoveryRoute, "/account/access", StringComparison.Ordinal)
                 && status.LeadRecoveryHint.Contains("Relink claimed install", StringComparison.Ordinal)
                 && status.RecoverySummary.Contains("/account/access", StringComparison.Ordinal)
+                && string.Equals(status.RecoveryActionLabel, "Open account access", StringComparison.Ordinal)
                 && status.LeadObservedAtUtc == provenanceRecoveryReceipts[0].ObservedAtUtc
                 && status.LatestReceiptObservedAtUtc == provenanceRecoveryReceipts[0].ObservedAtUtc
                 && status.CurrentProvenanceReceiptCount == 0
@@ -624,13 +754,16 @@ internal static class CampaignSpineRestoreVerification
             "Standalone entitlement sync status should default to entitlement-scoped lead receipt identity instead of workspace-restore fallback values.");
         VerificationAssert.True(
             string.Equals(status.RecoveryRoute, "/account/access", StringComparison.Ordinal)
+                && string.Equals(status.RecoveryActionLabel, "Open account access", StringComparison.Ordinal)
                 && string.Equals(status.LeadRecoveryHint, "Open account access and review entitlement sync receipts before trusting this device.", StringComparison.Ordinal)
                 && string.Equals(status.RecoverySummary, "Review entitlement sync receipts through /account/access before continuing from this device.", StringComparison.Ordinal),
             "Standalone entitlement sync status should default to the account-access recovery lane when no receipts have been minted yet.");
         VerificationAssert.True(
             status.Summary.Contains("entitlement-sync provenance receipt(s)", StringComparison.Ordinal)
                 && status.Summary.Contains("entitlement-sync conflict receipt(s)", StringComparison.Ordinal)
-                && status.Summary.Contains("entitlement replication posture", StringComparison.Ordinal),
+                && status.Summary.Contains("entitlement replication posture", StringComparison.Ordinal)
+                && status.ProvenanceSummary.Contains("Entitlement sync provenance keeps 0 receipt(s) explicit", StringComparison.Ordinal)
+                && status.ConflictSummary.Contains("Entitlement sync conflicts keep 0 receipt(s) explicit", StringComparison.Ordinal),
             "Standalone entitlement sync status summary should name entitlement-sync receipts and entitlement replication posture instead of generic restore wording.");
     }
 

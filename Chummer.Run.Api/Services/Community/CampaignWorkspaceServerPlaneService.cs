@@ -545,6 +545,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
             NextSafeAction: nextSafeAction,
             RestoreReceiptStatus: restoreReceiptStatus,
+            RestoreReceiptSurfaces: BuildRestoreReceiptSurfaceProjections(
+                restoreProvenanceReceipts,
+                restoreProvenanceRecoveryReceipts,
+                restoreConflictReceipts,
+                "workspace_restore",
+                "entitlement_sync"),
             RestoreProvenanceReceipts: ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts),
             RestoreProvenanceRecoveryReceipts: ProjectRestoreProvenanceRecoveryReceipts(context.Restore.ProvenanceReceipts),
             RestoreConflictReceipts: ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts),
@@ -574,11 +580,56 @@ public sealed class CampaignWorkspaceServerPlaneService
                 provenanceRecoveryReceipts,
                 conflictReceipts,
                 RestoreReceiptStatusScope.EntitlementSync),
+            ReceiptSurfaces: BuildRestoreReceiptSurfaceProjections(
+                provenanceReceipts,
+                provenanceRecoveryReceipts,
+                conflictReceipts,
+                "entitlement_sync"),
             ProvenanceReceipts: provenanceReceipts,
             ProvenanceRecoveryReceipts: provenanceRecoveryReceipts,
             ConflictReceipts: conflictReceipts,
             GeneratedAtUtc: restore.GeneratedAtUtc);
     }
+
+    private static IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> BuildRestoreReceiptSurfaceProjections(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts,
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> provenanceRecoveryReceipts,
+        IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> conflictReceipts,
+        params string[] surfaces)
+    {
+        List<WorkspaceRestoreReceiptSurfaceProjection> projections = new(surfaces.Length);
+        foreach (string surface in surfaces)
+        {
+            RestoreReceiptStatusScope scope = string.Equals(surface, "entitlement_sync", StringComparison.Ordinal)
+                ? RestoreReceiptStatusScope.EntitlementSync
+                : RestoreReceiptStatusScope.Restore;
+            IReadOnlyList<WorkspaceRestoreProvenanceReceipt> surfaceProvenanceReceipts = provenanceReceipts
+                .Where(item => string.Equals(item.Surface, surface, StringComparison.Ordinal))
+                .ToArray();
+            IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> surfaceProvenanceRecoveryReceipts = provenanceRecoveryReceipts
+                .Where(item => string.Equals(item.Surface, surface, StringComparison.Ordinal))
+                .ToArray();
+            IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> surfaceConflictReceipts = conflictReceipts
+                .Where(item => string.Equals(item.Surface, surface, StringComparison.Ordinal))
+                .ToArray();
+
+            projections.Add(new WorkspaceRestoreReceiptSurfaceProjection(
+                Surface: surface,
+                Label: HumanizeRestoreReceiptSurface(surface),
+                Status: BuildRestoreReceiptStatusProjection(
+                    surfaceProvenanceReceipts,
+                    surfaceProvenanceRecoveryReceipts,
+                    surfaceConflictReceipts,
+                    scope)));
+        }
+
+        return projections;
+    }
+
+    private static string HumanizeRestoreReceiptSurface(string surface)
+        => string.Equals(surface, "entitlement_sync", StringComparison.Ordinal)
+            ? "Entitlement sync"
+            : "Workspace restore";
 
     private static WorkspaceRestoreReceiptStatusProjection BuildRestoreReceiptStatusProjection(
         IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts,
@@ -655,6 +706,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string recoveryRoute = leadConflict?.RecoveryRoute
             ?? leadRecoverableProvenance?.RecoveryRoute
             ?? ResolveRestoreReceiptStatusFallbackRecoveryRoute(scope);
+        string recoveryActionLabel = DescribeRestoreReceiptRecoveryAction(recoveryRoute);
         string recoverySummary = leadConflict?.RecoverySummary
             ?? leadRecoverableProvenance?.RecoverySummary
             ?? ResolveRestoreReceiptStatusFallbackRecoverySummary(scope);
@@ -668,9 +720,25 @@ public sealed class CampaignWorkspaceServerPlaneService
             refreshBeforeContinueCount,
             safeToContinueWithReceiptCount,
             scope);
+        string provenanceSummary = BuildRestoreReceiptProvenanceSummary(
+            provenanceReceipts.Count,
+            workspaceRestoreProvenanceCount,
+            entitlementSyncProvenanceCount,
+            currentProvenanceReceiptCount,
+            staleOrDriftProvenanceReceiptCount,
+            scope);
+        string conflictSummary = BuildRestoreReceiptConflictSummary(
+            conflictReceipts.Count,
+            workspaceRestoreConflictCount,
+            entitlementSyncConflictCount,
+            blockingConflictCount,
+            reviewBeforeContinueConflictCount,
+            scope);
 
         return new WorkspaceRestoreReceiptStatusProjection(
             Summary: summary,
+            ProvenanceSummary: provenanceSummary,
+            ConflictSummary: conflictSummary,
             StalenessPosture: stalenessPosture,
             ConflictPosture: conflictPosture,
             RecoverabilityPosture: recoverabilityPosture,
@@ -684,6 +752,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             LeadObservedAtUtc: leadObservedAtUtc,
             LatestReceiptObservedAtUtc: latestReceiptObservedAtUtc,
             RecoveryRoute: recoveryRoute,
+            RecoveryActionLabel: recoveryActionLabel,
             RecoverySummary: recoverySummary,
             CurrentProvenanceReceiptCount: currentProvenanceReceiptCount,
             StaleOrDriftProvenanceReceiptCount: staleOrDriftProvenanceReceiptCount,
@@ -725,6 +794,40 @@ public sealed class CampaignWorkspaceServerPlaneService
         };
 
         return $"{provenanceReceiptCount} {provenanceLabel} receipt(s) and {conflictReceiptCount} {conflictLabel} receipt(s) keep {postureLabel} explicit; {staleOrDriftProvenanceReceiptCount} stale-or-drift, {currentProvenanceReceiptCount} current, {blockingConflictCount} blocking, {reviewBeforeContinueConflictCount} review-before-continue, {refreshBeforeContinueCount} refresh-before-continue, and {safeToContinueWithReceiptCount} safe-with-receipt cue(s) are attached.";
+    }
+
+    private static string BuildRestoreReceiptProvenanceSummary(
+        int provenanceReceiptCount,
+        int workspaceRestoreProvenanceCount,
+        int entitlementSyncProvenanceCount,
+        int currentProvenanceReceiptCount,
+        int staleOrDriftProvenanceReceiptCount,
+        RestoreReceiptStatusScope scope)
+    {
+        string scopeLabel = scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "Entitlement sync",
+            _ => "Restore"
+        };
+
+        return $"{scopeLabel} provenance keeps {provenanceReceiptCount} receipt(s) explicit: {workspaceRestoreProvenanceCount} workspace restore, {entitlementSyncProvenanceCount} entitlement sync, {currentProvenanceReceiptCount} current, and {staleOrDriftProvenanceReceiptCount} stale-or-drift.";
+    }
+
+    private static string BuildRestoreReceiptConflictSummary(
+        int conflictReceiptCount,
+        int workspaceRestoreConflictCount,
+        int entitlementSyncConflictCount,
+        int blockingConflictCount,
+        int reviewBeforeContinueConflictCount,
+        RestoreReceiptStatusScope scope)
+    {
+        string scopeLabel = scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "Entitlement sync",
+            _ => "Restore"
+        };
+
+        return $"{scopeLabel} conflicts keep {conflictReceiptCount} receipt(s) explicit: {workspaceRestoreConflictCount} workspace restore, {entitlementSyncConflictCount} entitlement sync, {blockingConflictCount} blocking, and {reviewBeforeContinueConflictCount} review-before-continue.";
     }
 
     private static string ResolveRestoreReceiptStatusFallbackReceiptId(RestoreReceiptStatusScope scope)
@@ -781,6 +884,16 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             RestoreReceiptStatusScope.EntitlementSync => "Review entitlement sync receipts through /account/access before continuing from this device.",
             _ => "Review the restore rail before continuing from another device."
+        };
+
+    private static string DescribeRestoreReceiptRecoveryAction(string route)
+        => route switch
+        {
+            "/account/access" => "Open account access",
+            "/account/work" => "Open shared campaign view",
+            "/downloads" => "Open downloads",
+            _ when !string.IsNullOrWhiteSpace(route) && route.StartsWith("/", StringComparison.Ordinal) => $"Open {route}",
+            _ => "Review this route"
         };
 
     private static IReadOnlyList<WorkspaceRestoreProvenanceReceipt> ProjectRestoreProvenanceReceipts(
