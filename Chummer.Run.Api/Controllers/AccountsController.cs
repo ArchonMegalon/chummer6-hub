@@ -4,6 +4,7 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Campaign.Contracts;
+using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Community;
 using Microsoft.AspNetCore.Mvc;
 
@@ -110,6 +111,7 @@ public sealed class AccountsController : Controller
                 : _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
             var selectedSupportCaseSummary = selectedSupportCase is null ? null : _supportPresentation.Build(selectedSupportCase, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            EntitlementSyncReceiptProjection entitlementSyncReceipts = _workspaceServerPlane.GetEntitlementSyncReceiptProjection(user, installLinking);
             var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
             var selectedWorkspace = FindById(campaignSpine.Workspaces, workspaceId, static item => item.WorkspaceId);
@@ -147,6 +149,7 @@ public sealed class AccountsController : Controller
                 SelectedSupportCase: selectedSupportCase,
                 SelectedSupportCaseSummary: selectedSupportCaseSummary,
                 CampaignSpine: campaignSpine,
+                EntitlementSyncReceipts: entitlementSyncReceipts,
                 SelectedWorkspace: selectedWorkspace,
                 SelectedWorkspaceServerPlane: selectedWorkspaceServerPlane,
                 SelectedWorkspaceRosterTransferPlan: selectedWorkspaceRosterTransferPlan,

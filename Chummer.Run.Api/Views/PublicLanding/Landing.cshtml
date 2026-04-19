@@ -17,31 +17,24 @@
             ?? Model.Assets.BySlot("scene_dossier_desk");
     }
     var proofNotes = Model.Workflows.Take(1).ToArray();
-    var heroProofTrail = Model.Surface.ProductProofTrail.Take(4).ToArray();
-    var proofSectionTrail = Model.Surface.ProductProofTrail.Skip(1).Take(2).ToArray();
+    var heroProofTrail = Model.Surface.ProductProofTrail.Take(2).ToArray();
     var availableHighlight = Model.AvailableToday.FirstOrDefault();
     var comingNextHighlight = Model.ComingNext.FirstOrDefault();
     var previewCount = Model.PreviewItems.Count;
     var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var release = Model.ReleaseExperience;
+    var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
+    var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
     var contextualHeroPrimaryHref = guestNeedsInstallGate
         ? release.GuestGatePrimaryHref
         : Model.PrimaryHeroAction.Href;
-    var contextualProductProofPrimaryHref = guestNeedsInstallGate
-        ? release.GuestGatePrimaryHref
-        : Model.Surface.ProductProofPrimaryHref;
-    var trustPulse = Model.TrustPulse;
+    var contextualProductPrimaryAction = Model.PrimaryHeroAction;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
     var worksNowSection = Section("whats_real_now");
     var closingSection = Section("closing_cta");
-    var starterWorkspace = Model.CampaignSpine?.Workspaces
-        .FirstOrDefault(static workspace => workspace.FirstPlayableSession is not null)
-        ?? Model.CampaignSpine?.Workspaces.FirstOrDefault();
-    var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
-    var starterFirstPlayableEvidence = starterFirstPlayableSession?.EvidenceLines.FirstOrDefault();
 
     PublicLandingSectionDto Section(string id)
         => sectionsById.TryGetValue(id, out var section)
@@ -81,7 +74,7 @@
                 <a class="button-like button-like--primary" href="@contextualHeroPrimaryHref">@Model.PrimaryHeroAction.Label</a>
                 <a class="button-like button-like--secondary" href="@Model.SecondaryHeroAction.Href">@Model.SecondaryHeroAction.Label</a>
             </div>
-            <div class="proof-chip-row" aria-label="Trust anchors">
+            <div class="proof-chip-row" aria-label="Highlights">
                 @foreach (var chip in Model.Surface.SecondaryHighlights)
                 {
                     <span class="proof-chip">@chip</span>
@@ -93,7 +86,7 @@
         {
             <div class="launch-hero__media">
                 @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
-                <div class="launch-hero__prooffloat" aria-label="Current preview proof">
+                <div class="launch-hero__prooffloat" aria-label="Current preview details">
                     <div class="launch-hero__proof-topline">
                         <span>Current preview</span>
                         <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
@@ -102,12 +95,15 @@
                         <strong>@Model.Surface.ProductProofResultTitle</strong>
                         <p>@Model.Surface.ProductProofResultSummary</p>
                     </div>
-                    <div class="launch-hero__proof-trail">
-                        @foreach (var step in heroProofTrail)
-                        {
-                            <span>@step</span>
-                        }
-                    </div>
+                    @if (heroProofTrail.Length > 0)
+                    {
+                        <div class="launch-hero__proof-trail">
+                            @foreach (var step in heroProofTrail)
+                            {
+                                <span>@step</span>
+                            }
+                        </div>
+                    }
                     @if (heroProofAsset is not null)
                     {
                         <div class="launch-hero__proof-shot">
@@ -120,84 +116,11 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (trustPulse is not null)
-{
-    <section class="release-footnote">
-        <p class="eyebrow">What changed this week</p>
-        <h2 class="editorial-title">@trustPulse.Heading</h2>
-        <div class="editorial-copy">
-            @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", trustPulse)
-        </div>
-        <div class="stacked-actions">
-            <a class="button-like button-like--secondary" href="/now">Open what works today</a>
-            <a class="button-like button-like--ghost" href="/progress">Open progress</a>
-        </div>
-    </section>
-}
-
-@if (Model.Chrome.Authenticated)
-{
-    <section class="release-footnote">
-        <p class="eyebrow">Starter lane</p>
-        <h2 class="editorial-title">Reach the first playable session from the signed-in front door</h2>
-        @if (starterFirstPlayableSession is not null && starterWorkspace is not null)
-        {
-            <div class="editorial-copy">
-                <p>
-                    @starterFirstPlayableSession.Summary
-                    <span> Playable kickoff: @starterFirstPlayableSession.CampaignStartSummary.</span>
-                    <span> Next: @starterFirstPlayableSession.NextSafeAction.</span>
-                </p>
-                <p><strong>Legal runner:</strong> @starterFirstPlayableSession.RuleReadySummary</p>
-                <p><strong>Understandable return:</strong> @starterFirstPlayableSession.ReturnLaneSummary</p>
-                <p><strong>Campaign-ready lane:</strong> @starterFirstPlayableSession.CampaignReadySummary</p>
-                @if (Model.SignedInStatus is not null)
-                {
-                    <p><strong>Fix availability:</strong> @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the signed-in trust snapshot to confirm the grounded fix lane.")</p>
-                    <p><strong>Current caution:</strong> @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the signed-in trust snapshot to confirm the current caution lane.")</p>
-                }
-                @if (!string.IsNullOrWhiteSpace(starterFirstPlayableEvidence))
-                {
-                    <p><strong>Grounded evidence:</strong> @starterFirstPlayableEvidence</p>
-                }
-            </div>
-            <div class="stacked-actions">
-                <a class="button-like button-like--primary" href="/home/work">Open starter lane on Home</a>
-                <a class="button-like button-like--ghost" href="@($"/account/work/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}#selected-first-playable-session")">Open first playable session proof</a>
-                <a class="button-like button-like--ghost" href="/contact?kind=install_help">Open install support</a>
-            </div>
-        }
-        else
-        {
-            <div class="editorial-copy">
-                <p>The signed-in starter lane reuses the same campaign, trust, and support truth once your first shared campaign view is seeded, so onboarding does not fork into tutorial folklore.</p>
-            </div>
-            <div class="stacked-actions">
-                <a class="button-like button-like--primary" href="/home/work">Open starter lane on Home</a>
-            </div>
-        }
-    </section>
-}
-
 <section class="product-proof">
     <div class="product-proof__copy">
         <p class="eyebrow">@Model.Surface.ProductProofEyebrow</p>
         <h2 class="editorial-title">@productProofSection.Title</h2>
         <p class="editorial-copy">@productProofSection.Intro</p>
-        @if (proofSectionTrail.Length > 0)
-        {
-            <div class="trust-claim__microproof">
-                @foreach (var step in proofSectionTrail)
-                {
-                    <span>@step</span>
-                }
-            </div>
-        }
         @if (proofNotes.Length > 0)
         {
             var workflow = proofNotes[0];
@@ -206,7 +129,7 @@
             </div>
         }
         <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@contextualProductProofPrimaryHref">@Model.Surface.ProductProofPrimaryLabel</a>
+            <a class="button-like button-like--primary" href="@contextualProductPrimaryAction.Href">@contextualProductPrimaryAction.Label</a>
         </div>
         <p class="muted-copy">Need the broader shelf? <a class="inline-link" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>.</p>
     </div>
@@ -231,7 +154,7 @@
                 <div class="compact-rail__copy">
                     <span class="tag">@PublicSurfaceStatus.DisplayLabel(availableHighlight.Card.Badge)</span>
                     <h3>@availableHighlight.Card.Title</h3>
-                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more live proof surface(s) sit on the full shelf." : string.Empty)</p>
+                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more working surface(s) sit on the full shelf." : string.Empty)</p>
                 </div>
                 <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
             </article>
@@ -242,7 +165,7 @@
                 <div class="compact-rail__copy">
                     <span class="tag @PublicSurfaceStatus.CssTone(comingNextHighlight.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(comingNextHighlight.Card.Badge)</span>
                     <h3>@comingNextHighlight.Card.Title</h3>
-                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more roadmap surface(s) stay visible on the full roadmap." : string.Empty)</p>
+                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more planned surface(s) stay visible on the full roadmap." : string.Empty)</p>
                 </div>
                 <a class="inline-link" href="@comingNextHighlight.Action.Href">@comingNextHighlight.Action.Label</a>
             </article>
@@ -254,12 +177,54 @@
             Preview in progress: <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Card.Title</a>
             @if (previewCount > 1)
             {
-                <span> plus @(previewCount - 1) more opening surface(s) on the full proof shelf.</span>
+                <span> plus @(previewCount - 1) more opening surface(s) on the full preview shelf.</span>
             }
         </p>
     }
-    <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open the full proof shelf</a>.</p>
+    <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open what works today</a>.</p>
 </section>
+
+@if (Model.TrustPulse is not null || Model.SignedInStatus is not null)
+{
+    <section class="release-shelf" aria-label="Current trust and first-session return">
+        @if (Model.TrustPulse is not null)
+        {
+            <article class="app-action-card">
+                <span class="tag">@Model.TrustPulse.Eyebrow</span>
+                <h2>@Model.TrustPulse.Heading</h2>
+                @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", Model.TrustPulse)
+            </article>
+        }
+        @if (Model.SignedInStatus is not null)
+        {
+            @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+            <article class="app-action-card">
+                <span class="tag">Return rail</span>
+                <h2>@(starterFirstPlayableSession?.Label ?? "First session proof")</h2>
+                <p>@(starterFirstPlayableSession?.CampaignStartSummary ?? "Your first playable session proof stays attached to the signed-in return path.")</p>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Access now</span>
+                        <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm access.")</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Fix availability</span>
+                        <strong>@TrustRowValue(Model.SignedInStatus, "Fix availability", "Open support to confirm tracked fixes.")</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Current caution</span>
+                        <strong>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open status to confirm the current caution lane.")</strong>
+                    </div>
+                </div>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="/home">Open starter lane on Home</a>
+                    <a class="button-like button-like--secondary" href="/home#selected-first-playable-session">Open first playable session proof</a>
+                    <a class="button-like button-like--secondary" href="/contact">Open install support</a>
+                </div>
+            </article>
+        }
+    </section>
+}
 
 <section class="access-band">
     <div class="access-band__copy">
@@ -272,18 +237,12 @@
         {
             <a class="button-like button-like--primary" href="/home">Open home</a>
             <p class="muted-copy">Your setup, updates, and access state already live in the signed-in product.</p>
-            @if (Model.SignedInStatus is not null)
-            {
-                <p class="muted-copy"><strong>Access now:</strong> @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the signed-in trust snapshot to confirm live access posture.")</p>
-                <p class="muted-copy"><strong>Fix availability:</strong> @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the signed-in trust snapshot to confirm the tracked fix lane.")</p>
-                <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the signed-in trust snapshot to confirm the current caution lane.")</p>
-            }
         }
         else
         {
             <a class="button-like button-like--primary" href="/signup?next=/home">Create account</a>
             <p class="muted-copy">Already have one? <a class="inline-link" href="/login?next=/home">Sign in</a></p>
         }
-        <p class="muted-copy">Still evaluating? <a class="quiet-link" href="/artifacts">Open the proof gallery</a> or <a class="quiet-link" href="/what-is-chummer">read the product story</a>.</p>
+        <p class="muted-copy">Still evaluating? <a class="quiet-link" href="/artifacts">Open the artifact gallery</a> or <a class="quiet-link" href="/what-is-chummer">read the product story</a>.</p>
     </div>
 </section>

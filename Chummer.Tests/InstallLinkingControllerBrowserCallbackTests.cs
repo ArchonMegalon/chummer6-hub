@@ -116,6 +116,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
     [Theory]
     [InlineData("http://127.0.0.1:47761/install-link/callback?state=desktop&nonce=callback-proof", "127.0.0.1", "/install-link/callback", true)]
     [InlineData("http://[::1]:47763/install-link/callback?state=desktop", "[::1]", "/install-link/callback", true)]
+    [InlineData("http://127.0.0.1:47761/install-link/callback/?state=desktop", "127.0.0.1", "/install-link/callback/", true)]
     [InlineData("https://localhost:47762/install-link/callback", "localhost", "/install-link/callback", false)]
     public async Task Browser_install_link_preserves_app_local_callback_targets(
         string callbackUri,
@@ -162,6 +163,43 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
         Assert.Equal("ins-local-callback", callback.InstallationId);
         Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_strips_stale_grant_claim_and_receipt_query_from_app_local_callback()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            installationId: "ins-authoritative",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: "http://127.0.0.1:47761/install-link/callback?state=desktop&accessToken=stale-access&grantId=stale-grant&claimCode=stale-claim&claimTicketId=stale-ticket&ticketId=stale-ticket-id&receiptId=stale-receipt&installedBuildReceiptId=stale-installed-receipt&callbackCode=stale-callback&code=stale-code",
+            cancellationToken: CancellationToken.None);
+
+        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("code=", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("installationId=ins-authoritative", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-access", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-grant", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-claim", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-ticket", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-ticket-id", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-receipt", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-installed-receipt", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-callback", redirect.Url, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-code", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("installLinkTransport=grant_callback", redirect.Url, StringComparison.Ordinal);
     }
 
     private sealed class Fixture : IDisposable

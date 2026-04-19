@@ -13,26 +13,26 @@
         <div class="participation-hero__content">
             <p class="eyebrow">Participation</p>
             <h1 class="hero-brand">Help Chummer show its work.</h1>
-            <h2 class="hero-headline">Open a temporary contribution lane only when you are ready to use it.</h2>
-            <p class="participation-lead">Use the guided contribution flow only when you want to help with bounded product work. Final landing still goes through review, and authorization by itself does not count as contribution credit.</p>
+            <h2 class="hero-headline">Authorize a temporary Codex lane only when you want to use it.</h2>
+            <p class="participation-lead">Use the guided contribution flow only when you want Chummer to use your OpenAI account in ChatGPT for bounded product work. Final landing still goes through review, and authorization by itself does not count as contribution credit.</p>
             <div class="stacked-actions">
-                <button id="openParticipationWizardButton" class="button-like button-like--primary" type="button">I want to participate</button>
+                <button id="openParticipationWizardButton" class="button-like button-like--primary" type="button">Authorize Codex access</button>
                 <a class="button-like button-like--ghost" href="/account">Open account</a>
             </div>
-            <p class="privacy-note">Signed in as @Model.User.DisplayName. Codes expire quickly, so Chummer only generates a fresh one when you explicitly start.</p>
+            <p class="privacy-note">Signed in as @Model.User.DisplayName. Codes expire quickly, so Chummer only generates a fresh one when you explicitly ask for it.</p>
         </div>
     </section>
 
     <section class="participation-answer-grid" aria-label="Participation questions">
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What you are authorizing</p>
-            <h3>A temporary ChatGPT contribution lane</h3>
-            <p>Chummer opens a short-lived contribution lane that is scoped to bounded work. It is not a blank check to act on your behalf anywhere else.</p>
+            <h3>A temporary Codex lane backed by your OpenAI account</h3>
+            <p>Chummer opens a short-lived contribution lane that uses your OpenAI account in ChatGPT only for bounded work. It is not a blank check to act on your behalf anywhere else.</p>
         </article>
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What you need ready</p>
-            <h3>Your browser and your ChatGPT account</h3>
-            <p>When you start, Chummer requests a fresh device-auth code, opens the verification page, and waits for confirmation. If the code expires, you can request a new one from the wizard.</p>
+            <h3>Your browser and your OpenAI account</h3>
+            <p>When you start, Chummer requests a fresh device-auth code, opens the ChatGPT verification page, and waits for confirmation. If the code expires, you can request a new one from the wizard.</p>
         </article>
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What Chummer stores</p>
@@ -63,8 +63,8 @@
             <article class="participation-step">
                 <span class="participation-step__index">2</span>
                 <div>
-                    <h3>Authorize in ChatGPT</h3>
-                    <p>Use the one-time code Chummer generates for that session and keep the wizard open while confirmation lands.</p>
+                    <h3>Authorize with your OpenAI account</h3>
+                    <p>Use the one-time code Chummer generates for that session in ChatGPT and keep the wizard open while confirmation lands.</p>
                 </div>
             </article>
             <article class="participation-step">
@@ -100,7 +100,7 @@
                 <li id="wizardStepAuthorize" class="wizard-step">
                     <span class="wizard-step__index">2</span>
                     <div>
-                        <strong>Authorize in ChatGPT</strong>
+                        <strong>Authorize with OpenAI</strong>
                         <p>Open the verification page and enter the one-time code.</p>
                     </div>
                 </li>
@@ -114,7 +114,7 @@
             </ol>
         </div>
 
-        <h2 id="participationHeading">Open a fresh contribution lane</h2>
+        <h2 id="participationHeading">Authorize a fresh Codex lane</h2>
         <p id="stateSupport">Chummer only generates a one-time code after you explicitly start, because those codes expire quickly.</p>
         <div id="stateLine" class="wizard-status" aria-live="polite"></div>
         <div id="lifecycleStateLine" class="wizard-status muted-copy" aria-live="polite"></div>
@@ -136,7 +136,7 @@
             <div class="wizard-card">
                 <p class="wizard-card__eyebrow">Step 1</p>
                 <h3>Generate a fresh code</h3>
-                <p>When you continue, Chummer will request a new one-time ChatGPT code for this session. If you do not use it in time, ask for another one here.</p>
+                <p>When you continue, Chummer will request a new one-time OpenAI/ChatGPT code for this session. If you do not use it in time, ask for another one here.</p>
             </div>
             <div class="stacked-actions">
                 <button id="startContributionButton" class="button-like button-like--primary" type="button">Generate fresh code</button>
@@ -148,8 +148,8 @@
         <div id="authorizeState" class="state-stack" hidden>
             <div class="wizard-card">
                 <p class="wizard-card__eyebrow">Step 2</p>
-                <h3>Authorize in ChatGPT</h3>
-                <p>Open the authorization page, sign in to ChatGPT, and enter the one-time code shown below. If the code expires, ask for a fresh one.</p>
+                <h3>Authorize with your OpenAI account</h3>
+                <p>Open the authorization page, sign in to ChatGPT with your OpenAI account, and enter the one-time code shown below. If the code expires, ask for a fresh one.</p>
             </div>
             <div class="stacked-actions">
                 <button id="openAuthorizationLink" class="button-like button-like--primary" type="button" disabled>Open authorization page</button>

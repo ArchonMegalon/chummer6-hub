@@ -208,7 +208,7 @@ public sealed class PublicLandingService
         }
 
         var normalized = PublicRouteCatalog.NormalizeRoute(href);
-        if (!allowedRoutes.Contains(normalized))
+        if (!PublicRouteCatalog.Contains(normalized, allowedRoutes))
         {
             throw new InvalidOperationException($"{description} points at missing route '{href}'.");
         }

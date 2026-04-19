@@ -1,6 +1,8 @@
 using System.Net;
+using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -12,14 +14,24 @@ public sealed class EntitlementsController : ControllerBase
     private readonly AccountService _accounts;
     private readonly HubIdentityClient _identity;
     private readonly EntitlementService _entitlements;
+    private readonly InstallLinkingService _installLinking;
     private readonly RewardService _rewards;
+    private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
 
-    public EntitlementsController(AccountService accounts, HubIdentityClient identity, EntitlementService entitlements, RewardService rewards)
+    public EntitlementsController(
+        AccountService accounts,
+        HubIdentityClient identity,
+        EntitlementService entitlements,
+        InstallLinkingService installLinking,
+        RewardService rewards,
+        CampaignWorkspaceServerPlaneService workspaceServerPlane)
     {
         _accounts = accounts;
         _identity = identity;
         _entitlements = entitlements;
+        _installLinking = installLinking;
         _rewards = rewards;
+        _workspaceServerPlane = workspaceServerPlane;
     }
 
     [HttpGet("/rewards")]
@@ -27,7 +39,8 @@ public sealed class EntitlementsController : ControllerBase
     public IActionResult RewardsPage([FromQuery] string subjectId = "") => Redirect("/account");
 
     [HttpGet("me")]
-    public async Task<ActionResult<object>> GetMine([FromQuery] string subjectId, CancellationToken cancellationToken)
+    [ProducesResponseType<EntitlementAccountProjection>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<EntitlementAccountProjection>> GetMine([FromQuery] string subjectId, CancellationToken cancellationToken)
     {
         try
         {
@@ -38,12 +51,12 @@ public sealed class EntitlementsController : ControllerBase
                 return NotFound();
             }
 
-            return Ok(new
-            {
-                user,
-                entitlements = _entitlements.ListForUser(user.UserId),
-                badges = _rewards.ListBadgesForUser(user.UserId),
-            });
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(new EntitlementAccountProjection(
+                User: user,
+                Entitlements: _entitlements.ListForUser(user.UserId),
+                Badges: _rewards.ListBadgesForUser(user.UserId),
+                SyncReceipts: _workspaceServerPlane.GetEntitlementSyncReceiptProjection(user, installLinking)));
         }
         catch (HubRequestAuthException ex)
         {

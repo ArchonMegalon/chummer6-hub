@@ -22,6 +22,9 @@ Campaign authority is scoped by role and artifact family:
 * `Player`: participant with runner authority.
 * `Observer`: read-only participant in one campaign view.
 * `Organizer / Community Operator`: campaign-facing community role used for participation and group operations.
+* `World Operator`: capability holder for city/world frame governance within an approved organizer context.
+* `Season Operator`: capability holder for season-level governance and season artifact controls.
+* `Faction Seat`: delegated campaign-adjacent seat authority used to represent a stable political position.
 * `Support`: Hub and Fleet support operators for escalation and case closure.
 * `EA Operator`: EA-side execution/operator role for grounded automation and pilot operations.
 
@@ -41,6 +44,20 @@ Campaign authority is scoped by role and artifact family:
 | Publication promotion | no | propose | no | no | write | no | no |
 | Evidence / receipt correction | no | propose | no | no | no | write | write |
 
+### Future world-layer authority policy
+
+The world layer is adjacent to the campaign lane and must never be treated as campaign truth.
+
+Current policy:
+
+* `World Operator`: can define and mutate `WorldFrame`-adjacent governance and mission-market policy, including seasonal/world-level packets and campaign-consumable mission opportunities.
+* `Season Operator`: can adjust season-level parameters, pressure progression, and shared city cadence.
+* `Faction Seat`: is a capability class, not a role. It does not imply campaign-owner or support authority and cannot bypass GM campaign authorization for a run.
+* `World Operator`, `Season Operator`, and `Faction Seat` operate under explicit campaign-consent semantics:
+  - campaign owners/GM must still authorize GM-run adoption of any world-seeded packet into a live campaign
+  - campaign continuity facts remain unchanged unless replay-safe continuation rules allow the linkage
+  - support/control truth stays in `Chummer.Control.Contracts`
+
 ## Truth owner
 
 * Campaign and roster truth: `chummer6-hub`
@@ -49,6 +66,7 @@ Campaign authority is scoped by role and artifact family:
 * Publication state: `chummer6-hub-registry`
 * Support closure truth: `chummer6-hub` + `fleet`
 * Automation output: `executive-assistant` only with explicit provenance requirements
+* World and season governance truth (future): `chummer6-hub`
 
 ## Conflict rule
 

@@ -148,7 +148,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("Chummer Setup.ps1", file.FileDownloadName);
         string script = Encoding.UTF8.GetString(file.FileContents);
         Assert.Contains("blazor-desktop-win-x64-installer", script, StringComparison.Ordinal);
-        Assert.Contains($"\"ClaimUrl\":\"https://chummer.run/downloads/install/avalonia-win-x64-installer/claim.json?ticket={Uri.EscapeDataString(ticket.Ticket)}\"", script, StringComparison.Ordinal);
+        Assert.Contains($"\"ClaimUrl\":\"https://chummer.run/downloads/install/avalonia-win-x64-installer/continue.json?ticket={Uri.EscapeDataString(ticket.Ticket)}\"", script, StringComparison.Ordinal);
         Assert.Contains("--bootstrap-install", script, StringComparison.Ordinal);
         Assert.Contains("ConvertFrom-Json", script, StringComparison.Ordinal);
         Assert.Contains("Confirmed linked installs", script, StringComparison.Ordinal);
@@ -182,7 +182,7 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("chummer-setup.sh", file.FileDownloadName);
         string script = Encoding.UTF8.GetString(file.FileContents);
         Assert.Contains("blazor-desktop-linux-x64-installer", script, StringComparison.Ordinal);
-        Assert.Contains($"https://chummer.run/downloads/install/avalonia-linux-x64-installer/claim.json?ticket={Uri.EscapeDataString(ticket.Ticket)}", script, StringComparison.Ordinal);
+        Assert.Contains($"https://chummer.run/downloads/install/avalonia-linux-x64-installer/continue.json?ticket={Uri.EscapeDataString(ticket.Ticket)}", script, StringComparison.Ordinal);
         Assert.Contains("dpkg-deb -x", script, StringComparison.Ordinal);
         Assert.Contains("Confirmed linked installs", script, StringComparison.Ordinal);
         Assert.DoesNotContain("claimCode=", script, StringComparison.Ordinal);

@@ -43,6 +43,9 @@ public sealed class PublicLandingClaimRecoveryFlowTests
         Assert.Contains("Current install rail", accountView, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay below as a fallback, not the first instruction.", accountView, StringComparison.Ordinal);
         Assert.Contains("Open Devices and access", presenter, StringComparison.Ordinal);
-        Assert.Contains("Follow-up stays inside Account > Support and Devices & access for this signed-in install rail.", presenter, StringComparison.Ordinal);
+        Assert.Contains(
+            "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Devices & access only when you need to relink or reclaim that copy.",
+            presenter,
+            StringComparison.Ordinal);
     }
 }

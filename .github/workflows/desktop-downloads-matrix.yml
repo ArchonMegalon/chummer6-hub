@@ -44,8 +44,16 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Prepare local compatibility NuGet feed directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.tmp/ai/local-nuget"
+
       - name: Restore API
-        run: dotnet restore Chummer.Run.Api/Chummer.Run.Api.csproj
+        run: |
+          dotnet restore Chummer.Run.Api/Chummer.Run.Api.csproj \
+            -p:UseChummerEngineContractsLocalFeed=false
 
       - name: Publish API bundle
         shell: bash
@@ -54,8 +62,10 @@ jobs:
           mkdir -p out/api dist
           dotnet publish Chummer.Run.Api/Chummer.Run.Api.csproj \
             -c Release \
+            --no-restore \
             --self-contained false \
             -p:UseAppHost=false \
+            -p:UseChummerEngineContractsLocalFeed=false \
             -o out/api
           tar -C out/api -czf dist/chummer-run-api-portable.tar.gz .
 

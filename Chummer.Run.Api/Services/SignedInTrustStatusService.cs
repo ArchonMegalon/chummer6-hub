@@ -97,24 +97,26 @@ public sealed class SignedInTrustStatusService
 
         if (followThrough?.NeedsInstallUpdate == true)
         {
+            var installAction = BuildRecommendedInstallAction(releaseExperience, tone: "primary");
             return new SignedInTrustStatusPanelViewModel(
                 Eyebrow: "Signed-in trust status",
                 Heading: "Update your linked install",
                 Summary: followThrough.InstallReadinessSummary,
                 Rows: rows,
-                PrimaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "primary"),
+                PrimaryAction: installAction,
                 SecondaryAction: new TrustPageActionViewModel("Open support timeline", "/account/support", "secondary"));
         }
 
         if (followThrough?.CanVerifyFix == true)
         {
+            var installAction = BuildRecommendedInstallAction(releaseExperience, tone: "secondary");
             return new SignedInTrustStatusPanelViewModel(
                 Eyebrow: "Signed-in trust status",
                 Heading: "Your linked install can verify a fix now",
                 Summary: followThrough.VerificationSummary,
                 Rows: rows,
                 PrimaryAction: new TrustPageActionViewModel("Verify fix on this install", followThrough.DetailHref, "primary"),
-                SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
+                SecondaryAction: installAction);
         }
 
         if (followThrough?.ReporterActionNeeded == true)
@@ -130,23 +132,40 @@ public sealed class SignedInTrustStatusService
 
         if (latestInstallation is null)
         {
+            var installAction = BuildRecommendedInstallAction(releaseExperience, tone: "secondary");
             return new SignedInTrustStatusPanelViewModel(
                 Eyebrow: "Signed-in trust status",
                 Heading: "No linked install is attached yet",
                 Summary: "Claim the current preview first so downloads, support closure, and recovery stay attached to this account instead of turning into a fresh unknown device next time.",
                 Rows: rows,
                 PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
-                SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
+                SecondaryAction: installAction);
         }
 
         string installationLabel = ResolveInstallationDisplayLabel(latestInstallation);
+        var recommendedAction = BuildRecommendedInstallAction(releaseExperience, tone: "secondary");
         return new SignedInTrustStatusPanelViewModel(
             Eyebrow: "Signed-in trust status",
             Heading: $"{installationLabel} is attached",
             Summary: $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.",
             Rows: rows,
             PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"));
+            SecondaryAction: recommendedAction);
+    }
+
+    private static TrustPageActionViewModel BuildRecommendedInstallAction(
+        ReleaseExperienceViewModel releaseExperience,
+        string tone)
+    {
+        if (releaseExperience.Recommended is null)
+        {
+            return new TrustPageActionViewModel("Open downloads", "/downloads", tone);
+        }
+
+        return new TrustPageActionViewModel(
+            releaseExperience.Recommended.ActionLabel,
+            releaseExperience.Recommended.DispatchHref,
+            tone);
     }
 
     private static string ResolveInstallationDisplayLabel(ClaimedInstallationDto installation)

@@ -10,6 +10,7 @@ internal static class ServiceCollectionBoundedContextExtensions
 {
     public static IServiceCollection AddHubPublicGuideContext(this IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
         services.AddSingleton<PublicCanonFileLoader>();
         services.AddSingleton<PublicRouteCatalogService>();
         services.AddSingleton<PublicActionResolver>();

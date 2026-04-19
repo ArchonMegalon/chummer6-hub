@@ -23,6 +23,7 @@ public sealed class InstallLinkingStore
     public string StoragePath => _storagePath;
     public Dictionary<string, DownloadReceiptDto> ReceiptsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, InstallClaimTicketDto> ClaimTicketsById { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, InstallBrowserCallbackDto> BrowserCallbacksById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, ClaimedInstallationDto> InstallationsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, InstallationGrantDto> GrantsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, PersonalizedInstallScriptLinkDto> PersonalizedInstallScriptsById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -34,6 +35,9 @@ public sealed class InstallLinkingStore
                 .OrderByDescending(static item => item.IssuedAtUtc)
                 .ToArray(),
             ClaimTickets: ClaimTicketsById.Values
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray(),
+            BrowserCallbacks: BrowserCallbacksById.Values
                 .OrderByDescending(static item => item.CreatedAtUtc)
                 .ToArray(),
             Installations: InstallationsById.Values
@@ -81,6 +85,7 @@ public sealed class InstallLinkingStore
     {
         ReceiptsById.Clear();
         ClaimTicketsById.Clear();
+        BrowserCallbacksById.Clear();
         InstallationsById.Clear();
         GrantsById.Clear();
         PersonalizedInstallScriptsById.Clear();
@@ -93,6 +98,11 @@ public sealed class InstallLinkingStore
         foreach (var ticket in snapshot.ClaimTickets ?? Array.Empty<InstallClaimTicketDto>())
         {
             ClaimTicketsById[ticket.TicketId] = ticket;
+        }
+
+        foreach (var callback in snapshot.BrowserCallbacks ?? Array.Empty<InstallBrowserCallbackDto>())
+        {
+            BrowserCallbacksById[callback.CallbackId] = callback;
         }
 
         foreach (var installation in snapshot.Installations ?? Array.Empty<ClaimedInstallationDto>())
@@ -126,6 +136,7 @@ public sealed class InstallLinkingStore
 internal sealed record InstallLinkingStoreSnapshot(
     IReadOnlyList<DownloadReceiptDto> Receipts,
     IReadOnlyList<InstallClaimTicketDto> ClaimTickets,
+    IReadOnlyList<InstallBrowserCallbackDto>? BrowserCallbacks,
     IReadOnlyList<ClaimedInstallationDto> Installations,
     IReadOnlyList<InstallationGrantDto> Grants,
     IReadOnlyList<PersonalizedInstallScriptLinkDto>? PersonalizedInstallScripts = null);

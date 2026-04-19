@@ -204,6 +204,7 @@ public sealed record DownloadsPageViewModel(
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
     ReleaseExperienceViewModel ReleaseExperience,
+    IReadOnlyList<WindowsProofInstallerRecord>? WindowsProofInstallers = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
@@ -212,6 +213,7 @@ public sealed record ReleaseUploadPageViewModel(
     string Heading,
     string Summary,
     string Command,
+    string HandoffCode,
     string BootstrapUrl,
     DateTimeOffset TicketExpiresAtUtc,
     string UploadUrl,
@@ -563,6 +565,7 @@ public sealed record AccountPageViewModel(
     SupportCaseProjection? SelectedSupportCase,
     SupportCasePresentationViewModel? SelectedSupportCaseSummary,
     AccountCampaignSummary CampaignSpine,
+    EntitlementSyncReceiptProjection? EntitlementSyncReceipts = null,
     CampaignWorkspaceProjection? SelectedWorkspace = null,
     CampaignWorkspaceServerPlaneProjection? SelectedWorkspaceServerPlane = null,
     RosterTransferPlannerProjection? SelectedWorkspaceRosterTransferPlan = null,

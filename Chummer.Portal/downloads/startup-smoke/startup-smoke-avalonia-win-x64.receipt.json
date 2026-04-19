@@ -1,0 +1,18 @@
+{
+  "headId": "avalonia",
+  "version": "smoke-0001",
+  "channelId": "docker",
+  "platform": "windows",
+  "arch": "x64",
+  "readyCheckpoint": "pre_ui_event_loop",
+  "hostClass": "win-host",
+  "operatingSystem": "Windows",
+  "recordedAtUtc": "2026-04-14T20:30:00Z",
+  "artifactId": "avalonia-win-x64-installer",
+  "rid": "win-x64",
+  "status": "pass",
+  "artifactFileName": "chummer-avalonia-win-x64-installer.exe",
+  "artifactRelativePath": "files/chummer-avalonia-win-x64-installer.exe",
+  "artifactDigest": "sha256:cb3493c1113c23b5e496dfe8a1e6de9afc43c802d7da865adc5255497341e5c4",
+  "artifactSha256": "cb3493c1113c23b5e496dfe8a1e6de9afc43c802d7da865adc5255497341e5c4"
+}

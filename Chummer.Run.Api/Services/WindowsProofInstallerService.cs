@@ -127,8 +127,12 @@ public sealed class WindowsProofInstallerService
         }
 
         yield return Path.GetFullPath(Path.Combine(downloadsRoot, "proof", "windows"));
+        yield return Path.GetFullPath(Path.Combine(downloadsRoot, "files"));
         yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "Chummer.Portal", "downloads", "proof", "windows"));
+        yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "Chummer.Portal", "downloads", "files"));
         yield return "/docker/chummercomplete/chummer-presentation/Chummer.Portal/downloads/proof/windows";
+        yield return "/docker/chummercomplete/chummer-presentation/Chummer.Portal/downloads/files";
+        yield return "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files";
         yield return "/docker/chummercomplete/chummer-presentation/dist-proof";
     }
 

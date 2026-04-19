@@ -17,6 +17,9 @@ domains:
   - id: install_update_support
     label: Install, update, and support
     description: Downloads, first-launch claim, updater, crash, bug, feedback, and support closure surfaces.
+  - id: companion_runtime
+    label: Companion runtime and voice affordances
+    description: First-party companion barks, chips, evidence drawers, and voice-opt-in fallback copy on desktop and mobile surfaces.
   - id: explain_receipts
     label: Explain and receipts
     description: Grounded explanations, receipts, migration explanations, and update/support decision text.
@@ -31,10 +34,12 @@ acceptance_gates:
   - missing_key_fail_fast
   - top_surface_overflow_checks
   - locale_smoke_first_launch
+  - locale_smoke_companion
   - locale_smoke_settings
   - locale_smoke_explain
   - locale_smoke_updater
   - locale_smoke_support
+  - voice_opt_in_fallback_smoke
   - non_english_generated_artifact_smoke
 locale_matrix:
   - locale: en-US
@@ -42,6 +47,7 @@ locale_matrix:
     domains:
       app_chrome: release_required
       install_update_support: release_required
+      companion_runtime: release_required
       explain_receipts: release_required
       data_rules_names: release_required
       generated_artifacts: release_required
@@ -50,6 +56,7 @@ locale_matrix:
     domains:
       app_chrome: release_required
       install_update_support: release_required
+      companion_runtime: release_required
       explain_receipts: release_required
       data_rules_names: release_required
       generated_artifacts: release_required
@@ -58,6 +65,7 @@ locale_matrix:
     domains:
       app_chrome: release_required
       install_update_support: release_required
+      companion_runtime: release_required
       explain_receipts: release_required
       data_rules_names: release_required
       generated_artifacts: release_required
@@ -66,6 +74,7 @@ locale_matrix:
     domains:
       app_chrome: release_required
       install_update_support: release_required
+      companion_runtime: release_required
       explain_receipts: release_required
       data_rules_names: release_required
       generated_artifacts: release_required
@@ -74,6 +83,7 @@ locale_matrix:
     domains:
       app_chrome: release_required
       install_update_support: release_required
+      companion_runtime: release_required
       explain_receipts: release_required
       data_rules_names: release_required
       generated_artifacts: release_required
@@ -82,6 +92,7 @@ locale_matrix:
     domains:
       app_chrome: release_required
       install_update_support: release_required
+      companion_runtime: release_required
       explain_receipts: release_required
       data_rules_names: release_required
       generated_artifacts: release_required

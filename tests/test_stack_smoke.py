@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -211,33 +212,34 @@ class StackConfigSmokeTests(unittest.TestCase):
             startup_smoke_dir = temp_path / "startup-smoke"
             files_dir.mkdir()
             startup_smoke_dir.mkdir()
+            published_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
             artifact_path = files_dir / "chummer-avalonia-osx-arm64-installer.dmg"
             artifact_path.write_bytes(b"dummy mac installer payload\n")
 
             receipt_path = startup_smoke_dir / "startup-smoke-avalonia-osx-arm64.receipt.json"
             receipt_path.write_text(
-                "\n".join(
-                    [
-                        "{",
-                        '  "headId": "avalonia",',
-                        '  "version": "dummy-preview",',
-                        '  "releaseVersion": "dummy-preview",',
-                        '  "channelId": "preview",',
-                        '  "platform": "macos",',
-                        '  "arch": "arm64",',
-                        '  "rid": "osx-arm64",',
-                        '  "readyCheckpoint": "pre_ui_event_loop",',
-                        '  "hostClass": "macos-host",',
-                        '  "processPath": "/tmp/Chummer.Avalonia",',
-                        '  "framework": ".NET 10.0.0",',
-                        '  "operatingSystem": "macOS Sonoma",',
-                        '  "recordedAtUtc": "2026-04-09T00:00:00Z",',
-                        '  "startedAtUtc": "2026-04-09T00:00:00Z",',
-                        '  "completedAtUtc": "2026-04-09T00:00:00Z"',
-                        "}",
-                    ]
-                ),
+                json.dumps(
+                    {
+                        "headId": "avalonia",
+                        "version": "dummy-preview",
+                        "releaseVersion": "dummy-preview",
+                        "channelId": "preview",
+                        "platform": "macos",
+                        "arch": "arm64",
+                        "rid": "osx-arm64",
+                        "readyCheckpoint": "pre_ui_event_loop",
+                        "hostClass": "macos-host",
+                        "processPath": "/tmp/Chummer.Avalonia",
+                        "framework": ".NET 10.0.0",
+                        "operatingSystem": "macOS Sonoma",
+                        "recordedAtUtc": published_at,
+                        "startedAtUtc": published_at,
+                        "completedAtUtc": published_at,
+                    },
+                    indent=2,
+                )
+                + "\n",
                 encoding="utf-8",
             )
             release_fixture = json.loads(known_good_release_channel.read_text(encoding="utf-8"))
@@ -270,7 +272,6 @@ class StackConfigSmokeTests(unittest.TestCase):
 
             manifest_path = temp_path / "RELEASE_CHANNEL.generated.json"
             compat_path = temp_path / "releases.json"
-            published_at = "2026-04-09T00:00:00Z"
             release_fixture["releaseProof"]["generatedAt"] = published_at
             release_fixture["releaseProof"]["generated_at"] = published_at
             ui_gate = release_fixture["releaseProof"].get("uiLocalizationReleaseGate") or {}

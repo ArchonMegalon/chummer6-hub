@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer6-ui.localization_release_gate",
-  "generated_at": "2026-04-04T18:02:33Z",
+  "generated_at": "2026-04-16T21:16:00Z",
   "status": "pass",
   "shipping_locales": [
     "en-us",
@@ -27,7 +27,7 @@
     "retry_attempted": false,
     "retry_reason": "",
     "log_excerpt": [
-      "[B15] PASS: localization release smoke runner checks passed."
+      "[B13] PASS: targeted accessibility smoke runner checks passed."
     ]
   },
   "locale_summary": [
@@ -92,87 +92,83 @@
       "legacy_data_xml_present": true
     }
   ],
-  "legacy_language_root": "/docker/chummercomplete/chummer-presentation/Chummer/lang",
+  "legacy_language_root": "/docker/chummercomplete/chummer6-ui/Chummer/lang",
   "local_release_proof": {
     "contract_name": "chummer6-ui.local_release_proof",
-    "generated_at": "2026-03-28T14:39:05Z",
+    "generated_at": "2026-04-14T21:32:52Z",
     "status": "passed",
     "base_url": "http://127.0.0.1:8091",
     "compose_file": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
     "playwright_timeout_seconds": 240,
     "edge_rebuild_skipped": true,
-    "route_probe_executed": true,
+    "route_probe_executed": false,
     "journeys_passed": [
-      "public_bridge_boot",
-      "desktop_downloads_projection",
-      "portal_route_probe"
+      "install_claim_restore_continue",
+      "build_explain_publish",
+      "campaign_session_recover_recap",
+      "report_cluster_release_notify",
+      "organize_community_and_close_loop"
     ],
     "proof_routes": [
-      "/",
-      "/blazor/",
-      "/hub/",
-      "/avalonia/",
-      "/downloads/",
-      "/downloads/releases.json",
-      "/session/",
-      "/coach/",
-      "/contact",
-      "/what-is-chummer",
-      "/artifacts",
-      "/faq"
+      "/downloads/install/avalonia-linux-x64-installer",
+      "/home/access",
+      "/home/work",
+      "/account/work",
+      "/account/support",
+      "/contact"
     ]
   },
   "blocking_findings": [],
   "translation_backlog_findings": [],
   "domain_coverage": {
     "app_chrome": "pass",
-    "data_rules_names": "pass",
+    "install_update_support": "pass",
     "explain_receipts": "pass",
-    "generated_artifacts": "pass",
-    "install_update_support": "pass"
+    "data_rules_names": "pass",
+    "generated_artifacts": "pass"
   },
   "locale_domain_coverage": {
     "en-us": {
       "app_chrome": "pass",
-      "data_rules_names": "pass",
+      "install_update_support": "pass",
       "explain_receipts": "pass",
-      "generated_artifacts": "pass",
-      "install_update_support": "pass"
+      "data_rules_names": "pass",
+      "generated_artifacts": "pass"
     },
     "de-de": {
       "app_chrome": "pass",
-      "data_rules_names": "pass",
+      "install_update_support": "pass",
       "explain_receipts": "pass",
-      "generated_artifacts": "pass",
-      "install_update_support": "pass"
+      "data_rules_names": "pass",
+      "generated_artifacts": "pass"
     },
     "fr-fr": {
       "app_chrome": "pass",
-      "data_rules_names": "pass",
+      "install_update_support": "pass",
       "explain_receipts": "pass",
-      "generated_artifacts": "pass",
-      "install_update_support": "pass"
+      "data_rules_names": "pass",
+      "generated_artifacts": "pass"
     },
     "ja-jp": {
       "app_chrome": "pass",
-      "data_rules_names": "pass",
+      "install_update_support": "pass",
       "explain_receipts": "pass",
-      "generated_artifacts": "pass",
-      "install_update_support": "pass"
+      "data_rules_names": "pass",
+      "generated_artifacts": "pass"
     },
     "pt-br": {
       "app_chrome": "pass",
-      "data_rules_names": "pass",
+      "install_update_support": "pass",
       "explain_receipts": "pass",
-      "generated_artifacts": "pass",
-      "install_update_support": "pass"
+      "data_rules_names": "pass",
+      "generated_artifacts": "pass"
     },
     "zh-cn": {
       "app_chrome": "pass",
-      "data_rules_names": "pass",
+      "install_update_support": "pass",
       "explain_receipts": "pass",
-      "generated_artifacts": "pass",
-      "install_update_support": "pass"
+      "data_rules_names": "pass",
+      "generated_artifacts": "pass"
     }
   },
   "acceptance_gates": [

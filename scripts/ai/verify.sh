@@ -13,8 +13,9 @@ resolve_ui_repo_root() {
   fi
   local candidate
   for candidate in \
-    "$ROOT_DIR/../chummer6-ui-finish" \
     "$ROOT_DIR/../chummer6-ui" \
+    "$ROOT_DIR/../chummer6-ui-finish" \
+    "$ROOT_DIR/../chummer-presentation-clean" \
     "$ROOT_DIR/../chummer-presentation"
   do
     if [[ -d "$candidate" ]]; then
@@ -22,7 +23,7 @@ resolve_ui_repo_root() {
       return 0
     fi
   done
-  echo "$ROOT_DIR/../chummer6-ui-finish"
+  echo "$ROOT_DIR/../chummer6-ui"
 }
 
 UI_REPO_ROOT="$(resolve_ui_repo_root)"
@@ -2324,5 +2325,6 @@ python3 scripts/verify_workspace_restore_queue_identity.py
 python3 -m unittest tests/test_workspace_restore_receipts.py tests/test_workspace_restore_queue_frontier_guard.py tests/test_workspace_restore_commit_resolution.py tests/test_workspace_restore_queue_identity.py
 python3 scripts/verify_artifact_factory_orchestration.py
 python3 -m unittest tests/test_artifact_factory_orchestration.py
+python3 -m unittest tests/test_artifact_factory_source_pack_launcher.py
 
 bash scripts/ai/run_services_smoke.sh

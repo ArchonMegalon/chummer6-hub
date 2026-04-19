@@ -21,7 +21,9 @@ It does not imply that every owned tool must be integrated.
 * `Soundmadeseen` - narrated media, recap, and briefing clips
 * `vidBoard` - structured presenter-video and multilingual walkthrough lane
 * `Crezlo Tours` - explorable GM run-site artifacts
+* `Deftform` - structured intake and concierge handoff lane
 * `First Book ai` - long-form player, GM, and creator authoring lane
+* `Lunacal` - booking and human-escalation lane
 * `MarkupGo` - bounded document rendering and formatted artifact output
 * `AvoMap` - route and location visualization lane
 * `PeekShot` - preview/share-card adapter lane
@@ -36,6 +38,7 @@ It does not imply that every owned tool must be integrated.
 * `Teable` - curation and projection board only, never system of record
 * `ApiX-Drive` - low-risk automation glue only, never truth
 * `Browserly` - bounded browser capture and reference-pack helper
+* `FacePop` - bounded public trust / concierge widget and moderated testimonial capture lane
 * `hedy.ai` - bounded post-session transcript structure, highlight digest, and GM debrief helper for `TABLE PULSE`
 * `Nonverbia` - post-session coaching and social-dynamics analysis lane
 * `Unmixr AI` - candidate voice lane until proven
@@ -68,6 +71,16 @@ Current rule:
 * No AppSumo chat/support product is promoted as the first support feature.
 * `MetaSurvey` and `Documentation.AI` are enough to start structured feedback and help projection behind Hub-owned adapters.
 * The grounded support assistant is the phase-2 layer: Hub-owned, grounded on curated help/known-issue and signed-in case sources, and optional rather than gating crash or bug submission.
+* Public concierge is a separate bounded lane: `FacePop` may help users choose a safe path on Hub-owned public surfaces, but it may not replace first-party support, install, auth, or case truth.
+
+## Public concierge / trust posture
+
+Working rule:
+
+* `FacePop` is bounded to public, low-risk trust surfaces with a kill switch and first-party fallback.
+* `Lunacal` may provide human escalation and booking, but it may not become support-case or campaign truth.
+* `Deftform` may provide structured intake, but Hub-owned receipts and first-party followthrough remain canonical.
+* Desktop, mobile, updater, claim-code, signed-in workspace, and support-thread surfaces remain first-party only.
 
 ## Bounded owner assignments
 
@@ -75,6 +88,9 @@ Current rule:
 * `Teable` - `chummer6-hub` for curation/projection workflows
 * `ApiX-Drive` - `chummer6-hub` for low-risk automation glue
 * `Browserly` - `chummer6-hub` for bounded capture/reference packets
+* `FacePop` - `chummer6-hub` for public-surface routing, consent, fallback, and intake receipt mirroring; `chummer6-media-factory` for moderated testimonial derivative support
+* `Deftform` - `chummer6-hub` for structured intake routing and receipt mirroring
+* `Lunacal` - `chummer6-hub` for booking linkage and escalation routing
 * `hedy.ai` - `chummer6-hub` for consent-gated coaching packet orchestration, `chummer6-media-factory` for transcript prep and rendered recap packet support
 * `Nonverbia` - `chummer6-hub` for coaching analysis and privacy gating, `chummer6-media-factory` for bounded rendered outputs
 * `Unmixr AI` - `chummer6-media-factory` for bounded voice experiments

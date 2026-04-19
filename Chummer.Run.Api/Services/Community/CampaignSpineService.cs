@@ -1546,6 +1546,22 @@ public sealed class CampaignSpineService
                     : "Resolve the orphaned grant in account access before trusting replay on a second device."));
         }
 
+        if (activeGrants.Count > 0)
+        {
+            int matchedGrantCount = activeGrants.Count(grant => installationsById.ContainsKey(grant.InstallationId));
+            int orphanGrantCount = activeGrants.Count - matchedGrantCount;
+            receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                ReceiptId: StableId("restore-provenance", $"{userId}:entitlement-replication:{matchedGrantCount}:{orphanGrantCount}"),
+                Kind: "entitlement_replication",
+                SubjectId: userId,
+                Surface: "entitlement_sync",
+                Summary: $"Entitlement replication snapshot carries {matchedGrantCount} grant(s) bound to claimed installs and {orphanGrantCount} orphaned grant(s) that must be reconciled before roaming restore is trusted.",
+                Proof: $"matched:{matchedGrantCount};orphaned:{orphanGrantCount}",
+                ObservedAtUtc: observedAtUtc,
+                Authority: "hub_entitlement_ledger",
+                RecoveryHint: "Open account access to refresh entitlement replication receipts before continuing from a second device when counts or claim posture drift."));
+        }
+
         foreach (RestoreArtifactProjection artifact in recentArtifacts)
         {
             receipts.Add(new WorkspaceRestoreProvenanceReceipt(
@@ -1558,6 +1574,63 @@ public sealed class CampaignSpineService
                 ObservedAtUtc: observedAtUtc,
                 Authority: "hub_registry_release_receipts",
                 RecoveryHint: "Redownload or refresh the signed-in install rail if this artifact receipt no longer matches the device you are restoring."));
+        }
+
+        foreach (ClaimedInstallationDto installation in claimedInstallations)
+        {
+            RestoreArtifactProjection? artifactEvidence = recentArtifacts.FirstOrDefault(
+                item => !string.IsNullOrWhiteSpace(item.ArtifactId)
+                    && string.Equals(item.ArtifactId, installation.ArtifactId, StringComparison.OrdinalIgnoreCase));
+
+            if (artifactEvidence is not null
+                && (HasRestoreDrift(installation.Channel, artifactEvidence.Channel)
+                    || HasRestoreDrift(installation.Version, artifactEvidence.Version)))
+            {
+                receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: StableId("restore-provenance", $"{userId}:{installation.InstallationId}:artifact-drift:{artifactEvidence.ArtifactId}"),
+                    Kind: "entitlement_artifact_drift",
+                    SubjectId: installation.InstallationId,
+                    Surface: "entitlement_sync",
+                    Summary: $"Restore provenance records artifact drift for claimed install {installation.InstallationId}: device reports {installation.Channel ?? "unknown"} {installation.Version ?? "unknown"}, while reconnectable receipt {artifactEvidence.ArtifactId} carries {artifactEvidence.Channel ?? "unknown"} {artifactEvidence.Version ?? "unknown"}.",
+                    Proof: $"device:{installation.Channel ?? "unknown"}:{installation.Version ?? "unknown"};artifact:{artifactEvidence.Channel ?? "unknown"}:{artifactEvidence.Version ?? "unknown"}",
+                    ObservedAtUtc: observedAtUtc,
+                    Authority: "hub_registry_release_receipts",
+                    RecoveryHint: "Refresh the signed-in download or install rail before continuing so entitlement replay and artifact truth match."));
+            }
+
+            if (!string.Equals(installation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase)
+                || observedAtUtc - installation.UpdatedAtUtc > RestoreSnapshotStaleWindow)
+            {
+                receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: StableId("restore-provenance", $"{userId}:{installation.InstallationId}:claimed-installation-stale:{installation.Status}"),
+                    Kind: "claimed_installation_stale",
+                    SubjectId: installation.InstallationId,
+                    Surface: "workspace_restore",
+                    Summary: $"Restore provenance records stale claimed-install state for {installation.InstallationId}: status {installation.Status}, last refreshed {installation.UpdatedAtUtc:O}.",
+                    Proof: $"status:{installation.Status};updated:{installation.UpdatedAtUtc:O}",
+                    ObservedAtUtc: observedAtUtc,
+                    Authority: "hub_registry_install_linking",
+                    RecoveryHint: "Open account access and relink this claimed install before editing shared workspace state on another device."));
+            }
+        }
+
+        foreach (InstallationGrantDto grant in activeGrants)
+        {
+            if (installationsById.TryGetValue(grant.InstallationId, out ClaimedInstallationDto? claimedInstallation)
+                && (!string.Equals(claimedInstallation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase)
+                    || observedAtUtc - claimedInstallation.UpdatedAtUtc > RestoreSnapshotStaleWindow))
+            {
+                receipts.Add(new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: StableId("restore-provenance", $"{userId}:{grant.GrantId}:entitlement-replication-stale-claim:{claimedInstallation.InstallationId}"),
+                    Kind: "entitlement_replication_stale_claim",
+                    SubjectId: grant.GrantId,
+                    Surface: "entitlement_sync",
+                    Summary: $"Entitlement replication provenance records grant {grant.GrantId} pointing at stale claimed install {claimedInstallation.InstallationId}.",
+                    Proof: $"grant:{grant.GrantId};claim:{claimedInstallation.InstallationId};claim-status:{claimedInstallation.Status};claim-updated:{claimedInstallation.UpdatedAtUtc:O}",
+                    ObservedAtUtc: observedAtUtc,
+                    Authority: "hub_entitlement_ledger",
+                    RecoveryHint: "Refresh account access so the claimed install and entitlement replication receipt are minted from the same current state."));
+            }
         }
 
         foreach (RuleEnvironmentRef environment in ruleEnvironments.Take(4))
@@ -1627,10 +1700,37 @@ public sealed class CampaignSpineService
             .Where(static item => !string.IsNullOrWhiteSpace(item.InstallationId))
             .GroupBy(static item => item.InstallationId, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, ClaimedInstallationDto> claimedInstallationsById = claimedInstallations
+            .Where(static item => !string.IsNullOrWhiteSpace(item.InstallationId))
+            .GroupBy(static item => item.InstallationId, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.OrdinalIgnoreCase);
         HashSet<string> claimedInstallationIds = claimedInstallations
             .Select(static item => item.InstallationId)
             .Where(static item => !string.IsNullOrWhiteSpace(item))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (IGrouping<string, InstallationGrantDto> duplicateGrantGroup in activeGrants
+            .Where(static item => !string.IsNullOrWhiteSpace(item.InstallationId))
+            .Where(static item => string.Equals(item.Status, InstallationGrantStates.Active, StringComparison.OrdinalIgnoreCase))
+            .GroupBy(static item => item.InstallationId, StringComparer.OrdinalIgnoreCase)
+            .Where(static group => group.Count() > 1))
+        {
+            string[] grantIds = duplicateGrantGroup
+                .Select(static item => item.GrantId)
+                .Where(static item => !string.IsNullOrWhiteSpace(item))
+                .OrderBy(static item => item, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            receipts.Add(new WorkspaceRestoreConflictReceipt(
+                ReceiptId: StableId("restore-conflict", $"{userId}:{duplicateGrantGroup.Key}:duplicate-entitlement-grants:{string.Join(":", grantIds)}"),
+                Severity: "blocking",
+                Kind: "entitlement_replication_duplicate_grant",
+                SubjectId: duplicateGrantGroup.Key,
+                Summary: $"Entitlement replication has {duplicateGrantGroup.Count()} active grant receipts for claimed install {duplicateGrantGroup.Key}: {string.Join(", ", grantIds)}.",
+                Resolution: "Open account access and rotate duplicate entitlement grants before restoring this workspace on another device.",
+                ObservedAtUtc: observedAtUtc,
+                Surface: "entitlement_sync",
+                BlocksContinue: true));
+        }
 
         foreach (InstallationGrantDto grant in activeGrants)
         {
@@ -1675,6 +1775,22 @@ public sealed class CampaignSpineService
                     Surface: "entitlement_sync",
                     BlocksContinue: true));
             }
+
+            if (claimedInstallationsById.TryGetValue(grant.InstallationId, out ClaimedInstallationDto? claimedInstallation)
+                && (!string.Equals(claimedInstallation.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase)
+                    || observedAtUtc - claimedInstallation.UpdatedAtUtc > RestoreSnapshotStaleWindow))
+            {
+                receipts.Add(new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: StableId("restore-conflict", $"{userId}:{grant.GrantId}:replication-stale-claim"),
+                    Severity: "blocking",
+                    Kind: "entitlement_replication_stale_claim",
+                    SubjectId: grant.GrantId,
+                    Summary: $"Entitlement replication for {grant.GrantId} points at claimed install {claimedInstallation.InstallationId}, but that claim is {claimedInstallation.Status} and last refreshed at {claimedInstallation.UpdatedAtUtc:O}.",
+                    Resolution: "Refresh the claimed install and entitlement replication receipts in account access before restoring this workspace on another device.",
+                    ObservedAtUtc: observedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true));
+            }
         }
 
         foreach (ClaimedInstallationDto installation in claimedInstallations)
@@ -1701,14 +1817,14 @@ public sealed class CampaignSpineService
             {
                 receipts.Add(new WorkspaceRestoreConflictReceipt(
                     ReceiptId: StableId("restore-conflict", $"{userId}:{installation.InstallationId}:stale-claimed-install"),
-                    Severity: "warning",
+                    Severity: "blocking",
                     Kind: "claimed_installation_stale",
                     SubjectId: installation.InstallationId,
                     Summary: $"Claimed install {installation.InstallationId} has not refreshed since {installation.UpdatedAtUtc:O}; restore evidence may be stale.",
                     Resolution: "Reopen the install from account access and relink to refresh claim and entitlement replay evidence.",
                     ObservedAtUtc: observedAtUtc,
                     Surface: "workspace_restore",
-                    BlocksContinue: false));
+                    BlocksContinue: true));
             }
 
             if (artifactEvidence is not null

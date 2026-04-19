@@ -586,11 +586,11 @@ public sealed class SupportProgressEmailWorkflowService
                 request.Note.Trim(),
                 "",
                 HasInstallRailContext(supportCase)
-                    ? "Please test it on the affected linked install and tell Chummer if the fix holds."
+                    ? "Open the affected claimed desktop install first and tell Chummer if the fix holds there."
                     : "Please test it on the affected flow and tell Chummer if the fix holds.",
                 $"Download: {downloadUrl}",
                 !string.IsNullOrWhiteSpace(installRailUrl)
-                    ? $"Linked install rail: {installRailUrl}"
+                    ? $"Browser fallback for relink or recovery: {installRailUrl}"
                     : string.Empty,
                 BuildAffectedInstallLine(supportCase),
                 string.IsNullOrWhiteSpace(supportCase.FixedVersion)

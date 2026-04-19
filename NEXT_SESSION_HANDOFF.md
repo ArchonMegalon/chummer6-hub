@@ -378,7 +378,7 @@ Updated: 2026-03-30T11:00:07+02:00
   - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
   - `bash scripts/ai/run_services_smoke.sh`
   - `bash scripts/run_smoke.sh`
-  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
   - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
@@ -405,7 +405,7 @@ Updated: 2026-03-30T11:00:07+02:00
   - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "PublicTrustPulseServiceTests|VerificationEntryPointTests"`
   - `bash scripts/ai/run_services_smoke.sh`
   - `bash scripts/run_smoke.sh`
-  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
   - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
@@ -422,7 +422,7 @@ Updated: 2026-03-30T11:00:07+02:00
   - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
   - `bash scripts/ai/run_services_smoke.sh`
   - `bash scripts/run_smoke.sh`
-  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
   - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
@@ -431,7 +431,7 @@ Updated: 2026-03-30T11:00:07+02:00
 ## Handoff refresh (2026-03-29T21:45:00+02:00)
 
 - Local execution status is clean and green from the required full verification loop:
-  - `docker compose -f docker-compose.public-edge.yml up -d --build` completes successfully.
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build` completes successfully.
   - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work` passes.
   - `bash scripts/ai/run_services_smoke.sh` passes.
   - `bash scripts/run_smoke.sh` passes.
@@ -461,7 +461,7 @@ Updated: 2026-03-30T11:00:07+02:00
   - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
   - `bash scripts/ai/run_services_smoke.sh`
   - `bash scripts/run_smoke.sh`
-  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
   - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
@@ -481,7 +481,7 @@ Updated: 2026-03-30T11:00:07+02:00
   - `dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "WeeklyProductPulseArtifactServiceTests|PublicTrustPulseServiceTests|VerificationEntryPointTests|DesignMirrorExecutionPlanTests"`
   - `bash scripts/ai/run_services_smoke.sh`
   - `bash scripts/run_smoke.sh`
-  - `docker compose -f docker-compose.public-edge.yml up -d --build`
+  - `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build`
   - `python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh`
   - `CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh`
@@ -503,7 +503,7 @@ Remaining immediate gap
 ## Current state
 
 - Local docker public edge is the active proof lane for `chummer.run`
-- Public and signed-in live audits are green on a clean `docker compose -f docker-compose.public-edge.yml up -d --build` cycle
+- Public and signed-in live audits are green on a clean `docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build` cycle
 - Wave 1 campaign workspace work now includes:
   - governed roster transfer operator flow
   - governed prep-library search
@@ -616,7 +616,7 @@ dotnet build Chummer.Run.Api/Chummer.Run.Api.csproj -v minimal
 dotnet test Chummer.Run.sln -v minimal
 bash scripts/ai/run_services_smoke.sh
 bash scripts/audit-compliance.sh
-docker compose -f docker-compose.public-edge.yml up -d --build
+docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build
 python3 scripts/hub-live-audit.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --verify-http-redirects --verify-signed-in-work
 CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh
 CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh
@@ -637,7 +637,7 @@ CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hu
 
 ## Latest session snapshot
 
-- Ran `docker compose -f docker-compose.public-edge.yml down && docker compose -f docker-compose.public-edge.yml up -d --build` and re-validated:
+- Ran `docker compose -p chummer6-hub -f docker-compose.public-edge.yml down && docker compose -p chummer6-hub -f docker-compose.public-edge.yml up -d --build` and re-validated:
   - `python3 scripts/hub-live-audit.py --verify-http-redirects`
   - `python3 scripts/hub-live-audit.py --verify-signed-in-work`
   - `bash scripts/run_smoke.sh`

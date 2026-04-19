@@ -6,6 +6,7 @@ using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Search;
+using ApiWorkspaceRestoreConflictReceiptProjection = Chummer.Run.Api.Contracts.WorkspaceRestoreConflictReceiptProjection;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -434,6 +435,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<SupportCaseDigestViewModel> SupportDigests,
         DateTimeOffset GeneratedAtUtc);
 
+    private enum RestoreReceiptStatusScope
+    {
+        Restore,
+        EntitlementSync
+    }
+
     private static readonly char[] SearchSeparators =
     [
         ' ',
@@ -493,6 +500,14 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<KnownIssueAffectingInstall> knownIssues = BuildKnownIssues(context.SupportDigests);
         IReadOnlyList<DecisionNotice> decisionNotices = BuildDecisionNotices(context.Workspace, context.Digest, installLinking, context.SupportDigests, prepLibrary, gmOperations, travelMode, context.LeadRun);
         NextSafeActionCue nextSafeAction = BuildNextSafeActionCue(context.Workspace, context.Restore, installLinking, context.SupportDigests);
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> restoreProvenanceReceipts = ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts);
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> restoreProvenanceRecoveryReceipts = ProjectRestoreProvenanceRecoveryReceipts(context.Restore.ProvenanceReceipts);
+        IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> restoreConflictReceipts = ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts);
+        WorkspaceRestoreReceiptStatusProjection restoreReceiptStatus = BuildRestoreReceiptStatusProjection(
+            restoreProvenanceReceipts,
+            restoreProvenanceRecoveryReceipts,
+            restoreConflictReceipts,
+            RestoreReceiptStatusScope.Restore);
         WorkspaceStateSummary workspaceState = BuildWorkspaceStateSummary(
             context.Workspace,
             installLinking,
@@ -529,36 +544,373 @@ public sealed class CampaignWorkspaceServerPlaneService
             CampaignMemory: context.Workspace.CampaignMemory,
             NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
             NextSafeAction: nextSafeAction,
+            RestoreReceiptStatus: restoreReceiptStatus,
             RestoreProvenanceReceipts: ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts),
+            RestoreProvenanceRecoveryReceipts: ProjectRestoreProvenanceRecoveryReceipts(context.Restore.ProvenanceReceipts),
             RestoreConflictReceipts: ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts),
             GeneratedAtUtc: context.GeneratedAtUtc);
     }
+
+    public EntitlementSyncReceiptProjection GetEntitlementSyncReceiptProjection(
+        HubUserDto user,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceRestoreProjection restore = _campaignSpine.GetRestoreProjection(user, installLinking);
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts = ProjectRestoreProvenanceReceipts(restore.ProvenanceReceipts)
+            .Where(static item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal))
+            .ToArray();
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> provenanceRecoveryReceipts = ProjectRestoreProvenanceRecoveryReceipts(restore.ProvenanceReceipts)
+            .Where(static item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal))
+            .ToArray();
+        IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> conflictReceipts = ProjectRestoreConflictReceipts(restore.ConflictReceipts)
+            .Where(static item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal))
+            .ToArray();
+
+        return new EntitlementSyncReceiptProjection(
+            ReceiptStatus: BuildRestoreReceiptStatusProjection(
+                provenanceReceipts,
+                provenanceRecoveryReceipts,
+                conflictReceipts,
+                RestoreReceiptStatusScope.EntitlementSync),
+            ProvenanceReceipts: provenanceReceipts,
+            ProvenanceRecoveryReceipts: provenanceRecoveryReceipts,
+            ConflictReceipts: conflictReceipts,
+            GeneratedAtUtc: restore.GeneratedAtUtc);
+    }
+
+    private static WorkspaceRestoreReceiptStatusProjection BuildRestoreReceiptStatusProjection(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts,
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> provenanceRecoveryReceipts,
+        IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> conflictReceipts,
+        RestoreReceiptStatusScope scope)
+    {
+        int workspaceRestoreProvenanceCount = provenanceReceipts.Count(static item => string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal));
+        int entitlementSyncProvenanceCount = provenanceReceipts.Count(static item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal));
+        int workspaceRestoreConflictCount = conflictReceipts.Count(static item => string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal));
+        int entitlementSyncConflictCount = conflictReceipts.Count(static item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal));
+        int currentProvenanceReceiptCount = provenanceRecoveryReceipts.Count(static item => string.Equals(item.StalenessPosture, "current_receipt", StringComparison.Ordinal));
+        int staleOrDriftProvenanceReceiptCount = provenanceRecoveryReceipts.Count(static item => !string.Equals(item.StalenessPosture, "current_receipt", StringComparison.Ordinal));
+        int safeToContinueWithReceiptCount = provenanceRecoveryReceipts.Count(static item => string.Equals(item.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal));
+        int refreshBeforeContinueCount = provenanceRecoveryReceipts.Count(static item => string.Equals(item.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal));
+        int reviewBeforeContinueConflictCount = conflictReceipts.Count(static item => string.Equals(item.ContinuePosture, "review_before_continue", StringComparison.Ordinal));
+        int blockingConflictCount = conflictReceipts.Count(static item => item.BlocksContinue);
+        ApiWorkspaceRestoreConflictReceiptProjection? leadConflict = conflictReceipts.FirstOrDefault(static item => item.BlocksContinue)
+            ?? conflictReceipts.FirstOrDefault();
+        WorkspaceRestoreProvenanceRecoveryProjection? leadRecoverableProvenance = provenanceRecoveryReceipts.FirstOrDefault(static item =>
+            string.Equals(item.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal))
+            ?? provenanceRecoveryReceipts.FirstOrDefault();
+        DateTimeOffset leadObservedAtUtc = leadConflict?.ObservedAtUtc
+            ?? leadRecoverableProvenance?.ObservedAtUtc
+            ?? DateTimeOffset.MinValue;
+        DateTimeOffset latestReceiptObservedAtUtc = provenanceRecoveryReceipts
+            .Select(static item => item.ObservedAtUtc)
+            .Concat(conflictReceipts.Select(static item => item.ObservedAtUtc))
+            .DefaultIfEmpty(DateTimeOffset.MinValue)
+            .Max();
+        string leadReceiptId = leadConflict?.ReceiptId
+            ?? leadRecoverableProvenance?.ReceiptId
+            ?? ResolveRestoreReceiptStatusFallbackReceiptId(scope);
+        string leadSurface = leadConflict?.Surface
+            ?? leadRecoverableProvenance?.Surface
+            ?? ResolveRestoreReceiptStatusFallbackSurface(scope);
+        string leadAuthority = leadConflict?.Authority
+            ?? leadRecoverableProvenance?.Authority
+            ?? ResolveRestoreReceiptStatusFallbackAuthority(scope);
+        string leadKind = leadConflict?.Kind
+            ?? leadRecoverableProvenance?.Kind
+            ?? ResolveRestoreReceiptStatusFallbackKind(scope);
+        string leadSubjectId = leadConflict?.SubjectId
+            ?? leadRecoverableProvenance?.SubjectId
+            ?? ResolveRestoreReceiptStatusFallbackSubject(scope);
+        string leadRecoveryHint = leadConflict?.RecoveryHint
+            ?? leadRecoverableProvenance?.RecoveryHint
+            ?? ResolveRestoreReceiptStatusFallbackRecoveryHint(scope);
+
+        string stalenessPosture = refreshBeforeContinueCount > 0
+            ? "stale_or_drift_receipts_present"
+            : provenanceRecoveryReceipts.Count > 0
+                ? "current_receipts"
+                : "no_receipts";
+        string conflictPosture = blockingConflictCount > 0
+            ? "blocking_conflict_present"
+            : conflictReceipts.Count > 0
+                ? "reviewable_conflicts_present"
+                : "no_active_conflicts";
+        string continuePosture = blockingConflictCount > 0
+            ? "blocked_until_receipt_resolved"
+            : refreshBeforeContinueCount > 0
+                ? "refresh_before_continue"
+                : provenanceRecoveryReceipts.Count > 0
+                    ? "safe_to_continue_with_receipt"
+                    : "review_before_continue";
+        string recoverabilityPosture = blockingConflictCount > 0
+            ? leadConflict?.RecoverabilityPosture ?? "recoverable_before_continue"
+            : refreshBeforeContinueCount > 0
+                ? leadRecoverableProvenance?.RecoverabilityPosture ?? "recoverable_by_refresh"
+                : provenanceRecoveryReceipts.Count > 0 || conflictReceipts.Count > 0
+                    ? "recoverable_with_receipts"
+                    : "restore_review_recommended";
+        string recoveryRoute = leadConflict?.RecoveryRoute
+            ?? leadRecoverableProvenance?.RecoveryRoute
+            ?? ResolveRestoreReceiptStatusFallbackRecoveryRoute(scope);
+        string recoverySummary = leadConflict?.RecoverySummary
+            ?? leadRecoverableProvenance?.RecoverySummary
+            ?? ResolveRestoreReceiptStatusFallbackRecoverySummary(scope);
+        string summary = BuildRestoreReceiptStatusSummary(
+            provenanceReceipts.Count,
+            conflictReceipts.Count,
+            staleOrDriftProvenanceReceiptCount,
+            currentProvenanceReceiptCount,
+            blockingConflictCount,
+            reviewBeforeContinueConflictCount,
+            refreshBeforeContinueCount,
+            safeToContinueWithReceiptCount,
+            scope);
+
+        return new WorkspaceRestoreReceiptStatusProjection(
+            Summary: summary,
+            StalenessPosture: stalenessPosture,
+            ConflictPosture: conflictPosture,
+            RecoverabilityPosture: recoverabilityPosture,
+            ContinuePosture: continuePosture,
+            LeadReceiptId: leadReceiptId,
+            LeadSurface: leadSurface,
+            LeadAuthority: leadAuthority,
+            LeadKind: leadKind,
+            LeadSubjectId: leadSubjectId,
+            LeadRecoveryHint: leadRecoveryHint,
+            LeadObservedAtUtc: leadObservedAtUtc,
+            LatestReceiptObservedAtUtc: latestReceiptObservedAtUtc,
+            RecoveryRoute: recoveryRoute,
+            RecoverySummary: recoverySummary,
+            CurrentProvenanceReceiptCount: currentProvenanceReceiptCount,
+            StaleOrDriftProvenanceReceiptCount: staleOrDriftProvenanceReceiptCount,
+            WorkspaceRestoreProvenanceCount: workspaceRestoreProvenanceCount,
+            EntitlementSyncProvenanceCount: entitlementSyncProvenanceCount,
+            WorkspaceRestoreConflictCount: workspaceRestoreConflictCount,
+            EntitlementSyncConflictCount: entitlementSyncConflictCount,
+            SafeToContinueWithReceiptCount: safeToContinueWithReceiptCount,
+            RefreshBeforeContinueCount: refreshBeforeContinueCount,
+            ReviewBeforeContinueConflictCount: reviewBeforeContinueConflictCount,
+            BlockingConflictCount: blockingConflictCount);
+    }
+
+    private static string BuildRestoreReceiptStatusSummary(
+        int provenanceReceiptCount,
+        int conflictReceiptCount,
+        int staleOrDriftProvenanceReceiptCount,
+        int currentProvenanceReceiptCount,
+        int blockingConflictCount,
+        int reviewBeforeContinueConflictCount,
+        int refreshBeforeContinueCount,
+        int safeToContinueWithReceiptCount,
+        RestoreReceiptStatusScope scope)
+    {
+        string provenanceLabel = scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "entitlement-sync provenance",
+            _ => "provenance"
+        };
+        string conflictLabel = scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "entitlement-sync conflict",
+            _ => "conflict"
+        };
+        string postureLabel = scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "entitlement replication posture",
+            _ => "restore posture"
+        };
+
+        return $"{provenanceReceiptCount} {provenanceLabel} receipt(s) and {conflictReceiptCount} {conflictLabel} receipt(s) keep {postureLabel} explicit; {staleOrDriftProvenanceReceiptCount} stale-or-drift, {currentProvenanceReceiptCount} current, {blockingConflictCount} blocking, {reviewBeforeContinueConflictCount} review-before-continue, {refreshBeforeContinueCount} refresh-before-continue, and {safeToContinueWithReceiptCount} safe-with-receipt cue(s) are attached.";
+    }
+
+    private static string ResolveRestoreReceiptStatusFallbackReceiptId(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "entitlement_sync_review_required",
+            _ => "restore_review_required"
+        };
+
+    private static string ResolveRestoreReceiptStatusFallbackSurface(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "entitlement_sync",
+            _ => "workspace_restore"
+        };
+
+    private static string ResolveRestoreReceiptStatusFallbackAuthority(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "hub_entitlement_ledger",
+            _ => "hub_campaign_spine_projection"
+        };
+
+    private static string ResolveRestoreReceiptStatusFallbackKind(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "entitlement_sync_review",
+            _ => "restore_review"
+        };
+
+    private static string ResolveRestoreReceiptStatusFallbackSubject(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "entitlement-sync",
+            _ => "restore-plane"
+        };
+
+    private static string ResolveRestoreReceiptStatusFallbackRecoveryHint(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "Open account access and review entitlement sync receipts before trusting this device.",
+            _ => "Review the restore rail before continuing from another device."
+        };
+
+    private static string ResolveRestoreReceiptStatusFallbackRecoveryRoute(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "/account/access",
+            _ => "/account/work"
+        };
+
+    private static string ResolveRestoreReceiptStatusFallbackRecoverySummary(RestoreReceiptStatusScope scope)
+        => scope switch
+        {
+            RestoreReceiptStatusScope.EntitlementSync => "Review entitlement sync receipts through /account/access before continuing from this device.",
+            _ => "Review the restore rail before continuing from another device."
+        };
 
     private static IReadOnlyList<WorkspaceRestoreProvenanceReceipt> ProjectRestoreProvenanceReceipts(
         IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? restoreProvenanceReceipts)
         => (restoreProvenanceReceipts ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
             .Select(receipt => receipt with
             {
-                Surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind)
+                ReceiptId = ResolveRestoreProvenanceReceiptId(receipt),
+                Kind = ResolveRestoreProvenanceKind(receipt),
+                SubjectId = ResolveRestoreProvenanceSubject(receipt),
+                Surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind),
+                Summary = ResolveRestoreProvenanceSummary(receipt),
+                Proof = ResolveRestoreProvenanceProof(receipt),
+                Authority = ResolveRestoreProvenanceAuthority(receipt),
+                RecoveryHint = ResolveRestoreProvenanceRecoveryHint(receipt)
             })
+            .OrderByDescending(ResolveRestoreProvenanceProjectionPriority)
+            .ThenByDescending(static receipt => receipt.ObservedAtUtc)
             .ToArray();
 
-    private static IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> ProjectRestoreConflictReceipts(
-        IReadOnlyList<WorkspaceRestoreConflictReceipt>? restoreConflictReceipts)
-        => (restoreConflictReceipts ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
-            .Select(receipt => new WorkspaceRestoreConflictReceiptProjection(
-                ReceiptId: receipt.ReceiptId,
-                Severity: receipt.Severity,
-                Kind: receipt.Kind,
+    private static IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> ProjectRestoreProvenanceRecoveryReceipts(
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt>? restoreProvenanceReceipts)
+        => (restoreProvenanceReceipts ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
+            .Select(receipt => new WorkspaceRestoreProvenanceRecoveryProjection(
+                ReceiptId: ResolveRestoreProvenanceReceiptId(receipt),
+                Kind: ResolveRestoreProvenanceKind(receipt),
+                SubjectId: ResolveRestoreProvenanceSubject(receipt),
                 Surface: ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind),
-                SubjectId: receipt.SubjectId,
-                Summary: ResolveRestoreConflictSummary(receipt),
-                Resolution: ResolveRestoreConflictResolution(receipt),
+                Summary: ResolveRestoreProvenanceSummary(receipt),
+                Proof: ResolveRestoreProvenanceProof(receipt),
                 ObservedAtUtc: receipt.ObservedAtUtc,
-                BlocksContinue: receipt.BlocksContinue))
+                Authority: ResolveRestoreProvenanceAuthority(receipt),
+                StalenessPosture: ResolveRestoreProvenanceStalenessPosture(receipt),
+                RecoverabilityPosture: ResolveRestoreProvenanceRecoverabilityPosture(receipt),
+                RecoveryHint: ResolveRestoreProvenanceRecoveryHint(receipt),
+                RecoveryRoute: ResolveRestoreProvenanceRecoveryRoute(receipt),
+                RecoverySummary: ResolveRestoreProvenanceRecoverySummary(receipt),
+                ContinuePosture: ResolveRestoreProvenanceContinuePosture(receipt)))
+            .OrderByDescending(receipt => ResolveRestoreProvenanceProjectionPriority(
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: receipt.ReceiptId,
+                    Kind: receipt.Kind,
+                    SubjectId: receipt.SubjectId,
+                    Surface: receipt.Surface,
+                    Summary: receipt.Summary,
+                    Proof: receipt.Proof,
+                    ObservedAtUtc: receipt.ObservedAtUtc,
+                    Authority: receipt.Authority,
+                    RecoveryHint: receipt.RecoveryHint)))
+            .ThenByDescending(static receipt => receipt.ObservedAtUtc)
             .ToArray();
 
-    private static string ResolveRestoreConflictSummary(WorkspaceRestoreConflictReceipt receipt)
+    private static int ResolveRestoreProvenanceProjectionPriority(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        int priority = 0;
+        string continuePosture = ResolveRestoreProvenanceContinuePosture(receipt);
+        if (string.Equals(continuePosture, "refresh_before_continue", StringComparison.Ordinal))
+        {
+            priority += 10;
+        }
+
+        string kind = ResolveRestoreProvenanceKind(receipt);
+        if (kind.Contains("stale", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("drift", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("expired", StringComparison.OrdinalIgnoreCase))
+        {
+            priority += 5;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, kind);
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            priority += 3;
+        }
+
+        if (IsArtifactRestoreKind(kind))
+        {
+            priority += 2;
+        }
+
+        return priority;
+    }
+
+    private static string ResolveRestoreProvenanceReceiptId(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string? receiptId = NormalizeOptional(receipt.ReceiptId);
+        if (receiptId is not null)
+        {
+            return receiptId;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        string kind = ResolveRestoreProvenanceKind(receipt);
+        string subject = NormalizeReceiptToken(ResolveRestoreProvenanceSubject(receipt));
+        return $"{surface}:{kind}:{subject}:provenance";
+    }
+
+    private static string ResolveRestoreProvenanceKind(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string? kind = NormalizeOptional(receipt.Kind);
+        if (kind is not null)
+        {
+            return kind;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        return string.Equals(surface, "entitlement_sync", StringComparison.Ordinal)
+            ? "entitlement_restore_provenance"
+            : "workspace_restore_provenance";
+    }
+
+    private static string ResolveRestoreProvenanceSubject(WorkspaceRestoreProvenanceReceipt receipt)
+        => NormalizeOptional(receipt.SubjectId) ?? "unknown restore subject";
+
+    private static string ResolveRestoreProvenanceProof(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string? proof = NormalizeOptional(receipt.Proof);
+        if (proof is not null)
+        {
+            return proof;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        string kind = ResolveRestoreProvenanceKind(receipt);
+        string subject = NormalizeReceiptToken(ResolveRestoreProvenanceSubject(receipt));
+        string authority = ResolveRestoreProvenanceAuthority(receipt);
+        return $"{authority}:{surface}:{kind}:{subject}";
+    }
+
+    private static string ResolveRestoreProvenanceSummary(WorkspaceRestoreProvenanceReceipt receipt)
     {
         if (!string.IsNullOrWhiteSpace(receipt.Summary))
         {
@@ -566,8 +918,257 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
-        string subject = NormalizeOptional(receipt.SubjectId) ?? "unknown restore subject";
-        string posture = receipt.BlocksContinue ? "blocking" : "reviewable";
+        string subject = ResolveRestoreProvenanceSubject(receipt);
+        return string.Equals(surface, "entitlement_sync", StringComparison.Ordinal)
+            ? $"Entitlement sync has restore provenance for {subject}."
+            : $"Workspace restore has continuity provenance for {subject}.";
+    }
+
+    private static string ResolveRestoreProvenanceAuthority(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string? authority = NormalizeOptional(receipt.Authority);
+        if (authority is not null)
+        {
+            return authority;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            return IsArtifactRestoreKind(receipt.Kind)
+                ? "hub_registry_release_receipts"
+                : "hub_entitlement_ledger";
+        }
+
+        return string.Equals(NormalizeOptional(receipt.Kind), "rule_environment", StringComparison.OrdinalIgnoreCase)
+            ? "core_rule_environment_receipts"
+            : "hub_campaign_spine_projection";
+    }
+
+    private static string ResolveRestoreProvenanceRecoveryHint(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string? recoveryHint = NormalizeOptional(receipt.RecoveryHint);
+        if (recoveryHint is not null)
+        {
+            return recoveryHint;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            return IsArtifactRestoreKind(receipt.Kind)
+                ? "Refresh the signed-in install rail so this artifact receipt matches the device before continuing."
+                : "Open account access and refresh the entitlement grant before trusting replay on another device.";
+        }
+
+        return "Open the restore rail and review this workspace receipt before editing shared campaign state on another device.";
+    }
+
+    private static string ResolveRestoreProvenanceRecoveryRoute(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            return IsArtifactRestoreKind(receipt.Kind)
+                ? "/downloads"
+                : "/account/access";
+        }
+
+        string kind = NormalizeOptional(receipt.Kind) ?? string.Empty;
+        return kind.Contains("claimed_installation", StringComparison.OrdinalIgnoreCase)
+            ? "/account/access"
+            : "/account/work";
+    }
+
+    private static string ResolveRestoreProvenanceRecoverySummary(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string route = ResolveRestoreProvenanceRecoveryRoute(receipt);
+        string continuePosture = ResolveRestoreProvenanceContinuePosture(receipt);
+        string subject = ResolveRestoreProvenanceSubject(receipt);
+        return string.Equals(continuePosture, "refresh_before_continue", StringComparison.Ordinal)
+            ? $"Refresh {subject} through {route} before continuing from this restored workspace."
+            : $"Receipt for {subject} is recoverable through {route} if restore evidence drifts.";
+    }
+
+    private static string ResolveRestoreProvenanceContinuePosture(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string kind = NormalizeOptional(receipt.Kind) ?? string.Empty;
+        return kind.Contains("stale", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("drift", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("expired", StringComparison.OrdinalIgnoreCase)
+                ? "refresh_before_continue"
+                : "safe_to_continue_with_receipt";
+    }
+
+    private static string ResolveRestoreProvenanceStalenessPosture(WorkspaceRestoreProvenanceReceipt receipt)
+    {
+        string kind = ResolveRestoreProvenanceKind(receipt);
+        if (kind.Contains("expired", StringComparison.OrdinalIgnoreCase))
+        {
+            return "expired_state";
+        }
+
+        if (kind.Contains("stale", StringComparison.OrdinalIgnoreCase))
+        {
+            return "stale_state";
+        }
+
+        if (kind.Contains("drift", StringComparison.OrdinalIgnoreCase))
+        {
+            return "artifact_drift";
+        }
+
+        return "current_receipt";
+    }
+
+    private static string ResolveRestoreProvenanceRecoverabilityPosture(WorkspaceRestoreProvenanceReceipt receipt)
+        => string.Equals(ResolveRestoreProvenanceContinuePosture(receipt), "refresh_before_continue", StringComparison.Ordinal)
+            ? "recoverable_by_refresh"
+            : "recoverable_with_receipt";
+
+    private static IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> ProjectRestoreConflictReceipts(
+        IReadOnlyList<WorkspaceRestoreConflictReceipt>? restoreConflictReceipts)
+        => (restoreConflictReceipts ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
+            .Select(receipt => new ApiWorkspaceRestoreConflictReceiptProjection(
+                ReceiptId: ResolveRestoreConflictReceiptId(receipt),
+                Severity: ResolveRestoreConflictSeverity(receipt),
+                Kind: ResolveRestoreConflictKind(receipt),
+                Surface: ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind),
+                Authority: ResolveRestoreConflictAuthority(receipt),
+                SubjectId: ResolveRestoreConflictSubject(receipt),
+                Summary: ResolveRestoreConflictSummary(receipt),
+                Resolution: ResolveRestoreConflictResolution(receipt),
+                ConflictPosture: ResolveRestoreConflictPosture(receipt),
+                RecoverabilityPosture: ResolveRestoreConflictRecoverabilityPosture(receipt),
+                RecoveryRoute: ResolveRestoreConflictRecoveryRoute(receipt),
+                RecoveryHint: ResolveRestoreConflictRecoveryHint(receipt),
+                RecoverySummary: ResolveRestoreConflictRecoverySummary(receipt),
+                ContinuePosture: ResolveRestoreConflictContinuePosture(receipt),
+                ObservedAtUtc: receipt.ObservedAtUtc,
+                BlocksContinue: IsRestoreConflictContinueBlocking(receipt)))
+            .OrderByDescending(ResolveRestoreConflictProjectionPriority)
+            .ThenByDescending(static receipt => receipt.ObservedAtUtc)
+            .ToArray();
+
+    private static int ResolveRestoreConflictProjectionPriority(ApiWorkspaceRestoreConflictReceiptProjection receipt)
+    {
+        int priority = ResolveReadinessAttentionPriority(receipt.Severity);
+        if (receipt.BlocksContinue)
+        {
+            priority += 10;
+        }
+
+        if (string.Equals(receipt.Surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            priority += 3;
+        }
+
+        if (IsArtifactRestoreKind(receipt.Kind))
+        {
+            priority += 2;
+        }
+
+        return priority;
+    }
+
+    private static IEnumerable<WorkspaceRestoreConflictReceipt> OrderRestoreConflictReceiptsForRecovery(
+        IEnumerable<WorkspaceRestoreConflictReceipt> receipts)
+        => receipts
+            .OrderByDescending(ResolveRestoreConflictProjectionPriority)
+            .ThenByDescending(static receipt => receipt.ObservedAtUtc);
+
+    private static IEnumerable<WorkspaceRestoreProvenanceReceipt> OrderRestoreProvenanceReceiptsForRecovery(
+        IEnumerable<WorkspaceRestoreProvenanceReceipt> receipts)
+        => receipts
+            .OrderByDescending(ResolveRestoreProvenanceProjectionPriority)
+            .ThenByDescending(static receipt => receipt.ObservedAtUtc);
+
+    private static int ResolveRestoreConflictProjectionPriority(WorkspaceRestoreConflictReceipt receipt)
+    {
+        int priority = ResolveReadinessAttentionPriority(ResolveRestoreConflictSeverity(receipt));
+        if (IsRestoreConflictContinueBlocking(receipt))
+        {
+            priority += 10;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            priority += 3;
+        }
+
+        if (IsArtifactRestoreKind(receipt.Kind))
+        {
+            priority += 2;
+        }
+
+        return priority;
+    }
+
+    private static string ResolveRestoreConflictReceiptId(WorkspaceRestoreConflictReceipt receipt)
+    {
+        string? receiptId = NormalizeOptional(receipt.ReceiptId);
+        if (receiptId is not null)
+        {
+            return receiptId;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        string kind = ResolveRestoreConflictKind(receipt);
+        string subject = NormalizeReceiptToken(ResolveRestoreConflictSubject(receipt));
+        return $"{surface}:{kind}:{subject}:conflict";
+    }
+
+    private static string ResolveRestoreConflictSeverity(WorkspaceRestoreConflictReceipt receipt)
+    {
+        if (IsRestoreConflictContinueBlocking(receipt))
+        {
+            return "blocking";
+        }
+
+        string? severity = NormalizeOptional(receipt.Severity);
+        if (severity is not null)
+        {
+            return severity;
+        }
+
+        return receipt.BlocksContinue ? "blocking" : "attention";
+    }
+
+    private static string ResolveRestoreConflictKind(WorkspaceRestoreConflictReceipt receipt)
+    {
+        string? kind = NormalizeOptional(receipt.Kind);
+        if (kind is not null)
+        {
+            return kind;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        return string.Equals(surface, "entitlement_sync", StringComparison.Ordinal)
+            ? "entitlement_restore_conflict"
+            : "workspace_restore_conflict";
+    }
+
+    private static string ResolveRestoreConflictSubject(WorkspaceRestoreConflictReceipt receipt)
+        => NormalizeOptional(receipt.SubjectId) ?? "unknown restore subject";
+
+    private static string ResolveRestoreConflictSummary(WorkspaceRestoreConflictReceipt receipt)
+    {
+        if (!string.IsNullOrWhiteSpace(receipt.Summary))
+        {
+            string summary = receipt.Summary.Trim();
+            if (IsRestoreConflictContinueBlocking(receipt)
+                && !summary.Contains("restore conflict", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{summary} blocking restore conflict for {ResolveRestoreConflictSubject(receipt)}.";
+            }
+
+            return summary;
+        }
+
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        string subject = ResolveRestoreConflictSubject(receipt);
+        string posture = IsRestoreConflictContinueBlocking(receipt) ? "blocking" : "reviewable";
         return string.Equals(surface, "entitlement_sync", StringComparison.Ordinal)
             ? $"Entitlement sync has a {posture} restore conflict for {subject}."
             : $"Workspace restore has a {posture} continuity conflict for {subject}.";
@@ -580,9 +1181,142 @@ public sealed class CampaignWorkspaceServerPlaneService
             return receipt.Resolution;
         }
 
-        return receipt.BlocksContinue
-            ? "Open account access and resolve this restore receipt before continuing on this workspace."
-            : null;
+        if (!IsRestoreConflictContinueBlocking(receipt))
+        {
+            return null;
+        }
+
+        string route = ResolveRestoreConflictRecoveryRoute(receipt);
+        if (string.Equals(route, "/downloads", StringComparison.Ordinal))
+        {
+            return "Refresh the signed-in download or install rail before continuing on this workspace.";
+        }
+
+        if (string.Equals(route, "/account/access", StringComparison.Ordinal))
+        {
+            return "Open account access and resolve this restore receipt before continuing on this workspace.";
+        }
+
+        return "Open account workspace restore and resolve this receipt before continuing on this workspace.";
+    }
+
+    private static string ResolveRestoreConflictRecoveryRoute(WorkspaceRestoreConflictReceipt receipt)
+    {
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            return IsArtifactRestoreKind(receipt.Kind)
+                ? "/downloads"
+                : "/account/access";
+        }
+
+        string kind = ResolveRestoreConflictKind(receipt);
+        return kind.Contains("claimed_installation", StringComparison.OrdinalIgnoreCase)
+            ? "/account/access"
+            : "/account/work";
+    }
+
+    private static string ResolveRestoreConflictRecoveryHint(WorkspaceRestoreConflictReceipt receipt)
+    {
+        string kind = ResolveRestoreConflictKind(receipt);
+        string subject = ResolveRestoreConflictSubject(receipt);
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+
+        if (IsArtifactRestoreKind(kind))
+        {
+            return $"Refresh the signed-in download or install rail for {subject} so artifact truth matches entitlement replay before continuing.";
+        }
+
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            return $"Open account access and refresh entitlement replication for {subject} before restoring this workspace on another device.";
+        }
+
+        if (kind.Contains("claimed_installation", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Relink claimed install {subject} from account access so workspace restore can recover current device state.";
+        }
+
+        return $"Review workspace restore receipt {subject} before editing shared campaign state on this device.";
+    }
+
+    private static string ResolveRestoreConflictRecoverySummary(WorkspaceRestoreConflictReceipt receipt)
+    {
+        string route = ResolveRestoreConflictRecoveryRoute(receipt);
+        string subject = ResolveRestoreConflictSubject(receipt);
+        return IsRestoreConflictContinueBlocking(receipt)
+            ? $"Resolve {subject} through {route} before continuing from this restored workspace."
+            : $"Review {subject} through {route} before carrying this workspace forward.";
+    }
+
+    private static string ResolveRestoreConflictContinuePosture(WorkspaceRestoreConflictReceipt receipt)
+        => IsRestoreConflictContinueBlocking(receipt)
+            ? "blocked_until_receipt_resolved"
+            : "review_before_continue";
+
+    private static string ResolveRestoreConflictPosture(WorkspaceRestoreConflictReceipt receipt)
+    {
+        if (IsRestoreConflictContinueBlocking(receipt))
+        {
+            return "blocking_conflict";
+        }
+
+        string kind = ResolveRestoreConflictKind(receipt);
+        if (kind.Contains("stale", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("expired", StringComparison.OrdinalIgnoreCase)
+            || kind.Contains("drift", StringComparison.OrdinalIgnoreCase))
+        {
+            return "stale_or_drift_conflict";
+        }
+
+        return "reviewable_conflict";
+    }
+
+    private static string ResolveRestoreConflictRecoverabilityPosture(WorkspaceRestoreConflictReceipt receipt)
+    {
+        string route = ResolveRestoreConflictRecoveryRoute(receipt);
+        if (string.Equals(route, "/downloads", StringComparison.Ordinal))
+        {
+            return IsRestoreConflictContinueBlocking(receipt)
+                ? "recoverable_by_download_refresh_before_continue"
+                : "recoverable_by_download_refresh";
+        }
+
+        if (string.Equals(route, "/account/access", StringComparison.Ordinal))
+        {
+            return IsRestoreConflictContinueBlocking(receipt)
+                ? "recoverable_by_account_access_before_continue"
+                : "recoverable_by_account_access";
+        }
+
+        return IsRestoreConflictContinueBlocking(receipt)
+            ? "recoverable_by_workspace_review_before_continue"
+            : "recoverable_by_workspace_review";
+    }
+
+    private static bool IsRestoreConflictContinueBlocking(WorkspaceRestoreConflictReceipt receipt)
+        => receipt.BlocksContinue
+            || string.Equals(NormalizeOptional(receipt.Severity), "blocking", StringComparison.OrdinalIgnoreCase);
+
+    private static string ResolveRestoreConflictAuthority(WorkspaceRestoreConflictReceipt receipt)
+    {
+        string surface = ResolveRestoreReceiptSurface(receipt.Surface, receipt.Kind);
+        if (string.Equals(surface, "entitlement_sync", StringComparison.Ordinal))
+        {
+            return IsArtifactRestoreKind(receipt.Kind)
+                ? "hub_registry_release_receipts"
+                : "hub_entitlement_ledger";
+        }
+
+        string normalizedKind = NormalizeOptional(receipt.Kind) ?? string.Empty;
+        if (normalizedKind.Contains("rule_environment", StringComparison.OrdinalIgnoreCase))
+        {
+            return "core_rule_environment_receipts";
+        }
+
+        return normalizedKind.Contains("claimed_installation", StringComparison.OrdinalIgnoreCase)
+            ? "hub_registry_install_linking"
+            : "hub_campaign_spine_projection";
     }
 
     private static GmOperationsReadinessSummary BuildGmOperationsReadiness(
@@ -978,7 +1712,7 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static string DescribeRestoreReceiptSummary(WorkspaceRestoreProjection restore)
     {
         IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts = ProjectRestoreProvenanceReceipts(restore.ProvenanceReceipts);
-        IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> conflictReceipts = ProjectRestoreConflictReceipts(restore.ConflictReceipts);
+        IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> conflictReceipts = ProjectRestoreConflictReceipts(restore.ConflictReceipts);
         int workspaceProvenanceCount = provenanceReceipts.Count(static receipt => string.Equals(receipt.Surface, "workspace_restore", StringComparison.OrdinalIgnoreCase));
         int entitlementProvenanceCount = provenanceReceipts.Count(static receipt => string.Equals(receipt.Surface, "entitlement_sync", StringComparison.OrdinalIgnoreCase));
         int workspaceConflictCount = conflictReceipts.Count(static receipt => string.Equals(receipt.Surface, "workspace_restore", StringComparison.OrdinalIgnoreCase));
@@ -1282,21 +2016,23 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignWorkspaceProjection workspace,
         WorkspaceRestoreProjection restore)
     {
-        List<ContinuityConflictCue> cues = restore.ConflictSummaries
+        IReadOnlyList<WorkspaceRestoreConflictReceipt> restoreConflictReceipts = restore.ConflictReceipts
+            ?? Array.Empty<WorkspaceRestoreConflictReceipt>();
+        ContinuityConflictCue[] restoreReceiptCues = OrderRestoreConflictReceiptsForRecovery(restoreConflictReceipts)
+            .Select(receipt => new ContinuityConflictCue(
+                CueId: $"restore-conflict:{workspace.WorkspaceId}:{StableCueId(ResolveRestoreConflictReceiptId(receipt))}",
+                Severity: NormalizeSeverity(receipt.Severity, IsRestoreConflictContinueBlocking(receipt)),
+                Summary: ResolveRestoreConflictSummary(receipt),
+                ResolutionAction: ResolveRestoreConflictResolution(receipt) ?? $"Review restore evidence for {workspace.CampaignName} before continuing."))
+            .ToArray();
+
+        List<ContinuityConflictCue> cues = restoreReceiptCues.ToList();
+        cues.AddRange(restore.ConflictSummaries
             .Select(summary => new ContinuityConflictCue(
                 CueId: $"conflict:{workspace.WorkspaceId}:{StableCueId(summary)}",
                 Severity: "warning",
                 Summary: summary,
-                ResolutionAction: $"Resolve restore review before you reopen {workspace.CampaignName} on another device."))
-            .ToList();
-
-        IReadOnlyList<WorkspaceRestoreConflictReceipt> restoreConflictReceipts = restore.ConflictReceipts
-            ?? Array.Empty<WorkspaceRestoreConflictReceipt>();
-        cues.AddRange(restoreConflictReceipts.Select(receipt => new ContinuityConflictCue(
-            CueId: $"restore-conflict:{workspace.WorkspaceId}:{StableCueId(receipt.ReceiptId)}",
-            Severity: NormalizeSeverity(receipt.Severity),
-            Summary: ResolveRestoreConflictSummary(receipt),
-            ResolutionAction: NormalizeOptional(receipt.Resolution) ?? $"Review restore evidence for {workspace.CampaignName} before continuing.")));
+                ResolutionAction: $"Resolve restore review before you reopen {workspace.CampaignName} on another device.")));
 
         cues.AddRange(restore.LocalOnlyNotes.Select(summary => new ContinuityConflictCue(
             CueId: $"local-only:{workspace.WorkspaceId}:{StableCueId(summary)}",
@@ -1307,10 +2043,12 @@ public sealed class CampaignWorkspaceServerPlaneService
         return cues.Take(6).ToArray();
     }
 
-    private static string NormalizeSeverity(string? severity)
-        => string.IsNullOrWhiteSpace(severity) ? "warning"
-            : severity switch
+    private static string NormalizeSeverity(string? severity, bool blocksContinue = false)
+        => blocksContinue ? "blocking"
+            : string.IsNullOrWhiteSpace(severity) ? "warning"
+            : severity.Trim().ToLowerInvariant() switch
             {
+                "blocking" => "blocking",
                 "attention" => "attention",
                 "warning" => "warning",
                 "info" => "info",
@@ -1336,7 +2074,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             return "entitlement_sync";
         }
 
-        return IsEntitlementRestoreKind(kind) || normalizedSurface.Contains("entitlement", StringComparison.OrdinalIgnoreCase)
+        return IsEntitlementRestoreKind(kind)
+            || IsArtifactRestoreKind(kind)
+            || normalizedSurface.Contains("entitlement", StringComparison.OrdinalIgnoreCase)
             ? "entitlement_sync"
             : "workspace_restore";
     }
@@ -1347,6 +2087,13 @@ public sealed class CampaignWorkspaceServerPlaneService
         return normalizedKind.StartsWith("entitlement_", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("entitlement", StringComparison.OrdinalIgnoreCase)
             || normalizedKind.Contains("grant", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsArtifactRestoreKind(string? kind)
+    {
+        string normalizedKind = NormalizeOptional(kind) ?? string.Empty;
+        return normalizedKind.Contains("artifact", StringComparison.OrdinalIgnoreCase)
+            || normalizedKind.Contains("release", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<RecapShelfEntry> BuildRecapShelf(
@@ -2024,15 +2771,31 @@ public sealed class CampaignWorkspaceServerPlaneService
         InstallLinkingSummaryDto? installLinking,
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests)
     {
-        WorkspaceRestoreConflictReceipt? blockingRestoreConflict = (restore.ConflictReceipts ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
-            .FirstOrDefault(static receipt => receipt.BlocksContinue);
+        WorkspaceRestoreConflictReceipt? blockingRestoreConflict = OrderRestoreConflictReceiptsForRecovery(
+                restore.ConflictReceipts ?? Array.Empty<WorkspaceRestoreConflictReceipt>())
+            .FirstOrDefault(static receipt => IsRestoreConflictContinueBlocking(receipt));
         if (blockingRestoreConflict is not null)
         {
             return new NextSafeActionCue(
-                ActionId: $"restore:{workspace.WorkspaceId}:{StableCueId(blockingRestoreConflict.ReceiptId)}",
+                ActionId: $"restore:{workspace.WorkspaceId}:{StableCueId(ResolveRestoreConflictReceiptId(blockingRestoreConflict))}",
                 Label: "Review restore receipts",
-                Summary: NormalizeOptional(blockingRestoreConflict.Resolution)
+                Summary: ResolveRestoreConflictResolution(blockingRestoreConflict)
                     ?? "Review the restore and entitlement receipts before you continue this shared campaign on another device.",
+                SourceKind: "restore");
+        }
+
+        WorkspaceRestoreProvenanceReceipt? staleRestoreProvenance = OrderRestoreProvenanceReceiptsForRecovery(
+                restore.ProvenanceReceipts ?? Array.Empty<WorkspaceRestoreProvenanceReceipt>())
+            .FirstOrDefault(static receipt => string.Equals(
+                ResolveRestoreProvenanceContinuePosture(receipt),
+                "refresh_before_continue",
+                StringComparison.Ordinal));
+        if (staleRestoreProvenance is not null)
+        {
+            return new NextSafeActionCue(
+                ActionId: $"restore-provenance:{workspace.WorkspaceId}:{StableCueId(ResolveRestoreProvenanceReceiptId(staleRestoreProvenance))}",
+                Label: "Refresh restore receipts",
+                Summary: ResolveRestoreProvenanceRecoveryHint(staleRestoreProvenance),
                 SourceKind: "restore");
         }
 
@@ -5453,6 +6216,8 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static int ResolveReadinessAttentionPriority(string? severity)
         => severity?.Trim().ToLowerInvariant() switch
         {
+            "blocking" => 4,
+            "critical" => 4,
             "attention" => 3,
             "warning" => 2,
             "review" => 1,
@@ -5525,6 +6290,17 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string NormalizeReceiptToken(string value)
+    {
+        string normalized = new(value
+            .Trim()
+            .Select(static character => char.IsLetterOrDigit(character) || character is '_' or '-' or '.'
+                ? char.ToLowerInvariant(character)
+                : '_')
+            .ToArray());
+        return string.IsNullOrWhiteSpace(normalized.Trim('_')) ? "unknown" : normalized.Trim('_');
+    }
 
     private static string StableCueId(string value)
     {

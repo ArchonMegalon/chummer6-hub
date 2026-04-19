@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
+HUB_EDGE_PROJECT_NAME="${CHUMMER_HUB_EDGE_PROJECT_NAME:-chummer6-hub}"
 HUB_LOCAL_BASE_URL="${HUB_LOCAL_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 HUB_LIVE_BASE_URL="${HUB_LIVE_BASE_URL:-https://chummer.run}"
 HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-chummer.run}"
@@ -16,11 +17,12 @@ HUB_CLOSEOUT_LIVE_AUDIT="${HUB_CLOSEOUT_LIVE_AUDIT:-1}"
 echo "== hub closeout =="
 echo "local base: $HUB_LOCAL_BASE_URL"
 echo "live base: $HUB_LIVE_BASE_URL"
+echo "compose project: $HUB_EDGE_PROJECT_NAME"
 
 if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_CLOSEOUT_BUILD" == "TRUE" ]]; then
   echo
   echo "== rebuild local public edge =="
-  docker compose -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal
+  docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal
 fi
 
 echo

@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Chummer.Play.Contracts</AssemblyName>
     <PackageId>Chummer.Play.Contracts</PackageId>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
+    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
   </PropertyGroup>
 
 </Project>

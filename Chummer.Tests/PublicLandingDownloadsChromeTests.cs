@@ -64,6 +64,47 @@ public sealed class PublicLandingDownloadsChromeTests
             authenticated: false);
     }
 
+    private static ReleaseExperienceViewModel BuildGuestWindowsDirectInstallExperience()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var releaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260416-direct-install",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-16T08:00:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows x64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "win-direct",
+                    SizeBytes: 202,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "open_public")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/get/avalonia-win-x64-installer"
+            ]);
+
+        return releaseSelection.BuildExperience(
+            manifest,
+            userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            authenticated: false);
+    }
+
     [Fact]
     public void RebindDownloadsHeaderActionsRepointsPrimaryGuestCtaToRecommendedMacInstallRoute()
     {
@@ -78,9 +119,9 @@ public sealed class PublicLandingDownloadsChromeTests
             HeaderActions:
             [
                 new SiteChromeActionViewModel("Sign in", "/auth/google/start?next=%2Fdownloads", "link"),
-                new SiteChromeActionViewModel("Create account to get preview", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
+                new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
             ],
-            PublicPrimaryCta: new SiteChromeActionViewModel("Create account to get preview", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
+            PublicPrimaryCta: new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
             Authenticated: false,
             SignedInLabel: null,
             FooterCanonicalSource: "fixture",
@@ -117,9 +158,9 @@ public sealed class PublicLandingDownloadsChromeTests
             HeaderActions:
             [
                 new SiteChromeActionViewModel("Sign in", "/login?next=%2Fstatus", "link"),
-                new SiteChromeActionViewModel("Create account to get preview", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
+                new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary")
             ],
-            PublicPrimaryCta: new SiteChromeActionViewModel("Create account to get preview", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
+            PublicPrimaryCta: new SiteChromeActionViewModel("Create account to install", "/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", "primary"),
             Authenticated: false,
             SignedInLabel: null,
             FooterCanonicalSource: "fixture",
@@ -140,5 +181,45 @@ public sealed class PublicLandingDownloadsChromeTests
         Assert.Equal("/signup?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", primary.Href);
         Assert.NotNull(rebound.PublicPrimaryCta);
         Assert.Equal(releaseExperience.GuestGatePrimaryHref, rebound.PublicPrimaryCta!.Href);
+    }
+
+    [Fact]
+    public void RebindGuestGateChromeActionsUsesDirectInstallRouteWhenGuestInstallIsAllowed()
+    {
+        var releaseExperience = BuildGuestWindowsDirectInstallExperience();
+        var chrome = new SiteChromeViewModel(
+            Title: "FAQ",
+            Description: "Install answers.",
+            CurrentPath: "/faq",
+            PrimaryNavigation: [],
+            SecondaryNavigation: [],
+            UtilityNavigation: [],
+            HeaderActions:
+            [
+                new SiteChromeActionViewModel("Sign in", "/login?next=%2Ffaq", "link"),
+                new SiteChromeActionViewModel("Install Chummer", "/downloads", "primary")
+            ],
+            PublicPrimaryCta: new SiteChromeActionViewModel("Install Chummer", "/downloads", "primary"),
+            Authenticated: false,
+            SignedInLabel: null,
+            FooterCanonicalSource: "fixture",
+            FooterGeneratedNote: "fixture");
+
+        var method = typeof(PublicLandingController).GetMethod(
+            "RebindGuestGateChromeActions",
+            BindingFlags.NonPublic | BindingFlags.Static);
+
+        Assert.NotNull(method);
+
+        var rebound = Assert.IsType<SiteChromeViewModel>(method!.Invoke(null, [chrome, releaseExperience, false]));
+        var signIn = Assert.Single(rebound.HeaderActions, action => action.Label == "Sign in");
+        var primary = Assert.Single(rebound.HeaderActions, action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("/login?next=%2Ffaq", signIn.Href);
+        Assert.Equal(releaseExperience.Recommended!.ActionLabel, primary.Label);
+        Assert.Equal(releaseExperience.Recommended.DispatchHref, primary.Href);
+        Assert.NotNull(rebound.PublicPrimaryCta);
+        Assert.Equal(releaseExperience.Recommended.ActionLabel, rebound.PublicPrimaryCta!.Label);
+        Assert.Equal(releaseExperience.Recommended.DispatchHref, rebound.PublicPrimaryCta!.Href);
     }
 }

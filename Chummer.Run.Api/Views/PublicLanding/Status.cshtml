@@ -33,11 +33,11 @@
 <section class="section-band">
     <div class="page-lead">
         <p class="eyebrow">Current status</p>
-        <h1 class="page-title">Weekly pulse, release posture, and the current longest pole</h1>
-        <p class="page-copy">Use this route when you want the honest customer-facing status surface: what is working, what still needs caution, and which proof lane should move next.</p>
+        <h1 class="page-title">What works now, what needs caution, and what is next</h1>
+        <p class="page-copy">Use this page for the current customer-facing summary: what you can install, what still needs caution, and where to look next.</p>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/now">Open current release</a>
+        <a class="button-like button-like--primary" href="/now">Open what works today</a>
         <a class="button-like button-like--ghost" href="/progress">Open progress</a>
     </div>
     @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
@@ -51,21 +51,21 @@
             <strong>@Model.Manifest.Version</strong>
         </div>
         <div class="settings-summary-row">
-            <span>Release proof</span>
+            <span>Validation state</span>
             <strong>@(string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus)</strong>
         </div>
         <div class="settings-summary-row">
-            <span>Update posture</span>
+            <span>Update status</span>
             <strong>@Model.ReleaseExperience.UpdatePostureSummary</strong>
         </div>
         @if (Model.CampaignOsProof is not null)
         {
             <div class="settings-summary-row">
-                <span>Campaign OS proof</span>
+                <span>Campaign status</span>
                 <strong>@Model.CampaignOsProof.Status</strong>
             </div>
             <div class="settings-summary-row">
-                <span>Journey gates</span>
+                <span>Journeys covered</span>
                 <strong>@(Model.CampaignOsProof.JourneysPassed.Count == 0 ? "No mirrored journeys yet" : string.Join(", ", Model.CampaignOsProof.JourneysPassed))</strong>
             </div>
         }
@@ -75,8 +75,8 @@
 <section class="compact-rail">
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Release posture</h3>
-            <p>@(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message ?? "The current release shelf, proof route, and support path should read like one honest record.")</p>
+            <h3>Release status</h3>
+            <p>@(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message ?? "The current release shelf, notes, and support path should read like one honest record.")</p>
         </div>
         <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
@@ -90,14 +90,14 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Fix and closure follow-through</h3>
-            <p>@(Model.Manifest.FixAvailabilitySummary ?? "Use support only when the release shelf and proof route stop being enough to move forward.")</p>
+            <p>@(Model.Manifest.FixAvailabilitySummary ?? "Use support only when downloads, notes, and known issues stop being enough to move forward.")</p>
         </div>
         <a class="inline-link" href="/contact#support-intake">Open support</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Weighted delivery report</h3>
-            <p>The deeper weighted program report stays separate from the customer-facing status route so status can stay honest without turning into delivery cargo.</p>
+            <h3>Detailed progress report</h3>
+            <p>The deeper build report stays separate from this page so the public status view can stay short and honest.</p>
         </div>
         <a class="inline-link" href="/progress">Open progress</a>
     </article>
@@ -133,8 +133,8 @@
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">Status poster</p>
-        <h2 class="editorial-title">One public visual for the current weighted program read</h2>
-        <p class="editorial-copy">The poster is the lighter public companion to the deeper progress report. It should agree with the weekly pulse and current release posture.</p>
+        <h2 class="editorial-title">One public visual for current progress</h2>
+        <p class="editorial-copy">The poster is the lighter public companion to the deeper progress report. It should match this page.</p>
     </div>
     <div class="story-cinematic__media">
         <img src="/api/public/progress-poster.svg" alt="Current public progress poster" loading="lazy" />

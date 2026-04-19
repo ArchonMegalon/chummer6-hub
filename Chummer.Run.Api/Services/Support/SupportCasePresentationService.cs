@@ -170,6 +170,11 @@ public sealed class SupportCasePresentationService
                 false)
         }};
 
+        if (installRailCase)
+        {
+            nextSafeAction = BuildInstallRailNextSafeAction(status, fixedReleaseLabel, installReadiness, nextSafeAction);
+        }
+
         return new SupportCasePresentationViewModel(
             Case: supportCase,
             StatusLabel: HumanizeStatus(status),
@@ -303,7 +308,7 @@ public sealed class SupportCasePresentationService
         {
             if (HasInstallRailContext(supportCase))
             {
-                return "Follow-up stays inside Account > Support and Devices & access for this signed-in install rail.";
+                return "Follow-up stays attached to the affected claimed install. Use Account > Support for tracked history and Devices & access only when you need to relink or reclaim that copy.";
             }
 
             return "Follow-up stays inside Account > Support for this signed-in report.";
@@ -318,11 +323,7 @@ public sealed class SupportCasePresentationService
     }
 
     private static bool HasInstallRailContext(SupportCaseProjection supportCase)
-        => string.Equals(NormalizeOptional(supportCase.Kind, 64), SupportCaseKinds.InstallHelp, StringComparison.OrdinalIgnoreCase)
-           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.InstallationId, 64))
-           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.ReleaseChannel, 64))
-           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.HeadId, 64))
-           || !string.IsNullOrWhiteSpace(NormalizeOptional(supportCase.Platform, 64));
+        => HasSupportCaseInstallTruth(supportCase);
 
     private static string BuildReleaseProgressSummary(
         SupportCaseProjection supportCase,
@@ -386,6 +387,57 @@ public sealed class SupportCasePresentationService
                 => $"{installReadiness.Summary} After that update, use the buttons here to confirm whether the fix worked here or whether the same issue still reproduces.",
             _ => "No fix confirmation is requested yet."
         };
+    }
+
+    private static string BuildInstallRailNextSafeAction(
+        string normalizedStatus,
+        string fixedReleaseLabel,
+        InstallVerificationReadiness installReadiness,
+        string fallbackAction)
+    {
+        if (installReadiness.NeedsLinkedInstall)
+        {
+            return normalizedStatus switch
+            {
+                SupportCaseStatuses.Fixed => "Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you wait for this fix to land there.",
+                SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                    ? "Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you pick up the reporter-ready fix there."
+                    : $"Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you pick up {fixedReleaseLabel} there.",
+                SupportCaseStatuses.UserNotified => "Relink or reclaim the affected copy in Devices and access, then return to that claimed install before you verify whether the reported fix held there.",
+                _ => fallbackAction
+            };
+        }
+
+        if (installReadiness.NeedsInstallUpdate)
+        {
+            return normalizedStatus switch
+            {
+                SupportCaseStatuses.Fixed => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                    ? "Update the affected claimed install, then continue fix follow-through on that same copy."
+                    : $"Update the affected claimed install to {fixedReleaseLabel}, then continue fix follow-through on that same copy.",
+                SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                    ? "Update the affected claimed install to the reporter-ready build, then verify the fix on that same copy."
+                    : $"Update the affected claimed install to {fixedReleaseLabel}, then verify the fix on that same copy.",
+                SupportCaseStatuses.UserNotified => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                    ? "Update or reinstall the affected claimed install before you reopen this case."
+                    : $"Update or reinstall the affected claimed install to {fixedReleaseLabel} before you reopen this case.",
+                _ => fallbackAction
+            };
+        }
+
+        if (installReadiness.FixReadyOnLinkedInstall)
+        {
+            return normalizedStatus switch
+            {
+                SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
+                    ? "Verify the reporter-ready fix on the affected claimed install."
+                    : $"Verify {fixedReleaseLabel} on the affected claimed install.",
+                SupportCaseStatuses.UserNotified => "Verify the affected claimed install before you decide whether to reopen support.",
+                _ => fallbackAction
+            };
+        }
+
+        return fallbackAction;
     }
 
     private static bool CanVerifyFix(string normalizedStatus, string verificationState)
@@ -489,22 +541,31 @@ public sealed class SupportCasePresentationService
         {
             ClaimedInstallationDto? direct = installations
                 .FirstOrDefault(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase));
-            if (direct is not null)
+            if (direct is not null
+                && HasSupportCaseInstallTruth(supportCase)
+                && MatchesSupportCaseInstallTruth(supportCase, direct))
             {
                 return direct;
             }
         }
 
         string? releaseChannel = NormalizeOptional(supportCase.ReleaseChannel, 64);
+        string? applicationVersion = NormalizeOptional(supportCase.ApplicationVersion, 64);
         string? headId = NormalizeOptional(supportCase.HeadId, 64);
         string? platform = NormalizeOptional(supportCase.Platform, 64);
         string? arch = NormalizeOptional(supportCase.Arch, 32);
+        if (!HasCompleteInstalledBuildTruth(applicationVersion, releaseChannel)
+            || !HasCompleteDeviceTruth(headId, platform, arch))
+        {
+            return null;
+        }
 
         var best = installations
+            .Where(item => MatchesSupportCaseInstallTruth(supportCase, item))
             .Select(item => new
             {
                 Installation = item,
-                Score = ScoreInstallationMatch(item, releaseChannel, headId, platform, arch)
+                Score = ScoreInstallationMatch(item, applicationVersion, releaseChannel, headId, platform, arch)
             })
             .OrderByDescending(static item => item.Score)
             .ThenByDescending(static item => item.Installation.UpdatedAtUtc)
@@ -517,12 +578,19 @@ public sealed class SupportCasePresentationService
 
     private static int ScoreInstallationMatch(
         ClaimedInstallationDto installation,
+        string? applicationVersion,
         string? releaseChannel,
         string? headId,
         string? platform,
         string? arch)
     {
         int score = 0;
+        if (!string.IsNullOrWhiteSpace(applicationVersion)
+            && string.Equals(installation.Version, applicationVersion, StringComparison.OrdinalIgnoreCase))
+        {
+            score += 16;
+        }
+
         if (!string.IsNullOrWhiteSpace(releaseChannel)
             && string.Equals(installation.Channel, releaseChannel, StringComparison.OrdinalIgnoreCase))
         {
@@ -549,6 +617,35 @@ public sealed class SupportCasePresentationService
 
         return score;
     }
+
+    private static bool MatchesSupportCaseInstallTruth(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
+        => MatchesOptionalInstallField(supportCase.ApplicationVersion, installation.Version)
+           && MatchesOptionalInstallField(supportCase.ReleaseChannel, installation.Channel)
+           && MatchesOptionalInstallField(supportCase.HeadId, installation.HeadId)
+           && MatchesOptionalInstallField(supportCase.Platform, installation.Platform)
+           && MatchesOptionalInstallField(supportCase.Arch, installation.Arch);
+
+    private static bool HasSupportCaseInstallTruth(SupportCaseProjection supportCase)
+        => HasCompleteInstalledBuildTruth(
+               NormalizeOptional(supportCase.ApplicationVersion, 64),
+               NormalizeOptional(supportCase.ReleaseChannel, 64))
+           && HasCompleteDeviceTruth(
+               NormalizeOptional(supportCase.HeadId, 64),
+               NormalizeOptional(supportCase.Platform, 64),
+               NormalizeOptional(supportCase.Arch, 32));
+
+    private static bool MatchesOptionalInstallField(string? supportValue, string? installationValue)
+        => string.IsNullOrWhiteSpace(supportValue)
+           || string.Equals(supportValue, installationValue, StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasCompleteInstalledBuildTruth(string? applicationVersion, string? releaseChannel)
+        => !string.IsNullOrWhiteSpace(applicationVersion)
+           && !string.IsNullOrWhiteSpace(releaseChannel);
+
+    private static bool HasCompleteDeviceTruth(string? headId, string? platform, string? arch)
+        => !string.IsNullOrWhiteSpace(headId)
+           && !string.IsNullOrWhiteSpace(platform)
+           && !string.IsNullOrWhiteSpace(arch);
 
     private static string BuildInstallationLabel(ClaimedInstallationDto installation)
     {

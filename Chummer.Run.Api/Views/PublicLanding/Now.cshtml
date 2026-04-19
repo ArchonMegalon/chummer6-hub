@@ -1,6 +1,6 @@
 @model NowPageViewModel
 @{
-    ViewData["Title"] = "What Is Real Now";
+    ViewData["Title"] = "What Works Today";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now";
     static string NormalizeRoute(string href)
@@ -20,11 +20,6 @@
 
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
-
-    static string HumanizeToken(string value)
-        => string.IsNullOrWhiteSpace(value)
-            ? "Unknown"
-            : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
 
     var proofTargets = Model.ProofModules
         .Select(card => NormalizeRoute(card.Action.Href))
@@ -54,8 +49,8 @@
 <section class="evidence-header">
     <div class="page-lead">
         <p class="eyebrow">What works today</p>
-        <h1 class="page-title">Current preview, visible proof, and known limits</h1>
-        <p class="page-copy">Start with release health, then move to the proof shelf. This page should tell you whether to download now, wait, or inspect one more proof surface first.</p>
+        <h1 class="page-title">What works today and what still needs caution</h1>
+        <p class="page-copy">Use this page to decide whether to install now, wait, or read one more detail first.</p>
     </div>
     <div class="evidence-header__stats">
         <div>
@@ -73,28 +68,16 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
-@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
-
 <section class="evidence-wall">
     <article class="evidence-group">
         <div class="evidence-group__header">
             <span class="readiness-tag">Current release</span>
-            <h2>Release health before you install</h2>
+            <h2>Before you install</h2>
         </div>
         <div class="evidence-row-list">
             <article class="evidence-row">
                 <div class="evidence-row__copy">
-                    <h3>What changed since the last preview</h3>
+                    <h3>Current preview</h3>
                     <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
                 </div>
                 <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
@@ -108,7 +91,7 @@
             </article>
             <article class="evidence-row">
                 <div class="evidence-row__copy">
-                    <h3>Update status</h3>
+                    <h3>Update path</h3>
                     <p>@Model.ReleaseExperience.UpdatePostureSummary</p>
                 </div>
                 <span class="readiness-tag">Preview channel</span>
@@ -120,45 +103,17 @@
                 </div>
                 <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
             </article>
-            @if (Model.CampaignOsProof is not null)
-            {
-                <article class="evidence-row">
-                    <div class="evidence-row__copy">
-                        <h3>Campaign OS local proof</h3>
-                        <p>
-                            Source-backed local smoke contract
-                            @if (!string.IsNullOrWhiteSpace(Model.CampaignOsProof.SourceFile))
-                            {
-                                <text> from <code class="mono-receipt">@Model.CampaignOsProof.SourceFile</code></text>
-                            }
-                            covering @Model.CampaignOsProof.JourneysPassed.Count journey(s)
-                            @if (Model.CampaignOsProof.GeneratedAt is not null)
-                            {
-                                <text> as of @Model.CampaignOsProof.GeneratedAt.Value.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'")</text>
-                            }.
-                        </p>
-                        @if (Model.CampaignOsProof.JourneysPassed.Count > 0)
-                        {
-                            <div class="trust-claim__microproof">
-                                @foreach (var journey in Model.CampaignOsProof.JourneysPassed)
-                                {
-                                    <span>@HumanizeToken(journey)</span>
-                                }
-                            </div>
-                        }
-                    </div>
-                    <span class="readiness-tag">@HumanizeToken(Model.CampaignOsProof.Status)</span>
-                </article>
-            }
         </div>
     </article>
 </section>
 
+@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+
 <section class="workflow-band">
     <div class="workflow-band__lead">
-        <p class="eyebrow">What you can verify now</p>
+        <p class="eyebrow">What you can try now</p>
         <h2 class="editorial-title">Build, explain, and run with visible evidence</h2>
-        <p class="editorial-copy">These are the three product behaviors the current preview is already proving in public: builder truth, explanation trail, and continuity under drift.</p>
+        <p class="editorial-copy">These are the three product behaviors the current preview already shows in public: builder truth, explanation trail, and continuity under drift.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.ProofModules)

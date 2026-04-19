@@ -3,6 +3,7 @@ set -euo pipefail
 
 MAX_ITERS="${1:-6}"
 HUB_EDGE_COMPOSE_FILE="${HUB_EDGE_COMPOSE_FILE:-docker-compose.public-edge.yml}"
+HUB_EDGE_PROJECT_NAME="${CHUMMER_HUB_EDGE_PROJECT_NAME:-chummer6-hub}"
 PORTAL_E2E="${CHUMMER_PORTAL_E2E:-1}"
 HUB_E2E="${CHUMMER_HUB_E2E:-1}"
 FAILED=0
@@ -10,7 +11,7 @@ FAILED=0
 for ((iter = 1; iter <= MAX_ITERS; iter++)); do
   echo "===== migration slice iteration ${iter}/${MAX_ITERS} ====="
 
-  if docker compose -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal \
+  if docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal \
     && bash scripts/audit-compliance.sh \
     && if [[ "$PORTAL_E2E" == "1" ]]; then CHUMMER_PORTAL_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-portal.sh; else true; fi \
     && if [[ "$HUB_E2E" == "1" ]]; then CHUMMER_HUB_E2E_SKIP_EDGE_REBUILD=1 bash scripts/e2e-hub.sh; else true; fi; then
@@ -19,7 +20,7 @@ for ((iter = 1; iter <= MAX_ITERS; iter++)); do
   fi
 
   echo "[debug] dumping service logs after failed iteration"
-  docker compose -f "$HUB_EDGE_COMPOSE_FILE" logs --tail 200 chummer-run-identity chummer-portal || true
+  docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" logs --tail 200 chummer-run-identity chummer-portal || true
   echo "iteration $iter failed; continuing to next loop"
   FAILED=$((FAILED + 1))
 done

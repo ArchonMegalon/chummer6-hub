@@ -17,6 +17,15 @@ DO_NOT_REOPEN_REASON = (
     "restore receipt, registry row, queue row, and design-queue row instead of reopening the "
     "workspace restore and entitlement conflict receipt package."
 )
+ALLOWED_PATHS = [
+    "Chummer.Run.Api",
+    "scripts",
+    "tests",
+]
+OWNED_SURFACES = [
+    "workspace_restore:provenance",
+    "entitlement_sync:conflict_receipts",
+]
 
 
 QUEUE_PATHS = [
@@ -67,6 +76,23 @@ def block_contains_scalar(block: str, key: str, value: str) -> bool:
     return f"    {key}: {value}\n" in block
 
 
+def extract_scalar_list(block: str, key: str) -> list[str]:
+    marker = f"    {key}:\n"
+    start = block.find(marker)
+    if start == -1:
+        return []
+
+    start += len(marker)
+    values: list[str] = []
+    for line in block[start:].splitlines():
+        if line.startswith("      - "):
+            values.append(line[len("      - ") :].strip())
+            continue
+        break
+
+    return values
+
+
 def check_queue(path: Path, missing: list[str]) -> None:
     text = read_text(path, missing)
     if not text:
@@ -107,6 +133,14 @@ def check_queue(path: Path, missing: list[str]) -> None:
     for key, value in required_scalars.items():
         if not block_contains_scalar(package_block, key, value):
             missing.append(f"{path}: {PACKAGE_ID}.{key} must be {value!r}")
+
+    allowed_paths = extract_scalar_list(package_block, "allowed_paths")
+    if allowed_paths != ALLOWED_PATHS:
+        missing.append(f"{path}: {PACKAGE_ID}.allowed_paths must be exactly {ALLOWED_PATHS!r}")
+
+    owned_surfaces = extract_scalar_list(package_block, "owned_surfaces")
+    if owned_surfaces != OWNED_SURFACES:
+        missing.append(f"{path}: {PACKAGE_ID}.owned_surfaces must be exactly {OWNED_SURFACES!r}")
 
 
 def main() -> int:

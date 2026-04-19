@@ -10,15 +10,19 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_artifact_factory_orchestration.py"
+CANONICAL_SUCCESSOR_REGISTRY = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
+CANONICAL_FLEET_QUEUE = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 SOURCE_FILES = [
     "scripts/verify_artifact_factory_orchestration.py",
     "scripts/ai/verify.sh",
+    "scripts/launch_artifact_factory_source_pack_batch.py",
     "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
     "Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
     "Chummer.Run.Api/Controllers/PublicLandingController.cs",
     "Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
     "Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
     "tests/test_artifact_factory_orchestration.py",
+    "tests/test_artifact_factory_source_pack_launcher.py",
 ]
 
 
@@ -415,6 +419,150 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("RejectRequestedFormatOverridesOutsideRequiredFamilies", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_response_contract_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-response-contract-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            launcher_path = temp_root / "scripts/launch_artifact_factory_source_pack_batch.py"
+            launcher_text = launcher_path.read_text(encoding="utf-8")
+            launcher_path.write_text(
+                launcher_text.replace(
+                    "        validate_batch_launch_response(response, recipe_catalog, payload)\n",
+                    "",
+                ).replace(
+                    "\n\ndef validate_batch_launch_response(response: Any, recipe_catalog: dict[str, Any]) -> None:\n"
+                    "    if not isinstance(response, dict):\n"
+                    "        raise LaunchValidationError(\"artifact-factory source-pack batch response must be a JSON object.\")\n\n"
+                    "    expected_contract_name = recipe_catalog.get(\"contractName\")\n"
+                    "    expected_recipe_version = recipe_catalog.get(\"recipeVersion\")\n"
+                    "    if response.get(\"contractName\") != expected_contract_name:\n"
+                    "        raise LaunchValidationError(\n"
+                    "            \"artifact-factory source-pack batch response contractName must match the recipe catalog contractName.\"\n"
+                    "        )\n\n"
+                    "    if response.get(\"recipeVersion\") != expected_recipe_version:\n"
+                    "        raise LaunchValidationError(\n"
+                    "            \"artifact-factory source-pack batch response recipeVersion must match the recipe catalog recipeVersion.\"\n"
+                    "        )\n\n"
+                    "    state = response.get(\"state\")\n"
+                    "    if not isinstance(state, str) or not state.strip():\n"
+                    "        raise LaunchValidationError(\"artifact-factory source-pack batch response must include a non-empty state.\")\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("validate_batch_launch_response(response, recipe_catalog, payload)", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_response_family_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-response-family-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            launcher_path = temp_root / "scripts/launch_artifact_factory_source_pack_batch.py"
+            launcher_text = launcher_path.read_text(encoding="utf-8")
+            launcher_path.write_text(
+                launcher_text.replace(
+                    "    required_families = normalize_string_list(response.get(\"requiredFamilies\"), \"requiredFamilies\")\n"
+                    "    expected_required_families = normalize_string_list(\n"
+                    "        normalized_payload.get(\"requiredFamilies\"),\n"
+                    "        \"launch request requiredFamilies\",\n"
+                    "    )\n"
+                    "    if required_families != expected_required_families:\n"
+                    "        raise LaunchValidationError(\n"
+                    "            \"artifact-factory source-pack batch response requiredFamilies must match the launch request requiredFamilies.\"\n"
+                    "        )\n\n"
+                    "    families = normalize_string_list(response.get(\"families\"), \"families\")\n"
+                    "    if families != expected_required_families:\n"
+                    "        raise LaunchValidationError(\n"
+                    "            \"artifact-factory source-pack batch response families must match the launch request requiredFamilies.\"\n"
+                    "        )\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("launch request requiredFamilies", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_response_source_pack_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-response-packids-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            launcher_path = temp_root / "scripts/launch_artifact_factory_source_pack_batch.py"
+            launcher_text = launcher_path.read_text(encoding="utf-8")
+            launcher_path.write_text(
+                launcher_text.replace(
+                    "    source_pack_ids = normalize_string_list(response.get(\"sourcePackIds\"), \"sourcePackIds\")\n"
+                    "    expected_source_pack_ids = sorted(\n"
+                    "        {\n"
+                    "            source_pack[\"sourcePackId\"].strip()\n"
+                    "            for source_pack in normalized_payload[\"sourcePacks\"]\n"
+                    "            if isinstance(source_pack, dict) and isinstance(source_pack.get(\"sourcePackId\"), str) and source_pack[\"sourcePackId\"].strip()\n"
+                    "        }\n"
+                    "    )\n"
+                    "    if source_pack_ids != expected_source_pack_ids:\n"
+                    "        raise LaunchValidationError(\n"
+                    "            \"artifact-factory source-pack batch response sourcePackIds must match the launch request sourcePackIds.\"\n"
+                    "        )\n\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("launch request sourcePackIds", result.stderr)
 
     def test_verifier_fails_closed_when_batch_stable_segment_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-id-proof-") as temp_dir:
@@ -1952,6 +2100,36 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Orchestrate recipe-backed artifact jobs", result.stderr)
 
+    def test_verifier_fails_closed_when_successor_registry_drops_source_pack_launcher_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-registry-launcher-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            registry_path = temp_root / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            registry_path.write_text(
+                (
+                    CANONICAL_SUCCESSOR_REGISTRY.read_text(encoding="utf-8")
+                    .replace(
+                        "          - /docker/chummercomplete/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py preflights approved source-pack batches against the internal recipe catalog before launch.\n",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_SUCCESSOR_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("launch_artifact_factory_source_pack_batch.py preflights approved source-pack batches", result.stderr)
+
     def test_verifier_fails_closed_when_queue_package_allows_extra_paths(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-proof-") as temp_dir:
             queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
@@ -1966,17 +2144,19 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    repo: chummer6-hub",
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
+                        "    completion_action: verify_closed_package_only",
+                        "    do_not_reopen_reason: M107 chummer6-hub artifact factory orchestration is complete; future shards must verify this receipt, registry row, Fleet queue row, and design queue row instead of reopening the artifact-factory orchestration and public proof shelf release-bundles package.",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2006,6 +2186,237 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("allowed_paths", result.stderr)
         self.assertIn("unexpected Chummer.Run.AI", result.stderr)
+
+    def test_verifier_fails_closed_when_queue_drops_source_pack_launcher_test_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-launcher-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            queue_path = temp_root / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                (
+                    CANONICAL_FLEET_QUEUE.read_text(encoding="utf-8")
+                    .replace(
+                        "      - python3 -m unittest tests/test_artifact_factory_source_pack_launcher.py\n",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("test_artifact_factory_source_pack_launcher.py", result.stderr)
+
+    def test_verifier_fails_closed_when_queue_uses_absolute_unittest_path_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-absolute-unittest-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            queue_path = temp_root / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                (
+                    CANONICAL_FLEET_QUEUE.read_text(encoding="utf-8")
+                    .replace(
+                        "      - python3 -m unittest tests/test_artifact_factory_orchestration.py\n",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py\n",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker", result.stderr)
+        self.assertIn(
+            "python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+            result.stderr,
+        )
+
+    def test_verifier_fails_closed_when_queue_completion_action_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-completion-action-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                "\n".join(
+                    [
+                        "items:",
+                        "  - title: Stand up artifact-factory orchestration for release, support, and publication bundles",
+                        "    task: Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
+                        "    package_id: next90-m107-hub-artifact-factory",
+                        "    milestone_id: 107",
+                        "    wave: W9",
+                        "    repo: chummer6-hub",
+                        "    status: complete",
+                        "    frontier_id: 1421219975",
+                        "    landed_commit: b9e6b52e",
+                        "    proof:",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
+                        "    allowed_paths:",
+                        "      - Chummer.Run.Api",
+                        "      - scripts",
+                        "      - tests",
+                        "    owned_surfaces:",
+                        "      - artifact_factory:orchestration",
+                        "      - public_proof_shelf:release_bundles",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("completion_action must be 'verify_closed_package_only'", result.stderr)
+
+    def test_verifier_fails_closed_when_queue_wave_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-wave-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                "\n".join(
+                    [
+                        "items:",
+                        "  - title: Stand up artifact-factory orchestration for release, support, and publication bundles",
+                        "    task: Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
+                        "    package_id: next90-m107-hub-artifact-factory",
+                        "    milestone_id: 107",
+                        "    repo: chummer6-hub",
+                        "    status: complete",
+                        "    frontier_id: 1421219975",
+                        "    landed_commit: b9e6b52e",
+                        "    completion_action: verify_closed_package_only",
+                        "    do_not_reopen_reason: M107 chummer6-hub artifact factory orchestration is complete; future shards must verify this receipt, registry row, Fleet queue row, and design queue row instead of reopening the artifact-factory orchestration and public proof shelf release-bundles package.",
+                        "    proof:",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
+                        "    allowed_paths:",
+                        "      - Chummer.Run.Api",
+                        "      - scripts",
+                        "      - tests",
+                        "    owned_surfaces:",
+                        "      - artifact_factory:orchestration",
+                        "      - public_proof_shelf:release_bundles",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("wave must be 'W9'", result.stderr)
+
+    def test_verifier_fails_closed_when_queue_do_not_reopen_reason_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-do-not-reopen-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                "\n".join(
+                    [
+                        "items:",
+                        "  - title: Stand up artifact-factory orchestration for release, support, and publication bundles",
+                        "    task: Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
+                        "    package_id: next90-m107-hub-artifact-factory",
+                        "    milestone_id: 107",
+                        "    wave: W9",
+                        "    repo: chummer6-hub",
+                        "    status: complete",
+                        "    frontier_id: 1421219975",
+                        "    landed_commit: b9e6b52e",
+                        "    completion_action: verify_closed_package_only",
+                        "    proof:",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
+                        "    allowed_paths:",
+                        "      - Chummer.Run.Api",
+                        "      - scripts",
+                        "      - tests",
+                        "    owned_surfaces:",
+                        "      - artifact_factory:orchestration",
+                        "      - public_proof_shelf:release_bundles",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("do_not_reopen_reason must be", result.stderr)
 
     def test_verifier_fails_closed_when_queue_package_is_duplicated(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-duplicate-queue-proof-") as temp_dir:
@@ -2055,18 +2466,18 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/MissingArtifactFactoryProofAnchor.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/MissingArtifactFactoryProofAnchor.cs",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
                         "      - scripts",
@@ -2152,16 +2563,16 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
                         "      - scripts",
@@ -2258,17 +2669,17 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2312,18 +2723,18 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2367,19 +2778,19 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2423,20 +2834,20 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2480,21 +2891,21 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2538,23 +2949,23 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "      - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2598,24 +3009,24 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "      - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2651,7 +3062,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 51623cd3 pins M107 artifact factory duplicate queue guard proof.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 51623cd3 pins M107 artifact factory duplicate queue guard proof.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -2679,7 +3090,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 2b8a9431 tightens the current M107 duplicate queue proof guard.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 2b8a9431 tightens the current M107 duplicate queue proof guard.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -2715,25 +3126,25 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "      - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2777,26 +3188,26 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "      - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit a20aa910 tightens M107 artifact factory public shelf ref safety.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit a20aa910 tightens M107 artifact factory public shelf ref safety.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2840,27 +3251,27 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "      - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit a20aa910 tightens M107 artifact factory public shelf ref safety.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7ce86602 pins M107 artifact factory shelf safety proof.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit a20aa910 tightens M107 artifact factory public shelf ref safety.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7ce86602 pins M107 artifact factory shelf safety proof.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2904,28 +3315,28 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "      - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit a20aa910 tightens M107 artifact factory public shelf ref safety.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7ce86602 pins M107 artifact factory shelf safety proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 326db197 tightens M107 artifact factory source-pack proof.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit f0bdfcb9 tightens M107 artifact factory duplicate queue/package proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 66b1a1c7 tightens M107 artifact factory duplicate queue proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit a20aa910 tightens M107 artifact factory public shelf ref safety.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7ce86602 pins M107 artifact factory shelf safety proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 326db197 tightens M107 artifact factory source-pack proof.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
@@ -2961,7 +3372,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 6851982b tightens M107 artifact factory proof hygiene.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 6851982b tightens M107 artifact factory proof hygiene.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -2989,7 +3400,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 5b901df5 tightens M107 artifact factory proof branch guard.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 5b901df5 tightens M107 artifact factory proof branch guard.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3017,7 +3428,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit cbae3cdd tightens M107 artifact factory output shelf proof.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit cbae3cdd tightens M107 artifact factory output shelf proof.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3045,7 +3456,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit f0142482 pins M107 artifact factory output shelf proof.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit f0142482 pins M107 artifact factory output shelf proof.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3073,7 +3484,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit a66a06bb tightens M107 artifact output shelf proof pin.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit a66a06bb tightens M107 artifact output shelf proof pin.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3101,7 +3512,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 9a8e56f0 tightens M107 artifact shelf proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 9a8e56f0 tightens M107 artifact shelf proof floor.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3129,7 +3540,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit a929cc7d pins M107 artifact shelf proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit a929cc7d pins M107 artifact shelf proof floor.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3157,10 +3568,10 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit ff3100b4 requires the current M107 artifact shelf proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit ff3100b4 requires the current M107 artifact shelf proof floor.\n",
                     "",
                 ).replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 94f0c9e1 pins M107 current duplicate queue guard.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 94f0c9e1 pins M107 current duplicate queue guard.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3189,7 +3600,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit f22ce5a5 tightens M107 artifact factory source-pack id normalization.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit f22ce5a5 tightens M107 artifact factory source-pack id normalization.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3217,7 +3628,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit b15c2193 pins M107 source pack id proof.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit b15c2193 pins M107 source pack id proof.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3245,7 +3656,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 9b032c87 tightens M107 artifact path id guards.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 9b032c87 tightens M107 artifact path id guards.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3273,7 +3684,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit f1ca6c1a pins M107 artifact path guard proof.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit f1ca6c1a pins M107 artifact path guard proof.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3301,7 +3712,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit a91ea733 tightens M107 artifact factory receipt refs.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit a91ea733 tightens M107 artifact factory receipt refs.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3329,7 +3740,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit c31258fa tightens M107 artifact factory proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit c31258fa tightens M107 artifact factory proof floor.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3357,7 +3768,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 45d3d498 tightens M107 artifact factory proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 45d3d498 tightens M107 artifact factory proof floor.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3385,7 +3796,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit c3aaf05a pins M107 artifact factory proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit c3aaf05a pins M107 artifact factory proof floor.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3413,7 +3824,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 285e97be tightens the current M107 artifact factory proof floor guard.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 285e97be tightens the current M107 artifact factory proof floor guard.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3441,7 +3852,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit ce1c6611 pins M107 artifact factory proof floor guard.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit ce1c6611 pins M107 artifact factory proof floor guard.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3469,7 +3880,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 67ae7dab requires refreshed M107 proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 67ae7dab requires refreshed M107 proof floor.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3497,7 +3908,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit 65ac67a8 pins M107 refreshed artifact factory proof floor.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit 65ac67a8 pins M107 refreshed artifact factory proof floor.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3525,7 +3936,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             queue_text = source_queue.read_text(encoding="utf-8")
             queue_path.write_text(
                 queue_text.replace(
-                    "      - /docker/chummercomplete/chummer.run-services commit e0121780 tightens M107 artifact factory external URI guard.\n",
+                    "      - /docker/chummercomplete/chummer6-hub commit e0121780 tightens M107 artifact factory external URI guard.\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -3591,16 +4002,16 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
                         "    allowed_paths:",
                         "      - Chummer.Run.Api",
                         "      - scripts",
@@ -3644,23 +4055,23 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "    status: complete",
                         "    landed_commit: b9e6b52e",
                         "    proof:",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
-                        "      - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py",
-                        "      - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py",
-                        "      - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
-                        "      - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "      - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "      - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs",
+                        "      - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py",
+                        "      - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py",
+                        "      - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore",
+                        "      - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "      - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "      - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
                         "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
                         "      - /var/lib/codex-fleet/chummer_design_supervisor/shard-13/ACTIVE_RUN_HANDOFF.generated.md",
                         "    allowed_paths:",
@@ -3707,25 +4118,25 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
                         "        title: Orchestrate recipe-backed artifact jobs from approved release, support, and publication packs.",
                         "        status: complete",
                         "        evidence:",
-                        "          - /docker/chummercomplete/chummer.run-services commit cda8849a binds release, fix, support, and publication recipe jobs to stable public proof shelf output refs.",
-                        "          - /docker/chummercomplete/chummer.run-services commit e25842ac tightens mixed source-pack output anchoring so release bundle refs always bind to an approved artifact-bearing source pack.",
-                        "          - /docker/chummercomplete/chummer.run-services commit b9e6b52e tightens recipe-specific public proof shelf route guards so approved local refs cannot cross from release or publication recipes onto the wrong shelf family.",
-                        "          - /docker/chummercomplete/chummer.run-services commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution so stale file or commit anchors cannot keep the completed package green.",
-                        "          - /docker/chummercomplete/chummer.run-services commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
-                        "          - /docker/chummercomplete/chummer.run-services commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
-                        "          - /docker/chummercomplete/chummer.run-services commit 60125d9e tightens M107 artifact factory proof guard.",
-                        "          - /docker/chummercomplete/chummer.run-services commit c98a49f2 tightens M107 artifact factory closeout proof.",
-                        "          - /docker/chummercomplete/chummer.run-services commit 28d3e13f tightens M107 artifact factory closeout guard.",
-                        "          - /docker/chummercomplete/chummer.run-services commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
-                        "          - /docker/chummercomplete/chummer.run-services commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
+                        "          - /docker/chummercomplete/chummer6-hub commit cda8849a binds release, fix, support, and publication recipe jobs to stable public proof shelf output refs.",
+                        "          - /docker/chummercomplete/chummer6-hub commit e25842ac tightens mixed source-pack output anchoring so release bundle refs always bind to an approved artifact-bearing source pack.",
+                        "          - /docker/chummercomplete/chummer6-hub commit b9e6b52e tightens recipe-specific public proof shelf route guards so approved local refs cannot cross from release or publication recipes onto the wrong shelf family.",
+                        "          - /docker/chummercomplete/chummer6-hub commit 7331cd26 tightens artifact-factory queue and registry proof-anchor resolution so stale file or commit anchors cannot keep the completed package green.",
+                        "          - /docker/chummercomplete/chummer6-hub commit 0eac80b6 tightens design-owned queue source verification and standard Hub verify wiring for the M107 artifact-factory proof.",
+                        "          - /docker/chummercomplete/chummer6-hub commit cfd5d208 pins the completed M107 artifact-factory proof guard evidence.",
+                        "          - /docker/chummercomplete/chummer6-hub commit 60125d9e tightens M107 artifact factory proof guard.",
+                        "          - /docker/chummercomplete/chummer6-hub commit c98a49f2 tightens M107 artifact factory closeout proof.",
+                        "          - /docker/chummercomplete/chummer6-hub commit 28d3e13f tightens M107 artifact factory closeout guard.",
+                        "          - /docker/chummercomplete/chummer6-hub commit 76b0c410 tightens M107 artifact factory release-bundle output refs.",
+                        "          - /docker/chummercomplete/chummer6-hub commit e5e2e57f tightens M107 artifact factory telemetry proof guard.",
                         "          - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
-                        "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
-                        "          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
-                        "          - /docker/chummercomplete/chummer.run-services/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs proves release, support, fix, and publication bundles route through approved source-pack receipts.",
-                        "          - /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py fail-closes missing recipe families, internal endpoint auth, public proof shelf bundle refs, and anchored source-pack output selection.",
-                        "          - python3 /docker/chummercomplete/chummer.run-services/scripts/verify_artifact_factory_orchestration.py exits 0.",
-                        "          - python3 -m unittest /docker/chummercomplete/chummer.run-services/tests/test_artifact_factory_orchestration.py exits 0.",
-                        "          - dotnet test /docker/chummercomplete/chummer.run-services/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.",
+                        "          - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
+                        "          - /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
+                        "          - /docker/chummercomplete/chummer6-hub/Chummer.Tests/ArtifactFactoryOrchestrationServiceTests.cs proves release, support, fix, and publication bundles route through approved source-pack receipts.",
+                        "          - /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py fail-closes missing recipe families, internal endpoint auth, public proof shelf bundle refs, and anchored source-pack output selection.",
+                        "          - python3 /docker/chummercomplete/chummer6-hub/scripts/verify_artifact_factory_orchestration.py exits 0.",
+                        "          - python3 -m unittest /docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_orchestration.py exits 0.",
+                        "          - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.",
                         "          - TASK_LOCAL_TELEMETRY.generated.json active-run helper output",
                     ]
                 ),
@@ -3747,6 +4158,60 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
         self.assertIn("forbidden active-run proof marker: active-run helper", result.stderr)
+
+    def test_verifier_fails_closed_when_queue_proof_cites_out_of_scope_repo_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-queue-scope-proof-") as temp_dir:
+            queue_path = Path(temp_dir) / "NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
+            queue_path.write_text(
+                CANONICAL_FLEET_QUEUE.read_text(encoding="utf-8").replace(
+                    "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.\n",
+                    "      - successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.\n"
+                    "      - /docker/chummercomplete/chummer-hub-registry/scripts/verify_next90_m101_registry_promotion_discipline.py\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_QUEUE_STAGING"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("out-of-scope repo citation /docker/chummercomplete/chummer-hub-registry/scripts/verify_next90_m101_registry_promotion_discipline.py", result.stderr)
+
+    def test_verifier_fails_closed_when_registry_evidence_cites_out_of_scope_repo_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-registry-scope-proof-") as temp_dir:
+            registry_path = Path(temp_dir) / "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            registry_path.write_text(
+                CANONICAL_SUCCESSOR_REGISTRY.read_text(encoding="utf-8").replace(
+                    "          - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.\n",
+                    "          - dotnet test /docker/chummercomplete/chummer6-hub/Chummer.Tests/Chummer.Tests.csproj --filter ArtifactFactoryOrchestrationServiceTests --no-restore exits 0.\n"
+                    "          - /docker/chummercomplete/chummer-hub-registry/scripts/verify_next90_m101_registry_promotion_discipline.py\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_SUCCESSOR_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("out-of-scope repo citation /docker/chummercomplete/chummer-hub-registry/scripts/verify_next90_m101_registry_promotion_discipline.py", result.stderr)
 
 
 if __name__ == "__main__":

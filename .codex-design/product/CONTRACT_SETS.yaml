@@ -117,6 +117,26 @@ packages:
       - chummer6-ui
       - chummer6-mobile
 
+  - id: Chummer.World.Contracts
+    owner_repo: chummer6-hub
+    purpose: World-state, mission-market, and campaign-adjacent consequence contracts.
+    status: in_progress
+    versioning_policy: SemVer. Breaking world-frame semantics, packet ownership rules, or consequence receipts is major; additive world object fields and cosmetic metadata are minor; compatible clarifications are patch.
+    deprecation_policy: Deprecations are announced in design and hub with rollback guidance and are applied only when replacement contracts carry equivalent campaign/world observability contracts.
+    consumers:
+      - chummer6-hub
+      - chummer6-ui
+      - chummer6-mobile
+      - chummer6-media-factory
+      - executive-assistant
+      - fleet
+    forbidden_source_copies:
+      - chummer6-core
+      - chummer6-ui
+      - chummer6-mobile
+      - chummer6-media-factory
+      - chummer6-hub-registry
+
 contract_sets:
   - id: runtime_dtos_vnext
     canonical_package: Chummer.Engine.Contracts
@@ -224,6 +244,38 @@ contract_sets:
       - owner scope
       - approval state
     rule: "`Chummer.Engine.Contracts` owns ruleset and pack provenance atoms, but the chosen person, campaign, or group rule environment that a workspace restores is long-lived product truth in `Chummer.Campaign.Contracts`."
+
+  - id: world_frame_vnext
+    canonical_package: Chummer.World.Contracts
+    semantic_owner: chummer6-hub
+    status: in_progress
+    includes:
+      - world frame identity
+      - city/faction/project state
+      - seasonal frame and world tick metadata
+      - governance and operator references
+      - compatibility-facing constraints for campaign handoff
+
+  - id: mission_market_vnext
+    canonical_package: Chummer.World.Contracts
+    semantic_owner: chummer6-hub
+    status: in_progress
+    includes:
+      - mission market seed packet families
+      - world offers and scenario modifiers
+      - job seed and job packet projection rules
+      - GM approval and campaign-consumption links
+      - city pressure and district progression tags
+
+  - id: resolution_report_vnext
+    canonical_package: Chummer.World.Contracts
+    semantic_owner: chummer6-hub
+    status: in_progress
+    includes:
+      - campaign-linked resolution reports
+      - outcome classes and consequence deltas
+      - approval-aware consequence handoff
+      - campaign-facing consequence summary projections
 
   - id: roaming_workspace_vnext
     canonical_package: Chummer.Campaign.Contracts

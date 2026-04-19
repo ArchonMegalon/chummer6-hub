@@ -5,6 +5,12 @@ public sealed record PublicRouteCatalog(
     IReadOnlyList<string> AuthRoutes,
     IReadOnlyList<string> RegisteredRoutes)
 {
+    private static readonly HashSet<string> RuntimeCompatibilityRoutes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "/artifacts/campaign-primer-video",
+        "/artifacts/mission-brief-video"
+    };
+
     public IReadOnlySet<string> AllowedRoutes { get; } = PublicRoutes
         .Concat(AuthRoutes)
         .Concat(RegisteredRoutes)
@@ -28,6 +34,12 @@ public sealed record PublicRouteCatalog(
 
         return string.IsNullOrWhiteSpace(trimmed) ? "/" : trimmed;
     }
+
+    public bool Contains(string route)
+        => Contains(NormalizeRoute(route), AllowedRoutes);
+
+    public static bool Contains(string normalizedRoute, IReadOnlySet<string> allowedRoutes)
+        => allowedRoutes.Contains(normalizedRoute) || RuntimeCompatibilityRoutes.Contains(normalizedRoute);
 }
 
 public sealed class PublicRouteCatalogService
@@ -74,7 +86,7 @@ public sealed class PublicRouteCatalogService
 
         var allowedRoutes = Load().AllowedRoutes;
         var normalized = PublicRouteCatalog.NormalizeRoute(href);
-        if (!allowedRoutes.Contains(normalized))
+        if (!PublicRouteCatalog.Contains(normalized, allowedRoutes))
         {
             throw new InvalidOperationException($"{description} points at missing route '{href}'.");
         }

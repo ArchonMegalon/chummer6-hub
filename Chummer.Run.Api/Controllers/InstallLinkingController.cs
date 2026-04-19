@@ -2,6 +2,7 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
@@ -15,6 +16,38 @@ namespace Chummer.Run.Api.Controllers;
 public sealed class InstallLinkingController : ControllerBase
 {
     private const string AppLocalInstallLinkCallbackPath = "/install-link/callback";
+    private const string NativeContinuationHref = "/api/v1/install-linking/continuation";
+    private const string NativeSupportHref = "/api/v1/install-linking/continuation/support";
+    private const string NativeUpdateHref = "/api/v1/install-linking/continuation/update";
+    private const string NativeRollbackHref = "/api/v1/install-linking/continuation/rollback";
+    private const string NativeRecoveryHref = NativeContinuationHref;
+    private static readonly HashSet<string> InstallLinkCallbackReservedQueryKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "artifactId",
+        "code",
+        "accessToken",
+        "applicationVersion",
+        "callbackCode",
+        "channelId",
+        "claimCode",
+        "claimTicketId",
+        "grantId",
+        "headId",
+        "hostLabel",
+        "installAccessClass",
+        "installationId",
+        "installedBuildReceiptId",
+        "releaseChannel",
+        "receiptId",
+        "platform",
+        "platformId",
+        "arch",
+        "publicKey",
+        "ticketId",
+        "version",
+        "installLinkMode",
+        "installLinkTransport"
+    };
     private readonly HubIdentityClient _identity;
     private readonly AccountService _accounts;
     private readonly InstallLinkingService _installLinking;
@@ -203,21 +236,24 @@ public sealed class InstallLinkingController : ControllerBase
             ? null
             : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
-        IReadOnlyList<DesktopInstallSupportContinuationCase> supportCases = ResolveSupportContinuationCases(installation, installSummary, receipt);
+        IReadOnlyList<DesktopInstallSupportContinuationCase> supportCases = ResolveSupportContinuationCases(
+            installation,
+            installSummary,
+            receipt,
+            manifest,
+            releaseArtifact,
+            continuation,
+            updateAvailable);
         DesktopInstallSupportContinuationCase? leadSupportCase = supportCases.FirstOrDefault(static item => item.ReporterActionNeeded)
             ?? supportCases.FirstOrDefault();
-        string supportHref = releaseArtifact is null
-            ? BuildFallbackSupportHref(installation)
-            : DesktopInstallRail.BuildSupportHref(
-                releaseArtifact,
-                manifest,
-                installation.InstallationId,
-                recoveryMode: false,
-                applicationVersion: installation.Version,
-                releaseChannel: installation.Channel,
-                headId: installation.HeadId,
-                platform: installation.Platform,
-                arch: installation.Arch);
+        string supportHref = DesktopInstallRail.BuildAccountSupportHref(
+            installationId: installation.InstallationId,
+            applicationVersion: installation.Version,
+            releaseChannel: installation.Channel,
+            headId: installation.HeadId,
+            platform: installation.Platform,
+            arch: installation.Arch,
+            installedBuildReceiptId: receipt?.ReceiptId);
 
         return Ok(new DesktopInstallNativeContinuationResponse(
             InstallationId: installation.InstallationId,
@@ -236,16 +272,368 @@ public sealed class InstallLinkingController : ControllerBase
                 ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
             UpdateAvailable: updateAvailable,
             NextSafeAction: BuildNativeNextSafeAction(updateAvailable, leadSupportCase, continuation),
+            NativePrimaryActionHref: BuildNativeContinuationPrimaryActionHref(updateAvailable, leadSupportCase),
             UpdateAction: updateAvailable
                 ? $"Update this linked install from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh the install grant from the app."
                 : continuation?.UpdateAction ?? "Refresh the install grant from the app before starting a new install or support path.",
             RollbackAction: continuation?.RollbackAction
                 ?? "If update or setup fails, keep the previous installed copy and return to this continuation endpoint before opening a new support path.",
             SupportHref: supportHref,
+            NativeUpdateHref: "/api/v1/install-linking/continuation/update",
+            NativeSupportHref: "/api/v1/install-linking/continuation/support",
+            NativeRollbackHref: "/api/v1/install-linking/continuation/rollback",
+            NativeRecoveryHref: NativeRecoveryHref,
+            RecoveryAction: BuildNativeRecoveryAction(installation, continuation),
             SupportContinuation: leadSupportCase?.NextSafeAction
                 ?? continuation?.SupportContinuation
                 ?? "Support follow-through stays on this claimed install with the current build, channel, and device context attached.",
             SupportCases: supportCases));
+    }
+
+    [HttpPost("continuation/support")]
+    [ProducesResponseType<DesktopInstallNativeSupportResponse>(StatusCodes.Status202Accepted)]
+    public ActionResult<DesktopInstallNativeSupportResponse> SubmitClaimedInstallSupport([FromBody] DesktopInstallNativeSupportRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("native support payload is required.");
+        }
+
+        ClaimedInstallationDto? installation = _installLinking.ResolveInstallationForGrant(request.InstallationId, request.AccessToken);
+        if (installation is null)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown or expired.");
+        }
+
+        InstallLinkingSummaryDto installSummary = _installLinking.GetSummary(installation.UserId, installation.SubjectId);
+        PublicReleaseManifestDto manifest = _releases.LoadManifest();
+        PublicReleaseArtifactDto? releaseArtifact = ResolveContinuationArtifact(manifest, installation);
+        DesktopInstallContinuationReceipt? continuation = releaseArtifact is null
+            ? null
+            : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
+        DownloadReceiptDto? receipt = ResolveLatestReceipt(installSummary, installation, releaseArtifact);
+        bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
+
+        SupportCaseProjection created;
+        try
+        {
+            created = _supportCases.Submit(
+                installation.UserId,
+                installation.SubjectId,
+                BuildNativeInstallSupportRequest(request, installation, receipt, manifest, releaseArtifact, continuation, updateAvailable));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+
+        SupportCasePresentationViewModel presented = _supportPresentation.Build(created, installSummary);
+        return Accepted(new DesktopInstallNativeSupportResponse(
+            CaseId: created.CaseId,
+            InstallationId: installation.InstallationId,
+            ApplicationVersion: installation.Version,
+            ReleaseChannel: installation.Channel,
+            HeadId: NormalizeResponseValue(installation.HeadId),
+            Platform: NormalizeResponseValue(installation.Platform),
+            Arch: NormalizeResponseValue(installation.Arch),
+            StatusLabel: presented.StatusLabel,
+            StageLabel: presented.StageLabel,
+            NextSafeAction: BuildNativeSupportNextSafeAction(presented, updateAvailable),
+            PrimaryActionHref: BuildNativeSupportCaseActionHref(presented),
+            AccountSupportHref: $"/account/support/{Uri.EscapeDataString(created.CaseId)}",
+            NativeSupportHref: "/api/v1/install-linking/continuation/support",
+            NativeContinuationHref: "/api/v1/install-linking/continuation",
+            NativeUpdateHref: "/api/v1/install-linking/continuation/update",
+            NativeRollbackHref: "/api/v1/install-linking/continuation/rollback",
+            NativeRecoveryHref: NativeRecoveryHref,
+            InstalledBuildReceiptId: receipt?.ReceiptId,
+            CurrentReleaseVersion: manifest.Version,
+            CurrentReleaseChannel: manifest.Channel,
+            CurrentArtifactId: releaseArtifact?.Id,
+            FallbackPosture: continuation?.FallbackPosture
+                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+            UpdateAvailable: updateAvailable,
+            UpdateAction: updateAvailable
+                ? $"Update this linked install from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh the install grant from the app."
+                : continuation?.UpdateAction ?? "Refresh the install grant from the app before starting a new install or support path.",
+            RollbackAction: "If support, update, or setup fails, keep the previous installed copy and return to this claimed install continuation rail.",
+            RecoveryAction: BuildNativeRecoveryAction(installation, continuation)));
+    }
+
+    [HttpPost("continuation/update")]
+    [ProducesResponseType<DesktopInstallNativeUpdateResponse>(StatusCodes.Status200OK)]
+    public ActionResult<DesktopInstallNativeUpdateResponse> PlanClaimedInstallUpdate([FromBody] DesktopInstallNativeContinuationRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("update payload is required.");
+        }
+
+        ClaimedInstallationDto? installation = _installLinking.ResolveInstallationForGrant(request.InstallationId, request.AccessToken);
+        if (installation is null)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown or expired.");
+        }
+
+        InstallLinkingSummaryDto installSummary = _installLinking.GetSummary(installation.UserId, installation.SubjectId);
+        PublicReleaseManifestDto manifest = _releases.LoadManifest();
+        PublicReleaseArtifactDto? releaseArtifact = ResolveContinuationArtifact(manifest, installation);
+        DesktopInstallContinuationReceipt? continuation = releaseArtifact is null
+            ? null
+            : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
+        DownloadReceiptDto? receipt = ResolveLatestReceipt(installSummary, installation, releaseArtifact);
+        bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
+
+        string supportHref = DesktopInstallRail.BuildAccountSupportHref(
+            installationId: installation.InstallationId,
+            applicationVersion: installation.Version,
+            releaseChannel: installation.Channel,
+            headId: installation.HeadId,
+            platform: installation.Platform,
+            arch: installation.Arch,
+            installedBuildReceiptId: receipt?.ReceiptId);
+
+        return Ok(new DesktopInstallNativeUpdateResponse(
+            InstallationId: installation.InstallationId,
+            ArtifactId: installation.ArtifactId,
+            ApplicationVersion: installation.Version,
+            ReleaseChannel: installation.Channel,
+            HeadId: NormalizeResponseValue(installation.HeadId),
+            Platform: NormalizeResponseValue(installation.Platform),
+            Arch: NormalizeResponseValue(installation.Arch),
+            InstalledBuildReceiptId: receipt?.ReceiptId,
+            CurrentReleaseVersion: manifest.Version,
+            CurrentReleaseChannel: manifest.Channel,
+            CurrentArtifactId: releaseArtifact?.Id,
+            UpdateAvailable: updateAvailable,
+            UpdatePlan: BuildNativeUpdatePlan(installation, manifest, releaseArtifact, receipt, updateAvailable),
+            UpdateAction: updateAvailable
+                ? $"Update this linked install from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh this grant-bound update planner from the app."
+                : continuation?.UpdateAction ?? "Refresh this grant-bound update planner from the app before starting another install or support path.",
+            NativePrimaryActionHref: NativeUpdateHref,
+            SupportHref: supportHref,
+            NativeContinuationHref: "/api/v1/install-linking/continuation",
+            NativeSupportHref: "/api/v1/install-linking/continuation/support",
+            NativeRollbackHref: "/api/v1/install-linking/continuation/rollback",
+            NativeRecoveryHref: NativeRecoveryHref,
+            FallbackPosture: continuation?.FallbackPosture
+                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+            RecoveryAction: BuildNativeRecoveryAction(installation, continuation)));
+    }
+
+    [HttpPost("continuation/rollback")]
+    [ProducesResponseType<DesktopInstallNativeRollbackResponse>(StatusCodes.Status200OK)]
+    public ActionResult<DesktopInstallNativeRollbackResponse> PlanClaimedInstallRollback([FromBody] DesktopInstallNativeContinuationRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("rollback payload is required.");
+        }
+
+        ClaimedInstallationDto? installation = _installLinking.ResolveInstallationForGrant(request.InstallationId, request.AccessToken);
+        if (installation is null)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown or expired.");
+        }
+
+        InstallLinkingSummaryDto installSummary = _installLinking.GetSummary(installation.UserId, installation.SubjectId);
+        PublicReleaseManifestDto manifest = _releases.LoadManifest();
+        PublicReleaseArtifactDto? releaseArtifact = ResolveContinuationArtifact(manifest, installation);
+        DesktopInstallContinuationReceipt? continuation = releaseArtifact is null
+            ? null
+            : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
+        DownloadReceiptDto? receipt = ResolveLatestReceipt(installSummary, installation, releaseArtifact);
+        bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
+
+        string supportHref = DesktopInstallRail.BuildAccountSupportHref(
+            installationId: installation.InstallationId,
+            applicationVersion: installation.Version,
+            releaseChannel: installation.Channel,
+            headId: installation.HeadId,
+            platform: installation.Platform,
+            arch: installation.Arch,
+            installedBuildReceiptId: receipt?.ReceiptId);
+
+        return Ok(new DesktopInstallNativeRollbackResponse(
+            InstallationId: installation.InstallationId,
+            ArtifactId: installation.ArtifactId,
+            ApplicationVersion: installation.Version,
+            ReleaseChannel: installation.Channel,
+            HeadId: NormalizeResponseValue(installation.HeadId),
+            Platform: NormalizeResponseValue(installation.Platform),
+            Arch: NormalizeResponseValue(installation.Arch),
+            InstalledBuildReceiptId: receipt?.ReceiptId,
+            CurrentReleaseVersion: manifest.Version,
+            CurrentReleaseChannel: manifest.Channel,
+            CurrentArtifactId: releaseArtifact?.Id,
+            UpdateAvailable: updateAvailable,
+            RollbackPlan: BuildNativeRollbackPlan(installation, receipt),
+            RollbackAction: continuation?.RollbackAction
+                ?? "Keep the previous installed copy and return to this claimed install continuation rail before starting another recovery path.",
+            NativePrimaryActionHref: NativeRollbackHref,
+            SupportHref: supportHref,
+            NativeContinuationHref: "/api/v1/install-linking/continuation",
+            NativeUpdateHref: "/api/v1/install-linking/continuation/update",
+            NativeSupportHref: "/api/v1/install-linking/continuation/support",
+            NativeRecoveryHref: NativeRecoveryHref,
+            FallbackPosture: continuation?.FallbackPosture
+                ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+            RecoveryAction: BuildNativeRecoveryAction(installation, continuation)));
+    }
+
+    private static SupportCaseSubmitRequest BuildNativeInstallSupportRequest(
+        DesktopInstallNativeSupportRequest request,
+        ClaimedInstallationDto installation,
+        DownloadReceiptDto? installedBuildReceipt,
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto? releaseArtifact,
+        DesktopInstallContinuationReceipt? continuation,
+        bool updateAvailable)
+    {
+        string title = string.IsNullOrWhiteSpace(request.Title)
+            ? "Install help for claimed desktop install"
+            : request.Title.Trim();
+        string summary = string.IsNullOrWhiteSpace(request.Summary)
+            ? "The desktop app needs help on this claimed install rail."
+            : request.Summary.Trim();
+        string detail = string.IsNullOrWhiteSpace(request.Detail)
+            ? "The desktop app filed this from a grant-bound claimed install. Keep install, update, rollback, and verification on this same native continuation rail."
+            : request.Detail.Trim();
+        string? installedBuildReceiptId = string.IsNullOrWhiteSpace(installedBuildReceipt?.ReceiptId)
+            ? null
+            : installedBuildReceipt.ReceiptId.Trim();
+        detail = AppendInstalledBuildReceiptDetail(detail, installedBuildReceiptId);
+        detail = AppendAuthoritativeNativeInstallTruthDetail(detail, installation);
+        detail = AppendNativeReleaseRecoveryTruthDetail(detail, manifest, releaseArtifact, continuation, updateAvailable);
+        detail = AppendNativeRequestedActionDetail(detail, request.RequestedActionHref);
+        detail = AppendNativeRouteReceiptDetail(detail);
+        detail = AppendNativeContinuationContextDetail(detail);
+
+        return new SupportCaseSubmitRequest(
+            Kind: SupportCaseKinds.InstallHelp,
+            Title: title,
+            Summary: summary,
+            Detail: detail,
+            ReporterEmail: string.IsNullOrWhiteSpace(request.ReporterEmail) ? null : request.ReporterEmail.Trim(),
+            InstallationId: installation.InstallationId,
+            ApplicationVersion: installation.Version,
+            ReleaseChannel: installation.Channel,
+            HeadId: installation.HeadId,
+            Platform: installation.Platform,
+            Arch: installation.Arch,
+            Source: SupportCaseSourceKinds.DesktopFeedback);
+    }
+
+    private static string AppendInstalledBuildReceiptDetail(string detail, string? installedBuildReceiptId)
+    {
+        if (string.IsNullOrWhiteSpace(installedBuildReceiptId))
+        {
+            return detail;
+        }
+
+        string requiredLine = $"Installed build receipt: {installedBuildReceiptId}";
+        return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
+            ? detail
+            : $"{detail}\n\n{requiredLine}";
+    }
+
+    private static string AppendAuthoritativeNativeInstallTruthDetail(string detail, ClaimedInstallationDto installation)
+    {
+        string requiredLine =
+            $"Authoritative claimed install: {installation.InstallationId}; build {installation.Channel} {installation.Version}; device {NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)}.";
+        return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
+            ? detail
+            : $"{detail}\n\n{requiredLine}";
+    }
+
+    private static string AppendNativeContinuationContextDetail(string detail)
+    {
+        const string requiredLine = "Native continuation: grant-bound claimed install support; browser callback, claim-code, or public form identifiers in the desktop payload are advisory only.";
+        return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
+            ? detail
+            : $"{detail}\n\n{requiredLine}";
+    }
+
+    private static string AppendNativeRequestedActionDetail(string detail, string? requestedActionHref)
+    {
+        if (string.IsNullOrWhiteSpace(requestedActionHref))
+        {
+            return detail;
+        }
+
+        string trimmed = requestedActionHref.Trim();
+        string safeHref = RedactNativeRequestedActionHref(trimmed);
+        string posture = NormalizeNativeInstallRailHref(trimmed) is not null
+            ? "native grant-bound action"
+            : "advisory browser or external action";
+        string requiredLine = $"Desktop requested action ({posture}): {safeHref}";
+        return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
+            ? detail
+            : $"{detail}\n\n{requiredLine}";
+    }
+
+    private static string RedactNativeRequestedActionHref(string href)
+    {
+        if (!Uri.TryCreate(href, UriKind.Absolute, out Uri? parsedUri)
+            && !Uri.TryCreate($"https://chummer.run{(href.StartsWith("/", StringComparison.Ordinal) ? href : $"/{href}")}", UriKind.Absolute, out parsedUri))
+        {
+            return href;
+        }
+
+        Uri absoluteUri = parsedUri;
+        if (string.IsNullOrEmpty(absoluteUri.Query))
+        {
+            return href;
+        }
+
+        Dictionary<string, string?> sanitizedQuery = new(StringComparer.OrdinalIgnoreCase);
+        bool redacted = false;
+        foreach (var item in QueryHelpers.ParseQuery(absoluteUri.Query))
+        {
+            if (InstallLinkCallbackReservedQueryKeys.Contains(item.Key))
+            {
+                sanitizedQuery[item.Key] = "[redacted-install-link-secret]";
+                redacted = true;
+                continue;
+            }
+
+            sanitizedQuery[item.Key] = item.Value.ToString();
+        }
+
+        if (!redacted)
+        {
+            return href;
+        }
+
+        string pathAndQuery = QueryHelpers.AddQueryString(absoluteUri.AbsolutePath, sanitizedQuery);
+        return Uri.TryCreate(href, UriKind.Absolute, out _)
+            ? $"{absoluteUri.Scheme}://{absoluteUri.Authority}{pathAndQuery}{absoluteUri.Fragment}"
+            : $"{pathAndQuery}{absoluteUri.Fragment}";
+    }
+
+    private static string AppendNativeRouteReceiptDetail(string detail)
+    {
+        string requiredLine =
+            $"Native route receipt: support {NativeSupportHref}; update {NativeUpdateHref}; rollback {NativeRollbackHref}; recovery {NativeRecoveryHref}; account, downloads, and public support links are human fallback only.";
+        return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
+            ? detail
+            : $"{detail}\n\n{requiredLine}";
+    }
+
+    private static string AppendNativeReleaseRecoveryTruthDetail(
+        string detail,
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto? releaseArtifact,
+        DesktopInstallContinuationReceipt? continuation,
+        bool updateAvailable)
+    {
+        string fallbackPosture = continuation?.FallbackPosture
+            ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.";
+        string requiredLine =
+            $"Native release recovery truth: current {manifest.Channel} {manifest.Version}; artifact {NormalizeResponseValue(releaseArtifact?.Id)}; updateAvailable {updateAvailable.ToString().ToLowerInvariant()}; rollback stays on the previous installed copy; fallback {fallbackPosture}";
+        return detail.Contains(requiredLine, StringComparison.OrdinalIgnoreCase)
+            ? detail
+            : $"{detail}\n\n{requiredLine}";
     }
 
     private static PublicReleaseArtifactDto? ResolveContinuationArtifact(PublicReleaseManifestDto manifest, ClaimedInstallationDto installation)
@@ -272,32 +660,49 @@ public sealed class InstallLinkingController : ControllerBase
     private static int ScoreArtifactMatch(PublicReleaseArtifactDto artifact, ClaimedInstallationDto installation)
     {
         int score = 0;
-        if (!string.IsNullOrWhiteSpace(installation.HeadId)
-            && string.Equals(artifact.Head, installation.HeadId, StringComparison.OrdinalIgnoreCase))
+        if (!TryScoreArtifactField(artifact.Head, installation.HeadId, 4, ref score))
         {
-            score += 4;
+            return 0;
         }
 
-        if (!string.IsNullOrWhiteSpace(installation.Platform)
-            && (string.Equals(artifact.PlatformId, installation.Platform, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(artifact.Platform, installation.Platform, StringComparison.OrdinalIgnoreCase)))
+        if (!TryScoreArtifactField(artifact.PlatformId, installation.Platform, 2, ref score)
+            && !TryScoreArtifactField(artifact.Platform, installation.Platform, 2, ref score))
         {
-            score += 2;
+            return 0;
         }
 
-        if (!string.IsNullOrWhiteSpace(installation.Arch)
-            && string.Equals(artifact.Arch, installation.Arch, StringComparison.OrdinalIgnoreCase))
+        if (!TryScoreArtifactField(artifact.Arch, installation.Arch, 1, ref score))
         {
-            score += 1;
+            return 0;
         }
 
         return score;
     }
 
+    private static bool TryScoreArtifactField(string? artifactValue, string? installationValue, int fieldScore, ref int score)
+    {
+        if (string.IsNullOrWhiteSpace(installationValue))
+        {
+            return true;
+        }
+
+        if (!string.Equals(artifactValue, installationValue, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        score += fieldScore;
+        return true;
+    }
+
     private IReadOnlyList<DesktopInstallSupportContinuationCase> ResolveSupportContinuationCases(
         ClaimedInstallationDto installation,
         InstallLinkingSummaryDto installSummary,
-        DownloadReceiptDto? receipt)
+        DownloadReceiptDto? receipt,
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto? releaseArtifact,
+        DesktopInstallContinuationReceipt? continuation,
+        bool updateAvailable)
     {
         IReadOnlyList<SupportCaseProjection> reporterCases = _supportCases.ListForReporter(installation.UserId, installation.SubjectId).Items;
         var relevantCases = reporterCases
@@ -316,19 +721,222 @@ public sealed class InstallLinkingController : ControllerBase
                 InstalledBuildReceiptId: receipt?.ReceiptId,
                 StatusLabel: item.StatusLabel,
                 StageLabel: item.StageLabel,
-                NextSafeAction: item.NextSafeAction,
-                PrimaryActionHref: item.PrimaryActionHref,
+                NextSafeAction: BuildNativeSupportNextSafeAction(item, updateAvailable),
+                PrimaryActionHref: BuildNativeSupportCaseActionHref(item),
                 FixedReleaseLabel: item.FixedReleaseLabel,
                 InstallReadinessSummary: item.InstallReadinessSummary,
                 ReporterActionNeeded: item.ReporterActionNeeded,
                 FixReadyOnLinkedInstall: item.FixReadyOnLinkedInstall,
                 NeedsInstallUpdate: item.NeedsInstallUpdate,
-                NeedsLinkedInstall: item.NeedsLinkedInstall))
+                NeedsLinkedInstall: item.NeedsLinkedInstall,
+                CurrentReleaseVersion: manifest.Version,
+                CurrentReleaseChannel: manifest.Channel,
+                CurrentArtifactId: releaseArtifact?.Id,
+                FallbackPosture: continuation?.FallbackPosture
+                    ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
+                UpdateAvailable: updateAvailable,
+                UpdateAction: updateAvailable
+                    ? $"Update this linked install from {installation.Channel} {installation.Version} to {manifest.Channel} {manifest.Version}, then refresh the grant-bound support follow-through from the app."
+                    : continuation?.UpdateAction ?? "Refresh the grant-bound support follow-through from the app before starting another install or support path.",
+                RollbackAction: continuation?.RollbackAction
+                    ?? "If support, update, or setup fails, keep the previous installed copy and return to this claimed install continuation rail.",
+                NativeContinuationHref: "/api/v1/install-linking/continuation",
+                NativeSupportHref: "/api/v1/install-linking/continuation/support",
+                NativeUpdateHref: "/api/v1/install-linking/continuation/update",
+                NativeRollbackHref: "/api/v1/install-linking/continuation/rollback",
+                NativeRecoveryHref: NativeRecoveryHref,
+                RecoveryAction: BuildNativeRecoveryAction(installation, continuation)))
             .ToArray();
+    }
+
+    private static string BuildNativeSupportCaseActionHref(SupportCasePresentationViewModel item)
+    {
+        if (item.ReporterActionNeeded)
+        {
+            return NativeSupportHref;
+        }
+
+        if (item.NeedsInstallUpdate)
+        {
+            return NativeUpdateHref;
+        }
+
+        if (item.FixReadyOnLinkedInstall)
+        {
+            return NativeContinuationHref;
+        }
+
+        string? nativeActionHref = NormalizeNativeInstallRailHref(item.PrimaryActionHref);
+        bool primaryActionIsBrowserRail = IsBrowserRailHref(item.PrimaryActionHref);
+        return !primaryActionIsBrowserRail && nativeActionHref is not null
+            ? nativeActionHref
+            : NativeContinuationHref;
+    }
+
+    private static string BuildNativeSupportNextSafeAction(SupportCasePresentationViewModel item, bool updateAvailable)
+    {
+        if (item.ReporterActionNeeded)
+        {
+            return "Continue support follow-through from the desktop app on this grant-bound native support endpoint; keep the case, install, and device tuple attached.";
+        }
+
+        if (item.NeedsInstallUpdate)
+        {
+            return updateAvailable
+                ? "Continue on the grant-bound native update planner for this claimed install, then return to this same support follow-through to verify the fix."
+                : "Refresh this grant-bound continuation from the desktop app before verifying support; do not start a downloads or account browser handoff.";
+        }
+
+        if (item.FixReadyOnLinkedInstall)
+        {
+            return "Verify the fix from this claimed desktop install through the grant-bound continuation rail; keep support follow-through attached to this install.";
+        }
+
+        string? nativeActionHref = NormalizeNativeInstallRailHref(item.PrimaryActionHref);
+        bool primaryActionIsBrowserRail = IsBrowserRailHref(item.PrimaryActionHref);
+        if (!primaryActionIsBrowserRail && nativeActionHref is not null)
+        {
+            return "Continue on the grant-bound native install rail for this claimed desktop install.";
+        }
+
+        return "Stay on the grant-bound desktop continuation rail for this claimed install; account, downloads, and public support browser links are human fallback only.";
+    }
+
+    private static string? NormalizeNativeInstallRailHref(string? href)
+    {
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return null;
+        }
+
+        string trimmed = href.Trim();
+        if (trimmed.StartsWith("//", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (!trimmed.StartsWith("/", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (trimmed.Contains('\\')
+            || ContainsEncodedPathSeparator(trimmed)
+            || Uri.TryCreate(trimmed, UriKind.Absolute, out _))
+        {
+            return null;
+        }
+
+        string path = NormalizeBrowserRailPath(trimmed);
+        if (path.Equals(NativeContinuationHref, StringComparison.OrdinalIgnoreCase))
+        {
+            return NativeContinuationHref;
+        }
+
+        if (path.Equals(NativeSupportHref, StringComparison.OrdinalIgnoreCase))
+        {
+            return NativeSupportHref;
+        }
+
+        if (path.Equals(NativeUpdateHref, StringComparison.OrdinalIgnoreCase))
+        {
+            return NativeUpdateHref;
+        }
+
+        return path.Equals(NativeRollbackHref, StringComparison.OrdinalIgnoreCase)
+            ? NativeRollbackHref
+            : null;
+    }
+
+    private static bool ContainsEncodedPathSeparator(string href)
+        => href.Contains("%2f", StringComparison.OrdinalIgnoreCase)
+           || href.Contains("%5c", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsBrowserRailHref(string? href)
+    {
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return false;
+        }
+
+        string trimmed = href.Trim();
+        string path = NormalizeBrowserRailPath(trimmed);
+        return path.StartsWith("/account/", StringComparison.OrdinalIgnoreCase)
+               || path.Equals("/account", StringComparison.OrdinalIgnoreCase)
+               || path.StartsWith("/contact", StringComparison.OrdinalIgnoreCase)
+               || path.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizeBrowserRailPath(string href)
+    {
+        string trimmed = href.Trim();
+        string path = trimmed.StartsWith("//", StringComparison.Ordinal)
+            ? trimmed
+            : Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? parsed)
+            ? parsed.AbsolutePath
+            : trimmed;
+        int queryIndex = path.IndexOfAny(['?', '#']);
+        if (queryIndex >= 0)
+        {
+            path = path[..queryIndex];
+        }
+
+        path = DecodeBrowserRailPath(path);
+        path = NormalizeBrowserRailSeparators(path);
+        path = NormalizeLeadingBrowserRailSlashes(path);
+        return path.StartsWith("/", StringComparison.Ordinal)
+            ? path
+            : $"/{path}";
+    }
+
+    private static string DecodeBrowserRailPath(string path)
+    {
+        string decoded = path;
+        for (int index = 0; index < 4; index++)
+        {
+            string next;
+            try
+            {
+                next = Uri.UnescapeDataString(decoded);
+            }
+            catch (UriFormatException)
+            {
+                return decoded;
+            }
+
+            if (string.Equals(next, decoded, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            decoded = next;
+        }
+
+        return decoded;
+    }
+
+    private static string NormalizeBrowserRailSeparators(string path)
+        => path.Replace('\\', '/');
+
+    private static string NormalizeLeadingBrowserRailSlashes(string path)
+    {
+        string trimmed = path.TrimStart();
+        int index = 0;
+        while (index < trimmed.Length && trimmed[index] == '/')
+        {
+            index++;
+        }
+
+        return index > 1 ? $"/{trimmed[index..]}" : trimmed;
     }
 
     private static bool IsInstallContinuationCase(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
     {
+        if (!string.Equals(supportCase.Kind, SupportCaseKinds.InstallHelp, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (string.Equals(supportCase.InstallationId, installation.InstallationId, StringComparison.OrdinalIgnoreCase))
         {
             return MatchesClaimedInstallTruthWhenPresent(supportCase, installation);
@@ -339,16 +947,12 @@ public sealed class InstallLinkingController : ControllerBase
             return false;
         }
 
-        if (!string.Equals(supportCase.Kind, SupportCaseKinds.InstallHelp, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
         return MatchesClaimedInstallTruth(supportCase, installation);
     }
 
     private static bool MatchesClaimedInstallTruthWhenPresent(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
-        => MatchesOptionalTruth(supportCase.ReleaseChannel, installation.Channel)
+        => HasSupportCaseInstallTruth(supportCase)
+           && MatchesOptionalTruth(supportCase.ReleaseChannel, installation.Channel)
            && MatchesOptionalTruth(supportCase.ApplicationVersion, installation.Version)
            && MatchesOptionalTruth(supportCase.HeadId, installation.HeadId)
            && MatchesOptionalTruth(supportCase.Platform, installation.Platform)
@@ -360,7 +964,8 @@ public sealed class InstallLinkingController : ControllerBase
 
     private static bool MatchesClaimedInstallTruth(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
     {
-        if (string.IsNullOrWhiteSpace(supportCase.ReleaseChannel)
+        if (!HasInstallTruth(supportCase.ApplicationVersion, supportCase.ReleaseChannel)
+            || !string.Equals(supportCase.ApplicationVersion, installation.Version, StringComparison.OrdinalIgnoreCase)
             || !string.Equals(supportCase.ReleaseChannel, installation.Channel, StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -378,6 +983,22 @@ public sealed class InstallLinkingController : ControllerBase
 
         return hasInstallSpecificContext && hasDeviceSpecificContext;
     }
+
+    private static bool HasSupportCaseInstallTruth(SupportCaseProjection supportCase)
+        => HasInstallTruth(supportCase.ApplicationVersion, supportCase.ReleaseChannel)
+           && HasDeviceTruth(supportCase.HeadId, supportCase.Platform, supportCase.Arch);
+
+    private static bool HasInstallTruth(string? applicationVersion, string? releaseChannel)
+        => HasCompleteInstalledBuildTruth(applicationVersion, releaseChannel);
+
+    private static bool HasCompleteInstalledBuildTruth(string? applicationVersion, string? releaseChannel)
+        => !string.IsNullOrWhiteSpace(applicationVersion)
+           && !string.IsNullOrWhiteSpace(releaseChannel);
+
+    private static bool HasDeviceTruth(string? headId, string? platform, string? arch)
+        => !string.IsNullOrWhiteSpace(headId)
+           && !string.IsNullOrWhiteSpace(platform)
+           && !string.IsNullOrWhiteSpace(arch);
 
     private static bool MatchesOptionalInstallTruth(string? supportValue, string? installationValue, ref bool hasInstallSpecificContext)
     {
@@ -467,22 +1088,70 @@ public sealed class InstallLinkingController : ControllerBase
             ?? "Continue from this claimed desktop install; use support recovery only if this app reports a recovery state.";
     }
 
-    private static string BuildFallbackSupportHref(ClaimedInstallationDto installation)
-        => QueryHelpers.AddQueryString(
-            "/contact",
-            new Dictionary<string, string?>
-            {
-                ["kind"] = SupportCaseKinds.InstallHelp,
-                ["title"] = "Install help for claimed desktop install",
-                ["summary"] = "Install, update, rollback, or support follow-through needs help on this linked device.",
-                ["detail"] = "The desktop app requested continuation help from its claimed install rail.",
-                ["installationId"] = installation.InstallationId,
-                ["applicationVersion"] = installation.Version,
-                ["releaseChannel"] = installation.Channel,
-                ["headId"] = installation.HeadId,
-                ["platform"] = installation.Platform,
-                ["arch"] = installation.Arch
-            });
+    private static string BuildNativeContinuationPrimaryActionHref(
+        bool updateAvailable,
+        DesktopInstallSupportContinuationCase? leadSupportCase)
+    {
+        if (leadSupportCase is not null)
+        {
+            return BuildNativeSupportContinuationCaseActionHref(leadSupportCase);
+        }
+
+        return updateAvailable ? NativeUpdateHref : NativeContinuationHref;
+    }
+
+    private static string BuildNativeSupportContinuationCaseActionHref(DesktopInstallSupportContinuationCase item)
+    {
+        if (item.ReporterActionNeeded)
+        {
+            return NativeSupportHref;
+        }
+
+        if (item.NeedsInstallUpdate)
+        {
+            return NativeUpdateHref;
+        }
+
+        if (item.FixReadyOnLinkedInstall)
+        {
+            return NativeContinuationHref;
+        }
+
+        return NormalizeNativeInstallRailHref(item.PrimaryActionHref) ?? NativeContinuationHref;
+    }
+
+    private static string BuildNativeRollbackPlan(ClaimedInstallationDto installation, DownloadReceiptDto? receipt)
+    {
+        string receiptLabel = string.IsNullOrWhiteSpace(receipt?.ReceiptId)
+            ? "the installed build already linked to this grant"
+            : $"installed build receipt {receipt.ReceiptId}";
+        return $"Keep or restore {installation.Channel} {installation.Version} from {receiptLabel} on {NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)}, then refresh this grant-bound continuation rail before filing support.";
+    }
+
+    private static string BuildNativeUpdatePlan(
+        ClaimedInstallationDto installation,
+        PublicReleaseManifestDto manifest,
+        PublicReleaseArtifactDto? releaseArtifact,
+        DownloadReceiptDto? receipt,
+        bool updateAvailable)
+    {
+        string receiptLabel = string.IsNullOrWhiteSpace(receipt?.ReceiptId)
+            ? "the installed build already linked to this grant"
+            : $"installed build receipt {receipt.ReceiptId}";
+        string artifactLabel = string.IsNullOrWhiteSpace(releaseArtifact?.Id)
+            ? "the matching release artifact"
+            : releaseArtifact.Id;
+        string deviceLabel = $"{NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)}";
+        return updateAvailable
+            ? $"Update {deviceLabel} from {installation.Channel} {installation.Version} using {receiptLabel} to {manifest.Channel} {manifest.Version} via {artifactLabel}, then refresh this grant-bound continuation rail before support verification."
+            : $"Keep {deviceLabel} on {installation.Channel} {installation.Version} from {receiptLabel}; no newer matching release artifact is required, so refresh this grant-bound continuation rail before filing support.";
+    }
+
+    private static string BuildNativeRecoveryAction(
+        ClaimedInstallationDto installation,
+        DesktopInstallContinuationReceipt? continuation)
+        => continuation?.NextSafeAction
+           ?? $"Return {NormalizeResponseValue(installation.HeadId)} {NormalizeResponseValue(installation.Platform)} {NormalizeResponseValue(installation.Arch)} to the grant-bound continuation rail for recovery; claim-code and account browser links remain fallback context only.";
 
     private static PublicReleaseArtifactDto? ResolveBrowserCallbackArtifact(
         PublicReleaseManifestDto manifest,
@@ -553,7 +1222,21 @@ public sealed class InstallLinkingController : ControllerBase
                && System.Net.IPAddress.IsLoopback(address));
 
     private static bool IsAppLocalInstallLinkCallbackPath(string absolutePath)
-        => string.Equals(absolutePath, AppLocalInstallLinkCallbackPath, StringComparison.Ordinal);
+    {
+        if (string.IsNullOrWhiteSpace(absolutePath))
+        {
+            return false;
+        }
+
+        string normalizedPath = absolutePath.Trim();
+        while (normalizedPath.Length > AppLocalInstallLinkCallbackPath.Length
+               && normalizedPath.EndsWith("/", StringComparison.Ordinal))
+        {
+            normalizedPath = normalizedPath[..^1];
+        }
+
+        return string.Equals(normalizedPath, AppLocalInstallLinkCallbackPath, StringComparison.Ordinal);
+    }
 
     private static string BuildBrowserInstallCallbackRedirectUri(
         string callbackUri,
@@ -565,7 +1248,7 @@ public sealed class InstallLinkingController : ControllerBase
         string platform,
         string arch)
         => QueryHelpers.AddQueryString(
-            callbackUri,
+            StripReservedInstallLinkCallbackQuery(callbackUri),
             new Dictionary<string, string?>
             {
                 ["code"] = callbackCode,
@@ -578,6 +1261,34 @@ public sealed class InstallLinkingController : ControllerBase
                 ["installLinkMode"] = "browser_callback",
                 ["installLinkTransport"] = "grant_callback"
             });
+
+    private static string StripReservedInstallLinkCallbackQuery(string callbackUri)
+    {
+        if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed) || string.IsNullOrEmpty(parsed.Query))
+        {
+            return callbackUri;
+        }
+
+        var preservedQuery = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in QueryHelpers.ParseQuery(parsed.Query))
+        {
+            if (InstallLinkCallbackReservedQueryKeys.Contains(item.Key))
+            {
+                continue;
+            }
+
+            preservedQuery[item.Key] = item.Value.ToString();
+        }
+
+        var builder = new UriBuilder(parsed)
+        {
+            Query = string.Empty
+        };
+        string baseUri = builder.Uri.ToString();
+        return preservedQuery.Count == 0
+            ? baseUri
+            : QueryHelpers.AddQueryString(baseUri, preservedQuery);
+    }
 
     private static string NormalizeResponseValue(string? value)
         => string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
@@ -603,11 +1314,102 @@ public sealed record DesktopInstallNativeContinuationResponse(
     string FallbackPosture,
     bool UpdateAvailable,
     string NextSafeAction,
+    string NativePrimaryActionHref,
     string UpdateAction,
     string RollbackAction,
     string SupportHref,
+    string NativeUpdateHref,
+    string NativeSupportHref,
+    string NativeRollbackHref,
+    string NativeRecoveryHref,
+    string RecoveryAction,
     string SupportContinuation,
     IReadOnlyList<DesktopInstallSupportContinuationCase> SupportCases);
+
+public sealed record DesktopInstallNativeSupportRequest(
+    string InstallationId,
+    string AccessToken,
+    string? Title = null,
+    string? Summary = null,
+    string? Detail = null,
+    string? ReporterEmail = null,
+    string? RequestedActionHref = null);
+
+public sealed record DesktopInstallNativeSupportResponse(
+    string CaseId,
+    string InstallationId,
+    string ApplicationVersion,
+    string ReleaseChannel,
+    string HeadId,
+    string Platform,
+    string Arch,
+    string StatusLabel,
+    string StageLabel,
+    string NextSafeAction,
+    string PrimaryActionHref,
+    string AccountSupportHref,
+    string NativeSupportHref,
+    string NativeContinuationHref,
+    string NativeUpdateHref,
+    string NativeRollbackHref,
+    string NativeRecoveryHref,
+    string? InstalledBuildReceiptId,
+    string CurrentReleaseVersion,
+    string CurrentReleaseChannel,
+    string? CurrentArtifactId,
+    string FallbackPosture,
+    bool UpdateAvailable,
+    string UpdateAction,
+    string RollbackAction,
+    string RecoveryAction);
+
+public sealed record DesktopInstallNativeUpdateResponse(
+    string InstallationId,
+    string ArtifactId,
+    string ApplicationVersion,
+    string ReleaseChannel,
+    string HeadId,
+    string Platform,
+    string Arch,
+    string? InstalledBuildReceiptId,
+    string CurrentReleaseVersion,
+    string CurrentReleaseChannel,
+    string? CurrentArtifactId,
+    bool UpdateAvailable,
+    string UpdatePlan,
+    string UpdateAction,
+    string NativePrimaryActionHref,
+    string SupportHref,
+    string NativeContinuationHref,
+    string NativeSupportHref,
+    string NativeRollbackHref,
+    string NativeRecoveryHref,
+    string FallbackPosture,
+    string RecoveryAction);
+
+public sealed record DesktopInstallNativeRollbackResponse(
+    string InstallationId,
+    string ArtifactId,
+    string ApplicationVersion,
+    string ReleaseChannel,
+    string HeadId,
+    string Platform,
+    string Arch,
+    string? InstalledBuildReceiptId,
+    string CurrentReleaseVersion,
+    string CurrentReleaseChannel,
+    string? CurrentArtifactId,
+    bool UpdateAvailable,
+    string RollbackPlan,
+    string RollbackAction,
+    string NativePrimaryActionHref,
+    string SupportHref,
+    string NativeContinuationHref,
+    string NativeUpdateHref,
+    string NativeSupportHref,
+    string NativeRecoveryHref,
+    string FallbackPosture,
+    string RecoveryAction);
 
 public sealed record DesktopInstallSupportContinuationCase(
     string CaseId,
@@ -627,4 +1429,17 @@ public sealed record DesktopInstallSupportContinuationCase(
     bool ReporterActionNeeded,
     bool FixReadyOnLinkedInstall,
     bool NeedsInstallUpdate,
-    bool NeedsLinkedInstall);
+    bool NeedsLinkedInstall,
+    string CurrentReleaseVersion,
+    string CurrentReleaseChannel,
+    string? CurrentArtifactId,
+    string FallbackPosture,
+    bool UpdateAvailable,
+    string UpdateAction,
+    string RollbackAction,
+    string NativeContinuationHref,
+    string NativeSupportHref,
+    string NativeUpdateHref,
+    string NativeRollbackHref,
+    string NativeRecoveryHref,
+    string RecoveryAction);

@@ -274,8 +274,8 @@
                 <article class="app-action-card">
                     <span class="tag">Current release</span>
                     <h2>Use the current preview</h2>
-                    <p>See what changed, what is working today, and whether the current release is the right moment to install or update.</p>
-                    <a class="button-like button-like--secondary" href="/now">Open current release</a>
+                    <p>See what changed, what is working today, and whether now is the right moment to install or update.</p>
+                    <a class="button-like button-like--secondary" href="/now">Open what works today</a>
                 </article>
                 <article class="app-action-card">
                     <span class="tag">Devices &amp; access</span>
@@ -362,7 +362,7 @@
                                                     <h3>Use the current preview</h3>
                                                     <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
                                                 </div>
-                                                <a class="inline-link" href="/now">Open current release</a>
+                                                <a class="inline-link" href="/now">Open what works today</a>
                                             </article>
                                             <article class="app-rail__item">
                                                 <span class="tag">Device state</span>
@@ -675,7 +675,7 @@
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.TrustBand))
                                                                     {
                                                                         <span> Trust ranking: @HumanizeStatus(leadAftermathShelfEntry.TrustBand, "Draft").</span>
-                                                                        <span> Discoverable now: @(leadAftermathShelfEntry.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                                        <span> Available now: @(leadAftermathShelfEntry.Discoverable ? "Eligible now" : "Still bounded").</span>
                                                                     }
                                                                     @if (!string.IsNullOrWhiteSpace(leadAftermathShelfEntry.PublicationSummary))
                                                                     {
@@ -1150,7 +1150,7 @@
                                                             {
                                                                 <span> Lineage: @publication.LineageSummary</span>
                                                             }
-                                                            <span>Discoverable now: @(publication.Discoverable ? "Eligible now" : "Still bounded").</span>
+                                                            <span>Available now: @(publication.Discoverable ? "Eligible now" : "Still bounded").</span>
                                                             <span>State: @HumanizeStatus(publication.PublicationStatus, "Published").</span>
                                                             @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
                                                             {

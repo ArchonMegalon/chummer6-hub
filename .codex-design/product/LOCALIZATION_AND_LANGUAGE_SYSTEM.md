@@ -47,6 +47,10 @@ Rules, catalog, and data-facing labels that historically came from the Chummer l
 
 User-visible generated output that leaves the immediate UI shell, such as exported sheets, visible update/help packets, or bounded release/support projections.
 
+### Companion runtime text
+
+First-party companion barks, action chips, evidence-drawer labels, voice opt-in copy, and rare scene fallback text that render inside desktop or mobile runtime surfaces.
+
 ## Authoring source
 
 The carried XML language corpus remains the translation authoring source for the current desktop wave.
@@ -68,6 +72,9 @@ Phase 1 runtime language behavior is intentionally boring:
 * unsupported or malformed locale codes fall back to `en-US`
 * numbers, dates, and similar culture-sensitive formatting follow the chosen locale when supported
 * missing keys must not silently create mixed-language public surfaces
+* companion text, chips, evidence drawers, and voice-mode affordances must resolve in the chosen locale
+* if EA compile output, a companion locale pack, or a media attachment is unavailable, runtime falls back to the first-party local template for that locale and then to `en-US`
+* denied or unavailable microphone access keeps the same localized text-first path instead of hiding actions or surfacing ad hoc English prompts
 
 If a locale or string is unavailable, the product must fall back deterministically to `en-US` instead of rendering ad hoc partial state.
 
@@ -80,6 +87,7 @@ That means:
 * critical install, update, support, and settings surfaces must surface missing-key diagnostics in development and release gating
 * explain and receipt text may degrade to the canonical fallback string only when the product can still remain honest about what happened
 * public-facing trust, install, and support surfaces must not silently blend untranslated and translated strings in ways that look complete when they are not
+* companion runtime may not wait on EA compile, media lanes, or speech services; it must render the first-party fallback copy or stay silent when the trigger is no longer relevant
 
 ## Support-critical scope
 
@@ -89,11 +97,13 @@ The following surfaces are first-class localization scope from day one of the de
 
 * downloads and install guidance
 * first-launch claim and account-aware install linking
+* first-run companion greeting and voice opt-in prompt
 * update status and release posture
 * crash capture and recovery
 * bug reporting
 * lightweight feedback
 * support status and closure messaging
+* restore-conflict, campaign-drift, and fix-confirmation companion moments
 
 If those surfaces remain English-only while the rest of the app looks translated, the product trust loop is not actually localized.
 
@@ -104,7 +114,8 @@ Localization readiness requires:
 * pseudo-localization coverage for desktop chrome
 * missing-key fail-fast checks in release validation
 * screenshot or visual overflow checks for top desktop surfaces
-* locale smoke tests for first launch, settings, build sheet, explain panel, updater surfaces, and support dialogs
+* locale smoke tests for first launch, companion cards, settings, build sheet, explain panel, updater surfaces, and support dialogs
+* voice-opt-in fallback smoke proving the companion stays truthful when microphone permission is denied or when EA/media lanes are unavailable
 * at least one generated-artifact smoke in a non-English locale
 
 ## Current phase rule
@@ -117,4 +128,5 @@ The quality bar is:
 * deterministic fallback
 * restart-safe language changes
 * localized install/update/support surfaces
+* localized companion runtime copy with deterministic text-only fallback
 * release gating that proves the localization system is not drifting silently

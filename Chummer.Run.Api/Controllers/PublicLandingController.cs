@@ -120,13 +120,13 @@ public sealed class PublicLandingController : Controller
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
-        var manifestPrimaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase));
         var secondaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "secondary", StringComparison.OrdinalIgnoreCase))
             ?? surface.HeroCtas.Skip(1).FirstOrDefault()
             ?? new PublicLandingActionDto("See what works today", "/now", "secondary");
-        var primaryHeroAction = !authenticated && manifestPrimaryHeroAction is not null
-            ? manifestPrimaryHeroAction
-            : _releaseSelection.BuildPublicPrimaryAction(manifest, authenticated);
+        var primaryHeroAction = _releaseSelection.BuildPublicPrimaryAction(
+            manifest,
+            Request.Headers.UserAgent.ToString(),
+            authenticated);
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
@@ -223,6 +223,7 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var windowsProofInstallers = _windowsProofInstallers.LoadCatalog();
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var model = new DownloadsPageViewModel(
@@ -231,6 +232,7 @@ public sealed class PublicLandingController : Controller
             Assets: new AssetCatalogViewModel(surface.Assets),
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
+            WindowsProofInstallers: windowsProofInstallers,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
@@ -248,19 +250,29 @@ public sealed class PublicLandingController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var ticket = _releaseUploadTickets.Issue(subject);
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
-            string bootstrapUrl = BuildAbsoluteUrl(
-                "/downloads/release-upload/bootstrap.sh",
-                QueryString.Create("ticket", ticket.Ticket));
-            string command = BuildReleaseUploadBootstrapCommand(bootstrapUrl);
+            string webRoot = _webHostEnvironment.WebRootPath
+                ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+            string templatePath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+            if (!System.IO.File.Exists(templatePath))
+            {
+                return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
+            }
+
+            string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
+            string renderedBootstrap = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath));
+            string command = BuildReleaseUploadBootstrapCommand(
+                bootstrapUrl,
+                ComputeSha256Hex(renderedBootstrap));
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     "Release upload handoff",
-                    "Mint a short-lived upload ticket and hand a zero-touch bootstrap command to the Mac or Windows release runner.",
+                    "Mint a short-lived upload handoff code and hand a digest-pinned bootstrap command to the Mac or Windows release runner.",
                     currentPath,
                     user.DisplayName),
                 Heading: "Signed-in release upload handoff",
-                Summary: "This page mints a short-lived upload ticket, bakes it into the bootstrap command, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
+                Summary: "This page mints a short-lived upload handoff code, keeps it off the command line, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
                 Command: command,
+                HandoffCode: ticket.Ticket,
                 BootstrapUrl: bootstrapUrl,
                 TicketExpiresAtUtc: ticket.Claims.ExpiresAtUtc,
                 UploadUrl: BuildAbsoluteUrl("/api/internal/releases/bundles"),
@@ -286,11 +298,6 @@ public sealed class PublicLandingController : Controller
     [Produces("text/x-shellscript", "application/problem+json")]
     public IActionResult ReleaseUploadBootstrapScript([FromQuery] string? ticket, [FromQuery] string? apiToken)
     {
-        if (!TryResolveReleaseUploadToken(ticket, apiToken, out string? uploadToken))
-        {
-            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "release upload ticket is missing, expired, or invalid.");
-        }
-
         string webRoot = _webHostEnvironment.WebRootPath
             ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
         string templatePath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
@@ -299,42 +306,9 @@ public sealed class PublicLandingController : Controller
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
         }
 
-        string rendered = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath), uploadToken!);
+        string rendered = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath));
+        Response.Headers["Cache-Control"] = "private, no-store";
         return Content(rendered, "text/x-shellscript; charset=utf-8", Encoding.UTF8);
-    }
-
-    private bool TryResolveReleaseUploadToken(string? ticket, string? apiToken, out string? uploadToken)
-    {
-        if (_releaseUploadTickets.TryValidate(ticket, out _))
-        {
-            uploadToken = ticket;
-            return true;
-        }
-
-        if (IsConfiguredApiToken(apiToken))
-        {
-            uploadToken = apiToken;
-            return true;
-        }
-
-        uploadToken = null;
-        return false;
-    }
-
-    private bool IsConfiguredApiToken(string? token)
-    {
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            return false;
-        }
-
-        string configuredToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(configuredToken))
-        {
-            return false;
-        }
-
-        return FixedTimeEquals(token.Trim(), configuredToken);
     }
 
     private static bool FixedTimeEquals(string left, string right)
@@ -488,7 +462,7 @@ public sealed class PublicLandingController : Controller
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return Redirect($"/login?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}");
+            return Redirect($"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}");
         }
         catch (HubRequestAuthException ex)
         {
@@ -505,8 +479,8 @@ public sealed class PublicLandingController : Controller
     {
         bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
-            "Windows proof installer",
-            "Proof-only Windows installer handoff while the promoted Windows shelf is still waiting on current startup-smoke evidence.",
+            "Windows preview build",
+            "Current Windows preview installer while the main Windows shelf catches up to this build.",
             $"/downloads/install/{artifactId}",
             cancellationToken);
         var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
@@ -515,14 +489,14 @@ public sealed class PublicLandingController : Controller
             : "Avalonia Desktop";
         var model = new DownloadDispatchPageViewModel(
             Chrome: chrome,
-            Eyebrow: "Windows proof install",
+            Eyebrow: "Windows preview build",
             Heading: $"{headLabel} Windows setup",
-            Summary: "This Windows installer is available on the proof rail. It is downloadable from chummer.run, but it is not yet on the promoted public shelf.",
-            DispatchNote: "Use this when you need the current Windows build directly. Promotion is still blocked on current Windows startup-smoke evidence, so this route stays explicitly proof-only.",
+            Summary: "This Windows installer is available as the current preview build. It is downloadable from chummer.run, but it is not yet on the main Windows shelf.",
+            DispatchNote: "Use this when you need the current Windows build directly. It stays on this preview route until it moves onto the main Windows shelf.",
             ArtifactTitle: $"{headLabel} Windows x64 installer",
-            ArtifactSupportLine: "Proof-only Windows installer. Treat it as the current validation build, not the promoted release rail.",
+            ArtifactSupportLine: "Windows preview installer. Treat it as the current preview build, not the main Windows shelf.",
             DownloadHref: $"/downloads/install/{Uri.EscapeDataString(artifactId)}/proof",
-            DownloadLabel: "Download proof installer",
+            DownloadLabel: "Download preview installer",
             TerminalInstallCommand: null,
             BootstrapCommandLabel: null,
             BootstrapCommandIntro: null,
@@ -534,7 +508,7 @@ public sealed class PublicLandingController : Controller
             BootstrapScriptDownload: false,
             PromoteSecondaryDownload: false,
             SecondaryDownloadHref: proofInstaller.DownloadUrl,
-            SecondaryDownloadLabel: "Direct proof file",
+            SecondaryDownloadLabel: "Direct preview file",
             AccountHref: "/downloads",
             AccountLabel: "Back to downloads",
             HelpHref: release.InstallHelpHref,
@@ -544,9 +518,9 @@ public sealed class PublicLandingController : Controller
                 new Dictionary<string, string?>
                 {
                     ["kind"] = SupportCaseKinds.InstallHelp,
-                    ["title"] = $"{headLabel} Windows proof install help",
-                    ["summary"] = "Proof-lane Windows installer needs help on this device.",
-                    ["detail"] = "The proof-only Windows installer path needs help on this device. Keep support on the same install rail.",
+                    ["title"] = $"{headLabel} Windows preview install help",
+                    ["summary"] = "Windows preview installer needs help on this device.",
+                    ["detail"] = "The Windows preview installer path needs help on this device. Keep support on the same install rail.",
                     ["applicationVersion"] = manifest.Version,
                     ["releaseChannel"] = manifest.Channel,
                     ["headId"] = proofInstaller.Head,
@@ -557,7 +531,7 @@ public sealed class PublicLandingController : Controller
             Display: release.Display,
             Channel: manifest.Channel,
             Version: manifest.Version,
-            CurrentReleaseSummary: "Windows is on the proof rail; macOS remains the promoted signed-in preview route.",
+            CurrentReleaseSummary: "Windows stays on the preview track here; macOS remains the main signed-in preview route.",
             PlatformLabel: "Windows x64",
             HeadLabel: headLabel,
             ClaimExchangeUrl: null,
@@ -565,9 +539,9 @@ public sealed class PublicLandingController : Controller
             ClaimCodeExpiresAtUtc: null,
             Steps:
             [
-                "Download the proof-only installer directly from this page.",
+                "Download the preview installer directly from this page.",
                 "Install and validate the current Windows build.",
-                "Use the install-help and support surfaces if you hit proof-only regressions."
+                "Use install help and support if you hit preview-only regressions."
             ],
             TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, release, cancellationToken));
@@ -816,7 +790,7 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var cards = _landing.CardsForBucket(surface, "participate");
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in guided contribution path.", "/participate", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in Codex path that uses your OpenAI account in ChatGPT.", "/participate", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         var model = new ParticipatePageViewModel(
@@ -894,6 +868,16 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
     }
 
+    [HttpGet("/artifacts/release-bundles/{releaseArtifactId}")]
+    [Produces("application/json")]
+    public IActionResult ReleaseArtifactBundleProof([FromRoute] string releaseArtifactId)
+        => BuildReleaseArtifactBundleProof(releaseArtifactId, requestedFormat: null);
+
+    [HttpGet("/artifacts/release-bundles/{releaseArtifactId}/{format}")]
+    [Produces("application/json")]
+    public IActionResult ReleaseArtifactBundleOutputProof([FromRoute] string releaseArtifactId, [FromRoute] string format)
+        => BuildReleaseArtifactBundleProof(releaseArtifactId, format);
+
     [HttpGet("/artifacts/creator/{publicationId}")]
     public IActionResult CreatorPublicationDetailCompatibilityRedirect([FromRoute] string publicationId)
         => LocalRedirect($"/artifacts/publications/{Uri.EscapeDataString(publicationId)}");
@@ -919,6 +903,80 @@ public sealed class PublicLandingController : Controller
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/PublicCreatorPublication.cshtml", model);
+    }
+
+    private IActionResult BuildReleaseArtifactBundleProof(string releaseArtifactId, string? requestedFormat)
+    {
+        PublicReleaseArtifactDto? artifact = _releases.FindDownload(releaseArtifactId);
+        if (artifact is null)
+        {
+            return NotFound();
+        }
+
+        string artifactId = artifact.Id.Trim();
+        string bundleRef = $"/artifacts/release-bundles/{Uri.EscapeDataString(artifactId)}";
+        string installRef = $"/downloads/install/{Uri.EscapeDataString(artifactId)}";
+        string? normalizedFormat = NormalizeArtifactFactoryOutputFormat(requestedFormat);
+        if (requestedFormat is not null && normalizedFormat is null)
+        {
+            return BadRequest(new
+            {
+                contractName = "chummer.run.public_proof_shelf.release_bundle.v1",
+                releaseArtifactId = artifactId,
+                rejectedFormat = requestedFormat,
+                allowedFormats = ArtifactFactoryOrchestrationService.GetReleaseBundleFormats()
+            });
+        }
+
+        Dictionary<string, string> outputRefs = ArtifactFactoryOrchestrationService.GetReleaseBundleFormats()
+            .ToDictionary(
+                static format => format,
+                format => $"{bundleRef}/{Uri.EscapeDataString(format)}",
+                StringComparer.OrdinalIgnoreCase);
+
+        return Ok(new
+        {
+            contractName = "chummer.run.public_proof_shelf.release_bundle.v1",
+            releaseArtifactId = artifactId,
+            state = "published",
+            publicProofShelfRef = normalizedFormat is null ? bundleRef : outputRefs[normalizedFormat],
+            releaseBundleRef = bundleRef,
+            canonicalInstallRef = installRef,
+            requestedFormat = normalizedFormat,
+            outputRefs,
+            requiredReceiptRefs = new[]
+            {
+                $"release:{artifactId}",
+                $"public-shelf:{installRef}",
+                $"public-shelf:{bundleRef}"
+            },
+            artifact = new
+            {
+                artifact.Id,
+                artifact.Head,
+                artifact.Platform,
+                artifact.PlatformId,
+                artifact.Arch,
+                artifact.Kind,
+                artifact.FileName,
+                artifact.Sha256,
+                artifact.SizeBytes,
+                artifact.InstallAccessClass
+            }
+        });
+    }
+
+    private static string? NormalizeArtifactFactoryOutputFormat(string? format)
+    {
+        if (string.IsNullOrWhiteSpace(format))
+        {
+            return null;
+        }
+
+        string normalized = format.Trim().Replace('-', '_').ToLowerInvariant();
+        return ArtifactFactoryOrchestrationService.GetReleaseBundleFormats().Contains(normalized, StringComparer.OrdinalIgnoreCase)
+            ? normalized
+            : null;
     }
 
     [HttpGet("/help")]
@@ -1192,7 +1250,7 @@ public sealed class PublicLandingController : Controller
             SupportCaseSummaries: supportCaseSummaries,
             CampaignSpine: campaignSpine,
             LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
-            PrimaryAction: BuildHomePrimaryAction(experience, campaignSpine, installLinking),
+            PrimaryAction: BuildHomePrimaryAction(experience, campaignSpine, installLinking, releaseExperience),
             SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
             NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
             HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));
@@ -1270,7 +1328,8 @@ public sealed class PublicLandingController : Controller
     private static HomePrimaryActionViewModel BuildHomePrimaryAction(
         HubUserExperienceDto experience,
         AccountCampaignSummary campaignSpine,
-        InstallLinkingSummaryDto installLinking)
+        InstallLinkingSummaryDto installLinking,
+        ReleaseExperienceViewModel releaseExperience)
     {
         if (!experience.OnboardingCompleted)
         {
@@ -1301,12 +1360,14 @@ public sealed class PublicLandingController : Controller
 
         if ((installLinking.ClaimedInstallations?.Count ?? 0) == 0 && installLinking.RecentReceipts.Count == 0 && installLinking.PendingClaimTickets.Count == 0)
         {
+            var installActionLabel = releaseExperience.Recommended?.ActionLabel ?? "Open downloads";
+            var installActionHref = releaseExperience.Recommended?.DispatchHref ?? "/downloads";
             return new HomePrimaryActionViewModel(
                 "Install",
-                "Get the preview build",
+                "Install Chummer",
                 "Start with the recommended installer, then come back here when you want to link the installed copy to this account.",
-                "Open downloads",
-                "/downloads",
+                installActionLabel,
+                installActionHref,
                 "primary");
         }
 
@@ -2814,15 +2875,25 @@ public sealed class PublicLandingController : Controller
         ReleaseExperienceViewModel releaseExperience,
         bool rebindSignIn)
     {
-        if (chrome.Authenticated || releaseExperience.Recommended?.RequiresAccount != true)
+        if (chrome.Authenticated || releaseExperience.Recommended is null)
         {
             return chrome;
         }
 
+        var requiresAccount = releaseExperience.Recommended.RequiresAccount;
+        var primaryHref = requiresAccount
+            ? releaseExperience.GuestGatePrimaryHref
+            : releaseExperience.Recommended.DispatchHref;
+        var primaryLabel = requiresAccount
+            ? releaseExperience.GuestGatePrimaryLabel
+            : releaseExperience.Recommended.ActionLabel;
+
         var reboundActions = chrome.HeaderActions
             .Select(action =>
             {
-                if (rebindSignIn && string.Equals(action.Label, "Sign in", StringComparison.OrdinalIgnoreCase))
+                if (rebindSignIn
+                    && requiresAccount
+                    && string.Equals(action.Label, "Sign in", StringComparison.OrdinalIgnoreCase))
                 {
                     return action with
                     {
@@ -2837,7 +2908,8 @@ public sealed class PublicLandingController : Controller
                 {
                     return action with
                     {
-                        Href = releaseExperience.GuestGatePrimaryHref,
+                        Label = primaryLabel,
+                        Href = primaryHref,
                         Current = false
                     };
                 }
@@ -2849,7 +2921,8 @@ public sealed class PublicLandingController : Controller
         var reboundPublicPrimaryCta = chrome.PublicPrimaryCta is not null
             ? chrome.PublicPrimaryCta with
             {
-                Href = releaseExperience.GuestGatePrimaryHref,
+                Label = primaryLabel,
+                Href = primaryHref,
                 Current = false
             }
             : null;
@@ -3958,7 +4031,7 @@ public sealed class PublicLandingController : Controller
             }
             catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
             {
-                return (null, Redirect($"/login?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}"));
+                return (null, Redirect($"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}"));
             }
             catch (HubRequestAuthException ex)
             {
@@ -5535,7 +5608,7 @@ echo "Help: ${HELP_URL}"
     private static string EscapePowerShellSingleQuoted(string value)
         => value.Replace("'", "''", StringComparison.Ordinal);
 
-    private static string RenderReleaseUploadBootstrapScript(string template, string ticket)
+    private static string RenderReleaseUploadBootstrapScript(string template)
     {
         string scriptBody = template.StartsWith("#!/usr/bin/env bash", StringComparison.Ordinal)
             ? template["#!/usr/bin/env bash".Length..].TrimStart('\r', '\n')
@@ -5543,15 +5616,10 @@ echo "Help: ${HELP_URL}"
         StringBuilder builder = new();
         builder.AppendLine("#!/usr/bin/env bash");
         builder.AppendLine("# Signed-in release upload always targets the live chummer.run shelf.");
-        builder.Append("export CHUMMER_RELEASE_UPLOAD_TOKEN='")
-            .Append(SingleQuoteShellLiteral(ticket))
-            .AppendLine("'");
         builder.AppendLine("export CHUMMER_RELEASE_PUBLISH_MODE='http'");
         builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"");
         builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=\"https://chummer.run/api/internal/releases/upload-sessions\"");
         builder.AppendLine("export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'");
-        builder.AppendLine("export CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH='https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json'");
-        builder.AppendLine("export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH='https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json'");
         builder.AppendLine(scriptBody);
         return builder.ToString();
     }
@@ -5562,7 +5630,7 @@ echo "Help: ${HELP_URL}"
     private static string SingleQuoteShellLiteral(string value)
         => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
 
-    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl)
+    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl, string bootstrapSha256)
     {
         return "set -euo pipefail; " +
             "export CHUMMER_RELEASE_CHANNEL='preview'; " +
@@ -5571,8 +5639,17 @@ echo "Help: ${HELP_URL}"
             "export CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4'; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
             "trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
-            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; check authentication, channel, and ticket freshness.' >&2; exit 1; }; " +
+            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
+            "ACTUAL_BOOTSTRAP_SHA256=\"$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \"$TMP_BOOTSTRAP_SCRIPT\")\"; " +
+            "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
+            "export CHUMMER_BOOTSTRAP_EXPECTED_SHA256=" + SingleQuoteShellValue(bootstrapSha256) + "; " +
             "bash \"$TMP_BOOTSTRAP_SCRIPT\"";
+    }
+
+    private static string ComputeSha256Hex(string value)
+    {
+        byte[] bytes = Encoding.UTF8.GetBytes(value);
+        return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
 
     internal sealed record MacInstallBootstrapArtifact(

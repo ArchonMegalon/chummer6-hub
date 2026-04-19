@@ -5,8 +5,8 @@
     ViewData["SurfaceClass"] = "surface-horizons";
     var groups = new[]
     {
-        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current proof shelf and the next release-adjacent work." },
-        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need proof work before they belong on the live shelf." },
+        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current preview and the next release-adjacent work." },
+        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need more implementation before they belong on the live shelf." },
         new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research track", Intro = "These are worth following early, but they are not current-preview promises yet." }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -23,17 +23,15 @@
     </div>
 </section>
 
+@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
 @if (Model.SignedInStatus is not null)
 {
     @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
 }
-
 @if (Model.TrustPulse is not null)
 {
     @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
-
-@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
 
 @foreach (var group in groups)
 {
@@ -89,7 +87,7 @@
                             @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
                             {
                                 <div>
-                                    <span class="horizon-band__label">Related proof now</span>
+                                    <span class="horizon-band__label">Related live surface now</span>
                                     <p>@card.Card.ProofNote</p>
                                 </div>
                             }

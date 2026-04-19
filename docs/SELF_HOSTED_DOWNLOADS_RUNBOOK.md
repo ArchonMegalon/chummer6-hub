@@ -79,11 +79,19 @@ Repository variables:
 
 Required live sequence:
 1. Deploy the updated public edge app first so the proof routes exist:
-`docker compose --env-file .env -f docker-compose.public-edge.yml up -d --build chummer-portal`
+`docker compose --env-file .env -p chummer6-hub -f docker-compose.public-edge.yml up -d --build chummer-portal`
 2. Rebuild the current unified shelf bundle:
 `bash scripts/materialize-public-downloads-bundle.sh`
 3. Upload the rebuilt bundle to the live shelf:
 `CHUMMER_RELEASE_UPLOAD_TOKEN=<ticket-or-token> RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
+
+Mac release bootstrap note:
+1. The hosted mac bootstrap now defaults temporary packaging work to the run workspace and exports:
+`CHUMMER_MAC_RELEASE_TMPDIR="$work_root/tmp"`
+`CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"`
+2. Override `CHUMMER_MAC_RELEASE_TMPDIR` when the default workspace volume is not the right SSD for `hdiutil` temp work.
+3. Override `CHUMMER_DESKTOP_INSTALLER_TMPDIR` separately only when installer-image temp files must live on a different volume.
+4. If a release ticket still fails with `hdiutil: create failed - No space left on device`, point `CHUMMER_MAC_RELEASE_TMPDIR` at a workspace-backed path on the target SSD and clear unneeded old `run-*` directories under the same parent before rerunning.
 
 Dry run:
 1. `CHUMMER_RELEASE_UPLOAD_DRY_RUN=1 RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
