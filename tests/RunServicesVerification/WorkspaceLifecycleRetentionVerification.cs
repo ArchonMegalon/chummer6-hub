@@ -14,6 +14,7 @@ internal static class WorkspaceLifecycleRetentionVerification
         VerifyWorkspaceRetentionRunbook();
         VerifyExpiredRestoreSummariesArePrunedAndRegenerated();
         VerifyUnchangedRestoreProjectionPreservesReceiptObservationTimestamps();
+        VerifyDuplicateSemanticReceiptsPreserveEarliestObservationTimestamps();
         return Task.CompletedTask;
     }
 
@@ -265,6 +266,99 @@ internal static class WorkspaceLifecycleRetentionVerification
             existing.ConflictReceipts![2].ObservedAtUtc.ToString("O"),
             rotatedFinalized.ConflictReceipts![2].ObservedAtUtc.ToString("O"),
             "Restore projections should preserve conflict receipt observation timestamps when source receipt ids rotate but semantic identity is stable.");
+    }
+
+    private static void VerifyDuplicateSemanticReceiptsPreserveEarliestObservationTimestamps()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_WORKSPACE_RESTORE_RETENTION_DAYS"] = "30"
+            })
+            .Build();
+
+        WorkspaceLifecyclePolicyService lifecycle = new(configuration);
+        DateTimeOffset generatedAtUtc = DateTimeOffset.UtcNow.AddHours(-6);
+        DateTimeOffset earliestObservedAtUtc = generatedAtUtc.AddMinutes(2);
+        DateTimeOffset laterObservedAtUtc = generatedAtUtc.AddMinutes(9);
+
+        WorkspaceRestoreProjection existing = BuildRestoreProjection("usr_duplicate_receipts", generatedAtUtc) with
+        {
+            ProvenanceReceipts =
+            [
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: "restore-provenance:duplicate:newer",
+                    Kind: "entitlement_replication_stale_claim",
+                    SubjectId: "grant-duplicate",
+                    Surface: "entitlement_sync",
+                    Summary: "Later duplicate entitlement provenance receipt.",
+                    Proof: "grant-duplicate",
+                    ObservedAtUtc: laterObservedAtUtc),
+                new WorkspaceRestoreProvenanceReceipt(
+                    ReceiptId: "restore-provenance:duplicate:earlier",
+                    Kind: "entitlement_replication_stale_claim",
+                    SubjectId: "grant-duplicate",
+                    Surface: "entitlement_sync",
+                    Summary: "Earlier duplicate entitlement provenance receipt.",
+                    Proof: "grant-duplicate",
+                    ObservedAtUtc: earliestObservedAtUtc)
+            ],
+            ConflictReceipts =
+            [
+                new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: "restore-conflict:duplicate:newer",
+                    Severity: "blocking",
+                    Kind: "entitlement_replication_duplicate_grant",
+                    SubjectId: "grant-duplicate",
+                    Summary: "Later duplicate entitlement conflict receipt.",
+                    Resolution: "Refresh entitlement replication before continuing.",
+                    ObservedAtUtc: laterObservedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true),
+                new WorkspaceRestoreConflictReceipt(
+                    ReceiptId: "restore-conflict:duplicate:earlier",
+                    Severity: "blocking",
+                    Kind: "entitlement_replication_duplicate_grant",
+                    SubjectId: "grant-duplicate",
+                    Summary: "Earlier duplicate entitlement conflict receipt.",
+                    Resolution: "Refresh entitlement replication before continuing.",
+                    ObservedAtUtc: earliestObservedAtUtc,
+                    Surface: "entitlement_sync",
+                    BlocksContinue: true)
+            ]
+        };
+
+        WorkspaceRestoreProjection candidate = existing with
+        {
+            GeneratedAtUtc = DateTimeOffset.UtcNow,
+            ProvenanceReceipts =
+            [
+                existing.ProvenanceReceipts![0] with
+                {
+                    ReceiptId = "restore-provenance:duplicate:current",
+                    ObservedAtUtc = DateTimeOffset.UtcNow
+                }
+            ],
+            ConflictReceipts =
+            [
+                existing.ConflictReceipts![0] with
+                {
+                    ReceiptId = "restore-conflict:duplicate:current",
+                    ObservedAtUtc = DateTimeOffset.UtcNow
+                }
+            ]
+        };
+
+        WorkspaceRestoreProjection finalized = lifecycle.FinalizeRestoreProjection(existing, candidate, DateTimeOffset.UtcNow);
+
+        VerificationAssert.Equal(
+            earliestObservedAtUtc.ToString("O"),
+            finalized.ProvenanceReceipts![0].ObservedAtUtc.ToString("O"),
+            "Duplicate semantic provenance receipts should preserve the earliest known observation timestamp instead of depending on existing list order.");
+        VerificationAssert.Equal(
+            earliestObservedAtUtc.ToString("O"),
+            finalized.ConflictReceipts![0].ObservedAtUtc.ToString("O"),
+            "Duplicate semantic conflict receipts should preserve the earliest known observation timestamp instead of depending on existing list order.");
     }
 
     private static string ResolveRepoRoot()

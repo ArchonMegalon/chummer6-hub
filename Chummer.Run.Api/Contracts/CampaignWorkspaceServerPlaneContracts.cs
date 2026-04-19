@@ -31,13 +31,21 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     NextSessionCarryForwardProjection? NextSessionCarryForward,
     NextSafeActionCue NextSafeAction,
     WorkspaceRestoreReceiptStatusProjection RestoreReceiptStatus,
+    IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> RestoreReceiptSurfaces,
     IReadOnlyList<WorkspaceRestoreProvenanceReceipt> RestoreProvenanceReceipts,
     IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> RestoreProvenanceRecoveryReceipts,
     IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> RestoreConflictReceipts,
     DateTimeOffset GeneratedAtUtc);
 
+public sealed record WorkspaceRestoreReceiptSurfaceProjection(
+    string Surface,
+    string Label,
+    WorkspaceRestoreReceiptStatusProjection Status);
+
 public sealed record WorkspaceRestoreReceiptStatusProjection(
     string Summary,
+    string ProvenanceSummary,
+    string ConflictSummary,
     string StalenessPosture,
     string ConflictPosture,
     string RecoverabilityPosture,
@@ -51,6 +59,7 @@ public sealed record WorkspaceRestoreReceiptStatusProjection(
     DateTimeOffset LeadObservedAtUtc,
     DateTimeOffset LatestReceiptObservedAtUtc,
     string RecoveryRoute,
+    string RecoveryActionLabel,
     string RecoverySummary,
     int CurrentProvenanceReceiptCount,
     int StaleOrDriftProvenanceReceiptCount,
