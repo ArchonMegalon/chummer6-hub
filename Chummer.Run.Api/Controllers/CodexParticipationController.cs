@@ -56,7 +56,7 @@ public sealed class CodexParticipationController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var model = new ParticipationConsolePageViewModel(
-                Chrome: _chrome.BuildAuthenticatedChrome("Participate", "Start contributing from one signed-in surface, authorize with your OpenAI account in ChatGPT, then leave with a clean status and account trail.", "/participate/codex", user.DisplayName),
+                Chrome: _chrome.BuildAuthenticatedChrome("Participate", "Start contributing from one signed-in surface, authorize with your OpenAI account in ChatGPT, then leave with a clean status and account trail.", "/participate/codex", user.DisplayName, user.Email),
                 User: user,
                 Links: _links.GetSummary(subject.SubjectId),
                 Experience: _experience.GetOrCreate(subject.SubjectId));

@@ -93,38 +93,35 @@ public sealed class HubPageChromeService
         return $"/login?next={Uri.EscapeDataString(normalizedCurrentPath)}";
     }
 
-    public SiteChromeViewModel BuildAuthenticatedChrome(string title, string description, string currentPath, string signedInLabel)
+    public SiteChromeViewModel BuildAuthenticatedChrome(
+        string title,
+        string description,
+        string currentPath,
+        string signedInLabel,
+        string? signedInEmail = null)
     {
         var surface = _landing.LoadSurface();
         var nav = _navigation.LoadNavigation();
         var normalizedCurrentPath = NormalizeRoute(currentPath);
         var actions = new List<SiteChromeActionViewModel>
         {
-            new SiteChromeActionViewModel("Home", "/home", "secondary", normalizedCurrentPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase)),
-            new SiteChromeActionViewModel("Build", "/downloads/release-upload", "secondary", normalizedCurrentPath.StartsWith("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)),
-            new SiteChromeActionViewModel("Account", "/account", "secondary", normalizedCurrentPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)),
-            new SiteChromeActionViewModel("Sign out", "/logout", "primary")
+            new SiteChromeActionViewModel("Home", "/home", "secondary", normalizedCurrentPath.StartsWith("/home", StringComparison.OrdinalIgnoreCase))
         };
 
-        bool hasBuildAction = actions.Any(action =>
-            string.Equals(NormalizeRoute(action.Href), "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(action.Label, "Build", StringComparison.OrdinalIgnoreCase));
-        if (!hasBuildAction)
+        if (ReleaseUploadAccessPolicy.CanAccess(signedInEmail))
         {
-            int signOutIndex = actions.FindIndex(action =>
-                string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(action.Label, "Sign out", StringComparison.OrdinalIgnoreCase));
-            if (signOutIndex < 0)
-            {
-                signOutIndex = actions.Count;
-            }
-
-            actions.Insert(signOutIndex, new SiteChromeActionViewModel(
+            actions.Add(new SiteChromeActionViewModel(
                 "Build",
                 "/downloads/release-upload",
                 "secondary",
                 normalizedCurrentPath.StartsWith("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)));
         }
+
+        actions.AddRange(
+        [
+            new SiteChromeActionViewModel("Account", "/account", "secondary", normalizedCurrentPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)),
+            new SiteChromeActionViewModel("Sign out", "/logout", "primary")
+        ]);
 
         return new SiteChromeViewModel(
             Title: title,

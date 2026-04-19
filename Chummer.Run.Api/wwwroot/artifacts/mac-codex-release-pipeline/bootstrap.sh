@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 log() {
   printf '[chummer-mac-release] %s\n' "$*"
@@ -388,7 +389,7 @@ resolve_hub_local_release_proof_path() {
   fi
 
   if resolve_candidate_is_http_url "${requested:-}" && [[ "$allow_remote_requested" != "1" ]]; then
-    echo "Ignoring remote requested release proof because remote proof inputs are disabled by default for non-official endpoints: $requested" >&2
+    echo "Ignoring remote requested release proof because remote proof inputs are disabled by default: $requested" >&2
   fi
   requested_path="$(resolve_local_file_path "$requested" "$allow_remote_requested")"
   if [[ -n "$requested_path" && -f "$requested_path" ]]; then
@@ -433,7 +434,7 @@ resolve_first_existing_file_path() {
   fi
 
   if resolve_candidate_is_http_url "${requested:-}" && [[ "$allow_remote_requested" != "1" ]]; then
-    echo "Ignoring remote requested release gate because remote proof inputs are disabled by default for non-official endpoints: $requested" >&2
+    echo "Ignoring remote requested release gate because remote proof inputs are disabled by default: $requested" >&2
   fi
   requested_path="$(resolve_local_file_path "$requested" "$allow_remote_requested")"
   if [[ -n "$requested_path" && -f "$requested_path" ]]; then
@@ -510,19 +511,6 @@ resolve_candidate_is_http_url() {
   [[ "$candidate" == http://* || "$candidate" == https://* ]]
 }
 
-official_chummer_release_proof_url() {
-  local candidate="${1:-}"
-  case "$candidate" in
-    https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json|\
-    https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json\?*|\
-    https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json|\
-    https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json\?*)
-      return 0
-      ;;
-  esac
-  return 1
-}
-
 allow_remote_release_proof_inputs() {
   case "$(to_lower_ascii "${CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS:-0}")" in
     1|true|yes|on)
@@ -540,10 +528,6 @@ allow_remote_release_proof_input_for_candidate() {
   fi
 
   if allow_remote_release_proof_inputs; then
-    return 0
-  fi
-
-  if official_chummer_release_proof_url "$candidate"; then
     return 0
   fi
 
@@ -1320,6 +1304,7 @@ clone_or_update() {
   local repo_url="$1"
   local target_dir="$2"
   local ref="$3"
+  local expected_commit="${4:-}"
   local low_speed_limit="${CHUMMER_GIT_HTTP_LOW_SPEED_LIMIT:-1000}"
   local low_speed_time="${CHUMMER_GIT_HTTP_LOW_SPEED_TIME:-30}"
   local max_attempts="${CHUMMER_GIT_MAX_ATTEMPTS:-4}"
@@ -1370,6 +1355,7 @@ clone_or_update() {
       git \
       -C "$target_dir" \
       checkout -q FETCH_HEAD
+    verify_checkout_expected_commit "$target_dir" "$ref" "$expected_commit"
     return 0
   fi
 
@@ -1385,6 +1371,21 @@ clone_or_update() {
     with_git_transport_tuning \
     git \
     clone --depth 1 --branch "$ref" "$repo_url" "$target_dir"
+  verify_checkout_expected_commit "$target_dir" "$ref" "$expected_commit"
+}
+
+verify_checkout_expected_commit() {
+  local target_dir="$1"
+  local ref="$2"
+  local expected_commit="$3"
+  [[ -n "$expected_commit" ]] || return 0
+  [[ "$expected_commit" =~ ^[0-9a-fA-F]{40}$ ]] || die "expected pinned commit for $(basename "$target_dir") is not a full SHA-1: $expected_commit"
+
+  local actual_commit
+  actual_commit="$(git -C "$target_dir" rev-parse HEAD 2>/dev/null || true)"
+  [[ -n "$actual_commit" ]] || die "could not resolve checked-out commit for $(basename "$target_dir")"
+  [[ "$actual_commit" == "$expected_commit" ]] || die "checked-out commit drift for $(basename "$target_dir"): ref $ref resolved to $actual_commit, expected $expected_commit"
+  log "pinned checkout verified: $(basename "$target_dir") ref=${ref} commit=${actual_commit}"
 }
 
 infer_publish_mode() {
@@ -1443,6 +1444,30 @@ ensure_release_upload_token() {
   [[ -n "$(release_upload_token_value)" ]] && return 0
   prompt_for_release_upload_ticket && [[ -n "$(release_upload_token_value)" ]] && return 0
   die "set CHUMMER_RELEASE_UPLOAD_TICKET or CHUMMER_RELEASE_UPLOAD_TOKEN for HTTP release promotion"
+}
+
+write_release_upload_curl_config() {
+  local config_path="$1"
+  ensure_release_upload_token
+  chmod 600 "$config_path"
+  if [[ -n "${CHUMMER_RELEASE_UPLOAD_TOKEN:-}" ]]; then
+    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TOKEN}"
+  elif [[ -n "${CHUMMER_RELEASE_UPLOAD_TICKET:-}" ]]; then
+    printf '%s' "${CHUMMER_RELEASE_UPLOAD_TICKET}"
+  elif [[ -n "${FLEET_INTERNAL_API_TOKEN:-}" ]]; then
+    printf '%s' "${FLEET_INTERNAL_API_TOKEN}"
+  else
+    die "release upload token could not be resolved after prompting"
+  fi | python3 - "$config_path" <<'PY'
+from pathlib import Path
+import sys
+
+config_path = Path(sys.argv[1])
+token = sys.stdin.read()
+escaped = token.replace("\\", "\\\\").replace('"', '\\"')
+config_path.write_text(f'header = "Authorization: Bearer {escaped}"\n', encoding="utf-8")
+PY
+  unset CHUMMER_RELEASE_UPLOAD_TICKET CHUMMER_RELEASE_UPLOAD_TOKEN FLEET_INTERNAL_API_TOKEN
 }
 
 validate_publish_mode() {
@@ -2502,10 +2527,10 @@ PY
 upload_release_bundle_http() {
   local bundle_dir="$1"
   local upload_url="$2"
-  local upload_token="$3"
+  local curl_auth_config="$3"
   local response_path="$4"
 
-  local fallback_mode="${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-1}"
+  local fallback_mode="${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0}"
   local retry_attempts="${CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS:-4}"
   local retry_sleep="${CHUMMER_RELEASE_UPLOAD_RETRY_SLEEP_SECONDS:-5}"
   local direct_limit_bytes="${CHUMMER_RELEASE_UPLOAD_DIRECT_LIMIT_BYTES:-94371840}"
@@ -2517,8 +2542,8 @@ upload_release_bundle_http() {
   local session_json session_id files_url chunks_url complete_url
   local file_path relative_path file_size
   local -a request_common=(
-    "-H"
-    "Authorization: Bearer ${upload_token}"
+    "--config"
+    "$curl_auth_config"
   )
 
   curl_status_from_headers() {
@@ -2675,6 +2700,7 @@ upload_release_bundle_http() {
       if curl --fail-with-body -sS -D "$headers_file" -o "$body_file" -X POST "$@" "$request_url"; then
         if [[ -n "$output_path" ]]; then
           mv "$body_file" "$output_path"
+          chmod 600 "$output_path" 2>/dev/null || true
         else
           rm -f "$body_file"
         fi
@@ -2698,6 +2724,7 @@ upload_release_bundle_http() {
       if [[ "$status" == "400" || "$status" == "401" || "$status" == "403" ]]; then
         if [[ -n "$output_path" ]]; then
           mv "$body_file" "$output_path"
+          chmod 600 "$output_path" 2>/dev/null || true
         else
           rm -f "$body_file"
         fi
@@ -2707,6 +2734,7 @@ upload_release_bundle_http() {
       if (( attempt >= retry_attempts )); then
         if [[ -n "$output_path" ]]; then
           mv "$body_file" "$output_path"
+          chmod 600 "$output_path" 2>/dev/null || true
         else
           rm -f "$body_file"
         fi
@@ -2994,6 +3022,13 @@ main() {
   local registry_ref="${CHUMMER_HUB_REGISTRY_REF:-fleet/hub-registry}"
   local media_factory_ref="${CHUMMER_MEDIA_FACTORY_REF:-main}"
   local legacy_ref="${CHUMMER_LEGACY_REF:-Docker}"
+  local ui_expected_commit="${CHUMMER_UI_EXPECTED_COMMIT:-}"
+  local core_expected_commit="${CHUMMER_CORE_EXPECTED_COMMIT:-}"
+  local hub_expected_commit="${CHUMMER_HUB_EXPECTED_COMMIT:-}"
+  local ui_kit_expected_commit="${CHUMMER_UI_KIT_EXPECTED_COMMIT:-}"
+  local registry_expected_commit="${CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT:-}"
+  local media_factory_expected_commit="${CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT:-}"
+  local legacy_expected_commit="${CHUMMER_LEGACY_EXPECTED_COMMIT:-}"
   local apps_raw="${CHUMMER_RELEASE_APP:-avalonia,blazor-desktop}"
   local rid="${CHUMMER_RELEASE_RID:-osx-arm64}"
   local release_channel="${CHUMMER_RELEASE_CHANNEL:-preview}"
@@ -3021,6 +3056,13 @@ main() {
     log "manifest retry without startup-smoke filter is enabled on zero-manifest projection"
   fi
   validate_publish_mode "$publish_mode" "$upload_url"
+  local release_upload_curl_config=""
+  if [[ "$publish_mode" == "http" ]]; then
+    release_upload_curl_config="$(mktemp)"
+    chmod 600 "$release_upload_curl_config"
+    bootstrap_tmp_paths+=("$release_upload_curl_config")
+    write_release_upload_curl_config "$release_upload_curl_config"
+  fi
 
   local sign_identity="${CHUMMER_APP_SIGN_IDENTITY:-}"
   local notary_profile="${CHUMMER_NOTARY_PROFILE:-}"
@@ -3065,14 +3107,14 @@ main() {
   require_min_free_space_gib "$work_root" "release work root" "$minimum_free_gib"
   require_min_free_space_gib "$TMPDIR" "temporary packaging root" "$minimum_free_gib"
 
-  clone_or_update "https://github.com/ArchonMegalon/chummer6-ui.git" "$ui_repo" "$ui_ref"
+  clone_or_update "https://github.com/ArchonMegalon/chummer6-ui.git" "$ui_repo" "$ui_ref" "$ui_expected_commit"
   require_compatible_dotnet_sdk "$ui_repo"
-  clone_or_update "https://github.com/ArchonMegalon/chummer6-core.git" "$core_repo" "$core_ref"
-  clone_or_update "https://github.com/ArchonMegalon/chummer6-hub.git" "$hub_repo" "$hub_ref"
-  clone_or_update "https://github.com/ArchonMegalon/chummer6-ui-kit.git" "$ui_kit_repo" "$ui_kit_ref"
-  clone_or_update "https://github.com/ArchonMegalon/chummer6-hub-registry.git" "$registry_repo" "$registry_ref"
-  clone_or_update "https://github.com/ArchonMegalon/chummer6-media-factory.git" "$media_repo" "$media_factory_ref"
-  clone_or_update "https://github.com/ArchonMegalon/chummer5a.git" "$legacy_repo" "$legacy_ref"
+  clone_or_update "https://github.com/ArchonMegalon/chummer6-core.git" "$core_repo" "$core_ref" "$core_expected_commit"
+  clone_or_update "https://github.com/ArchonMegalon/chummer6-hub.git" "$hub_repo" "$hub_ref" "$hub_expected_commit"
+  clone_or_update "https://github.com/ArchonMegalon/chummer6-ui-kit.git" "$ui_kit_repo" "$ui_kit_ref" "$ui_kit_expected_commit"
+  clone_or_update "https://github.com/ArchonMegalon/chummer6-hub-registry.git" "$registry_repo" "$registry_ref" "$registry_expected_commit"
+  clone_or_update "https://github.com/ArchonMegalon/chummer6-media-factory.git" "$media_repo" "$media_factory_ref" "$media_factory_expected_commit"
+  clone_or_update "https://github.com/ArchonMegalon/chummer5a.git" "$legacy_repo" "$legacy_ref" "$legacy_expected_commit"
 
   ensure_link_target "$core_repo" "$core_alias"
   ensure_link_target "$hub_repo" "$hub_alias"
@@ -3102,8 +3144,8 @@ main() {
 
   local requested_release_proof="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE:-${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}}}"
   local requested_ui_localization_release_gate="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_FILE:-${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}}}"
-  local fallback_release_proof_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json}"
-  local fallback_ui_localization_release_gate_url="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-https://chummer.run/proofs/mac-codex-release/UI_LOCALIZATION_RELEASE_GATE.generated.json}"
+  local fallback_release_proof_url="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}"
+  local fallback_ui_localization_release_gate_url="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}"
   local release_proof_path
   local ui_localization_release_gate_path
   local sanitized_release_proof_path
@@ -3275,6 +3317,7 @@ main() {
   local smoke_dir="$dist_dir/startup-smoke"
   local release_evidence_dir="$dist_dir/release-evidence"
   local response_path="$dist_dir/release-upload-response.json"
+  local keep_upload_response="${CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE:-0}"
   rm -rf "$out_root" "$dist_dir"
   mkdir -p "$smoke_dir" "$dist_dir/files" "$release_evidence_dir"
 
@@ -3587,7 +3630,7 @@ main() {
       upload_release_bundle_http \
         "$publish_bundle_dir" \
         "$upload_url" \
-        "$(release_upload_token_value)" \
+        "$release_upload_curl_config" \
         "$response_path"
       ;;
     filesystem)
@@ -3619,6 +3662,7 @@ main() {
   verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$verify_url" "$canonical_verify_url" "$response_path"
 
   if [[ -f "$response_path" ]]; then
+    chmod 600 "$response_path" 2>/dev/null || true
     log "public downloads url: $(jq -r '.downloadsUrl // empty' "$response_path")"
     jq -r '.installDispatchUrls[]? | "install handoff: " + .' "$response_path"
     jq -r '.directFileUrls[]? | "direct file: " + .' "$response_path"
@@ -3629,6 +3673,12 @@ main() {
       if jq -e '.signedInInstallClaims | length > 0' "$response_path" >/dev/null 2>&1; then
         log "claim codes are stored in $response_path; rerun with CHUMMER_RELEASE_PRINT_SIGNED_INSTALL_CLAIMS=1 to print them."
       fi
+    fi
+    if is_true "$keep_upload_response"; then
+      log "sensitive release upload response retained at $response_path"
+    else
+      rm -f "$response_path"
+      log "removed sensitive release upload response file; set CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE=1 to retain it."
     fi
   fi
 
