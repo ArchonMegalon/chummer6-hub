@@ -166,13 +166,7 @@
   ],
   "proof_routes": [
     "/downloads/install/avalonia-linux-x64-installer",
-    "/downloads/install/avalonia-linux-x64-installer/continue.json",
-    "/artifacts/release-bundles/avalonia-linux-x64-installer",
-    "/artifacts/release-bundles/avalonia-linux-x64-installer/preview_card",
-    "/api/v1/install-linking/continuation",
-    "/api/v1/install-linking/continuation/support",
     "/home/access",
-    "/account/access",
     "/home/work",
     "/account/work",
     "/account/support",
@@ -264,6 +258,6 @@
       ]
     }
   ],
-  "generated_at": "2026-04-19T10:26:33Z",
-  "generatedAt": "2026-04-19T10:26:33Z"
+  "generated_at": "2026-04-19T17:41:56Z",
+  "generatedAt": "2026-04-19T17:41:56Z"
 }

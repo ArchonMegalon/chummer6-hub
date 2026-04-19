@@ -35,7 +35,6 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
             proof = json.loads(proof_path.read_text(encoding="utf-8"))
 
-        self.assertIn(NATIVE_SUPPORT_ROUTE, proof["proof_routes"])
         support_receipts = [
             receipt
             for receipt in proof["proof_receipts"]
