@@ -186,6 +186,7 @@ items:
       - /docker/chummercomplete/chummer6-ui-finish/.codex-studio/published/NEXT90_M101_UI_RELEASE_TRAIN.generated.json
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Tests/Compliance/DesktopExecutableGateComplianceTests.cs
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Tests/Compliance/Next90M101ReleaseTrainGuardTests.cs
+      - /docker/chummercomplete/chummer6-ui-finish commit c9c0d84f tightens the M101 closeout verifier to prove registry, queue, and release-channel authority together for the independent Avalonia primary route.
       - /docker/chummercomplete/chummer6-ui-finish commit 5844ad03 pins successor frontier 2450443084 into the completed M101 proof guard.
       - /docker/chummercomplete/chummer6-ui-finish commit 2e87dce3 tightens M101 verifier against design-owned queue source drift.
       - /docker/chummercomplete/chummer6-ui-finish commit c61a8fb5 pins M101 design queue closure tokens into the verifier, receipt, and compliance guard.
@@ -353,17 +354,13 @@ items:
     completion_action: verify_closed_package_only
     do_not_reopen_reason: M103 executive-assistant parity-lab extraction is complete; future shards must verify this receipt, registry row, design queue row, Fleet queue row, and direct proof command instead of recapturing Chummer5a oracle baselines or veteran workflow packs.
     proof:
-      - /docker/EA/docs/chummer5a_parity_lab/CHUMMER5A_PARITY_LAB_PACK.yaml
-      - /docker/EA/docs/chummer5a_parity_lab/README.md
-      - /docker/EA/docs/chummer5a_parity_lab/oracle_baselines.yaml
-      - /docker/EA/docs/chummer5a_parity_lab/veteran_workflow_pack.yaml
-      - /docker/EA/docs/chummer5a_parity_lab/compare_packs.yaml
-      - /docker/EA/docs/chummer5a_parity_lab/import_export_fixture_inventory.yaml
-      - /docker/EA/docs/chummer5a_parity_lab/SUCCESSOR_HANDOFF_CLOSEOUT.yaml
-      - /docker/EA/.codex-studio/published/CHUMMER5A_PARITY_ORACLE_PACK.generated.json
-      - python tests/test_chummer5a_parity_lab_pack.py
-      - python tests/test_chummer5a_parity_lab_pack.py exits with ran=18 failed=0 and blocks operator-owned run-helper proof for the closed EA package.
-      - /docker/EA commit f252c02 pins the latest M103 parity-lab proof floor into the published receipt, handoff closeout, and direct guard.
+      - /docker/fleet/docs/chummer5a-oracle/README.md
+      - /docker/fleet/docs/chummer5a-oracle/parity_lab_capture_pack.yaml
+      - /docker/fleet/docs/chummer5a-oracle/veteran_workflow_packs.yaml
+      - /docker/fleet/tests/test_ea_parity_lab_capture_pack.py
+      - /docker/fleet/feedback/2026-04-18-next90-m103-ea-parity-lab-closeout.md
+      - python3 tests/test_ea_parity_lab_capture_pack.py
+      - python3 tests/test_ea_parity_lab_capture_pack.py exits 0 in /docker/fleet and fail-closes stale /docker/EA parity-lab closure references for the completed package.
     allowed_paths:
       - skills
       - tests
@@ -764,6 +761,9 @@ items:
       - commit b909cc5 tightens the M106 codexea helper proof guard.
       - commit 787d27a pins the M106 packet refresh floor.
       - commit b467c27 tightens the M106 design queue OODA prompt proof guard.
+      - stale aggregate receipt-gate counts cannot overstate installed-build followthrough without detailed row truth
+      - local proof floor commit fe4c621 pinned for M106 receipt-gate row-truth guard
+      - commit fe4c621 tightens the M106 receipt-gate row-truth guard.
       - do-not-reopen handoff routes remaining M106 work to dependency or sibling packages
     allowed_paths:
       - admin
@@ -887,6 +887,7 @@ items:
       - /docker/chummercomplete/chummer-hub-registry commit 1cf64e1 pins M101 current fallback rollback proof floor so future shards verify the current completed-package guard instead of repeating it.
       - /docker/chummercomplete/chummer-hub-registry commit 49dd07a tightens the M101 route-truth row-shape guard so future shards reject non-object desktop route-truth rows instead of repeating the current completed-package guard.
       - /docker/chummercomplete/chummer-hub-registry commit acb881d tightens the M101 projection alias proof guard so future shards reject release-channel versus compatibility-shelf alias drift on generatedAt/generated_at and keep the documented six-tuple successor matrix aligned with the completed-package guard.
+      - /docker/chummercomplete/chummer-hub-registry commit a1da9ca tightens the M101 exact route-tuple rationale proof so future shards reject platform-only desktop route rationale and verify the direct regression tests together with the canonical release-channel rows.
     allowed_paths:
       - Chummer.Hub.Registry
       - scripts
@@ -988,7 +989,9 @@ items:
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Desktop.Runtime/DesktopInstallLinkingRuntime.cs
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Blazor/Components/Shell/DialogTrustReceiptText.cs
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Blazor/Components/Shell/DialogHost.razor
+      - /docker/chummercomplete/chummer6-ui-finish/Chummer.Blazor/Components/Shell/ResultPanel.razor
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Blazor/Components/Shell/SectionPane.razor
+      - /docker/chummercomplete/chummer6-ui-finish/Chummer.Blazor/Components/Shared/RuntimeInspectorPanel.razor
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Tests/DesktopCrashRuntimeTests.cs
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Tests/Presentation/BlazorShellComponentTests.cs
       - /docker/chummercomplete/chummer6-ui-finish/Chummer.Tests/Presentation/AccessibilitySignoffSmokeTests.cs
