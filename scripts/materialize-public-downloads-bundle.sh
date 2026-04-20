@@ -85,6 +85,7 @@ PRESENTATION_RELEASE_EVIDENCE_SOURCE="${CHUMMER_PRESENTATION_RELEASE_EVIDENCE_SO
 RELEASE_PROOF_SOURCE="${CHUMMER_RUN_LOCAL_RELEASE_PROOF_SOURCE:-$REPO_ROOT/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 UI_LOCALIZATION_RELEASE_GATE_SOURCE="$(resolve_ui_localization_release_gate_source)"
 STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-172800}"
+DISABLED_ARTIFACT_IDS="${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}}"
 
 if [[ ! -d "$RUNSERVICES_SOURCE_FILES_ROOT" ]]; then
   echo "run-services source downloads root missing: $RUNSERVICES_SOURCE_FILES_ROOT" >&2
@@ -222,6 +223,84 @@ find "$combined_startup_smoke_root" -maxdepth 1 -type f -name 'startup-smoke-*.r
   | while IFS= read -r -d '' receipt_path; do
       cp "$receipt_path" "$OUTPUT_ROOT/startup-smoke"/
     done
+
+if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
+  python3 - "$OUTPUT_ROOT" "$DISABLED_ARTIFACT_IDS" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+output_root = Path(sys.argv[1])
+disabled = {
+    token.strip().lower()
+    for raw in sys.argv[2].replace(";", ",").replace("\n", ",").split(",")
+    for token in raw.split()
+    if token.strip()
+}
+removed_files: set[str] = set()
+disabled_route_tokens: set[str] = set(disabled)
+
+def add_route_tokens(item: dict, id_key: str, url_key: str) -> None:
+    artifact_id = str(item.get(id_key) or "").strip()
+    if artifact_id:
+        disabled_route_tokens.add(artifact_id)
+    file_name = str(item.get("fileName") or "").strip()
+    if not file_name:
+        url = str(item.get(url_key) or "").strip()
+        if url:
+            file_name = Path(url.split("?", 1)[0].split("#", 1)[0]).name
+    if file_name:
+        removed_files.add(file_name)
+        disabled_route_tokens.add(file_name)
+    url = str(item.get(url_key) or "").strip()
+    if url:
+        disabled_route_tokens.add(url)
+
+for manifest_name, array_key, id_key, url_key in (
+    ("releases.json", "downloads", "id", "url"),
+    ("RELEASE_CHANNEL.generated.json", "artifacts", "artifactId", "downloadUrl"),
+):
+    manifest_path = output_root / manifest_name
+    if not manifest_path.exists():
+        continue
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    rows = payload.get(array_key) or []
+    kept = []
+    for item in rows:
+        artifact_id = str(item.get(id_key) or "").strip().lower()
+        if artifact_id in disabled:
+            add_route_tokens(item, id_key, url_key)
+            continue
+        kept.append(item)
+    payload[array_key] = kept
+
+    for proof_container in (payload, payload.get("releaseProof") if isinstance(payload.get("releaseProof"), dict) else None):
+        if not isinstance(proof_container, dict):
+            continue
+        routes = proof_container.get("proofRoutes")
+        if isinstance(routes, list):
+            proof_container["proofRoutes"] = [
+                route for route in routes
+                if isinstance(route, str) and not any(token and token.lower() in route.lower() for token in disabled_route_tokens)
+            ]
+
+    manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+for relative_root in ("files", "proof/windows"):
+    directory = output_root / relative_root
+    for file_name in removed_files:
+        candidate = directory / file_name
+        if candidate.exists():
+            candidate.unlink()
+
+startup_smoke_root = output_root / "startup-smoke"
+if startup_smoke_root.exists():
+    for receipt_path in startup_smoke_root.glob("startup-smoke-*.receipt.json"):
+        lowered = receipt_path.name.lower()
+        if any(token.replace("-installer", "").replace("-archive", "") in lowered for token in disabled):
+            receipt_path.unlink()
+PY
+fi
 
 python3 - "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" <<'PY'
 import json

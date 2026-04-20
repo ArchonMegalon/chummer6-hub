@@ -5760,7 +5760,7 @@ echo "Help: ${HELP_URL}"
     private static IReadOnlyList<ReleaseUploadBootstrapRepoPin> GetReleaseUploadBootstrapRepoPins()
         =>
         [
-            new("CHUMMER_UI_REF", "main", "CHUMMER_UI_EXPECTED_COMMIT", "f64cf15223b11f7a6da4b76f7ac4bb0ac14a5988"),
+            new("CHUMMER_UI_REF", "main", "CHUMMER_UI_EXPECTED_COMMIT", "07bcbbaebb2f73fec52af74949bd6f321482502b"),
             new("CHUMMER_CORE_REF", "main", "CHUMMER_CORE_EXPECTED_COMMIT", "ae55923f1cb6c8fdf40748f7e2600815be123e1e"),
             new("CHUMMER_HUB_REF", "release-upload-hub-proof-routes-20260419", "CHUMMER_HUB_EXPECTED_COMMIT", "5dcde8a9746ecb2f02c70e8181be662f198af84d"),
             new("CHUMMER_UI_KIT_REF", "fleet/ui-kit", "CHUMMER_UI_KIT_EXPECTED_COMMIT", "2ef502630a2d1cd20350f9b0f134af0bac0fe863"),

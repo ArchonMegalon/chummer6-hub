@@ -7,6 +7,8 @@ public sealed class WindowsProofInstallerService
 {
     private const string ProofInstallerRootKey = "CHUMMER_WINDOWS_PROOF_INSTALLER_ROOT";
     private const string DownloadsRootKey = "CHUMMER_DOWNLOADS_SOURCE_ROOT";
+    private const string PublicDisabledArtifactIdsKey = "CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS";
+    private const string ReleaseDisabledArtifactIdsKey = "CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS";
     private const string DefaultDownloadsRoot = "/downloads-source";
     private static readonly string[] PreferredFileNames =
     {
@@ -56,6 +58,11 @@ public sealed class WindowsProofInstallerService
             return null;
         }
 
+        if (IsDisabledArtifactId(ResolveArtifactId(allowedFileName)))
+        {
+            return null;
+        }
+
         var proofFilePath = ResolveProofFilePath(allowedFileName);
         if (proofFilePath is null)
         {
@@ -84,6 +91,11 @@ public sealed class WindowsProofInstallerService
     {
         string normalizedArtifactId = NormalizeArtifactId(artifactId);
         if (string.IsNullOrWhiteSpace(normalizedArtifactId))
+        {
+            return null;
+        }
+
+        if (IsDisabledArtifactId(normalizedArtifactId))
         {
             return null;
         }
@@ -151,6 +163,35 @@ public sealed class WindowsProofInstallerService
         => fileName.Contains("blazor-desktop", StringComparison.OrdinalIgnoreCase)
             ? "blazor-desktop-win-x64-installer"
             : "avalonia-win-x64-installer";
+
+    private bool IsDisabledArtifactId(string artifactId)
+    {
+        if (string.IsNullOrWhiteSpace(artifactId))
+        {
+            return false;
+        }
+
+        HashSet<string> disabledArtifactIds = new(StringComparer.OrdinalIgnoreCase);
+        AddDisabledArtifacts(disabledArtifactIds, _configuration[PublicDisabledArtifactIdsKey]);
+        AddDisabledArtifacts(disabledArtifactIds, _configuration[ReleaseDisabledArtifactIdsKey]);
+        return disabledArtifactIds.Contains(artifactId.Trim());
+    }
+
+    private static void AddDisabledArtifacts(HashSet<string> destination, string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return;
+        }
+
+        foreach (string value in rawValue.Split([',', ';', '\n', '\r', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                destination.Add(value.Trim());
+            }
+        }
+    }
 
     private static string ComputeSha256(string path)
     {

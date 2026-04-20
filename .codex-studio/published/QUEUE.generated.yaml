@@ -1,83 +1,53 @@
 mode: append
 items:
-- Add milestone mapping or executable queue work for The missing `Chummer.Media.Contracts`
-  package still prevents a dedicated media-factory repo from becoming a real package-only
-  seam..
-- Add milestone mapping or executable queue work for `Chummer.Run.Contracts.Media`
-  still needs a clean split between render-only media DTOs and upstream narrative-generation,
-  delivery, and session-aware orchestration DTOs..
-- Publish or append runnable backlog for `Chummer.Run.Contracts.Media` still needs
-  a clean split between render-only media DTOs and upstream narrative-generation,
-  delivery, and session-aware orchestration DTOs..
-- Make the remaining publication, moderation, and projection seams for `hub` explicit
-  and owner-backed rather than implied by runtime behavior.
-- Delete or quarantine the remaining legacy roots in `hub` so compatibility clutter
-  stops sharing space with the current owner surface.
-- Turn the remaining `hub` adapter/provider/media seams into explicit owned slices
-  instead of leaving them as open-ended uncovered scope.
-- Add milestone mapping or executable queue work for Legacy desktop/tooling clutter
-  still shares the run-services repo root with hosted-service code..
-- Publish or append runnable backlog for The missing `Chummer.Media.Contracts` package
-  still prevents a dedicated media-factory repo from becoming a real package-only
-  seam..
-- Publish or append runnable backlog for The `chummer-media-factory` split exists
-  as a scaffold, but not yet as a render-only asset/job boundary separated from orchestration
-  and narrative-authoring DTOs..
-- Add milestone mapping or executable queue work for The `chummer-media-factory` split
-  exists as a scaffold, but not yet as a render-only asset/job boundary separated
-  from orchestration and narrative-authoring DTOs..
-- Publish or append runnable backlog for The `chummer-hub-registry` split exists as
-  a scaffold, but not yet as a clean repo/package boundary around catalog, publication,
-  installs, and runtime bundle heads..
-- Add milestone mapping or executable queue work for The `chummer-hub-registry` split
-  exists as a scaffold, but not yet as a clean repo/package boundary around catalog,
-  publication, installs, and runtime bundle heads..
-- Publish or append runnable backlog for Dedicated `Chummer.Play.Contracts` and `/api/play/*`
-  seams are not yet public package/API reality for the new play repo..
-- Add milestone mapping or executable queue work for Dedicated `Chummer.Play.Contracts`
-  and `/api/play/*` seams are not yet public package/API reality for the new play
-  repo..
-- Isolate renderer/storage/job surfaces so the dedicated media-factory repo can own
-  assets, jobs, previews, TTL, retention, and lineage without Spider, lore, or session
-  relay code.
-- Publish or append runnable backlog for Group-level asset review and publication
-  seams still need explicit milestone mapping..
-- Add milestone mapping or executable queue work for Group-level asset review and
-  publication seams still need explicit milestone mapping..
-- Keep finalized render requests/results, manifests, and lifecycle state in the future
-  media package; keep news/shadowfeed/NPC message drafting, approvals policy, and
-  delivery state in run-services orchestration contracts.
-- Publish or append runnable backlog for Additional Hub milestone families beyond
-  the current queued work remain unmaterialized..
-- Add milestone mapping or executable queue work for Additional Hub milestone families
-  beyond the current queued work remain unmaterialized..
-- Move asset/job/render/lifecycle DTOs into `Chummer.Media.Contracts` and keep the
-  package dependency-light with no play, UI, or session-policy dependencies.
-- Publish or append runnable backlog for Contract reset and relay/runtime alignment
-  are not yet represented as explicit Hub milestones..
-- Finish milestone coverage modeling for hub so ETA and completion truth are no longer
-  partial.
-- Add milestone mapping or executable queue work for Contract reset and relay/runtime
-  alignment are not yet represented as explicit Hub milestones..
-- Keep registry, relay, Spider, media, and identity in the hosted repo and move legacy
-  app/tooling surfaces into a separate legacy or interoperability boundary.
-- Keep compatibility wrappers server-side only during migration and stop exposing
-  them as a peer contract surface.
-- Break the catch-all contract file into narrower hosted contract families for relay,
-  memory, media, docs, and AI gateway surfaces.
-- Sync the approved Chummer design bundle into `hub` under `.codex-design/` and refresh
-  repo-local review context.
-- title: Auto-detect and repair recurring `hub` mirror drift after 752 repeated audit
-    observations; keep one bounded queue slice for the affected local design mirror
-    bundle instead of reopening one-off mirror refresh work.
-  task: Auto-detect and repair recurring `hub` mirror drift after 752 repeated audit
-    observations; keep one bounded queue slice for the affected local design mirror
-    bundle instead of reopening one-off mirror refresh work.
+- Add milestone mapping or executable queue work for The missing `Chummer.Media.Contracts` package still prevents a dedicated media-factory repo from becoming a real package-only seam..
+- Add milestone mapping or executable queue work for `Chummer.Run.Contracts.Media` still needs a clean split between render-only media DTOs and upstream narrative-generation, delivery, and session-aware orchestration DTOs..
+- Publish or append runnable backlog for `Chummer.Run.Contracts.Media` still needs a clean split between render-only media DTOs and upstream narrative-generation, delivery, and session-aware orchestration DTOs..
+- Make the remaining publication, moderation, and projection seams for `hub` explicit and owner-backed rather than implied by runtime behavior.
+- Delete or quarantine the remaining legacy roots in `hub` so compatibility clutter stops sharing space with the current owner surface.
+- Turn the remaining `hub` adapter/provider/media seams into explicit owned slices instead of leaving them as open-ended uncovered scope.
+- Add milestone mapping or executable queue work for Legacy desktop/tooling clutter still shares the run-services repo root with hosted-service code..
+- Publish or append runnable backlog for The missing `Chummer.Media.Contracts` package still prevents a dedicated media-factory repo from becoming a real package-only seam..
+- Publish or append runnable backlog for The `chummer-media-factory` split exists as a scaffold, but not yet as a render-only asset/job boundary separated from orchestration and narrative-authoring DTOs..
+- Add milestone mapping or executable queue work for The `chummer-media-factory` split exists as a scaffold, but not yet as a render-only asset/job boundary separated from orchestration and narrative-authoring DTOs..
+- Publish or append runnable backlog for The `chummer-hub-registry` split exists as a scaffold, but not yet as a clean repo/package boundary around catalog, publication, installs, and runtime bundle heads..
+- Add milestone mapping or executable queue work for The `chummer-hub-registry` split exists as a scaffold, but not yet as a clean repo/package boundary around catalog, publication, installs, and runtime bundle heads..
+- Publish or append runnable backlog for Dedicated `Chummer.Play.Contracts` and `/api/play/*` seams are not yet public package/API reality for the new play repo..
+- Add milestone mapping or executable queue work for Dedicated `Chummer.Play.Contracts` and `/api/play/*` seams are not yet public package/API reality for the new play repo..
+- Isolate renderer/storage/job surfaces so the dedicated media-factory repo can own assets, jobs, previews, TTL, retention, and lineage without Spider, lore, or session relay code.
+- Publish or append runnable backlog for Group-level asset review and publication seams still need explicit milestone mapping..
+- Add milestone mapping or executable queue work for Group-level asset review and publication seams still need explicit milestone mapping..
+- Keep finalized render requests/results, manifests, and lifecycle state in the future media package; keep news/shadowfeed/NPC message drafting, approvals policy, and delivery state in run-services orchestration contracts.
+- Publish or append runnable backlog for Additional Hub milestone families beyond the current queued work remain unmaterialized..
+- Add milestone mapping or executable queue work for Additional Hub milestone families beyond the current queued work remain unmaterialized..
+- Move asset/job/render/lifecycle DTOs into `Chummer.Media.Contracts` and keep the package dependency-light with no play, UI, or session-policy dependencies.
+- Publish or append runnable backlog for Contract reset and relay/runtime alignment are not yet represented as explicit Hub milestones..
+- Finish milestone coverage modeling for hub so ETA and completion truth are no longer partial.
+- Add milestone mapping or executable queue work for Contract reset and relay/runtime alignment are not yet represented as explicit Hub milestones..
+- Keep registry, relay, Spider, media, and identity in the hosted repo and move legacy app/tooling surfaces into a separate legacy or interoperability boundary.
+- Keep compatibility wrappers server-side only during migration and stop exposing them as a peer contract surface.
+- Break the catch-all contract file into narrower hosted contract families for relay, memory, media, docs, and AI gateway surfaces.
+- Sync the approved Chummer design bundle into `hub` under `.codex-design/` and refresh repo-local review context.
+- title: Auto-detect and repair recurring `hub` mirror drift after 752 repeated audit observations; keep one bounded queue slice for the affected local design mirror bundle instead of reopening one-off mirror refresh work.
+  task: Auto-detect and repair recurring `hub` mirror drift after 752 repeated audit observations; keep one bounded queue slice for the affected local design mirror bundle instead of reopening one-off mirror refresh work.
   package_id: audit-task-11709
   source_ref: audit_task_candidates[11709]
   audit_finding_key: project.design_mirror_missing_or_stale
   audit_scope_id: hub
   source_items:
+  - /docker/chummercomplete/chummer.run-services/.codex-design/product/NEXT_90_DAY_QUEUE_STAGING.generated.yaml
+  allowed_paths:
+  - .codex-design
+  owned_surfaces:
+  - design_mirror:hub
+- title: Auto-detect and repair recurring `hub` mirror drift after 1156 repeated audit observations; keep one bounded queue slice for the affected local design mirror bundle instead of reopening one-off mirror refresh work.
+  task: Auto-detect and repair recurring `hub` mirror drift after 1156 repeated audit observations; keep one bounded queue slice for the affected local design mirror bundle instead of reopening one-off mirror refresh work.
+  package_id: audit-task-11709
+  source_ref: audit_task_candidates[11709]
+  audit_finding_key: project.design_mirror_missing_or_stale
+  audit_scope_id: hub
+  source_items:
+  - /docker/chummercomplete/chummer.run-services/.codex-design/product/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml
   - /docker/chummercomplete/chummer.run-services/.codex-design/product/NEXT_90_DAY_QUEUE_STAGING.generated.yaml
   allowed_paths:
   - .codex-design

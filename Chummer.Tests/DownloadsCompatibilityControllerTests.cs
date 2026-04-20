@@ -59,6 +59,25 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
+    public void CanonicalReleaseManifestFiltersDisabledArtifactsWhenSuppressionIsConfigured()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS"] = "avalonia-win-x64-installer"
+        });
+
+        IActionResult result = fixture.Controller.CanonicalReleaseManifest();
+
+        var content = Assert.IsType<ContentResult>(result);
+        using JsonDocument document = JsonDocument.Parse(content.Content ?? "{}");
+        JsonElement artifacts = document.RootElement.GetProperty("artifacts");
+        Assert.DoesNotContain(artifacts.EnumerateArray(), artifact =>
+            string.Equals(artifact.GetProperty("artifactId").GetString(), "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
+        JsonElement coverage = document.RootElement.GetProperty("desktopTupleCoverage");
+        Assert.Contains("windows", coverage.GetProperty("missingRequiredPlatforms").EnumerateArray().Select(static value => value.GetString()));
+    }
+
+    [Fact]
     public void ReleaseManifestKeepsGeneratedTimestampAliases()
     {
         using Fixture fixture = new();
@@ -311,6 +330,23 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DisabledWindowsArtifactsDoNotSurfaceThroughProofRoutes()
+    {
+        using Fixture fixture = new(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS"] = "avalonia-win-x64-installer blazor-desktop-win-x64-installer"
+        });
+
+        IActionResult catalog = fixture.Controller.WindowsProofInstallers();
+        IActionResult byFile = fixture.Controller.DownloadWindowsProofInstaller("chummer-avalonia-win-x64-installer.exe");
+        IActionResult byArtifact = fixture.Controller.DownloadWindowsProofInstallerByArtifactId("avalonia-win-x64-installer");
+
+        Assert.IsType<NotFoundObjectResult>(catalog);
+        Assert.IsType<NotFoundResult>(byFile);
+        Assert.IsType<NotFoundResult>(byArtifact);
+    }
+
     private static void WriteEmbeddedPayloadInstaller(string path, string head)
     {
         File.WriteAllBytes(
@@ -323,7 +359,7 @@ public sealed class DownloadsCompatibilityControllerTests
     {
         private readonly string _root;
 
-        public Fixture()
+        public Fixture(IReadOnlyDictionary<string, string?>? additionalSettings = null)
         {
             _root = Path.Combine(Path.GetTempPath(), "downloads-compatibility-controller-tests", Guid.NewGuid().ToString("N"));
             string downloadsRoot = Path.Combine(_root, "downloads");
@@ -389,6 +425,37 @@ public sealed class DownloadsCompatibilityControllerTests
                   "generatedAt": "2026-04-02T16:15:00Z",
                   "publishedAt": "2026-04-02T16:14:30Z",
                   "status": "published",
+                  "desktopTupleCoverage": {
+                    "requiredDesktopPlatforms": ["linux", "windows", "macos"],
+                    "requiredDesktopHeads": ["avalonia"],
+                    "requiredDesktopPlatformHeadRidTuples": ["avalonia:linux-x64:linux", "avalonia:win-x64:windows", "avalonia:osx-arm64:macos"],
+                    "missingRequiredPlatforms": ["linux", "macos"],
+                    "missingRequiredHeads": [],
+                    "missingRequiredPlatformHeadPairs": ["avalonia:linux", "avalonia:macos"],
+                    "missingRequiredPlatformHeadRidTuples": ["avalonia:linux-x64:linux", "avalonia:osx-arm64:macos"],
+                    "promotedInstallerTuples": [
+                      {
+                        "tupleId": "avalonia:windows:win-x64",
+                        "head": "avalonia",
+                        "platform": "windows",
+                        "rid": "win-x64",
+                        "arch": "x64",
+                        "kind": "installer",
+                        "artifactId": "avalonia-win-x64-installer"
+                      }
+                    ],
+                    "promotedPlatformHeads": {
+                      "linux": [],
+                      "windows": ["avalonia"],
+                      "macos": []
+                    },
+                    "promotedPlatformHeadRidTuples": ["avalonia:win-x64:windows"],
+                    "externalProofRequests": [],
+                    "desktopRouteTruth": [
+                      { "artifactId": "avalonia-win-x64-installer" }
+                    ],
+                    "complete": false
+                  },
                   "artifacts": [
                     {
                       "artifactId": "avalonia-osx-x64-installer",
@@ -427,7 +494,8 @@ public sealed class DownloadsCompatibilityControllerTests
                     ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking.json"),
                     ["IDENTITY_SERVICE_BASE_URL"] = "http://127.0.0.1:9"
-                })
+                }.Concat(additionalSettings ?? new Dictionary<string, string?>())
+                    .ToDictionary(static entry => entry.Key, static entry => entry.Value))
                 .Build();
 
             ManifestService = new PublicReleaseManifestService(Configuration);

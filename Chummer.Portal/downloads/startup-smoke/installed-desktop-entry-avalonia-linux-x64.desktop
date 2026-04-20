@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Chummer
-Exec=/usr/bin/chummer6-avalonia
-Icon=/opt/chummer6/avalonia-linux-x64/chummer-icon.png
-Terminal=false
-Categories=Game;
-StartupNotify=true
