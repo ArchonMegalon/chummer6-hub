@@ -262,8 +262,8 @@ verify_live_release_projection() {
   live_compat_path="$(mktemp)"
   live_canonical_path="$(mktemp)"
 
-  curl --fail-with-body -fsS "$compatibility_url" > "$live_compat_path"
-  curl --fail-with-body -fsS "$canonical_url" > "$live_canonical_path"
+  curl --fail-with-body -sS "$compatibility_url" > "$live_compat_path"
+  curl --fail-with-body -sS "$canonical_url" > "$live_canonical_path"
 
   python3 - "$local_canonical_path" "$live_compat_path" "$live_canonical_path" <<'PY'
 import json
@@ -3152,6 +3152,13 @@ main() {
     for path in "${bootstrap_tmp_paths[@]}"; do
       [[ -f "$path" ]] && rm -f "$path"
     done
+
+    if [[ "${BOOTSTRAP_KEEP_UPLOAD_RESPONSE:-0}" != "1" ]] \
+      && [[ -n "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH:-}" ]] \
+      && [[ -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" ]]; then
+      chmod 600 "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}" 2>/dev/null || true
+      rm -f "${BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH}"
+    fi
   }
   trap cleanup_bootstrap_tmp_paths EXIT
 
@@ -3331,6 +3338,8 @@ main() {
   local release_evidence_dir="$dist_dir/release-evidence"
   local response_path="$dist_dir/release-upload-response.json"
   local keep_upload_response="${CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE:-0}"
+  BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH="$response_path"
+  BOOTSTRAP_KEEP_UPLOAD_RESPONSE="$keep_upload_response"
   rm -rf "$out_root" "$dist_dir"
   mkdir -p "$smoke_dir" "$dist_dir/files" "$release_evidence_dir"
 
@@ -3693,6 +3702,7 @@ main() {
       log "sensitive release upload response retained at $response_path"
     else
       rm -f "$response_path"
+      BOOTSTRAP_RELEASE_UPLOAD_RESPONSE_PATH=""
       log "removed sensitive release upload response file; set CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE=1 to retain it."
     fi
   fi

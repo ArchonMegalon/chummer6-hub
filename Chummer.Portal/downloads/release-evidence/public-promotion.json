@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-04-16T15:51:58Z",
+  "generatedAt": "2026-04-20T07:23:39Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -12,8 +12,8 @@
       "startupSmokeReceiptPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/startup-smoke/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "4544ef844262d3381bc424105c4d67e95fa6f3c2541c1c79b00d0b4666a6198c",
-      "artifactSizeBytes": 31796460,
+      "artifactSha256": "84d5c3a7065666286c5e3a5feccbc2ee3c04117cf5afaa116c09e1e2d9e44643",
+      "artifactSizeBytes": 35010278,
       "kind": "installer"
     },
     {
@@ -26,8 +26,8 @@
       "startupSmokeReceiptPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/startup-smoke/startup-smoke-blazor-desktop-linux-x64.receipt.json",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "fba47bb24a11f45dcd37c9d70b036346355d24802a434bf9eac2e6f3767c11f3",
-      "artifactSizeBytes": 34182932,
+      "artifactSha256": "755de1de2a11d363f5f127dd81d9a00a1f33d9b20f6e75adb569d1c97e3faa94",
+      "artifactSizeBytes": 37378650,
       "kind": "installer"
     },
     {
@@ -35,28 +35,56 @@
       "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
       "platform": "macos",
       "promotionStatus": "fail",
-      "startupSmokeStatus": "pass",
-      "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/startup-smoke/startup-smoke-avalonia-osx-arm64.receipt.json",
-      "signingStatus": "fail",
-      "notarizationStatus": "fail",
-      "artifactSha256": "424b3216afedf86347494eea985cc1e7ceca7cb8cbf7aff04a475456a15973f4",
-      "artifactSizeBytes": 50299530,
+      "startupSmokeStatus": "fail",
+      "startupSmokeReason": "startup-smoke receipt hostClass does not identify the macos host",
+      "startupSmokeReceiptPath": "",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": "skipped_preview",
+      "artifactSha256": "ca6c25f0cdaf48bddfe83e3e983ff87b8763d973e671100165248c9edcd044bd",
+      "artifactSizeBytes": 51703625,
       "kind": "installer"
     },
     {
-      "artifactId": "avalonia-win-x64-installer",
-      "fileName": "chummer-avalonia-win-x64-installer.exe",
-      "platform": "windows",
+      "artifactId": "blazor-desktop-osx-arm64-installer",
+      "fileName": "chummer-blazor-desktop-osx-arm64-installer.dmg",
+      "platform": "macos",
       "promotionStatus": "fail",
+      "startupSmokeStatus": "fail",
+      "startupSmokeReason": "startup-smoke receipt hostClass does not identify the macos host",
+      "startupSmokeReceiptPath": "",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": "skipped_preview",
+      "artifactSha256": "8c1f85e688667daf8ad576ab2d3152294f5d27a55b4005e059dff022356a2df4",
+      "artifactSizeBytes": 51586470,
+      "kind": "installer"
+    },
+    {
+      "artifactId": "avalonia-osx-arm64-archive",
+      "fileName": "chummer-avalonia-osx-arm64.tar.gz",
+      "platform": "macos",
+      "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
-      "signingStatus": "fail",
-      "notarizationStatus": null,
-      "artifactSha256": "cb3493c1113c23b5e496dfe8a1e6de9afc43c802d7da865adc5255497341e5c4",
-      "artifactSizeBytes": 96466473,
-      "kind": "installer"
+      "startupSmokeReceiptPath": "",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": "skipped_preview",
+      "artifactSha256": "3466279179e7be99be59097bffee666632276817383f7c22ff65b3ab4dd4f9c5",
+      "artifactSizeBytes": 45231049,
+      "kind": "archive"
+    },
+    {
+      "artifactId": "blazor-desktop-osx-arm64-archive",
+      "fileName": "chummer-blazor-desktop-osx-arm64.tar.gz",
+      "platform": "macos",
+      "promotionStatus": "pass",
+      "startupSmokeStatus": "pass",
+      "startupSmokeReason": "",
+      "startupSmokeReceiptPath": "",
+      "signingStatus": "skipped_preview",
+      "notarizationStatus": "skipped_preview",
+      "artifactSha256": "5d4f1e75a70e1c729347217ad9aa25d94fd5ba64acf51c129964f27143738df3",
+      "artifactSizeBytes": 45080078,
+      "kind": "archive"
     }
   ]
 }

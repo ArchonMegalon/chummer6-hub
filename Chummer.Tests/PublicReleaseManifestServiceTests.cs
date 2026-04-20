@@ -253,6 +253,115 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.Equal("Chummer.Hub.Registry.Contracts", document.RootElement.GetProperty("contract_name").GetString());
     }
 
+    [Fact]
+    public void LoadManifestSuppressesDisabledArtifactsAndMarksCoverageIncomplete()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["contractName"] = "Chummer.Hub.Registry.Contracts",
+            ["contract_name"] = "Chummer.Hub.Registry.Contracts",
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260420-010101",
+            ["publishedAt"] = "2026-04-20T01:01:01Z",
+            ["status"] = "published",
+            ["releaseProof"] = new Dictionary<string, object?>
+            {
+                ["status"] = "passed",
+                ["proofRoutes"] = new[]
+                {
+                    "/downloads/install/avalonia-linux-x64-installer",
+                    "/downloads/install/avalonia-win-x64-installer"
+                }
+            },
+            ["desktopTupleCoverage"] = new Dictionary<string, object?>
+            {
+                ["requiredDesktopPlatforms"] = new[] { "linux", "windows", "macos" },
+                ["requiredDesktopHeads"] = new[] { "avalonia" },
+                ["requiredDesktopPlatformHeadRidTuples"] = new[] { "avalonia:linux-x64:linux", "avalonia:win-x64:windows", "avalonia:osx-arm64:macos" },
+                ["missingRequiredPlatforms"] = Array.Empty<string>(),
+                ["missingRequiredHeads"] = Array.Empty<string>(),
+                ["missingRequiredPlatformHeadPairs"] = Array.Empty<string>(),
+                ["missingRequiredPlatformHeadRidTuples"] = Array.Empty<string>(),
+                ["promotedInstallerTuples"] = new object[]
+                {
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:linux:linux-x64", ["head"] = "avalonia", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["kind"] = "installer", ["artifactId"] = "avalonia-linux-x64-installer" },
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:windows:win-x64", ["head"] = "avalonia", ["platform"] = "windows", ["rid"] = "win-x64", ["arch"] = "x64", ["kind"] = "installer", ["artifactId"] = "avalonia-win-x64-installer" },
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:macos:osx-arm64", ["head"] = "avalonia", ["platform"] = "macos", ["rid"] = "osx-arm64", ["arch"] = "arm64", ["kind"] = "installer", ["artifactId"] = "avalonia-osx-arm64-installer" }
+                },
+                ["promotedPlatformHeads"] = new Dictionary<string, object?> { ["linux"] = new[] { "avalonia" }, ["windows"] = new[] { "avalonia" }, ["macos"] = new[] { "avalonia" } },
+                ["promotedPlatformHeadRidTuples"] = new[] { "avalonia:linux-x64:linux", "avalonia:win-x64:windows", "avalonia:osx-arm64:macos" },
+                ["externalProofRequests"] = Array.Empty<object>(),
+                ["desktopRouteTruth"] = new object[]
+                {
+                    new Dictionary<string, object?> { ["artifactId"] = "avalonia-linux-x64-installer" },
+                    new Dictionary<string, object?> { ["artifactId"] = "avalonia-win-x64-installer" }
+                },
+                ["complete"] = true
+            },
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = "linux123",
+                    ["sizeBytes"] = 1L,
+                    ["installAccessClass"] = "account_required"
+                },
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-win-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "windows",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Windows X64 Installer",
+                    ["fileName"] = "chummer-avalonia-win-x64-installer.exe",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    ["sha256"] = "win123",
+                    ["sizeBytes"] = 2L,
+                    ["installAccessClass"] = "account_required"
+                },
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-osx-arm64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "macos",
+                    ["arch"] = "arm64",
+                    ["kind"] = "dmg",
+                    ["platformLabel"] = "Avalonia Desktop macOS ARM64 Installer",
+                    ["fileName"] = "chummer-avalonia-osx-arm64-installer.dmg",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    ["sha256"] = "mac123",
+                    ["sizeBytes"] = 3L,
+                    ["installAccessClass"] = "account_required"
+                }
+            }
+        });
+
+        var manifest = fixture.CreateService(additionalSettings: new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS"] = "avalonia-win-x64-installer"
+        }).LoadManifest();
+
+        Assert.DoesNotContain(manifest.Downloads, item => string.Equals(item.Id, "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("coverage_incomplete", manifest.RolloutState);
+        Assert.Equal("review_required", manifest.SupportabilityState);
+        Assert.DoesNotContain(manifest.ProofRoutes ?? [], route => route.Contains("avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
+
+        JsonElement coverage = Assert.IsType<JsonElement>(manifest.DesktopTupleCoverage);
+        Assert.False(coverage.GetProperty("complete").GetBoolean());
+        Assert.Contains("windows", coverage.GetProperty("missingRequiredPlatforms").EnumerateArray().Select(static value => value.GetString()));
+    }
+
     private sealed class PublicReleaseManifestFixture : IDisposable
     {
         private readonly string _root;
@@ -268,7 +377,10 @@ public sealed class PublicReleaseManifestServiceTests
             Directory.CreateDirectory(_canonRoot);
         }
 
-        public PublicReleaseManifestService CreateService(HttpClient? httpClient = null, bool includeRuntimeUrl = false)
+        public PublicReleaseManifestService CreateService(
+            HttpClient? httpClient = null,
+            bool includeRuntimeUrl = false,
+            IReadOnlyDictionary<string, string?>? additionalSettings = null)
         {
             Dictionary<string, string?> settings = new()
             {
@@ -278,6 +390,14 @@ public sealed class PublicReleaseManifestServiceTests
             if (includeRuntimeUrl)
             {
                 settings["CHUMMER_RELEASE_REGISTRY_CURRENT_URL"] = "https://registry.local/api/v1/registry/release-channel/current";
+            }
+
+            if (additionalSettings is not null)
+            {
+                foreach ((string key, string? value) in additionalSettings)
+                {
+                    settings[key] = value;
+                }
             }
 
             var configuration = new ConfigurationBuilder()
