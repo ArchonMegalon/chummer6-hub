@@ -272,6 +272,7 @@ verify_live_release_projection() {
   local compatibility_url="$2"
   local canonical_url="$3"
   local response_path="${4:-}"
+  local require_compatibility_projection="${5:-0}"
 
   local live_compat_path live_canonical_path
   live_compat_path="$(mktemp)"
@@ -280,7 +281,8 @@ verify_live_release_projection() {
   curl --fail-with-body -sS "$compatibility_url" > "$live_compat_path"
   curl --fail-with-body -sS "$canonical_url" > "$live_canonical_path"
 
-  python3 - "$local_canonical_path" "$live_compat_path" "$live_canonical_path" <<'PY'
+  local projection_message=""
+  if ! projection_message="$(python3 - "$local_canonical_path" "$live_compat_path" "$live_canonical_path" "$require_compatibility_projection" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -288,6 +290,7 @@ from pathlib import Path
 local_canonical = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 live_compat = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
 live_canonical = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
+require_compatibility = str(sys.argv[4]).strip().lower() in {"1", "true", "yes", "on"}
 
 expected_ids = {
     str(item.get("artifactId") or "").strip()
@@ -322,12 +325,29 @@ canonical_ids = {
 
 missing_compat = sorted(compatibility_expected_ids - compat_ids)
 missing_canonical = sorted(expected_ids - canonical_ids)
-if missing_compat or missing_canonical:
+if missing_canonical:
     raise SystemExit(
-        "public shelf is incoherent after promotion: "
-        + f"compat installer missing={missing_compat}, canonical missing={missing_canonical}"
+        "canonical release projection is incoherent after promotion: "
+        + f"canonical missing={missing_canonical}"
     )
+if missing_compat:
+    message = (
+        "compatibility release projection is still missing installer tuples after promotion: "
+        + f"{missing_compat}. canonical release truth is already live; "
+        + "set CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION=1 to make compatibility drift fatal."
+    )
+    if require_compatibility:
+        raise SystemExit(message)
+    print(message)
 PY
+  )"; then
+    rm -f "$live_compat_path" "$live_canonical_path"
+    die "$projection_message"
+  fi
+
+  if [[ -n "$projection_message" ]]; then
+    log "$projection_message"
+  fi
 
   if [[ -f "$response_path" ]]; then
     local -a install_urls=()
@@ -3114,6 +3134,7 @@ main() {
   local publish_mode
   publish_mode="$(infer_publish_mode)"
   local verify_url="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/RELEASE_CHANNEL.generated.json}"
+  local require_compatibility_projection="${CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION:-0}"
   local upload_url="${CHUMMER_RELEASE_UPLOAD_URL:-https://chummer.run/api/internal/releases/bundles}"
   local materializer_skip_startup_smoke_filter="${CHUMMER_MATERIALIZE_SKIP_STARTUP_SMOKE_FILTER:-0}"
   local materializer_retry_without_filter="${CHUMMER_MATERIALIZE_RETRY_WITHOUT_STARTUP_SMOKE_FILTER_ON_ZERO:-}"
@@ -3746,7 +3767,7 @@ main() {
     bash scripts/verify-releases-manifest.sh "$canonical_verify_url"
 
   log "verifying live release projection at $canonical_verify_url"
-  verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$compatibility_verify_url" "$canonical_verify_url" "$response_path"
+  verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$compatibility_verify_url" "$canonical_verify_url" "$response_path" "$require_compatibility_projection"
 
   if [[ -f "$response_path" ]]; then
     chmod 600 "$response_path" 2>/dev/null || true

@@ -484,7 +484,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL", bootstrap, StringComparison.Ordinal);
         Assert.Contains("resolve_live_release_verify_urls", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("compat installer missing=", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("compatibility release projection is still missing installer tuples after promotion", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("canonical release truth is already live", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/RELEASE_CHANNEL.generated.json", bootstrap, StringComparison.Ordinal);
         Assert.Contains("-p:UseChummerEngineContractsLocalFeed=false", bootstrap, StringComparison.Ordinal);
         Assert.Contains("log_bootstrap_identity", bootstrap, StringComparison.Ordinal);
@@ -3367,8 +3368,11 @@ public sealed class VerificationEntryPointTests
         string program = File.ReadAllText(programPath);
 
         Assert.Contains("RequiresNoStoreHeaders", program, StringComparison.Ordinal);
+        Assert.Contains("IsPublicReleaseUploadBootstrapPath", program, StringComparison.Ordinal);
         Assert.Contains("IsLegacyMacReleaseBootstrapArtifactPath", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/release-upload", program, StringComparison.Ordinal);
+        Assert.Contains("/downloads/release-upload/bootstrap.sh", program, StringComparison.Ordinal);
+        Assert.Contains("context.Response.SendFileAsync(bootstrapPath)", program, StringComparison.Ordinal);
         Assert.Contains("/artifacts/mac-codex-release-pipeline/bootstrap.sh", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/proof/windows", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/install", program, StringComparison.Ordinal);
@@ -3380,6 +3384,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Surrogate-Control", program, StringComparison.Ordinal);
         Assert.Contains("no-store, max-age=0", program, StringComparison.Ordinal);
         Assert.Contains("no-cache", program, StringComparison.Ordinal);
+        Assert.Contains("app.UseExceptionHandler(errorApp =>", program, StringComparison.Ordinal);
+        Assert.Contains("Unexpected server error.", program, StringComparison.Ordinal);
+        Assert.Contains("The request could not be completed. Retry, and contact support if the problem continues.", program, StringComparison.Ordinal);
     }
 
     [Fact]

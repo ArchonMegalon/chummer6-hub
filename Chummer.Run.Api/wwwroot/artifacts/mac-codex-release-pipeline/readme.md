@@ -98,6 +98,7 @@ export CHUMMER_MAC_RELEASE_MIN_FREE_GIB="20"
 export CHUMMER_MAC_RELEASE_TMPDIR="$HOME/chummer-release-tmp"
 export CHUMMER_DESKTOP_INSTALLER_TMPDIR="$CHUMMER_MAC_RELEASE_TMPDIR/desktop-installer"
 export CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE="0"
+export CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION="0"
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE=""      # optional explicit local release-proof JSON path
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH=""      # optional explicit local release-proof JSON path (preferred when precomputed)
 export CHUMMER_HUB_LOCAL_RELEASE_PROOF_BASE_URL="https://chummer.run"
@@ -128,6 +129,7 @@ Notes:
    - Override `CHUMMER_DESKTOP_INSTALLER_TMPDIR` separately only when you intentionally want installer-image temp files on a different volume.
 11. If upload session requests return 4xx/5xx, upload now retries those requests first. Direct multipart promotion is available only when you opt in with `CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1`.
    - 400/401/403 responses are surfaced immediately with a parsed payload summary and stop-retry guidance.
+12. Post-publish success is gated on the canonical `RELEASE_CHANNEL.generated.json` projection. `releases.json` is still fetched and checked, but compatibility drift is warning-only unless you set `CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION=1`.
 ``` 
 
 Single-head overrides are still supported:

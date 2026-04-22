@@ -441,12 +441,15 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("BOOTSTRAP_KEEP_UPLOAD_RESPONSE=\"$keep_upload_response\"", template, StringComparison.Ordinal);
         Assert.Contains("removed sensitive release upload response file", template, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-0", template, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION", template, StringComparison.Ordinal);
         Assert.Contains("local fallback_release_proof_url=\"${CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL:-}\"", template, StringComparison.Ordinal);
         Assert.Contains("local fallback_ui_localization_release_gate_url=\"${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}\"", template, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \\", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$canonical_verify_url\"", template, StringComparison.Ordinal);
         Assert.Contains("resolve_live_release_verify_urls \"$verify_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("compatibility release projection is still missing installer tuples after promotion", template, StringComparison.Ordinal);
+        Assert.Contains("canonical release truth is already live", template, StringComparison.Ordinal);
         Assert.Contains("curl --fail-with-body -sS \"$compatibility_url\"", template, StringComparison.Ordinal);
         Assert.Contains("curl --fail-with-body -sS \"$canonical_url\"", template, StringComparison.Ordinal);
         Assert.DoesNotContain("curl --fail-with-body -fsS \"$compatibility_url\"", template, StringComparison.Ordinal);
