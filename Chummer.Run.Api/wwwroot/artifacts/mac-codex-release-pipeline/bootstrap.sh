@@ -294,6 +294,21 @@ expected_ids = {
     for item in local_canonical.get("artifacts") or []
     if isinstance(item, dict) and str(item.get("artifactId") or "").strip()
 }
+
+compatibility_expected_ids = {
+    str(item.get("artifactId") or "").strip()
+    for item in local_canonical.get("artifacts") or []
+    if isinstance(item, dict)
+    and str(item.get("artifactId") or "").strip()
+    and (
+        str(item.get("kind") or "").strip().lower() == "installer"
+        or (
+            not str(item.get("kind") or "").strip()
+            and str(item.get("artifactId") or "").strip().lower().endswith("-installer")
+        )
+    )
+}
+
 compat_ids = {
     str(item.get("id") or "").strip()
     for item in live_compat.get("downloads") or []
@@ -305,12 +320,12 @@ canonical_ids = {
     if isinstance(item, dict) and str(item.get("artifactId") or "").strip()
 }
 
-missing_compat = sorted(expected_ids - compat_ids)
+missing_compat = sorted(compatibility_expected_ids - compat_ids)
 missing_canonical = sorted(expected_ids - canonical_ids)
 if missing_compat or missing_canonical:
     raise SystemExit(
         "public shelf is incoherent after promotion: "
-        + f"compat missing={missing_compat}, canonical missing={missing_canonical}"
+        + f"compat installer missing={missing_compat}, canonical missing={missing_canonical}"
     )
 PY
 
@@ -345,6 +360,20 @@ PY
   fi
 
   rm -f "$live_compat_path" "$live_canonical_path"
+}
+
+resolve_live_release_verify_urls() {
+  local requested="$1"
+  if [[ "$requested" == */releases.json ]]; then
+    printf '%s|%s\n' "$requested" "${requested%/releases.json}/RELEASE_CHANNEL.generated.json"
+    return 0
+  fi
+  if [[ "$requested" == */RELEASE_CHANNEL.generated.json ]]; then
+    printf '%s|%s\n' "${requested%/RELEASE_CHANNEL.generated.json}/releases.json" "$requested"
+    return 0
+  fi
+  local base="${requested%/}"
+  printf '%s|%s\n' "$base/releases.json" "$base/RELEASE_CHANNEL.generated.json"
 }
 
 resolve_head_build_metadata() {
@@ -3084,7 +3113,7 @@ main() {
   local temp_root="${CHUMMER_MAC_RELEASE_TMPDIR:-$work_root/tmp}"
   local publish_mode
   publish_mode="$(infer_publish_mode)"
-  local verify_url="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/releases.json}"
+  local verify_url="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-https://chummer.run/downloads/RELEASE_CHANNEL.generated.json}"
   local upload_url="${CHUMMER_RELEASE_UPLOAD_URL:-https://chummer.run/api/internal/releases/bundles}"
   local materializer_skip_startup_smoke_filter="${CHUMMER_MATERIALIZE_SKIP_STARTUP_SMOKE_FILTER:-0}"
   local materializer_retry_without_filter="${CHUMMER_MATERIALIZE_RETRY_WITHOUT_STARTUP_SMOKE_FILTER_ON_ZERO:-}"
@@ -3102,6 +3131,8 @@ main() {
     log "manifest retry without startup-smoke filter is enabled on zero-manifest projection"
   fi
   validate_publish_mode "$publish_mode" "$upload_url"
+  local compatibility_verify_url canonical_verify_url
+  IFS='|' read -r compatibility_verify_url canonical_verify_url < <(resolve_live_release_verify_urls "$verify_url")
   local release_upload_curl_config=""
   if [[ "$publish_mode" == "http" ]]; then
     release_upload_curl_config="$(mktemp)"
@@ -3710,13 +3741,12 @@ main() {
   CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
     bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"
 
-  log "verifying live manifest at $verify_url"
+  log "verifying live canonical manifest at $canonical_verify_url"
   CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
-    bash scripts/verify-releases-manifest.sh "$verify_url"
+    bash scripts/verify-releases-manifest.sh "$canonical_verify_url"
 
-  local canonical_verify_url="${verify_url%/releases.json}/RELEASE_CHANNEL.generated.json"
   log "verifying live release projection at $canonical_verify_url"
-  verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$verify_url" "$canonical_verify_url" "$response_path"
+  verify_live_release_projection "$dist_dir/RELEASE_CHANNEL.generated.json" "$compatibility_verify_url" "$canonical_verify_url" "$response_path"
 
   if [[ -f "$response_path" ]]; then
     chmod 600 "$response_path" 2>/dev/null || true

@@ -43,6 +43,24 @@ to_bool() {
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
 
+prompt_for_upload_token() {
+  if [[ ! -t 0 ]]; then
+    return 1
+  fi
+
+  printf 'Paste the release upload handoff code or bearer token (input hidden): ' >&2
+  IFS= read -r -s TOKEN || return 1
+  printf '\n' >&2
+  [[ -n "${TOKEN:-}" ]]
+}
+
+write_auth_curl_config() {
+  local config_path="$1"
+  chmod 600 "$config_path"
+  printf '%s' "$TOKEN" | python3 -c 'from pathlib import Path; import sys; config_path = Path(sys.argv[1]); token = sys.stdin.read(); escaped = token.replace("\\\\", "\\\\\\\\").replace("\"", "\\\\\""); config_path.write_text(f"header = \"Authorization: Bearer {escaped}\"\n", encoding="utf-8")' "$config_path"
+  TOKEN=""
+}
+
 resolve_json_field() {
   local json_path="$1"
   shift
@@ -187,13 +205,16 @@ if to_bool "$DRY_RUN"; then
   echo "Files staged: $file_count"
   echo
   echo "Exact live publish command:"
-  echo "CHUMMER_RELEASE_UPLOAD_TOKEN='<release-upload-ticket-or-internal-token>' CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='$VERIFY_URL' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
+  echo "CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='$VERIFY_URL' bash '$SCRIPT_DIR/publish-download-bundle-http.sh' '$BUNDLE_DIR'"
+  echo "If CHUMMER_RELEASE_UPLOAD_TOKEN is unset, the script will prompt for it with hidden input."
   exit 0
 fi
 
 if [[ -z "$TOKEN" ]]; then
-  echo "Set CHUMMER_RELEASE_UPLOAD_TOKEN for live HTTP upload." >&2
-  exit 1
+  prompt_for_upload_token || {
+    echo "Set CHUMMER_RELEASE_UPLOAD_TOKEN for live HTTP upload." >&2
+    exit 1
+  }
 fi
 
 tmp_root="$(mktemp -d)"
@@ -202,8 +223,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
+auth_curl_config="$tmp_root/upload-auth.curl"
+write_auth_curl_config "$auth_curl_config"
+
 request_common=(
-  -H "Authorization: Bearer $TOKEN"
+  --config "$auth_curl_config"
   -H "Accept: application/json"
 )
 

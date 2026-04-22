@@ -70,7 +70,7 @@ Optional overrides:
 
 ```bash
 export CHUMMER_RELEASE_UPLOAD_URL="https://chummer.run/api/internal/releases/bundles"
-export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="https://chummer.run/downloads/releases.json"
+export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="https://chummer.run/downloads/RELEASE_CHANNEL.generated.json"
 export CHUMMER_RELEASE_UPLOAD_TICKET=""                # optional interactive handoff code override for non-prompted runs
 export CHUMMER_RELEASE_UPLOAD_TOKEN=""                 # optional explicit bearer token for CI or non-interactive runs
 export CHUMMER_RELEASE_CHANNEL="preview"
@@ -142,9 +142,10 @@ export CHUMMER_RELEASE_APP="blazor-desktop"
 
 When the upload succeeds:
 
-1. the promoted artifact is merged into the live `https://chummer.run/downloads/releases.json` shelf without dropping other platforms
-2. the direct file URLs become reachable under `/downloads/files/...`
-3. the signed-in claim-code handoffs appear at `/downloads/install/{artifactId}`
+1. the promoted artifact is merged into the canonical live `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json` shelf without dropping other platforms
+2. `https://chummer.run/downloads/releases.json` remains coherent as the installer-oriented compatibility view
+3. the direct file URLs become reachable under `/downloads/files/...`
+4. the signed-in claim-code handoffs appear at `/downloads/install/{artifactId}`
 
 For macOS signed releases, the promoted artifact will only be visible publicly when the uploaded bundle includes:
 

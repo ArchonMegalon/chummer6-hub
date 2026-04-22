@@ -19,6 +19,13 @@ It should take the now-hard flagship bar and make it boring:
 10. measured product-governor cadence.
 
 The machine-readable control plane for this follow-on wave lives in `NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml`.
+The sharper product-centering overlay for this wave lives in `CONFIDENCE_READINESS_AND_CONTINUITY_GUIDE.md` and `CONFIDENCE_READINESS_AND_CONTINUITY_REGISTRY.yaml`.
+
+The user-facing test for whether this quarter is actually working is simpler:
+
+* confidence: numbers and legality stay inspectable
+* readiness: players and GMs know what to do next at the table
+* continuity: the campaign remembers what happened
 
 ## Activation rule
 

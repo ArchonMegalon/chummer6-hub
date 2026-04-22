@@ -3,6 +3,7 @@
 ## North star
 
 Chummer becomes the explainable Shadowrun campaign OS.
+Chummer6 keeps Shadowrun understandable when the game gets complicated.
 
 The product wedge is still character building, but the finished product is not merely a next character builder.
 The finished product is the system players and GMs trust when Shadowrun gets complicated:
@@ -28,6 +29,17 @@ For GMs:
 For groups:
 
 * When something goes wrong, we recover calmly with receipts.
+
+## Confidence, readiness, continuity
+
+The daily product promises should be legible in plain language:
+
+* confidence: my numbers are right, and I can see why
+* readiness: I know what to do next at the table
+* continuity: the campaign remembers what happened
+
+These are not marketing garnish.
+They are the user-facing interpretation of deterministic truth, explainability, and campaign memory.
 
 ## Three rings
 
@@ -84,6 +96,15 @@ The character builder is the acquisition wedge.
 The campaign ledger is the retention engine.
 Roster, runs, scenes, objectives, debts, downtime, advancement, rules environment, session receipts, and recovery state are product surfaces, not side notes.
 
+### 3A. The product has four named surfaces
+
+Chummer should be legible as four surfaces, not one blurry everything-suite:
+
+* Chummer Build
+* Chummer Play
+* Chummer Campaign
+* Chummer Exchange
+
 ### 4. Workbench and play are different products
 
 `chummer6-ui` is the builder/workbench/admin surface.
@@ -128,6 +149,17 @@ A GM can run live sessions and long campaigns from a reliable campaign ledger an
 ### Group
 
 A group can survive disconnects, imports, updates, house-rule drift, and disputed modifiers without panic because the recovery path is receipt-backed, inspectable, and calm.
+
+## Repeat-use rule
+
+The good loop is continuity, not compulsion.
+
+Users should return because:
+
+* the campaign lives here
+* the product remembers what the table would otherwise forget
+* prep and play feel lighter
+* recovery is calmer than ad hoc notes
 
 ### Creator / publisher
 

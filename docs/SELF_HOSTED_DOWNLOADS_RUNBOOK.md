@@ -85,7 +85,8 @@ Required live sequence:
 3. Rebuild the current unified shelf bundle:
 `bash scripts/materialize-public-downloads-bundle.sh`
 4. Upload the rebuilt bundle to the live shelf:
-`CHUMMER_RELEASE_UPLOAD_TOKEN=<ticket-or-token> RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
+`RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
+   - If `CHUMMER_RELEASE_UPLOAD_TOKEN` is unset, the upload step now prompts for it with hidden input instead of requiring an inline shell assignment.
 
 Mac release bootstrap note:
 1. The hosted mac bootstrap now defaults temporary packaging work to the run workspace and exports:

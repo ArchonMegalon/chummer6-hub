@@ -213,6 +213,7 @@ public sealed record ReleaseUploadPageViewModel(
     string Heading,
     string Summary,
     string Command,
+    string HandoffCode,
     string BootstrapUrl,
     DateTimeOffset TicketExpiresAtUtc,
     string UploadUrl,
