@@ -11875,7 +11875,7 @@ def main() -> int:
     routes = [
         AuditRoute(
             "/",
-            "Create account to get preview",
+            "Create account to install",
             required_texts=(
                 "Final pool 9",
                 "Who can get it now",
@@ -11912,13 +11912,15 @@ def main() -> int:
         AuditRoute(
             "/downloads",
             "Install the current preview",
-            required_texts=("Sign in", "Get preview build", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"),
+            required_texts=("Sign in", "Create account to install", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"),
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
         AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Available today", "Preview in progress", "Status guide", "These are the artifacts you can use or inspect against the current preview today."), expects_header_count=1),
         AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "Use and verify this proof", "What this live artifact shows, who it helps, and what to check next", "Start from the live surface", "Open current release", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Anyone evaluating the preview", "Why this horizon matters now", "Current pain, expected unlock, and the live proof you should compare first", "Compare with current proof", "Need a decision instead?", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/shadowcasters-network", "SHADOWCASTERS NETWORK", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "See the world-state foundation", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/black-ledger", "BLACK LEDGER", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "See the related artifact preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute(
             "/participate",
             "Choose how to participate",

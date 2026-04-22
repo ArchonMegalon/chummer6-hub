@@ -1,13 +1,13 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-04-16T19:01:44Z",
-  "as_of": "2026-04-16",
+  "generated_at": "2026-04-22T06:10:04Z",
+  "as_of": "2026-04-22",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
-  "summary": "Campaign Breadth and Promotion remains the active wave; journey proof is ready; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
-  "active_wave": "Campaign Breadth and Promotion",
+  "summary": "Next 12 Biggest Wins remains the active wave; journey proof is ready; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
+  "active_wave": "Next 12 Biggest Wins",
   "active_wave_status": "complete",
   "release_health": {
     "state": "green_or_explained",
@@ -15,8 +15,8 @@
     "front_door_wave_closed": true
   },
   "flagship_readiness": {
-    "state": "watch",
-    "reason": "Flagship readiness is still constrained by blocked journey proof or missing local release proof."
+    "state": "ready",
+    "reason": "Journey gates are ready and local release proof passed."
   },
   "rule_environment_trust": {
     "state": "ready",
@@ -38,11 +38,11 @@
   },
   "top_support_or_feedback_clusters": [
     {
-      "cluster_id": "campaign_os_indispensable_and_launch_scale",
-      "summary": "Campaign Breadth and Promotion is the post-post-audit additive pressure cluster: make the campaign OS indispensable, widen Build and Explain, strengthen exchange and publication, and turn trust plus operator depth into launch-scale product posture.",
+      "cluster_id": "next12_trust_publication_launch_scale",
+      "summary": "Next 12 Biggest Wins is the active pressure cluster: finish install-specific trust/support truth, creator publication and shelf posture, pulse-v3 launch governance, and no-step-back utility parity.",
       "source_paths": [
         "products/chummer/ROADMAP.md",
-        "products/chummer/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml"
+        "products/chummer/NEXT_12_BIGGEST_WINS_REGISTRY.yaml"
       ]
     },
     {
@@ -67,9 +67,9 @@
   "public_promise_drift_count": 0,
   "governor_decisions": [
     {
-      "decision_id": "2026-04-16-closeout-and-continue-campaign-breadth-and-promotion",
-      "action": "closeout_and_continue",
-      "reason": "Keep the recommended wave on Campaign Breadth and Promotion now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 16 snapshots, and the pacing risk is still concentrated in Core Engine rather than in reopened foundation, campaign-middle, or trust-surface blockers.",
+      "decision_id": "2026-04-22-focus-next-12-biggest-wins",
+      "action": "focus_shift",
+      "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 16 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
       "cited_signals": [
         "overall_progress_percent=100",
         "history_snapshot_count=16",
@@ -80,15 +80,19 @@
       ]
     },
     {
-      "decision_id": "2026-04-16-launch-governance",
+      "decision_id": "2026-04-22-launch-governance",
       "action": "freeze_launch",
-      "reason": "Freeze launch expansion until fresh local release proof passes on the public edge.",
+      "reason": "Freeze launch expansion until successor dependency work task(s) 101.4, 102.2, 102.3, 104.4, 105.3, 105.4 close in the next-90-day registry.",
       "cited_signals": [
         "journey_gate_state=ready",
         "journey_gate_blocked_count=0",
-        "local_release_proof_status=unknown",
-        "provider_canary_status=Canary evidence is still accumulating",
-        "closure_health_state=clear"
+        "local_release_proof_status=passed",
+        "provider_canary_status=Canary green on all active lanes",
+        "closure_health_state=clear",
+        "successor_dependency_state=blocked",
+        "successor_open_dependency_ids=101,102,104,105",
+        "successor_open_dependency_work_task_ids=101.4,102.2,102.3,104.4,105.3,105.4",
+        "status_plane_final_claim_status=fail"
       ]
     }
   ],
@@ -100,8 +104,8 @@
       "front_door_wave_closed": true
     },
     "flagship_readiness": {
-      "state": "watch",
-      "reason": "Flagship readiness is still constrained by blocked journey proof or missing local release proof."
+      "state": "ready",
+      "reason": "Journey gates are ready and local release proof passed."
     },
     "rule_environment_trust": {
       "state": "ready",
@@ -123,11 +127,11 @@
     },
     "top_support_or_feedback_clusters": [
       {
-        "cluster_id": "campaign_os_indispensable_and_launch_scale",
-        "summary": "Campaign Breadth and Promotion is the post-post-audit additive pressure cluster: make the campaign OS indispensable, widen Build and Explain, strengthen exchange and publication, and turn trust plus operator depth into launch-scale product posture.",
+        "cluster_id": "next12_trust_publication_launch_scale",
+        "summary": "Next 12 Biggest Wins is the active pressure cluster: finish install-specific trust/support truth, creator publication and shelf posture, pulse-v3 launch governance, and no-step-back utility parity.",
         "source_paths": [
           "products/chummer/ROADMAP.md",
-          "products/chummer/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml"
+          "products/chummer/NEXT_12_BIGGEST_WINS_REGISTRY.yaml"
         ]
       },
       {
@@ -152,9 +156,9 @@
     "public_promise_drift_count": 0,
     "governor_decisions": [
       {
-        "decision_id": "2026-04-16-closeout-and-continue-campaign-breadth-and-promotion",
-        "action": "closeout_and_continue",
-        "reason": "Keep the recommended wave on Campaign Breadth and Promotion now that the Post-Audit Next 20 Big Wins program is materially closed. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 16 snapshots, and the pacing risk is still concentrated in Core Engine rather than in reopened foundation, campaign-middle, or trust-surface blockers.",
+        "decision_id": "2026-04-22-focus-next-12-biggest-wins",
+        "action": "focus_shift",
+        "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 16 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
         "cited_signals": [
           "overall_progress_percent=100",
           "history_snapshot_count=16",
@@ -165,32 +169,62 @@
         ]
       },
       {
-        "decision_id": "2026-04-16-launch-governance",
+        "decision_id": "2026-04-22-launch-governance",
         "action": "freeze_launch",
-        "reason": "Freeze launch expansion until fresh local release proof passes on the public edge.",
+        "reason": "Freeze launch expansion until successor dependency work task(s) 101.4, 102.2, 102.3, 104.4, 105.3, 105.4 close in the next-90-day registry.",
         "cited_signals": [
           "journey_gate_state=ready",
           "journey_gate_blocked_count=0",
-          "local_release_proof_status=unknown",
-          "provider_canary_status=Canary evidence is still accumulating",
-          "closure_health_state=clear"
+          "local_release_proof_status=passed",
+          "provider_canary_status=Canary green on all active lanes",
+          "closure_health_state=clear",
+          "successor_dependency_state=blocked",
+          "successor_open_dependency_ids=101,102,104,105",
+          "successor_open_dependency_work_task_ids=101.4,102.2,102.3,104.4,105.3,105.4",
+          "status_plane_final_claim_status=fail"
         ]
       }
     ],
     "next_checkpoint_question": "What is the smallest cross-repo slice that makes the campaign OS indispensable and turns trust, adoption, and publication depth into a real launch advantage?"
   },
   "supporting_signals": {
-    "current_recommended_wave": "Campaign Breadth and Promotion",
+    "current_recommended_wave": "Next 12 Biggest Wins",
     "overall_progress_percent": 100,
     "phase_label": "Public-fit polish",
     "history_snapshot_count": 16,
     "longest_pole": "Core Engine",
-    "launch_readiness": "Hold launch expansion pending fresh local release proof on the public edge.",
+    "launch_readiness": "Hold launch expansion until successor dependency work task(s) 101.4, 102.2, 102.3, 104.4, 105.3, 105.4 close in the next-90-day registry.",
     "provider_route_stewardship": {
       "default_status": "Pilot defaults are governed",
-      "canary_status": "Canary evidence is still accumulating",
-      "review_due": "2026-04-30",
-      "next_decision": "Hold broad promotion until public route canary coverage exists."
+      "canary_status": "Canary green on all active lanes",
+      "review_due": "2026-05-06",
+      "next_decision": "Promote once canaries stay green and support fallout remains clear through the next route review."
+    },
+    "successor_dependency_posture": {
+      "state": "blocked",
+      "milestone_id": 106,
+      "dependency_ids": [
+        101,
+        102,
+        103,
+        104,
+        105
+      ],
+      "open_dependency_ids": [
+        101,
+        102,
+        104,
+        105
+      ],
+      "open_dependency_work_task_ids": [
+        "101.4",
+        "102.2",
+        "102.3",
+        "104.4",
+        "105.3",
+        "105.4"
+      ],
+      "summary": "Successor launch dependency work tasks remain open in the next-90-day registry: 101.4, 102.2, 102.3, 104.4, 105.3, 105.4."
     },
     "journey_gate_source": "/docker/fleet/.codex-studio/published/JOURNEY_GATES.generated.json",
     "post_audit_next20_status": "complete",
@@ -217,12 +251,12 @@
       "summary": "0 waiting closure / 0 pending human response. 0 open support packets across 0 reported cases."
     },
     "adoption_health": {
-      "state": "early",
-      "local_release_proof_status": "unknown",
-      "proven_journey_count": 0,
-      "proven_route_count": 0,
+      "state": "clear",
+      "local_release_proof_status": "passed",
+      "proven_journey_count": 5,
+      "proven_route_count": 8,
       "history_snapshot_count": 16,
-      "summary": "Current local edge proof is unknown. Journey-proof evidence is still accumulating. 16 weekly snapshots are on record for the current public trust posture."
+      "summary": "Current local edge proof passed. 5 journey proofs and 8 trust routes are on record. 16 weekly snapshots are on record for the current public trust posture."
     },
     "progress_trend": {
       "state": "moving",

@@ -9,6 +9,10 @@ if [[ -z "${TARGET}" ]]; then
   exit 1
 fi
 
+if [[ "$TARGET" =~ ^https?://[^[:space:]]+$ && "$TARGET" != *.json ]]; then
+  TARGET="${TARGET%/}/downloads/releases.json"
+fi
+
 if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
   echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2
   exit 1

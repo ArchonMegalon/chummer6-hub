@@ -13,7 +13,8 @@
     var hasWindowsProofRail = windowsProofInstallers.Count > 0;
     var requestedWindowsUnavailable = requestedPlatformUnavailable && string.Equals(deviceLabel, "Windows", StringComparison.OrdinalIgnoreCase);
     var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0;
-    var hasAdvancedPanels = hasAdvancedDownloads || hasWindowsProofRail || release.PlatformAvailability.Count > 0;
+    var showPlatformShelf = release.PlatformAvailability.Count > 0;
+    var hasAdvancedPanels = hasAdvancedDownloads || hasWindowsProofRail;
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)
@@ -55,13 +56,13 @@
         <p class="release-stage__note">
             @(platformShelfNotice
                 ? requestedWindowsUnavailable && hasWindowsProofRail
-                    ? "Windows is still in preview rollout. If you need the current preview installer, open the Windows section below."
+                    ? "Windows is not promoted for this browser on the current public shelf. Check the main platform downloads below, and use the Windows verification rail only if support points you there."
                     : release.PlatformShelfNoticeSummary
                 : recommendedUsesMacSetupScript
                         ? "On macOS, the default path is the signed-in setup handoff. It gives you one Terminal command for this install."
                     : guestGateRequired
                         ? release.GuestGateSummary
-                        : "Other platforms, manual packages, and technical detail stay collapsed underneath.")
+                        : "Other platforms stay on the main platform downloads shelf below. Manual packages and technical detail stay collapsed underneath.")
         </p>
     </div>
 </section>
@@ -110,7 +111,7 @@ else
                         <a class="button-like button-like--secondary" href="#platform-shelf">See other platforms</a>
                         @if (requestedWindowsUnavailable && hasWindowsProofRail)
                         {
-                            <a class="button-like button-like--ghost" href="#windows-proof-rail">Open Windows preview build</a>
+                            <a class="button-like button-like--ghost" href="#windows-verification-rail">Open Windows verification rail</a>
                         }
                     }
                     else if (guestGateRequired)
@@ -135,12 +136,22 @@ else
                             : "After install, open Chummer and use Load Demo Runner to inspect the bundled Soma-Career.chum5 sample before starting blank.")
                     </p>
                     <div class="stacked-actions">
-                        <a class="button-like button-like--ghost" href="/now">What works today</a>
+                        <a class="button-like button-like--ghost" href="/now">Open current release</a>
                         <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
                         <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     </div>
-                    <p class="muted-copy">Known issues and install help stay nearby. Deeper release evidence lives on the status pages, not in front of the install button.</p>
-                    <p class="muted-copy">Release notes and known issues are both tied to this surface, so install confidence stays truthful even while release shelves evolve.</p>
+                    <details class="release-accordion">
+                        <summary>Release notes, known issues, and requirements</summary>
+                        <div class="release-accordion__body">
+                            <p class="muted-copy">Known issues and install help stay nearby. Deeper release evidence lives on the current-release and status surfaces, not in front of the install button.</p>
+                            <p class="muted-copy">Release notes and known issues stay tied to this shelf, so install confidence remains truthful even while release shelves evolve.</p>
+                            <div class="stacked-actions">
+                                <a class="button-like button-like--ghost" href="/now">Open current release</a>
+                                <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                                <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                            </div>
+                        </div>
+                    </details>
                 }
                 @if (hasAdvancedPanels)
                 {
@@ -151,6 +162,32 @@ else
             </div>
         </article>
     </section>
+
+    @if (showPlatformShelf)
+    {
+        <section class="release-shelf" id="platform-shelf">
+            <div class="downloads-advanced-group">
+                <h2 class="downloads-subheading">Main platform downloads</h2>
+                <p class="muted-copy">Published installers for each supported platform stay visible here on the main downloads page. Manual packages and support-only rails stay lower on the page.</p>
+                <div class="downloads-platform-grid">
+                    @foreach (var platform in release.PlatformAvailability)
+                    {
+                        var platformOption = ResolvePlatformOption(platform.PlatformId);
+                        <article class="downloads-platform-card">
+                            <span class="platform-pill">@platform.StatusLabel</span>
+                            <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
+                            <p>@platform.Summary</p>
+                            <p class="muted-copy">@platform.PrimaryPackageLabel · @platform.SupportabilityLabel</p>
+                            @if (platformOption is not null)
+                            {
+                                <a class="button-like button-like--ghost" href="@platformOption.DispatchHref">@platformOption.ActionLabel</a>
+                            }
+                        </article>
+                    }
+                </div>
+            </div>
+        </section>
+    }
 
     @if (hasAdvancedPanels)
     {
@@ -190,34 +227,11 @@ else
                         </div>
                     </div>
 
-                    @if (release.PlatformAvailability.Count > 0)
-                    {
-                        <div class="downloads-advanced-group" id="platform-shelf">
-                            <h3 class="downloads-subheading">Platform shelf</h3>
-                            <div class="downloads-platform-grid">
-                                @foreach (var platform in release.PlatformAvailability)
-                                {
-                                    var platformOption = ResolvePlatformOption(platform.PlatformId);
-                                    <article class="downloads-platform-card">
-                                        <span class="platform-pill">@platform.StatusLabel</span>
-                                        <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
-                                        <p>@platform.Summary</p>
-                                        <p class="muted-copy">@platform.PrimaryPackageLabel · @platform.SupportabilityLabel</p>
-                                        @if (platformOption is not null)
-                                        {
-                                            <a class="button-like button-like--ghost" href="@platformOption.DispatchHref">@platformOption.ActionLabel</a>
-                                        }
-                                    </article>
-                                }
-                            </div>
-                        </div>
-                    }
-
                     @if (hasWindowsProofRail)
                     {
-                        <div class="downloads-advanced-group" id="windows-proof-rail">
-                            <h3 class="downloads-subheading">Windows preview build</h3>
-                            <p class="muted-copy">Windows installers are available here while the main Windows shelf catches up to this build.</p>
+                        <div class="downloads-advanced-group" id="windows-verification-rail">
+                            <h3 class="downloads-subheading">Windows verification and support rail</h3>
+                            <p class="muted-copy">These direct Windows installers stay available for verification and support when a proof or support flow points to a specific build beyond the main platform shelf.</p>
                             <div class="evidence-row-list">
                                 @foreach (var proofInstaller in windowsProofInstallers)
                                 {
@@ -227,14 +241,14 @@ else
                                     <article class="evidence-row evidence-row--download">
                                         <div class="evidence-row__copy">
                                             <h3>@headLabel Windows x64 installer</h3>
-                                            <p>Windows preview installer. Use this when you need the current Windows build directly from chummer.run before it moves onto the main Windows shelf.</p>
+                                            <p>Direct Windows installer for verification and support. Use this when a proof or support flow points to this specific build.</p>
                                         </div>
                                         <div class="download-row__meta">
-                                            <span class="platform-pill">Preview build</span>
+                                            <span class="platform-pill">Support rail</span>
                                             <span class="muted-copy">Windows x64</span>
                                             <code class="mono-receipt">SHA @proofInstaller.Sha256[..Math.Min(proofInstaller.Sha256.Length, 16)]...</code>
                                         </div>
-                                        <a class="button-like button-like--ghost" href="/downloads/install/@Uri.EscapeDataString(proofInstaller.ArtifactId)">Open preview installer</a>
+                                        <a class="button-like button-like--ghost" href="/downloads/install/@Uri.EscapeDataString(proofInstaller.ArtifactId)">Open installer</a>
                                     </article>
                                 }
                             </div>

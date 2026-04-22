@@ -1023,7 +1023,7 @@
                         @if (IsNavigableAccountRoute(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute))
                         {
                             <p class="muted-copy">
-                                <a href="@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute">@entitlementSyncReceipts.ReceiptStatus.RecoveryActionLabel</a>
+                                <a href="@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(entitlementSyncReceipts.ReceiptStatus.RecoveryRoute)</a>
                             </p>
                         }
                         @if (entitlementSyncReceipts.ProvenanceRecoveryReceipts.Count == 0)
@@ -1880,7 +1880,7 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
                                         @if (IsNavigableAccountRoute(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute))
                                         {
-                                            <a href="@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute">@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryActionLabel</a>
+                                            <a href="@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute">@DescribeRecoveryRouteAction(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute)</a>
                                         }
                                     </div>
                                     <div class="settings-summary-row">

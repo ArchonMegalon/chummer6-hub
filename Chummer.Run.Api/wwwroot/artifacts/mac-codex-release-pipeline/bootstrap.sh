@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# Pinned repo refs for every release-upload entry point: signed-in, public curl, and repo-local wrapper.
+export CHUMMER_UI_REF='main'
+export CHUMMER_UI_EXPECTED_COMMIT='ee693310b35a0574e000eabdf86461b7c1f2664e'
+export CHUMMER_CORE_REF='main'
+export CHUMMER_CORE_EXPECTED_COMMIT='ae55923f1cb6c8fdf40748f7e2600815be123e1e'
+export CHUMMER_HUB_REF='release-upload-hub-proof-routes-20260419'
+export CHUMMER_HUB_EXPECTED_COMMIT='5dcde8a9746ecb2f02c70e8181be662f198af84d'
+export CHUMMER_UI_KIT_REF='fleet/ui-kit'
+export CHUMMER_UI_KIT_EXPECTED_COMMIT='7fe7265d84b5574b7a02fb56dd1015efadf44312'
+export CHUMMER_HUB_REGISTRY_REF='main'
+export CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT='6efcceb44dc1cafe4d5d141f402f79c35d15b1ef'
+export CHUMMER_MEDIA_FACTORY_REF='main'
+export CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT='e16286ca8c9bad84ff217466c72721ebcdbf48b5'
+export CHUMMER_LEGACY_REF='Docker'
+export CHUMMER_LEGACY_EXPECTED_COMMIT='0b8636d5a852e375409bf565b9ac9b4180ba4524'
 set -euo pipefail
 umask 077
 
@@ -1341,20 +1356,30 @@ clone_or_update() {
     "$@"
   }
 
-  if [[ -d "$target_dir/.git" ]]; then
-    log "updating $(basename "$target_dir") -> $ref"
+  fetch_checkout_target() {
+    local fetch_target="$ref"
+    if [[ -n "$expected_commit" ]]; then
+      fetch_target="$expected_commit"
+    fi
+
     run_git_cmd_with_retries \
-      "updating $(basename "$target_dir")" \
+      "fetching $(basename "$target_dir")" \
       with_git_transport_tuning \
       git \
       -C "$target_dir" \
-      fetch --depth 1 origin "$ref"
+      fetch --depth 1 origin "$fetch_target"
     run_git_cmd_with_retries \
       "checking out $(basename "$target_dir")" \
       with_git_transport_tuning \
       git \
       -C "$target_dir" \
       checkout -q FETCH_HEAD
+  }
+
+  if [[ -d "$target_dir/.git" ]]; then
+    log "updating $(basename "$target_dir") -> $ref"
+    run_git_cmd git -C "$target_dir" remote set-url origin "$repo_url"
+    fetch_checkout_target
     verify_checkout_expected_commit "$target_dir" "$ref" "$expected_commit"
     return 0
   fi
@@ -1365,12 +1390,20 @@ clone_or_update() {
     mv "$target_dir" "$stale_target"
   fi
 
-  log "cloning $(basename "$target_dir") -> $ref"
-  run_git_cmd_with_retries \
-    "cloning $(basename "$target_dir")" \
-    with_git_transport_tuning \
-    git \
-    clone --depth 1 --branch "$ref" "$repo_url" "$target_dir"
+  if [[ -n "$expected_commit" ]]; then
+    log "cloning $(basename "$target_dir") -> $ref (pinned $expected_commit)"
+    run_git_cmd mkdir -p "$target_dir"
+    run_git_cmd git -C "$target_dir" init -q
+    run_git_cmd git -C "$target_dir" remote add origin "$repo_url"
+    fetch_checkout_target
+  else
+    log "cloning $(basename "$target_dir") -> $ref"
+    run_git_cmd_with_retries \
+      "cloning $(basename "$target_dir")" \
+      with_git_transport_tuning \
+      git \
+      clone --depth 1 --branch "$ref" "$repo_url" "$target_dir"
+  fi
   verify_checkout_expected_commit "$target_dir" "$ref" "$expected_commit"
 }
 

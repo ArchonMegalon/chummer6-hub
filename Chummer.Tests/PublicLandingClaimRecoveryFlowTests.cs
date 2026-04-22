@@ -8,10 +8,12 @@ public sealed class PublicLandingClaimRecoveryFlowTests
     public void SignedInDispatchAndAccountAccessKeepRecoveryInInstallerOrAppFlow()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string releaseSelectionPath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "ReleaseSelectionService.cs");
         string dispatchViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml");
         string accountViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
 
         string controller = File.ReadAllText(controllerPath);
+        string releaseSelection = File.ReadAllText(releaseSelectionPath);
         string dispatchView = File.ReadAllText(dispatchViewPath);
         string accountView = File.ReadAllText(accountViewPath);
         string presenter = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Support", "SupportCasePresentationService.cs"));
@@ -23,8 +25,8 @@ public sealed class PublicLandingClaimRecoveryFlowTests
         Assert.Contains("ResolveSupportIntakeRailFromQuery()", controller, StringComparison.Ordinal);
         Assert.Contains("BuildSupportRailQuery(installRail)", controller, StringComparison.Ordinal);
         Assert.Contains(
-            "\"windows\" => \"The guided Windows setup assistant is the default linked-install path. Use the raw installer fallback only for support-directed recovery.\"",
-            controller,
+            "Open the Windows install handoff, download the published setup .exe, and finish account linking in your default browser after setup starts the browser callback.",
+            releaseSelection,
             StringComparison.Ordinal);
         Assert.Contains(
             "Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.",

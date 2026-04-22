@@ -127,7 +127,7 @@ internal static class DesktopInstallRail
             NextSafeAction: recoveryMode
                 ? "Finish setup in Chummer. Only use the recovery code if setup explicitly enters recovery mode."
                 : "Continue in the installer or desktop app so the linked install can claim this account without a browser handoff.",
-            UpdateAction: "Use the desktop app update lane or signed-in setup assistant for this same channel and build lineage before filing a new support case.",
+            UpdateAction: "Use the desktop app update lane or signed-in installer for this same channel and build lineage before filing a new support case.",
             RollbackAction: "If update or setup fails, keep the previous installed copy and return to this claimed install continuation rail or tracked support on this same install rail.",
             SupportContinuation: "Support follow-through stays on the same install rail with the current claim, build, channel, fallback, and recovery context attached.");
     }

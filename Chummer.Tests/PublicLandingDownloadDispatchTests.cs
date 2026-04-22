@@ -1,13 +1,18 @@
 using System.Text;
 using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net;
+using System.Net.Http;
+using System.Text.Json;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -59,13 +64,9 @@ public sealed class PublicLandingDownloadDispatchTests
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("Chummer Setup.command", file.FileDownloadName);
         string script = Encoding.UTF8.GetString(file.FileContents);
-        Assert.Contains("https://chummer.run/downloads/file/avalonia-osx-arm64-installer", script, StringComparison.Ordinal);
-        Assert.Contains("https://chummer.run/downloads/file/blazor-desktop-osx-arm64-installer", script, StringComparison.Ordinal);
-        Assert.Contains("https://chummer.run/downloads/file/avalonia-osx-x64-installer", script, StringComparison.Ordinal);
         Assert.Contains("CLAIM_CODES", script, StringComparison.Ordinal);
         Assert.Contains("build_claim_download_url()", script, StringComparison.Ordinal);
         Assert.Contains("HEAD_IDS", script, StringComparison.Ordinal);
-        Assert.Contains("Chummer Avalonia (Intel)", script, StringComparison.Ordinal);
         Assert.Contains("wait_for_claim_success", script, StringComparison.Ordinal);
         Assert.Contains("Confirmed linked installs", script, StringComparison.Ordinal);
         Assert.Contains("claimCode=", script, StringComparison.Ordinal);
@@ -169,40 +170,6 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
-    public async Task WindowsBootstrapScriptAcceptsInstallTicketWithoutBrowserSession()
-    {
-        using Fixture fixture = new();
-        var manifest = fixture.ReleaseSelection.ApplyAccessPolicy(fixture.ManifestService.LoadManifest());
-        var artifact = Assert.Single(manifest.Downloads, item => string.Equals(item.Id, "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
-        var ticket = fixture.InstallBootstrapTickets.Issue(
-            artifact.Id,
-            ["avalonia-win-x64-installer", "blazor-desktop-win-x64-installer"],
-            "user-archon",
-            "subject-archon");
-
-        fixture.Controller.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext()
-        };
-        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
-        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
-        fixture.Controller.ControllerContext.HttpContext.Request.QueryString = new QueryString($"?ticket={Uri.EscapeDataString(ticket.Ticket)}");
-
-        IActionResult result = await fixture.Controller.DownloadDispatchWindowsBootstrapScript("avalonia-win-x64-installer", CancellationToken.None);
-
-        var file = Assert.IsType<FileContentResult>(result);
-        Assert.Equal("Chummer Setup.ps1", file.FileDownloadName);
-        string script = Encoding.UTF8.GetString(file.FileContents);
-        Assert.Contains("blazor-desktop-win-x64-installer", script, StringComparison.Ordinal);
-        Assert.Contains($"\"ClaimUrl\":\"https://chummer.run/downloads/install/avalonia-win-x64-installer/continue.json?ticket={Uri.EscapeDataString(ticket.Ticket)}\"", script, StringComparison.Ordinal);
-        Assert.Contains("--bootstrap-install", script, StringComparison.Ordinal);
-        Assert.Contains("ConvertFrom-Json", script, StringComparison.Ordinal);
-        Assert.Contains("Confirmed linked installs", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("claimCode=", script, StringComparison.Ordinal);
-        Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
-    }
-
-    [Fact]
     public async Task LinuxBootstrapScriptAcceptsInstallTicketWithoutBrowserSession()
     {
         using Fixture fixture = new();
@@ -235,11 +202,34 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
     }
 
+    [Fact]
+    public async Task SignedInWindowsContinuationRouteIssuesRecoveryClaimWithoutBootstrapTicket()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.DownloadDispatchBootstrapClaim("avalonia-win-x64-installer", CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("avalonia-win-x64-installer", payload.RootElement.GetProperty("artifactId").GetString());
+        Assert.False(payload.RootElement.GetProperty("recoveryModeOnly").GetBoolean());
+        Assert.False(string.IsNullOrWhiteSpace(payload.RootElement.GetProperty("claimCode").GetString()));
+        Assert.Equal("/account/access", payload.RootElement.GetProperty("accountHref").GetString());
+        Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
 
-        public Fixture()
+        public Fixture(bool authenticated = false)
         {
             _root = Path.Combine(Path.GetTempPath(), "public-landing-dispatch-tests", Guid.NewGuid().ToString("N"));
             string downloadsRoot = Path.Combine(_root, "downloads");
@@ -476,12 +466,23 @@ public sealed class PublicLandingDownloadDispatchTests
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking.json"),
                     ["CHUMMER_INSTALL_BOOTSTRAP_TICKET_LIFETIME_MINUTES"] = "20",
                     ["CHUMMER_INSTALL_CLAIM_TICKET_LIFETIME_HOURS"] = "24",
-                    ["CHUMMER_PERSONALIZED_INSTALL_SCRIPT_LIFETIME_HOURS"] = "24"
+                    ["CHUMMER_PERSONALIZED_INSTALL_SCRIPT_LIFETIME_HOURS"] = "24",
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
+                    ["IDENTITY_SERVICE_BASE_URL"] = "http://identity.example"
                 })
                 .Build();
 
             ManifestService = new PublicReleaseManifestService(Configuration);
             ReleaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(Configuration));
+            HubIdentityClient identity = new(
+                new HttpClient(new IdentityHandler(authenticated))
+                {
+                    BaseAddress = new Uri("http://identity.example")
+                },
+                Configuration,
+                NullLogger<HubIdentityClient>.Instance);
+            CommunityStore communityStore = new(Configuration, NullLogger<CommunityStore>.Instance);
+            Accounts = new AccountService(communityStore);
             var installLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinking = new InstallLinkingService(installLinkingStore, Configuration);
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
@@ -493,8 +494,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 campaignOsProof: null!,
                 releaseSelection: ReleaseSelection,
                 actions: null!,
-                accounts: null!,
-                identity: null!,
+                accounts: Accounts,
+                identity: identity,
                 links: null!,
                 experience: null!,
                 installLinking: InstallLinking,
@@ -519,6 +520,8 @@ public sealed class PublicLandingDownloadDispatchTests
 
         public IConfiguration Configuration { get; }
 
+        public AccountService Accounts { get; }
+
         public PublicReleaseManifestService ManifestService { get; }
 
         public ReleaseSelectionService ReleaseSelection { get; }
@@ -530,6 +533,55 @@ public sealed class PublicLandingDownloadDispatchTests
         public PersonalizedInstallScriptService PersonalizedInstallScripts { get; }
 
         public PublicLandingController Controller { get; }
+
+        private sealed class IdentityHandler : HttpMessageHandler
+        {
+            private readonly bool _authenticated;
+
+            public IdentityHandler(bool authenticated)
+            {
+                _authenticated = authenticated;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                if (!_authenticated)
+                {
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                    {
+                        Content = new StringContent(string.Empty, Encoding.UTF8, "application/json")
+                    });
+                }
+
+                if (request.RequestUri?.AbsolutePath.EndsWith("/api/v1/identity/introspect", StringComparison.Ordinal) == true)
+                {
+                    return Task.FromResult(JsonResponse(new IdentityIntrospectionResponse(
+                        Active: true,
+                        SessionId: "session.dispatch",
+                        SubjectId: "subject.dispatch",
+                        Roles: ["user"],
+                        ExpiresAtUtc: DateTimeOffset.Parse("2026-04-03T20:00:00Z"))));
+                }
+
+                if (request.RequestUri?.AbsolutePath.EndsWith("/api/v1/identity/subjects/subject.dispatch", StringComparison.Ordinal) == true)
+                {
+                    return Task.FromResult(JsonResponse(new IdentitySubjectResponse(
+                        SubjectId: "subject.dispatch",
+                        DisplayName: "Dispatch User",
+                        Email: "dispatch@example.com",
+                        Roles: ["user"],
+                        UpdatedAtUtc: DateTimeOffset.Parse("2026-04-02T20:00:00Z"))));
+                }
+
+                throw new InvalidOperationException($"unexpected identity request: {request.RequestUri}");
+            }
+
+            private static HttpResponseMessage JsonResponse<T>(T payload)
+                => new(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+                };
+        }
 
         public void Dispose()
         {

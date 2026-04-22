@@ -74,14 +74,14 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound(new
             {
                 status = "missing",
-                message = "No staged Windows preview installers are available right now."
+                message = "No staged Windows supplemental installers are available right now."
             });
         }
 
         return Ok(new
         {
             status = "proof_only",
-            message = "These Windows installers are published as preview builds only. They are not on the main Windows shelf until the latest Windows startup checks are refreshed for the active release head.",
+            message = "These Windows installers stay on a verification and support rail. Use the main downloads shelf for the recommended Windows setup when available, and use these direct copies only when a proof or support flow points to them.",
             downloads = installers.Select(static installer => new
             {
                 installer.FileName,

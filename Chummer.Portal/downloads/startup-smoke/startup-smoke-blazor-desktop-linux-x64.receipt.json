@@ -17,11 +17,11 @@
   "startedAtUtc": "2026-04-20T07:27:06.5202314+00:00",
   "completedAtUtc": "2026-04-20T07:27:06.5221829+00:00",
   "artifactInstallMode": "dpkg_rootless_install",
-  "artifactInstallVerificationPath": "/docker/chummercomplete/chummer6-ui/.codex-studio/out/linux-desktop-exit-gate/run.bO5d18/startup-smoke-installer/install-verification-blazor-desktop-linux-x64.json",
-  "artifactInstallDpkgLogPath": "/docker/chummercomplete/chummer6-ui/.codex-studio/out/linux-desktop-exit-gate/run.bO5d18/startup-smoke-installer/dpkg-blazor-desktop-linux-x64.log",
-  "artifactInstallLaunchCapturePath": "/docker/chummercomplete/chummer6-ui/.codex-studio/out/linux-desktop-exit-gate/run.bO5d18/startup-smoke-installer/installed-launch-blazor-desktop-linux-x64.bin",
-  "artifactInstallWrapperCapturePath": "/docker/chummercomplete/chummer6-ui/.codex-studio/out/linux-desktop-exit-gate/run.bO5d18/startup-smoke-installer/installed-wrapper-blazor-desktop-linux-x64.sh",
-  "artifactInstallDesktopEntryCapturePath": "/docker/chummercomplete/chummer6-ui/.codex-studio/out/linux-desktop-exit-gate/run.bO5d18/startup-smoke-installer/installed-desktop-entry-blazor-desktop-linux-x64.desktop",
-  "artifactPath": "dist/files/chummer-blazor-desktop-linux-x64-installer.deb",
+  "artifactInstallVerificationPath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/install-verification-blazor-desktop-linux-x64.json",
+  "artifactInstallDpkgLogPath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/dpkg-blazor-desktop-linux-x64.log",
+  "artifactInstallLaunchCapturePath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/installed-launch-blazor-desktop-linux-x64.bin",
+  "artifactInstallWrapperCapturePath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/installed-wrapper-blazor-desktop-linux-x64.sh",
+  "artifactInstallDesktopEntryCapturePath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/installed-desktop-entry-blazor-desktop-linux-x64.desktop",
+  "artifactPath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
   "status": "pass"
 }

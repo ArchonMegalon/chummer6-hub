@@ -160,12 +160,15 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("requiredFamilies", script, StringComparison.Ordinal);
         Assert.Contains("required_legacy_interaction_keys", script, StringComparison.Ordinal);
         Assert.Contains("missing_required_legacy_interaction_keys", script, StringComparison.Ordinal);
+        Assert.Contains("defaultSingleRunnerKeepsWorkspaceChromeCollapsed", script, StringComparison.Ordinal);
+        Assert.Contains("default_single_runner_keeps_workspace_chrome_collapsed", script, StringComparison.Ordinal);
         Assert.Contains("reports non-pass flagship head contract markers", script, StringComparison.Ordinal);
         Assert.Contains("required_tests", script, StringComparison.Ordinal);
         Assert.Contains("must not include leading/trailing whitespace", script, StringComparison.Ordinal);
         Assert.Contains("must not be blank", script, StringComparison.Ordinal);
         Assert.Contains("must not contain duplicate ids", script, StringComparison.Ordinal);
-        Assert.Contains("Desktop_shell_preserves_classic_dense_three_pane_workbench_posture", script, StringComparison.Ordinal);
+        Assert.Contains("Desktop_shell_preserves_classic_dense_center_first_workbench_posture", script, StringComparison.Ordinal);
+        Assert.Contains("Runtime_backed_shell_hides_workspace_tree_until_multiple_workspaces_exist", script, StringComparison.Ordinal);
         Assert.Contains("Gear_builder_preserves_familiar_browse_detail_confirm_rhythm", script, StringComparison.Ordinal);
         Assert.Contains("Cyberware_and_cyberlimb_builder_preserve_legacy_dialog_familiarity_cues", script, StringComparison.Ordinal);
         Assert.Contains("Contacts_diary_and_support_routes_execute_with_public_path_visibility", script, StringComparison.Ordinal);
@@ -174,6 +177,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("declares unexpected milestone-2 visual tests", script, StringComparison.Ordinal);
         Assert.Contains("must preserve canonical milestone-2 visual test ordering", script, StringComparison.Ordinal);
         Assert.Contains("required_screenshots", script, StringComparison.Ordinal);
+        Assert.Contains("18-import-dialog-light.png", script, StringComparison.Ordinal);
         Assert.Contains("missing required milestone-2 screenshots", script, StringComparison.Ordinal);
         Assert.Contains("declares unexpected milestone-2 screenshots", script, StringComparison.Ordinal);
         Assert.Contains("must preserve canonical milestone-2 screenshot ordering", script, StringComparison.Ordinal);
@@ -424,6 +428,7 @@ public sealed class VerificationEntryPointTests
         string viewModelPath = RepoPaths.FromRoot("Chummer.Run.Api", "ViewModels", "SiteViewModels.cs");
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ReleaseUpload.cshtml");
         string bootstrapPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+        string liveVerifierPath = RepoPaths.FromRoot("scripts", "verify-live-mac-bootstrap.sh");
         string wrapperPath = RepoPaths.FromRoot("scripts", "run-mac-release-bootstrap.sh");
         string maintenanceReadmePath = RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "maintenance", "MAC_CODEX_RELEASE_TO_CHUMMER_RUN.md");
         string presentationRunbookPath = RepoPaths.FromRoot("..", "chummer-presentation", "docs", "MAC_CODEX_RELEASE_TO_CHUMMER_RUN.md");
@@ -434,6 +439,7 @@ public sealed class VerificationEntryPointTests
         string viewModel = File.ReadAllText(viewModelPath);
         string view = File.ReadAllText(viewPath);
         string bootstrap = File.ReadAllText(bootstrapPath);
+        string liveVerifier = File.ReadAllText(liveVerifierPath);
         string wrapper = File.ReadAllText(wrapperPath);
         string maintenanceReadme = File.ReadAllText(maintenanceReadmePath);
         string presentationRunbook = File.ReadAllText(presentationRunbookPath);
@@ -442,7 +448,7 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("/downloads/release-upload", controller, StringComparison.Ordinal);
         Assert.Contains("/downloads/release-upload/bootstrap.sh", controller, StringComparison.Ordinal);
-        Assert.Contains("set -o pipefail", controller, StringComparison.Ordinal);
+        Assert.Contains("set -euo pipefail", controller, StringComparison.Ordinal);
         Assert.Contains("curl -fsSL", controller, StringComparison.Ordinal);
         Assert.Contains("TMP_BOOTSTRAP_SCRIPT", controller, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256", controller, StringComparison.Ordinal);
@@ -467,6 +473,10 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("staged upload token:", bootstrap, StringComparison.Ordinal);
         Assert.Contains("verify_checkout_expected_commit", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_EXPECTED_COMMIT", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_KIT_EXPECTED_COMMIT", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_REF='main'", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REF='release-upload-hub-proof-routes-20260419'", bootstrap, StringComparison.Ordinal);
         Assert.Contains("umask 077", bootstrap, StringComparison.Ordinal);
         Assert.Contains("\"--config\"", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", bootstrap, StringComparison.Ordinal);
@@ -479,21 +489,31 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("${ui_gate_status,,}", bootstrap, StringComparison.Ordinal);
         Assert.Contains("bootstrap template not found", wrapper, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", wrapper, StringComparison.Ordinal);
-        Assert.Contains("artifacts/mac-codex-release-pipeline/bootstrap.sh", wrapper, StringComparison.Ordinal);
+        Assert.Contains("downloads/release-upload/bootstrap.sh", wrapper, StringComparison.Ordinal);
         Assert.DoesNotContain("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/artifacts/mac-codex-release-pipeline/bootstrap.sh", wrapper, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", maintenanceReadme, StringComparison.Ordinal);
+        Assert.Contains("downloads/release-upload/bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("run-mac-release-bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
         Assert.DoesNotContain("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/artifacts/mac-codex-release-pipeline/bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("hdiutil: create failed - No space left on device", selfHostedRunbook, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("downloads/release-upload/bootstrap.sh", publicReadme, StringComparison.Ordinal);
         Assert.Contains("run-mac-release-bootstrap.sh", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_UI_EXPECTED_COMMIT", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_UI_KIT_EXPECTED_COMMIT", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("LOCAL_BOOTSTRAP_PATH", liveVerifier, StringComparison.Ordinal);
+        Assert.Contains("/downloads/release-upload/bootstrap.sh", liveVerifier, StringComparison.Ordinal);
+        Assert.Contains("/artifacts/mac-codex-release-pipeline/bootstrap.sh", liveVerifier, StringComparison.Ordinal);
+        Assert.Contains("live bootstrap drift", liveVerifier, StringComparison.Ordinal);
+        Assert.Contains("legacy bootstrap route does not redirect to primary path", liveVerifier, StringComparison.Ordinal);
+        Assert.Contains("legacy bootstrap route is missing no-store cache policy", liveVerifier, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -514,23 +534,18 @@ public sealed class VerificationEntryPointTests
         string dispatchView = File.ReadAllText(dispatchViewPath);
 
         Assert.Contains("/downloads/install/{artifactId}/bootstrap.command", controller, StringComparison.Ordinal);
-        Assert.Contains("/downloads/install/{artifactId}/bootstrap.ps1", controller, StringComparison.Ordinal);
         Assert.Contains("/downloads/install/{artifactId}/bootstrap.sh", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("/downloads/install/{artifactId}/bootstrap.ps1", controller, StringComparison.Ordinal);
         Assert.Contains("RenderMacInstallBootstrapScript", controller, StringComparison.Ordinal);
-        Assert.Contains("RenderWindowsInstallBootstrapScript", controller, StringComparison.Ordinal);
         Assert.Contains("RenderLinuxInstallBootstrapScript", controller, StringComparison.Ordinal);
         Assert.Contains("asks which Chummer apps to install and where to put them", controller, StringComparison.Ordinal);
         Assert.Contains("The Mac setup assistant offers Auto select", controller, StringComparison.Ordinal);
-        Assert.Contains("The Windows setup assistant offers Auto select", controller, StringComparison.Ordinal);
         Assert.Contains("The Linux setup assistant offers Auto select", controller, StringComparison.Ordinal);
         Assert.Contains("whether to leave quick access in Applications only or add Desktop links", controller, StringComparison.Ordinal);
         Assert.Contains("staged account linking for first open", controller, StringComparison.Ordinal);
         Assert.Contains("verify_download_digest", controller, StringComparison.Ordinal);
         Assert.Contains("perform_staged_install", controller, StringComparison.Ordinal);
         Assert.Contains("launch_bundle_binary_with_claim", controller, StringComparison.Ordinal);
-        Assert.Contains("ConvertFrom-Json", controller, StringComparison.Ordinal);
-        Assert.Contains("--bootstrap-install", controller, StringComparison.Ordinal);
-        Assert.Contains("--install-claim-code", controller, StringComparison.Ordinal);
         Assert.Contains("dpkg-deb -x", controller, StringComparison.Ordinal);
         Assert.Contains("resolve_install_state_root", controller, StringComparison.Ordinal);
         Assert.Contains("build_install_state_path", controller, StringComparison.Ordinal);
@@ -3337,15 +3352,19 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
-    public void PublicEdgeProgramForcesNoStoreHeadersForProofAndInstallRoutes()
+    public void PublicEdgeProgramForcesNoStoreHeadersForBootstrapProofAndInstallRoutes()
     {
         string programPath = RepoPaths.FromRoot("Chummer.Run.Api", "Program.cs");
         string program = File.ReadAllText(programPath);
 
         Assert.Contains("RequiresNoStoreHeaders", program, StringComparison.Ordinal);
+        Assert.Contains("IsLegacyMacReleaseBootstrapArtifactPath", program, StringComparison.Ordinal);
+        Assert.Contains("/downloads/release-upload", program, StringComparison.Ordinal);
+        Assert.Contains("/artifacts/mac-codex-release-pipeline/bootstrap.sh", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/proof/windows", program, StringComparison.Ordinal);
         Assert.Contains("/downloads/install", program, StringComparison.Ordinal);
         Assert.Contains("/install-", program, StringComparison.Ordinal);
+        Assert.Contains("context.Response.Redirect(\"/downloads/release-upload/bootstrap.sh\", permanent: false)", program, StringComparison.Ordinal);
         Assert.Contains("Cache-Control", program, StringComparison.Ordinal);
         Assert.Contains("CDN-Cache-Control", program, StringComparison.Ordinal);
         Assert.Contains("Cloudflare-CDN-Cache-Control", program, StringComparison.Ordinal);
@@ -3580,6 +3599,48 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("LoadWeeklyPulseJson", service, StringComparison.Ordinal);
         Assert.Contains("/api/public/weekly-pulse", audit, StringComparison.Ordinal);
         Assert.Contains("chummer.weekly_product_pulse", audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HubLiveAuditDownloadsRouteUsesCurrentInstallCtaText()
+    {
+        string auditPath = RepoPaths.FromRoot("scripts", "hub-live-audit.py");
+        string audit = File.ReadAllText(auditPath);
+
+        Assert.Contains("\"/downloads\"", audit, StringComparison.Ordinal);
+        Assert.Contains("\"Create account to install\"", audit, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"Get preview build\"", audit, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicDownloadCanonUsesCurrentInstallWording()
+    {
+        string designRoot = "/docker/chummercomplete/chummer-design/products/chummer";
+        string downloadsPolicyPath = Path.Combine(designRoot, "PUBLIC_DOWNLOADS_POLICY.md");
+        string landingPolicyPath = Path.Combine(designRoot, "PUBLIC_LANDING_POLICY.md");
+        string landingManifestPath = Path.Combine(designRoot, "PUBLIC_LANDING_MANIFEST.yaml");
+        string canonicalFeatureRegistryPath = Path.Combine(designRoot, "PUBLIC_FEATURE_REGISTRY.yaml");
+        string mirroredLandingManifestPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_LANDING_MANIFEST.yaml");
+        string mirroredFeatureRegistryPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FEATURE_REGISTRY.yaml");
+
+        string downloadsPolicy = File.ReadAllText(downloadsPolicyPath);
+        string landingPolicy = File.ReadAllText(landingPolicyPath);
+        string landingManifest = File.ReadAllText(landingManifestPath);
+        string canonicalFeatureRegistry = File.ReadAllText(canonicalFeatureRegistryPath);
+        string mirroredLandingManifest = File.ReadAllText(mirroredLandingManifestPath);
+        string mirroredFeatureRegistry = File.ReadAllText(mirroredFeatureRegistryPath);
+
+        Assert.Contains("`Create account to install`", downloadsPolicy, StringComparison.Ordinal);
+        Assert.DoesNotContain("`Get preview build`", downloadsPolicy, StringComparison.Ordinal);
+        Assert.Contains("`Create account to install`", landingPolicy, StringComparison.Ordinal);
+        Assert.DoesNotContain("`Get preview build`", landingPolicy, StringComparison.Ordinal);
+        Assert.Contains("product_proof_primary_label: Create account to install", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("Create account to install the current preview", landingManifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("product_proof_primary_label: Install the current preview", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("action_label: Create account to install", canonicalFeatureRegistry, StringComparison.Ordinal);
+        Assert.DoesNotContain("action_label: Install the current preview", canonicalFeatureRegistry, StringComparison.Ordinal);
+        Assert.Equal(landingManifest, mirroredLandingManifest);
+        Assert.Equal(canonicalFeatureRegistry, mirroredFeatureRegistry);
     }
 
     [Fact]

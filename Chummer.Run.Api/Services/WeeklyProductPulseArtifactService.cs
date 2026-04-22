@@ -80,12 +80,14 @@ public sealed class WeeklyProductPulseArtifactService
                 pulse["as_of"] = progressReport.AsOf;
             }
 
-            if (!string.IsNullOrWhiteSpace(progressReport?.ActiveWave))
+            if (string.IsNullOrWhiteSpace(JsonStringOrNull(pulse["active_wave"]))
+                && !string.IsNullOrWhiteSpace(progressReport?.ActiveWave))
             {
                 pulse["active_wave"] = progressReport.ActiveWave;
             }
 
-            if (!string.IsNullOrWhiteSpace(progressReport?.ActiveWaveStatus))
+            if (string.IsNullOrWhiteSpace(JsonStringOrNull(pulse["active_wave_status"]))
+                && !string.IsNullOrWhiteSpace(progressReport?.ActiveWaveStatus))
             {
                 pulse["active_wave_status"] = progressReport.ActiveWaveStatus;
             }
@@ -643,6 +645,11 @@ public sealed class WeeklyProductPulseArtifactService
             : !string.IsNullOrWhiteSpace(fallback)
                 ? fallback
                 : defaultValue;
+
+    private static string? JsonStringOrNull(JsonNode? node)
+        => node is JsonValue value && value.TryGetValue<string>(out string? parsed) && !string.IsNullOrWhiteSpace(parsed)
+            ? parsed
+            : null;
 
     private sealed record WeeklyProductPulseSeed(
         [property: JsonPropertyName("generated_at")] string? GeneratedAt,

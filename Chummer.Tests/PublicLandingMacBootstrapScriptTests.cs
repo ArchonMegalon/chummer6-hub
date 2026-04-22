@@ -268,24 +268,26 @@ public sealed class PublicLandingMacBootstrapScriptTests
     [Fact]
     public void ReleaseUploadBootstrapWrapperDoesNotForceHostedProofOverridesOrEmbedSecrets()
     {
-        MethodInfo renderMethod = typeof(PublicLandingController).GetMethod(
-            "RenderReleaseUploadBootstrapScript",
-            BindingFlags.NonPublic | BindingFlags.Static)
-            ?? throw new InvalidOperationException("missing RenderReleaseUploadBootstrapScript");
+        string script = File.ReadAllText(
+            RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "artifacts", "mac-codex-release-pipeline", "bootstrap.sh"));
 
-        string script = (string)(renderMethod.Invoke(
-            obj: null,
-            parameters: ["#!/usr/bin/env bash\nprintf 'ok\\n'\n"]) ?? throw new InvalidOperationException("wrapper render returned null"));
-
-        Assert.DoesNotContain("CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH=", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH=", script, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN='", script, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"", script, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_UI_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='07bcbbaebb2f73fec52af74949bd6f321482502b'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='ee693310b35a0574e000eabdf86461b7c1f2664e'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_CORE_REF='main'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_CORE_EXPECTED_COMMIT='ae55923f1cb6c8fdf40748f7e2600815be123e1e'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_HUB_REF='release-upload-hub-proof-routes-20260419'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_HUB_EXPECTED_COMMIT='5dcde8a9746ecb2f02c70e8181be662f198af84d'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_KIT_REF='fleet/ui-kit'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_KIT_EXPECTED_COMMIT='7fe7265d84b5574b7a02fb56dd1015efadf44312'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REGISTRY_REF='main'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT='6efcceb44dc1cafe4d5d141f402f79c35d15b1ef'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_MEDIA_FACTORY_REF='main'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT='e16286ca8c9bad84ff217466c72721ebcdbf48b5'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_LEGACY_REF='Docker'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_LEGACY_EXPECTED_COMMIT='0b8636d5a852e375409bf565b9ac9b4180ba4524'", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -317,7 +319,6 @@ public sealed class PublicLandingMacBootstrapScriptTests
     [InlineData(nameof(PublicLandingController.ReleaseUploadBootstrapScript))]
     [InlineData(nameof(PublicLandingController.DownloadDispatchBootstrapScript))]
     [InlineData(nameof(PublicLandingController.DownloadDispatchPersonalizedMacBootstrapScript))]
-    [InlineData(nameof(PublicLandingController.DownloadDispatchWindowsBootstrapScript))]
     [InlineData(nameof(PublicLandingController.DownloadDispatchLinuxBootstrapScript))]
     public void BootstrapEndpointsAdvertiseProblemJsonForFailureNegotiation(string methodName)
     {
@@ -416,6 +417,13 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("verify_checkout_expected_commit", template, StringComparison.Ordinal);
         Assert.Contains("local expected_commit=\"${4:-}\"", template, StringComparison.Ordinal);
         Assert.Contains("local ui_expected_commit=\"${CHUMMER_UI_EXPECTED_COMMIT:-}\"", template, StringComparison.Ordinal);
+        Assert.Contains("local fetch_target=\"$ref\"", template, StringComparison.Ordinal);
+        Assert.Contains("fetch_target=\"$expected_commit\"", template, StringComparison.Ordinal);
+        Assert.Contains("fetch --depth 1 origin \"$fetch_target\"", template, StringComparison.Ordinal);
+        Assert.Contains("remote set-url origin \"$repo_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("git -C \"$target_dir\" init -q", template, StringComparison.Ordinal);
+        Assert.Contains("git -C \"$target_dir\" remote add origin \"$repo_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("cloning $(basename \"$target_dir\") -> $ref (pinned $expected_commit)", template, StringComparison.Ordinal);
         Assert.Contains("umask 077", template, StringComparison.Ordinal);
         Assert.Contains("request_common=(", template, StringComparison.Ordinal);
         Assert.Contains("\"--config\"", template, StringComparison.Ordinal);
@@ -455,52 +463,52 @@ public sealed class PublicLandingMacBootstrapScriptTests
             Downloads:
             [
                 new PublicReleaseArtifactDto(
-                    Id: "avalonia-win-x64-installer",
-                    Platform: "Avalonia Desktop Windows x64 Installer",
-                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
-                    Sha256: "w1",
-                    SizeBytes: 101,
-                    Head: "avalonia",
-                    PlatformId: "win-x64",
-                    Arch: "x64",
-                    Kind: "installer",
-                    FileName: "chummer-avalonia-win-x64-installer.exe",
-                    InstallAccessClass: "account_required"),
-                new PublicReleaseArtifactDto(
-                    Id: "blazor-desktop-win-x64-installer",
-                    Platform: "Blazor Desktop Windows x64 Installer",
-                    Url: "/downloads/files/chummer-blazor-desktop-win-x64-installer.exe",
-                    Sha256: "w2",
-                    SizeBytes: 202,
-                    Head: "blazor-desktop",
-                    PlatformId: "win-x64",
-                    Arch: "x64",
-                    Kind: "installer",
-                    FileName: "chummer-blazor-desktop-win-x64-installer.exe",
-                    InstallAccessClass: "account_required"),
-                new PublicReleaseArtifactDto(
-                    Id: "avalonia-win-arm64-installer",
-                    Platform: "Avalonia Desktop Windows ARM64 Installer",
-                    Url: "/downloads/files/chummer-avalonia-win-arm64-installer.exe",
-                    Sha256: "w3",
-                    SizeBytes: 303,
-                    Head: "avalonia",
-                    PlatformId: "win-arm64",
-                    Arch: "arm64",
-                    Kind: "installer",
-                    FileName: "chummer-avalonia-win-arm64-installer.exe",
-                    InstallAccessClass: "account_required"),
-                new PublicReleaseArtifactDto(
                     Id: "avalonia-linux-x64-installer",
                     Platform: "Avalonia Desktop Linux x64 Installer",
                     Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
                     Sha256: "l1",
-                    SizeBytes: 404,
+                    SizeBytes: 101,
                     Head: "avalonia",
                     PlatformId: "linux",
                     Arch: "x64",
                     Kind: "installer",
                     FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "account_required"),
+                new PublicReleaseArtifactDto(
+                    Id: "blazor-desktop-linux-x64-installer",
+                    Platform: "Blazor Desktop Linux x64 Installer",
+                    Url: "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
+                    Sha256: "l2",
+                    SizeBytes: 202,
+                    Head: "blazor-desktop",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-blazor-desktop-linux-x64-installer.deb",
+                    InstallAccessClass: "account_required"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-arm64-installer",
+                    Platform: "Avalonia Desktop Linux ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-arm64-installer.deb",
+                    Sha256: "l3",
+                    SizeBytes: 303,
+                    Head: "avalonia",
+                    PlatformId: "linux-arm64",
+                    Arch: "arm64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-arm64-installer.deb",
+                    InstallAccessClass: "account_required"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-arm64-installer",
+                    Platform: "Avalonia Desktop macOS ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    Sha256: "m1",
+                    SizeBytes: 404,
+                    Head: "avalonia",
+                    PlatformId: "osx-arm64",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
                     InstallAccessClass: "account_required")
             ]);
 
@@ -510,74 +518,9 @@ public sealed class PublicLandingMacBootstrapScriptTests
 
         Assert.Collection(
             artifacts,
-            item => Assert.Equal("avalonia-win-x64-installer", item.Id),
-            item => Assert.Equal("blazor-desktop-win-x64-installer", item.Id),
-            item => Assert.Equal("avalonia-win-arm64-installer", item.Id));
-    }
-
-    [Fact]
-    public void RenderWindowsInstallBootstrapScriptIncludesGuidedSelectionAndShortcutChoices()
-    {
-        string script = PublicLandingController.RenderWindowsInstallBootstrapScript(
-            [
-                new PublicLandingController.GuidedBootstrapArtifact(
-                    ArtifactId: "avalonia-win-x64-installer",
-                    HeadId: "avalonia",
-                    Title: "Avalonia Desktop Windows x64 Installer",
-                    ShortLabel: "Chummer Avalonia (x64)",
-                    DownloadUrl: "https://chummer.run/downloads/file/avalonia-win-x64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/avalonia-win-x64-installer/continue.json?ticket=T-1",
-                    Sha256: "sha-a",
-                    PackageName: "chummer-avalonia-win-x64-installer.exe",
-                    Architecture: "x64",
-                    LaunchAfterInstall: true,
-                    InstallFolderName: "avalonia-win-x64",
-                    ExecutableName: "Chummer.Avalonia.exe",
-                    LauncherName: "chummer6-avalonia",
-                    DesktopEntryName: "chummer6-avalonia.desktop"),
-                new PublicLandingController.GuidedBootstrapArtifact(
-                    ArtifactId: "blazor-desktop-win-x64-installer",
-                    HeadId: "blazor-desktop",
-                    Title: "Blazor Desktop Windows x64 Installer",
-                    ShortLabel: "Chummer Blazor Desktop (x64)",
-                    DownloadUrl: "https://chummer.run/downloads/file/blazor-desktop-win-x64-installer?ticket=T-1",
-                    ClaimUrl: "https://chummer.run/downloads/install/blazor-desktop-win-x64-installer/continue.json?ticket=T-1",
-                    Sha256: "sha-b",
-                    PackageName: "chummer-blazor-desktop-win-x64-installer.exe",
-                    Architecture: "x64",
-                    LaunchAfterInstall: false,
-                    InstallFolderName: "blazor-desktop-win-x64",
-                    ExecutableName: "Chummer.Blazor.Desktop.exe",
-                    LauncherName: "chummer6-blazor-desktop",
-                    DesktopEntryName: "chummer6-blazor-desktop.desktop")
-            ],
-            publicBaseUrl: "https://chummer.run/",
-            accountUrl: "https://chummer.run/account/access",
-            downloadsUrl: "https://chummer.run/downloads",
-            helpUrl: "https://chummer.run/help");
-
-        Assert.Contains("ConvertFrom-Json", script, StringComparison.Ordinal);
-        Assert.Contains("Auto select", script, StringComparison.Ordinal);
-        Assert.Contains("Choose manually", script, StringComparison.Ordinal);
-        Assert.Contains("Show-ChecklistDialog", script, StringComparison.Ordinal);
-        Assert.Contains("Resolve-InstallRoot", script, StringComparison.Ordinal);
-        Assert.Contains("Start menu only", script, StringComparison.Ordinal);
-        Assert.Contains("Desktop links", script, StringComparison.Ordinal);
-        Assert.Contains("--bootstrap-install", script, StringComparison.Ordinal);
-        Assert.Contains("--start-menu-shortcut", script, StringComparison.Ordinal);
-        Assert.Contains("--desktop-shortcut", script, StringComparison.Ordinal);
-        Assert.Contains("--install-claim-code", script, StringComparison.Ordinal);
-        Assert.Contains("ClaimUrl", script, StringComparison.Ordinal);
-        Assert.Contains("Get-InstallClaimCode", script, StringComparison.Ordinal);
-        Assert.Contains("$env:PROCESSOR_ARCHITEW6432", script, StringComparison.Ordinal);
-        Assert.Contains("Prepared first-open account linking", script, StringComparison.Ordinal);
-        Assert.Contains("Installed Windows desktop builds:", script, StringComparison.Ordinal);
-        Assert.Contains("Chummer Avalonia (x64)", script, StringComparison.Ordinal);
-        Assert.Contains("Chummer Blazor Desktop (x64)", script, StringComparison.Ordinal);
-        Assert.Contains("Chummer.Avalonia.exe", script, StringComparison.Ordinal);
-        Assert.Contains("Chummer.Blazor.Desktop.exe", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("Artifact.ClaimCode", script, StringComparison.Ordinal);
-        Assert.DoesNotContain("??", script, StringComparison.Ordinal);
+            item => Assert.Equal("avalonia-linux-x64-installer", item.Id),
+            item => Assert.Equal("blazor-desktop-linux-x64-installer", item.Id),
+            item => Assert.Equal("avalonia-linux-arm64-installer", item.Id));
     }
 
     [Fact]

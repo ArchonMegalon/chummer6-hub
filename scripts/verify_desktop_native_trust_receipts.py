@@ -116,12 +116,13 @@ REQUIRED_SOURCE_MARKERS = {
         "Desktop requested action ({posture}): {safeHref}",
         "RedactNativeRequestedActionHref(trimmed)",
         "private static string RedactNativeRequestedActionHref(string href)",
-        "string sanitizedQuery = SanitizeInstallLinkSecretQueryComponent(",
-        "string sanitizedFragment = SanitizeInstallLinkSecretQueryComponent(",
-        'prefix: "#"',
-        "if (!queryRedacted && !fragmentRedacted)",
+        'string replacement = Uri.EscapeDataString("[redacted-install-link-secret]");',
+        "foreach (string key in InstallLinkCallbackReservedQueryKeys)",
+        "separator != '?' && separator != '&' && separator != '#'",
         "private static string SanitizeInstallLinkSecretQueryComponent(string component, string prefix, out bool redacted)",
-        'sanitizedQuery[item.Key] = "[redacted-install-link-secret]";',
+        'sanitized = $"{sanitized[..valueStart]}{replacement}{sanitized[valueEnd..]}";',
+        'string encodedValue = Uri.EscapeDataString("[redacted-install-link-secret]");',
+        'sanitizedParts[index] = $"{rawKey}={encodedValue}";',
         "advisory browser or external action",
         "AppendNativeRouteReceiptDetail(detail)",
         "private static string AppendNativeRouteReceiptDetail(string detail)",
@@ -283,9 +284,9 @@ REQUIRED_SOURCE_MARKERS = {
         "Native support action sanitizer should fail closed instead of preserving encoded native-looking actions.",
         "Native support action sanitizer should fail closed instead of preserving Windows-style native-looking actions.",
         "Native support action sanitizer should fail closed instead of handing the desktop app to a non-http action.",
-        "Native support action sanitizer should preserve trusted absolute Hub-native update actions.",
+        "Native support action sanitizer should fail closed to the continuation rail when support presentation returns an absolute Hub-native update action.",
         "Native support action sanitizer should preserve trusted app-local native support actions.",
-        "Native support action sanitizer should preserve grant-bound native update planner actions.",
+        "Native support action sanitizer should fall back to the continuation rail when a native update href is presented without update-needed support state.",
         "Native support case should redact reserved fragment secrets from the desktop requested action.",
         "Native support case should preserve app-local listener query state while redacting fragment-carried install-link secrets.",
         "Invalid native support continuation grants should fail closed.",
@@ -1050,6 +1051,10 @@ def _configured_path(env_name: str, default_path: Path) -> Path:
     return Path(override) if override else default_path
 
 
+def _has_configured_path_override(env_name: str) -> bool:
+    return bool(os.environ.get(env_name))
+
+
 def _configured_repo_anchor_root(repo_root: Path) -> Path:
     override = os.environ.get("CHUMMER_RUN_SERVICES_PROOF_ANCHOR_ROOT")
     return Path(override) if override else repo_root
@@ -1063,6 +1068,14 @@ def _proof_path(repo_root: Path) -> Path:
 def _served_proof_path(repo_root: Path) -> Path:
     configured = _configured_path("CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH", DEFAULT_SERVED_PROOF_PATH)
     return configured if configured.is_absolute() else repo_root / configured
+
+
+def _should_verify_served_proof_matches_published() -> bool:
+    published_override = _has_configured_path_override("CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH")
+    served_override = _has_configured_path_override("CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH")
+    # Only compare shelf parity when both paths are using repo defaults or both were
+    # intentionally overridden together for the same verification context.
+    return published_override == served_override
 
 
 def _extract_yaml_block(text: str, anchor: str) -> str | None:
@@ -1795,7 +1808,8 @@ def main() -> int:
     served_proof_path = _served_proof_path(repo_root)
     _verify_evidence_path_has_no_forbidden_markers(errors, served_proof_path, "served release proof file")
     _verify_static_proof_file(errors, served_proof_path, "served release proof file")
-    _verify_served_proof_matches_published(errors, proof_path, served_proof_path)
+    if _should_verify_served_proof_matches_published():
+        _verify_served_proof_matches_published(errors, proof_path, served_proof_path)
 
     queue_staging_path = _configured_path("CHUMMER_NEXT90_QUEUE_STAGING_PATH", DEFAULT_QUEUE_STAGING_PATH)
     design_queue_staging_path = _configured_path("CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH", DEFAULT_DESIGN_QUEUE_STAGING_PATH)

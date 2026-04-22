@@ -578,6 +578,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "/account/work",
                     "/account/support",
                     "/contact",
+                    "/downloads/install/avalonia-osx-arm64-installer",
+                    "/downloads/install/avalonia-win-x64-installer",
                 ],
                 payload["proof_routes"],
             )
@@ -2229,6 +2231,11 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}",
             )
             self.assertIn("desktop native trust receipts verified", result.stdout)
+            self.assertNotIn(
+                "served HUB_LOCAL_RELEASE_PROOF.generated.json drifts from "
+                "published HUB_LOCAL_RELEASE_PROOF.generated.json for next90-m102-hub-desktop-native-trust",
+                result.stderr,
+            )
 
     def test_verifier_fail_closes_weakened_generated_package_exit_criterion(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:

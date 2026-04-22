@@ -764,6 +764,11 @@ items:
       - stale aggregate receipt-gate counts cannot overstate installed-build followthrough without detailed row truth
       - local proof floor commit fe4c621 pinned for M106 receipt-gate row-truth guard
       - commit fe4c621 tightens the M106 receipt-gate row-truth guard.
+      - local proof floor commit 653380a pinned for M106 receipt-gate row-truth proof floor
+      - commit 653380a pins the M106 receipt-gate row-truth guard.
+      - local proof floor commit b568034 pinned for M106 closure-proof dependency package routing guard
+      - commit b568034 tightens the M106 governor packet closure proof.
+      - remaining dependency package ids stay projected through package closeout, repeat prevention, and measured rollout loop
       - do-not-reopen handoff routes remaining M106 work to dependency or sibling packages
     allowed_paths:
       - admin
@@ -817,15 +822,17 @@ items:
       - weekly governor source-path hygiene and worker command guard fail the standalone verifier
       - no-PYTHONPATH bootstrap guard includes the standalone M102 verifier
       - successor frontier 2454416974 pinned for next90-m102-fleet-reporter-receipts repeat prevention
+      - successor verifier fail-closes missing Fleet proof anchors and SUPPORT_CASE_PACKETS.generated.json reports missing_registry_proof_anchor_paths=[] and missing_queue_proof_anchor_paths=[]
       - design-owned queue source row matches the Fleet completed queue proof assignment
       - design-owned queue source proof markers fail the standalone verifier
-      - successor verifier fail-closes missing Fleet proof anchors and SUPPORT_CASE_PACKETS.generated.json reports missing_registry_proof_anchor_paths=[] and missing_queue_proof_anchor_paths=[]
       - telemetry command proof markers fail the standalone verifier and shared successor authority check
       - runtime handoff frontier metadata proof markers fail the standalone verifier and shared successor authority check
       - distinct queue proof anti-collapse guard prevents broad prose proof lines from satisfying command and negative-proof rows
       - duplicate queue, design-queue, and registry work-task rows for next90-m102-fleet-reporter-receipts fail the shared successor authority check
       - cached packet fallback provenance guard keeps ready followthrough closed when `source.refresh_mode=cached_packets_fallback`
       - seeded cached-packet mirror provenance guard keeps ready followthrough closed when `seeded_from_cached_packets_generated_at` is present
+      - weekly governor recomputes followthrough readiness from row-level install, release, installed-build, and fix receipt truth instead of stale summary counters or partial ready rows
+      - fix-available action rows keep `send_fix_available` versus `send_fix_available_with_update` aligned with receipt-backed `update_required`, and the standalone verifier rejects drift
       - completed queue action guard requires verify_closed_package_only and package-specific do_not_reopen_reason on Fleet and design queue rows
     allowed_paths:
       - scripts

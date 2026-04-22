@@ -238,6 +238,81 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestPreservesCanonicalRidAsCompatibilityPlatformId()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["contractName"] = "Chummer.Hub.Registry.Contracts",
+            ["contract_name"] = "Chummer.Hub.Registry.Contracts",
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260421-000001",
+            ["generatedAt"] = "2026-04-21T00:00:01Z",
+            ["publishedAt"] = "2026-04-21T00:00:01Z",
+            ["status"] = "published",
+            ["desktopTupleCoverage"] = new Dictionary<string, object?>
+            {
+                ["requiredDesktopPlatforms"] = new[] { "linux", "windows", "macos" },
+                ["requiredDesktopHeads"] = new[] { "avalonia" },
+                ["requiredDesktopPlatformHeadRidTuples"] = new[] { "avalonia:linux-x64:linux", "avalonia:win-x64:windows", "avalonia:osx-arm64:macos" },
+                ["promotedInstallerTuples"] = new object[]
+                {
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:linux:linux-x64", ["head"] = "avalonia", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["kind"] = "installer", ["artifactId"] = "avalonia-linux-x64-installer" },
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:macos:osx-arm64", ["head"] = "avalonia", ["platform"] = "macos", ["rid"] = "osx-arm64", ["arch"] = "arm64", ["kind"] = "installer", ["artifactId"] = "avalonia-osx-arm64-installer" }
+                },
+                ["promotedPlatformHeads"] = new Dictionary<string, object?> { ["linux"] = new[] { "avalonia" }, ["windows"] = Array.Empty<string>(), ["macos"] = new[] { "avalonia" } },
+                ["promotedPlatformHeadRidTuples"] = new[] { "avalonia:linux-x64:linux", "avalonia:osx-arm64:macos" },
+                ["missingRequiredPlatforms"] = new[] { "windows" },
+                ["missingRequiredHeads"] = Array.Empty<string>(),
+                ["missingRequiredPlatformHeadPairs"] = new[] { "avalonia:windows" },
+                ["missingRequiredPlatformHeadRidTuples"] = new[] { "avalonia:win-x64:windows" },
+                ["externalProofRequests"] = Array.Empty<object>(),
+                ["desktopRouteTruth"] = Array.Empty<object>(),
+                ["complete"] = false
+            },
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = "linux123",
+                    ["sizeBytes"] = 1L,
+                    ["installAccessClass"] = "account_required"
+                },
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-osx-arm64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "macos",
+                    ["rid"] = "osx-arm64",
+                    ["arch"] = "arm64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop macOS ARM64 Installer",
+                    ["fileName"] = "chummer-avalonia-osx-arm64-installer.dmg",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    ["sha256"] = "mac123",
+                    ["sizeBytes"] = 2L,
+                    ["installAccessClass"] = "account_required"
+                }
+            }
+        });
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Contains(manifest.Downloads, item => item.Id == "avalonia-linux-x64-installer" && item.PlatformId == "linux-x64");
+        Assert.Contains(manifest.Downloads, item => item.Id == "avalonia-osx-arm64-installer" && item.PlatformId == "osx-arm64");
+    }
+
+    [Fact]
     public void LoadManifestDefaultsContractNameWhenSourceManifestOmitsIt()
     {
         using var fixture = new PublicReleaseManifestFixture();

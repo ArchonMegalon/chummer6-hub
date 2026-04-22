@@ -28,7 +28,7 @@ public sealed class WindowsProofInstallerService
         _configuration = configuration;
     }
 
-    public IReadOnlyList<WindowsProofInstallerRecord> LoadCatalog()
+    public IReadOnlyList<WindowsProofInstallerRecord> LoadCatalog(IReadOnlyCollection<string>? publishedArtifactIds = null)
     {
         var rows = new List<WindowsProofInstallerRecord>();
         foreach (var fileName in PreferredFileNames)
@@ -37,6 +37,21 @@ public sealed class WindowsProofInstallerService
             if (row is not null)
             {
                 rows.Add(row);
+            }
+        }
+
+        if (publishedArtifactIds is { Count: > 0 })
+        {
+            HashSet<string> publishedSet = publishedArtifactIds
+                .Where(static artifactId => !string.IsNullOrWhiteSpace(artifactId))
+                .Select(static artifactId => artifactId.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (publishedSet.Count > 0)
+            {
+                rows = rows
+                    .Where(row => !publishedSet.Contains(row.ArtifactId))
+                    .ToList();
             }
         }
 

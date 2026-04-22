@@ -70,9 +70,9 @@
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@Model.SecondaryDownloadLabel</a>
                 </div>
-                <p class="muted-copy">Use this raw installer fallback only when support asks for it. The guided setup assistant below remains the linked-install default.</p>
+                <p class="muted-copy">Use this raw installer fallback only when support asks for it. The guided setup assistant below remains the linked-install default when this route is active.</p>
                 <details class="release-disclosure">
-                    <summary>Guided Windows setup assistant</summary>
+                    <summary>Guided setup assistant</summary>
                     <div class="release-disclosure__body">
                         <div class="code-panel">
                             <div class="code-panel__label">@(Model.BootstrapCommandLabel ?? "Install command")</div>

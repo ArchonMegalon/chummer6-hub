@@ -7,9 +7,10 @@ Generated automatically from the parity oracle and current contracts catalogs.
 - Tab catalog source: `../chummer-core-engine/Chummer.Rulesets.Hosting/Presentation/NavigationTabCatalog.cs`
 - Action catalog source: `../chummer-core-engine/Chummer.Rulesets.Hosting/Presentation/WorkspaceSurfaceActionCatalog.cs`
 - Desktop dialog source: `../chummer-presentation/Chummer.Presentation/Overview/DesktopDialogFactory.cs`
+- Overview command policy source: `../chummer-presentation/Chummer.Presentation/Overview/OverviewCommandPolicy.cs`
 - Workspace Actions coverage compares parity-oracle action IDs to action `TargetId` values.
 - Catalog-only IDs must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.
-- Desktop Controls coverage compares parity-oracle control IDs to dialog control IDs in `DesktopDialogFactory`.
+- Desktop Controls coverage compares parity-oracle control IDs to dialog control IDs in `DesktopDialogFactory`, excluding import-hint command routes declared in `OverviewCommandPolicy`.
 - Dialog-factory-only desktop controls must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.
 
 ## Summary

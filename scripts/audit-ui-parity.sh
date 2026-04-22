@@ -1691,7 +1691,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "Master_index_is_a_first_class_runtime_backed_workbench_route",
         "Character_roster_is_a_first_class_runtime_backed_workbench_route",
         "Desktop_shell_preserves_chummer5a_familiarity_cues",
-        "Desktop_shell_preserves_classic_dense_three_pane_workbench_posture",
+        "Desktop_shell_preserves_classic_dense_center_first_workbench_posture",
         "Theme_tokens_preserve_chummer5a_palette_and_readability",
         "Loaded_runner_preserves_visible_character_tab_posture",
         "Loaded_runner_header_stays_tab_panel_only_without_metric_cards",
@@ -1707,7 +1707,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "Runtime_backed_menu_bar_preserves_classic_labels_and_clickable_primary_menus",
         "Runtime_backed_toolstrip_preserves_classic_labeled_workbench_actions",
         "Runtime_backed_toolstrip_preserves_flat_classic_toolbar_posture",
-        "Runtime_backed_codex_tree_preserves_legacy_left_rail_navigation_posture",
+        "Runtime_backed_shell_hides_workspace_tree_until_multiple_workspaces_exist",
         "Runtime_backed_ruleset_switch_preserves_sr4_sr5_and_sr6_codex_landmarks",
         "Runtime_backed_shell_avoids_modern_dashboard_copy_that_breaks_chummer5a_orientation",
         "Runtime_backed_shell_chrome_stays_enabled_after_runner_load",
@@ -1756,6 +1756,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "runtimeBackedFileMenuRoutes",
         "runtimeBackedMasterIndex",
         "runtimeBackedCharacterRoster",
+        "defaultSingleRunnerKeepsWorkspaceChromeCollapsed",
         "legacyMainframeVisualSimilarity",
         "legacyDenseBuilderRhythm",
         "legacyCreationWorkflowRhythm",
@@ -1798,6 +1799,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "runtime_backed_file_menu_routes": "runtime-backed file menu routes",
         "runtime_backed_master_index": "runtime-backed master index",
         "runtime_backed_character_roster": "runtime-backed character roster",
+        "default_single_runner_keeps_workspace_chrome_collapsed": "default single-runner workspace chrome collapse",
         "legacy_mainframe_visual_similarity": "legacy mainframe visual similarity",
         "legacy_dense_builder_rhythm": "legacy dense builder rhythm",
         "legacy_creation_workflow_rhythm": "legacy creation workflow rhythm",
@@ -1998,6 +2000,7 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "15-creation-section-light.png",
         "16-master-index-dialog-light.png",
         "17-character-roster-dialog-light.png",
+        "18-import-dialog-light.png",
     )
     missing_required_screenshots = sorted(
         screenshot_name

@@ -58,6 +58,19 @@ Current policy:
   - campaign continuity facts remain unchanged unless replay-safe continuation rules allow the linkage
   - support/control truth stays in `Chummer.Control.Contracts`
 
+### Future open-run and network authority policy
+
+Open-run and Shadowcasters Network authority stays narrower than campaign truth:
+
+* GMs own run listing, roster, and closeout decisions for one `OpenRun` unless an explicit organizer-curated mode says otherwise.
+* Organizers may define visibility scope, season policy, and moderation policy, but they do not silently seize GM run truth.
+* Organizers or community operators may publish `CommunityRuleEnvironment` and approval policy, but legality still derives from Chummer-owned rule-environment packages, amend packages, and approval receipts.
+* Run-application preflight may recommend `pass`, `warn`, `fail`, or `blocked`, but it must expose readable reasons and next safe actions instead of hidden gatekeeping.
+* External scheduling or meeting tools may project booking, links, or channel access. They do not own `RunPlan`, `OpenRun`, accepted roster, or outcome truth.
+* VTTs and play surfaces may receive exported runner, opposition, or handout packets. They do not own roster, run, or consequence truth.
+* GOD observer or debrief assistance requires explicit consent policy for that run; no operator may silently turn it on after roster lock.
+* Reputation and seasonal-honor events must derive from typed source objects and visibility policy; Table Pulse or observer outputs may assist drafts but may not directly publish public scoring.
+
 ## Truth owner
 
 * Campaign and roster truth: `chummer6-hub`

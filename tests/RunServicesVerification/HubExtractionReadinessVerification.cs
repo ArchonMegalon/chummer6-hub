@@ -362,9 +362,19 @@ internal static class HubExtractionReadinessVerification
                 continue;
             }
 
-            var sourceFiles = Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            var sourceFiles = Directory.EnumerateFiles(
+                    root,
+                    "*.cs",
+                    new EnumerationOptions
+                    {
+                        RecurseSubdirectories = true,
+                        IgnoreInaccessible = true,
+                        AttributesToSkip = FileAttributes.ReparsePoint
+                    })
                 .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}tests{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+                .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}chummer.run-services{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase));
 
             foreach (var sourceFile in sourceFiles)
             {

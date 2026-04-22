@@ -43,12 +43,13 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
-      CHUMMER_PUBLIC_CANON_ROOT: /repo
+      CHUMMER_PUBLIC_CANON_ROOT: /app
       CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT: /fleet-artifacts
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
       CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
       CHUMMER_RELEASE_UPLOAD_TICKET_LIFETIME_MINUTES: ${CHUMMER_RELEASE_UPLOAD_TICKET_LIFETIME_MINUTES:-720}
-      CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS: ${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-avalonia-win-x64-installer,blazor-desktop-win-x64-installer}
+      CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS: ${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-blazor-desktop-win-x64-installer}
+      CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER: ${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-true}
       IDENTITY_SERVICE_BASE_URL: http://chummer-run-identity:8080
       IDENTITY_ADMIN_KEY: ${IDENTITY_ADMIN_KEY:-}
       GOOGLE_OIDC_CLIENT_ID: ${GOOGLE_OIDC_CLIENT_ID:-}
@@ -72,7 +73,6 @@ services:
       CHUMMER_TEABLE_USERS_RECONCILE_INTERVAL_MINUTES: ${CHUMMER_TEABLE_USERS_RECONCILE_INTERVAL_MINUTES:-30}
     volumes:
       - chummer-run-api-state:/app/state
-      - ./:/repo:ro
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
     ports:

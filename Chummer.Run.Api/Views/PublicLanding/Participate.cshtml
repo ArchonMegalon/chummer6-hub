@@ -19,6 +19,15 @@
     <p class="muted-copy">Authorization is optional, revocable, and does not count as contribution credit by itself.</p>
 </section>
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 <section class="editorial-block editorial-block--lanes">
     <div class="lane-strip-list">
         <article class="lane-strip">
@@ -47,7 +56,7 @@
         <article class="lane-strip">
             <div class="lane-strip__copy">
                 <span class="tag tag--amber">Account required</span>
-                <h2>Guided Codex participation</h2>
+                <h2>Signed-in participation</h2>
                 <p>Use the signed-in path when you want tracked beta follow-up or want to grant temporary Codex access with your OpenAI account in ChatGPT.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)

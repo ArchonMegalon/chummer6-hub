@@ -43,6 +43,12 @@ desktop_dialog_factory_path = pathlib.Path(
         str(presentation_root / "Chummer.Presentation" / "Overview" / "DesktopDialogFactory.cs"),
     )
 )
+overview_command_policy_path = pathlib.Path(
+    os.environ.get(
+        "CHUMMER_PARITY_OVERVIEW_COMMAND_POLICY_PATH",
+        str(presentation_root / "Chummer.Presentation" / "Overview" / "OverviewCommandPolicy.cs"),
+    )
+)
 
 
 def read_text(path: pathlib.Path) -> str:
@@ -135,9 +141,52 @@ def parse_workspace_action_target_ids(text: str) -> list[str]:
     )
 
 
-def parse_desktop_dialog_control_ids(text: str) -> list[str]:
+def parse_static_string_hash_set_ids(text: str, *, set_name: str, source: str) -> list[str]:
+    match = re.search(
+        rf'{re.escape(set_name)}\s*=\s*new\(StringComparer\.Ordinal\)\s*\{{(?P<body>.*?)\n\s*\}};',
+        text,
+        re.DOTALL,
+    )
+    if match is None:
+        raise ValueError(f"{source} is missing string hash set {set_name}")
     return parse_catalog_token_matches(
-        re.findall(r'"([A-Za-z0-9_]+)"\s*=>\s*new\s+DesktopDialogState\(', text),
+        re.findall(r'"([A-Za-z0-9_]+)"', match.group("body")),
+        source=f"{source} {set_name}",
+        allow_duplicate_ids=False,
+    )
+
+
+def extract_switch_expression_body(text: str, *, variable_name: str) -> str:
+    match = re.search(
+        rf'return\s+{re.escape(variable_name)}\s+switch\s*\{{(?P<body>.*?)\n\s*\}};',
+        text,
+        re.DOTALL,
+    )
+    if match is None:
+        raise ValueError(
+            f"{display_path(desktop_dialog_factory_path)} is missing a switch expression for {variable_name}"
+        )
+    return match.group("body")
+
+
+def parse_switch_case_ids(text: str, *, variable_name: str) -> list[str]:
+    switch_body = extract_switch_expression_body(text, variable_name=variable_name)
+    return parse_catalog_token_matches(
+        re.findall(r'"([A-Za-z0-9_]+)"\s*=>', switch_body),
+        source=f"{display_path(desktop_dialog_factory_path)} {variable_name} switch IDs",
+        allow_duplicate_ids=False,
+    )
+
+
+def parse_desktop_dialog_control_ids(text: str, *, ignored_command_ids: Sequence[str]) -> list[str]:
+    ignored_command_id_set = set(ignored_command_ids)
+    command_ids = [
+        command_id
+        for command_id in parse_switch_case_ids(text, variable_name="commandId")
+        if command_id not in ignored_command_id_set
+    ]
+    return parse_catalog_token_matches(
+        command_ids + parse_switch_case_ids(text, variable_name="controlId"),
         source=f"{display_path(desktop_dialog_factory_path)} desktop dialog control IDs",
         allow_duplicate_ids=False,
     )
@@ -234,6 +283,7 @@ if not isinstance(parity_oracle, dict):
 navigation_catalog_text = read_text(navigation_catalog_path)
 action_catalog_text = read_text(action_catalog_path)
 desktop_dialog_factory_text = read_text(desktop_dialog_factory_path)
+overview_command_policy_text = read_text(overview_command_policy_path)
 
 legacy_tabs = parse_required_token_list(
     parity_oracle,
@@ -264,6 +314,11 @@ legacy_desktop_controls = parse_required_token_list(
     parity_oracle,
     "desktopControls",
     source=display_path(parity_oracle_path),
+)
+import_hint_command_ids = parse_static_string_hash_set_ids(
+    overview_command_policy_text,
+    set_name="ImportHintCommandIds",
+    source=display_path(overview_command_policy_path),
 )
 
 required_milestone2_tabs = {
@@ -412,7 +467,10 @@ fail_on_missing_milestone2_baseline_ids(
 
 catalog_tabs = parse_catalog_ids(navigation_catalog_text)
 catalog_actions = parse_workspace_action_target_ids(action_catalog_text)
-catalog_desktop_controls = parse_desktop_dialog_control_ids(desktop_dialog_factory_text)
+catalog_desktop_controls = parse_desktop_dialog_control_ids(
+    desktop_dialog_factory_text,
+    ignored_command_ids=import_hint_command_ids,
+)
 
 covered_tabs, missing_tabs, catalog_only_tabs = partition_coverage(legacy_tabs, catalog_tabs)
 covered_actions, missing_actions, catalog_only_actions = partition_coverage(legacy_actions, catalog_actions)
@@ -464,9 +522,10 @@ output_lines: list[str] = [
     f"- Tab catalog source: `{display_path(navigation_catalog_path)}`",
     f"- Action catalog source: `{display_path(action_catalog_path)}`",
     f"- Desktop dialog source: `{display_path(desktop_dialog_factory_path)}`",
+    f"- Overview command policy source: `{display_path(overview_command_policy_path)}`",
     "- Workspace Actions coverage compares parity-oracle action IDs to action `TargetId` values.",
     "- Catalog-only IDs must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.",
-    "- Desktop Controls coverage compares parity-oracle control IDs to dialog control IDs in `DesktopDialogFactory`.",
+    "- Desktop Controls coverage compares parity-oracle control IDs to dialog control IDs in `DesktopDialogFactory`, excluding import-hint command routes declared in `OverviewCommandPolicy`.",
     "- Dialog-factory-only desktop controls must be acknowledged explicitly in `docs/PARITY_ORACLE.json`.",
     "",
     "## Summary",

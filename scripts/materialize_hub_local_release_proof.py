@@ -207,6 +207,8 @@ def main() -> int:
             "/account/work",
             "/account/support",
             "/contact",
+            "/downloads/install/avalonia-osx-arm64-installer",
+            "/downloads/install/avalonia-win-x64-installer",
         ],
         "proof_receipts": [
             {

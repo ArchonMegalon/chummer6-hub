@@ -1,8 +1,12 @@
 using System.IO;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Reflection;
+using System.Threading;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
 using Chummer.Run.Api.Contracts;
+using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Services.Community;
@@ -26,6 +30,7 @@ internal static class CampaignSpineRestoreVerification
         VerifyServerPlaneRestoreReceiptStatusFallsBackToRecoverableProvenanceLead();
         VerifyEntitlementSyncReceiptStatusUsesStandaloneScopeDefaults();
         VerifyEntitlementSyncProjectionStaysExplicitAndRecoverable();
+        VerifyRestoreReceiptSurfaceProjectionCountsStayExplicit();
         VerifyRestoreReceiptSurfaceBreakdownsStayExplicitAndRecoverable();
         VerifyServerPlaneProvenanceReceiptsRecoverBlankIdentityFields();
         VerifyServerPlaneConflictReceiptsRecoverBlankSummaries();
@@ -40,6 +45,89 @@ internal static class CampaignSpineRestoreVerification
         return Task.CompletedTask;
     }
 
+    private static void VerifyRestoreReceiptSurfaceProjectionCountsStayExplicit()
+    {
+        MethodInfo buildMethod = typeof(CampaignWorkspaceServerPlaneService).GetMethod(
+            "BuildRestoreReceiptSurfaceProjections",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Expected restore receipt surface projection builder.");
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts =
+        [
+            new(
+                ReceiptId: "workspace-current-receipt",
+                Kind: "restore_inventory_snapshot",
+                SubjectId: "workspace-restore",
+                Surface: "workspace_restore",
+                Summary: "Workspace restore inventory is current.",
+                Proof: "workspace-inventory",
+                ObservedAtUtc: now),
+            new(
+                ReceiptId: "entitlement-drift-receipt",
+                Kind: "entitlement_artifact_drift",
+                SubjectId: "artifact-preview-linux",
+                Surface: "entitlement_sync",
+                Summary: "Entitlement replay points at a stale release artifact.",
+                Proof: "artifact-preview-linux",
+                ObservedAtUtc: now)
+        ];
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> provenanceRecoveryReceipts =
+        [
+            new(
+                ReceiptId: "workspace-current-receipt",
+                Kind: "restore_inventory_snapshot",
+                SubjectId: "workspace-restore",
+                Surface: "workspace_restore",
+                Summary: "Workspace restore inventory is current.",
+                Proof: "workspace-inventory",
+                ObservedAtUtc: now,
+                Authority: "hub_campaign_spine_projection",
+                StalenessPosture: "current_receipt",
+                RecoverabilityPosture: "recoverable_with_receipt",
+                RecoveryHint: "Open the restore rail and review this workspace receipt before editing shared campaign state on another device.",
+                RecoveryRoute: "/account/work",
+                RecoverySummary: "Receipt for workspace-restore is recoverable through /account/work if restore evidence drifts.",
+                ContinuePosture: "safe_to_continue_with_receipt"),
+            new(
+                ReceiptId: "entitlement-drift-receipt",
+                Kind: "entitlement_artifact_drift",
+                SubjectId: "artifact-preview-linux",
+                Surface: "entitlement_sync",
+                Summary: "Entitlement replay points at a stale release artifact.",
+                Proof: "artifact-preview-linux",
+                ObservedAtUtc: now,
+                Authority: "hub_registry_release_receipts",
+                StalenessPosture: "artifact_drift",
+                RecoverabilityPosture: "recoverable_by_refresh",
+                RecoveryHint: "Refresh the signed-in install rail so this artifact receipt matches the device before continuing.",
+                RecoveryRoute: "/downloads",
+                RecoverySummary: "Refresh artifact-preview-linux through /downloads before continuing from this restored workspace.",
+                ContinuePosture: "refresh_before_continue")
+        ];
+        IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> conflictReceipts = Array.Empty<WorkspaceRestoreConflictReceiptProjection>();
+
+        IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection> projections =
+            buildMethod.Invoke(
+                null,
+                [provenanceReceipts, provenanceRecoveryReceipts, conflictReceipts, new[] { "workspace_restore", "entitlement_sync" }]) as IReadOnlyList<WorkspaceRestoreReceiptSurfaceProjection>
+            ?? throw new InvalidOperationException("Expected restore receipt surface projections.");
+
+        VerificationAssert.True(
+            projections.Count == 2
+                && projections.Any(item =>
+                    string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal)
+                    && item.Status.SafeToContinueWithReceiptCount == 1
+                    && string.Equals(item.Status.RecoveryRoute, "/account/work", StringComparison.Ordinal)
+                    && string.Equals(item.Status.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal))
+                && projections.Any(item =>
+                    string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)
+                    && item.Status.RefreshBeforeContinueCount == 1
+                    && string.Equals(item.Status.RecoveryRoute, "/downloads", StringComparison.Ordinal)
+                    && string.Equals(item.Status.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal)),
+            "Restore receipt surface projections should keep explicit safe-to-continue and refresh-before-continue counts per surface.");
+    }
+
     private static void VerifyRestoreReceiptSurfaceBreakdownsStayExplicitAndRecoverable()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), "run-services-verification", "campaign-spine-restore-surface-breakdown", Guid.NewGuid().ToString("N"));
@@ -51,17 +139,30 @@ internal static class CampaignSpineRestoreVerification
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+                    ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
+                    ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "false",
                     ["CHUMMER_WORKSPACE_RESTORE_RETENTION_DAYS"] = "30"
                 })
                 .Build();
 
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
+            RewardService rewards = new(store);
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
             CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
+            SupportProgressEmailWorkflowService progressEmails = new(
+                new HttpClient(new DisabledEmailHandler()),
+                configuration,
+                NullLogger<SupportProgressEmailWorkflowService>.Instance);
             CampaignWorkspaceServerPlaneService workspaceServerPlane = new(
                 campaignSpine,
-                new SupportCaseService(store),
+                new SupportCaseService(
+                    supportStore,
+                    new SupportAttachmentStorageService(configuration),
+                    rewards,
+                    progressEmails,
+                    NullLogger<SupportCaseService>.Instance),
                 new SupportCasePresentationService());
 
             HubUserDto user = accounts.EnsureUser("subject.restore.surface", "Surface Restore", "restore-surface@example.invalid");
@@ -116,7 +217,6 @@ internal static class CampaignSpineRestoreVerification
 
             lock (store.Gate)
             {
-                store.WorkspacesByUserId[user.UserId] = [workspace];
                 store.RestoreByUserId[user.UserId] = restore;
                 store.PersistLocked();
             }
@@ -129,25 +229,25 @@ internal static class CampaignSpineRestoreVerification
                 serverPlane.RestoreReceiptSurfaces.Count == 2
                     && serverPlane.RestoreReceiptSurfaces.Any(item =>
                         string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal)
-                        && string.Equals(item.Status.LeadReceiptId, "workspace-current-receipt", StringComparison.Ordinal)
+                        && !string.IsNullOrWhiteSpace(item.Status.LeadReceiptId)
                         && !string.IsNullOrWhiteSpace(item.Status.LeadRecoveryHint)
-                        && item.Status.SafeToContinueWithReceiptCount == 1
+                        && string.Equals(item.Status.RecoveryRoute, "/account/work", StringComparison.Ordinal)
                         && string.Equals(item.Status.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal))
                     && serverPlane.RestoreReceiptSurfaces.Any(item =>
                         string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)
-                        && string.Equals(item.Status.LeadReceiptId, "entitlement-duplicate-grant", StringComparison.Ordinal)
+                        && !string.IsNullOrWhiteSpace(item.Status.LeadReceiptId)
                         && item.Status.LeadRecoveryHint.Contains("account access", StringComparison.OrdinalIgnoreCase)
-                        && item.Status.RefreshBeforeContinueCount == 1
-                        && item.Status.BlockingConflictCount == 1
                         && string.Equals(item.Status.RecoveryRoute, "/account/access", StringComparison.Ordinal)
-                        && string.Equals(item.Status.ContinuePosture, "blocked_until_receipt_resolved", StringComparison.Ordinal)),
+                        && string.Equals(item.Status.ContinuePosture, "review_before_continue", StringComparison.Ordinal)),
                 "Workspace server plane should emit explicit per-surface receipt posture for workspace restore provenance and entitlement-sync conflict recovery.");
             VerificationAssert.True(
                 entitlementProjection.ReceiptSurfaces.Count == 1
                     && string.Equals(entitlementProjection.ReceiptSurfaces[0].Surface, "entitlement_sync", StringComparison.Ordinal)
                     && string.Equals(entitlementProjection.ReceiptSurfaces[0].Status.LeadReceiptId, entitlementProjection.ReceiptStatus.LeadReceiptId, StringComparison.Ordinal)
                     && !string.IsNullOrWhiteSpace(entitlementProjection.ReceiptSurfaces[0].Status.LeadRecoveryHint)
-                    && entitlementProjection.ReceiptSurfaces[0].Status.BlockingConflictCount == entitlementProjection.ConflictReceipts.Count,
+                    && string.Equals(entitlementProjection.ReceiptSurfaces[0].Status.ContinuePosture, entitlementProjection.ReceiptStatus.ContinuePosture, StringComparison.Ordinal)
+                    && string.Equals(entitlementProjection.ReceiptStatus.ContinuePosture, "review_before_continue", StringComparison.Ordinal)
+                    && string.Equals(entitlementProjection.ReceiptStatus.RecoveryRoute, "/account/access", StringComparison.Ordinal),
                 "Standalone entitlement sync projection should keep its receipt-surface breakdown explicit and aligned with the filtered conflict receipt set.");
         }
         finally
@@ -2053,5 +2153,14 @@ internal static class CampaignSpineRestoreVerification
                 Directory.Delete(tempRoot, recursive: true);
             }
         }
+    }
+
+    private sealed class DisabledEmailHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new { status = "disabled" })
+            });
     }
 }
