@@ -87,6 +87,7 @@ Required live sequence:
 4. Upload the rebuilt bundle to the live shelf:
 `RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
    - If `CHUMMER_RELEASE_UPLOAD_TOKEN` is unset, the upload step now prompts for it with hidden input instead of requiring an inline shell assignment.
+   - Canonical post-publish success is gated on `RELEASE_CHANNEL.generated.json`. Set `CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION=1` only if you intentionally want `releases.json` compatibility drift to fail the run.
 
 Mac release bootstrap note:
 1. The hosted mac bootstrap now defaults temporary packaging work to the run workspace and exports:
