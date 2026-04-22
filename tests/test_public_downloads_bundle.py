@@ -41,8 +41,19 @@ class PublicDownloadsBundleTests(unittest.TestCase):
             if linux_installer is not None:
                 self.assertEqual(
                     linux_installer.get("installAccessClass"),
-                    "account_required",
-                    "published Linux installer rows must stay account-gated when they are present",
+                    "open_public",
+                    "published Linux installer rows must stay publicly downloadable when they are present",
+                )
+
+            windows_installer = next(
+                (item for item in downloads if str(item.get("id") or "") == "avalonia-win-x64-installer"),
+                None,
+            )
+            if windows_installer is not None:
+                self.assertEqual(
+                    windows_installer.get("installAccessClass"),
+                    "open_public",
+                    "published Windows installer rows must stay publicly downloadable when they are present",
                 )
 
             startup_root = output_root / "startup-smoke"
