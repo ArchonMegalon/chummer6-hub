@@ -224,11 +224,7 @@ normalize_preview_install_access_classes() {
   local release_channel="$2"
   : "$release_channel"
 
-  if [[ -z "$PREVIEW_INSTALL_ACCESS_CLASS" ]]; then
-    PREVIEW_INSTALL_ACCESS_CLASS="account_required"
-  fi
-
-  python3 - "$manifest_path" "$PREVIEW_INSTALL_ACCESS_CLASS" <<'PY'
+  python3 - "$manifest_path" "$release_channel" "$PREVIEW_INSTALL_ACCESS_CLASS" "${CHUMMER_PREVIEW_WINDOWS_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_LINUX_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_MACOS_INSTALL_ACCESS_CLASS:-account_required}" <<'PY'
 from __future__ import annotations
 
 import json
@@ -236,13 +232,48 @@ import sys
 from pathlib import Path
 
 manifest_path = Path(sys.argv[1])
-access_class = str(sys.argv[2] or "account_required").strip().lower()
-if not access_class:
-    raise SystemExit(0)
+release_channel = str(sys.argv[2] or "").strip().lower()
+global_access_class = str(sys.argv[3] or "").strip().lower()
+windows_access_class = str(sys.argv[4] or "open_public").strip().lower() or "open_public"
+linux_access_class = str(sys.argv[5] or "open_public").strip().lower() or "open_public"
+macos_access_class = str(sys.argv[6] or "account_required").strip().lower() or "account_required"
 
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 if not isinstance(payload, dict):
     raise SystemExit(0)
+
+
+def normalize_platform(artifact: dict[str, object]) -> str:
+    candidates = [
+        artifact.get("platform"),
+        artifact.get("platformId"),
+        artifact.get("rid"),
+        artifact.get("artifactId"),
+        artifact.get("fileName"),
+    ]
+    joined = " ".join(str(value or "").strip().lower() for value in candidates if str(value or "").strip())
+    if not joined:
+        return ""
+    if "windows" in joined or "win-" in joined or joined.endswith(".exe"):
+        return "windows"
+    if "linux" in joined:
+        return "linux"
+    if "macos" in joined or "osx" in joined or joined.endswith(".dmg") or joined.endswith(".pkg"):
+        return "macos"
+    return ""
+
+
+def resolved_access_class(artifact: dict[str, object]) -> str:
+    if global_access_class:
+        return global_access_class
+    platform = normalize_platform(artifact)
+    if platform == "windows":
+        return windows_access_class
+    if platform == "linux":
+        return linux_access_class
+    if platform == "macos":
+        return macos_access_class
+    return ""
 
 downloads = payload.get("downloads")
 if isinstance(downloads, list):
@@ -252,6 +283,9 @@ if isinstance(downloads, list):
             continue
         kind = str(artifact.get("kind") or "").strip().lower()
         if kind not in {"installer", "dmg", "pkg", "msix"}:
+            continue
+        access_class = resolved_access_class(artifact)
+        if not access_class:
             continue
         if str(artifact.get("installAccessClass") or "").strip().lower() == access_class:
             continue
@@ -268,6 +302,10 @@ for artifact in payload.get("artifacts") or []:
 
     kind = str(artifact.get("kind") or "").strip().lower()
     if kind not in {"installer", "dmg", "pkg", "msix"}:
+        continue
+
+    access_class = resolved_access_class(artifact)
+    if not access_class:
         continue
 
     if str(artifact.get("installAccessClass") or "").strip().lower() == access_class:
