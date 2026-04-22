@@ -300,16 +300,16 @@ public sealed class PublicLandingMacBootstrapScriptTests
 
         string command = (string)(buildMethod.Invoke(
             obj: null,
-            parameters: ["https://chummer.run/downloads/release-upload/bootstrap.sh", "abc123", "ticket-123"]) ?? throw new InvalidOperationException("command build returned null"));
+            parameters: ["https://chummer.run/downloads/release-upload/bootstrap.sh", "abc123"]) ?? throw new InvalidOperationException("command build returned null"));
 
         Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256='abc123'", command, StringComparison.Ordinal);
         Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET='ticket-123'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0'", command, StringComparison.Ordinal);
         Assert.DoesNotContain("bootstrap.sh?ticket=", command, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("apiToken=", command, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TICKET=", command, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN=", command, StringComparison.Ordinal);
         Assert.DoesNotContain("export CHUMMER_RELEASE_UPLOAD_TICKET=", command, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='1'", command, StringComparison.Ordinal);
@@ -445,7 +445,8 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("local fallback_ui_localization_release_gate_url=\"${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_URL:-}\"", template, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \\", template, StringComparison.Ordinal);
         Assert.Contains("bash scripts/verify-releases-manifest.sh \"$dist_dir/releases.json\"", template, StringComparison.Ordinal);
-        Assert.Contains("bash scripts/verify-releases-manifest.sh \"$verify_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("bash scripts/verify-releases-manifest.sh \"$canonical_verify_url\"", template, StringComparison.Ordinal);
+        Assert.Contains("resolve_live_release_verify_urls \"$verify_url\"", template, StringComparison.Ordinal);
         Assert.Contains("curl --fail-with-body -sS \"$compatibility_url\"", template, StringComparison.Ordinal);
         Assert.Contains("curl --fail-with-body -sS \"$canonical_url\"", template, StringComparison.Ordinal);
         Assert.DoesNotContain("curl --fail-with-body -fsS \"$compatibility_url\"", template, StringComparison.Ordinal);

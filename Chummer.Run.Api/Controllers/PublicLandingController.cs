@@ -278,8 +278,7 @@ public sealed class PublicLandingController : Controller
             string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
             string command = BuildReleaseUploadBootstrapCommand(
                 bootstrapUrl,
-                ComputeSha256Hex(bootstrapTemplate),
-                ticket.Ticket);
+                ComputeSha256Hex(bootstrapTemplate));
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     "Release upload handoff",
@@ -288,13 +287,14 @@ public sealed class PublicLandingController : Controller
                     user.DisplayName,
                     user.Email),
                 Heading: "Signed-in release upload handoff",
-                Summary: "This page mints a short-lived upload handoff code, embeds it directly into the signed-in bootstrap command, and lets the release runner promote the artifact directly onto the live downloads shelf without a manual server copy step.",
+                Summary: "This page mints a short-lived upload handoff code, keeps it off the copied bootstrap command, and lets the release runner paste it only after the bootstrap is already running with temp-file auth handling.",
                 Command: command,
+                HandoffCode: ticket.Ticket,
                 BootstrapUrl: bootstrapUrl,
                 TicketExpiresAtUtc: ticket.Claims.ExpiresAtUtc,
                 UploadUrl: BuildAbsoluteUrl("/api/internal/releases/bundles"),
                 ReadmeUrl: BuildAbsoluteUrl("/artifacts/mac-codex-release-pipeline/readme.md"),
-                VerifyUrl: BuildAbsoluteUrl("/downloads/releases.json"),
+                VerifyUrl: BuildAbsoluteUrl("/downloads/RELEASE_CHANNEL.generated.json"),
                 WindowsUploadNote: "Windows bundles use the same upload endpoint and the same signed-in claim-code return path once the signed installer, startup-smoke receipts, and promotion evidence are present.",
                 TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
                 SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -5065,7 +5065,7 @@ echo "Help: ${HELP_URL}"
     private static string SingleQuoteShellLiteral(string value)
         => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
 
-    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl, string bootstrapSha256, string uploadTicket)
+    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl, string bootstrapSha256)
     {
         return "set -euo pipefail; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
@@ -5073,7 +5073,6 @@ echo "Help: ${HELP_URL}"
             "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
             "ACTUAL_BOOTSTRAP_SHA256=\"$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \"$TMP_BOOTSTRAP_SCRIPT\")\"; " +
             "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
-            "CHUMMER_RELEASE_UPLOAD_TICKET=" + SingleQuoteShellValue(uploadTicket) + " " +
             "CHUMMER_RELEASE_CHANNEL='preview' " +
             "CHUMMER_ALLOW_UNSIGNED_PREVIEW='1' " +
             "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0' " +
