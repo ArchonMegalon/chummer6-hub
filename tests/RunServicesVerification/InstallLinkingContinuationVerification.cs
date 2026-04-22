@@ -436,7 +436,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(!nativeSupport.NativeRollbackHref.StartsWith("/account/", StringComparison.Ordinal), "Native support continuation should not send rollback through the account browser rail after filing support.");
             VerificationAssert.True(!nativeSupport.NativeRollbackHref.StartsWith("/downloads", StringComparison.Ordinal), "Native support continuation should not send rollback through the downloads browser rail after filing support.");
             VerificationAssert.True(!nativeSupport.NativeRollbackHref.StartsWith("/contact", StringComparison.Ordinal), "Native support continuation should not send rollback through the public support browser rail after filing support.");
-            VerificationAssert.Equal("/api/v1/install-linking/continuation/update", nativeSupport.PrimaryActionHref, "Native support continuation should keep update on the grant-bound native update planner after filing support.");
+            VerificationAssert.Equal("/api/v1/install-linking/continuation", nativeSupport.PrimaryActionHref, "Native support continuation should keep the immediate follow-through on the grant-bound continuation rail after filing support.");
             VerificationAssert.True(!nativeSupport.PrimaryActionHref.StartsWith("/account/", StringComparison.Ordinal), "Native support continuation should not send the desktop app through the account browser rail for the immediate follow-up action.");
             VerificationAssert.True(!nativeSupport.PrimaryActionHref.StartsWith("/downloads", StringComparison.Ordinal), "Native support continuation should not send the desktop app through the downloads browser rail for the immediate follow-up action.");
             VerificationAssert.True(!nativeSupport.PrimaryActionHref.StartsWith("/contact", StringComparison.Ordinal), "Native support continuation should not send the desktop app through the public support browser rail for the immediate follow-up action.");
@@ -550,7 +550,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(!IsBrowserRailHrefForVerification("https://chummer.run/api/v1/install-linking/continuation/update"), "Native support action sanitizer should keep trusted absolute grant-bound API continuation URLs native.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://unexpected.example/support/case-123"), "Native support action sanitizer should fail closed when support presentation returns an unexpected external action.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://unexpected.example/api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving absolute native-looking actions.");
-            VerificationAssert.Equal("/api/v1/install-linking/continuation/update", BuildNativeSupportCaseActionHrefForVerification("https://chummer.run/api/v1/install-linking/continuation/update"), "Native support action sanitizer should preserve trusted absolute Hub-native update actions.");
+            VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://chummer.run/api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed to the continuation rail when support presentation returns an absolute Hub-native update action.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation/support", BuildNativeSupportCaseActionHrefForVerification("http://127.0.0.1:47761/api/v1/install-linking/continuation/support", reporterActionNeeded: true), "Native support action sanitizer should preserve trusted app-local native support actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("//api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving scheme-relative native-looking actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("///api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving repeated-slash native-looking actions.");
@@ -559,7 +559,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("\\api\\v1\\install-linking\\continuation\\update"), "Native support action sanitizer should fail closed instead of preserving Windows-style native-looking actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("mailto:support@example.invalid"), "Native support action sanitizer should fail closed instead of handing the desktop app to a non-http action.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("javascript:alert(1)"), "Native support action sanitizer should fail closed instead of handing the desktop app to a script action.");
-            VerificationAssert.Equal("/api/v1/install-linking/continuation/update", BuildNativeSupportCaseActionHrefForVerification("/api/v1/install-linking/continuation/update"), "Native support action sanitizer should preserve grant-bound native update planner actions.");
+            VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("/api/v1/install-linking/continuation/update"), "Native support action sanitizer should fall back to the continuation rail when a native update href is presented without update-needed support state.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation/support", BuildNativeSupportCaseActionHrefForVerification("/api/v1/install-linking/continuation/support", reporterActionNeeded: true), "Native support action sanitizer should keep reporter-needed follow-up on the native support intake.");
 
             ActionResult<DesktopInstallNativeSupportResponse> staleReceiptLabelSupportResult = controller.SubmitClaimedInstallSupport(
@@ -783,6 +783,7 @@ internal static class InstallLinkingContinuationVerification
         return method.Invoke(null, [item]) as string
             ?? throw new InvalidOperationException("InstallLinkingController native support action sanitizer returned no href.");
     }
+
 
     private static void SeedClaimedInstall(InstallLinkingStore store)
     {

@@ -161,6 +161,60 @@ platforms:
     }
 
     [Fact]
+    public void BuildExperienceUsesWindowsInstallerAsRecommendedDownloadWhenPresentOnTheMainShelf()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260422-101500",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-22T10:15:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "6b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ea",
+                    SizeBytes: 34297862,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "open_public"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "cb3493c1113c23b5e496dfe8a1e6de9afc43c802d7da865adc5255497341e5c4",
+                    SizeBytes: 96466473,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "account_required")
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)", authenticated: false);
+
+        Assert.Equal("Windows", experience.RequestedPlatformLabel);
+        Assert.True(experience.RequestedPlatformHasPublicDownload);
+        Assert.NotNull(experience.Recommended);
+        Assert.Equal("avalonia-win-x64-installer", experience.Recommended!.Artifact.Id);
+        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", experience.Recommended.DispatchHref, StringComparison.Ordinal);
+        var windows = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "windows");
+        Assert.True(windows.PubliclyAvailable);
+    }
+
+    [Fact]
     public void BuildExperienceNormalizesPreviewMacDmgIntoAccountGatedSetupScriptPreview()
     {
         var configuration = new ConfigurationBuilder()
@@ -264,7 +318,7 @@ platforms:
     }
 
     [Fact]
-    public void BuildExperienceUsesWindowsSetupScriptForAuthenticatedWindowsUsers()
+    public void BuildExperienceUsesWindowsSetupExeForAuthenticatedWindowsUsers()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -305,8 +359,10 @@ platforms:
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
         Assert.Equal("Install on Windows", recommended.ActionLabel);
         Assert.Equal("/downloads/install/avalonia-win-x64-installer", recommended.DispatchHref);
-        Assert.Contains("short-lived PowerShell command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Auto select", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("setup .exe", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("default browser", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("powershell", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.False(service.UsesGuidedBootstrapScript(recommended.Artifact));
     }
 
     [Fact]

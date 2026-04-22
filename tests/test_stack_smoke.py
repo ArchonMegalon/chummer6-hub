@@ -95,6 +95,51 @@ class StackConfigSmokeTests(unittest.TestCase):
                 msg=f"{service_name} should restart automatically after host or docker daemon restarts",
             )
 
+    def test_public_edge_promotes_windows_installer_on_main_shelf(self):
+        public_edge_path = REPO_ROOT / "docker-compose.public-edge.yml"
+        if not public_edge_path.exists():
+            self.skipTest("docker-compose.public-edge.yml is not present for this repository slice")
+
+        payload = yaml.safe_load(public_edge_path.read_text(encoding="utf-8")) or {}
+        services = payload.get("services") or {}
+        portal = services.get("chummer-portal") or {}
+        environment = portal.get("environment") or {}
+
+        self.assertEqual(
+            environment.get("CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER"),
+            "${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-true}",
+            msg="public edge should promote the Windows installer onto the main downloads shelf",
+        )
+        self.assertEqual(
+            environment.get("CHUMMER_PUBLIC_CANON_ROOT"),
+            "/app",
+            msg="public edge should read baked canonical product truth instead of a drift-prone repo mirror mount",
+        )
+
+        volumes = portal.get("volumes") or []
+        self.assertNotIn(
+            "./:/repo:ro",
+            volumes,
+            msg="public edge should not keep a live repo mount once canonical product truth is baked into /app",
+        )
+
+    def test_public_edge_dockerfile_bakes_design_canon_into_app_product_root(self):
+        dockerfile_path = REPO_ROOT / "Chummer.Run.Api" / "Dockerfile"
+        if not dockerfile_path.exists():
+            self.skipTest("Chummer.Run.Api/Dockerfile is not present for this repository slice")
+
+        dockerfile_text = dockerfile_path.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "COPY --from=build /src/chummercomplete/chummer.run-services/.codex-design /app/.codex-design",
+            dockerfile_text,
+        )
+        self.assertIn(
+            "COPY chummercomplete/chummer-design/products/chummer/ /app/.codex-design/product/",
+            dockerfile_text,
+            msg="public edge image should overlay the canonical chummer-design product onto the app product root",
+        )
+
     def test_release_upload_bootstrap_stamps_receipts_with_artifact_identity(self):
         bootstrap_path = (
             REPO_ROOT
@@ -184,6 +229,33 @@ class StackConfigSmokeTests(unittest.TestCase):
             if script_path in run_services_gate_paths:
                 self.assertIn("CHUMMER_MACOS_PUBLIC_SHELF_ENABLED", script_text)
                 self.assertIn("is_public_artifact()", script_text)
+
+    def test_shared_release_publish_scripts_support_public_startup_smoke_override_and_canonical_release_proof_origin(self):
+        generate_paths = [
+            REPO_ROOT.parent / "chummer-presentation" / "scripts" / "generate-releases-manifest.sh",
+            REPO_ROOT.parent / "chummer6-ui" / "scripts" / "generate-releases-manifest.sh",
+        ]
+        publish_paths = [
+            REPO_ROOT.parent / "chummer-presentation" / "scripts" / "publish-download-bundle.sh",
+            REPO_ROOT.parent / "chummer6-ui" / "scripts" / "publish-download-bundle.sh",
+        ]
+
+        for script_path in generate_paths:
+            if not script_path.exists():
+                self.skipTest(f"missing shared manifest materializer: {script_path}")
+            script_text = script_path.read_text(encoding="utf-8")
+            self.assertIn("CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER", script_text)
+            self.assertIn("--skip-startup-smoke-filter", script_text)
+            self.assertIn("CHUMMER_EXTERNAL_PROOF_BASE_URL", script_text)
+            self.assertIn('sanitized["baseUrl"] = canonical_base_url', script_text)
+            self.assertIn('sanitized["base_url"] = canonical_base_url', script_text)
+
+        for script_path in publish_paths:
+            if not script_path.exists():
+                self.skipTest(f"missing shared bundle publisher: {script_path}")
+            script_text = script_path.read_text(encoding="utf-8")
+            self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"', script_text)
+            self.assertIn('CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}"', script_text)
 
     def test_run_services_release_upload_scripts_avoid_bash4_array_builtins(self):
         script_paths = [

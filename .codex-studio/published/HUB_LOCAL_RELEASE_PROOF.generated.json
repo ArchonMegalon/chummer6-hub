@@ -153,9 +153,9 @@
       "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture."
     }
   },
-  "base_url": "https://chummer.run",
-  "compose_file": "docker-compose.yml",
-  "playwright_timeout_seconds": 120,
+  "base_url": "http://127.0.0.1:8091",
+  "compose_file": "docker-compose.public-edge.yml",
+  "playwright_timeout_seconds": 300,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
@@ -170,7 +170,9 @@
     "/home/work",
     "/account/work",
     "/account/support",
-    "/contact"
+    "/contact",
+    "/downloads/install/avalonia-osx-arm64-installer",
+    "/downloads/install/avalonia-win-x64-installer"
   ],
   "proof_receipts": [
     {
@@ -258,6 +260,6 @@
       ]
     }
   ],
-  "generated_at": "2026-04-19T17:41:56Z",
-  "generatedAt": "2026-04-19T17:41:56Z"
+  "generated_at": "2026-04-22T05:39:48Z",
+  "generatedAt": "2026-04-22T05:39:48Z"
 }

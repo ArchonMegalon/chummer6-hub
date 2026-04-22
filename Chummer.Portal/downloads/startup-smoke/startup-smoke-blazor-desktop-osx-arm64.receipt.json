@@ -18,7 +18,7 @@
   "completedAtUtc": "2026-04-19T20:54:34.32963+00:00",
   "status": "pass",
   "artifactId": "blazor-desktop-osx-arm64-installer",
-  "artifactPath": "dist/files/chummer-blazor-desktop-osx-arm64-installer.dmg",
+  "artifactPath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-blazor-desktop-osx-arm64-installer.dmg",
   "artifactFileName": "chummer-blazor-desktop-osx-arm64-installer.dmg",
   "artifactRelativePath": "files/chummer-blazor-desktop-osx-arm64-installer.dmg",
   "artifactSha256": "8c1f85e688667daf8ad576ab2d3152294f5d27a55b4005e059dff022356a2df4"

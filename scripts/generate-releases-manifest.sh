@@ -11,6 +11,7 @@ PORTAL_MANIFEST_PATH="${PORTAL_MANIFEST_PATH:-$REPO_ROOT/Chummer.Portal/download
 PORTAL_DOWNLOADS_DIR="${PORTAL_DOWNLOADS_DIR:-$REPO_ROOT/Chummer.Portal/downloads}"
 STARTUP_SMOKE_DIR="${STARTUP_SMOKE_DIR:-$(dirname "$DOWNLOADS_DIR")/startup-smoke}"
 STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-}"
+PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"
 RELEASE_VERSION="${RELEASE_VERSION:-unpublished}"
 RELEASE_CHANNEL="${RELEASE_CHANNEL:-docker}"
 RELEASE_PUBLISHED_AT="${RELEASE_PUBLISHED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
@@ -19,6 +20,7 @@ CANONICAL_MANIFEST_PATH="${CANONICAL_MANIFEST_PATH:-$(dirname "$MANIFEST_PATH")/
 PORTAL_CANONICAL_MANIFEST_PATH="${PORTAL_CANONICAL_MANIFEST_PATH:-$(dirname "$PORTAL_MANIFEST_PATH")/RELEASE_CHANNEL.generated.json}"
 SOURCE_MANIFEST_PATH="${SOURCE_MANIFEST_PATH:-}"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
+PREVIEW_INSTALL_ACCESS_CLASS="${CHUMMER_PREVIEW_INSTALL_ACCESS_CLASS:-}"
 
 resolve_ui_localization_release_gate_path() {
   local explicit_path="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-}"
@@ -217,6 +219,68 @@ to_bool() {
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
 }
 
+normalize_preview_install_access_classes() {
+  local manifest_path="$1"
+  local release_channel="$2"
+  : "$release_channel"
+
+  if [[ -z "$PREVIEW_INSTALL_ACCESS_CLASS" ]]; then
+    PREVIEW_INSTALL_ACCESS_CLASS="account_required"
+  fi
+
+  python3 - "$manifest_path" "$PREVIEW_INSTALL_ACCESS_CLASS" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+access_class = str(sys.argv[2] or "account_required").strip().lower()
+if not access_class:
+    raise SystemExit(0)
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+if not isinstance(payload, dict):
+    raise SystemExit(0)
+
+downloads = payload.get("downloads")
+if isinstance(downloads, list):
+    changed = False
+    for artifact in downloads:
+        if not isinstance(artifact, dict):
+            continue
+        kind = str(artifact.get("kind") or "").strip().lower()
+        if kind not in {"installer", "dmg", "pkg", "msix"}:
+            continue
+        if str(artifact.get("installAccessClass") or "").strip().lower() == access_class:
+            continue
+        artifact["installAccessClass"] = access_class
+        changed = True
+    if changed:
+        manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    raise SystemExit(0)
+
+changed = False
+for artifact in payload.get("artifacts") or []:
+    if not isinstance(artifact, dict):
+        continue
+
+    kind = str(artifact.get("kind") or "").strip().lower()
+    if kind not in {"installer", "dmg", "pkg", "msix"}:
+        continue
+
+    if str(artifact.get("installAccessClass") or "").strip().lower() == access_class:
+        continue
+
+    artifact["installAccessClass"] = access_class
+    changed = True
+
+if changed:
+    manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
 is_public_artifact() {
   local artifact_name
   artifact_name="$(basename "$1")"
@@ -289,8 +353,13 @@ fi
 if [[ -n "$STARTUP_SMOKE_MAX_AGE_SECONDS" && "$materializer_help" == *"--startup-smoke-max-age-seconds"* ]]; then
   materialize_args+=(--startup-smoke-max-age-seconds "$STARTUP_SMOKE_MAX_AGE_SECONDS")
 fi
+if to_bool "$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" && [[ "$materializer_help" == *"--skip-startup-smoke-filter"* ]]; then
+  materialize_args+=(--skip-startup-smoke-filter)
+fi
 
 python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" "${materialize_args[@]}" >/dev/null
+normalize_preview_install_access_classes "$CANONICAL_MANIFEST_PATH" "$RELEASE_CHANNEL"
+normalize_preview_install_access_classes "$MANIFEST_PATH" "$RELEASE_CHANNEL"
 promoted_file_names=()
 while IFS= read -r file_name; do
   [[ -n "$file_name" ]] || continue

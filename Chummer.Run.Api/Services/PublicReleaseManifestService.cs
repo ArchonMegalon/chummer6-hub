@@ -381,7 +381,7 @@ public sealed class PublicReleaseManifestService
                 Sha256: item.Sha256 ?? "",
                 SizeBytes: item.SizeBytes,
                 Head: item.Head,
-                PlatformId: item.Platform,
+                PlatformId: string.IsNullOrWhiteSpace(item.Rid) ? item.Platform : item.Rid,
                 Arch: item.Arch,
                 Kind: item.Kind,
                 FileName: item.FileName,
@@ -992,17 +992,18 @@ public sealed class PublicReleaseManifestService
 
     private static ManifestArtifactShape BuildArtifactShape(JsonObject artifact)
     {
-        string rid = NormalizeToken(GetJsonString(artifact["rid"]));
+        string rid = NormalizeRidToken(GetJsonString(artifact["rid"]));
         if (string.IsNullOrWhiteSpace(rid))
         {
-            rid = NormalizeToken(GetJsonString(artifact["platformId"]));
+            rid = NormalizeRidToken(GetJsonString(artifact["platformId"]));
         }
 
         string platform = NormalizePlatformToken(GetJsonString(artifact["platform"]));
         if (string.IsNullOrWhiteSpace(platform))
         {
             string platformId = NormalizeToken(GetJsonString(artifact["platformId"]));
-            platform = RidToPlatformArch.TryGetValue(platformId, out (string Platform, string Arch) mapping)
+            string platformRid = NormalizeRidToken(platformId);
+            platform = RidToPlatformArch.TryGetValue(platformRid, out (string Platform, string Arch) mapping)
                 ? mapping.Platform
                 : NormalizePlatformToken(platformId);
         }
@@ -1038,7 +1039,7 @@ public sealed class PublicReleaseManifestService
 
     private static ManifestArtifactShape BuildArtifactShape(PublicReleaseArtifactDto artifact)
     {
-        string rid = NormalizeToken(artifact.PlatformId);
+        string rid = NormalizeRidToken(artifact.PlatformId);
         string platform = NormalizePlatformToken(artifact.PlatformId);
         if (string.IsNullOrWhiteSpace(platform))
         {
@@ -1093,6 +1094,19 @@ public sealed class PublicReleaseManifestService
             "win" => "windows",
             "osx" => "macos",
             _ => normalized is "linux" or "windows" or "macos" ? normalized : string.Empty
+        };
+    }
+
+    private static string NormalizeRidToken(string? value)
+    {
+        string normalized = NormalizeToken(value);
+        return normalized switch
+        {
+            "windows-x64" => "win-x64",
+            "windows-arm64" => "win-arm64",
+            "macos-x64" => "osx-x64",
+            "macos-arm64" => "osx-arm64",
+            _ => RidToPlatformArch.ContainsKey(normalized) ? normalized : string.Empty
         };
     }
 
@@ -1195,6 +1209,7 @@ public sealed class PublicReleaseManifestService
         string? ArtifactId,
         string? Head,
         string? Platform,
+        string? Rid,
         string? Arch,
         string? Kind,
         string? PlatformLabel,

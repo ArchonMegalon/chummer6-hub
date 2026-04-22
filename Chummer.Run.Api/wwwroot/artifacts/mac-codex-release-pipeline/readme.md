@@ -10,12 +10,13 @@ Signed-in prompt-safe path:
 2. Copy the generated one-liner
 3. Paste it into the Mac shell
 
-That signed-in handoff is the source of truth for live publication because it serves the current hosted bootstrap, pins the bootstrap digest in the one-liner, pins the repo refs to expected commits inside the fetched bootstrap, and keeps the short-lived upload handoff code off the command line.
+That signed-in handoff is the source of truth for live publication because it serves the current hosted bootstrap, pins the bootstrap digest in the one-liner, and keeps the short-lived upload handoff code off the command line.
+The bootstrap file itself now carries the pinned repo refs, so the signed-in, public curl, and repo-local wrapper paths all execute the same pinned checkout plan.
 
 Public bootstrap path:
 
 ```bash
-bash <(curl -fsSL https://chummer.run/artifacts/mac-codex-release-pipeline/bootstrap.sh)
+bash <(curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.sh)
 ```
 
 Repo-local checkout path, if you already cloned `chummer.run-services` somewhere on the Mac:

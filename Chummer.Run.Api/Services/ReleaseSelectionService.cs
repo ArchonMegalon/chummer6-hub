@@ -374,7 +374,6 @@ public sealed class ReleaseSelectionService
 
     private static bool UsesGuidedBootstrapFlow(PublicReleaseArtifactDto download)
         => UsesMacBootstrapFlow(download)
-           || UsesWindowsBootstrapFlow(download)
            || UsesLinuxBootstrapFlow(download);
 
     private static string RecommendedSupport(PublicReleaseArtifactDto download)
@@ -391,7 +390,7 @@ public sealed class ReleaseSelectionService
     {
         if (authenticated && UsesWindowsBootstrapFlow(download))
         {
-            return "Open the Windows install handoff. It gives you a short-lived PowerShell command that offers Auto select for the matching Windows desktop builds, lets you choose which Chummer apps to install, where to place them, whether quick access should stay in the Start menu or add Desktop links, verifies the published installer digest, and confirms the selected apps wrote a linked install receipt successfully.";
+            return "Open the Windows install handoff, download the published setup .exe, and finish account linking in your default browser after setup starts the browser callback.";
         }
 
         if (authenticated && UsesLinuxBootstrapFlow(download))

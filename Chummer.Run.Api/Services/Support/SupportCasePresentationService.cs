@@ -61,7 +61,9 @@ public sealed class SupportCasePresentationService
         string followUpLaneSummary = BuildFollowUpLaneSummary(supportCase);
         string verificationState = NormalizeVerificationState(supportCase.ReporterVerificationState);
         bool verificationAvailable = CanVerifyFix(status, verificationState);
-        InstallVerificationReadiness installReadiness = BuildInstallReadiness(supportCase, status, fixedReleaseLabel, installLinking, verificationAvailable);
+        bool allowUpdatedInstallResolution = verificationAvailable
+            || verificationState == SupportCaseVerificationStates.ConfirmedFixed;
+        InstallVerificationReadiness installReadiness = BuildInstallReadiness(supportCase, status, fixedReleaseLabel, installLinking, verificationAvailable, allowUpdatedInstallResolution);
         string releaseProgressSummary = BuildReleaseProgressSummary(supportCase, status, fixedReleaseLabel, verificationState, installReadiness);
         string verificationSummary = BuildVerificationSummary(supportCase, fixedReleaseLabel, verificationState, installReadiness);
         bool canVerifyFix = verificationAvailable && installReadiness.FixReadyOnLinkedInstall;
@@ -70,7 +72,9 @@ public sealed class SupportCasePresentationService
         {
             SupportCaseVerificationStates.ConfirmedFixed => (
                 "Closed and confirmed",
-                "No further action is needed unless the same issue returns on a later update.",
+                installRailCase
+                    ? "Update the affected claimed install normally. Reopen this same tracked case only if the same issue returns on a later update."
+                    : "No further action is needed unless the same issue returns on a later update.",
                 string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "The closure notice already went out, and the reporter confirmed that the fix worked on the affected install."
                     : $"The closure notice already went out for {fixedReleaseLabel}, and the reporter confirmed that the fix worked on the affected install.",
@@ -451,7 +455,8 @@ public sealed class SupportCasePresentationService
         string normalizedStatus,
         string fixedReleaseLabel,
         InstallLinkingSummaryDto? installLinking,
-        bool verificationAvailable)
+        bool verificationAvailable,
+        bool allowUpdatedInstallResolution)
     {
         var installations = installLinking?.ClaimedInstallations ?? Array.Empty<ClaimedInstallationDto>();
         if (installations.Count == 0)
@@ -469,7 +474,7 @@ public sealed class SupportCasePresentationService
                     NeedsLinkedInstall: true);
         }
 
-        ClaimedInstallationDto? installation = ResolveRelevantInstallation(supportCase, installations);
+        ClaimedInstallationDto? installation = ResolveRelevantInstallation(supportCase, installations, allowUpdatedInstallResolution);
         if (installation is null)
         {
             return verificationAvailable
@@ -534,7 +539,8 @@ public sealed class SupportCasePresentationService
 
     private static ClaimedInstallationDto? ResolveRelevantInstallation(
         SupportCaseProjection supportCase,
-        IReadOnlyList<ClaimedInstallationDto> installations)
+        IReadOnlyList<ClaimedInstallationDto> installations,
+        bool allowUpdatedInstallForVerification)
     {
         string? installationId = NormalizeOptional(supportCase.InstallationId, 64);
         if (installationId is not null)
@@ -542,8 +548,14 @@ public sealed class SupportCasePresentationService
             ClaimedInstallationDto? direct = installations
                 .FirstOrDefault(item => string.Equals(item.InstallationId, installationId, StringComparison.OrdinalIgnoreCase));
             if (direct is not null
-                && HasSupportCaseInstallTruth(supportCase)
-                && MatchesSupportCaseInstallTruth(supportCase, direct))
+                && (allowUpdatedInstallForVerification
+                    ? HasCompleteDeviceTruth(
+                        NormalizeOptional(supportCase.HeadId, 64),
+                        NormalizeOptional(supportCase.Platform, 64),
+                        NormalizeOptional(supportCase.Arch, 32))
+                      && MatchesSupportCaseDeviceTruth(supportCase, direct)
+                    : HasSupportCaseInstallTruth(supportCase)
+                      && MatchesSupportCaseInstallTruth(supportCase, direct)))
             {
                 return direct;
             }
@@ -561,7 +573,9 @@ public sealed class SupportCasePresentationService
         }
 
         var best = installations
-            .Where(item => MatchesSupportCaseInstallTruth(supportCase, item))
+            .Where(item => allowUpdatedInstallForVerification
+                ? MatchesSupportCaseDeviceTruth(supportCase, item)
+                : MatchesSupportCaseInstallTruth(supportCase, item))
             .Select(item => new
             {
                 Installation = item,
@@ -622,6 +636,11 @@ public sealed class SupportCasePresentationService
         => MatchesOptionalInstallField(supportCase.ApplicationVersion, installation.Version)
            && MatchesOptionalInstallField(supportCase.ReleaseChannel, installation.Channel)
            && MatchesOptionalInstallField(supportCase.HeadId, installation.HeadId)
+           && MatchesOptionalInstallField(supportCase.Platform, installation.Platform)
+           && MatchesOptionalInstallField(supportCase.Arch, installation.Arch);
+
+    private static bool MatchesSupportCaseDeviceTruth(SupportCaseProjection supportCase, ClaimedInstallationDto installation)
+        => MatchesOptionalInstallField(supportCase.HeadId, installation.HeadId)
            && MatchesOptionalInstallField(supportCase.Platform, installation.Platform)
            && MatchesOptionalInstallField(supportCase.Arch, installation.Arch);
 

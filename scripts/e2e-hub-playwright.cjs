@@ -246,7 +246,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/', async () => {
     await expectVisible(page, 'header[data-site-header]', 'Landing header should render once.');
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
-    await expectVisible(page, 'text=Create account to get preview');
+    await expectVisible(page, 'text=Create account to install');
     await assertTextCount(page, 'Final pool 9', 1, 'Landing');
     await expectVisible(page, 'text=Who can get it now');
     await expectVisible(page, 'text=Release proof');
@@ -314,7 +314,9 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/terms', async () => {
     await expectVisible(page, 'text=Preview terms in plain language');
     await expectVisible(page, 'text=What changed in this version');
-    await expectVisible(page, 'text=Create account to get preview');
+    await expectVisible(page, 'text=Create account to install');
+    await expectVisible(page, 'text=Main platform downloads');
+    await expectVisible(page, 'text=Chummer for Windows');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/downloads"]', '/terms downloads link'), '/downloads');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/terms help link'), '/help');
     await assertNoBannedCopy(page, '/terms');
@@ -344,7 +346,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, 'Signed-out /participate/codex redirect');
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
-    await expectVisible(page, 'text=Create account to get preview');
+    await expectVisible(page, 'text=Create account to install');
     await expectVisible(page, 'text=Advanced download options');
     await assertNoBannedCopy(page, 'Downloads');
   });
@@ -8070,6 +8072,26 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/roadmap/nexus-pan compare link'), '/now');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/roadmap/nexus-pan support link'), '/contact#support-intake');
     await assertNoBannedCopy(page, '/roadmap/nexus-pan');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/roadmap/shadowcasters-network', async () => {
+    await expectVisible(page, 'text=Why this horizon matters now');
+    await expectVisible(page, 'text=Current pain, expected unlock, and the live surface you should compare first');
+    await expectVisible(page, 'text=See the world-state foundation');
+    await expectVisible(page, 'text=Need a decision instead?');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/roadmap/black-ledger"]', '/roadmap/shadowcasters-network primary link'), '/roadmap/black-ledger');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/roadmap/shadowcasters-network support link'), '/contact#support-intake');
+    await assertNoBannedCopy(page, '/roadmap/shadowcasters-network');
+  });
+
+  await gotoAndAssert(page, pageErrors, '/roadmap/black-ledger', async () => {
+    await expectVisible(page, 'text=Why this horizon matters now');
+    await expectVisible(page, 'text=Current pain, expected unlock, and the live surface you should compare first');
+    await expectVisible(page, 'text=See the related artifact preview');
+    await expectVisible(page, 'text=Need a decision instead?');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/artifacts/replay-after-action"]', '/roadmap/black-ledger primary link'), '/artifacts/replay-after-action');
+    assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/roadmap/black-ledger support link'), '/contact#support-intake');
+    await assertNoBannedCopy(page, '/roadmap/black-ledger');
   });
 
   await gotoAndAssert(page, pageErrors, '/artifacts/current-preview-build', async () => {

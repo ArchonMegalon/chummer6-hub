@@ -81,6 +81,16 @@ app.Use(async (context, next) =>
 
     await next();
 });
+app.Use(async (context, next) =>
+{
+    if (IsLegacyMacReleaseBootstrapArtifactPath(context.Request.Path))
+    {
+        context.Response.Redirect("/downloads/release-upload/bootstrap.sh", permanent: false);
+        return;
+    }
+
+    await next();
+});
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = fileContext =>
@@ -99,7 +109,14 @@ app.Run();
 
 static bool RequiresNoStoreHeaders(PathString path)
 {
-    return path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
+    return path.StartsWithSegments("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
+        || IsLegacyMacReleaseBootstrapArtifactPath(path)
+        || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
+}
+
+static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)
+{
+    return path.Equals("/artifacts/mac-codex-release-pipeline/bootstrap.sh", StringComparison.OrdinalIgnoreCase);
 }

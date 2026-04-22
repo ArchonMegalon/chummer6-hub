@@ -94,6 +94,29 @@ public sealed class DownloadsCompatibilityControllerTests
     }
 
     [Fact]
+    public void ReleaseManifestPreservesCanonicalRidBackedPlatformIdsAndTupleCoverage()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.ReleaseManifest();
+
+        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        string payload = JsonSerializer.Serialize(ok.Value, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        using JsonDocument document = JsonDocument.Parse(payload);
+        JsonElement downloads = document.RootElement.GetProperty("downloads");
+        Assert.Contains(downloads.EnumerateArray(), item =>
+            string.Equals(item.GetProperty("id").GetString(), "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.GetProperty("platformId").GetString(), "win-x64", StringComparison.OrdinalIgnoreCase));
+
+        JsonElement coverage = document.RootElement.GetProperty("desktopTupleCoverage");
+        Assert.Contains(coverage.GetProperty("promotedInstallerTuples").EnumerateArray(), item =>
+            string.Equals(item.GetProperty("tupleId").GetString(), "avalonia:windows:win-x64", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(item.GetProperty("rid").GetString(), "win-x64", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(coverage.GetProperty("missingRequiredPlatformHeadRidTuples").EnumerateArray(), item =>
+            string.Equals(item.GetString(), "avalonia:osx-arm64:macos", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task AccountRequiredMacArtifactDownloadAcceptsClaimCodeWithoutBrowserSession()
     {
         using Fixture fixture = new();
@@ -226,8 +249,25 @@ public sealed class DownloadsCompatibilityControllerTests
         var ok = Assert.IsType<OkObjectResult>(result);
         string payload = JsonSerializer.Serialize(ok.Value);
         Assert.Contains("\"status\":\"proof_only\"", payload, StringComparison.Ordinal);
+        Assert.Contains("verification and support rail", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-blazor-desktop-win-x64-installer.exe", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsProofInstallersCatalogUsesSupplementalMissingMessageWhenEmpty()
+    {
+        using Fixture fixture = new();
+        Directory.Delete(fixture.ProofRoot, recursive: true);
+        Directory.CreateDirectory(fixture.ProofRoot);
+
+        IActionResult result = fixture.Controller.WindowsProofInstallers();
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        string payload = JsonSerializer.Serialize(notFound.Value);
+        Assert.Contains("\"status\":\"missing\"", payload, StringComparison.Ordinal);
+        Assert.Contains("No staged Windows supplemental installers are available right now.", payload, StringComparison.Ordinal);
+        Assert.DoesNotContain("preview installers", payload, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -328,6 +368,18 @@ public sealed class DownloadsCompatibilityControllerTests
         string payload = JsonSerializer.Serialize(ok.Value);
         Assert.Contains("\"status\":\"proof_only\"", payload, StringComparison.Ordinal);
         Assert.Contains("chummer-avalonia-win-x64-installer.exe", payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsProofInstallersCatalogCanOmitInstallersAlreadyPublishedOnTheMainShelf()
+    {
+        using Fixture fixture = new();
+        var service = new WindowsProofInstallerService(fixture.Configuration);
+
+        var catalog = service.LoadCatalog(["avalonia-win-x64-installer"]);
+
+        Assert.DoesNotContain(catalog, item => string.Equals(item.ArtifactId, "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(catalog, item => string.Equals(item.ArtifactId, "blazor-desktop-win-x64-installer", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -461,6 +513,7 @@ public sealed class DownloadsCompatibilityControllerTests
                       "artifactId": "avalonia-osx-x64-installer",
                       "head": "avalonia",
                       "platform": "macos",
+                      "rid": "osx-x64",
                       "arch": "x64",
                       "kind": "dmg",
                       "platformLabel": "Avalonia Desktop macOS X64 Installer",
@@ -474,6 +527,7 @@ public sealed class DownloadsCompatibilityControllerTests
                       "artifactId": "avalonia-win-x64-installer",
                       "head": "avalonia",
                       "platform": "windows",
+                      "rid": "win-x64",
                       "arch": "x64",
                       "kind": "installer",
                       "platformLabel": "Avalonia Desktop Windows X64 Installer",

@@ -80,9 +80,11 @@ Repository variables:
 Required live sequence:
 1. Deploy the updated public edge app first so the proof routes exist:
 `docker compose --env-file .env -p chummer6-hub -f docker-compose.public-edge.yml up -d --build chummer-portal`
-2. Rebuild the current unified shelf bundle:
+2. Verify the live bootstrap matches the deployed source and the legacy path redirects cleanly:
+`bash scripts/verify-live-mac-bootstrap.sh`
+3. Rebuild the current unified shelf bundle:
 `bash scripts/materialize-public-downloads-bundle.sh`
-3. Upload the rebuilt bundle to the live shelf:
+4. Upload the rebuilt bundle to the live shelf:
 `CHUMMER_RELEASE_UPLOAD_TOKEN=<ticket-or-token> RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
 
 Mac release bootstrap note:

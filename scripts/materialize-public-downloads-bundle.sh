@@ -85,6 +85,8 @@ PRESENTATION_RELEASE_EVIDENCE_SOURCE="${CHUMMER_PRESENTATION_RELEASE_EVIDENCE_SO
 RELEASE_PROOF_SOURCE="${CHUMMER_RUN_LOCAL_RELEASE_PROOF_SOURCE:-$REPO_ROOT/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
 UI_LOCALIZATION_RELEASE_GATE_SOURCE="$(resolve_ui_localization_release_gate_source)"
 STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-172800}"
+PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"
+PUBLIC_RELEASE_PROOF_BASE_URL="${CHUMMER_PUBLIC_RELEASE_PROOF_BASE_URL:-https://chummer.run}"
 DISABLED_ARTIFACT_IDS="${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}}"
 
 if [[ ! -d "$RUNSERVICES_SOURCE_FILES_ROOT" ]]; then
@@ -134,13 +136,14 @@ if [[ -d "$PRESENTATION_STARTUP_SMOKE_ROOT" ]]; then
 fi
 
 sanitized_release_proof_path="$tmp_root/HUB_LOCAL_RELEASE_PROOF.generated.json"
-python3 - "$RELEASE_PROOF_SOURCE" "$sanitized_release_proof_path" <<'PY'
+python3 - "$RELEASE_PROOF_SOURCE" "$sanitized_release_proof_path" "$PUBLIC_RELEASE_PROOF_BASE_URL" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 source = Path(sys.argv[1])
 target = Path(sys.argv[2])
+canonical_base_url = str(sys.argv[3]).strip()
 allowed = {
     "status",
     "generatedAt",
@@ -155,8 +158,12 @@ allowed = {
     "ui_localization_release_gate",
 }
 payload = json.loads(source.read_text(encoding="utf-8"))
+sanitized = {key: value for key, value in payload.items() if key in allowed}
+if canonical_base_url:
+    sanitized["baseUrl"] = canonical_base_url
+    sanitized["base_url"] = canonical_base_url
 target.write_text(
-    json.dumps({key: value for key, value in payload.items() if key in allowed}, indent=2) + "\n",
+    json.dumps(sanitized, indent=2) + "\n",
     encoding="utf-8",
 )
 PY
@@ -204,11 +211,12 @@ RELEASE_CHANNEL="$release_channel" \
 RELEASE_VERSION="$release_version" \
 RELEASE_PUBLISHED_AT="$release_published_at" \
 CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS="$STARTUP_SMOKE_MAX_AGE_SECONDS" \
+CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="$PUBLIC_SKIP_STARTUP_SMOKE_FILTER" \
 bash "$SCRIPT_DIR/generate-releases-manifest.sh"
 
 rm -rf "$OUTPUT_ROOT/proof/windows"
 mkdir -p "$OUTPUT_ROOT/proof/windows"
-find "$RUNSERVICES_SOURCE_FILES_ROOT" -maxdepth 1 -type f -name 'chummer-*-win-x64-installer.exe' -print0 \
+find "$combined_files_root" -maxdepth 1 -type f -name 'chummer-*-win-x64-installer.exe' -print0 \
   | while IFS= read -r -d '' installer_path; do
       cp "$installer_path" "$OUTPUT_ROOT/proof/windows"/
     done
@@ -219,10 +227,116 @@ cp "$PRESENTATION_RELEASE_EVIDENCE_SOURCE" "$OUTPUT_ROOT/release-evidence/public
 
 rm -rf "$OUTPUT_ROOT/startup-smoke"
 mkdir -p "$OUTPUT_ROOT/startup-smoke"
-find "$combined_startup_smoke_root" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \
-  | while IFS= read -r -d '' receipt_path; do
-      cp "$receipt_path" "$OUTPUT_ROOT/startup-smoke"/
-    done
+python3 - "$combined_startup_smoke_root" "$PRESENTATION_STARTUP_SMOKE_ROOT" "$OUTPUT_ROOT/startup-smoke" "$OUTPUT_ROOT/files" "$release_channel" "$release_version" <<'PY'
+from __future__ import annotations
+
+import json
+import shutil
+import sys
+from pathlib import Path
+
+receipt_root = Path(sys.argv[1])
+fallback_root = Path(sys.argv[2])
+deploy_root = Path(sys.argv[3])
+files_root = Path(sys.argv[4])
+release_channel = str(sys.argv[5]).strip()
+release_version = str(sys.argv[6]).strip()
+
+deploy_root.mkdir(parents=True, exist_ok=True)
+
+
+def resolve_companion(source_root: Path, value: object) -> Path | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+
+    token = Path(raw)
+    candidates: list[Path] = []
+    if token.is_absolute():
+        candidates.append(token)
+    else:
+        candidates.append(source_root / token)
+    candidates.append(source_root / token.name)
+    if fallback_root != source_root:
+        if token.is_absolute():
+            candidates.append(fallback_root / token.name)
+        else:
+            candidates.append(fallback_root / token)
+            candidates.append(fallback_root / token.name)
+
+    seen: set[Path] = set()
+    for candidate in candidates:
+        candidate = candidate.resolve(strict=False)
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def copy_companion(source_root: Path, value: object) -> str:
+    source_path = resolve_companion(source_root, value)
+    if source_path is None:
+        return ""
+
+    target_path = deploy_root / source_path.name
+    if source_path.resolve() != target_path.resolve():
+        shutil.copy2(source_path, target_path)
+    return str(target_path)
+
+
+def rewrite_install_verification(verification_path: Path, source_root: Path) -> None:
+    payload = json.loads(verification_path.read_text(encoding="utf-8-sig"))
+    for key in (
+        "dpkgLogPath",
+        "installedLaunchCapturePath",
+        "wrapperCapturePath",
+        "desktopEntryCapturePath",
+    ):
+        copied = copy_companion(source_root, payload.get(key))
+        if copied:
+            payload[key] = copied
+    verification_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+for receipt_path in sorted(receipt_root.glob("startup-smoke-*.receipt.json")):
+    source_root = receipt_path.parent
+    payload = json.loads(receipt_path.read_text(encoding="utf-8-sig"))
+
+    if release_channel:
+        payload["channelId"] = release_channel
+        payload["channel"] = release_channel
+    if release_version:
+        payload["releaseVersion"] = release_version
+        payload["version"] = release_version
+
+    verification_dest = copy_companion(source_root, payload.get("artifactInstallVerificationPath"))
+    if verification_dest:
+        payload["artifactInstallVerificationPath"] = verification_dest
+        rewrite_install_verification(Path(verification_dest), source_root)
+
+    for key in (
+        "artifactInstallDpkgLogPath",
+        "artifactInstallLaunchCapturePath",
+        "artifactInstallWrapperCapturePath",
+        "artifactInstallDesktopEntryCapturePath",
+    ):
+        copied = copy_companion(source_root, payload.get(key))
+        if copied:
+            payload[key] = copied
+
+    artifact_name = Path(str(payload.get("artifactPath") or "").strip()).name
+    if artifact_name:
+        published_artifact = files_root / artifact_name
+        if published_artifact.is_file():
+            payload["artifactPath"] = str(published_artifact)
+
+    (deploy_root / receipt_path.name).write_text(
+        json.dumps(payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+PY
 
 if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
   python3 - "$OUTPUT_ROOT" "$DISABLED_ARTIFACT_IDS" <<'PY'

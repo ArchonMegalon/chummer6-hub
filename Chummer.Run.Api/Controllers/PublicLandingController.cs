@@ -127,6 +127,13 @@ public sealed class PublicLandingController : Controller
             manifest,
             Request.Headers.UserAgent.ToString(),
             authenticated);
+        if (!authenticated && manifest.Downloads.Count > 0)
+        {
+            primaryHeroAction = new PublicLandingActionDto(
+                releaseExperience.GuestGatePrimaryLabel,
+                releaseExperience.GuestGatePrimaryHref,
+                "primary");
+        }
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
@@ -223,7 +230,11 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
-        var windowsProofInstallers = _windowsProofInstallers.LoadCatalog();
+        var windowsProofInstallers = _windowsProofInstallers.LoadCatalog(
+            manifest.Downloads
+                .Select(static download => download.Id)
+                .Where(static artifactId => !string.IsNullOrWhiteSpace(artifactId))
+                .ToArray());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var model = new DownloadsPageViewModel(
@@ -264,10 +275,10 @@ public sealed class PublicLandingController : Controller
             }
 
             string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
-            string renderedBootstrap = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath));
+            string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
             string command = BuildReleaseUploadBootstrapCommand(
                 bootstrapUrl,
-                ComputeSha256Hex(renderedBootstrap),
+                ComputeSha256Hex(bootstrapTemplate),
                 ticket.Ticket);
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
@@ -312,9 +323,8 @@ public sealed class PublicLandingController : Controller
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
         }
 
-        string rendered = RenderReleaseUploadBootstrapScript(System.IO.File.ReadAllText(templatePath));
         Response.Headers["Cache-Control"] = "private, no-store";
-        return Content(rendered, "text/x-shellscript; charset=utf-8", Encoding.UTF8);
+        return Content(System.IO.File.ReadAllText(templatePath), "text/x-shellscript; charset=utf-8", Encoding.UTF8);
     }
 
     private static bool FixedTimeEquals(string left, string right)
@@ -495,8 +505,8 @@ public sealed class PublicLandingController : Controller
     {
         bool authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
-            "Windows preview build",
-            "Current Windows preview installer while the main Windows shelf catches up to this build.",
+            "Supplemental Windows installer",
+            "Direct Windows installer for verification and support outside the main recommended shelf.",
             $"/downloads/install/{artifactId}",
             cancellationToken);
         var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
@@ -505,14 +515,14 @@ public sealed class PublicLandingController : Controller
             : "Avalonia Desktop";
         var model = new DownloadDispatchPageViewModel(
             Chrome: chrome,
-            Eyebrow: "Windows preview build",
+            Eyebrow: "Supplemental Windows installer",
             Heading: $"{headLabel} Windows setup",
-            Summary: "This Windows installer is available as the current preview build. It is downloadable from chummer.run, but it is not yet on the main Windows shelf.",
-            DispatchNote: "Use this when you need the current Windows build directly. It stays on this preview route until it moves onto the main Windows shelf.",
+            Summary: "This direct Windows installer stays available for verification and support when this specific build is not on the main recommended shelf.",
+            DispatchNote: "Use this route only when support, verification, or a specific proof flow points to this installer.",
             ArtifactTitle: $"{headLabel} Windows x64 installer",
-            ArtifactSupportLine: "Windows preview installer. Treat it as the current preview build, not the main Windows shelf.",
+            ArtifactSupportLine: "Direct Windows installer for verification and support.",
             DownloadHref: $"/downloads/install/{Uri.EscapeDataString(artifactId)}/proof",
-            DownloadLabel: "Download preview installer",
+            DownloadLabel: "Download installer",
             TerminalInstallCommand: null,
             BootstrapCommandLabel: null,
             BootstrapCommandIntro: null,
@@ -524,7 +534,7 @@ public sealed class PublicLandingController : Controller
             BootstrapScriptDownload: false,
             PromoteSecondaryDownload: false,
             SecondaryDownloadHref: proofInstaller.DownloadUrl,
-            SecondaryDownloadLabel: "Direct preview file",
+            SecondaryDownloadLabel: "Direct file mirror",
             AccountHref: "/downloads",
             AccountLabel: "Back to downloads",
             HelpHref: release.InstallHelpHref,
@@ -534,9 +544,9 @@ public sealed class PublicLandingController : Controller
                 new Dictionary<string, string?>
                 {
                     ["kind"] = SupportCaseKinds.InstallHelp,
-                    ["title"] = $"{headLabel} Windows preview install help",
-                    ["summary"] = "Windows preview installer needs help on this device.",
-                    ["detail"] = "The Windows preview installer path needs help on this device. Keep support on the same install rail.",
+                    ["title"] = $"{headLabel} Windows supplemental install help",
+                    ["summary"] = "Windows supplemental installer needs help on this device.",
+                    ["detail"] = "The Windows supplemental installer path needs help on this device. Keep support on the same install rail.",
                     ["applicationVersion"] = manifest.Version,
                     ["releaseChannel"] = manifest.Channel,
                     ["headId"] = proofInstaller.Head,
@@ -547,7 +557,7 @@ public sealed class PublicLandingController : Controller
             Display: release.Display,
             Channel: manifest.Channel,
             Version: manifest.Version,
-            CurrentReleaseSummary: "Windows stays on the preview track here; macOS remains the main signed-in preview route.",
+            CurrentReleaseSummary: "Windows stays on a supplemental verification rail here; use the main downloads shelf for the recommended setup when it is promoted there.",
             PlatformLabel: "Windows x64",
             HeadLabel: headLabel,
             ClaimExchangeUrl: null,
@@ -555,9 +565,9 @@ public sealed class PublicLandingController : Controller
             ClaimCodeExpiresAtUtc: null,
             Steps:
             [
-                "Download the preview installer directly from this page.",
+                "Download the supplemental installer directly from this page.",
                 "Install and validate the current Windows build.",
-                "Use install help and support if you hit preview-only regressions."
+                "Use install help and support if this specific Windows installer needs follow-through."
             ],
             TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, release, cancellationToken));
@@ -690,30 +700,6 @@ public sealed class PublicLandingController : Controller
             BuildMacBootstrapFileName(artifact));
     }
 
-    [HttpGet("/downloads/install/{artifactId}/bootstrap.ps1")]
-    [Produces("text/plain", "application/problem+json")]
-    public async Task<IActionResult> DownloadDispatchWindowsBootstrapScript([FromRoute] string artifactId, CancellationToken cancellationToken)
-    {
-        var (context, failure) = await TryBuildGuidedBootstrapContextAsync(artifactId, "windows", cancellationToken);
-        if (failure is not null)
-        {
-            return failure;
-        }
-
-        string script = RenderWindowsInstallBootstrapScript(
-            context!.Artifacts,
-            BuildAbsoluteUrl("/"),
-            BuildAbsoluteUrl("/account/access"),
-            BuildAbsoluteUrl("/downloads"),
-            BuildAbsoluteUrl("/help"));
-
-        Response.Headers["Cache-Control"] = "private, no-store";
-        return File(
-            Encoding.UTF8.GetBytes(script),
-            "text/plain; charset=utf-8",
-            BuildWindowsBootstrapFileName(context.Artifact));
-    }
-
     [HttpGet("/downloads/install/{artifactId}/bootstrap.sh")]
     [Produces("text/x-shellscript", "application/problem+json")]
     public async Task<IActionResult> DownloadDispatchLinuxBootstrapScript([FromRoute] string artifactId, CancellationToken cancellationToken)
@@ -741,7 +727,7 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/downloads/install/{artifactId}/claim.json")]
     [HttpGet("/downloads/install/{artifactId}/continue.json")]
     [Produces("application/json")]
-    public IActionResult DownloadDispatchBootstrapClaim([FromRoute] string artifactId)
+    public async Task<IActionResult> DownloadDispatchBootstrapClaim([FromRoute] string artifactId, CancellationToken cancellationToken)
     {
         var (manifest, artifact) = ResolveInstallDispatchArtifact(artifactId);
         if (artifact is null)
@@ -749,24 +735,48 @@ public sealed class PublicLandingController : Controller
             return NotFound();
         }
 
-        if (!_releaseSelection.UsesGuidedBootstrapScript(artifact))
-        {
-            return NotFound();
-        }
+        string? userId;
+        string? subjectId;
+        bool guidedBootstrapDownload = _releaseSelection.UsesGuidedBootstrapScript(artifact);
 
-        string? bootstrapTicket = Request.Query["ticket"].ToString();
-        if (!_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out InstallBootstrapTicketClaims? ticketClaims)
-            || ticketClaims is null)
+        if (guidedBootstrapDownload)
         {
-            Response.Headers["Cache-Control"] = "private, no-store";
-            return Unauthorized(new
+            string? bootstrapTicket = Request.Query["ticket"].ToString();
+            if (!_installBootstrapTickets.TryValidateForArtifact(bootstrapTicket, artifact.Id, out InstallBootstrapTicketClaims? ticketClaims)
+                || ticketClaims is null)
             {
-                error = "invalid_or_expired_install_ticket",
-                message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
-            });
+                Response.Headers["Cache-Control"] = "private, no-store";
+                return Unauthorized(new
+                {
+                    error = "invalid_or_expired_install_ticket",
+                    message = "The install command expired. Re-open the signed-in downloads handoff and copy a fresh install command."
+                });
+            }
+
+            userId = ticketClaims.UserId;
+            subjectId = ticketClaims.SubjectId;
+        }
+        else
+        {
+            try
+            {
+                var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+                var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+                userId = user.UserId;
+                subjectId = subject.SubjectId;
+            }
+            catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+            {
+                Response.Headers["Cache-Control"] = "private, no-store";
+                return Unauthorized(new
+                {
+                    error = "install_session_auth_required",
+                    message = "Sign in again to refresh install recovery for this setup download."
+                });
+            }
         }
 
-        var dispatch = _installLinking.IssueDownload(manifest, artifact, ticketClaims.UserId, ticketClaims.SubjectId);
+        var dispatch = _installLinking.IssueDownload(manifest, artifact, userId, subjectId);
         if (dispatch.ClaimTicket is null || string.IsNullOrWhiteSpace(dispatch.ClaimTicket.ClaimCode))
         {
             Response.Headers["Cache-Control"] = "private, no-store";
@@ -791,7 +801,7 @@ public sealed class PublicLandingController : Controller
             expiresAtUtc = dispatch.ClaimTicket.ExpiresAtUtc,
             status = "pass",
             nextSafeAction = continuation.NextSafeAction,
-            recoveryModeOnly = true,
+            recoveryModeOnly = guidedBootstrapDownload,
             applicationVersion = continuation.ApplicationVersion,
             releaseChannel = continuation.ReleaseChannel,
             headId = continuation.HeadId,
@@ -1097,6 +1107,9 @@ public sealed class PublicLandingController : Controller
         var user = subject is null
             ? null
             : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var installLinking = user is null || subject is null
+            ? null
+            : _installLinking.GetSummary(user.UserId, subject.SubjectId);
         var trackedCase = subject is null
             ? null
             : _supportCases.GetForReporter(caseId, user!.UserId, subject.SubjectId);
@@ -1150,7 +1163,7 @@ public sealed class PublicLandingController : Controller
             Highlights: highlights,
             Actions: actions,
             Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>(),
-            TrackedCaseSummary: trackedCase is null ? null : _supportPresentation.Build(trackedCase),
+            TrackedCaseSummary: trackedCase is null ? null : _supportPresentation.Build(trackedCase, installLinking),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience)));
     }
@@ -2889,7 +2902,37 @@ public sealed class PublicLandingController : Controller
             manifest,
             Request.Headers.UserAgent.ToString(),
             authenticated: false);
-        return RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: false);
+        var reboundChrome = RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: false);
+
+        if (string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase) && manifest.Downloads.Count > 0)
+        {
+            var headerActions = reboundChrome.HeaderActions
+                .Select(action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase)
+                    ? action with
+                    {
+                        Label = releaseExperience.GuestGatePrimaryLabel,
+                        Href = releaseExperience.GuestGatePrimaryHref,
+                        Current = false
+                    }
+                    : action)
+                .ToArray();
+            var publicPrimaryCta = reboundChrome.PublicPrimaryCta is not null
+                ? reboundChrome.PublicPrimaryCta with
+                {
+                    Label = releaseExperience.GuestGatePrimaryLabel,
+                    Href = releaseExperience.GuestGatePrimaryHref,
+                    Current = false
+                }
+                : null;
+
+            reboundChrome = reboundChrome with
+            {
+                HeaderActions = headerActions,
+                PublicPrimaryCta = publicPrimaryCta
+            };
+        }
+
+        return reboundChrome;
     }
 
     private static SiteChromeViewModel RebindDownloadsHeaderActions(SiteChromeViewModel chrome, ReleaseExperienceViewModel releaseExperience)
@@ -2974,11 +3017,6 @@ public sealed class PublicLandingController : Controller
             return "macos";
         }
 
-        if (IsWindowsBootstrapArtifact(artifact))
-        {
-            return "windows";
-        }
-
         if (IsLinuxBootstrapArtifact(artifact))
         {
             return "linux";
@@ -2991,7 +3029,6 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => $"/downloads/install/{Uri.EscapeDataString(artifactId)}/bootstrap.command",
-            "windows" => $"/downloads/install/{Uri.EscapeDataString(artifactId)}/bootstrap.ps1",
             "linux" => $"/downloads/install/{Uri.EscapeDataString(artifactId)}/bootstrap.sh",
             _ => throw new InvalidOperationException($"unsupported bootstrap platform '{platform}'.")
         };
@@ -3005,7 +3042,6 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Install command",
-            "windows" => "Windows install command",
             "linux" => "Linux install command",
             _ => null
         };
@@ -3014,7 +3050,6 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Copy this into Terminal.",
-            "windows" => "Paste this into PowerShell.",
             "linux" => "Paste this into your shell.",
             _ => null
         };
@@ -3037,7 +3072,6 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "It streams a short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
-            "windows" => "It streams a short-lived PowerShell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Start menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             "linux" => "It streams a short-lived shell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the applications menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             _ => null
         };
@@ -3050,13 +3084,6 @@ public sealed class PublicLandingController : Controller
                 new("Choose your setup", "Pick Avalonia, Blazor Desktop, or both from a native macOS dialog before any files are copied."),
                 new("Choose where it lands", "Install into /Applications or ~/Applications without changing the published DMGs."),
                 new("Choose your quick access", "Keep Chummer in the Applications folder only or let setup drop Desktop links for the apps you picked."),
-                new("Finish verified and linked", "The selected apps are launched once through a short-lived environment handoff, and setup checks the install-link receipt before it tells you the apps are attached to this account.")
-            ],
-            "windows" =>
-            [
-                new("Choose your setup", "Pick the Windows desktop builds to install before any installers are run."),
-                new("Choose where it lands", "Install into your local Chummer programs folder or a folder you pick without changing the published installers."),
-                new("Choose your quick access", "Keep Chummer in the Start menu only or let setup add Desktop shortcuts for the apps you picked."),
                 new("Finish verified and linked", "The selected apps are launched once through a short-lived environment handoff, and setup checks the install-link receipt before it tells you the apps are attached to this account.")
             ],
             "linux" =>
@@ -3073,7 +3100,6 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Download setup script",
-            "windows" => "Download setup script fallback",
             "linux" => "Download setup script fallback",
             _ => "Download setup script fallback"
         };
@@ -3082,7 +3108,6 @@ public sealed class PublicLandingController : Controller
         => platform switch
         {
             "macos" => "Download raw DMG instead",
-            "windows" => "Download raw installer fallback",
             "linux" => "Download raw package instead",
             _ => null
         };
@@ -3090,7 +3115,6 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapDispatchSummary(string? platform)
         => platform switch
         {
-            "windows" => "Copy the Windows install command below. It streams a short-lived guided setup assistant, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account.",
             "linux" => "Paste the shell install command below. It streams a short-lived Linux setup assistant, asks which Chummer apps to install and where to put them, then downloads, verifies, installs, and links the selected apps to this account.",
             _ => "Copy the install command and run it in Terminal."
         };
@@ -3098,7 +3122,6 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapDispatchNote(string? platform)
         => platform switch
         {
-            "windows" => "The guided Windows setup assistant is the default linked-install path. Use the raw installer fallback only for support-directed recovery.",
             "linux" => "The shell command keeps the published Debian packages unchanged while streaming a short-lived guided setup assistant that can attach the install relationship to this account from the first launch.",
             _ => "macOS can quarantine a downloaded unsigned .command and label it as damaged. The signed Terminal command avoids that by streaming the same short-lived setup assistant directly into bash while keeping the published DMGs unchanged."
         };
@@ -3106,14 +3129,6 @@ public sealed class PublicLandingController : Controller
     private static IReadOnlyList<string> BuildBootstrapSteps(string? platform)
         => platform switch
         {
-            "windows" =>
-            [
-                "Copy the Windows install command below and paste it into PowerShell.",
-                "The Windows setup assistant offers Auto select for the matching desktop builds on this PC, lets you switch to manual selection when you want different heads, asks where to install them, whether quick access should stay in the Start menu or add Desktop links, whether to open Chummer when it finishes, and then verifies that linking actually completed.",
-                "PowerShell then shows staged progress while it downloads the selected installers, verifies their published SHA-256 digests, installs the selected apps, and preserves rollback-safe installer behavior.",
-                "Each selected app is started once through a short-lived environment handoff so it is already linked to this account the next time you open it.",
-                "Use the raw installer fallback only when support asks for a manual recovery lane."
-            ],
             "linux" =>
             [
                 "Copy the shell install command below and paste it into your shell.",
@@ -3135,11 +3150,6 @@ public sealed class PublicLandingController : Controller
         return "Chummer Setup.command";
     }
 
-    private static string BuildWindowsBootstrapFileName(PublicReleaseArtifactDto artifact)
-    {
-        return "Chummer Setup.ps1";
-    }
-
     private static string BuildLinuxBootstrapFileName(PublicReleaseArtifactDto artifact)
     {
         return "chummer-setup.sh";
@@ -3148,7 +3158,6 @@ public sealed class PublicLandingController : Controller
     internal static string BuildBootstrapInstallCommand(string? platform, string bootstrapUrl)
         => platform switch
         {
-            "windows" => $"powershell -NoProfile -ExecutionPolicy Bypass -Command \"Set-StrictMode -Version Latest; $ProgressPreference='SilentlyContinue'; iex ((Invoke-WebRequest -UseBasicParsing {SingleQuoteShellValue(bootstrapUrl)}).Content)\"",
             "linux" => BuildMacBootstrapTerminalCommand(bootstrapUrl),
             _ => BuildMacBootstrapTerminalCommand(bootstrapUrl)
         };
@@ -3156,7 +3165,6 @@ public sealed class PublicLandingController : Controller
     internal static string BuildBootstrapInstallCommand(string? platform, string bootstrapUrl, string? bootstrapSha256)
         => platform switch
         {
-            "windows" => BuildBootstrapInstallCommand(platform, bootstrapUrl),
             "linux" => BuildMacBootstrapTerminalCommand(bootstrapUrl, bootstrapSha256),
             _ => BuildMacBootstrapTerminalCommand(bootstrapUrl, bootstrapSha256)
         };
@@ -3292,7 +3300,6 @@ public sealed class PublicLandingController : Controller
     private static string BuildBootstrapCurrentReleaseSummary(string? platform, IReadOnlyList<PublicReleaseArtifactDto> artifacts)
         => platform switch
         {
-            "windows" => BuildWindowsBootstrapCurrentReleaseSummary(artifacts),
             "linux" => BuildLinuxBootstrapCurrentReleaseSummary(artifacts),
             _ => BuildMacCurrentReleaseSummary(artifacts)
         };
@@ -4198,15 +4205,6 @@ public sealed class PublicLandingController : Controller
             || ((artifact.FileName ?? string.Empty).EndsWith(".dmg", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool IsWindowsBootstrapArtifact(PublicReleaseArtifactDto artifact)
-    {
-        string platformToken = $"{artifact.PlatformId} {artifact.Platform} {artifact.Url}";
-        return (platformToken.Contains("win", StringComparison.OrdinalIgnoreCase)
-                || ((artifact.FileName ?? string.Empty).EndsWith(".exe", StringComparison.OrdinalIgnoreCase)))
-               && (artifact.Url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
-                   || (artifact.FileName ?? string.Empty).EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
-    }
-
     private static bool IsLinuxBootstrapArtifact(PublicReleaseArtifactDto artifact)
     {
         string platformToken = $"{artifact.PlatformId} {artifact.Platform} {artifact.Url}";
@@ -4261,40 +4259,6 @@ public sealed class PublicLandingController : Controller
             : $"macOS desktop setup handoff, {heads}, {arches}";
     }
 
-    private static string BuildWindowsBootstrapCurrentReleaseSummary(IReadOnlyList<PublicReleaseArtifactDto> artifacts)
-    {
-        if (artifacts.Count == 0)
-        {
-            return "Windows desktop setup handoff";
-        }
-
-        string heads = string.Join(
-            " + ",
-            artifacts
-                .Select(static artifact => NormalizeBootstrapToken(artifact.Head)?.ToLowerInvariant() switch
-                {
-                    "avalonia" => "Avalonia",
-                    "blazor-desktop" => "Blazor Desktop",
-                    _ => string.IsNullOrWhiteSpace(artifact.Head) ? "Desktop" : artifact.Head
-                })
-                .Distinct(StringComparer.OrdinalIgnoreCase));
-
-        string arches = string.Join(
-            " + ",
-            artifacts
-                .Select(static artifact => NormalizeBootstrapToken(artifact.Arch)?.ToLowerInvariant() switch
-                {
-                    "arm64" => "ARM64",
-                    "x64" => "x64",
-                    _ => string.IsNullOrWhiteSpace(artifact.Arch) ? "Windows" : artifact.Arch
-                })
-                .Distinct(StringComparer.OrdinalIgnoreCase));
-
-        return string.IsNullOrWhiteSpace(arches)
-            ? $"Windows desktop setup handoff, {heads}"
-            : $"Windows desktop setup handoff, {heads}, {arches}";
-    }
-
     private static string BuildLinuxBootstrapCurrentReleaseSummary(IReadOnlyList<PublicReleaseArtifactDto> artifacts)
     {
         if (artifacts.Count == 0)
@@ -4337,9 +4301,7 @@ public sealed class PublicLandingController : Controller
     private static string ResolveGuidedBootstrapExecutableName(PublicReleaseArtifactDto artifact)
         => NormalizeBootstrapToken(artifact.Head)?.ToLowerInvariant() switch
         {
-            "blazor-desktop" when string.Equals(ResolveGuidedBootstrapPlatform(artifact), "windows", StringComparison.OrdinalIgnoreCase) => "Chummer.Blazor.Desktop.exe",
             "blazor-desktop" => "Chummer.Blazor.Desktop",
-            _ when string.Equals(ResolveGuidedBootstrapPlatform(artifact), "windows", StringComparison.OrdinalIgnoreCase) => "Chummer.Avalonia.exe",
             _ => "Chummer.Avalonia"
         };
 
@@ -4356,7 +4318,6 @@ public sealed class PublicLandingController : Controller
     private static string BuildGuidedBootstrapArtifactTitle(PublicReleaseArtifactDto artifact)
         => ResolveGuidedBootstrapPlatform(artifact) switch
         {
-            "windows" => BuildWindowsBootstrapArtifactTitle(artifact),
             "linux" => BuildLinuxBootstrapArtifactTitle(artifact),
             _ => BuildMacBootstrapArtifactTitle(artifact)
         };
@@ -4364,7 +4325,6 @@ public sealed class PublicLandingController : Controller
     private static string BuildGuidedBootstrapShortLabel(PublicReleaseArtifactDto artifact)
         => ResolveGuidedBootstrapPlatform(artifact) switch
         {
-            "windows" => BuildWindowsBootstrapShortLabel(artifact),
             "linux" => BuildLinuxBootstrapShortLabel(artifact),
             _ => BuildMacBootstrapShortLabel(artifact)
         };
@@ -4394,42 +4354,6 @@ public sealed class PublicLandingController : Controller
         {
             "arm64" => " (Apple Silicon)",
             "x64" => " (Intel)",
-            _ => string.Empty
-        };
-
-        return NormalizeBootstrapToken(artifact.Head)?.ToLowerInvariant() switch
-        {
-            "avalonia" => $"Chummer Avalonia{suffix}",
-            "blazor-desktop" => $"Chummer Blazor Desktop{suffix}",
-            _ => string.IsNullOrWhiteSpace(artifact.Platform) ? artifact.Id : $"{artifact.Platform}{suffix}"
-        };
-    }
-
-    private static string BuildWindowsBootstrapArtifactTitle(PublicReleaseArtifactDto artifact)
-    {
-        string headLabel = NormalizeBootstrapToken(artifact.Head)?.ToLowerInvariant() switch
-        {
-            "avalonia" => "Avalonia Desktop",
-            "blazor-desktop" => "Blazor Desktop",
-            _ => string.IsNullOrWhiteSpace(artifact.Head) ? "Desktop" : artifact.Head!
-        };
-
-        string archLabel = NormalizeBootstrapToken(artifact.Arch)?.ToLowerInvariant() switch
-        {
-            "arm64" => "ARM64",
-            "x64" => "x64",
-            _ => "Windows"
-        };
-
-        return $"{headLabel} Windows {archLabel} Installer";
-    }
-
-    private static string BuildWindowsBootstrapShortLabel(PublicReleaseArtifactDto artifact)
-    {
-        string suffix = NormalizeBootstrapToken(artifact.Arch)?.ToLowerInvariant() switch
-        {
-            "arm64" => " (ARM64)",
-            "x64" => " (x64)",
             _ => string.Empty
         };
 
@@ -4475,566 +4399,6 @@ public sealed class PublicLandingController : Controller
             "blazor-desktop" => $"Chummer Blazor Desktop{suffix}",
             _ => string.IsNullOrWhiteSpace(artifact.Platform) ? artifact.Id : $"{artifact.Platform}{suffix}"
         };
-    }
-
-    internal static string RenderWindowsInstallBootstrapScript(
-        IReadOnlyList<GuidedBootstrapArtifact> artifacts,
-        string publicBaseUrl,
-        string accountUrl,
-        string downloadsUrl,
-        string helpUrl)
-    {
-        ArgumentNullException.ThrowIfNull(artifacts);
-        if (artifacts.Count == 0)
-        {
-            throw new ArgumentException("at least one Windows bootstrap artifact is required.", nameof(artifacts));
-        }
-
-        string artifactsJson = JsonSerializer.Serialize(artifacts);
-        string template = """
-[CmdletBinding()]
-param()
-
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
-$ProgressPreference = 'SilentlyContinue'
-
-$PublicBaseUrl = '__PUBLIC_BASE_URL__'
-$AccountUrl = '__ACCOUNT_URL__'
-$DownloadsUrl = '__DOWNLOADS_URL__'
-$HelpUrl = '__HELP_URL__'
-$Artifacts = @'
-__ARTIFACTS_JSON__
-'@ | ConvertFrom-Json
-
-try {
-    Add-Type -AssemblyName System.Windows.Forms
-    Add-Type -AssemblyName System.Drawing
-    $GuiAvailable = $true
-}
-catch {
-    $GuiAvailable = $false
-}
-
-function Write-Banner {
-    Write-Host '============================================================'
-    Write-Host ' Chummer Setup'
-    Write-Host ' Guided Windows install for the current desktop preview'
-    Write-Host '============================================================'
-    Write-Host ''
-}
-
-function Write-Step([int]$Step, [int]$Total, [string]$Message) {
-    $percent = [Math]::Min([Math]::Round(($Step / [double]$Total) * 100), 100)
-    Write-Progress -Activity 'Chummer Setup' -Status $Message -PercentComplete $percent
-    Write-Host ''
-    Write-Host ('[' + ('#' * [Math]::Max([int][Math]::Round($percent / 4), 1)).PadRight(25, '.') + "] $Step/$Total $Message")
-}
-
-function Read-ConsoleChoice([string]$Prompt, [string[]]$Choices, [int]$DefaultIndex) {
-    Write-Host $Prompt
-    for ($i = 0; $i -lt $Choices.Length; $i++) {
-        $marker = if ($i -eq $DefaultIndex) { '*' } else { ' ' }
-        Write-Host ("  [{0}] {1} {2}" -f ($i + 1), $marker, $Choices[$i])
-    }
-
-    while ($true) {
-        $raw = Read-Host ("Choose 1-{0} (blank = {1})" -f $Choices.Length, ($DefaultIndex + 1))
-        if ([string]::IsNullOrWhiteSpace($raw)) {
-            return $Choices[$DefaultIndex]
-        }
-
-        $selectedIndex = 0
-        if ([int]::TryParse($raw, [ref]$selectedIndex) -and $selectedIndex -ge 1 -and $selectedIndex -le $Choices.Length) {
-            return $Choices[$selectedIndex - 1]
-        }
-    }
-}
-
-function Show-ButtonDialog([string]$Title, [string]$Message, [string[]]$Buttons, [string]$DefaultButton) {
-    if (-not $GuiAvailable) {
-        $defaultIndex = [Array]::IndexOf($Buttons, $DefaultButton)
-        if ($defaultIndex -lt 0) { $defaultIndex = 0 }
-        return Read-ConsoleChoice $Message $Buttons $defaultIndex
-    }
-
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = $Title
-    $form.StartPosition = 'CenterScreen'
-    $form.FormBorderStyle = 'FixedDialog'
-    $form.MinimizeBox = $false
-    $form.MaximizeBox = $false
-    $form.TopMost = $true
-    $form.ClientSize = New-Object System.Drawing.Size(620, 210)
-
-    $label = New-Object System.Windows.Forms.Label
-    $label.AutoSize = $false
-    $label.Text = $Message
-    $label.Left = 18
-    $label.Top = 18
-    $label.Width = 584
-    $label.Height = 110
-    $label.MaximumSize = New-Object System.Drawing.Size(584, 0)
-
-    $buttonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
-    $buttonsPanel.Left = 18
-    $buttonsPanel.Top = 142
-    $buttonsPanel.Width = 584
-    $buttonsPanel.Height = 46
-    $buttonsPanel.FlowDirection = 'RightToLeft'
-
-    foreach ($choice in $Buttons) {
-        $button = New-Object System.Windows.Forms.Button
-        $button.Text = $choice
-        $button.AutoSize = $true
-        $button.Add_Click({
-            $form.Tag = $this.Text
-            $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
-            $form.Close()
-        })
-        if ($choice -eq $DefaultButton) {
-            $form.AcceptButton = $button
-        }
-        [void]$buttonsPanel.Controls.Add($button)
-    }
-
-    [void]$form.Controls.Add($label)
-    [void]$form.Controls.Add($buttonsPanel)
-    [void]$form.ShowDialog()
-    if ($null -eq $form.Tag) {
-        throw 'Chummer Setup was cancelled.'
-    }
-
-    return [string]$form.Tag
-}
-
-function Show-ChecklistDialog([string]$Title, [string]$Message, [object[]]$Items, [string[]]$DefaultIds) {
-    if (-not $GuiAvailable) {
-        Write-Host $Message
-        for ($i = 0; $i -lt $Items.Count; $i++) {
-            $item = $Items[$i]
-            $selected = if ($DefaultIds -contains $item.ArtifactId) { '*' } else { ' ' }
-            Write-Host ("  [{0}] {1} {2}" -f ($i + 1), $selected, $item.ShortLabel)
-        }
-
-        $raw = Read-Host 'Enter comma-separated numbers (blank keeps Auto select defaults)'
-        if ([string]::IsNullOrWhiteSpace($raw)) {
-            return $DefaultIds
-        }
-
-        $selectedIds = New-Object System.Collections.Generic.List[string]
-        foreach ($token in ($raw -split ',')) {
-            $value = $token.Trim()
-            if (-not [string]::IsNullOrWhiteSpace($value)) {
-                $index = 0
-                if ([int]::TryParse($value, [ref]$index) -and $index -ge 1 -and $index -le $Items.Count) {
-                    [void]$selectedIds.Add([string]$Items[$index - 1].ArtifactId)
-                }
-            }
-        }
-
-        if ($selectedIds.Count -eq 0) {
-            throw 'Choose at least one Chummer app.'
-        }
-
-        return $selectedIds.ToArray()
-    }
-
-    $form = New-Object System.Windows.Forms.Form
-    $form.Text = $Title
-    $form.StartPosition = 'CenterScreen'
-    $form.FormBorderStyle = 'FixedDialog'
-    $form.MinimizeBox = $false
-    $form.MaximizeBox = $false
-    $form.TopMost = $true
-    $form.ClientSize = New-Object System.Drawing.Size(620, 420)
-
-    $label = New-Object System.Windows.Forms.Label
-    $label.AutoSize = $false
-    $label.Text = $Message
-    $label.Left = 18
-    $label.Top = 18
-    $label.Width = 584
-    $label.Height = 72
-
-    $checkList = New-Object System.Windows.Forms.CheckedListBox
-    $checkList.Left = 18
-    $checkList.Top = 96
-    $checkList.Width = 584
-    $checkList.Height = 250
-    foreach ($item in $Items) {
-        $index = $checkList.Items.Add([string]$item.ShortLabel)
-        if ($DefaultIds -contains [string]$item.ArtifactId) {
-            $checkList.SetItemChecked($index, $true)
-        }
-    }
-
-    $buttonsPanel = New-Object System.Windows.Forms.FlowLayoutPanel
-    $buttonsPanel.Left = 18
-    $buttonsPanel.Top = 360
-    $buttonsPanel.Width = 584
-    $buttonsPanel.Height = 44
-    $buttonsPanel.FlowDirection = 'RightToLeft'
-
-    $okButton = New-Object System.Windows.Forms.Button
-    $okButton.Text = 'Continue'
-    $okButton.AutoSize = $true
-    $okButton.Add_Click({
-        if ($checkList.CheckedIndices.Count -eq 0) {
-            [System.Windows.Forms.MessageBox]::Show('Choose at least one Chummer app.', 'Chummer Setup', [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
-            return
-        }
-
-        $selected = New-Object System.Collections.Generic.List[string]
-        foreach ($index in $checkList.CheckedIndices) {
-            [void]$selected.Add([string]$Items[[int]$index].ArtifactId)
-        }
-
-        $form.Tag = $selected.ToArray()
-        $form.DialogResult = [System.Windows.Forms.DialogResult]::OK
-        $form.Close()
-    })
-
-    $cancelButton = New-Object System.Windows.Forms.Button
-    $cancelButton.Text = 'Cancel'
-    $cancelButton.AutoSize = $true
-    $cancelButton.Add_Click({
-        $form.Close()
-    })
-
-    [void]$buttonsPanel.Controls.Add($okButton)
-    [void]$buttonsPanel.Controls.Add($cancelButton)
-    [void]$form.Controls.Add($label)
-    [void]$form.Controls.Add($checkList)
-    [void]$form.Controls.Add($buttonsPanel)
-    [void]$form.ShowDialog()
-
-    if ($null -eq $form.Tag) {
-        throw 'Chummer Setup was cancelled.'
-    }
-
-    return [string[]]$form.Tag
-}
-
-function Show-FolderDialog([string]$Description, [string]$SelectedPath) {
-    if (-not $GuiAvailable) {
-        $raw = Read-Host ($Description + " (blank keeps " + $SelectedPath + ")")
-        if ([string]::IsNullOrWhiteSpace($raw)) {
-            return $SelectedPath
-        }
-
-        return $raw
-    }
-
-    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dialog.Description = $Description
-    $dialog.SelectedPath = $SelectedPath
-    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
-        return $SelectedPath
-    }
-
-    return $dialog.SelectedPath
-}
-
-function Get-HostArchitecture {
-    foreach ($candidate in @($env:PROCESSOR_ARCHITEW6432, $env:PROCESSOR_ARCHITECTURE)) {
-        if ([string]::IsNullOrWhiteSpace($candidate)) {
-            continue
-        }
-
-        $arch = $candidate.Trim().ToUpperInvariant()
-        if ($arch.Contains('ARM64')) {
-            return 'arm64'
-        }
-
-        if ($arch.Contains('64')) {
-            return 'x64'
-        }
-    }
-
-    return 'x64'
-}
-
-function Get-HostArchitectureLabel([string]$Arch) {
-    switch ($Arch) {
-        'arm64' { return 'ARM64' }
-        default { return 'x64' }
-    }
-}
-
-function Get-DefaultArtifacts([object[]]$ArtifactSet, [string]$HostArch) {
-    $matching = @($ArtifactSet | Where-Object { $_.Architecture -eq $HostArch })
-    if ($matching.Count -gt 0) {
-        return $matching
-    }
-
-    return @($ArtifactSet | Sort-Object @{ Expression = { if ($_.LaunchAfterInstall) { 0 } else { 1 } } }, ShortLabel)
-}
-
-function Resolve-SelectedArtifacts {
-    $hostArch = Get-HostArchitecture
-    $defaultArtifacts = @(Get-DefaultArtifacts $Artifacts $hostArch)
-    $defaultIds = @($defaultArtifacts | ForEach-Object { [string]$_.ArtifactId })
-    $defaultSummary = (($defaultArtifacts | ForEach-Object { [string]$_.ShortLabel }) -join [Environment]::NewLine)
-    $message = "Auto select the matching $(Get-HostArchitectureLabel $hostArch) builds for this PC, or choose manually?`n`nAuto select:`n$defaultSummary"
-    $mode = Show-ButtonDialog 'Chummer Setup' $message @('Choose manually', 'Auto select') 'Auto select'
-    if ($mode -eq 'Auto select') {
-        return $defaultArtifacts
-    }
-
-    $selectedIds = @(Show-ChecklistDialog 'Chummer Setup' 'Choose which Chummer desktop apps to install now.' $Artifacts $defaultIds)
-    return @($Artifacts | Where-Object { $selectedIds -contains [string]$_.ArtifactId })
-}
-
-function Resolve-InstallRoot {
-    $defaultRoot = Join-Path $env:LOCALAPPDATA 'Programs\Chummer6'
-    $choice = Show-ButtonDialog 'Chummer Setup' "Choose where to install the selected apps.`n`nRecommended keeps them under:`n$defaultRoot" @('Choose folder', 'Recommended') 'Recommended'
-    if ($choice -eq 'Choose folder') {
-        return Show-FolderDialog 'Choose the folder that should hold the installed Chummer app folders.' $defaultRoot
-    }
-
-    return $defaultRoot
-}
-
-function Resolve-ShortcutMode {
-    $choice = Show-ButtonDialog 'Chummer Setup' 'Where should Chummer leave quick access after setup?' @('Start menu only', 'Desktop links', 'Both') 'Start menu only'
-    switch ($choice) {
-        'Desktop links' { return 'desktop' }
-        'Both' { return 'both' }
-        default { return 'start' }
-    }
-}
-
-function Resolve-OpenAfterInstall {
-    $choice = Show-ButtonDialog 'Chummer Setup' 'After Chummer finishes installing, should it open the selected app when setup is done?' @('Finish closed', 'Open when done') 'Open when done'
-    return $choice -eq 'Open when done'
-}
-
-function Ensure-Directory([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) {
-        New-Item -ItemType Directory -Path $Path -Force | Out-Null
-    }
-}
-
-function Download-Artifact([object]$Artifact, [string]$DownloadRoot) {
-    Ensure-Directory $DownloadRoot
-    $targetPath = Join-Path $DownloadRoot ([string]$Artifact.PackageName)
-    Write-Host ("Downloading {0} to {1}" -f $Artifact.Title, $targetPath)
-    Invoke-WebRequest -UseBasicParsing -Uri ([string]$Artifact.DownloadUrl) -OutFile $targetPath
-    return $targetPath
-}
-
-function Verify-ArtifactHash([string]$DownloadedPath, [object]$Artifact) {
-    if ([string]::IsNullOrWhiteSpace([string]$Artifact.Sha256)) {
-        return
-    }
-
-    $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $DownloadedPath).Hash.ToLowerInvariant()
-    $expected = ([string]$Artifact.Sha256).Trim().ToLowerInvariant()
-    if ($actual -ne $expected) {
-        throw ("SHA-256 mismatch for {0}. Expected {1} but saw {2}." -f $Artifact.Title, $expected, $actual)
-    }
-}
-
-function Invoke-Installer([string]$InstallerPath, [string]$TargetDir, [string]$ShortcutMode, [string]$InstallClaimCode) {
-    $startMenu = if ($ShortcutMode -eq 'desktop') { 'off' } else { 'on' }
-    $desktop = if ($ShortcutMode -eq 'start') { 'off' } else { 'on' }
-    $arguments = @(
-        '--bootstrap-install', $TargetDir,
-        '--start-menu-shortcut', $startMenu,
-        '--desktop-shortcut', $desktop,
-        '--launch', 'off'
-    )
-    if (-not [string]::IsNullOrWhiteSpace($InstallClaimCode)) {
-        $arguments += @('--install-claim-code', $InstallClaimCode)
-    }
-    $process = Start-Process -FilePath $InstallerPath -ArgumentList $arguments -Wait -PassThru
-    if ($process.ExitCode -ne 0) {
-        throw ("Installer exited with code {0} for {1}" -f $process.ExitCode, $InstallerPath)
-    }
-}
-
-function Get-StatePath([object]$Artifact) {
-    $stateRoot = Join-Path $env:LOCALAPPDATA 'Chummer6\install-linking'
-    return Join-Path $stateRoot ([IO.Path]::Combine([string]$Artifact.HeadId, 'windows', [string]$Artifact.Architecture, 'state.json'))
-}
-
-function Read-State([string]$StatePath) {
-    if (-not (Test-Path -LiteralPath $StatePath)) {
-        return $null
-    }
-
-    try {
-        return (Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json)
-    }
-    catch {
-        return $null
-    }
-}
-
-function Get-StateField([string]$StatePath, [string]$FieldName) {
-    $state = Read-State $StatePath
-    if ($null -eq $state) {
-        return $null
-    }
-
-    $property = $state.PSObject.Properties[$FieldName]
-    if ($null -eq $property) {
-        return $null
-    }
-
-    return [string]$property.Value
-}
-
-function Wait-ForClaimSuccess([string]$StatePath, [int]$TimeoutSeconds) {
-    for ($i = 0; $i -lt $TimeoutSeconds; $i++) {
-        $state = Read-State $StatePath
-        if ($null -ne $state -and [string]$state.status -eq 'claimed' -and $state.grantToken -and $state.claimedAtUtc) {
-            return $true
-        }
-
-        Start-Sleep -Seconds 1
-    }
-
-    return $false
-}
-
-function Resolve-InstalledExecutable([string]$InstallDir, [object]$Artifact) {
-    return Join-Path $InstallDir ([string]$Artifact.ExecutableName)
-}
-
-function Get-InstallClaimCode([object]$Artifact) {
-    $response = Invoke-WebRequest -UseBasicParsing -Uri ([string]$Artifact.ClaimUrl)
-    $payload = $response.Content | ConvertFrom-Json
-    $claimCode = [string]$payload.claimCode
-    if ([string]::IsNullOrWhiteSpace($claimCode)) {
-        throw ("Install claim exchange did not return a usable claim code for {0}" -f $Artifact.Title)
-    }
-
-    return $claimCode
-}
-
-function Start-ClaimLaunch([string]$ExecutablePath, [object]$Artifact) {
-    $claimCode = Get-InstallClaimCode $Artifact
-    $previousClaimCode = $env:CHUMMER_INSTALL_CLAIM_CODE
-    $previousApiBase = $env:CHUMMER_API_BASE_URL
-    $previousWebBase = $env:CHUMMER_WEB_BASE_URL
-    try {
-        $env:CHUMMER_INSTALL_CLAIM_CODE = $claimCode
-        $env:CHUMMER_API_BASE_URL = $PublicBaseUrl
-        $env:CHUMMER_WEB_BASE_URL = $PublicBaseUrl
-        return Start-Process -FilePath $ExecutablePath -WorkingDirectory (Split-Path -Parent $ExecutablePath) -PassThru
-    }
-    finally {
-        $env:CHUMMER_INSTALL_CLAIM_CODE = $previousClaimCode
-        $env:CHUMMER_API_BASE_URL = $previousApiBase
-        $env:CHUMMER_WEB_BASE_URL = $previousWebBase
-    }
-}
-
-Write-Banner
-Write-Step 1 6 'Preparing the guided Windows install'
-$selectedArtifacts = @(Resolve-SelectedArtifacts)
-if ($selectedArtifacts.Count -eq 0) {
-    throw 'Choose at least one Chummer app.'
-}
-
-$hostArch = Get-HostArchitecture
-$installRoot = Resolve-InstallRoot
-$shortcutMode = Resolve-ShortcutMode
-$openAfterInstall = Resolve-OpenAfterInstall
-
-Write-Host 'Selected apps:'
-foreach ($artifact in $selectedArtifacts) {
-    Write-Host (" - {0}" -f $artifact.ShortLabel)
-}
-Write-Host ("Install destination: {0}" -f $installRoot)
-Write-Host ("Current PC architecture: {0}" -f (Get-HostArchitectureLabel $hostArch))
-Write-Host ("Quick access: {0}" -f $(switch ($shortcutMode) { 'desktop' { 'Desktop links' } 'both' { 'Start menu + Desktop links' } default { 'Start menu only' } }))
-Write-Host ("Finish behavior: {0}" -f $(if ($openAfterInstall) { 'open the selected apps when installation completes' } else { 'finish without opening the selected apps' }))
-
-$downloadRoot = Join-Path $env:TEMP ("chummer-setup-" + [Guid]::NewGuid().ToString('N'))
-$installedArtifacts = New-Object System.Collections.Generic.List[object]
-$installWarnings = New-Object System.Collections.Generic.List[string]
-$stagedLinkCount = 0
-
-foreach ($artifact in $selectedArtifacts) {
-    Write-Step 2 6 ("Downloading " + $artifact.Title)
-    $downloadedInstaller = Download-Artifact $artifact $downloadRoot
-    Verify-ArtifactHash $downloadedInstaller $artifact
-
-    $targetDir = Join-Path $installRoot ([string]$artifact.InstallFolderName)
-    $claimCode = $null
-    try {
-        Write-Step 3 6 ("Preparing account linking for " + $artifact.Title)
-        $claimCode = Get-InstallClaimCode $artifact
-    }
-    catch {
-        $installWarnings.Add("$($artifact.Title) could not fetch a short-lived setup ticket for account linking. Setup will continue, but Devices and access may stay guest-only until you rerun the guided installer.") | Out-Null
-    }
-    Write-Step 3 6 ("Installing " + $artifact.Title)
-    Write-Host ("Installing {0} to {1}" -f $artifact.Title, $targetDir)
-    Invoke-Installer $downloadedInstaller $targetDir $shortcutMode $claimCode
-
-    $installedArtifacts.Add([pscustomobject]@{
-        Artifact = $artifact
-        InstallDir = $targetDir
-        ExecutablePath = (Resolve-InstalledExecutable $targetDir $artifact)
-        ClaimCodeStaged = (-not [string]::IsNullOrWhiteSpace($claimCode))
-    }) | Out-Null
-    if (-not [string]::IsNullOrWhiteSpace($claimCode)) {
-        $stagedLinkCount += 1
-        Write-Host ($artifact.Title + ' is staged to finish account linking on first open.')
-    }
-}
-
-Write-Host ''
-Write-Host 'Installed Windows desktop builds:'
-foreach ($installed in $installedArtifacts) {
-    Write-Host (" - {0}" -f $installed.InstallDir)
-}
-if ($openAfterInstall) {
-    Write-Step 4 6 'Opening selected apps'
-    foreach ($installed in $installedArtifacts) {
-        if ([bool]$installed.Artifact.LaunchAfterInstall) {
-            Start-Process -FilePath $installed.ExecutablePath -WorkingDirectory $installed.InstallDir | Out-Null
-        }
-    }
-}
-
-Write-Step 5 6 'Finishing Chummer Setup'
-Write-Host ''
-Write-Host ("Confirmed linked installs: {0} / {1}" -f $stagedLinkCount, $installedArtifacts.Count)
-Write-Host ("Prepared first-open account linking: {0} / {1}" -f $stagedLinkCount, $installedArtifacts.Count)
-if ($stagedLinkCount -eq $installedArtifacts.Count) {
-    Write-Host 'The selected Chummer app or apps were installed and setup staged account linking for first open.'
-    Write-Host 'When you open them, they should attach to this account without asking you to copy a claim code from the website.'
-}
-else {
-    Write-Host 'The selected Chummer app or apps were installed, but setup could not pre-stage account linking for every app.'
-    Write-Host 'If Devices and access does not show them after first open, rerun the current guided installer.'
-}
-
-if ($installWarnings.Count -gt 0) {
-    Write-Host ''
-    Write-Host 'Setup notes:'
-    foreach ($warning in $installWarnings) {
-        Write-Host (" - {0}" -f $warning)
-    }
-}
-
-Write-Host ("Devices and access: {0}" -f $AccountUrl)
-Write-Host ("Downloads shelf: {0}" -f $DownloadsUrl)
-Write-Host ("Help: {0}" -f $HelpUrl)
-Write-Step 6 6 'Done'
-""";
-
-        return template
-            .Replace("__PUBLIC_BASE_URL__", EscapePowerShellSingleQuoted(publicBaseUrl), StringComparison.Ordinal)
-            .Replace("__ACCOUNT_URL__", EscapePowerShellSingleQuoted(accountUrl), StringComparison.Ordinal)
-            .Replace("__DOWNLOADS_URL__", EscapePowerShellSingleQuoted(downloadsUrl), StringComparison.Ordinal)
-            .Replace("__HELP_URL__", EscapePowerShellSingleQuoted(helpUrl), StringComparison.Ordinal)
-            .Replace("__ARTIFACTS_JSON__", artifactsJson, StringComparison.Ordinal);
     }
 
     internal static string RenderLinuxInstallBootstrapScript(
@@ -5695,37 +5059,6 @@ echo "Help: ${HELP_URL}"
             .Replace("__ARTIFACT_BLOCK__", artifactBlock.ToString().TrimEnd(), StringComparison.Ordinal);
     }
 
-    private static string EscapePowerShellSingleQuoted(string value)
-        => value.Replace("'", "''", StringComparison.Ordinal);
-
-    private static string RenderReleaseUploadBootstrapScript(string template)
-    {
-        string scriptBody = template.StartsWith("#!/usr/bin/env bash", StringComparison.Ordinal)
-            ? template["#!/usr/bin/env bash".Length..].TrimStart('\r', '\n')
-            : template;
-        IReadOnlyList<ReleaseUploadBootstrapRepoPin> pinnedRepos = GetReleaseUploadBootstrapRepoPins();
-        StringBuilder builder = new();
-        builder.AppendLine("#!/usr/bin/env bash");
-        builder.AppendLine("# Signed-in release upload always targets the live chummer.run shelf.");
-        builder.AppendLine("export CHUMMER_RELEASE_PUBLISH_MODE='http'");
-        builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_URL=\"https://chummer.run/api/internal/releases/bundles\"");
-        builder.AppendLine("export CHUMMER_RELEASE_UPLOAD_SESSIONS_URL=\"https://chummer.run/api/internal/releases/upload-sessions\"");
-        builder.AppendLine("export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL='https://chummer.run/downloads/releases.json'");
-        foreach (ReleaseUploadBootstrapRepoPin pin in pinnedRepos)
-        {
-            builder.Append("export ")
-                .Append(pin.RefVariable)
-                .Append('=')
-                .AppendLine(SingleQuoteShellValue(pin.RefValue));
-            builder.Append("export ")
-                .Append(pin.ExpectedCommitVariable)
-                .Append('=')
-                .AppendLine(SingleQuoteShellValue(pin.ExpectedCommit));
-        }
-        builder.AppendLine(scriptBody);
-        return builder.ToString();
-    }
-
     private static string SingleQuoteShellValue(string value)
         => $"'{SingleQuoteShellLiteral(value)}'";
 
@@ -5756,18 +5089,6 @@ echo "Help: ${HELP_URL}"
         byte[] bytes = Encoding.UTF8.GetBytes(value);
         return Convert.ToHexStringLower(SHA256.HashData(bytes));
     }
-
-    private static IReadOnlyList<ReleaseUploadBootstrapRepoPin> GetReleaseUploadBootstrapRepoPins()
-        =>
-        [
-            new("CHUMMER_UI_REF", "main", "CHUMMER_UI_EXPECTED_COMMIT", "07bcbbaebb2f73fec52af74949bd6f321482502b"),
-            new("CHUMMER_CORE_REF", "main", "CHUMMER_CORE_EXPECTED_COMMIT", "ae55923f1cb6c8fdf40748f7e2600815be123e1e"),
-            new("CHUMMER_HUB_REF", "release-upload-hub-proof-routes-20260419", "CHUMMER_HUB_EXPECTED_COMMIT", "5dcde8a9746ecb2f02c70e8181be662f198af84d"),
-            new("CHUMMER_UI_KIT_REF", "fleet/ui-kit", "CHUMMER_UI_KIT_EXPECTED_COMMIT", "2ef502630a2d1cd20350f9b0f134af0bac0fe863"),
-            new("CHUMMER_HUB_REGISTRY_REF", "main", "CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT", "85f6c1bdb5054b3fccea1d9115d20a1c6b5cd959"),
-            new("CHUMMER_MEDIA_FACTORY_REF", "main", "CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT", "e16286ca8c9bad84ff217466c72721ebcdbf48b5"),
-            new("CHUMMER_LEGACY_REF", "Docker", "CHUMMER_LEGACY_EXPECTED_COMMIT", "0b8636d5a852e375409bf565b9ac9b4180ba4524")
-        ];
 
     internal sealed record MacInstallBootstrapArtifact(
         string ArtifactId,
@@ -5805,9 +5126,4 @@ echo "Help: ${HELP_URL}"
         string? UserId,
         string? SubjectId);
 
-    private sealed record ReleaseUploadBootstrapRepoPin(
-        string RefVariable,
-        string RefValue,
-        string ExpectedCommitVariable,
-        string ExpectedCommit);
 }

@@ -283,7 +283,7 @@ public sealed class PublicLandingService
 
     private static void ValidateAssets(PublicLandingSurfaceDto surface, string repoRoot)
     {
-        var webRoot = Path.Combine(repoRoot, "Chummer.Run.Api", "wwwroot");
+        var webRoot = ResolveWebRoot(repoRoot);
         ValidateAsset(surface.Assets.FirstOrDefault(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "section_hero", webRoot, requireMobilePoster: true);
         if (surface.Assets.FirstOrDefault(static asset => string.Equals(asset.AssetSlot, "product_proof_ui", StringComparison.Ordinal)) is { } productProofAsset)
         {
@@ -294,6 +294,23 @@ public sealed class PublicLandingService
         {
             ValidateAsset(surface.Assets.FirstOrDefault(asset => string.Equals(asset.AssetSlot, slot, StringComparison.Ordinal)), slot, webRoot, requireMobilePoster: true);
         }
+    }
+
+    private static string ResolveWebRoot(string repoRoot)
+    {
+        foreach (var candidate in new[]
+                 {
+                     Path.Combine(repoRoot, "Chummer.Run.Api", "wwwroot"),
+                     Path.Combine(repoRoot, "wwwroot")
+                 })
+        {
+            if (Directory.Exists(candidate))
+            {
+                return Path.GetFullPath(candidate);
+            }
+        }
+
+        throw new DirectoryNotFoundException($"Unable to resolve a public landing web root from '{repoRoot}'.");
     }
 
     private static void ValidateAsset(PublicLandingAssetDto? asset, string slot, string webRoot, bool requireMobilePoster)

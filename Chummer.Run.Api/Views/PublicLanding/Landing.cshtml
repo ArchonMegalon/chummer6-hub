@@ -184,44 +184,46 @@
     <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open what works today</a>.</p>
 </section>
 
-@if (Model.TrustPulse is not null || Model.SignedInStatus is not null)
+@if (Model.TrustPulse is not null)
 {
     <section class="release-shelf" aria-label="Current trust and first-session return">
-        @if (Model.TrustPulse is not null)
-        {
-            <article class="app-action-card">
-                <span class="tag">@Model.TrustPulse.Eyebrow</span>
-                <h2>@Model.TrustPulse.Heading</h2>
-                @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", Model.TrustPulse)
-            </article>
-        }
-        @if (Model.SignedInStatus is not null)
-        {
-            <article class="app-action-card">
-                <span class="tag">Return rail</span>
-                <h2>@(starterFirstPlayableSession?.Label ?? "First session proof")</h2>
-                <p>@(starterFirstPlayableSession?.CampaignStartSummary ?? "Your first playable session proof stays attached to the signed-in return path.")</p>
-                <div class="settings-summary-list">
-                    <div class="settings-summary-row">
-                        <span>Access now</span>
-                        <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm access.")</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Fix availability</span>
-                        <strong>@TrustRowValue(Model.SignedInStatus, "Fix availability", "Open support to confirm tracked fixes.")</strong>
-                    </div>
-                    <div class="settings-summary-row">
-                        <span>Current caution</span>
-                        <strong>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open status to confirm the current caution lane.")</strong>
-                    </div>
+        <article class="app-action-card">
+            <span class="tag">@Model.TrustPulse.Eyebrow</span>
+            <h2>@Model.TrustPulse.Heading</h2>
+            @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", Model.TrustPulse)
+        </article>
+    </section>
+}
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+
+    <section class="release-shelf" aria-label="First-session return">
+        <article class="app-action-card">
+            <span class="tag">Return rail</span>
+            <h2>@(starterFirstPlayableSession?.Label ?? "First session proof")</h2>
+            <p>@(starterFirstPlayableSession?.CampaignStartSummary ?? "Your first playable session proof stays attached to the signed-in return path.")</p>
+            <div class="settings-summary-list">
+                <div class="settings-summary-row">
+                    <span>Access now</span>
+                    <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm access.")</strong>
                 </div>
-                <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="/home">Open starter lane on Home</a>
-                    <a class="button-like button-like--secondary" href="/home#selected-first-playable-session">Open first playable session proof</a>
-                    <a class="button-like button-like--secondary" href="/contact">Open install support</a>
+                <div class="settings-summary-row">
+                    <span>Fix availability</span>
+                    <strong>@TrustRowValue(Model.SignedInStatus, "Fix availability", "Open support to confirm tracked fixes.")</strong>
                 </div>
-            </article>
-        }
+                <div class="settings-summary-row">
+                    <span>Current caution</span>
+                    <strong>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open status to confirm the current caution lane.")</strong>
+                </div>
+            </div>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="/home">Open starter lane on Home</a>
+                <a class="button-like button-like--secondary" href="/home#selected-first-playable-session">Open first playable session proof</a>
+                <a class="button-like button-like--secondary" href="/contact">Open install support</a>
+            </div>
+        </article>
     </section>
 }
 

@@ -681,10 +681,82 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
     var currentAccount = await accountController.GetMe("subject.demo", CancellationToken.None);
     var currentAccountResult = currentAccount.Result as OkObjectResult;
     Assert(currentAccountResult?.Value is HubUserDto { UserId: not null }, "authenticated account endpoints should allow matching subjects.");
+    var currentUser = (HubUserDto)currentAccountResult!.Value!;
+    var seededEntitlements = entitlements.ApplyReceipt(
+        new ContributionReceiptDto(
+            ReceiptId: "rcpt-entitlement-seed-001",
+            EventKind: "slice_landed",
+            LaneId: "entitlement-seed-01",
+            ProjectId: "fleet",
+            UserId: currentUser.UserId,
+            GroupId: "grp-demo",
+            SponsorSessionId: "sps-demo",
+            AuthClass: "chatgpt_auth_json",
+            LaneType: "participant_burst",
+            LaneRole: "coding",
+            Verified: true,
+            SignedByFleet: "hmac-sha256:entitlement-seed",
+            AuthorizationTierAtReceipt: "pro",
+            TierSource: "fleet_detected"),
+        mintedPoints: 0);
+    Assert(seededEntitlements.Contains("supporter-flair", StringComparer.OrdinalIgnoreCase), "signed-in smoke setup should seed a supporter entitlement before the entitlements api is queried.");
+    var entitlementSmokeManifest = new PublicReleaseManifestDto(
+        Version: "0.6.0-entitlement-smoke",
+        Channel: "preview",
+        PublishedAt: DateTimeOffset.UtcNow,
+        Downloads:
+        [
+            new PublicReleaseArtifactDto(
+                Id: "entitlement-smoke-linux-x64",
+                Platform: "Linux x64",
+                Url: "https://downloads.example.invalid/entitlement-smoke-linux-x64.exe",
+                Sha256: new string('a', 64),
+                SizeBytes: 1024,
+                Head: "avalonia",
+                PlatformId: "linux",
+                Arch: "x64",
+                Kind: "installer",
+                FileName: "entitlement-smoke-linux-x64.exe",
+                InstallAccessClass: InstallAccessClasses.AccountRecommended)
+        ]);
+    var entitlementSmokeArtifact = entitlementSmokeManifest.Downloads[0];
+    var entitlementSmokeInstallationId = $"install-entitlement-smoke-{Guid.NewGuid():N}";
+    var entitlementSmokeDownload = installLinking.IssueDownload(
+        entitlementSmokeManifest,
+        entitlementSmokeArtifact,
+        currentUser.UserId,
+        currentUser.SubjectId);
+    Assert(entitlementSmokeDownload.ClaimTicket is not null, "signed-in smoke setup should mint a claim ticket for entitlement-sync restore proof.");
+    var entitlementSmokeRedeem = installLinking.RedeemClaim(
+        new RedeemInstallClaimRequestDto(
+            ClaimCode: entitlementSmokeDownload.ClaimTicket!.ClaimCode,
+            InstallationId: entitlementSmokeInstallationId,
+            HeadId: "avalonia",
+            ApplicationVersion: "0.6.0-entitlement-smoke",
+            ChannelId: "preview",
+            Platform: "linux",
+            Arch: "x64",
+            PublicKey: "entitlement-smoke-public-key",
+            HostLabel: "entitlement-smoke-host"));
+    var duplicateGrantIssuedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+    lock (installLinkingStore.Gate)
+    {
+        installLinkingStore.GrantsById["igr-entitlement-smoke-duplicate-001"] = new InstallationGrantDto(
+            GrantId: "igr-entitlement-smoke-duplicate-001",
+            InstallationId: entitlementSmokeRedeem.Installation.InstallationId,
+            Status: InstallationGrantStates.Active,
+            AccessToken: "entitlement-smoke-duplicate-token",
+            IssuedAtUtc: duplicateGrantIssuedAt,
+            ExpiresAtUtc: duplicateGrantIssuedAt.AddDays(14),
+            UserId: currentUser.UserId,
+            SubjectId: currentUser.SubjectId);
+        installLinkingStore.PersistLocked();
+    }
     var entitlementResult = await entitlementsController.GetMine("subject.demo", CancellationToken.None);
     var entitlementPayload = (entitlementResult.Result as OkObjectResult)?.Value as EntitlementAccountProjection ?? entitlementResult.Value;
     Assert(entitlementPayload is not null && entitlementPayload.Entitlements.Count >= 1, "entitlements api should keep the signed-in entitlement list available.");
-    Assert(entitlementPayload!.SyncReceipts.ProvenanceReceipts.Count >= 1, "entitlements api should expose entitlement-sync provenance receipts alongside grants.");
+    Assert(entitlementPayload!.Entitlements.Any(item => string.Equals(item.Key, "supporter-flair", StringComparison.OrdinalIgnoreCase)), "entitlements api should preserve the seeded supporter entitlement on the signed-in account surface.");
+    Assert(entitlementPayload.SyncReceipts.ProvenanceReceipts.Count >= 1, "entitlements api should expose entitlement-sync provenance receipts alongside grants.");
     Assert(entitlementPayload.SyncReceipts.ProvenanceReceipts.All(item => string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)), "entitlements api should isolate entitlement-sync provenance receipts instead of mixing workspace-only restore items.");
     Assert(entitlementPayload.SyncReceipts.ProvenanceRecoveryReceipts.Any(item => string.Equals(item.RecoveryRoute, "/account/access", StringComparison.Ordinal)), "entitlements api should expose recoverable account-access provenance routes for entitlement replay.");
     Assert(entitlementPayload.SyncReceipts.ConflictReceipts.Count >= 1, "entitlements api should expose explicit entitlement-sync conflict receipts when restore continuity drifts.");
@@ -2403,7 +2475,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.AuthRoutes.Any(static route => string.Equals(route.Path, "/signup", StringComparison.Ordinal)), "landing surface should expose the signup route");
     Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/login?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Sign in", StringComparison.Ordinal)), "landing guest shell should expose the sign-in action");
     Assert(surface.GuestShellActions.Any(static action => string.Equals(action.Href, "/signup?next=/home", StringComparison.Ordinal) && string.Equals(action.Label, "Create account", StringComparison.Ordinal)), "landing guest shell should expose the create-account action");
-    Assert(surface.HeroCtas.Any(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase) && string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal)), "landing canon should single-source the guest hero access CTA.");
+    Assert(surface.HeroCtas.Any(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase) && string.Equals(action.Label, "Create account to install", StringComparison.Ordinal)), "landing canon should single-source the guest hero access CTA.");
     Assert(surface.Assets.Any(static asset => string.Equals(asset.AssetSlot, "section_hero", StringComparison.Ordinal)), "landing surface should load the hero asset slot");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Research", StringComparison.Ordinal)), "landing feature registry should carry the updated readiness posture for KARMA FORGE");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
@@ -2613,7 +2685,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var landingModel = landingView?.Model as LandingPageViewModel;
     Assert(landingModel is not null, "landing page should render through the MVC view layer.");
     Assert(string.Equals(landingModel!.Surface.Headline, "Shadowrun rules truth, with receipts.", StringComparison.Ordinal), "landing page should render the canonical headline");
-    Assert(string.Equals(landingModel.PrimaryHeroAction.Label, "Create account to get preview", StringComparison.Ordinal), "landing page should source the guest-gated primary CTA from release canon.");
+    Assert(string.Equals(landingModel.PrimaryHeroAction.Label, "Create account to install", StringComparison.Ordinal), "landing page should source the guest-gated primary CTA from release canon.");
     Assert(landingModel.PrimaryHeroAction.Href.StartsWith("/signup?next=", StringComparison.Ordinal), "guest-gated primary CTA should route to signup through the install handoff.");
     Assert(string.Equals(landingModel.SecondaryHeroAction.Label, "See what works today", StringComparison.Ordinal), "landing page should keep the manifest-backed secondary CTA.");
     Assert(landingModel.TrustPulse is not null, "landing page should surface a compact weekly trust pulse on the front door.");
@@ -2628,7 +2700,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "landing page should surface the current caution lane from the weekly trust pulse.");
     Assert(landingModel.SignedInStatus is null, "guest landing should not project install-specific signed-in trust posture.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
-    Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to get preview", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
+    Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to install", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
     Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
     Assert(landingModel.AvailableToday.Any(static card => string.Equals(card.Card.Id, "real_mobile_prep", StringComparison.Ordinal)), "landing should treat inspectable continuity proof as available today instead of relegating it to a preview bucket.");
@@ -2723,7 +2795,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(downloadsModel?.Manifest.Version, "0.6.1-smoke", StringComparison.Ordinal), "downloads page should surface the manifest version");
     Assert(downloadsModel!.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Download the current published package for your platform.", StringComparison.OrdinalIgnoreCase)), "guest-readable releases should keep the public install steps for the current preview recommendation.");
     Assert(!downloadsModel.ReleaseExperience.InstallSteps.Any(static step => step.Contains("Create your Chummer account first.", StringComparison.OrdinalIgnoreCase)), "guest-readable releases should not pretend the current preview requires account creation before download.");
-    Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account to get preview", StringComparison.Ordinal), "downloads page should keep the signup-first guest gate label.");
+    Assert(string.Equals(downloadsModel.ReleaseExperience.GuestGatePrimaryLabel, "Create account to install", StringComparison.Ordinal), "downloads page should keep the signup-first guest gate label.");
     Assert(string.Equals(downloadsModel.ReleaseExperience.KnownIssuesLabel, "Known issues and install help", StringComparison.Ordinal), "downloads page should keep a single known-issues/install-help label for the current preview.");
     Assert(string.Equals(downloadsModel.Manifest.SupportabilityState, "local_docker_proven", StringComparison.Ordinal), "downloads page should preserve registry-owned supportability posture.");
     Assert(string.Equals(downloadsModel.Manifest.ProofStatus, "passed", StringComparison.Ordinal), "downloads page should preserve registry-owned release proof posture.");

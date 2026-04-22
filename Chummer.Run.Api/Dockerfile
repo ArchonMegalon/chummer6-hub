@@ -32,5 +32,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 COPY --from=build /src/chummercomplete/chummer.run-services/.codex-design /app/.codex-design
+COPY chummercomplete/chummer-design/products/chummer/ /app/.codex-design/product/
 ENV ASPNETCORE_URLS=http://+:8080
 ENTRYPOINT ["dotnet", "Chummer.Run.Api.dll"]

@@ -574,48 +574,49 @@ public sealed class InstallLinkingController : ControllerBase
 
     private static string RedactNativeRequestedActionHref(string href)
     {
-        bool absoluteInput = Uri.TryCreate(href, UriKind.Absolute, out Uri? parsedUri);
-        if (!absoluteInput
-            && !Uri.TryCreate($"https://chummer.run{(href.StartsWith("/", StringComparison.Ordinal) ? href : $"/{href}")}", UriKind.Absolute, out parsedUri))
+        string trimmed = href.Trim();
+        string sanitized = trimmed;
+        bool redacted = false;
+        string replacement = Uri.EscapeDataString("[redacted-install-link-secret]");
+
+        foreach (string key in InstallLinkCallbackReservedQueryKeys)
         {
-            return href;
+            int searchIndex = 0;
+            string needle = $"{key}=";
+            while (searchIndex < sanitized.Length)
+            {
+                int keyIndex = sanitized.IndexOf(needle, searchIndex, StringComparison.OrdinalIgnoreCase);
+                if (keyIndex < 0)
+                {
+                    break;
+                }
+
+                if (keyIndex > 0)
+                {
+                    char separator = sanitized[keyIndex - 1];
+                    if (separator != '?' && separator != '&' && separator != '#')
+                    {
+                        searchIndex = keyIndex + needle.Length;
+                        continue;
+                    }
+                }
+
+                int valueStart = keyIndex + needle.Length;
+                int valueEnd = valueStart;
+                while (valueEnd < sanitized.Length
+                    && sanitized[valueEnd] != '&'
+                    && sanitized[valueEnd] != '#')
+                {
+                    valueEnd++;
+                }
+
+                sanitized = $"{sanitized[..valueStart]}{replacement}{sanitized[valueEnd..]}";
+                redacted = true;
+                searchIndex = valueStart + replacement.Length;
+            }
         }
 
-        if (parsedUri is null)
-        {
-            return href;
-        }
-
-        Uri absoluteUri = parsedUri;
-        string sanitizedQuery = SanitizeInstallLinkSecretQueryComponent(
-            absoluteUri.Query,
-            prefix: "?",
-            out bool queryRedacted);
-        string sanitizedFragment = SanitizeInstallLinkSecretQueryComponent(
-            absoluteUri.Fragment,
-            prefix: "#",
-            out bool fragmentRedacted);
-
-        if (!queryRedacted && !fragmentRedacted)
-        {
-            return href;
-        }
-
-        string pathAndQuery = absoluteUri.AbsolutePath;
-        if (!string.IsNullOrEmpty(sanitizedQuery))
-        {
-            pathAndQuery = $"{pathAndQuery}{sanitizedQuery}";
-        }
-
-        string fragment = fragmentRedacted
-            ? sanitizedFragment
-            : absoluteUri.Fragment;
-        if (absoluteInput)
-        {
-            return $"{absoluteUri.Scheme}://{absoluteUri.Authority}{pathAndQuery}{fragment}";
-        }
-
-        return $"{pathAndQuery}{fragment}";
+        return redacted ? sanitized : href;
     }
 
     private static string SanitizeInstallLinkSecretQueryComponent(string component, string prefix, out bool redacted)
@@ -629,17 +630,42 @@ public sealed class InstallLinkingController : ControllerBase
             return component;
         }
 
-        Dictionary<string, string?> sanitizedQuery = new(StringComparer.OrdinalIgnoreCase);
-        foreach (var item in QueryHelpers.ParseQuery(component.Replace(prefix, "?", StringComparison.Ordinal)))
+        string body = component[prefix.Length..];
+        string[] parts = body.Split('&', StringSplitOptions.None);
+        string[] sanitizedParts = new string[parts.Length];
+
+        for (int index = 0; index < parts.Length; index++)
         {
-            if (InstallLinkCallbackReservedQueryKeys.Contains(item.Key))
+            string part = parts[index];
+            if (string.IsNullOrEmpty(part))
             {
-                sanitizedQuery[item.Key] = "[redacted-install-link-secret]";
-                redacted = true;
+                sanitizedParts[index] = part;
                 continue;
             }
 
-            sanitizedQuery[item.Key] = item.Value.ToString();
+            int equalsIndex = part.IndexOf('=');
+            string rawKey = equalsIndex >= 0
+                ? part[..equalsIndex]
+                : part;
+            string decodedKey;
+            try
+            {
+                decodedKey = Uri.UnescapeDataString(rawKey.Replace("+", "%20", StringComparison.Ordinal));
+            }
+            catch (UriFormatException)
+            {
+                decodedKey = rawKey;
+            }
+
+            if (!InstallLinkCallbackReservedQueryKeys.Contains(decodedKey))
+            {
+                sanitizedParts[index] = part;
+                continue;
+            }
+
+            string encodedValue = Uri.EscapeDataString("[redacted-install-link-secret]");
+            sanitizedParts[index] = $"{rawKey}={encodedValue}";
+            redacted = true;
         }
 
         if (!redacted)
@@ -647,13 +673,7 @@ public sealed class InstallLinkingController : ControllerBase
             return component;
         }
 
-        string sanitized = QueryHelpers.AddQueryString(string.Empty, sanitizedQuery);
-        if (string.IsNullOrEmpty(sanitized))
-        {
-            return string.Empty;
-        }
-
-        return $"{prefix}{sanitized.TrimStart('?')}";
+        return $"{prefix}{string.Join("&", sanitizedParts)}";
     }
 
     private static string AppendNativeRouteReceiptDetail(string detail)

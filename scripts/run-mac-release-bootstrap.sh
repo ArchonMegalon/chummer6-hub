@@ -16,7 +16,7 @@ Run this wrapper from a real chummer.run-services checkout, or use one of the ho
     https://chummer.run/downloads/release-upload
 
   Public bootstrap:
-    bash <(curl -fsSL https://chummer.run/artifacts/mac-codex-release-pipeline/bootstrap.sh)
+    bash <(curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.sh)
 EOF
   exit 1
 fi
