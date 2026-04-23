@@ -207,6 +207,7 @@ DEFAULT_REQUIRED_LOCAL_COMMITS = [
     "fdac7b2f",
     "afea8813",
     "badbcbd8",
+    "cfc7ec67",
 ]
 REQUIRED_LOCAL_COMMITS = [
     item.strip()
@@ -839,6 +840,7 @@ REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer6-hub commit da9bb74c pins the blank restore conflict summary proof in the package verifier and commit-resolution test.",
     "/docker/chummercomplete/chummer6-hub commit fdac7b2f tightens the M105 closed queue action guard so Fleet and design queue rows must carry verify_closed_package_only plus the package-specific do-not-reopen reason.",
     "/docker/chummercomplete/chummer6-hub commit afea8813 tightens M105 typed recovery actions for workspace restore and entitlement conflict receipts.",
+    "/docker/chummercomplete/chummer6-hub commit cfc7ec67 tightens M105 restore action route proof so recovery links for workspace and entitlement receipts cannot carry query or fragment secrets.",
     "/docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py fail-closes missing source/proof markers",
     "/docker/chummercomplete/chummer6-hub/tests/test_workspace_restore_queue_frontier_guard.py",
     "python3 scripts/verify_workspace_restore_receipts.py exits 0.",
@@ -973,6 +975,7 @@ QUEUE_STAGING_MARKERS = [
     "/docker/chummercomplete/chummer6-hub commit da9bb74c pins the blank restore conflict summary proof in the package verifier and commit-resolution test.",
     "/docker/chummercomplete/chummer6-hub commit fdac7b2f tightens the M105 closed queue action guard so Fleet and design queue rows must carry verify_closed_package_only plus the package-specific do-not-reopen reason.",
     "/docker/chummercomplete/chummer6-hub commit afea8813 tightens M105 typed recovery actions for workspace restore and entitlement conflict receipts.",
+    "/docker/chummercomplete/chummer6-hub commit cfc7ec67 tightens M105 restore action route proof so recovery links for workspace and entitlement receipts cannot carry query or fragment secrets.",
     "/docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py",
     "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
     "/docker/chummercomplete/chummer6-hub/scripts/ai/verify.sh",
