@@ -18,7 +18,7 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
 
         Assert.Equal("chummer.run.artifact_factory.recipe_job.v1", catalog.ContractName);
         Assert.Equal("2026-04-15", catalog.RecipeVersion);
-        Assert.Equal(["fix", "publication", "release", "support"], catalog.Recipes.Select(recipe => recipe.Family).ToArray());
+        Assert.Equal(["campaign_cold_open", "fix", "mission_briefing", "publication", "release", "support"], catalog.Recipes.Select(recipe => recipe.Family).ToArray());
         Assert.Contains(catalog.Recipes, recipe =>
             string.Equals(recipe.Family, "release", StringComparison.Ordinal)
             && string.Equals(recipe.RecipeId, "release-proof-shelf-bundle", StringComparison.Ordinal)
@@ -35,6 +35,18 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
             string.Equals(recipe.Family, "publication", StringComparison.Ordinal)
             && recipe.AllowedSourceKinds.Contains("creator_publication")
             && recipe.RequiredReceiptPrefixes.Contains("moderation"));
+        Assert.Contains(catalog.Recipes, recipe =>
+            string.Equals(recipe.Family, "campaign_cold_open", StringComparison.Ordinal)
+            && string.Equals(recipe.RecipeId, "campaign-cold-open-bundle", StringComparison.Ordinal)
+            && recipe.AllowedSourceKinds.Contains("campaign_primer")
+            && recipe.RequiredReceiptPrefixes.Contains("audience")
+            && recipe.RequiredReceiptPrefixes.Contains("locale"));
+        Assert.Contains(catalog.Recipes, recipe =>
+            string.Equals(recipe.Family, "mission_briefing", StringComparison.Ordinal)
+            && string.Equals(recipe.RecipeId, "mission-briefing-reel", StringComparison.Ordinal)
+            && recipe.AllowedSourceKinds.Contains("mission_pack")
+            && recipe.RequiredReceiptPrefixes.Contains("audience")
+            && recipe.RequiredReceiptPrefixes.Contains("locale"));
     }
 
     [Fact]

@@ -533,16 +533,13 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             launcher_path.write_text(
                 launcher_text.replace(
                     "    source_pack_ids = normalize_string_list(response.get(\"sourcePackIds\"), \"sourcePackIds\")\n"
-                    "    expected_source_pack_ids = sorted(\n"
-                    "        {\n"
-                    "            source_pack[\"sourcePackId\"].strip()\n"
-                    "            for source_pack in normalized_payload[\"sourcePacks\"]\n"
-                    "            if isinstance(source_pack, dict) and isinstance(source_pack.get(\"sourcePackId\"), str) and source_pack[\"sourcePackId\"].strip()\n"
-                    "        }\n"
+                    "    expected_source_pack_ids = expected_source_pack_ids_for_families(\n"
+                    "        expected_required_families,\n"
+                    "        normalized_payload,\n"
                     "    )\n"
                     "    if source_pack_ids != expected_source_pack_ids:\n"
                     "        raise LaunchValidationError(\n"
-                    "            \"artifact-factory source-pack batch response sourcePackIds must match the launch request sourcePackIds.\"\n"
+                    "            \"artifact-factory source-pack batch response sourcePackIds must match the launch request source packs for the requested recipe families.\"\n"
                     "        )\n\n",
                     "",
                 ),
@@ -562,7 +559,41 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             )
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("launch request sourcePackIds", result.stderr)
+        self.assertIn("requested recipe families", result.stderr)
+
+    def test_verifier_fails_closed_when_source_pack_batch_response_job_shape_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-source-pack-response-jobs-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            launcher_path = temp_root / "scripts/launch_artifact_factory_source_pack_batch.py"
+            launcher_text = launcher_path.read_text(encoding="utf-8")
+            launcher_path.write_text(
+                launcher_text.replace(
+                    "    validate_job_response_shape(response, expected_required_families, job_ids)\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("validate_job_response_shape(response, expected_required_families, job_ids)", result.stderr)
 
     def test_verifier_fails_closed_when_batch_stable_segment_guard_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-batch-id-proof-") as temp_dir:
@@ -745,6 +776,80 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("ListRecipes", result.stderr)
+
+    def test_verifier_fails_closed_when_campaign_recipes_are_filtered_from_catalog(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-campaign-catalog-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "        ArtifactFactoryRecipeDefinition[] recipes = Recipes\n"
+                    "            .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)\n",
+                    "        ArtifactFactoryRecipeDefinition[] recipes = Recipes\n"
+                    "            .Where(static item => DefaultBatchFamilies.Contains(item.Key))\n"
+                    "            .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)\n",
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ListRecipes must publish campaign_cold_open and mission_briefing recipes", result.stderr)
+
+    def test_verifier_fails_closed_when_campaign_surface_shelf_shape_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="artifact-factory-campaign-shelf-proof-") as temp_dir:
+            temp_root = Path(temp_dir)
+            for relative_path in SOURCE_FILES:
+                source = REPO_ROOT / relative_path
+                target = temp_root / relative_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(source, target)
+
+            service_path = temp_root / "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    '&& !HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/campaigns/", "cold-open", allowBundlesSuffix: true)',
+                    '&& !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/campaigns/", allowBundlesSuffix: true)',
+                ).replace(
+                    '&& !HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/missions/", "briefing", allowBundlesSuffix: true)',
+                    '&& !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/missions/", allowBundlesSuffix: true)',
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_ARTIFACT_FACTORY_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("HasResourceSurfaceShelfAnchorShape", result.stderr)
 
     def test_verifier_fails_closed_when_release_bundle_public_route_is_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="artifact-factory-release-route-proof-") as temp_dir:
@@ -1235,6 +1340,7 @@ class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):
             service_path.write_text(
                 service_text.replace(
                     "            return Recipes.Keys\n"
+                    "                .Where(static family => DefaultBatchFamilies.Contains(family))\n"
                     "                .Order(StringComparer.OrdinalIgnoreCase)\n"
                     "                .ToArray();\n",
                     "            return [];\n",

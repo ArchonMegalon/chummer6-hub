@@ -200,7 +200,6 @@ public sealed class ArtifactFactoryOrchestrationService
     public ArtifactFactoryRecipeCatalogResult ListRecipes()
     {
         ArtifactFactoryRecipeDefinition[] recipes = Recipes
-            .Where(static item => DefaultBatchFamilies.Contains(item.Key))
             .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
             .Select(static item => new ArtifactFactoryRecipeDefinition(
                 Family: item.Key,
@@ -1080,17 +1079,17 @@ public sealed class ArtifactFactoryOrchestrationService
         }
 
         if (family.Equals("campaign_cold_open", StringComparison.OrdinalIgnoreCase)
-            && !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/campaigns/", allowBundlesSuffix: true))
+            && !HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/campaigns/", "cold-open", allowBundlesSuffix: true))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe campaign public proof shelf {fieldName} '{publicShelfRef}'; campaign cold-open anchors must resolve to one campaign segment with an optional bundles shelf.");
+                $"source pack '{sourcePackId}' has unsafe campaign public proof shelf {fieldName} '{publicShelfRef}'; campaign cold-open anchors must resolve to /artifacts/campaigns/{{campaignId}}/cold-open with an optional bundles shelf.");
         }
 
         if (family.Equals("mission_briefing", StringComparison.OrdinalIgnoreCase)
-            && !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/missions/", allowBundlesSuffix: true))
+            && !HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/missions/", "briefing", allowBundlesSuffix: true))
         {
             throw new InvalidDataException(
-                $"source pack '{sourcePackId}' has unsafe mission public proof shelf {fieldName} '{publicShelfRef}'; mission briefing anchors must resolve to one mission segment with an optional bundles shelf.");
+                $"source pack '{sourcePackId}' has unsafe mission public proof shelf {fieldName} '{publicShelfRef}'; mission briefing anchors must resolve to /artifacts/missions/{{missionId}}/briefing with an optional bundles shelf.");
         }
     }
 
@@ -1115,6 +1114,28 @@ public sealed class ArtifactFactoryOrchestrationService
             || (allowBundlesSuffix
                 && segments.Length == 2
                 && segments[1].Equals("bundles", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool HasResourceSurfaceShelfAnchorShape(string publicShelfRef, string prefix, string surfaceSegment, bool allowBundlesSuffix)
+    {
+        if (!publicShelfRef.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string remainder = publicShelfRef[prefix.Length..].Trim('/');
+        if (string.IsNullOrWhiteSpace(remainder))
+        {
+            return false;
+        }
+
+        string[] segments = remainder.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        return segments.Length == 2
+            && segments[1].Equals(surfaceSegment, StringComparison.OrdinalIgnoreCase)
+            || (allowBundlesSuffix
+                && segments.Length == 3
+                && segments[1].Equals(surfaceSegment, StringComparison.OrdinalIgnoreCase)
+                && segments[2].Equals("bundles", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void RejectUnsafePublicPathId(string sourcePackId, string? value, string fieldName)

@@ -14,6 +14,117 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "launch_artifact_factory_source_pack_batch.py"
 
 
+def release_media_request() -> dict[str, object]:
+    return {
+        "recipeId": "release-proof-shelf-bundle",
+        "requiredReceiptRefs": [
+            "release:run-20260415",
+            "promotion:startup-smoke:avalonia-linux-x64",
+            "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+        ],
+        "publicProofShelfRefs": ["/artifacts/release-bundles/avalonia-linux-x64-installer"],
+        "approvedSourcePacks": [
+            {
+                "sourcePackId": "release-pack-20260415",
+                "sourcePackKind": "desktop_release",
+                "provenanceRef": "release-channel:preview:run-20260415",
+                "evidenceRefs": [
+                    "release:run-20260415",
+                    "promotion:startup-smoke:avalonia-linux-x64",
+                    "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                ],
+                "releaseArtifactId": "avalonia-linux-x64-installer",
+            }
+        ],
+        "outputBindings": [
+            {
+                "format": "preview_card",
+                "publicRef": "/artifacts/release-bundles/avalonia-linux-x64-installer/preview_card",
+            }
+        ],
+    }
+
+
+def support_media_request(include_release_pack: bool = False) -> dict[str, object]:
+    approved_source_packs: list[dict[str, object]] = []
+    if include_release_pack:
+        approved_source_packs.append(
+            {
+                "sourcePackId": "release-pack-20260415",
+                "sourcePackKind": "release",
+                "provenanceRef": "release-channel:preview:run-20260415",
+                "evidenceRefs": [
+                    "release:run-20260415",
+                    "promotion:startup-smoke:avalonia-linux-x64",
+                    "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                ],
+                "releaseArtifactId": "avalonia-linux-x64-installer",
+            }
+        )
+
+    approved_source_packs.append(
+        {
+            "sourcePackId": "support-pack-11709",
+            "sourcePackKind": "support_case",
+            "provenanceRef": "support-case:11709",
+            "evidenceRefs": [
+                "support:11709",
+                "privacy:redacted",
+                "install:preview",
+            ],
+            "supportCaseId": "11709",
+        }
+    )
+
+    return {
+        "recipeId": "support-case-proof-packet",
+        "requiredReceiptRefs": [
+            "support:11709",
+            "privacy:redacted",
+            "install:preview",
+        ],
+        "publicProofShelfRefs": ["/account/support-packets/11709"],
+        "approvedSourcePacks": approved_source_packs,
+        "outputBindings": [
+            {
+                "format": "packet",
+                "publicRef": "/account/support-packets/11709/packet",
+            }
+        ],
+    }
+
+
+def publication_media_request() -> dict[str, object]:
+    return {
+        "recipeId": "publication-proof-shelf-bundle",
+        "requiredReceiptRefs": [
+            "publication:redmond-brief:v3",
+            "moderation:approved:redmond-brief",
+            "public-shelf:/artifacts/publications/redmond-brief",
+        ],
+        "publicProofShelfRefs": ["/artifacts/publications/redmond-brief/bundles"],
+        "approvedSourcePacks": [
+            {
+                "sourcePackId": "publication-pack-redmond-brief",
+                "sourcePackKind": "publication",
+                "provenanceRef": "publication:redmond-brief:v3",
+                "evidenceRefs": [
+                    "publication:redmond-brief:v3",
+                    "moderation:approved:redmond-brief",
+                    "public-shelf:/artifacts/publications/redmond-brief",
+                ],
+                "publicationId": "redmond-brief",
+            }
+        ],
+        "outputBindings": [
+            {
+                "format": "caption",
+                "publicRef": "/artifacts/publications/redmond-brief/bundles/caption",
+            }
+        ],
+    }
+
+
 class _RecordingHandler(BaseHTTPRequestHandler):
     expected_methods_by_path = {
         "/api/internal/artifact-factory/recipes": "GET",
@@ -79,7 +190,7 @@ class _RecordingHandler(BaseHTTPRequestHandler):
             "jobIds": ["artifact-job-release-12345678"],
             "sourcePackIds": ["release-pack-20260415"],
             "jobs": [{"jobId": "artifact-job-release-12345678", "family": "release"}],
-            "mediaFactoryRequests": [{"recipeId": "release-proof-shelf-bundle"}],
+            "mediaFactoryRequests": [release_media_request()],
         },
     }
     requests: list[dict[str, object]] = []
@@ -188,7 +299,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "jobIds": ["artifact-job-release-12345678"],
                 "sourcePackIds": ["release-pack-20260415"],
                 "jobs": [{"jobId": "artifact-job-release-12345678", "family": "release"}],
-                "mediaFactoryRequests": [{"recipeId": "release-proof-shelf-bundle"}],
+                "mediaFactoryRequests": [release_media_request()],
             },
         }
         _RecordingHandler.requests = []
@@ -266,7 +377,7 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "jobIds": ["artifact-job-release-12345678"],
                 "sourcePackIds": ["release-pack-20260415"],
                 "jobs": [{"jobId": "artifact-job-release-12345678", "family": "release"}],
-                "mediaFactoryRequests": [{"recipeId": "release-proof-shelf-bundle"}],
+                "mediaFactoryRequests": [release_media_request()],
             },
             json.loads(result.stdout),
         )
@@ -563,7 +674,67 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("sourcePackIds", result.stderr)
-        self.assertIn("launch request sourcePackIds", result.stderr)
+        self.assertIn("requested recipe families", result.stderr)
+
+    def test_accepts_family_scoped_source_pack_ids_when_request_contains_extra_approved_packs(self) -> None:
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
+            **_RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"],
+            "sourcePackIds": ["release-pack-20260415"],
+        }
+        payload = {
+            "batchId": "next90-m107-source-pack-wave",
+            "requestedBy": "fleet.release",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "release-pack-20260415",
+                    "sourcePackKind": "desktop_release",
+                    "approvalState": "approved",
+                    "provenanceRef": "release-channel:preview:run-20260415",
+                    "evidenceRefs": [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                    ],
+                    "releaseArtifactId": "avalonia-linux-x64-installer",
+                },
+                {
+                    "sourcePackId": "support-pack-11709",
+                    "sourcePackKind": "support_case",
+                    "approvalState": "approved",
+                    "provenanceRef": "support-case:11709",
+                    "evidenceRefs": [
+                        "support:11709",
+                        "privacy:redacted",
+                        "install:preview",
+                    ],
+                    "supportCaseId": "11709",
+                },
+            ],
+            "requiredFamilies": ["release"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(["release"], _RecordingHandler.requests[1]["body"]["requiredFamilies"])
+        self.assertEqual(["release-pack-20260415"], json.loads(result.stdout)["sourcePackIds"])
 
     def test_fails_when_batch_response_recipe_ids_drift_from_required_families(self) -> None:
         _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
@@ -728,6 +899,100 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("jobIds length must match jobCount", result.stderr)
 
+    def test_fails_when_batch_response_job_ids_drift_from_jobs(self) -> None:
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
+            **_RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"],
+            "jobIds": ["artifact-job-release-different"],
+        }
+        payload = {
+            "batchId": "next90-m107-source-pack-wave",
+            "requestedBy": "fleet.release",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "release-pack-20260415",
+                    "sourcePackKind": "desktop_release",
+                    "approvalState": "approved",
+                    "provenanceRef": "release-channel:preview:run-20260415",
+                    "evidenceRefs": [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                    ],
+                    "releaseArtifactId": "avalonia-linux-x64-installer",
+                }
+            ],
+            "requiredFamilies": ["release"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("jobs jobId values must match response jobIds", result.stderr)
+
+    def test_fails_when_batch_response_job_families_drift_from_request(self) -> None:
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
+            **_RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"],
+            "jobs": [{"jobId": "artifact-job-release-12345678", "family": "support"}],
+        }
+        payload = {
+            "batchId": "next90-m107-source-pack-wave",
+            "requestedBy": "fleet.release",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "release-pack-20260415",
+                    "sourcePackKind": "desktop_release",
+                    "approvalState": "approved",
+                    "provenanceRef": "release-channel:preview:run-20260415",
+                    "evidenceRefs": [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                    ],
+                    "releaseArtifactId": "avalonia-linux-x64-installer",
+                }
+            ],
+            "requiredFamilies": ["release"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("jobs family values must match the launch request requiredFamilies", result.stderr)
+
     def test_fails_when_batch_response_media_factory_requests_length_drifts_from_job_count(self) -> None:
         _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
             **_RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"],
@@ -810,9 +1075,9 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 {"jobId": "artifact-job-support-12345678", "family": "support"},
             ],
             "mediaFactoryRequests": [
-                {"recipeId": "publication-proof-shelf-bundle"},
-                {"recipeId": "release-proof-shelf-bundle"},
-                {"recipeId": "support-case-proof-packet"},
+                publication_media_request(),
+                release_media_request(),
+                support_media_request(include_release_pack=True),
             ],
         }
         payload = {
@@ -1445,6 +1710,41 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(1, len(_RecordingHandler.requests))
         self.assertIn("must include evidenceRef 'locale:de-AT'", result.stderr)
+
+    def test_fails_campaign_briefing_preflight_when_public_shelf_skips_surface(self) -> None:
+        payload = {
+            "batchId": "next90-m108-campaign-briefing-wave",
+            "requestedBy": "campaign.ops",
+            "audience": "players",
+            "locale": "de-AT",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "campaign-primer-redmond-01",
+                    "sourcePackKind": "campaign_primer",
+                    "approvalState": "approved",
+                    "provenanceRef": "campaign:redmond-01:primer:v2",
+                    "evidenceRefs": ["campaign:redmond-01", "primer:approved:redmond-01", "audience:players", "locale:de-AT"],
+                    "publicShelfRef": "/artifacts/campaigns/redmond-01",
+                    "audience": "players",
+                    "locale": "de-AT",
+                }
+            ],
+            "requiredFamilies": ["campaign_cold_open"],
+        }
+
+        result = subprocess.run(
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(1, len(_RecordingHandler.requests))
+        self.assertIn("/artifacts/campaigns/{id}/cold-open", result.stderr)
 
     def test_fails_closed_without_internal_token(self) -> None:
         env = os.environ.copy()
