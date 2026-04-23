@@ -158,6 +158,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer6-hub commit 554cd159 pins M102 native receipt proof floor.",
     "      - /docker/chummercomplete/chummer6-hub commit 8e0a630e pins M102 current proof floor guard.",
     "      - /docker/chummercomplete/chummer6-hub commit 47a831ba hardens claimed install continuation action sanitization so trusted native absolute actions survive while query and fragment install-link secrets are redacted from support continuation receipts.",
+    "      - /docker/chummercomplete/chummer6-hub commit 9c0f3c17 pins the M102 receipt route proof citation.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -313,6 +314,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer6-hub commit 554cd159 pins M102 native receipt proof floor.",
     "          - /docker/chummercomplete/chummer6-hub commit 8e0a630e pins M102 current proof floor guard.",
     "          - /docker/chummercomplete/chummer6-hub commit 47a831ba hardens claimed install continuation action sanitization so trusted native absolute actions survive while query and fragment install-link secrets are redacted from support continuation receipts.",
+    "          - /docker/chummercomplete/chummer6-hub commit 9c0f3c17 pins the M102 receipt route proof citation.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -386,11 +388,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("47a831ba", verifier._current_local_proof_floor_commit())
+        self.assertEqual("9c0f3c17", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "fix(hub): harden claimed install continuation actions",
+            "fix(hub): pin M102 receipt route proof citation",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("9c0f3c17", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("47a831ba", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("554cd159", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("9e7d12ef", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -463,6 +466,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         )
         self.assertTrue(
             any("commit 47a831ba hardens claimed install continuation action sanitization" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        )
+        self.assertTrue(
+            any("commit 9c0f3c17 pins the M102 receipt route proof citation" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        )
+        self.assertTrue(
+            any("commit 9c0f3c17 pins the M102 receipt route proof citation" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -2896,6 +2905,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "554cd159",
                 "8e0a630e",
                 "47a831ba",
+                "9c0f3c17",
             ],
             verifier._required_resolving_commits(),
         )
