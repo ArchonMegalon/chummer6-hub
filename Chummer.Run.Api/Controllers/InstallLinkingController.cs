@@ -708,19 +708,16 @@ public sealed class InstallLinkingController : ControllerBase
             if (index + 2 < body.Length
                 && current == '%'
                 && (body.AsSpan(index, 3).Equals("%26", StringComparison.OrdinalIgnoreCase)
+                    || body.AsSpan(index, 3).Equals("%23", StringComparison.OrdinalIgnoreCase)
                     || body.AsSpan(index, 3).Equals("%3B", StringComparison.OrdinalIgnoreCase)))
             {
                 return (index, 3);
             }
 
             if (index + 4 < body.Length
-                && body.AsSpan(index, 5).Equals("%2526", StringComparison.OrdinalIgnoreCase))
-            {
-                return (index, 5);
-            }
-
-            if (index + 4 < body.Length
-                && body.AsSpan(index, 5).Equals("%253B", StringComparison.OrdinalIgnoreCase))
+                && (body.AsSpan(index, 5).Equals("%2526", StringComparison.OrdinalIgnoreCase)
+                    || body.AsSpan(index, 5).Equals("%2523", StringComparison.OrdinalIgnoreCase)
+                    || body.AsSpan(index, 5).Equals("%253B", StringComparison.OrdinalIgnoreCase)))
             {
                 return (index, 5);
             }
