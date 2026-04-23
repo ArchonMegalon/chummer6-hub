@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -16,6 +17,29 @@ COMPLETION_ACTION = "verify_closed_package_only"
 OWNED_SURFACES = ["install_aware_support_concierge", "release_concierge:hub"]
 DESIGN_OWNED_SURFACES = [*OWNED_SURFACES, "public_concierge_wrapper:hub"]
 ALLOWED_PATHS = ["Chummer.Run.Api", "scripts", "tests"]
+FORBIDDEN_PROOF_MARKERS = [
+    "TASK_LOCAL_TELEMETRY",
+    "ACTIVE_RUN_HANDOFF",
+    "/var/lib/codex-fleet",
+    "active-run helper",
+    "active-run helper command",
+    "active-run helper commands",
+    "operator telemetry",
+    "operator/OODA loop",
+    "run_ooda_design_supervisor_until_quiet",
+    "ooda_design_supervisor.py",
+    "supervisor status",
+    "status query",
+    "status_query_supported",
+    "polling_disabled",
+    "task-local telemetry",
+    "shard runtime handoff",
+    "first_commands",
+    "frontier_briefs",
+    "successor frontier detail",
+    "assigned successor queue package",
+    "execution rules inside this run",
+]
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_SUPPORT_CONCIERGE_ROOT", DEFAULT_ROOT))
@@ -221,6 +245,7 @@ def verify_queue_authority(
         missing.append(f"{label} {PACKAGE_ID} allowed_paths drifted: {path}")
     if item.get("owned_surfaces") != expected_owned_surfaces:
         missing.append(f"{label} {PACKAGE_ID} owned_surfaces drifted: {path}")
+    verify_no_forbidden_proof_markers(missing, item, f"{label} {PACKAGE_ID}")
 
 
 def verify_successor_registry(missing: list[str], path: Path) -> None:
@@ -256,6 +281,43 @@ def verify_successor_registry(missing: list[str], path: Path) -> None:
     title = str(task_matches[0].get("title") or "")
     if "Emit install-aware support and release concierge packets" not in title:
         missing.append(f"successor registry task 111.1 title drifted: {path}")
+    verify_no_forbidden_proof_markers(missing, task_matches[0], "successor registry task 111.1")
+
+
+def verify_no_forbidden_proof_markers(missing: list[str], value: object, label: str) -> None:
+    for marker in forbidden_markers_in_value(value):
+        missing.append(f"{label} has forbidden active-run proof marker: {marker}")
+
+
+def forbidden_markers_in_value(value: object) -> list[str]:
+    if isinstance(value, dict):
+        markers: list[str] = []
+        for child in value.values():
+            markers.extend(forbidden_markers_in_value(child))
+        return sorted(set(markers), key=str.casefold)
+    if isinstance(value, list):
+        markers = []
+        for child in value:
+            markers.extend(forbidden_markers_in_value(child))
+        return sorted(set(markers), key=str.casefold)
+    if isinstance(value, str):
+        return forbidden_markers_in_text(value)
+    return []
+
+
+def forbidden_markers_in_text(value: str) -> list[str]:
+    folded = value.casefold()
+    normalized = normalize_marker_text(value)
+    matches: list[str] = []
+    for marker in FORBIDDEN_PROOF_MARKERS:
+        marker_folded = marker.casefold()
+        if marker_folded in folded or normalize_marker_text(marker) in normalized:
+            matches.append(marker)
+    return matches
+
+
+def normalize_marker_text(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
 
 
 if __name__ == "__main__":
