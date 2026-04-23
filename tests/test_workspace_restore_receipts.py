@@ -326,6 +326,36 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
         self.assertIn("VerifyRestoreReceiptStatusEmitsTypedRecoveryActions", result.stderr)
 
+    def test_verifier_fails_closed_when_receipt_recovery_links_allow_query_or_fragment_secrets(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-route-secrets-") as temp_dir:
+            temp_root = Path(temp_dir)
+            view_path = temp_root / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
+            view_path.parent.mkdir(parents=True)
+            source_view_path = REPO_ROOT / "Chummer.Run.Api" / "Views" / "Accounts" / "Account.cshtml"
+            view_path.write_text(
+                source_view_path.read_text(encoding="utf-8")
+                .replace("            && !route.Contains('?', StringComparison.Ordinal)\n", "", 1)
+                .replace("            && !route.Contains('#', StringComparison.Ordinal);\n", "", 1),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Account.cshtml", result.stderr)
+        self.assertIn("!route.Contains('?', StringComparison.Ordinal)", result.stderr)
+        self.assertIn("!route.Contains('#', StringComparison.Ordinal)", result.stderr)
+
     def test_verifier_fails_closed_when_surface_breakdown_contracts_are_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-breakdown-") as temp_dir:
             temp_root = Path(temp_dir)

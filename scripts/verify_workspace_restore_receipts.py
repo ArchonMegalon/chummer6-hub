@@ -484,6 +484,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "Restore provenance and conflict receipts",
         "!route.StartsWith(\"//\", StringComparison.Ordinal)",
         "!route.Contains('\\\\', StringComparison.Ordinal)",
+        "!route.Contains('?', StringComparison.Ordinal)",
+        "!route.Contains('#', StringComparison.Ordinal)",
         "selectedWorkspaceServerPlane.RestoreReceiptSurfaces.Count > 0",
         "entitlementSyncReceipts.ReceiptSurfaces.Count > 0",
         "entitlementSyncReceipts.ReceiptStatus.RecoveryActions.Count > 0",
