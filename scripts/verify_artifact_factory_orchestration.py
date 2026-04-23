@@ -436,6 +436,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "commit 67ae7dab",
         "commit 65ac67a8",
         "commit e0121780",
+        "commit 700343bc",
         "test_verifier_fails_closed_when_proof_commit_anchor_is_not_on_current_branch",
         "test_verifier_fails_closed_when_branch_guard_commit_pin_is_missing",
         "test_verifier_fails_closed_when_output_shelf_pin_commit_is_missing",
@@ -471,6 +472,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "test_verifier_fails_closed_when_latest_refreshed_guard_floor_pin_is_missing",
         "test_verifier_fails_closed_when_pinned_refreshed_proof_floor_is_missing",
         "test_verifier_fails_closed_when_external_uri_guard_proof_floor_is_missing",
+        "test_verifier_fails_closed_when_current_format_scope_proof_floor_is_missing",
         "test_verifier_fails_closed_when_exact_provider_token_guard_is_removed",
         "test_verifier_fails_closed_when_provider_token_segment_guard_is_removed",
         "test_verifier_fails_closed_when_release_bundle_public_route_is_removed",
@@ -534,6 +536,7 @@ QUEUE_MARKERS = [
     "/docker/chummercomplete/chummer6-hub commit e0121780 tightens M107 artifact factory external URI guard",
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof",
+    "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
 ]
 
@@ -584,6 +587,7 @@ SUCCESSOR_REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer6-hub commit e0121780 tightens M107 artifact factory external URI guard",
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof",
+    "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor",
     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
     "/docker/chummercomplete/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py preflights approved source-pack batches against the internal recipe catalog before launch.",
@@ -683,6 +687,7 @@ REQUIRED_QUEUE_PROOF = {
     "/docker/chummercomplete/chummer6-hub commit e0121780 tightens M107 artifact factory external URI guard.",
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof.",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof.",
+    "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
 }
 REQUIRED_REGISTRY_EVIDENCE = {
@@ -729,6 +734,7 @@ REQUIRED_REGISTRY_EVIDENCE = {
     "/docker/chummercomplete/chummer6-hub commit e0121780 tightens M107 artifact factory external URI guard.",
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof.",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof.",
+    "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
