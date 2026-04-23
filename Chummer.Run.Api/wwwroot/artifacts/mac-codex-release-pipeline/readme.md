@@ -6,22 +6,29 @@ Purpose: let a Codex session running on a Mac build a public-ready desktop artif
 
 Signed-in prompt-safe path:
 
-1. Open `https://chummer.run/downloads/release-upload`
-2. Copy the generated one-liner
-3. Paste it into the Mac shell
-
-That signed-in handoff is the source of truth for live publication because it serves the current hosted bootstrap, pins the bootstrap digest in the one-liner, and keeps the short-lived upload handoff code off the command line.
-The bootstrap file itself now carries the pinned repo refs, so the signed-in, public curl, and repo-local wrapper paths all execute the same pinned checkout plan.
-
-Public bootstrap path:
+1. Run:
 
 ```bash
-bash <(curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.sh)
+curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.command | bash
 ```
+
+If that call returns an auth error, open `https://chummer.run/downloads/release-upload` in a signed-in browser once, then rerun.
+
+That signed-in handoff is the source of truth for live publication because it serves the current hosted bootstrap, pins the bootstrap digest in the one-liner, and pre-authenticates the short-lived upload handoff in the generated command.
+The bootstrap file itself now carries the pinned repo refs, so the signed-in, public curl, and repo-local wrapper paths all execute the same pinned checkout plan.
 
 Repo-local checkout path, if you already cloned `chummer.run-services` somewhere on the Mac:
 
 ```bash
+repo_root="$(git rev-parse --show-toplevel)"
+bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
+```
+
+If `CHUMMER_RELEASE_UPLOAD_TOKEN` (or `CHUMMER_RELEASE_UPLOAD_TOKEN_FILE`) is set, the wrapper runs fully non-interactive and never prompts for input.
+
+```bash
+export CHUMMER_RELEASE_UPLOAD_TOKEN=...            # or CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=/path/to/token
+export CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=
 repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 ```
@@ -72,7 +79,10 @@ Optional overrides:
 export CHUMMER_RELEASE_UPLOAD_URL="https://chummer.run/api/internal/releases/bundles"
 export CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL="https://chummer.run/downloads/RELEASE_CHANNEL.generated.json"
 export CHUMMER_RELEASE_UPLOAD_TICKET=""                # optional interactive handoff code override for non-prompted runs
+export CHUMMER_RELEASE_UPLOAD_TICKET_FILE=""           # optional path to a one-line handoff code file
+export CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=""            # optional path to a one-line bearer token file
 export CHUMMER_RELEASE_UPLOAD_TOKEN=""                 # optional explicit bearer token for CI or non-interactive runs
+export CHUMMER_BOOTSTRAP_FORCE_LOCAL="0"               # set to 1 to force repo-local bootstrap execution (legacy behavior)
 export CHUMMER_RELEASE_CHANNEL="preview"
 export CHUMMER_RELEASE_APP="avalonia,blazor-desktop"
 export CHUMMER_RELEASE_RID="osx-arm64"
@@ -117,7 +127,7 @@ Notes:
 2. The signed-in one-liner pins the hosted bootstrap SHA-256 before execution. Refresh the handoff page instead of bypassing the digest check.
 3. The fetched bootstrap now pins the repo refs to expected commits and fails closed if a fetched branch head no longer matches the signed-in handoff.
 4. The bootstrap starts with `umask 077`, so temp files and directories default to operator-only permissions.
-5. The signed-in handoff code is copied separately and pasted only when the bootstrap prompts for it, so it never lands in shell history or in the fetched bootstrap file.
+5. The signed-in handoff code is embedded in the generated one-liner so the bootstrap initializes authentication non-interactively, and token material is never written into the fetched bootstrap file.
 6. Upload auth now goes through a `0600` temp curl config file without passing the token through a long-lived shell variable or `curl` argv entry.
 7. `dist/release-upload-response.json` is sensitive because it can contain signed-in claim data. The bootstrap keeps it mode `0600` and deletes it by default after a successful run unless `CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE=1`.
 8. Local proof files are the default path. Remote proof or gate URLs are ignored unless `CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS=1`.
