@@ -12,6 +12,7 @@ PACKAGE_ID = "next90-m111-hub-support-concierge"
 FRONTIER_ID = 2746902416
 MILESTONE_ID = 111
 OWNED_SURFACES = ["install_aware_support_concierge", "release_concierge:hub"]
+DESIGN_OWNED_SURFACES = [*OWNED_SURFACES, "public_concierge_wrapper:hub"]
 ALLOWED_PATHS = ["Chummer.Run.Api", "scripts", "tests"]
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +21,12 @@ QUEUE_STAGING_PATH = Path(
     os.environ.get(
         "CHUMMER_SUPPORT_CONCIERGE_QUEUE_STAGING",
         "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+    )
+)
+DESIGN_QUEUE_STAGING_PATH = Path(
+    os.environ.get(
+        "CHUMMER_SUPPORT_CONCIERGE_DESIGN_QUEUE_STAGING",
+        "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
     )
 )
 SUCCESSOR_REGISTRY_PATH = Path(
@@ -102,7 +109,22 @@ def main() -> int:
             if marker not in text:
                 missing.append(f"{relative_path}: missing marker {marker!r}")
 
-    verify_queue_authority(missing, QUEUE_STAGING_PATH, "Fleet queue")
+    verify_queue_authority(
+        missing,
+        QUEUE_STAGING_PATH,
+        "Fleet queue",
+        expected_title="Emit install-aware release and support concierge packets from installed-build truth",
+        expected_task="Compile support closure and release explainer packets from installed build, channel, and support-case truth.",
+        expected_owned_surfaces=OWNED_SURFACES,
+    )
+    verify_queue_authority(
+        missing,
+        DESIGN_QUEUE_STAGING_PATH,
+        "design queue",
+        expected_title="Emit install-aware release, support, and public concierge packets from installed-build truth",
+        expected_task="Compile support closure and release explainer packets, plus public trust wrapper flows with first-party fallbacks, from installed build, channel, and support-case truth.",
+        expected_owned_surfaces=DESIGN_OWNED_SURFACES,
+    )
     verify_successor_registry(missing, SUCCESSOR_REGISTRY_PATH)
 
     if missing:
@@ -114,7 +136,15 @@ def main() -> int:
     return 0
 
 
-def verify_queue_authority(missing: list[str], path: Path, label: str) -> None:
+def verify_queue_authority(
+    missing: list[str],
+    path: Path,
+    label: str,
+    *,
+    expected_title: str,
+    expected_task: str,
+    expected_owned_surfaces: list[str],
+) -> None:
     if not path.is_file():
         missing.append(f"{label} is missing: {path}")
         return
@@ -132,8 +162,8 @@ def verify_queue_authority(missing: list[str], path: Path, label: str) -> None:
         "repo": "chummer6-hub",
         "milestone_id": MILESTONE_ID,
         "wave": "W9",
-        "title": "Emit install-aware release and support concierge packets from installed-build truth",
-        "task": "Compile support closure and release explainer packets from installed build, channel, and support-case truth.",
+        "title": expected_title,
+        "task": expected_task,
     }
     for key, value in expected.items():
         if item.get(key) != value:
@@ -144,7 +174,7 @@ def verify_queue_authority(missing: list[str], path: Path, label: str) -> None:
         missing.append(f"{label} {PACKAGE_ID} status must be 'in_progress' or 'complete': {path}")
     if item.get("allowed_paths") != ALLOWED_PATHS:
         missing.append(f"{label} {PACKAGE_ID} allowed_paths drifted: {path}")
-    if item.get("owned_surfaces") != OWNED_SURFACES:
+    if item.get("owned_surfaces") != expected_owned_surfaces:
         missing.append(f"{label} {PACKAGE_ID} owned_surfaces drifted: {path}")
 
 

@@ -106,6 +106,44 @@ items:
         self.assertIn("frontier_id must be 2746902416", result.stderr)
         self.assertIn("status must be 'in_progress' or 'complete'", result.stderr)
 
+    def test_verifier_fails_when_design_queue_public_wrapper_surface_drifts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-design-queue-") as temp_dir:
+            queue_path = Path(temp_dir) / "design-queue.yaml"
+            queue_path.write_text(
+                """
+items:
+  - title: Emit install-aware release, support, and public concierge packets from installed-build truth
+    task: Compile support closure and release explainer packets, plus public trust wrapper flows with first-party fallbacks, from installed build, channel, and support-case truth.
+    package_id: next90-m111-hub-support-concierge
+    milestone_id: 111
+    frontier_id: 2746902416
+    wave: W9
+    repo: chummer6-hub
+    status: complete
+    allowed_paths:
+      - Chummer.Run.Api
+      - scripts
+      - tests
+    owned_surfaces:
+      - install_aware_support_concierge
+      - release_concierge:hub
+""",
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env["CHUMMER_SUPPORT_CONCIERGE_DESIGN_QUEUE_STAGING"] = str(queue_path)
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("design queue next90-m111-hub-support-concierge owned_surfaces drifted", result.stderr)
+
     @staticmethod
     def copy_sources(temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:
