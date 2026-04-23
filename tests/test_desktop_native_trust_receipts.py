@@ -624,6 +624,24 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn("TASK_LOCAL_TELEMETRY", markers)
         self.assertIn("active-run helper commands", markers)
 
+    def test_forbidden_active_run_marker_matching_decodes_compressed_base32_and_base85_text(self) -> None:
+        verifier = load_verifier_module()
+        compressed_task_local = zlib.compress(b"TASK_LOCAL_TELEMETRY generated status query")
+        compressed_helper = zlib.compress(b"active-run helper commands")
+        compressed_supervisor = zlib.compress(b"run_ooda_design_supervisor_until_quiet")
+        base32_marker = base64.b32encode(compressed_task_local).decode("ascii")
+        base85_marker = base64.b85encode(compressed_helper).decode("ascii")
+        ascii85_marker = base64.a85encode(compressed_supervisor).decode("ascii")
+
+        markers = verifier._forbidden_markers_in_text(
+            f"{base32_marker} {base85_marker} {ascii85_marker}"
+        )
+
+        self.assertIn("TASK_LOCAL_TELEMETRY", markers)
+        self.assertIn("status query", markers)
+        self.assertIn("active-run helper commands", markers)
+        self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
+
     def test_canonical_yaml_block_rejects_encoded_active_run_markers(self) -> None:
         verifier = load_verifier_module()
 
