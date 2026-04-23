@@ -384,6 +384,14 @@ def _remove_telemetry_guard_proof(text: str) -> str:
     return text.replace(marker, "", 1)
 
 
+def _remove_queue_identity_guard_proof(text: str) -> str:
+    marker = "          - /docker/chummercomplete/chummer6-hub commit ec1bb219 tightens the M105 queue identity guard so copied title or frontier rows cannot make future shards repeat the closed workspace continuity package.\n"
+    if marker not in text:
+        raise AssertionError("missing queue identity guard proof floor")
+
+    return text.replace(marker, "", 1)
+
+
 class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
     def test_verifier_fails_closed_when_fleet_queue_drops_frontier_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-fleet-frontier-") as temp_dir:
@@ -921,6 +929,33 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("commit dc46a811 tightens the M105 telemetry proof floor", result.stderr)
+        self.assertIn("105.1", result.stderr)
+
+    def test_verifier_fails_closed_when_registry_drops_queue_identity_guard_proof(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-registry-identity-proof-") as temp_dir:
+            registry_path = Path(temp_dir) / "registry.yaml"
+            source_registry_path = Path(
+                "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"
+            )
+            registry_path.write_text(
+                _remove_queue_identity_guard_proof(source_registry_path.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY"] = str(registry_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("commit ec1bb219 tightens the M105 queue identity guard", result.stderr)
         self.assertIn("105.1", result.stderr)
 
     def test_verifier_rejects_task_local_telemetry_as_registry_proof(self) -> None:
