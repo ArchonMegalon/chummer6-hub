@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import json
+import base64
+import binascii
 import html
+import json
 import os
 import re
 import subprocess
@@ -1559,7 +1561,51 @@ def _forbidden_marker_text_variants(value: str) -> list[str]:
         html_then_url_decoded,
         url_then_html_decoded,
     ]
+    for variant in list(variants):
+        variants.extend(_base64_decoded_text_variants(variant))
     return list(dict.fromkeys(variants))
+
+
+def _base64_decoded_text_variants(value: str) -> list[str]:
+    decoded: list[str] = []
+    for match in re.finditer(r"[A-Za-z0-9+/_=-]{12,}", value):
+        token = match.group(0)
+        for candidate in _base64_decode_token_variants(token):
+            if candidate not in decoded:
+                decoded.append(candidate)
+
+    return decoded
+
+
+def _base64_decode_token_variants(token: str) -> list[str]:
+    variants: list[str] = []
+    normalized = token.strip()
+    if not normalized:
+        return variants
+
+    padded = normalized + ("=" * (-len(normalized) % 4))
+    decode_attempts = [
+        lambda: base64.b64decode(padded, validate=True),
+        lambda: base64.urlsafe_b64decode(padded),
+    ]
+    for attempt in decode_attempts:
+        try:
+            raw = attempt()
+        except (binascii.Error, ValueError):
+            continue
+
+        if not raw or any(byte < 9 or (13 < byte < 32) for byte in raw):
+            continue
+
+        try:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+
+        if text not in variants:
+            variants.append(text)
+
+    return variants
 
 
 def _normalize_forbidden_marker_text(value: str) -> str:
