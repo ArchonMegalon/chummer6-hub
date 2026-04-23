@@ -28,6 +28,11 @@
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
       "frontier_id": 2897065929,
+      "frontier_ids": [
+        2897065929,
+        2594403904
+      ],
+      "active_flagship_frontier_id": 2594403904,
       "repo": "chummer6-hub",
       "status": "complete",
       "completion_action": "verify_closed_package_only",
@@ -49,8 +54,10 @@
       "package_id": "next90-m107-hub-artifact-factory",
       "milestone_id": 107,
       "frontier_id": 1421219975,
+      "task": "Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
       "repo": "chummer6-hub",
       "status": "complete",
+      "wave": "W9",
       "completion_action": "verify_closed_package_only",
       "do_not_reopen_reason": "M107 chummer6-hub artifact factory orchestration is complete; future shards must verify this receipt, registry row, Fleet queue row, and design queue row instead of reopening the artifact-factory orchestration and public proof shelf release-bundles package.",
       "landed_commit": "b9e6b52e",
@@ -65,6 +72,51 @@
         "public_proof_shelf:release_bundles"
       ],
       "exit_criterion": "Release, fix, support, and publication explainers can ship as approved video, audio, preview, and packet bundles from the same underlying release and support truth."
+    },
+    {
+      "package_id": "next90-m108-hub-campaign-briefing-bundles",
+      "milestone_id": 108,
+      "frontier_id": 1639715882,
+      "repo": "chummer6-hub",
+      "task": "Turn approved campaign primer and mission packs into locale-matched cold-open and briefing requests with audience-safe proof anchors.",
+      "status": "complete",
+      "wave": "W10",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M108 chummer6-hub campaign briefing bundle composition is complete; future shards must verify the API orchestration service, launcher proof guard, focused tests, and queue/registry rows instead of reopening this package.",
+      "landed_commit": "d0a84683",
+      "title": "Compose campaign cold-open and mission-briefing bundles from approved packs",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "campaign_cold_open_pack",
+        "mission_briefing_reel"
+      ],
+      "exit_criterion": "Approved campaign primer and mission packs launch locale-matched cold-open and briefing artifact requests with audience-safe proof anchors and stable public shelf refs."
+    },
+    {
+      "package_id": "next90-m110-hub-runsite-orientation-requests",
+      "milestone_id": 110,
+      "frontier_id": 1545739925,
+      "repo": "chummer6-hub",
+      "task": "Compose governed runsite orientation requests from approved runsite packs, route summaries, and preview-safe pre-session truth.",
+      "status": "complete",
+      "wave": "W10",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M110 chummer6-hub runsite orientation requests are complete; future shards must verify the governed composition route, generated proof receipts, and queue/registry rows instead of reopening this package.",
+      "title": "Compose runsite orientation requests from approved runsite packs and route summaries",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "runsite_orientation_requests",
+        "route_summary:artifact_launch"
+      ],
+      "exit_criterion": "Compose governed runsite orientation requests from approved runsite packs, route summaries, and preview-safe pre-session truth."
     },
     {
       "package_id": "next90-m105-hub-workspace-continuity",
@@ -92,7 +144,10 @@
       "milestone_id": 111,
       "frontier_id": 2746902416,
       "repo": "chummer6-hub",
-      "status": "in_progress",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M111 chummer6-hub support concierge is complete; future shards must verify the authenticated concierge packet route, generated proof receipts, verifier, and queue/registry rows instead of reopening this package.",
+      "landed_commit": "3fb14923",
       "title": "Emit install-aware release and support concierge packets from installed-build truth",
       "allowed_paths": [
         "Chummer.Run.Api",
@@ -111,6 +166,11 @@
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
       "frontier_id": 2897065929,
+      "frontier_ids": [
+        2897065929,
+        2594403904
+      ],
+      "active_flagship_frontier_id": 2594403904,
       "repo": "chummer6-hub",
       "status": "complete",
       "completion_action": "verify_closed_package_only",
@@ -132,8 +192,10 @@
       "package_id": "next90-m107-hub-artifact-factory",
       "milestone_id": 107,
       "frontier_id": 1421219975,
+      "task": "Launch recipe-backed release, fix, support, and publication artifact jobs from approved source packs instead of one-off provider flows.",
       "repo": "chummer6-hub",
       "status": "complete",
+      "wave": "W9",
       "completion_action": "verify_closed_package_only",
       "do_not_reopen_reason": "M107 chummer6-hub artifact factory orchestration is complete; future shards must verify this receipt, registry row, Fleet queue row, and design queue row instead of reopening the artifact-factory orchestration and public proof shelf release-bundles package.",
       "landed_commit": "b9e6b52e",
@@ -148,6 +210,51 @@
         "public_proof_shelf:release_bundles"
       ],
       "exit_criterion": "Release, fix, support, and publication explainers can ship as approved video, audio, preview, and packet bundles from the same underlying release and support truth."
+    },
+    "next90-m108-hub-campaign-briefing-bundles": {
+      "package_id": "next90-m108-hub-campaign-briefing-bundles",
+      "milestone_id": 108,
+      "frontier_id": 1639715882,
+      "repo": "chummer6-hub",
+      "task": "Turn approved campaign primer and mission packs into locale-matched cold-open and briefing requests with audience-safe proof anchors.",
+      "status": "complete",
+      "wave": "W10",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M108 chummer6-hub campaign briefing bundle composition is complete; future shards must verify the API orchestration service, launcher proof guard, focused tests, and queue/registry rows instead of reopening this package.",
+      "landed_commit": "d0a84683",
+      "title": "Compose campaign cold-open and mission-briefing bundles from approved packs",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "campaign_cold_open_pack",
+        "mission_briefing_reel"
+      ],
+      "exit_criterion": "Approved campaign primer and mission packs launch locale-matched cold-open and briefing artifact requests with audience-safe proof anchors and stable public shelf refs."
+    },
+    "next90-m110-hub-runsite-orientation-requests": {
+      "package_id": "next90-m110-hub-runsite-orientation-requests",
+      "milestone_id": 110,
+      "frontier_id": 1545739925,
+      "repo": "chummer6-hub",
+      "task": "Compose governed runsite orientation requests from approved runsite packs, route summaries, and preview-safe pre-session truth.",
+      "status": "complete",
+      "wave": "W10",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M110 chummer6-hub runsite orientation requests are complete; future shards must verify the governed composition route, generated proof receipts, and queue/registry rows instead of reopening this package.",
+      "title": "Compose runsite orientation requests from approved runsite packs and route summaries",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "runsite_orientation_requests",
+        "route_summary:artifact_launch"
+      ],
+      "exit_criterion": "Compose governed runsite orientation requests from approved runsite packs, route summaries, and preview-safe pre-session truth."
     },
     "next90-m105-hub-workspace-continuity": {
       "package_id": "next90-m105-hub-workspace-continuity",
@@ -175,7 +282,10 @@
       "milestone_id": 111,
       "frontier_id": 2746902416,
       "repo": "chummer6-hub",
-      "status": "in_progress",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M111 chummer6-hub support concierge is complete; future shards must verify the authenticated concierge packet route, generated proof receipts, verifier, and queue/registry rows instead of reopening this package.",
+      "landed_commit": "3fb14923",
       "title": "Emit install-aware release and support concierge packets from installed-build truth",
       "allowed_paths": [
         "Chummer.Run.Api",
@@ -189,9 +299,9 @@
       "exit_criterion": "Compile support closure and release explainer packets from installed build, channel, and support-case truth."
     }
   },
-  "base_url": "http://localhost",
+  "base_url": "https://chummer.run",
   "compose_file": "docker-compose.yml",
-  "playwright_timeout_seconds": 30,
+  "playwright_timeout_seconds": 120,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
@@ -218,6 +328,11 @@
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
       "frontier_id": 2897065929,
+      "frontier_ids": [
+        2897065929,
+        2594403904
+      ],
+      "active_flagship_frontier_id": 2594403904,
       "summary": "Claim and recovery continuation now have installer/app-native receipts: guided setup is the default, claim codes are recovery fallback only, and the claimed desktop app can call the grant-bound continuation endpoint without a browser redemption ritual.",
       "routes": [
         "/downloads/install/avalonia-linux-x64-installer/continue.json",
@@ -235,6 +350,11 @@
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
       "frontier_id": 2897065929,
+      "frontier_ids": [
+        2897065929,
+        2594403904
+      ],
+      "active_flagship_frontier_id": 2594403904,
       "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
       "routes": [
         "/api/v1/install-linking/continuation",
@@ -246,6 +366,34 @@
         "support_followthrough:install_truth",
         "support_case_install_readiness",
         "desktop_update_rollback_recovery"
+      ]
+    },
+    {
+      "receipt_id": "fleet_and_operator_loop:desktop_native_trust",
+      "package_id": "next90-m102-hub-desktop-native-trust",
+      "milestone_id": 102,
+      "frontier_id": 2897065929,
+      "frontier_ids": [
+        2897065929,
+        2594403904
+      ],
+      "active_flagship_frontier_id": 2594403904,
+      "summary": "Hub publishes implementation-backed desktop-native trust receipts for the fleet/operator loop: claimed installs stay on grant-bound continuation, support follows installed-build truth, and proof refreshes come from verifier-owned scripts and tests rather than worker-state polling.",
+      "routes": [
+        "/api/v1/install-linking/continuation",
+        "/api/v1/install-linking/continuation/support",
+        "/api/v1/install-linking/continuation/update",
+        "/api/v1/install-linking/continuation/rollback"
+      ],
+      "surfaces": [
+        "fleet_and_operator_loop",
+        "desktop_native_claim_and_recovery",
+        "support_followthrough:install_truth"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_desktop_native_trust_receipts.py verifies the M102 generated proof package, owned surfaces, grant-bound native routes, and forbidden operator-helper evidence markers.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_desktop_native_trust_receipts.py fails closed when generated proof drops the fleet_and_operator_loop desktop-native trust receipt.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesVerification/InstallLinkingContinuationVerification.cs exercises continuation, support, update, rollback, recovery, callback, receipt-matching, and support-action sanitization on the claimed desktop rail."
       ]
     },
     {
@@ -263,6 +411,94 @@
         "artifact_factory:orchestration",
         "public_proof_shelf:release_bundles",
         "build_explain_publish"
+      ]
+    },
+    {
+      "receipt_id": "campaign_cold_open_pack",
+      "package_id": "next90-m108-hub-campaign-briefing-bundles",
+      "milestone_id": 108,
+      "frontier_id": 1639715882,
+      "summary": "Approved campaign primers now compose locale-matched cold-open artifact requests with audience-safe proof anchors and stable campaign proof shelf refs instead of ad hoc launch packets.",
+      "routes": [
+        "/api/internal/artifact-factory/source-pack-batches",
+        "/api/internal/artifact-factory/recipes",
+        "/artifacts/campaigns/{campaignId}/cold-open",
+        "/artifacts/campaigns/{campaignId}/cold-open/preview_card"
+      ],
+      "surfaces": [
+        "campaign_cold_open_pack",
+        "campaign_onboarding",
+        "artifact_factory:campaign_cold_open"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs composes campaign_cold_open jobs from approved campaign primer packs with explicit audience and locale validation.",
+        "/docker/chummercomplete/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py fail-closes campaign cold-open responses that omit audience/locale proof anchors or drift off the stable campaign cold-open shelf.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_source_pack_launcher.py covers locale-matched campaign cold-open launches and fail-closed proof-anchor drift."
+      ]
+    },
+    {
+      "receipt_id": "mission_briefing_reel",
+      "package_id": "next90-m108-hub-campaign-briefing-bundles",
+      "milestone_id": 108,
+      "frontier_id": 1639715882,
+      "summary": "Approved mission packs now compose locale-matched briefing artifact requests with audience-safe proof anchors and stable mission briefing shelf refs before media-factory launch.",
+      "routes": [
+        "/api/internal/artifact-factory/source-pack-batches",
+        "/api/internal/artifact-factory/recipes",
+        "/artifacts/missions/{missionId}/briefing",
+        "/artifacts/missions/{missionId}/briefing/preview_card"
+      ],
+      "surfaces": [
+        "mission_briefing_reel",
+        "campaign_onboarding",
+        "artifact_factory:mission_briefing"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs composes mission_briefing jobs from approved mission packs with explicit audience and locale validation.",
+        "/docker/chummercomplete/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py fail-closes mission briefing responses that omit audience/locale proof anchors or drift off the stable mission briefing shelf.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_artifact_factory_source_pack_launcher.py covers locale-matched mission briefing launches and fail-closed proof-anchor drift."
+      ]
+    },
+    {
+      "receipt_id": "runsite_orientation_requests",
+      "package_id": "next90-m110-hub-runsite-orientation-requests",
+      "milestone_id": 110,
+      "frontier_id": 1545739925,
+      "summary": "Approved runsite packs now compose governed host clips, tour siblings, audio companions, and preview-safe pre-session truth through one internal runsite orientation request contract before downstream media launch.",
+      "routes": [
+        "/api/internal/runsite-orientation/requests",
+        "/artifacts/routes/{routeSummaryId}/{routeSegmentId}"
+      ],
+      "surfaces": [
+        "runsite_orientation_requests",
+        "runsite_orientation_bundle",
+        "preview_safe_truth:pre_session"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/RunsiteOrientationRequestComposerService.cs composes governed runsite orientation bundles from approved packs, route summaries, and preview-safe inspectable truth refs.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalRunsiteOrientationController.cs exposes the bounded internal request route and rejects unauthorized or malformed orientation requests.",
+        "/docker/chummercomplete/chummer6-hub/tests/test_runsite_orientation_requests.py covers composed bundle output, preview-safe evidence anchors, duplicate-deduplication rejection, and queue/registry proof drift."
+      ]
+    },
+    {
+      "receipt_id": "route_summary:artifact_launch",
+      "package_id": "next90-m110-hub-runsite-orientation-requests",
+      "milestone_id": 110,
+      "frontier_id": 1545739925,
+      "summary": "Route summaries remain the only authority for runsite route previews: route preview artifacts stay inspectable, preview-safe, and route-summary governed even when approved packs provide the rest of the orientation bundle.",
+      "routes": [
+        "/api/internal/runsite-orientation/requests",
+        "/artifacts/routes/{routeSummaryId}/{routeSegmentId}"
+      ],
+      "surfaces": [
+        "route_summary:artifact_launch",
+        "route_preview:inspectable_truth",
+        "runsite_orientation_bundle"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/RunsiteOrientationRequestComposerService.cs rejects pack-owned route preview templates and forces route-summary route preview categories to remain inspectable and preview-safe.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Tests/RunsiteOrientationRequestComposerServiceTests.cs proves route previews stay route-summary governed and that internal authorization still gates the composition route.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_runsite_orientation_requests.py fail-closes missing route_summary:artifact_launch proof, weakened closure metadata, or worker-unsafe queue and registry evidence."
       ]
     },
     {
@@ -328,6 +564,9 @@
       "summary": "Hub release concierge packets explain why the current or fixed release is correct for the reporter's installed build and channel, while public wrappers stay bounded to first-party support and download routes.",
       "routes": [
         "/api/v1/support/cases/{caseId}/concierge",
+        "/now",
+        "/status",
+        "/help",
         "/downloads",
         "/downloads/install/{artifactId}",
         "/api/v1/install-linking/continuation"
@@ -339,6 +578,6 @@
       ]
     }
   ],
-  "generated_at": "2026-04-23T14:59:30Z",
-  "generatedAt": "2026-04-23T14:59:30Z"
+  "generated_at": "2026-04-23T22:32:33Z",
+  "generatedAt": "2026-04-23T22:32:33Z"
 }
