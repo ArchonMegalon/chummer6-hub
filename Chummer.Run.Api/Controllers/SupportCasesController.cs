@@ -21,6 +21,7 @@ public sealed class SupportCasesController : ControllerBase
     private readonly IdentityLinkService _links;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
+    private readonly SupportConciergePacketService _supportConciergePackets;
     private readonly SupportAssistantService _assistant;
     private readonly SupportAttachmentStorageService _attachments;
     private readonly IConfiguration _configuration;
@@ -32,6 +33,7 @@ public sealed class SupportCasesController : ControllerBase
         IdentityLinkService links,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
+        SupportConciergePacketService supportConciergePackets,
         SupportAssistantService assistant,
         SupportAttachmentStorageService attachments,
         InstallLinkingService installLinking,
@@ -42,6 +44,7 @@ public sealed class SupportCasesController : ControllerBase
         _links = links;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
+        _supportConciergePackets = supportConciergePackets;
         _assistant = assistant;
         _attachments = attachments;
         _installLinking = installLinking;
@@ -81,6 +84,37 @@ public sealed class SupportCasesController : ControllerBase
             var items = _supportCases.ListForReporter(user.UserId, subject.SubjectId, status, kind).Items;
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             return Ok(_supportPresentation.BuildDigestList(items, installLinking));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("{caseId}/concierge")]
+    [ProducesResponseType<InstallAwareSupportConciergePacket>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<InstallAwareSupportConciergePacket>> GetCaseConciergePacket(
+        [FromRoute] string caseId,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(caseId))
+        {
+            return BadRequest("caseId is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            SupportCaseProjection? item = _supportCases.GetForReporter(caseId, user.UserId, subject.SubjectId);
+            if (item is null)
+            {
+                return NotFound();
+            }
+
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_supportConciergePackets.Build(item, installLinking));
         }
         catch (HubRequestAuthException ex)
         {

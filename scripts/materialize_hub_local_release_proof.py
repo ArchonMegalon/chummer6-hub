@@ -157,6 +157,24 @@ def main() -> int:
             ],
             "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture.",
         },
+        {
+            "package_id": "next90-m111-hub-support-concierge",
+            "milestone_id": 111,
+            "frontier_id": 2746902416,
+            "repo": "chummer6-hub",
+            "status": "in_progress",
+            "title": "Emit install-aware release and support concierge packets from installed-build truth",
+            "allowed_paths": [
+                "Chummer.Run.Api",
+                "scripts",
+                "tests",
+            ],
+            "owned_surfaces": [
+                "install_aware_support_concierge",
+                "release_concierge:hub",
+            ],
+            "exit_criterion": "Compile support closure and release explainer packets from installed build, channel, and support-case truth.",
+        },
     ]
 
     payload = {
@@ -300,6 +318,42 @@ def main() -> int:
                     "entitlement_sync:recoverable_actions",
                     "entitlement_sync",
                     "workspace_restore",
+                ],
+            },
+            {
+                "receipt_id": "install_aware_support_concierge",
+                "package_id": "next90-m111-hub-support-concierge",
+                "milestone_id": 111,
+                "frontier_id": 2746902416,
+                "summary": "Hub now compiles authenticated support closure packets from support-case truth, installed build, release channel, claimed install context, and installed-build receipt ids instead of queued support status alone.",
+                "routes": [
+                    "/api/v1/support/cases/{caseId}/concierge",
+                    "/api/v1/install-linking/continuation/support",
+                    "/account/support",
+                    "/account/access",
+                ],
+                "surfaces": [
+                    "install_aware_support_concierge",
+                    "support_case_install_readiness",
+                    "support_closure_packets",
+                ],
+            },
+            {
+                "receipt_id": "release_concierge:hub",
+                "package_id": "next90-m111-hub-support-concierge",
+                "milestone_id": 111,
+                "frontier_id": 2746902416,
+                "summary": "Hub release concierge packets explain why the current or fixed release is correct for the reporter's installed build and channel, while public wrappers stay bounded to first-party support and download routes.",
+                "routes": [
+                    "/api/v1/support/cases/{caseId}/concierge",
+                    "/downloads",
+                    "/downloads/install/{artifactId}",
+                    "/api/v1/install-linking/continuation",
+                ],
+                "surfaces": [
+                    "release_concierge:hub",
+                    "release_explainer_packets",
+                    "public_concierge_trust_wrapper",
                 ],
             },
         ],
