@@ -172,6 +172,46 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(f"{PACKAGE_ID}.owned_surfaces must be exactly", result.stderr)
 
+    def test_queue_identity_guard_rejects_second_row_claiming_owned_surfaces(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-surface-copy-") as temp_dir:
+            queue_path = Path(temp_dir) / "queue.yaml"
+            source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            source_text = source_queue_path.read_text(encoding="utf-8")
+            start, end = self._package_block_range(source_text)
+            package_block = source_text[start:end]
+            duplicate_block = (
+                package_block.replace(
+                    f"  - title: {TITLE}\n",
+                    "  - title: Reopen workspace continuity through another package\n",
+                    1,
+                )
+                .replace(
+                    f"    package_id: {PACKAGE_ID}\n",
+                    "    package_id: next90-m105-hub-workspace-continuity-copy\n",
+                    1,
+                )
+                .replace("    frontier_id: 4623636482\n", "    frontier_id: 9999999999\n", 1)
+            )
+            queue_path.write_text(source_text + duplicate_block, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_FLEET_QUEUE"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_DESIGN_QUEUE"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected exactly one row owning surfaces", result.stderr)
+        self.assertIn("workspace_restore:provenance", result.stderr)
+        self.assertIn("entitlement_sync:conflict_receipts", result.stderr)
+
     def test_queue_identity_guard_rejects_wrong_completion_action(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-action-") as temp_dir:
             queue_path = Path(temp_dir) / "queue.yaml"
@@ -309,6 +349,37 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden active-run proof marker: execution rules inside this run", result.stderr)
+
+    def test_queue_identity_guard_rejects_task_local_telemetry_fields_in_package_block(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-telemetry-fields-") as temp_dir:
+            queue_path = Path(temp_dir) / "queue.yaml"
+            source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            source_text = source_queue_path.read_text(encoding="utf-8")
+            start, end = self._package_block_range(source_text)
+            package_block = source_text[start:end]
+            updated_block = (
+                package_block
+                + "      - active_runs_count, eta_human, and remaining_not_started_milestones from task-local telemetry are not repo-local proof.\n"
+            )
+            queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_FLEET_QUEUE"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_DESIGN_QUEUE"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: active_runs_count", result.stderr)
+        self.assertIn("forbidden active-run proof marker: eta_human", result.stderr)
+        self.assertIn("forbidden active-run proof marker: remaining_not_started_milestones", result.stderr)
 
     def test_queue_identity_guard_rejects_active_run_helper_command_markers_in_package_block(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-helper-command-") as temp_dir:

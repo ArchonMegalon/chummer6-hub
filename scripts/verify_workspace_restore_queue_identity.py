@@ -39,8 +39,15 @@ FORBIDDEN_PROOF_MARKERS = [
     "Selected account:",
     "Selected model:",
     "Open milestone ids:",
+    "active_runs_count",
     "successor-wave telemetry",
+    "eta_human",
+    "eta: 4.8d-1.7w",
+    "eta 4.8d-1.7w",
     "frontier_briefs",
+    "queue_item",
+    "slice_summary",
+    "scope_label",
     "successor frontier detail",
     "successor frontier ids",
     "assigned successor queue package",
@@ -61,6 +68,9 @@ FORBIDDEN_PROOF_MARKERS = [
     "runtime_handoff_path",
     "status_query_supported",
     "status query",
+    "remaining_in_progress_milestones",
+    "remaining_not_started_milestones",
+    "remaining_open_milestones",
     "successor_queue_path",
     "successor_registry_path",
     "remaining milestones",
@@ -165,6 +175,11 @@ def check_queue(path: Path, missing: list[str]) -> None:
     package_blocks = [block for block in blocks if block_contains_scalar(block, "package_id", PACKAGE_ID)]
     title_blocks = [block for block in blocks if block.startswith(f"  - title: {TITLE}\n")]
     frontier_blocks = [block for block in blocks if block_contains_scalar(block, "frontier_id", FRONTIER_ID)]
+    owned_surface_blocks = [
+        block
+        for block in blocks
+        if all(surface in extract_scalar_list(block, "owned_surfaces") for surface in OWNED_SURFACES)
+    ]
 
     if len(package_blocks) != 1:
         missing.append(f"{path}: expected exactly one package_id {PACKAGE_ID}; found {len(package_blocks)}")
@@ -172,6 +187,8 @@ def check_queue(path: Path, missing: list[str]) -> None:
         missing.append(f"{path}: expected exactly one title {TITLE!r}; found {len(title_blocks)}")
     if len(frontier_blocks) != 1:
         missing.append(f"{path}: expected exactly one frontier_id {FRONTIER_ID}; found {len(frontier_blocks)}")
+    if len(owned_surface_blocks) != 1:
+        missing.append(f"{path}: expected exactly one row owning surfaces {OWNED_SURFACES!r}; found {len(owned_surface_blocks)}")
 
     if not package_blocks:
         return
@@ -182,6 +199,8 @@ def check_queue(path: Path, missing: list[str]) -> None:
         missing.append(f"{path}: title row for {TITLE!r} must be the {PACKAGE_ID} package row")
     if frontier_blocks and frontier_blocks[0] != package_block:
         missing.append(f"{path}: frontier_id {FRONTIER_ID} must be pinned to the {PACKAGE_ID} package row")
+    if owned_surface_blocks and owned_surface_blocks[0] != package_block:
+        missing.append(f"{path}: owned surfaces {OWNED_SURFACES!r} must be pinned to the {PACKAGE_ID} package row")
 
     required_scalars = {
         "task": TASK,
