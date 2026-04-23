@@ -1565,8 +1565,21 @@ def _forbidden_marker_text_variants(value: str) -> list[str]:
         url_then_html_decoded,
     ]
     for variant in list(variants):
-        variants.extend(_base64_decoded_text_variants(variant))
+        variants.extend(_encoded_decoded_text_variants(variant))
     return list(dict.fromkeys(variants))
+
+
+def _encoded_decoded_text_variants(value: str) -> list[str]:
+    decoded: list[str] = []
+    for candidate in [
+        *_base64_decoded_text_variants(value),
+        *_base32_decoded_text_variants(value),
+        *_base85_decoded_text_variants(value),
+    ]:
+        if candidate not in decoded:
+            decoded.append(candidate)
+
+    return decoded
 
 
 def _base64_decoded_text_variants(value: str) -> list[str]:
@@ -1609,6 +1622,67 @@ def _base64_decode_token_variants(token: str) -> list[str]:
             variants.append(text)
 
     return variants
+
+
+def _base32_decoded_text_variants(value: str) -> list[str]:
+    decoded: list[str] = []
+    for match in re.finditer(r"[A-Z2-7=]{16,}", value.upper()):
+        token = match.group(0)
+        for candidate in _base32_decode_token_variants(token):
+            if candidate not in decoded:
+                decoded.append(candidate)
+
+    return decoded
+
+
+def _base32_decode_token_variants(token: str) -> list[str]:
+    normalized = token.strip()
+    if not normalized:
+        return []
+
+    padded = normalized + ("=" * (-len(normalized) % 8))
+    try:
+        raw = base64.b32decode(padded, casefold=True)
+    except (binascii.Error, ValueError):
+        return []
+
+    return _decoded_text_variants_from_bytes(raw)
+
+
+def _base85_decoded_text_variants(value: str) -> list[str]:
+    decoded: list[str] = []
+    for match in re.finditer(r"[\x21-\x7e]{12,}", value):
+        token = match.group(0)
+        for candidate in _base85_decode_token_variants(token):
+            if candidate not in decoded:
+                decoded.append(candidate)
+
+    return decoded
+
+
+def _base85_decode_token_variants(token: str) -> list[str]:
+    variants: list[str] = []
+    for decode in (base64.b85decode, base64.a85decode):
+        try:
+            raw = decode(token)
+        except (binascii.Error, ValueError):
+            continue
+
+        for candidate in _decoded_text_variants_from_bytes(raw):
+            if candidate not in variants:
+                variants.append(candidate)
+
+    return variants
+
+
+def _decoded_text_variants_from_bytes(raw: bytes) -> list[str]:
+    if not raw or any(byte < 9 or (13 < byte < 32) for byte in raw):
+        return []
+
+    try:
+        return [raw.decode("utf-8")]
+    except UnicodeDecodeError:
+        return []
 
 
 def _normalize_forbidden_marker_text(value: str) -> str:

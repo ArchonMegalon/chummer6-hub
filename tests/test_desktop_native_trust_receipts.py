@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import importlib.util
 import os
@@ -564,6 +565,20 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             "VEFTS19MT0NBTF9URUxFTUVUUlkuZ2VuZXJhdGVkLmpzb24= "
             "YWN0aXZlLXJ1biBoZWxwZXIgY29tbWFuZHM "
             "cnVuX29vZGFfZGVzaWduX3N1cGVydmlzb3JfdW50aWxfcXVpZXQ"
+        )
+
+        self.assertIn("TASK_LOCAL_TELEMETRY", markers)
+        self.assertIn("active-run helper commands", markers)
+        self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
+
+    def test_forbidden_active_run_marker_matching_decodes_base32_and_base85_text(self) -> None:
+        verifier = load_verifier_module()
+        base32_marker = base64.b32encode(b"TASK_LOCAL_TELEMETRY.generated.json").decode("ascii")
+        base85_marker = base64.b85encode(b"active-run helper commands").decode("ascii")
+        ascii85_marker = base64.a85encode(b"run_ooda_design_supervisor_until_quiet").decode("ascii")
+
+        markers = verifier._forbidden_markers_in_text(
+            f"{base32_marker} {base85_marker} {ascii85_marker}"
         )
 
         self.assertIn("TASK_LOCAL_TELEMETRY", markers)
