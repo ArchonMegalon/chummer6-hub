@@ -104,9 +104,24 @@ public sealed class PublicReleaseManifestService
     {
         if (runtimeManifest is { Downloads.Count: > 0 })
         {
-            return canonicalManifest.Downloads.Count == 0 || runtimeManifest.PublishedAt >= canonicalManifest.PublishedAt
-                ? runtimeManifest
-                : canonicalManifest;
+            if (canonicalManifest.Downloads.Count == 0)
+            {
+                return runtimeManifest;
+            }
+
+            if (runtimeManifest.PublishedAt > canonicalManifest.PublishedAt)
+            {
+                return runtimeManifest;
+            }
+
+            if (runtimeManifest.PublishedAt < canonicalManifest.PublishedAt)
+            {
+                return canonicalManifest;
+            }
+
+            return RuntimeManifestDropsCanonicalArtifacts(runtimeManifest, canonicalManifest)
+                ? canonicalManifest
+                : runtimeManifest;
         }
 
         if (canonicalManifest.Downloads.Count > 0)
@@ -117,6 +132,63 @@ public sealed class PublicReleaseManifestService
         return runtimeManifest ?? canonicalManifest;
     }
 
+    private static bool RuntimeManifestDropsCanonicalArtifacts(
+        PublicReleaseManifestDto runtimeManifest,
+        PublicReleaseManifestDto canonicalManifest)
+    {
+        if (!string.Equals(
+                NormalizeOptional(runtimeManifest.Channel),
+                NormalizeOptional(canonicalManifest.Channel),
+                StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(
+                NormalizeOptional(runtimeManifest.Version),
+                NormalizeOptional(canonicalManifest.Version),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        HashSet<string> runtimeDownloadIds = LoadArtifactIds(runtimeManifest.Downloads);
+        HashSet<string> canonicalDownloadIds = LoadArtifactIds(canonicalManifest.Downloads);
+        if (!canonicalDownloadIds.IsSubsetOf(runtimeDownloadIds))
+        {
+            return true;
+        }
+
+        HashSet<string> runtimeInstallerIds = LoadArtifactIds(runtimeManifest.Downloads, installersOnly: true);
+        HashSet<string> canonicalInstallerIds = LoadArtifactIds(canonicalManifest.Downloads, installersOnly: true);
+        return !canonicalInstallerIds.IsSubsetOf(runtimeInstallerIds);
+    }
+
+    private static HashSet<string> LoadArtifactIds(
+        IEnumerable<PublicReleaseArtifactDto> downloads,
+        bool installersOnly = false)
+        => downloads
+            .Where(download => !installersOnly || IsInstaller(download))
+            .Select(download => NormalizeOptional(download.Id))
+            .Where(static artifactId => artifactId is not null)
+            .Select(static artifactId => artifactId!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static bool IsInstaller(PublicReleaseArtifactDto download)
+    {
+        string kind = NormalizeOptional(download.Kind) ?? string.Empty;
+        if (kind.Length > 0)
+        {
+            return kind is "installer" or "dmg" or "pkg" or "msix";
+        }
+
+        string url = download.Url ?? string.Empty;
+        return url.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+               || url.EndsWith(".deb", StringComparison.OrdinalIgnoreCase)
+               || url.EndsWith(".msi", StringComparison.OrdinalIgnoreCase)
+               || url.EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
+               || url.EndsWith(".pkg", StringComparison.OrdinalIgnoreCase)
+               || (download.Id?.Contains("installer", StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    private static string? NormalizeOptional(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     public string? ResolveDownloadFilePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))

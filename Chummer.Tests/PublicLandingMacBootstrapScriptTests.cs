@@ -332,6 +332,30 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
+    public void PersonalizedMacBootstrapRoutesConstrainScriptAndDigestSegments()
+    {
+        MethodInfo method = typeof(PublicLandingController).GetMethod(
+            nameof(PublicLandingController.DownloadDispatchPersonalizedMacBootstrapScript))
+            ?? throw new InvalidOperationException("missing personalized bootstrap route");
+
+        HttpGetAttribute[] routes = method
+            .GetCustomAttributes<HttpGetAttribute>()
+            .ToArray();
+
+        Assert.Contains(
+            routes,
+            route => string.Equals(
+                route.Template,
+                "/install-{scriptId:minlength(24):maxlength(24)}.sh",
+                StringComparison.Ordinal));
+        Assert.Contains(
+            routes,
+            route => string.Equals(
+                route.Template,
+                "/install-{scriptId:minlength(24):maxlength(24)}-{renderedScriptSha256:minlength(64):maxlength(64)}.sh",
+                StringComparison.Ordinal));
+    }
+    [Fact]
     public void ReleaseUploadBootstrapTemplateUsesStrictSafeStartupSmokeHostClassDefault()
     {
         string templatePath = Path.GetFullPath(Path.Combine(

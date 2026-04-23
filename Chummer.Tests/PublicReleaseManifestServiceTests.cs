@@ -141,6 +141,82 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestPrefersCanonicalFileWhenRuntimeEndpointMatchesTimestampButDropsCanonicalArtifacts()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260423-201931",
+            ["publishedAt"] = "2026-04-23T20:22:05Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-osx-arm64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "macos",
+                    ["arch"] = "arm64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop macOS ARM64 Installer",
+                    ["fileName"] = "chummer-avalonia-osx-arm64-installer.dmg",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    ["sha256"] = "mac123",
+                    ["sizeBytes"] = 1L,
+                    ["installAccessClass"] = "account_required"
+                },
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "blazor-desktop-osx-arm64-installer",
+                    ["head"] = "blazor-desktop",
+                    ["platform"] = "macos",
+                    ["arch"] = "arm64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Blazor Desktop macOS ARM64 Installer",
+                    ["fileName"] = "chummer-blazor-desktop-osx-arm64-installer.dmg",
+                    ["downloadUrl"] = "/downloads/files/chummer-blazor-desktop-osx-arm64-installer.dmg",
+                    ["sha256"] = "mac456",
+                    ["sizeBytes"] = 2L,
+                    ["installAccessClass"] = "account_required"
+                }
+            }
+        });
+
+        using var httpClient = new HttpClient(new StaticJsonHandler(
+            """
+            {
+              "product": "chummer",
+              "channelId": "preview",
+              "version": "run-20260423-201931",
+              "publishedAt": "2026-04-23T20:22:05Z",
+              "status": "published",
+              "artifacts": [
+                {
+                  "artifactId": "avalonia-osx-arm64-installer",
+                  "head": "avalonia",
+                  "platform": "macos",
+                  "arch": "arm64",
+                  "kind": "installer",
+                  "platformLabel": "Avalonia Desktop macOS ARM64 Installer",
+                  "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
+                  "downloadUrl": "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                  "sha256": "mac123",
+                  "sizeBytes": 1,
+                  "installAccessClass": "account_required"
+                }
+              ]
+            }
+            """));
+
+        var manifest = fixture.CreateService(httpClient, includeRuntimeUrl: true).LoadManifest();
+
+        Assert.Equal("run-20260423-201931", manifest.Version);
+        Assert.Contains(manifest.Downloads, item => string.Equals(item.Id, "avalonia-osx-arm64-installer", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(manifest.Downloads, item => string.Equals(item.Id, "blazor-desktop-osx-arm64-installer", StringComparison.OrdinalIgnoreCase));
+    }
+    [Fact]
     public void LoadManifestPreservesTopLevelGeneratedTimestampFromCanonicalRegistryManifest()
     {
         using var fixture = new PublicReleaseManifestFixture();
