@@ -237,16 +237,13 @@ def validate_batch_launch_response(
         )
 
     source_pack_ids = normalize_string_list(response.get("sourcePackIds"), "sourcePackIds")
-    expected_source_pack_ids = sorted(
-        {
-            source_pack["sourcePackId"].strip()
-            for source_pack in normalized_payload["sourcePacks"]
-            if isinstance(source_pack, dict) and isinstance(source_pack.get("sourcePackId"), str) and source_pack["sourcePackId"].strip()
-        }
+    expected_source_pack_ids = expected_source_pack_ids_for_families(
+        expected_required_families,
+        normalized_payload,
     )
     if source_pack_ids != expected_source_pack_ids:
         raise LaunchValidationError(
-            "artifact-factory source-pack batch response sourcePackIds must match the launch request sourcePackIds."
+            "artifact-factory source-pack batch response sourcePackIds must match the launch request source packs for the requested recipe families."
         )
 
     recipe_ids = normalize_string_list(response.get("recipeIds"), "recipeIds")
@@ -293,8 +290,50 @@ def validate_batch_launch_response(
             "artifact-factory source-pack batch response jobCount must match the launch request requiredFamilies."
         )
 
+    validate_job_response_shape(response, expected_required_families, job_ids)
     validate_media_factory_request_response(response, recipe_catalog, normalized_payload)
     validate_campaign_media_factory_response(response, recipe_catalog, normalized_payload)
+
+
+def validate_job_response_shape(
+    response: dict[str, Any],
+    expected_required_families: list[str],
+    expected_job_ids: list[str],
+) -> None:
+    jobs = response.get("jobs")
+    if not isinstance(jobs, list):
+        raise LaunchValidationError("artifact-factory source-pack batch response jobs must be an array.")
+
+    response_job_ids = normalize_job_field_list(jobs, "jobId", "jobs jobId")
+    if response_job_ids != expected_job_ids:
+        raise LaunchValidationError(
+            "artifact-factory source-pack batch response jobs jobId values must match response jobIds."
+        )
+
+    response_job_families = normalize_job_field_list(jobs, "family", "jobs family")
+    if response_job_families != expected_required_families:
+        raise LaunchValidationError(
+            "artifact-factory source-pack batch response jobs family values must match the launch request requiredFamilies."
+        )
+
+
+def normalize_job_field_list(jobs: list[Any], field_name: str, label: str) -> list[str]:
+    values: list[str] = []
+    for job in jobs:
+        if not isinstance(job, dict):
+            raise LaunchValidationError(
+                "artifact-factory source-pack batch response jobs must only contain objects."
+            )
+
+        value = job.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response {label} values must be non-empty strings."
+            )
+
+        values.append(value.strip().replace("-", "_").lower() if field_name == "family" else value.strip())
+
+    return sorted(dict.fromkeys(values))
 
 
 def validate_media_factory_request_response(
@@ -348,16 +387,17 @@ def validate_media_factory_request_family_shape(
         media_request.get("requiredReceiptRefs"),
         f"mediaFactoryRequest '{recipe_id}' requiredReceiptRefs",
     )
-    expected_receipt_prefixes = expected_receipt_prefixes_for_family(family)
-    missing_receipt_prefixes = [
-        prefix for prefix in expected_receipt_prefixes if not receipt_ref_matches_prefix(set(required_receipt_refs), prefix)
-    ]
-    if missing_receipt_prefixes:
-        raise LaunchValidationError(
-            f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' missing receipt prefix(es): "
-            + ", ".join(missing_receipt_prefixes)
-            + "."
-        )
+    if family not in {"campaign_cold_open", "mission_briefing"}:
+        expected_receipt_prefixes = expected_receipt_prefixes_for_family(family)
+        missing_receipt_prefixes = [
+            prefix for prefix in expected_receipt_prefixes if not receipt_ref_matches_prefix(set(required_receipt_refs), prefix)
+        ]
+        if missing_receipt_prefixes:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' missing receipt prefix(es): "
+                + ", ".join(missing_receipt_prefixes)
+                + "."
+            )
 
     public_proof_shelf_refs = normalize_string_list(
         media_request.get("publicProofShelfRefs"),
@@ -421,6 +461,13 @@ def expected_source_pack_ids_for_family(family: str, normalized_payload: dict[st
             and string_field(source_pack, "sourcePackKind").replace("-", "_").lower() in allowed_source_kinds
         }
     )
+
+
+def expected_source_pack_ids_for_families(families: list[str], normalized_payload: dict[str, Any]) -> list[str]:
+    expected_source_pack_ids: set[str] = set()
+    for family in families:
+        expected_source_pack_ids.update(expected_source_pack_ids_for_family(family, normalized_payload))
+    return sorted(expected_source_pack_ids)
 
 
 def validate_family_response_output_bindings(
@@ -905,6 +952,7 @@ def validate_campaign_audience_and_locale(payload: dict[str, Any], required_fami
 
             require_campaign_proof_anchor(source_pack, "audience", audience)
             require_campaign_proof_anchor(source_pack, "locale", locale)
+            validate_campaign_public_shelf_ref(source_pack, family)
 
 
 def require_campaign_proof_anchor(source_pack: dict[str, Any], anchor_prefix: str, expected_value: str) -> None:
@@ -921,6 +969,39 @@ def require_campaign_proof_anchor(source_pack: dict[str, Any], anchor_prefix: st
         "artifact-factory source-pack batch request source pack "
         f"'{source_pack.get('sourcePackId')}' must include evidenceRef '{anchor_prefix}:{expected_value}' "
         "for audience-safe campaign artifact requests."
+    )
+
+
+def validate_campaign_public_shelf_ref(source_pack: dict[str, Any], family: str) -> None:
+    public_shelf_ref = string_field(source_pack, "publicShelfRef")
+    if not public_shelf_ref:
+        return
+
+    source_pack_id = string_field(source_pack, "sourcePackId")
+    expected_prefix = "/artifacts/campaigns/" if family == "campaign_cold_open" else "/artifacts/missions/"
+    expected_surface = "cold-open" if family == "campaign_cold_open" else "briefing"
+    if campaign_surface_shelf_ref_is_allowed(public_shelf_ref, expected_prefix, expected_surface):
+        return
+
+    raise LaunchValidationError(
+        f"artifact-factory source-pack batch request source pack '{source_pack_id}' publicShelfRef "
+        f"must resolve to {expected_prefix}{{id}}/{expected_surface} for audience-safe campaign artifact requests."
+    )
+
+
+def campaign_surface_shelf_ref_is_allowed(public_shelf_ref: str, expected_prefix: str, expected_surface: str) -> bool:
+    if not public_shelf_ref.startswith(expected_prefix):
+        return False
+
+    remainder = public_shelf_ref[len(expected_prefix):].strip("/")
+    segments = [segment for segment in remainder.split("/") if segment]
+    return (
+        len(segments) == 2
+        and segments[1].lower() == expected_surface
+    ) or (
+        len(segments) == 3
+        and segments[1].lower() == expected_surface
+        and segments[2].lower() == "bundles"
     )
 
 

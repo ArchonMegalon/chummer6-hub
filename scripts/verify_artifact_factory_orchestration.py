@@ -77,7 +77,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'families = normalize_string_list(response.get("families"), "families")',
         "artifact-factory source-pack batch response families must match the launch request requiredFamilies.",
         'source_pack_ids = normalize_string_list(response.get("sourcePackIds"), "sourcePackIds")',
-        "artifact-factory source-pack batch response sourcePackIds must match the launch request sourcePackIds.",
+        "expected_source_pack_ids_for_families(",
+        "artifact-factory source-pack batch response sourcePackIds must match the launch request source packs for the requested recipe families.",
         'recipe_ids = normalize_string_list(response.get("recipeIds"), "recipeIds")',
         "artifact-factory source-pack batch response recipeIds must include at least one non-empty recipe id.",
         'expected_recipe_ids = sorted(',
@@ -88,12 +89,30 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "artifact-factory source-pack batch response mediaFactoryRequests length must match jobCount.",
         "artifact-factory source-pack batch response jobIds length must match jobCount.",
         "artifact-factory source-pack batch response jobCount must match the launch request requiredFamilies.",
+        "validate_job_response_shape(response, expected_required_families, job_ids)",
+        "def validate_job_response_shape(",
+        "artifact-factory source-pack batch response jobs jobId values must match response jobIds.",
+        "artifact-factory source-pack batch response jobs family values must match the launch request requiredFamilies.",
+        "def normalize_job_field_list(jobs: list[Any], field_name: str, label: str) -> list[str]:",
+        "artifact-factory source-pack batch response jobs must only contain objects.",
+        "artifact-factory source-pack batch response {label} values must be non-empty strings.",
         "def normalize_string_list(value: Any, field_name: str) -> list[str]:",
         "artifact-factory source-pack batch response {field_name} must be a non-empty array of strings.",
         "artifact-factory source-pack batch response {field_name} must only contain non-empty strings.",
         "recipe_can_launch_from_source_packs(family, recipe, source_packs)",
         "if not recipe_can_launch_from_source_packs(family, recipe_map[family], source_packs)",
         "artifact-factory source-pack batch request sourcePacks must already be approved.",
+        "PROVIDER_SPECIFIC_REF_PREFIXES",
+        "validate_source_pack_refs(source_pack)",
+        "def validate_source_pack_refs(source_pack: dict[str, Any]) -> None:",
+        "validate_campaign_public_shelf_ref(source_pack, family)",
+        "def validate_campaign_public_shelf_ref(source_pack: dict[str, Any], family: str) -> None:",
+        "def campaign_surface_shelf_ref_is_allowed(public_shelf_ref: str, expected_prefix: str, expected_surface: str) -> bool:",
+        "must resolve to {expected_prefix}{{id}}/{expected_surface} for audience-safe campaign artifact requests.",
+        "def reject_provider_specific_ref(source_pack_id: str, value: str, field_name: str) -> None:",
+        "def reject_non_local_public_shelf_ref(source_pack_id: str, value: str, field_name: str) -> None:",
+        "jobs must launch from approved source-pack receipts instead of one-off provider flows.",
+        "artifact factory output refs must stay on the Chummer public proof shelf.",
         "artifact-factory source-pack batch request requestedFormats contains family",
     ],
     "tests/test_artifact_factory_source_pack_launcher.py": [
@@ -110,11 +129,22 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "test_fails_when_batch_response_required_families_drift_from_request",
         "test_fails_when_batch_response_source_pack_ids_drift_from_request",
         "test_fails_when_batch_response_recipe_ids_drift_from_required_families",
+        "test_fails_when_batch_response_job_ids_drift_from_jobs",
+        "test_fails_when_batch_response_job_families_drift_from_request",
         '"contractName": "chummer.run.artifact_factory.recipe_job.v2"',
         '"must match the recipe catalog"',
         '"launch request requiredFamilies"',
-        '"launch request sourcePackIds"',
+        '"requested recipe families"',
+        "test_accepts_family_scoped_source_pack_ids_when_request_contains_extra_approved_packs",
+        '"jobs jobId values must match response jobIds"',
+        '"jobs family values must match the launch request requiredFamilies"',
         '"support-case-proof-packet"',
+        "test_fails_provider_specific_source_pack_refs_before_launch",
+        "test_fails_external_public_shelf_evidence_before_launch",
+        "test_fails_campaign_briefing_preflight_when_public_shelf_skips_surface",
+        "provider-specific provenanceRef",
+        "non-local public proof shelf evidenceRef",
+        '"/artifacts/campaigns/{id}/cold-open"',
     ],
     "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs": [
         'private const string ContractName = "chummer.run.artifact_factory.recipe_job.v1";',
@@ -154,7 +184,14 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "RequiredFamilies: requiredFamilies,",
         "private static string[] NormalizeRequiredBatchFamilies(IReadOnlyList<string>? requiredFamilies)",
         "return Recipes.Keys",
+        ".Where(static family => DefaultBatchFamilies.Contains(family))",
         ".Order(StringComparer.OrdinalIgnoreCase)",
+        '["campaign_cold_open"] = new(',
+        'RecipeId: "campaign-cold-open-bundle"',
+        'RequiredReceiptPrefixes: ["campaign", "primer", "audience", "locale"]',
+        '["mission_briefing"] = new(',
+        'RecipeId: "mission-briefing-reel"',
+        'RequiredReceiptPrefixes: ["mission", "briefing", "audience", "locale"]',
         "artifact factory batch required recipe families cannot be empty.",
         'RejectProviderSpecificRef("batch-request", family, "requiredFamily");',
         'RejectUnsafeJobToken(family, "requiredFamily", allowComma: false);',
@@ -255,6 +292,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "approved source-pack ids must use stable receipt segment characters.",
         "private static void RejectUnsafePublicPathId(string sourcePackId, string? value, string fieldName)",
         "RejectProviderSpecificRef(sourcePackId, value, fieldName);",
+        "RejectProviderSpecificRef(sourcePackId, value, fieldName);\n\n        string pathId = value.Trim();",
         "artifact factory path ids must be stable public proof shelf segments.",
         "artifact factory path ids must not contain traversal, encoded provider delimiters, or encoded path separators.",
         "artifact factory path ids must use stable public proof shelf segment characters.",
@@ -271,8 +309,13 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "publication bundle anchors must resolve to one publication segment with an optional bundles shelf.",
         "support bundle anchors must resolve to exactly one support case segment.",
         "fix bundle anchors must resolve to exactly one support case or release artifact segment.",
+        'HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/campaigns/", "cold-open", allowBundlesSuffix: true)',
+        'HasResourceSurfaceShelfAnchorShape(publicShelfRef, "/artifacts/missions/", "briefing", allowBundlesSuffix: true)',
+        "campaign cold-open anchors must resolve to /artifacts/campaigns/{{campaignId}}/cold-open with an optional bundles shelf.",
+        "mission briefing anchors must resolve to /artifacts/missions/{{missionId}}/briefing with an optional bundles shelf.",
         "private static bool HasAnyResourceShelfAnchorShape(string publicShelfRef, IReadOnlyList<string> prefixes, bool allowBundlesSuffix)",
         "private static bool HasResourceShelfAnchorShape(string publicShelfRef, string prefix, bool allowBundlesSuffix)",
+        "private static bool HasResourceSurfaceShelfAnchorShape(string publicShelfRef, string prefix, string surfaceSegment, bool allowBundlesSuffix)",
         '"/account/support/", "/account/support-packets/"',
         '"/artifacts/publications/"',
         "outside recipe {family} shelf routes",
@@ -353,7 +396,12 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "next90-m107-source-pack-controller",
         "next90-m107-artifact-factory-partial",
         "next90-m107-artifact-factory-blank-families",
+        'Assert.Equal(["campaign_cold_open", "fix", "mission_briefing", "publication", "release", "support"], catalog.Recipes.Select(recipe => recipe.Family).ToArray());',
         'Assert.Equal(["fix", "publication", "release", "support"], result.RequiredFamilies);',
+        'string.Equals(recipe.Family, "campaign_cold_open", StringComparison.Ordinal)',
+        'string.Equals(recipe.RecipeId, "campaign-cold-open-bundle", StringComparison.Ordinal)',
+        'string.Equals(recipe.Family, "mission_briefing", StringComparison.Ordinal)',
+        'string.Equals(recipe.RecipeId, "mission-briefing-reel", StringComparison.Ordinal)',
         'Assert.Equal(["release-proof-shelf-bundle"], result.RecipeIds);',
         "LaunchJobRejectsDuplicateSourcePackIds",
         "LaunchJobRejectsWhitespacePaddedDuplicateSourcePackIds",
@@ -477,6 +525,8 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "test_verifier_fails_closed_when_provider_token_segment_guard_is_removed",
         "test_verifier_fails_closed_when_release_bundle_public_route_is_removed",
         "test_verifier_fails_closed_when_release_bundle_format_route_is_removed",
+        "test_verifier_fails_closed_when_campaign_surface_shelf_shape_guard_is_removed",
+        "HasResourceSurfaceShelfAnchorShape",
         "test_verifier_fails_closed_when_recipe_catalog_endpoint_is_removed",
         "test_verifier_fails_closed_when_recipe_catalog_contract_is_removed",
     ],
@@ -1006,6 +1056,20 @@ def verify_successor_registry_authority(missing: list[str], path: Path) -> None:
     )
 
 
+def verify_campaign_recipes_are_catalog_published(missing: list[str], service_text: str) -> None:
+    list_recipes_start = service_text.find("public ArtifactFactoryRecipeCatalogResult ListRecipes()")
+    default_batch_start = service_text.find("public static IReadOnlyList<string> GetAllowedFormats", list_recipes_start)
+    if list_recipes_start < 0 or default_batch_start < 0:
+        missing.append("Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs: cannot locate ListRecipes catalog body")
+        return
+
+    list_recipes_body = service_text[list_recipes_start:default_batch_start]
+    if ".Where(static item => DefaultBatchFamilies.Contains(item.Key))" in list_recipes_body:
+        missing.append(
+            "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs: ListRecipes must publish campaign_cold_open and mission_briefing recipes instead of filtering to default release/support families."
+        )
+
+
 def main() -> int:
     missing: list[str] = []
 
@@ -1019,6 +1083,8 @@ def main() -> int:
         for marker in markers:
             if marker not in text:
                 missing.append(f"{relative_path}: {marker}")
+        if relative_path == "Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs":
+            verify_campaign_recipes_are_catalog_published(missing, text)
 
     queue_paths: list[Path] = []
     for queue_path in (QUEUE_STAGING_PATH, DESIGN_QUEUE_STAGING_PATH):
