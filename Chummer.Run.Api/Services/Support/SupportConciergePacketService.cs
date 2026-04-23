@@ -34,19 +34,13 @@ public sealed class SupportConciergePacketService
         ClaimedInstallationDto? installation = ResolveInstallation(supportCase, installLinking?.ClaimedInstallations);
         PublicReleaseArtifactDto? artifact = ResolveArtifact(manifest, supportCase, installation);
         string? installedBuildReceiptId = ExtractInstalledBuildReceiptId(supportCase.Detail);
-        string supportChannel = Normalize(supportCase.ReleaseChannel) ?? Normalize(installation?.Channel) ?? manifest.Channel;
-        string supportVersion = Normalize(supportCase.ApplicationVersion) ?? Normalize(installation?.Version) ?? "unknown";
+        string? supportChannel = Normalize(supportCase.ReleaseChannel) ?? Normalize(installation?.Channel);
+        string? supportVersion = Normalize(supportCase.ApplicationVersion) ?? Normalize(installation?.Version);
         string releaseChannel = Normalize(supportCase.FixedChannel) ?? manifest.Channel;
         string releaseVersion = Normalize(supportCase.FixedVersion) ?? manifest.Version;
         string releaseLabel = BuildReleaseLabel(releaseChannel, releaseVersion);
         string installedLabel = BuildReleaseLabel(supportChannel, supportVersion);
-        bool channelAgrees = string.Equals(supportChannel, releaseChannel, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(supportChannel, manifest.Channel, StringComparison.OrdinalIgnoreCase);
-        bool installedBuildTruthPresent = !string.IsNullOrWhiteSpace(supportCase.ApplicationVersion)
-            && !string.IsNullOrWhiteSpace(supportCase.ReleaseChannel)
-            && !string.IsNullOrWhiteSpace(supportCase.HeadId)
-            && !string.IsNullOrWhiteSpace(supportCase.Platform)
-            && !string.IsNullOrWhiteSpace(supportCase.Arch);
+        bool channelAgrees = BuildChannelAgreement(supportChannel, supportCase.FixedChannel, manifest.Channel);
         bool supportCaseTruthPresent = !string.IsNullOrWhiteSpace(supportCase.CaseId)
             && !string.IsNullOrWhiteSpace(supportCase.Status)
             && !string.IsNullOrWhiteSpace(supportCase.Kind);
@@ -93,6 +87,8 @@ public sealed class SupportConciergePacketService
 
         IReadOnlyList<string> routes = BuildRoutes(supportCase, artifact);
         string correctnessBasis = BuildCorrectnessBasis(supportCase, installedLabel, releaseLabel, installedBuildReceiptId, channelAgrees);
+        SupportClosureReadiness closureReadiness = BuildClosureReadiness(presentation, installedTruth, releaseTruth, supportTruth);
+        InstalledToReleaseDelta installedToReleaseDelta = BuildInstalledToReleaseDelta(installedTruth, releaseTruth);
 
         return new InstallAwareSupportConciergePacket(
             ContractName: "chummer6-hub.install_aware_support_concierge.v1",
@@ -100,7 +96,7 @@ public sealed class SupportConciergePacketService
             MilestoneId: MilestoneId,
             FrontierId: FrontierId,
             BuiltAtUtc: DateTimeOffset.UtcNow,
-            IsInstallAware: installedBuildTruthPresent && supportCaseTruthPresent,
+            IsInstallAware: HasInstalledBuildTruth(installedTruth) && supportCaseTruthPresent,
             InstalledBuildTruth: installedTruth,
             ReleaseTruth: releaseTruth,
             SupportCaseTruth: supportTruth,
@@ -112,6 +108,7 @@ public sealed class SupportConciergePacketService
                 VerificationSummary: presentation.VerificationSummary,
                 FollowUpLaneSummary: presentation.FollowUpLaneSummary,
                 ReporterActionNeeded: presentation.ReporterActionNeeded,
+                ClosureReadiness: closureReadiness,
                 FirstPartyRoutes: routes),
             ReleaseExplainer: new ReleaseExplainerConciergePacket(
                 PacketId: $"release-explainer:{supportCase.CaseId}:{NormalizeToken(artifact?.Id ?? releaseLabel)}",
@@ -119,6 +116,7 @@ public sealed class SupportConciergePacketService
                 Summary: BuildReleaseExplainerSummary(presentation, installedLabel, releaseLabel, artifact),
                 CorrectnessBasis: correctnessBasis,
                 FallbackPosture: BuildFallbackPosture(presentation, artifact),
+                InstalledToReleaseDelta: installedToReleaseDelta,
                 FirstPartyRoutes: routes),
             PublicTrustWrapper: new PublicConciergeTrustWrapper(
                 Summary: "Public help and downloads may point to this bounded concierge packet, but installed-build truth, support history, and verification stay on signed-in first-party Hub surfaces.",
@@ -255,6 +253,17 @@ public sealed class SupportConciergePacketService
         return $"Case {supportCase.CaseId} binds {installedLabel}, {releaseLabel}, {receipt}, and support status {supportCase.Status}; {channelPosture}.";
     }
 
+    private static bool BuildChannelAgreement(string? installedChannel, string? fixedChannel, string manifestChannel)
+    {
+        if (string.IsNullOrWhiteSpace(installedChannel))
+        {
+            return false;
+        }
+
+        string releaseChannel = Normalize(fixedChannel) ?? manifestChannel;
+        return string.Equals(installedChannel, releaseChannel, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string BuildFallbackPosture(SupportCasePresentationViewModel presentation, PublicReleaseArtifactDto? artifact)
     {
         if (presentation.NeedsLinkedInstall)
@@ -270,6 +279,111 @@ public sealed class SupportConciergePacketService
         return artifact is null
             ? "Release artifact truth is not published for this install yet; keep support-directed recovery as the fallback."
             : "Use the same linked install and published artifact; public help is a wrapper, not the source of closure truth.";
+    }
+
+    private static SupportClosureReadiness BuildClosureReadiness(
+        SupportCasePresentationViewModel presentation,
+        InstallAwareBuildTruth installedTruth,
+        InstallAwareReleaseTruth releaseTruth,
+        SupportCaseConciergeTruth supportTruth)
+    {
+        bool installedBuildComplete = HasInstalledBuildTruth(installedTruth);
+        bool releaseArtifactReady = !string.IsNullOrWhiteSpace(releaseTruth.CurrentArtifactId)
+            && !string.IsNullOrWhiteSpace(releaseTruth.ArtifactSha256)
+            && !string.IsNullOrWhiteSpace(releaseTruth.ArtifactUrl);
+        bool reporterCanClose = !presentation.NeedsLinkedInstall
+            && !presentation.NeedsInstallUpdate
+            && supportTruth.CanVerifyFix
+            && releaseArtifactReady
+            && installedBuildComplete
+            && releaseTruth.ChannelAgreesWithInstalledBuild;
+
+        return new SupportClosureReadiness(
+            InstalledBuildComplete: installedBuildComplete,
+            ReleaseArtifactReady: releaseArtifactReady,
+            ReporterCanClose: reporterCanClose,
+            BlockerSummary: BuildClosureBlockerSummary(presentation, installedBuildComplete, releaseArtifactReady, releaseTruth.ChannelAgreesWithInstalledBuild));
+    }
+
+    private static string BuildClosureBlockerSummary(
+        SupportCasePresentationViewModel presentation,
+        bool installedBuildComplete,
+        bool releaseArtifactReady,
+        bool channelAgrees)
+    {
+        List<string> blockers = [];
+        if (!installedBuildComplete)
+        {
+            blockers.Add("installed build truth is incomplete");
+        }
+
+        if (!releaseArtifactReady)
+        {
+            blockers.Add("published artifact proof is incomplete");
+        }
+
+        if (!channelAgrees)
+        {
+            blockers.Add("installed channel and release channel do not agree");
+        }
+
+        if (presentation.NeedsLinkedInstall)
+        {
+            blockers.Add("the reporter still needs a linked install");
+        }
+
+        if (presentation.NeedsInstallUpdate)
+        {
+            blockers.Add("the reporter still needs to update before verification");
+        }
+
+        return blockers.Count == 0
+            ? "support closure is ready for reporter verification on the linked install"
+            : string.Join("; ", blockers);
+    }
+
+    private static bool HasInstalledBuildTruth(InstallAwareBuildTruth installedTruth)
+        => HasConcreteInstalledValue(installedTruth.ApplicationVersion)
+           && HasConcreteInstalledValue(installedTruth.ReleaseChannel)
+           && !string.IsNullOrWhiteSpace(installedTruth.HeadId)
+           && !string.IsNullOrWhiteSpace(installedTruth.Platform)
+           && !string.IsNullOrWhiteSpace(installedTruth.Arch)
+           && HasConcreteInstalledReceiptId(installedTruth.InstalledBuildReceiptId);
+
+    private static bool HasConcreteInstalledValue(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+           && !string.Equals(value, "unknown", StringComparison.OrdinalIgnoreCase)
+           && !value.StartsWith("unknown-", StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasConcreteInstalledReceiptId(string? receiptId)
+        => HasConcreteInstalledValue(receiptId)
+           && !string.Equals(receiptId.Trim(), "pending", StringComparison.OrdinalIgnoreCase)
+           && !string.Equals(receiptId.Trim(), "none", StringComparison.OrdinalIgnoreCase)
+           && !string.Equals(receiptId.Trim(), "n/a", StringComparison.OrdinalIgnoreCase)
+           && !receiptId.Trim().StartsWith("missing-", StringComparison.OrdinalIgnoreCase);
+
+    private static InstalledToReleaseDelta BuildInstalledToReleaseDelta(
+        InstallAwareBuildTruth installedTruth,
+        InstallAwareReleaseTruth releaseTruth)
+    {
+        string installedVersion = Normalize(installedTruth.ApplicationVersion) ?? "unknown-version";
+        string releaseVersion = Normalize(releaseTruth.FixedVersion) ?? releaseTruth.ManifestVersion;
+        string installedChannel = Normalize(installedTruth.ReleaseChannel) ?? "unknown-channel";
+        string releaseChannel = Normalize(releaseTruth.FixedChannel) ?? releaseTruth.ManifestChannel;
+        bool versionChanges = !string.Equals(installedVersion, releaseVersion, StringComparison.OrdinalIgnoreCase);
+        bool channelChanges = !string.Equals(installedChannel, releaseChannel, StringComparison.OrdinalIgnoreCase);
+        bool artifactMatchesDevice = Matches(releaseTruth.ArtifactHeadId, installedTruth.HeadId)
+            && Matches(releaseTruth.ArtifactPlatform, installedTruth.Platform)
+            && Matches(releaseTruth.ArtifactArch, installedTruth.Arch);
+
+        return new InstalledToReleaseDelta(
+            InstalledVersion: installedVersion,
+            ReleaseVersion: releaseVersion,
+            InstalledChannel: installedChannel,
+            ReleaseChannel: releaseChannel,
+            VersionChanges: versionChanges,
+            ChannelChanges: channelChanges,
+            ArtifactMatchesInstalledDevice: artifactMatchesDevice);
     }
 
     private static string? ExtractInstalledBuildReceiptId(string? detail)
@@ -323,8 +437,8 @@ public sealed record InstallAwareSupportConciergePacket(
 
 public sealed record InstallAwareBuildTruth(
     string? InstallationId,
-    string ApplicationVersion,
-    string ReleaseChannel,
+    string? ApplicationVersion,
+    string? ReleaseChannel,
     string? HeadId,
     string? Platform,
     string? Arch,
@@ -369,6 +483,7 @@ public sealed record SupportClosureConciergePacket(
     string VerificationSummary,
     string FollowUpLaneSummary,
     bool ReporterActionNeeded,
+    SupportClosureReadiness ClosureReadiness,
     IReadOnlyList<string> FirstPartyRoutes);
 
 public sealed record ReleaseExplainerConciergePacket(
@@ -377,7 +492,23 @@ public sealed record ReleaseExplainerConciergePacket(
     string Summary,
     string CorrectnessBasis,
     string FallbackPosture,
+    InstalledToReleaseDelta InstalledToReleaseDelta,
     IReadOnlyList<string> FirstPartyRoutes);
+
+public sealed record SupportClosureReadiness(
+    bool InstalledBuildComplete,
+    bool ReleaseArtifactReady,
+    bool ReporterCanClose,
+    string BlockerSummary);
+
+public sealed record InstalledToReleaseDelta(
+    string InstalledVersion,
+    string ReleaseVersion,
+    string InstalledChannel,
+    string ReleaseChannel,
+    bool VersionChanges,
+    bool ChannelChanges,
+    bool ArtifactMatchesInstalledDevice);
 
 public sealed record PublicConciergeTrustWrapper(
     string Summary,

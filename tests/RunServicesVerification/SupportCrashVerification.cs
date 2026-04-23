@@ -242,13 +242,102 @@ internal static class SupportCrashVerification
             VerificationAssert.Equal("next90-m111-hub-support-concierge", conciergePacket.PackageId, "M111 support concierge packet should cite the assigned package.");
             VerificationAssert.True(conciergePacket.IsInstallAware, "Support concierge packet should require installed build, channel, device, and support-case truth.");
             VerificationAssert.Equal("receipt-install-1", conciergePacket.InstalledBuildTruth.InstalledBuildReceiptId ?? string.Empty, "Support concierge packet should carry the installed-build receipt from support truth.");
-            VerificationAssert.Equal("1.1.0", conciergePacket.InstalledBuildTruth.ApplicationVersion, "Support concierge packet should preserve the affected installed build.");
-            VerificationAssert.Equal("preview", conciergePacket.InstalledBuildTruth.ReleaseChannel, "Support concierge packet should preserve the affected installed channel.");
+            VerificationAssert.Equal("1.1.0", conciergePacket.InstalledBuildTruth.ApplicationVersion ?? string.Empty, "Support concierge packet should preserve the affected installed build.");
+            VerificationAssert.Equal("preview", conciergePacket.InstalledBuildTruth.ReleaseChannel ?? string.Empty, "Support concierge packet should preserve the affected installed channel.");
             VerificationAssert.Equal("avalonia-linux-x64-installer", conciergePacket.ReleaseTruth.CurrentArtifactId ?? string.Empty, "Release explainer packet should resolve the current published artifact for the install.");
             VerificationAssert.True(conciergePacket.ReleaseTruth.ChannelAgreesWithInstalledBuild, "Release explainer packet should prove channel agreement before public wrapper promotion.");
+            VerificationAssert.True(!conciergePacket.SupportClosure.ClosureReadiness.ReporterCanClose, "Support closure packet should not mark reporter closure ready before the fixed release is installed.");
+            VerificationAssert.True(conciergePacket.SupportClosure.ClosureReadiness.ReleaseArtifactReady, "Support closure readiness should require a published artifact URL and checksum.");
+            VerificationAssert.True(conciergePacket.SupportClosure.ClosureReadiness.BlockerSummary.Contains("update before verification", StringComparison.Ordinal), "Support closure readiness should explain the install update blocker as structured truth.");
+            VerificationAssert.True(conciergePacket.ReleaseExplainer.InstalledToReleaseDelta.VersionChanges, "Release explainer delta should show the reporter is moving from the installed build to the fixed release.");
+            VerificationAssert.True(conciergePacket.ReleaseExplainer.InstalledToReleaseDelta.ArtifactMatchesInstalledDevice, "Release explainer delta should prove the resolved artifact matches the installed head, platform, and architecture.");
             VerificationAssert.True(conciergePacket.SupportClosure.FirstPartyRoutes.Contains("/api/v1/install-linking/continuation/support"), "Support closure packet should keep native support follow-through in first-party routes.");
             VerificationAssert.True(conciergePacket.ReleaseExplainer.CorrectnessBasis.Contains("receipt-install-1", StringComparison.Ordinal), "Release explainer packet should cite installed-build receipt truth.");
             VerificationAssert.True(conciergePacket.PublicTrustWrapper.FirstPartyOnlyTruth, "Public wrapper must not become the source of installed-build or support-case truth.");
+
+            SupportCaseProjection installBackedCase = supportCases.Submit(
+                "usr_runner",
+                "subject.runner",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Installer support case with claimed install tuple",
+                    Summary: "Reporter attached the affected install but omitted duplicate device tuple fields.",
+                    Detail: "Installed build receipt: receipt-claimed-install-only",
+                    InstallationId: "install-1",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            InstallAwareSupportConciergePacket installBackedPacket = conciergePackets.Build(
+                installBackedCase,
+                installLinking.GetSummary("usr_runner", "subject.runner"));
+            VerificationAssert.True(installBackedPacket.IsInstallAware, "M111 concierge packets should compile install awareness from resolved claimed-install truth when the support case carries the affected installation id.");
+            VerificationAssert.Equal("1.1.2", installBackedPacket.InstalledBuildTruth.ApplicationVersion ?? string.Empty, "Claimed-install truth should fill the installed version when support intake omits duplicate version fields.");
+            VerificationAssert.Equal("avalonia", installBackedPacket.InstalledBuildTruth.HeadId ?? string.Empty, "Claimed-install truth should fill the desktop head when support intake omits duplicate device fields.");
+            VerificationAssert.Equal("linux", installBackedPacket.InstalledBuildTruth.Platform ?? string.Empty, "Claimed-install truth should fill the platform when support intake omits duplicate device fields.");
+            VerificationAssert.Equal("x64", installBackedPacket.InstalledBuildTruth.Arch ?? string.Empty, "Claimed-install truth should fill the architecture when support intake omits duplicate device fields.");
+            VerificationAssert.Equal("receipt-claimed-install-only", installBackedPacket.InstalledBuildTruth.InstalledBuildReceiptId ?? string.Empty, "Claimed-install-backed concierge packets should still carry the installed-build receipt from support detail.");
+
+            SupportCaseProjection receiptlessInstallCase = supportCases.Submit(
+                "usr_runner",
+                "subject.runner",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Installer support case without installed-build receipt",
+                    Summary: "Reporter attached an install but the signed installed-build receipt did not arrive.",
+                    Detail: "Reporter attached install context but no installed build receipt marker.",
+                    InstallationId: "install-1",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            InstallAwareSupportConciergePacket receiptlessInstallPacket = conciergePackets.Build(
+                receiptlessInstallCase,
+                installLinking.GetSummary("usr_runner", "subject.runner"));
+            VerificationAssert.True(!receiptlessInstallPacket.IsInstallAware, "M111 concierge packets must not treat claimed install tuple fields as install-aware truth without an installed-build receipt id.");
+            VerificationAssert.True(!receiptlessInstallPacket.SupportClosure.ClosureReadiness.InstalledBuildComplete, "M111 support closure must block tuple-only install context until installed-build receipt truth is present.");
+            VerificationAssert.True(receiptlessInstallPacket.SupportClosure.ClosureReadiness.BlockerSummary.Contains("installed build truth is incomplete", StringComparison.Ordinal), "M111 support closure should explain receiptless installed-build truth as incomplete.");
+
+            SupportCaseProjection placeholderReceiptCase = supportCases.Submit(
+                "usr_runner",
+                "subject.runner",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.InstallHelp,
+                    Title: "Installer support case with placeholder receipt",
+                    Summary: "Reporter attached the affected install but the receipt id was still a placeholder.",
+                    Detail: "Installed build receipt: missing-installed-build-receipt",
+                    InstallationId: "install-1",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            InstallAwareSupportConciergePacket placeholderReceiptPacket = conciergePackets.Build(
+                placeholderReceiptCase,
+                installLinking.GetSummary("usr_runner", "subject.runner"));
+            VerificationAssert.True(!placeholderReceiptPacket.IsInstallAware, "M111 concierge packets must not treat placeholder installed-build receipt ids as signed installed-build truth.");
+            VerificationAssert.True(!placeholderReceiptPacket.SupportClosure.ClosureReadiness.InstalledBuildComplete, "M111 support closure must block placeholder installed-build receipt ids.");
+            VerificationAssert.True(placeholderReceiptPacket.SupportClosure.ClosureReadiness.BlockerSummary.Contains("installed build truth is incomplete", StringComparison.Ordinal), "M111 support closure should explain placeholder receipt truth as incomplete.");
+
+            SupportCaseProjection crossChannelCase = supportCases.Transition(
+                installBackedCase.CaseId,
+                new SupportCaseTransitionRequest(
+                    TargetStatus: SupportCaseStatuses.ReleasedToReporterChannel,
+                    Note: "Fix landed in a different release channel.",
+                    FixedVersion: "1.2.0",
+                    FixedChannel: "stable",
+                    Actor: "fleet"));
+            InstallAwareSupportConciergePacket crossChannelPacket = conciergePackets.Build(
+                crossChannelCase,
+                installLinking.GetSummary("usr_runner", "subject.runner"));
+            VerificationAssert.True(!crossChannelPacket.ReleaseTruth.ChannelAgreesWithInstalledBuild, "M111 release concierge channel agreement must compare the installed channel to fixed release truth before falling back to manifest channel.");
+            VerificationAssert.True(crossChannelPacket.SupportClosure.ClosureReadiness.BlockerSummary.Contains("installed channel and release channel do not agree", StringComparison.Ordinal), "M111 support closure should block reporter closure when fixed release channel differs from the installed channel.");
+
+            SupportCaseProjection unlinkedCase = supportCases.Submit(
+                "usr_runner",
+                "subject.runner",
+                new SupportCaseSubmitRequest(
+                    Kind: SupportCaseKinds.Feedback,
+                    Title: "Release copy question",
+                    Summary: "Reporter asks about release notes without attaching an install.",
+                    Detail: "No installed build detail was attached.",
+                    Source: SupportCaseSourceKinds.HubAccount));
+            InstallAwareSupportConciergePacket unlinkedPacket = conciergePackets.Build(
+                unlinkedCase,
+                installLinking.GetSummary("usr_runner", "subject.runner"));
+            VerificationAssert.True(!unlinkedPacket.IsInstallAware, "M111 concierge packets must not treat unknown labels or manifest fallback as installed-build truth.");
+            VerificationAssert.True(!unlinkedPacket.ReleaseTruth.ChannelAgreesWithInstalledBuild, "M111 release concierge must not claim channel agreement when the installed channel is missing.");
+            VerificationAssert.True(unlinkedPacket.SupportClosure.ClosureReadiness.BlockerSummary.Contains("installed build truth is incomplete", StringComparison.Ordinal), "M111 support closure should block closure when installed build truth is incomplete.");
 
             SupportStore reloadedStore = new(configuration, NullLogger<SupportStore>.Instance);
             SupportAttachmentStorageService reloadedAttachments = new(configuration);
