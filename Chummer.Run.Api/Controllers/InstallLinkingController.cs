@@ -578,7 +578,7 @@ public sealed class InstallLinkingController : ControllerBase
         string sanitized = trimmed;
         bool redacted = false;
 
-        int fragmentIndex = sanitized.IndexOf('#');
+        int fragmentIndex = FindNativeRequestedActionFragmentIndex(sanitized);
         string beforeFragment = fragmentIndex >= 0 ? sanitized[..fragmentIndex] : sanitized;
         string fragment = fragmentIndex >= 0 ? sanitized[fragmentIndex..] : string.Empty;
         int queryIndex = beforeFragment.IndexOf('?');
@@ -647,13 +647,72 @@ public sealed class InstallLinkingController : ControllerBase
         return redacted ? sanitized : href;
     }
 
+    private static int FindNativeRequestedActionFragmentIndex(string href)
+    {
+        for (int index = 0; index < href.Length; index++)
+        {
+            if (href[index] != '#')
+            {
+                continue;
+            }
+
+            if (IsHtmlNumericEntityHash(href, index))
+            {
+                continue;
+            }
+
+            return index;
+        }
+
+        return -1;
+    }
+
+    private static bool IsHtmlNumericEntityHash(string href, int hashIndex)
+    {
+        if (hashIndex <= 0 || href[hashIndex - 1] != '&')
+        {
+            return false;
+        }
+
+        int bodyStart = hashIndex + 1;
+        if (bodyStart >= href.Length)
+        {
+            return false;
+        }
+
+        if (href[bodyStart] is 'x' or 'X')
+        {
+            bodyStart++;
+            if (bodyStart >= href.Length)
+            {
+                return false;
+            }
+
+            int hexIndex = bodyStart;
+            while (hexIndex < href.Length && Uri.IsHexDigit(href[hexIndex]))
+            {
+                hexIndex++;
+            }
+
+            return hexIndex > bodyStart && hexIndex < href.Length && href[hexIndex] == ';';
+        }
+
+        int digitIndex = bodyStart;
+        while (digitIndex < href.Length && char.IsDigit(href[digitIndex]))
+        {
+            digitIndex++;
+        }
+
+        return digitIndex > bodyStart && digitIndex < href.Length && href[digitIndex] == ';';
+    }
+
     private static string SanitizeInstallLinkSecretQueryComponent(string component, string prefix, out bool redacted)
     {
         redacted = false;
         if (string.IsNullOrEmpty(component)
             || !component.StartsWith(prefix, StringComparison.Ordinal)
             || component.Length == prefix.Length
-            || !component.Contains('=', StringComparison.Ordinal))
+            || !ContainsInstallLinkSecretEqualsCandidate(component))
         {
             return component;
         }
@@ -695,11 +754,32 @@ public sealed class InstallLinkingController : ControllerBase
         return $"{prefix}{sanitizedBody}";
     }
 
+    private static bool ContainsInstallLinkSecretEqualsCandidate(string component)
+        => component.Contains('=', StringComparison.Ordinal)
+           || component.Contains("%3D", StringComparison.OrdinalIgnoreCase)
+           || component.Contains("%253D", StringComparison.OrdinalIgnoreCase)
+           || component.Contains("&equals;", StringComparison.OrdinalIgnoreCase)
+           || component.Contains("&#61;", StringComparison.OrdinalIgnoreCase)
+           || component.Contains("&#x3d;", StringComparison.OrdinalIgnoreCase);
+
     private static (int Index, int Length) FindNextInstallLinkSecretSeparator(string body, int startIndex)
     {
         for (int index = startIndex; index < body.Length; index++)
         {
             char current = body[index];
+            (bool hasHtmlEntitySeparator, int htmlEntitySeparatorLength) = MatchHtmlEntityInstallLinkSecretSeparator(body, index);
+            if (hasHtmlEntitySeparator)
+            {
+                return (index, htmlEntitySeparatorLength);
+            }
+
+            (bool hasHtmlEntityEquals, int htmlEntityEqualsLength) = MatchHtmlEntityInstallLinkSecretEquals(body, index);
+            if (hasHtmlEntityEquals)
+            {
+                index += htmlEntityEqualsLength - 1;
+                continue;
+            }
+
             if (current is '&' or ';')
             {
                 return (index, 1);
@@ -726,6 +806,35 @@ public sealed class InstallLinkingController : ControllerBase
         return (-1, 0);
     }
 
+    private static (bool Matched, int Length) MatchHtmlEntityInstallLinkSecretSeparator(string body, int index)
+    {
+        string remaining = body[index..];
+        if (remaining.StartsWith("&amp;", StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, 5);
+        }
+
+        if (remaining.StartsWith("&#38;", StringComparison.OrdinalIgnoreCase)
+            || remaining.StartsWith("&#59;", StringComparison.OrdinalIgnoreCase)
+            || remaining.StartsWith("&num;", StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, 5);
+        }
+
+        if (remaining.StartsWith("&#x26;", StringComparison.OrdinalIgnoreCase)
+            || remaining.StartsWith("&#x3b;", StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, 6);
+        }
+
+        if (remaining.StartsWith("&semi;", StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, 6);
+        }
+
+        return (false, 0);
+    }
+
     private static string SanitizeInstallLinkSecretQueryPart(string part, out bool redacted)
     {
         redacted = false;
@@ -734,7 +843,7 @@ public sealed class InstallLinkingController : ControllerBase
             return part;
         }
 
-        int equalsIndex = part.IndexOf('=');
+        (int equalsIndex, int equalsLength) = FindInstallLinkSecretEquals(part);
         string rawKey = equalsIndex >= 0
             ? part[..equalsIndex]
             : part;
@@ -747,7 +856,63 @@ public sealed class InstallLinkingController : ControllerBase
 
         string encodedValue = Uri.EscapeDataString("[redacted-install-link-secret]");
         redacted = true;
-        return $"{rawKey}={encodedValue}";
+        string separator = equalsIndex >= 0
+            ? part.Substring(equalsIndex, equalsLength)
+            : "=";
+        return $"{rawKey}{separator}{encodedValue}";
+    }
+
+    private static (int Index, int Length) FindInstallLinkSecretEquals(string part)
+    {
+        int literalIndex = part.IndexOf('=');
+        if (literalIndex >= 0)
+        {
+            return (literalIndex, 1);
+        }
+
+        for (int index = 0; index < part.Length; index++)
+        {
+            (bool hasHtmlEntityEquals, int htmlEntityEqualsLength) = MatchHtmlEntityInstallLinkSecretEquals(part, index);
+            if (hasHtmlEntityEquals)
+            {
+                return (index, htmlEntityEqualsLength);
+            }
+
+            if (index + 2 < part.Length
+                && part.AsSpan(index, 3).Equals("%3D", StringComparison.OrdinalIgnoreCase))
+            {
+                return (index, 3);
+            }
+
+            if (index + 4 < part.Length
+                && part.AsSpan(index, 5).Equals("%253D", StringComparison.OrdinalIgnoreCase))
+            {
+                return (index, 5);
+            }
+        }
+
+        return (-1, 0);
+    }
+
+    private static (bool Matched, int Length) MatchHtmlEntityInstallLinkSecretEquals(string body, int index)
+    {
+        string remaining = body[index..];
+        if (remaining.StartsWith("&equals;", StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, 8);
+        }
+
+        if (remaining.StartsWith("&#61;", StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, 5);
+        }
+
+        if (remaining.StartsWith("&#x3d;", StringComparison.OrdinalIgnoreCase))
+        {
+            return (true, 6);
+        }
+
+        return (false, 0);
     }
 
     private static string DecodeInstallLinkSecretKey(string rawKey)
@@ -976,7 +1141,8 @@ public sealed class InstallLinkingController : ControllerBase
             return null;
         }
 
-        if (Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absoluteUri))
+        if (!trimmed.StartsWith("/", StringComparison.Ordinal)
+            && Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? absoluteUri))
         {
             if (!IsTrustedNativeInstallRailAbsoluteUri(absoluteUri))
             {
@@ -990,14 +1156,16 @@ public sealed class InstallLinkingController : ControllerBase
             return null;
         }
 
-        if (trimmed.Contains('\\')
-            || ContainsEncodedPathSeparator(trimmed)
-            || Uri.TryCreate(trimmed, UriKind.Absolute, out _))
+        string pathForValidation = NativeInstallRailPathForValidation(trimmed);
+        if (pathForValidation.Contains('\\')
+            || ContainsEncodedPathSeparator(pathForValidation)
+            || (!pathForValidation.StartsWith("/", StringComparison.Ordinal)
+                && Uri.TryCreate(trimmed, UriKind.Absolute, out _)))
         {
             return null;
         }
 
-        string path = NormalizeBrowserRailPath(trimmed);
+        string path = NormalizeBrowserRailPath(pathForValidation);
         if (path.Equals(NativeContinuationHref, StringComparison.OrdinalIgnoreCase))
         {
             return NativeContinuationHref;
@@ -1019,16 +1187,63 @@ public sealed class InstallLinkingController : ControllerBase
     }
 
     private static bool IsTrustedNativeInstallRailAbsoluteUri(Uri absoluteUri)
-        => (string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            || string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase))
-           && IsTrustedNativeInstallRailHost(absoluteUri.Host);
+    {
+        if (IsTrustedNativeInstallRailPublicHost(absoluteUri.Host))
+        {
+            return string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+        }
 
-    private static bool IsTrustedNativeInstallRailHost(string host)
+        return IsAppLocalCallbackHost(absoluteUri.Host)
+               && (string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(absoluteUri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsTrustedNativeInstallRailPublicHost(string host)
         => string.Equals(host, "chummer.run", StringComparison.OrdinalIgnoreCase)
-           || string.Equals(host, "www.chummer.run", StringComparison.OrdinalIgnoreCase)
-           || IsAppLocalCallbackHost(host);
+           || string.Equals(host, "www.chummer.run", StringComparison.OrdinalIgnoreCase);
+
+    private static string NativeInstallRailPathForValidation(string href)
+    {
+        int queryOrFragmentIndex = href.IndexOfAny(['?', '#']);
+        return queryOrFragmentIndex >= 0 ? href[..queryOrFragmentIndex] : href;
+    }
 
     private static bool ContainsEncodedPathSeparator(string href)
+    {
+        if (ContainsSingleEncodedPathSeparator(href))
+        {
+            return true;
+        }
+
+        string decoded = href;
+        for (int index = 0; index < 4; index++)
+        {
+            string next;
+            try
+            {
+                next = Uri.UnescapeDataString(decoded);
+            }
+            catch (UriFormatException)
+            {
+                return false;
+            }
+
+            if (string.Equals(next, decoded, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            decoded = next;
+            if (ContainsSingleEncodedPathSeparator(decoded))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsSingleEncodedPathSeparator(string href)
         => href.Contains("%2f", StringComparison.OrdinalIgnoreCase)
            || href.Contains("%5c", StringComparison.OrdinalIgnoreCase);
 
@@ -1297,7 +1512,7 @@ public sealed class InstallLinkingController : ControllerBase
             return NativeContinuationHref;
         }
 
-        return NormalizeNativeInstallRailHref(item.PrimaryActionHref) ?? NativeContinuationHref;
+        return NativeContinuationHref;
     }
 
     private static string BuildNativeRollbackPlan(ClaimedInstallationDto installation, DownloadReceiptDto? receipt)
@@ -1428,7 +1643,7 @@ public sealed class InstallLinkingController : ControllerBase
         string platform,
         string arch)
         => QueryHelpers.AddQueryString(
-            StripReservedInstallLinkCallbackQuery(callbackUri),
+            StripReservedInstallLinkCallbackState(callbackUri),
             new Dictionary<string, string?>
             {
                 ["code"] = callbackCode,
@@ -1442,33 +1657,69 @@ public sealed class InstallLinkingController : ControllerBase
                 ["installLinkTransport"] = "grant_callback"
             });
 
-    private static string StripReservedInstallLinkCallbackQuery(string callbackUri)
+    private static string StripReservedInstallLinkCallbackState(string callbackUri)
     {
-        if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed) || string.IsNullOrEmpty(parsed.Query))
+        if (!Uri.TryCreate(callbackUri, UriKind.Absolute, out Uri? parsed)
+            || (string.IsNullOrEmpty(parsed.Query) && string.IsNullOrEmpty(parsed.Fragment)))
         {
             return callbackUri;
         }
 
-        var preservedQuery = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
-        foreach (var item in QueryHelpers.ParseQuery(parsed.Query))
+        var builder = new UriBuilder(parsed)
+        {
+            Query = string.Empty,
+            Fragment = string.Empty
+        };
+        string baseUri = builder.Uri.ToString();
+        string withQuery = AddPreservedInstallLinkCallbackComponent(baseUri, parsed.Query, prefix: "?");
+        return AppendPreservedInstallLinkCallbackFragment(withQuery, parsed.Fragment);
+    }
+
+    private static string AddPreservedInstallLinkCallbackComponent(string baseUri, string component, string prefix)
+    {
+        Dictionary<string, string?> preserved = PreserveInstallLinkCallbackComponent(component, prefix);
+        return preserved.Count == 0
+            ? baseUri
+            : QueryHelpers.AddQueryString(baseUri, preserved);
+    }
+
+    private static string AppendPreservedInstallLinkCallbackFragment(string baseUri, string fragment)
+    {
+        Dictionary<string, string?> preserved = PreserveInstallLinkCallbackComponent(fragment, "#");
+        return preserved.Count == 0
+            ? baseUri
+            : $"{baseUri}#{BuildInstallLinkCallbackComponent(preserved)}";
+    }
+
+    private static Dictionary<string, string?> PreserveInstallLinkCallbackComponent(string component, string prefix)
+    {
+        var preserved = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(component)
+            || !component.StartsWith(prefix, StringComparison.Ordinal)
+            || component.Length == prefix.Length
+            || !component.Contains('=', StringComparison.Ordinal))
+        {
+            return preserved;
+        }
+
+        foreach (var item in QueryHelpers.ParseQuery(component[prefix.Length..]))
         {
             if (InstallLinkCallbackReservedQueryKeys.Contains(item.Key))
             {
                 continue;
             }
 
-            preservedQuery[item.Key] = item.Value.ToString();
+            preserved[item.Key] = item.Value.ToString();
         }
 
-        var builder = new UriBuilder(parsed)
-        {
-            Query = string.Empty
-        };
-        string baseUri = builder.Uri.ToString();
-        return preservedQuery.Count == 0
-            ? baseUri
-            : QueryHelpers.AddQueryString(baseUri, preservedQuery);
+        return preserved;
     }
+
+    private static string BuildInstallLinkCallbackComponent(Dictionary<string, string?> values)
+        => string.Join(
+            "&",
+            values.Select(static item =>
+                $"{Uri.EscapeDataString(item.Key)}={Uri.EscapeDataString(item.Value ?? string.Empty)}"));
 
     private static string NormalizeResponseValue(string? value)
         => string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
