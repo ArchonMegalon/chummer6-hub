@@ -407,6 +407,84 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("forbidden active-run proof marker: run_ooda_design_supervisor_until_quiet", result.stderr)
 
+    def test_queue_identity_guard_rejects_html_encoded_active_run_markers(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-html-helper-") as temp_dir:
+            queue_path = Path(temp_dir) / "queue.yaml"
+            source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            source_text = source_queue_path.read_text(encoding="utf-8")
+            start, end = self._package_block_range(source_text)
+            package_block = source_text[start:end]
+            updated_block = package_block + "      - ACTIVE&#95;RUN&#95;HANDOFF.generated.md copied into queue proof\n"
+            queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_FLEET_QUEUE"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_DESIGN_QUEUE"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: ACTIVE_RUN_HANDOFF", result.stderr)
+
+    def test_queue_identity_guard_rejects_url_encoded_active_run_markers(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-url-helper-") as temp_dir:
+            queue_path = Path(temp_dir) / "queue.yaml"
+            source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            source_text = source_queue_path.read_text(encoding="utf-8")
+            start, end = self._package_block_range(source_text)
+            package_block = source_text[start:end]
+            updated_block = package_block + "      - TASK%5FLOCAL%5FTELEMETRY.generated.json copied into queue proof\n"
+            queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_FLEET_QUEUE"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_DESIGN_QUEUE"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+
+    def test_queue_identity_guard_rejects_hex_encoded_helper_commands(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-hex-helper-") as temp_dir:
+            queue_path = Path(temp_dir) / "queue.yaml"
+            source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+            source_text = source_queue_path.read_text(encoding="utf-8")
+            start, end = self._package_block_range(source_text)
+            package_block = source_text[start:end]
+            updated_block = package_block + "      - run\\x5fooda\\x5fdesign\\x5fsupervisor\\x5funtil\\x5fquiet copied into queue proof\n"
+            queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_FLEET_QUEUE"] = str(queue_path)
+            env["CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_DESIGN_QUEUE"] = str(queue_path)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("forbidden active-run proof marker: run_ooda_design_supervisor_until_quiet", result.stderr)
+
     def test_queue_identity_guard_rejects_design_queue_drift_when_fleet_queue_stays_canonical(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-queue-design-drift-") as temp_dir:
             fleet_queue_path = Path(temp_dir) / "fleet-queue.yaml"
