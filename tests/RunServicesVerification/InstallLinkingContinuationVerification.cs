@@ -713,7 +713,7 @@ internal static class InstallLinkingContinuationVerification
                     Title: "Native app encoded separator secret label",
                     Summary: "The app sent encoded separators before install-link secrets while filing native support.",
                     Detail: "Desktop payload carried encoded query and fragment separators.",
-                    RequestedActionHref: "/install-link/callback?state=desktop%3BaccessToken=encoded-separator-access%26grantId=encoded-separator-grant#state=desktop%253BclaimCode=double-encoded-separator-claim%2526installedBuildReceiptId=double-encoded-separator-receipt"));
+                    RequestedActionHref: "/install-link/callback?state=desktop%3BaccessToken=encoded-separator-access%26grantId=encoded-separator-grant%23claimCode=encoded-hash-claim#state=desktop%253BclaimCode=double-encoded-separator-claim%2526installedBuildReceiptId=double-encoded-separator-receipt%2523receiptId=double-encoded-hash-receipt"));
             ObjectResult encodedSeparatorSecretAccepted = encodedSeparatorSecretSupportResult.Result as ObjectResult
                 ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with encoded secret separators.");
             VerificationAssert.Equal(StatusCodes.Status202Accepted, encodedSeparatorSecretAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop requested-action separators are encoded.");
@@ -722,11 +722,15 @@ internal static class InstallLinkingContinuationVerification
             SupportCaseProjection? encodedSeparatorSecretCase = supportCases.GetForReporter(encodedSeparatorSecretSupport.CaseId, "usr-native", "subject.native");
             VerificationAssert.True(encodedSeparatorSecretCase is not null, "Native support continuation should create the encoded-separator-secret support case.");
             VerificationAssert.True(encodedSeparatorSecretCase!.Detail.Contains("state=desktop%3BaccessToken=%5Bredacted-install-link-secret%5D%26grantId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact query secrets after encoded separators.");
+            VerificationAssert.True(encodedSeparatorSecretCase.Detail.Contains("%23claimCode=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact query secrets after encoded hash separators.");
             VerificationAssert.True(encodedSeparatorSecretCase.Detail.Contains("#state=desktop%253BclaimCode=%5Bredacted-install-link-secret%5D%2526installedBuildReceiptId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact fragment secrets after double-encoded separators.");
+            VerificationAssert.True(encodedSeparatorSecretCase.Detail.Contains("%2523receiptId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact fragment secrets after double-encoded hash separators.");
             VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("encoded-separator-access", StringComparison.Ordinal), "Native support case should not persist access-token values after encoded separators.");
             VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("encoded-separator-grant", StringComparison.Ordinal), "Native support case should not persist grant values after encoded separators.");
+            VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("encoded-hash-claim", StringComparison.Ordinal), "Native support case should not persist claim-code values after encoded hash separators.");
             VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("double-encoded-separator-claim", StringComparison.Ordinal), "Native support case should not persist claim-code values after double-encoded separators.");
             VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("double-encoded-separator-receipt", StringComparison.Ordinal), "Native support case should not persist installed-build receipt values after double-encoded separators.");
+            VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("double-encoded-hash-receipt", StringComparison.Ordinal), "Native support case should not persist receipt values after double-encoded hash separators.");
 
             ActionResult<DesktopInstallNativeContinuationResponse> unauthorizedResult = controller.ContinueClaimedInstall(
                 new DesktopInstallNativeContinuationRequest("install-native", "wrong-token"));
