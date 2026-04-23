@@ -293,6 +293,345 @@ def validate_batch_launch_response(
             "artifact-factory source-pack batch response jobCount must match the launch request requiredFamilies."
         )
 
+    validate_media_factory_request_response(response, recipe_catalog, normalized_payload)
+    validate_campaign_media_factory_response(response, recipe_catalog, normalized_payload)
+
+
+def validate_media_factory_request_response(
+    response: dict[str, Any],
+    recipe_catalog: dict[str, Any],
+    normalized_payload: dict[str, Any],
+) -> None:
+    recipes_by_family = {
+        str(recipe.get("family")).strip().replace("-", "_").lower(): recipe
+        for recipe in recipe_catalog.get("recipes", [])
+        if isinstance(recipe, dict) and str(recipe.get("family")).strip()
+    }
+    expected_families = normalize_string_list(
+        normalized_payload.get("requiredFamilies"),
+        "launch request requiredFamilies",
+    )
+    media_factory_requests = response.get("mediaFactoryRequests")
+    if not isinstance(media_factory_requests, list):
+        raise LaunchValidationError(
+            "artifact-factory source-pack batch response mediaFactoryRequests must be an array."
+        )
+
+    for family in expected_families:
+        recipe = recipes_by_family.get(family)
+        recipe_id = string_field(recipe or {}, "recipeId")
+        if not recipe_id:
+            raise LaunchValidationError(
+                f"artifact-factory recipe catalog is missing recipeId for family '{family}'."
+            )
+
+        matching_requests = [
+            item
+            for item in media_factory_requests
+            if isinstance(item, dict) and string_field(item, "recipeId") == recipe_id
+        ]
+        if len(matching_requests) != 1:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequests must include exactly one recipeId '{recipe_id}'."
+            )
+
+        validate_media_factory_request_family_shape(family, recipe_id, matching_requests[0], normalized_payload)
+
+
+def validate_media_factory_request_family_shape(
+    family: str,
+    recipe_id: str,
+    media_request: dict[str, Any],
+    normalized_payload: dict[str, Any],
+) -> None:
+    required_receipt_refs = normalize_string_list(
+        media_request.get("requiredReceiptRefs"),
+        f"mediaFactoryRequest '{recipe_id}' requiredReceiptRefs",
+    )
+    expected_receipt_prefixes = expected_receipt_prefixes_for_family(family)
+    missing_receipt_prefixes = [
+        prefix for prefix in expected_receipt_prefixes if not receipt_ref_matches_prefix(set(required_receipt_refs), prefix)
+    ]
+    if missing_receipt_prefixes:
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' missing receipt prefix(es): "
+            + ", ".join(missing_receipt_prefixes)
+            + "."
+        )
+
+    public_proof_shelf_refs = normalize_string_list(
+        media_request.get("publicProofShelfRefs"),
+        f"mediaFactoryRequest '{recipe_id}' publicProofShelfRefs",
+    )
+    approved_source_packs = media_request.get("approvedSourcePacks")
+    if not isinstance(approved_source_packs, list) or not approved_source_packs:
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' must include approvedSourcePacks."
+        )
+
+    expected_source_pack_ids = expected_source_pack_ids_for_family(family, normalized_payload)
+    response_source_pack_ids = sorted(
+        {
+            string_field(source_pack, "sourcePackId")
+            for source_pack in approved_source_packs
+            if isinstance(source_pack, dict) and string_field(source_pack, "sourcePackId")
+        }
+    )
+    if response_source_pack_ids != expected_source_pack_ids:
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' approvedSourcePacks must match the launch request source packs for family '{family}'."
+        )
+
+    output_bindings = media_request.get("outputBindings")
+    if not isinstance(output_bindings, list) or not output_bindings:
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' must include outputBindings."
+        )
+
+    validate_family_response_output_bindings(family, recipe_id, output_bindings, set(public_proof_shelf_refs))
+
+
+def expected_receipt_prefixes_for_family(family: str) -> list[str]:
+    return {
+        "release": ["release", "promotion", "public-shelf"],
+        "fix": ["fix", "install", "support"],
+        "support": ["support", "privacy", "install"],
+        "publication": ["publication", "moderation", "public-shelf"],
+        "campaign_cold_open": ["campaign", "primer", "audience", "locale"],
+        "mission_briefing": ["mission", "briefing", "audience", "locale"],
+    }.get(family, [])
+
+
+def expected_source_pack_ids_for_family(family: str, normalized_payload: dict[str, Any]) -> list[str]:
+    family_to_source_kinds = {
+        "release": {"release", "release_evidence", "desktop_release", "install_receipt"},
+        "fix": {"fix_receipt", "support_case", "install_receipt", "release"},
+        "support": {"support_case", "crash_report", "install_receipt", "release"},
+        "publication": {"publication", "creator_publication", "campaign_recap", "runtime_bundle"},
+        "campaign_cold_open": {"campaign_primer", "campaign_pack", "campaign_cold_open_pack"},
+        "mission_briefing": {"mission_pack", "mission_briefing", "mission_briefing_pack"},
+    }
+    allowed_source_kinds = family_to_source_kinds.get(family, set())
+    return sorted(
+        {
+            string_field(source_pack, "sourcePackId")
+            for source_pack in normalized_payload.get("sourcePacks", [])
+            if isinstance(source_pack, dict)
+            and string_field(source_pack, "sourcePackId")
+            and string_field(source_pack, "sourcePackKind").replace("-", "_").lower() in allowed_source_kinds
+        }
+    )
+
+
+def validate_family_response_output_bindings(
+    family: str,
+    recipe_id: str,
+    output_bindings: list[Any],
+    public_proof_shelf_refs: set[str],
+) -> None:
+    for binding in output_bindings:
+        if not isinstance(binding, dict):
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' outputBindings must only contain objects."
+            )
+
+        public_ref = string_field(binding, "publicRef")
+        if not public_ref:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' outputBindings must include publicRef."
+            )
+
+        if not family_public_ref_is_allowed(family, public_ref):
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' output publicRef '{public_ref}' "
+                "must stay on the approved release, support, fix, publication, campaign, or mission proof shelf."
+            )
+
+        shelf_ref = public_ref.rsplit("/", 1)[0]
+        if shelf_ref not in public_proof_shelf_refs:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' publicProofShelfRefs must include '{shelf_ref}'."
+            )
+
+
+def family_public_ref_is_allowed(family: str, public_ref: str) -> bool:
+    prefixes_by_family = {
+        "release": ["/artifacts/release-bundles/"],
+        "fix": ["/account/fix-followthrough/", "/account/support/", "/artifacts/release-bundles/"],
+        "support": ["/account/support-packets/", "/account/support/"],
+        "publication": ["/artifacts/publications/"],
+        "campaign_cold_open": ["/artifacts/campaigns/"],
+        "mission_briefing": ["/artifacts/missions/"],
+    }
+    return any(public_ref.startswith(prefix) for prefix in prefixes_by_family.get(family, []))
+
+
+def validate_campaign_media_factory_response(
+    response: dict[str, Any],
+    recipe_catalog: dict[str, Any],
+    normalized_payload: dict[str, Any],
+) -> None:
+    campaign_families = [
+        family
+        for family in normalize_string_list(normalized_payload.get("requiredFamilies"), "launch request requiredFamilies")
+        if family in {"campaign_cold_open", "mission_briefing"}
+    ]
+    if not campaign_families:
+        return
+
+    audience = string_field(normalized_payload, "audience")
+    locale = string_field(normalized_payload, "locale") or "en-US"
+    expected_anchors = {f"audience:{audience}".lower(), f"locale:{locale}".lower()}
+    media_factory_requests = response.get("mediaFactoryRequests")
+    recipes_by_family = {
+        str(recipe.get("family")).strip().replace("-", "_").lower(): recipe
+        for recipe in recipe_catalog.get("recipes", [])
+        if isinstance(recipe, dict) and str(recipe.get("family")).strip()
+    }
+
+    for family in campaign_families:
+        recipe = recipes_by_family.get(family)
+        recipe_id = string_field(recipe or {}, "recipeId")
+        if not recipe_id:
+            raise LaunchValidationError(
+                f"artifact-factory recipe catalog is missing recipeId for campaign family '{family}'."
+            )
+
+        media_request = next(
+            (
+                item
+                for item in media_factory_requests
+                if isinstance(item, dict) and string_field(item, "recipeId") == recipe_id
+            ),
+            None,
+        )
+        if media_request is None:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequests must include recipeId '{recipe_id}' for audience-safe campaign artifacts."
+            )
+
+        required_receipt_refs = {
+            str(receipt_ref).strip().lower()
+            for receipt_ref in media_request.get("requiredReceiptRefs", []) or []
+            if isinstance(receipt_ref, str) and receipt_ref.strip()
+        }
+        missing_receipt_anchors = sorted(anchor for anchor in expected_anchors if anchor not in required_receipt_refs)
+        if missing_receipt_anchors:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' must include campaign proof anchor(s): "
+                + ", ".join(missing_receipt_anchors)
+                + "."
+            )
+
+        approved_source_packs = media_request.get("approvedSourcePacks")
+        if not isinstance(approved_source_packs, list) or not approved_source_packs:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' must include approvedSourcePacks for audience-safe campaign artifacts."
+            )
+
+        validate_campaign_response_source_packs(family, recipe_id, approved_source_packs, audience, locale, expected_anchors)
+
+        public_proof_shelf_refs = {
+            str(proof_ref).strip()
+            for proof_ref in media_request.get("publicProofShelfRefs", []) or []
+            if isinstance(proof_ref, str) and proof_ref.strip()
+        }
+        output_bindings = media_request.get("outputBindings")
+        if not isinstance(output_bindings, list) or not output_bindings:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' must include outputBindings for campaign artifacts."
+            )
+
+        validate_campaign_response_output_bindings(family, recipe_id, output_bindings, public_proof_shelf_refs)
+
+
+def validate_campaign_response_source_packs(
+    family: str,
+    recipe_id: str,
+    approved_source_packs: list[Any],
+    audience: str,
+    locale: str,
+    expected_anchors: set[str],
+) -> None:
+    for source_pack in approved_source_packs:
+        if not isinstance(source_pack, dict):
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' approvedSourcePacks must only contain objects."
+            )
+
+        pack_audience = string_field(source_pack, "audience")
+        allowed_audiences = [item.strip() for item in pack_audience.split(",") if item.strip()]
+        if audience not in allowed_audiences:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' source pack "
+                f"'{source_pack.get('sourcePackId')}' audience does not allow requested audience '{audience}'."
+            )
+
+        pack_locale = string_field(source_pack, "locale")
+        if pack_locale.lower() != locale.lower():
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' source pack "
+                f"'{source_pack.get('sourcePackId')}' locale '{pack_locale}' does not match requested locale '{locale}'."
+            )
+
+        evidence_refs = {
+            str(evidence_ref).strip().lower()
+            for evidence_ref in source_pack.get("evidenceRefs", []) or []
+            if isinstance(evidence_ref, str) and evidence_ref.strip()
+        }
+        missing_evidence_anchors = sorted(anchor for anchor in expected_anchors if anchor not in evidence_refs)
+        if missing_evidence_anchors:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' source pack "
+                f"'{source_pack.get('sourcePackId')}' must preserve evidence anchor(s): "
+                + ", ".join(missing_evidence_anchors)
+                + "."
+            )
+
+        if family == "campaign_cold_open" and not (string_field(source_pack, "campaignId") or string_field(source_pack, "publicShelfRef")):
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' source pack "
+                f"'{source_pack.get('sourcePackId')}' must preserve a campaignId or publicShelfRef."
+            )
+        if family == "mission_briefing" and not (string_field(source_pack, "missionId") or string_field(source_pack, "publicShelfRef")):
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' source pack "
+                f"'{source_pack.get('sourcePackId')}' must preserve a missionId or publicShelfRef."
+            )
+
+
+def validate_campaign_response_output_bindings(
+    family: str,
+    recipe_id: str,
+    output_bindings: list[Any],
+    public_proof_shelf_refs: set[str],
+) -> None:
+    for binding in output_bindings:
+        if not isinstance(binding, dict):
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' outputBindings must only contain objects."
+            )
+
+        public_ref = string_field(binding, "publicRef")
+        if not public_ref:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' outputBindings must include publicRef."
+            )
+
+        expected_prefix = "/artifacts/campaigns/" if family == "campaign_cold_open" else "/artifacts/missions/"
+        expected_leaf = "/cold-open/" if family == "campaign_cold_open" else "/briefing/"
+        if expected_prefix not in public_ref or expected_leaf not in public_ref:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' output publicRef '{public_ref}' "
+                "must stay on the campaign cold-open or mission briefing proof shelf."
+            )
+
+        shelf_ref = public_ref.rsplit("/", 1)[0]
+        if shelf_ref not in public_proof_shelf_refs:
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch response mediaFactoryRequest '{recipe_id}' publicProofShelfRefs must include '{shelf_ref}'."
+            )
+
 
 def normalize_string_list(value: Any, field_name: str) -> list[str]:
     if not isinstance(value, list) or not value:

@@ -136,6 +136,123 @@ public sealed class ArtifactFactoryOrchestrationServiceTests
     }
 
     [Fact]
+    public void LaunchSourcePackBatchBuildsCampaignColdOpenAndMissionBriefingRequests()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        ArtifactFactoryJobBatchLaunchResult result = service.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
+            BatchId: "next90-m108-campaign-briefing-wave",
+            RequestedBy: "campaign.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "campaign-primer-redmond-01",
+                    SourcePackKind: "campaign_primer",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "campaign:redmond-01:primer:v2",
+                    EvidenceRefs:
+                    [
+                        "campaign:redmond-01",
+                        "primer:approved:redmond-01",
+                        "audience:players",
+                        "locale:de-AT"
+                    ],
+                    CampaignId: "redmond-01",
+                    Audience: "players,gm",
+                    Locale: "de-AT"),
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "mission-pack-arcology-01",
+                    SourcePackKind: "mission_pack",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "mission:arcology-01:briefing:v1",
+                    EvidenceRefs:
+                    [
+                        "mission:arcology-01",
+                        "briefing:approved:arcology-01",
+                        "audience:players",
+                        "locale:de-AT"
+                    ],
+                    MissionId: "arcology-01",
+                    Audience: "players",
+                    Locale: "de-AT")
+            ],
+            Audience: "players",
+            Locale: "de-AT",
+            RequiredFamilies: ["campaign_cold_open", "mission_briefing"]));
+
+        Assert.Equal("queued", result.State);
+        Assert.Equal(["campaign_cold_open", "mission_briefing"], result.RequiredFamilies);
+        Assert.Equal(["campaign-cold-open-bundle", "mission-briefing-reel"], result.RecipeIds);
+        Assert.Contains(result.Jobs, job =>
+            string.Equals(job.Family, "campaign_cold_open", StringComparison.Ordinal)
+            && string.Equals(job.Audience, "players", StringComparison.Ordinal)
+            && string.Equals(job.Locale, "de-AT", StringComparison.Ordinal)
+            && job.RequiredReceiptRefs.Contains("audience:players")
+            && job.RequiredReceiptRefs.Contains("locale:de-AT")
+            && job.PublicProofShelfRefs.Contains("/artifacts/campaigns/redmond-01/cold-open")
+            && job.MediaFactoryRequest.ApprovedSourcePacks.Any(pack =>
+                string.Equals(pack.CampaignId, "redmond-01", StringComparison.Ordinal)
+                && string.Equals(pack.Audience, "players,gm", StringComparison.Ordinal)
+                && string.Equals(pack.Locale, "de-AT", StringComparison.Ordinal)));
+        Assert.Contains(result.Jobs, job =>
+            string.Equals(job.Family, "mission_briefing", StringComparison.Ordinal)
+            && string.Equals(job.Audience, "players", StringComparison.Ordinal)
+            && string.Equals(job.Locale, "de-AT", StringComparison.Ordinal)
+            && job.RequiredReceiptRefs.Contains("audience:players")
+            && job.RequiredReceiptRefs.Contains("locale:de-AT")
+            && job.PublicProofShelfRefs.Contains("/artifacts/missions/arcology-01/briefing")
+            && job.MediaFactoryRequest.ApprovedSourcePacks.Any(pack =>
+                string.Equals(pack.MissionId, "arcology-01", StringComparison.Ordinal)
+                && string.Equals(pack.Audience, "players", StringComparison.Ordinal)
+                && string.Equals(pack.Locale, "de-AT", StringComparison.Ordinal)));
+        Assert.Contains(result.MediaFactoryRequests, request =>
+            string.Equals(request.RecipeId, "campaign-cold-open-bundle", StringComparison.Ordinal)
+            && request.RequiredReceiptRefs.Contains("audience:players")
+            && request.RequiredReceiptRefs.Contains("locale:de-AT")
+            && request.OutputBindings.Any(binding =>
+                string.Equals(binding.PublicRef, "/artifacts/campaigns/redmond-01/cold-open/preview_card", StringComparison.Ordinal)));
+        Assert.Contains(result.MediaFactoryRequests, request =>
+            string.Equals(request.RecipeId, "mission-briefing-reel", StringComparison.Ordinal)
+            && request.RequiredReceiptRefs.Contains("audience:players")
+            && request.RequiredReceiptRefs.Contains("locale:de-AT")
+            && request.OutputBindings.Any(binding =>
+                string.Equals(binding.PublicRef, "/artifacts/missions/arcology-01/briefing/preview_card", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void LaunchSourcePackBatchRejectsCampaignBriefingLocaleDrift()
+    {
+        ArtifactFactoryOrchestrationService service = new();
+
+        InvalidDataException ex = Assert.Throws<InvalidDataException>(() => service.LaunchSourcePackBatch(new ArtifactFactorySourcePackBatchLaunchRequest(
+            BatchId: "next90-m108-campaign-briefing-wave",
+            RequestedBy: "campaign.ops",
+            SourcePacks:
+            [
+                new ApprovedArtifactSourcePack(
+                    SourcePackId: "campaign-primer-redmond-01",
+                    SourcePackKind: "campaign_primer",
+                    ApprovalState: "approved",
+                    ProvenanceRef: "campaign:redmond-01:primer:v2",
+                    EvidenceRefs:
+                    [
+                        "campaign:redmond-01",
+                        "primer:approved:redmond-01",
+                        "audience:players",
+                        "locale:de-AT"
+                    ],
+                    CampaignId: "redmond-01",
+                    Audience: "players",
+                    Locale: "de-AT")
+            ],
+            Audience: "players",
+            Locale: "fr-FR",
+            RequiredFamilies: ["campaign_cold_open"])));
+
+        Assert.Contains("locale 'de-AT' does not match requested locale 'fr-FR'", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LaunchJobRejectsUnapprovedOneOffSourcePack()
     {
         ArtifactFactoryOrchestrationService service = new();

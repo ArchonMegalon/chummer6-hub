@@ -1104,8 +1104,66 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 {"jobId": "artifact-job-mission-briefing-12345678", "family": "mission_briefing"},
             ],
             "mediaFactoryRequests": [
-                {"recipeId": "campaign-cold-open-bundle"},
-                {"recipeId": "mission-briefing-reel"},
+                {
+                    "recipeId": "campaign-cold-open-bundle",
+                    "requiredReceiptRefs": [
+                        "campaign:redmond-01",
+                        "primer:approved:redmond-01",
+                        "audience:players",
+                        "locale:de-AT",
+                    ],
+                    "publicProofShelfRefs": ["/artifacts/campaigns/redmond-01/cold-open"],
+                    "approvedSourcePacks": [
+                        {
+                            "sourcePackId": "campaign-primer-redmond-01",
+                            "evidenceRefs": [
+                                "campaign:redmond-01",
+                                "primer:approved:redmond-01",
+                                "audience:players",
+                                "locale:de-AT",
+                            ],
+                            "campaignId": "redmond-01",
+                            "audience": "players,gm",
+                            "locale": "de-AT",
+                        }
+                    ],
+                    "outputBindings": [
+                        {
+                            "format": "preview_card",
+                            "publicRef": "/artifacts/campaigns/redmond-01/cold-open/preview_card",
+                        }
+                    ],
+                },
+                {
+                    "recipeId": "mission-briefing-reel",
+                    "requiredReceiptRefs": [
+                        "mission:arcology-01",
+                        "briefing:approved:arcology-01",
+                        "audience:players",
+                        "locale:de-AT",
+                    ],
+                    "publicProofShelfRefs": ["/artifacts/missions/arcology-01/briefing"],
+                    "approvedSourcePacks": [
+                        {
+                            "sourcePackId": "mission-pack-arcology-01",
+                            "evidenceRefs": [
+                                "mission:arcology-01",
+                                "briefing:approved:arcology-01",
+                                "audience:players",
+                                "locale:de-AT",
+                            ],
+                            "missionId": "arcology-01",
+                            "audience": "players",
+                            "locale": "de-AT",
+                        }
+                    ],
+                    "outputBindings": [
+                        {
+                            "format": "preview_card",
+                            "publicRef": "/artifacts/missions/arcology-01/briefing/preview_card",
+                        }
+                    ],
+                },
             ],
         }
         payload = {
@@ -1172,6 +1230,81 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         self.assertEqual("players", _RecordingHandler.requests[1]["body"]["audience"])
         self.assertEqual("de-AT", _RecordingHandler.requests[1]["body"]["locale"])
         self.assertEqual(["campaign-cold-open-bundle", "mission-briefing-reel"], json.loads(result.stdout)["recipeIds"])
+
+    def test_fails_campaign_briefing_response_without_audience_locale_media_proof(self) -> None:
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
+            "contractName": "chummer.run.artifact_factory.recipe_job.v1",
+            "recipeVersion": "2026-04-15",
+            "state": "queued",
+            "jobCount": 1,
+            "families": ["campaign_cold_open"],
+            "requiredFamilies": ["campaign_cold_open"],
+            "recipeIds": ["campaign-cold-open-bundle"],
+            "jobIds": ["artifact-job-campaign-cold-open-12345678"],
+            "sourcePackIds": ["campaign-primer-redmond-01"],
+            "jobs": [{"jobId": "artifact-job-campaign-cold-open-12345678", "family": "campaign_cold_open"}],
+            "mediaFactoryRequests": [
+                {
+                    "recipeId": "campaign-cold-open-bundle",
+                    "requiredReceiptRefs": ["campaign:redmond-01", "primer:approved:redmond-01"],
+                    "approvedSourcePacks": [
+                        {
+                            "sourcePackId": "campaign-primer-redmond-01",
+                            "evidenceRefs": ["campaign:redmond-01", "primer:approved:redmond-01"],
+                            "campaignId": "redmond-01",
+                            "audience": "players",
+                            "locale": "de-AT",
+                        }
+                    ],
+                    "publicProofShelfRefs": ["/artifacts/campaigns/redmond-01/cold-open"],
+                    "outputBindings": [
+                        {
+                            "format": "preview_card",
+                            "publicRef": "/artifacts/campaigns/redmond-01/cold-open/preview_card",
+                        }
+                    ],
+                }
+            ],
+        }
+        payload = {
+            "batchId": "next90-m108-campaign-briefing-wave",
+            "requestedBy": "campaign.ops",
+            "audience": "players",
+            "locale": "de-AT",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "campaign-primer-redmond-01",
+                    "sourcePackKind": "campaign_primer",
+                    "approvalState": "approved",
+                    "provenanceRef": "campaign:redmond-01:primer:v2",
+                    "evidenceRefs": [
+                        "campaign:redmond-01",
+                        "primer:approved:redmond-01",
+                        "audience:players",
+                        "locale:de-AT",
+                    ],
+                    "campaignId": "redmond-01",
+                    "audience": "players",
+                    "locale": "de-AT",
+                }
+            ],
+            "requiredFamilies": ["campaign_cold_open"],
+        }
+
+        result = subprocess.run(
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must include campaign proof anchor(s)", result.stderr)
+        self.assertIn("audience:players", result.stderr)
+        self.assertIn("locale:de-at", result.stderr)
 
     def test_fails_campaign_briefing_preflight_when_locale_drifts(self) -> None:
         payload = {
