@@ -745,6 +745,8 @@ public sealed class ReleaseBundlePromotionService
         PublicReleaseManifestDto mergedCompatibilityManifest,
         JsonObject mergedCanonicalManifest)
     {
+        string canonicalChannel = NormalizeToken(mergedCompatibilityManifest.Channel);
+        string canonicalVersion = mergedCompatibilityManifest.Version?.Trim() ?? string.Empty;
         JsonArray mergedArtifacts = mergedCanonicalManifest["artifacts"] as JsonArray ?? [];
         JsonObject coverage = BuildDesktopTupleCoverage(
             mergedArtifacts,
@@ -803,6 +805,28 @@ public sealed class ReleaseBundlePromotionService
         };
 
         JsonObject normalizedCanonicalManifest = mergedCanonicalManifest.DeepClone().AsObject();
+        JsonArray normalizedArtifacts = normalizedCanonicalManifest["artifacts"] as JsonArray ?? [];
+        if (!string.IsNullOrWhiteSpace(canonicalChannel))
+        {
+            normalizedCanonicalManifest["channel"] = canonicalChannel;
+            normalizedCanonicalManifest["channelId"] = canonicalChannel;
+            foreach (JsonObject artifact in normalizedArtifacts.OfType<JsonObject>())
+            {
+                artifact["channel"] = canonicalChannel;
+                artifact["channelId"] = canonicalChannel;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(canonicalVersion))
+        {
+            normalizedCanonicalManifest["version"] = canonicalVersion;
+            foreach (JsonObject artifact in normalizedArtifacts.OfType<JsonObject>())
+            {
+                artifact["version"] = canonicalVersion;
+                artifact["releaseVersion"] = canonicalVersion;
+            }
+        }
+
         normalizedCanonicalManifest["desktopTupleCoverage"] = coverage.DeepClone();
         normalizedCanonicalManifest["rolloutState"] = rolloutState;
         normalizedCanonicalManifest["rolloutReason"] = rolloutReason;
