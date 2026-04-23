@@ -14,7 +14,7 @@ from pathlib import Path
 
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
-FRONTIER_ID = 2594403904
+FRONTIER_ID = 2897065929
 CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "43e273e9"
 CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "fix(hub): harden M102 native support secret redaction"
 
