@@ -125,6 +125,17 @@ def publication_media_request() -> dict[str, object]:
     }
 
 
+def aggregate_media_request_refs(media_requests: list[dict[str, object]], field_name: str) -> list[str]:
+    return sorted(
+        {
+            str(item).strip()
+            for media_request in media_requests
+            for item in media_request.get(field_name, [])
+            if isinstance(item, str) and item.strip()
+        }
+    )
+
+
 class _RecordingHandler(BaseHTTPRequestHandler):
     expected_methods_by_path = {
         "/api/internal/artifact-factory/recipes": "GET",
@@ -189,6 +200,8 @@ class _RecordingHandler(BaseHTTPRequestHandler):
             "recipeIds": ["release-proof-shelf-bundle"],
             "jobIds": ["artifact-job-release-12345678"],
             "sourcePackIds": ["release-pack-20260415"],
+            "requiredReceiptRefs": aggregate_media_request_refs([release_media_request()], "requiredReceiptRefs"),
+            "publicProofShelfRefs": aggregate_media_request_refs([release_media_request()], "publicProofShelfRefs"),
             "jobs": [{"jobId": "artifact-job-release-12345678", "family": "release"}],
             "mediaFactoryRequests": [release_media_request()],
         },
@@ -298,6 +311,8 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "recipeIds": ["release-proof-shelf-bundle"],
                 "jobIds": ["artifact-job-release-12345678"],
                 "sourcePackIds": ["release-pack-20260415"],
+                "requiredReceiptRefs": aggregate_media_request_refs([release_media_request()], "requiredReceiptRefs"),
+                "publicProofShelfRefs": aggregate_media_request_refs([release_media_request()], "publicProofShelfRefs"),
                 "jobs": [{"jobId": "artifact-job-release-12345678", "family": "release"}],
                 "mediaFactoryRequests": [release_media_request()],
             },
@@ -376,6 +391,8 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "recipeIds": ["release-proof-shelf-bundle"],
                 "jobIds": ["artifact-job-release-12345678"],
                 "sourcePackIds": ["release-pack-20260415"],
+                "requiredReceiptRefs": aggregate_media_request_refs([release_media_request()], "requiredReceiptRefs"),
+                "publicProofShelfRefs": aggregate_media_request_refs([release_media_request()], "publicProofShelfRefs"),
                 "jobs": [{"jobId": "artifact-job-release-12345678", "family": "release"}],
                 "mediaFactoryRequests": [release_media_request()],
             },
@@ -1048,6 +1065,102 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("mediaFactoryRequests length must match jobCount", result.stderr)
 
+    def test_fails_when_batch_response_required_receipts_drift_from_media_requests(self) -> None:
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
+            **_RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"],
+            "requiredReceiptRefs": ["release:run-20260415"],
+        }
+        payload = {
+            "batchId": "next90-m107-source-pack-wave",
+            "requestedBy": "fleet.release",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "release-pack-20260415",
+                    "sourcePackKind": "desktop_release",
+                    "approvalState": "approved",
+                    "provenanceRef": "release-channel:preview:run-20260415",
+                    "evidenceRefs": [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                    ],
+                    "releaseArtifactId": "avalonia-linux-x64-installer",
+                }
+            ],
+            "requiredFamilies": ["release"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requiredReceiptRefs", result.stderr)
+        self.assertIn("mediaFactoryRequests receipt union", result.stderr)
+
+    def test_fails_when_batch_response_public_shelf_refs_drift_from_media_requests(self) -> None:
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
+            **_RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"],
+            "publicProofShelfRefs": ["/artifacts/release-bundles/different-installer"],
+        }
+        payload = {
+            "batchId": "next90-m107-source-pack-wave",
+            "requestedBy": "fleet.release",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "release-pack-20260415",
+                    "sourcePackKind": "desktop_release",
+                    "approvalState": "approved",
+                    "provenanceRef": "release-channel:preview:run-20260415",
+                    "evidenceRefs": [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                    ],
+                    "releaseArtifactId": "avalonia-linux-x64-installer",
+                }
+            ],
+            "requiredFamilies": ["release"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("publicProofShelfRefs", result.stderr)
+        self.assertIn("mediaFactoryRequests proof shelf union", result.stderr)
+
     def test_fills_required_families_from_launchable_recipe_families_when_request_omits_them(self) -> None:
         _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
             **_RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"],
@@ -1069,6 +1182,14 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 "release-pack-20260415",
                 "support-pack-11709",
             ],
+            "requiredReceiptRefs": aggregate_media_request_refs(
+                [publication_media_request(), release_media_request(), support_media_request(include_release_pack=True)],
+                "requiredReceiptRefs",
+            ),
+            "publicProofShelfRefs": aggregate_media_request_refs(
+                [publication_media_request(), release_media_request(), support_media_request(include_release_pack=True)],
+                "publicProofShelfRefs",
+            ),
             "jobs": [
                 {"jobId": "artifact-job-publication-12345678", "family": "publication"},
                 {"jobId": "artifact-job-release-12345678", "family": "release"},
@@ -1431,6 +1552,15 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                 },
             ],
         }
+        media_requests = _RecordingHandler.response_payloads_by_path[
+            "/api/internal/artifact-factory/source-pack-batches"
+        ]["mediaFactoryRequests"]
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"][
+            "requiredReceiptRefs"
+        ] = aggregate_media_request_refs(media_requests, "requiredReceiptRefs")
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"][
+            "publicProofShelfRefs"
+        ] = aggregate_media_request_refs(media_requests, "publicProofShelfRefs")
         payload = {
             "batchId": "next90-m108-campaign-briefing-wave",
             "requestedBy": "campaign.ops",

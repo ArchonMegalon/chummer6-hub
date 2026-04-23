@@ -293,6 +293,48 @@ def validate_batch_launch_response(
     validate_job_response_shape(response, expected_required_families, job_ids)
     validate_media_factory_request_response(response, recipe_catalog, normalized_payload)
     validate_campaign_media_factory_response(response, recipe_catalog, normalized_payload)
+    validate_batch_aggregate_refs(response)
+
+
+def validate_batch_aggregate_refs(response: dict[str, Any]) -> None:
+    media_factory_requests = response.get("mediaFactoryRequests")
+    if not isinstance(media_factory_requests, list):
+        raise LaunchValidationError(
+            "artifact-factory source-pack batch response mediaFactoryRequests must be an array."
+        )
+
+    required_receipt_refs = normalize_string_list(response.get("requiredReceiptRefs"), "requiredReceiptRefs")
+    expected_required_receipt_refs = normalize_media_request_field_union(
+        media_factory_requests,
+        "requiredReceiptRefs",
+    )
+    if required_receipt_refs != expected_required_receipt_refs:
+        raise LaunchValidationError(
+            "artifact-factory source-pack batch response requiredReceiptRefs must match the mediaFactoryRequests receipt union."
+        )
+
+    public_proof_shelf_refs = normalize_string_list(response.get("publicProofShelfRefs"), "publicProofShelfRefs")
+    expected_public_proof_shelf_refs = normalize_media_request_field_union(
+        media_factory_requests,
+        "publicProofShelfRefs",
+    )
+    if public_proof_shelf_refs != expected_public_proof_shelf_refs:
+        raise LaunchValidationError(
+            "artifact-factory source-pack batch response publicProofShelfRefs must match the mediaFactoryRequests proof shelf union."
+        )
+
+
+def normalize_media_request_field_union(media_factory_requests: list[Any], field_name: str) -> list[str]:
+    values: set[str] = set()
+    for media_request in media_factory_requests:
+        if not isinstance(media_request, dict):
+            raise LaunchValidationError(
+                "artifact-factory source-pack batch response mediaFactoryRequests must only contain objects."
+            )
+
+        values.update(normalize_string_list(media_request.get(field_name), f"mediaFactoryRequest {field_name}"))
+
+    return sorted(values)
 
 
 def validate_job_response_shape(
