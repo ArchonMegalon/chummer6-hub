@@ -246,6 +246,8 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn('"afea8813"', script_text)
         self.assertIn("commit afea8813 tightens M105 typed recovery actions", script_text)
         self.assertIn('"badbcbd8"', script_text)
+        self.assertIn('"cfc7ec67"', script_text)
+        self.assertIn("commit cfc7ec67 tightens M105 restore action route proof", script_text)
         self.assertIn("/docker/chummercomplete/chummer6-hub/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
 
     def test_all_registry_and_queue_commit_citations_are_required_to_resolve(self) -> None:
