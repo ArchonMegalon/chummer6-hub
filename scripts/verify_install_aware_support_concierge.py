@@ -4,7 +4,13 @@ from __future__ import annotations
 import os
 import re
 import sys
+from base64 import a85decode, b32decode, b64decode, b85decode
+from binascii import Error as BinasciiError
+from html import unescape
 from pathlib import Path
+from typing import Callable
+from urllib.parse import unquote
+from zlib import decompress, error as ZlibError
 
 import yaml
 
@@ -306,14 +312,81 @@ def forbidden_markers_in_value(value: object) -> list[str]:
 
 
 def forbidden_markers_in_text(value: str) -> list[str]:
-    folded = value.casefold()
-    normalized = normalize_marker_text(value)
     matches: list[str] = []
-    for marker in FORBIDDEN_PROOF_MARKERS:
-        marker_folded = marker.casefold()
-        if marker_folded in folded or normalize_marker_text(marker) in normalized:
-            matches.append(marker)
-    return matches
+    for decoded in decoded_marker_texts(value):
+        folded = decoded.casefold()
+        normalized = normalize_marker_text(decoded)
+        for marker in FORBIDDEN_PROOF_MARKERS:
+            marker_folded = marker.casefold()
+            if marker_folded in folded or normalize_marker_text(marker) in normalized:
+                matches.append(marker)
+    return sorted(set(matches), key=str.casefold)
+
+
+def decoded_marker_texts(value: str) -> list[str]:
+    candidates = [value, unescape(value), unquote(value)]
+    for text in list(candidates):
+        compact = re.sub(r"\s+", "", text)
+        if len(compact) < 12:
+            continue
+        for decoder in (decode_base64_bytes, decode_base32_bytes, decode_base85_bytes, decode_ascii85_bytes):
+            decoded = decoder(compact)
+            if decoded is not None:
+                decoded_text = bytes_to_marker_text(decoded)
+                if decoded_text is not None:
+                    candidates.append(decoded_text)
+                decompressed_text = decompress_marker_bytes(decoded)
+                if decompressed_text is not None:
+                    candidates.append(decompressed_text)
+    return candidates
+
+
+def decode_base64_bytes(value: str) -> bytes | None:
+    padded = value + ("=" * (-len(value) % 4))
+    return decode_bytes(lambda: b64decode(padded, validate=True))
+
+
+def decode_base32_bytes(value: str) -> bytes | None:
+    padded = value + ("=" * (-len(value) % 8))
+    return decode_bytes(lambda: b32decode(padded, casefold=True))
+
+
+def decode_base85_bytes(value: str) -> bytes | None:
+    return decode_bytes(lambda: b85decode(value))
+
+
+def decode_ascii85_bytes(value: str) -> bytes | None:
+    return decode_bytes(lambda: a85decode(value))
+
+
+def decode_bytes(factory: Callable[[], bytes]) -> bytes | None:
+    try:
+        return factory()
+    except (BinasciiError, ValueError):
+        return None
+
+
+def bytes_to_marker_text(value: bytes) -> str | None:
+    try:
+        text = value.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    return text if is_plausible_marker_text(text) else None
+
+
+def decompress_marker_bytes(value: bytes) -> str | None:
+    try:
+        decoded = decompress(value)
+    except ZlibError:
+        return None
+    return bytes_to_marker_text(decoded)
+
+
+def is_plausible_marker_text(value: str) -> bool:
+    if not value:
+        return False
+    printable = sum(1 for ch in value if ch.isprintable() or ch.isspace())
+    return printable / len(value) > 0.9
 
 
 def normalize_marker_text(value: str) -> str:

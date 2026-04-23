@@ -5,7 +5,10 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from base64 import b64encode
 from pathlib import Path
+from urllib.parse import quote
+from zlib import compress
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -312,6 +315,57 @@ milestones:
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("successor registry task 111.1 has forbidden active-run proof marker: ACTIVE_RUN_HANDOFF", result.stderr)
         self.assertIn("successor registry task 111.1 has forbidden active-run proof marker: operator/OODA loop", result.stderr)
+
+    def test_verifier_fails_when_queue_evidence_cites_encoded_helper_context(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-encoded-helper-") as temp_dir:
+            queue_path = Path(temp_dir) / "queue.yaml"
+            encoded_telemetry = b64encode(b"TASK_LOCAL_TELEMETRY.generated.json captured active-run helper commands").decode("ascii")
+            encoded_compressed_handoff = b64encode(compress(b"ACTIVE_RUN_HANDOFF generated worker context")).decode("ascii")
+            encoded_command = quote("run_ooda_design_supervisor_until_quiet helper command", safe="")
+            queue_path.write_text(
+                f"""
+items:
+  - title: Emit install-aware release and support concierge packets from installed-build truth
+    task: Compile support closure and release explainer packets from installed build, channel, and support-case truth.
+    package_id: next90-m111-hub-support-concierge
+    milestone_id: 111
+    frontier_id: 2746902416
+    wave: W9
+    repo: chummer6-hub
+    status: complete
+    landed_commit: 3fb14923
+    completion_action: verify_closed_package_only
+    do_not_reopen_reason: Future shards must verify this package instead of reopening it.
+    proof:
+      - {encoded_telemetry}
+      - {encoded_compressed_handoff}
+      - {encoded_command}
+    allowed_paths:
+      - Chummer.Run.Api
+      - scripts
+      - tests
+    owned_surfaces:
+      - install_aware_support_concierge
+      - release_concierge:hub
+""",
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env["CHUMMER_SUPPORT_CONCIERGE_QUEUE_STAGING"] = str(queue_path)
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Fleet queue next90-m111-hub-support-concierge has forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+        self.assertIn("Fleet queue next90-m111-hub-support-concierge has forbidden active-run proof marker: ACTIVE_RUN_HANDOFF", result.stderr)
+        self.assertIn("Fleet queue next90-m111-hub-support-concierge has forbidden active-run proof marker: active-run helper", result.stderr)
+        self.assertIn("Fleet queue next90-m111-hub-support-concierge has forbidden active-run proof marker: run_ooda_design_supervisor_until_quiet", result.stderr)
 
     @staticmethod
     def copy_sources(temp_root: Path) -> None:
