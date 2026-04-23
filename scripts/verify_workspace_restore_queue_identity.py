@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import html
 import os
 import sys
+from urllib.parse import unquote
 from pathlib import Path
 
 
@@ -159,10 +161,42 @@ def extract_scalar_list(block: str, key: str) -> list[str]:
     return values
 
 
+def decode_hex_escapes(text: str) -> str:
+    def replace_match(match: str) -> str:
+        try:
+            return chr(int(match[2:], 16))
+        except ValueError:
+            return match
+
+    decoded: list[str] = []
+    index = 0
+    while index < len(text):
+        if (
+            index + 3 < len(text)
+            and text[index] == "\\"
+            and text[index + 1] in {"x", "X"}
+            and all(character in "0123456789abcdefABCDEF" for character in text[index + 2 : index + 4])
+        ):
+            decoded.append(replace_match(text[index : index + 4]))
+            index += 4
+            continue
+        decoded.append(text[index])
+        index += 1
+    return "".join(decoded)
+
+
+def forbidden_scan_texts(block: str) -> list[str]:
+    html_decoded = html.unescape(block)
+    url_decoded = unquote(block)
+    hex_decoded = decode_hex_escapes(block)
+    return [block, html_decoded, url_decoded, hex_decoded]
+
+
 def reject_forbidden_markers(path: Path, block: str, missing: list[str]) -> None:
-    normalized_block = block.casefold()
+    normalized_blocks = [text.casefold() for text in forbidden_scan_texts(block)]
     for marker in FORBIDDEN_PROOF_MARKERS:
-        if marker.casefold() in normalized_block:
+        marker_text = marker.casefold()
+        if any(marker_text in normalized_block for normalized_block in normalized_blocks):
             missing.append(f"{path}: forbidden active-run proof marker: {marker}")
 
 
