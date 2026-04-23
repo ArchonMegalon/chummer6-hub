@@ -236,6 +236,83 @@ items:
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("design queue next90-m111-hub-support-concierge owned_surfaces drifted", result.stderr)
 
+    def test_verifier_fails_when_queue_evidence_cites_active_run_helper_context(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-helper-queue-") as temp_dir:
+            queue_path = Path(temp_dir) / "queue.yaml"
+            queue_path.write_text(
+                """
+items:
+  - title: Emit install-aware release and support concierge packets from installed-build truth
+    task: Compile support closure and release explainer packets from installed build, channel, and support-case truth.
+    package_id: next90-m111-hub-support-concierge
+    milestone_id: 111
+    frontier_id: 2746902416
+    wave: W9
+    repo: chummer6-hub
+    status: complete
+    landed_commit: 3fb14923
+    completion_action: verify_closed_package_only
+    do_not_reopen_reason: Future shards must verify this package instead of reopening it.
+    proof:
+      - TASK_LOCAL_TELEMETRY.generated.json captured active-run helper commands
+    allowed_paths:
+      - Chummer.Run.Api
+      - scripts
+      - tests
+    owned_surfaces:
+      - install_aware_support_concierge
+      - release_concierge:hub
+""",
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env["CHUMMER_SUPPORT_CONCIERGE_QUEUE_STAGING"] = str(queue_path)
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Fleet queue next90-m111-hub-support-concierge has forbidden active-run proof marker: TASK_LOCAL_TELEMETRY", result.stderr)
+        self.assertIn("Fleet queue next90-m111-hub-support-concierge has forbidden active-run proof marker: active-run helper", result.stderr)
+
+    def test_verifier_fails_when_registry_evidence_cites_active_run_helper_context(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-helper-registry-") as temp_dir:
+            registry_path = Path(temp_dir) / "registry.yaml"
+            registry_path.write_text(
+                """
+milestones:
+  - id: 111
+    title: Install-aware release, support, and public concierge
+    work_tasks:
+      - id: 111.1
+        owner: chummer6-hub
+        title: Emit install-aware support and release concierge packets plus public trust wrapper routes tied to installed build, channel, and support-case truth.
+        status: complete
+        evidence:
+          - ACTIVE_RUN_HANDOFF.generated.md operator/OODA loop snippet
+""",
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env["CHUMMER_SUPPORT_CONCIERGE_SUCCESSOR_REGISTRY"] = str(registry_path)
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("successor registry task 111.1 has forbidden active-run proof marker: ACTIVE_RUN_HANDOFF", result.stderr)
+        self.assertIn("successor registry task 111.1 has forbidden active-run proof marker: operator/OODA loop", result.stderr)
+
     @staticmethod
     def copy_sources(temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:
