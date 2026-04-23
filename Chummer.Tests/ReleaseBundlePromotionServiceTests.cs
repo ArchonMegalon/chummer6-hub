@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
@@ -443,6 +444,51 @@ public sealed class ReleaseBundlePromotionServiceTests
             .ToArray());
     }
 
+    [Fact]
+    public async Task PromoteAsyncNormalizesExistingCanonicalArtifactsToIncomingChannelAndVersion()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        fixture.WriteLiveArtifact(
+            artifactId: "avalonia-linux-x64-installer",
+            fileName: "chummer-avalonia-linux-x64-installer.deb",
+            platform: "linux",
+            arch: "x64",
+            kind: "installer",
+            bytes: "linux-live");
+        fixture.SetCanonicalMetadata(
+            channelId: "public_stable",
+            version: "run-20260401-200000");
+
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260420-090000",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-preview"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        await fixture.PromoteAsync(bundlePath);
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+
+        foreach (JsonElement artifact in canonical.RootElement.GetProperty("artifacts").EnumerateArray())
+        {
+            Assert.Equal("preview", artifact.GetProperty("channel").GetString());
+            Assert.Equal("preview", artifact.GetProperty("channelId").GetString());
+            Assert.Equal("run-20260420-090000", artifact.GetProperty("version").GetString());
+            Assert.Equal("run-20260420-090000", artifact.GetProperty("releaseVersion").GetString());
+        }
+    }
+
     private sealed class ReleaseBundlePromotionFixture : IDisposable
     {
         private readonly string _root;
@@ -652,6 +698,33 @@ public sealed class ReleaseBundlePromotionServiceTests
             {
                 Directory.Delete(_root, recursive: true);
             }
+        }
+
+        public void SetCanonicalMetadata(string channelId, string version)
+        {
+            string path = Path.Combine(_downloadsRoot, "RELEASE_CHANNEL.generated.json");
+            JsonNode? root = JsonNode.Parse(File.ReadAllText(path));
+            if (root is not JsonObject canonical)
+            {
+                return;
+            }
+
+            canonical["channel"] = channelId;
+            canonical["channelId"] = channelId;
+            canonical["version"] = version;
+
+            if (canonical["artifacts"] is JsonArray artifacts)
+            {
+                foreach (JsonObject artifact in artifacts.OfType<JsonObject>())
+                {
+                    artifact["channel"] = channelId;
+                    artifact["channelId"] = channelId;
+                    artifact["version"] = version;
+                    artifact["releaseVersion"] = version;
+                }
+            }
+
+            File.WriteAllText(path, canonical.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
 
         private static void WriteCompatibilityManifest(string path, string version, IReadOnlyList<CompatibilityArtifact> downloads)
