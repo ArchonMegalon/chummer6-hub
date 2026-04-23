@@ -1665,7 +1665,12 @@ def _base32_decode_token_variants(token: str) -> list[str]:
     except (binascii.Error, ValueError):
         return []
 
-    return _decoded_text_variants_from_bytes(raw)
+    variants = _decoded_text_variants_from_bytes(raw)
+    for compressed_text in _compressed_decoded_text_variants(raw):
+        if compressed_text not in variants:
+            variants.append(compressed_text)
+
+    return variants
 
 
 def _base85_decoded_text_variants(value: str) -> list[str]:
@@ -1690,6 +1695,10 @@ def _base85_decode_token_variants(token: str) -> list[str]:
         for candidate in _decoded_text_variants_from_bytes(raw):
             if candidate not in variants:
                 variants.append(candidate)
+
+        for compressed_text in _compressed_decoded_text_variants(raw):
+            if compressed_text not in variants:
+                variants.append(compressed_text)
 
     return variants
 
