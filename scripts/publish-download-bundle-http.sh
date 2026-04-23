@@ -5,30 +5,41 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 BUNDLE_DIR="${1:-${DOWNLOAD_BUNDLE_DIR:-$REPO_ROOT/Chummer.Portal/downloads}}"
+MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_MANIFEST_PATH:-$BUNDLE_DIR/releases.json}"
+CANONICAL_MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_CANONICAL_MANIFEST_PATH:-$BUNDLE_DIR/RELEASE_CHANNEL.generated.json}"
 UPLOAD_URL="${CHUMMER_RELEASE_UPLOAD_URL:-https://chummer.run/api/internal/releases/bundles}"
 SESSIONS_URL="${CHUMMER_RELEASE_UPLOAD_SESSIONS_URL:-${UPLOAD_URL%/bundles}/upload-sessions}"
 PUBLIC_BASE_URL="${CHUMMER_PUBLIC_BASE_URL:-https://chummer.run}"
 VERIFY_URL="${CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL:-$PUBLIC_BASE_URL/downloads/RELEASE_CHANNEL.generated.json}"
 TOKEN="${CHUMMER_RELEASE_UPLOAD_TOKEN:-}"
+ARTIFACT_FACTORY_AUTOLAUNCH="${CHUMMER_ARTIFACT_FACTORY_AUTOLAUNCH:-1}"
+ARTIFACT_FACTORY_REQUESTED_BY="${CHUMMER_ARTIFACT_FACTORY_REQUESTED_BY:-fleet.release}"
+ARTIFACT_FACTORY_REQUIRED_FAMILIES="${CHUMMER_ARTIFACT_FACTORY_REQUIRED_FAMILIES:-}"
+ARTIFACT_FACTORY_SOURCE_PACKS="${CHUMMER_ARTIFACT_FACTORY_SOURCE_PACKS:-}"
+ARTIFACT_FACTORY_REQUESTED_FORMATS="${CHUMMER_ARTIFACT_FACTORY_REQUESTED_FORMATS:-}"
+ARTIFACT_FACTORY_AUDIENCE="${CHUMMER_ARTIFACT_FACTORY_AUDIENCE:-}"
+ARTIFACT_FACTORY_LOCALE="${CHUMMER_ARTIFACT_FACTORY_LOCALE:-}"
 ALLOW_DIRECT_FALLBACK="${CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK:-1}"
 DRY_RUN="${CHUMMER_RELEASE_UPLOAD_DRY_RUN:-0}"
 VERIFY_MANIFEST="${CHUMMER_RELEASE_UPLOAD_VERIFY_MANIFEST:-1}"
 VERIFY_ROUTES="${CHUMMER_RELEASE_UPLOAD_VERIFY_ROUTES:-1}"
 CHUNK_BYTES="${CHUMMER_RELEASE_UPLOAD_CHUNK_BYTES:-52428800}"
 DIRECT_LIMIT_BYTES="${CHUMMER_RELEASE_UPLOAD_DIRECT_LIMIT_BYTES:-$CHUNK_BYTES}"
+ARTIFACT_FACTORY_REQUEST_MATERIALIZER="$SCRIPT_DIR/materialize_artifact_factory_source_pack_batch.py"
+ARTIFACT_FACTORY_LAUNCHER="$SCRIPT_DIR/launch_artifact_factory_source_pack_batch.py"
 
 if [[ ! -d "$BUNDLE_DIR" ]]; then
   echo "Bundle directory not found: $BUNDLE_DIR" >&2
   exit 1
 fi
 
-if [[ ! -f "$BUNDLE_DIR/releases.json" ]]; then
-  echo "Bundle is missing releases.json: $BUNDLE_DIR/releases.json" >&2
+if [[ ! -f "$MANIFEST_PATH" ]]; then
+  echo "Bundle is missing releases.json: $MANIFEST_PATH" >&2
   exit 1
 fi
 
-if [[ ! -f "$BUNDLE_DIR/RELEASE_CHANNEL.generated.json" ]]; then
-  echo "Bundle is missing RELEASE_CHANNEL.generated.json: $BUNDLE_DIR/RELEASE_CHANNEL.generated.json" >&2
+if [[ ! -f "$CANONICAL_MANIFEST_PATH" ]]; then
+  echo "Bundle is missing RELEASE_CHANNEL.generated.json: $CANONICAL_MANIFEST_PATH" >&2
   exit 1
 fi
 
@@ -93,10 +104,34 @@ print(urljoin(sys.argv[1], sys.argv[2]))
 PY
 }
 
+resolve_base_url() {
+  local explicit_base_url="${1:-}"
+  local fallback_upload_url="$2"
+  local fallback_public_base_url="$3"
+  python3 - "$explicit_base_url" "$fallback_upload_url" "$fallback_public_base_url" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+explicit = str(sys.argv[1]).strip()
+upload_url = str(sys.argv[2]).strip()
+public_base_url = str(sys.argv[3]).strip()
+if explicit:
+    print(explicit)
+    raise SystemExit(0)
+
+parsed = urlsplit(upload_url)
+if parsed.scheme and parsed.netloc:
+    print(f"{parsed.scheme}://{parsed.netloc}")
+    raise SystemExit(0)
+
+print(public_base_url)
+PY
+}
+
 collect_upload_files() {
   local bundle_root="$1"
-  [[ -f "$bundle_root/releases.json" ]] && printf '%s\n' "$bundle_root/releases.json"
-  [[ -f "$bundle_root/RELEASE_CHANNEL.generated.json" ]] && printf '%s\n' "$bundle_root/RELEASE_CHANNEL.generated.json"
+  [[ -f "$MANIFEST_PATH" ]] && printf '%s\n' "$MANIFEST_PATH"
+  [[ -f "$CANONICAL_MANIFEST_PATH" ]] && printf '%s\n' "$CANONICAL_MANIFEST_PATH"
   [[ -f "$bundle_root/release-evidence/public-promotion.json" ]] && printf '%s\n' "$bundle_root/release-evidence/public-promotion.json"
   if [[ -d "$bundle_root/files" ]]; then
     find "$bundle_root/files" -type f | sort
@@ -163,6 +198,42 @@ $PUBLIC_BASE_URL/downloads/proof/windows/chummer-blazor-desktop-win-x64-installe
 EOF
 }
 
+resolve_release_proof_path() {
+  local bundle_root="$1"
+  local repo_root="$2"
+  local explicit_path="${3:-}"
+  python3 - "$bundle_root" "$repo_root" "$explicit_path" <<'PY'
+import sys
+from pathlib import Path
+
+bundle_root = Path(sys.argv[1]).resolve()
+repo_root = Path(sys.argv[2]).resolve()
+explicit = str(sys.argv[3]).strip()
+
+if explicit:
+    candidate = Path(explicit).expanduser()
+    if not candidate.is_absolute():
+        candidate = (repo_root / candidate).resolve()
+    if candidate.is_file():
+        print(candidate)
+        raise SystemExit(0)
+    raise SystemExit(1)
+
+candidates = [
+    bundle_root / "proof" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
+    repo_root / ".codex-studio" / "published" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
+    repo_root / "Chummer.Run.Api" / "wwwroot" / "proofs" / "mac-codex-release" / "HUB_LOCAL_RELEASE_PROOF.generated.json",
+]
+
+for candidate in candidates:
+    if candidate.is_file():
+        print(candidate)
+        raise SystemExit(0)
+
+raise SystemExit(1)
+PY
+}
+
 upload_file_direct() {
   local file_path="$1"
   local relative_path="$2"
@@ -224,7 +295,15 @@ cleanup() {
 trap cleanup EXIT
 
 auth_curl_config="$tmp_root/upload-auth.curl"
+ARTIFACT_FACTORY_TOKEN="${CHUMMER_ARTIFACT_FACTORY_TOKEN:-$TOKEN}"
 write_auth_curl_config "$auth_curl_config"
+ARTIFACT_FACTORY_BASE_URL="$(resolve_base_url "${CHUMMER_ARTIFACT_FACTORY_BASE_URL:-}" "$UPLOAD_URL" "$PUBLIC_BASE_URL")"
+RELEASE_PROOF_PATH_RESOLVED=""
+if RELEASE_PROOF_PATH_RESOLVED="$(resolve_release_proof_path "$BUNDLE_DIR" "$REPO_ROOT" "${RELEASE_PROOF_PATH:-}")"; then
+  :
+else
+  RELEASE_PROOF_PATH_RESOLVED=""
+fi
 
 request_common=(
   --config "$auth_curl_config"
@@ -292,6 +371,66 @@ echo
 if to_bool "$VERIFY_MANIFEST"; then
   CHUMMER_VERIFY_REQUIRE_COMPLETE_DESKTOP_COVERAGE=0 \
     bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$VERIFY_URL"
+fi
+
+if to_bool "$ARTIFACT_FACTORY_AUTOLAUNCH"; then
+  if [[ ! -f "$ARTIFACT_FACTORY_REQUEST_MATERIALIZER" ]]; then
+    echo "Artifact-factory request materializer missing: $ARTIFACT_FACTORY_REQUEST_MATERIALIZER" >&2
+    exit 1
+  fi
+  if [[ ! -f "$ARTIFACT_FACTORY_LAUNCHER" ]]; then
+    echo "Artifact-factory launcher missing: $ARTIFACT_FACTORY_LAUNCHER" >&2
+    exit 1
+  fi
+  if [[ -z "${ARTIFACT_FACTORY_TOKEN:-}" ]]; then
+    echo "Artifact-factory autolaunch requires CHUMMER_ARTIFACT_FACTORY_TOKEN or CHUMMER_RELEASE_UPLOAD_TOKEN." >&2
+    exit 1
+  fi
+
+  artifact_factory_request="$tmp_root/artifact-factory-source-pack-batch.json"
+  artifact_factory_response="$tmp_root/artifact-factory-source-pack-batch-response.json"
+  materializer_args=(
+    "python3"
+    "$ARTIFACT_FACTORY_REQUEST_MATERIALIZER"
+    "--release-manifest" "$MANIFEST_PATH"
+    "--promotion-result" "$response_json"
+    "--requested-by" "$ARTIFACT_FACTORY_REQUESTED_BY"
+    "--output" "$artifact_factory_request"
+  )
+  if [[ -n "$RELEASE_PROOF_PATH_RESOLVED" ]]; then
+    materializer_args+=("--release-proof" "$RELEASE_PROOF_PATH_RESOLVED")
+  fi
+  IFS=',' read -r -a required_families <<< "$ARTIFACT_FACTORY_REQUIRED_FAMILIES"
+  for family in "${required_families[@]}"; do
+    family="$(echo "$family" | xargs)"
+    [[ -n "$family" ]] || continue
+    materializer_args+=("--required-family" "$family")
+  done
+  IFS=',' read -r -a requested_formats <<< "$ARTIFACT_FACTORY_REQUESTED_FORMATS"
+  for requested_format in "${requested_formats[@]}"; do
+    requested_format="$(echo "$requested_format" | xargs)"
+    [[ -n "$requested_format" ]] || continue
+    materializer_args+=("--requested-format" "$requested_format")
+  done
+  if [[ -n "${ARTIFACT_FACTORY_AUDIENCE:-}" ]]; then
+    materializer_args+=("--audience" "$ARTIFACT_FACTORY_AUDIENCE")
+  fi
+  if [[ -n "${ARTIFACT_FACTORY_LOCALE:-}" ]]; then
+    materializer_args+=("--locale" "$ARTIFACT_FACTORY_LOCALE")
+  fi
+  IFS=':' read -r -a source_pack_files <<< "$ARTIFACT_FACTORY_SOURCE_PACKS"
+  for source_pack_file in "${source_pack_files[@]}"; do
+    source_pack_file="$(echo "$source_pack_file" | xargs)"
+    [[ -n "$source_pack_file" ]] || continue
+    materializer_args+=("--source-pack-file" "$source_pack_file")
+  done
+  "${materializer_args[@]}"
+
+  python3 "$ARTIFACT_FACTORY_LAUNCHER" \
+    --base-url "$ARTIFACT_FACTORY_BASE_URL" \
+    --token "$ARTIFACT_FACTORY_TOKEN" \
+    --request-file "$artifact_factory_request" > "$artifact_factory_response"
+  echo "Artifact-factory batch launched via $ARTIFACT_FACTORY_BASE_URL"
 fi
 
 if to_bool "$VERIFY_ROUTES"; then
