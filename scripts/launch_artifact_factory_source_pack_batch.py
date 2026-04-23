@@ -16,6 +16,33 @@ DEFAULT_BATCH_PATH = "/api/internal/artifact-factory/source-pack-batches"
 DEFAULT_RECIPES_PATH = "/api/internal/artifact-factory/recipes"
 EXPECTED_CONTRACT_NAME = "chummer.run.artifact_factory.recipe_job.v1"
 EXPECTED_RECIPE_VERSION = "2026-04-15"
+PROVIDER_SPECIFIC_REF_PREFIXES = {
+    "provider",
+    "vendor",
+    "one_off",
+    "one-off",
+    "heygen",
+    "elevenlabs",
+    "runway",
+    "replicate",
+    "veo",
+}
+CAMPAIGN_RECIPE_SUPPLEMENTS = [
+    {
+        "family": "campaign_cold_open",
+        "recipeId": "campaign-cold-open-bundle",
+        "allowedSourceKinds": ["campaign_primer", "campaign_pack", "campaign_cold_open_pack"],
+        "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
+        "requiredReceiptPrefixes": ["campaign", "primer", "audience", "locale"],
+    },
+    {
+        "family": "mission_briefing",
+        "recipeId": "mission-briefing-reel",
+        "allowedSourceKinds": ["mission_pack", "mission_briefing", "mission_briefing_pack"],
+        "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
+        "requiredReceiptPrefixes": ["mission", "briefing", "audience", "locale"],
+    },
+]
 
 
 class LaunchValidationError(SystemExit):
@@ -133,7 +160,21 @@ def load_recipe_catalog(base_url: str, token: str, public_host: str, forwarded_p
     if not isinstance(recipes, list) or not recipes:
         raise LaunchValidationError("artifact-factory recipe catalog response must include at least one recipe.")
 
+    response["recipes"] = merge_campaign_recipe_supplements(recipes)
     return response
+
+
+def merge_campaign_recipe_supplements(recipes: list[Any]) -> list[Any]:
+    merged = list(recipes)
+    families = {
+        str(recipe.get("family")).strip().replace("-", "_").lower()
+        for recipe in recipes
+        if isinstance(recipe, dict) and str(recipe.get("family")).strip()
+    }
+    for supplement in CAMPAIGN_RECIPE_SUPPLEMENTS:
+        if supplement["family"] not in families:
+            merged.append(supplement)
+    return merged
 
 
 def validate_recipe_catalog_contract(response: Any) -> None:
@@ -311,6 +352,8 @@ def normalize_launch_payload(payload: dict[str, Any], recipe_catalog: dict[str, 
         if not isinstance(source_pack_kind, str) or not source_pack_kind.strip():
             raise LaunchValidationError("artifact-factory source-pack batch request sourcePacks must include sourcePackKind.")
 
+        validate_source_pack_refs(source_pack)
+
     source_pack_kinds = {
         source_pack["sourcePackKind"].strip().replace("-", "_").lower()
         for source_pack in source_packs
@@ -358,6 +401,8 @@ def normalize_launch_payload(payload: dict[str, Any], recipe_catalog: dict[str, 
             + ", ".join(missing_families)
             + "."
         )
+
+    validate_campaign_audience_and_locale(payload, required_families, recipe_map)
 
     requested_formats = payload.get("requestedFormats")
     if requested_formats is not None:
@@ -457,7 +502,193 @@ def family_has_required_anchor(family: str, source_packs: list[dict[str, Any]]) 
         return any(string_field(source_pack, "supportCaseId") for source_pack in source_packs)
     if family == "publication":
         return any(string_field(source_pack, "publicationId") or string_field(source_pack, "publicShelfRef") for source_pack in source_packs)
+    if family == "campaign_cold_open":
+        return campaign_pack_metadata_matches_request(family, source_packs)
+    if family == "mission_briefing":
+        return campaign_pack_metadata_matches_request(family, source_packs)
     return False
+
+
+def campaign_pack_metadata_matches_request(family: str, source_packs: list[dict[str, Any]]) -> bool:
+    return any(
+        (string_field(source_pack, "campaignId") if family == "campaign_cold_open" else string_field(source_pack, "missionId"))
+        or string_field(source_pack, "publicShelfRef")
+        for source_pack in source_packs
+    )
+
+
+def validate_campaign_audience_and_locale(payload: dict[str, Any], required_families: list[str], recipe_map: dict[str, dict[str, Any]]) -> None:
+    campaign_families = [family for family in required_families if family in {"campaign_cold_open", "mission_briefing"}]
+    if not campaign_families:
+        return
+
+    audience = string_field(payload, "audience")
+    if not audience or audience == "public-proof-shelf":
+        raise LaunchValidationError(
+            "artifact-factory source-pack batch request campaign recipes require an explicit audience token."
+        )
+
+    locale = string_field(payload, "locale") or "en-US"
+    for family in campaign_families:
+        recipe = recipe_map[family]
+        allowed_source_kinds = {
+            str(kind).strip().replace("-", "_").lower()
+            for kind in recipe.get("allowedSourceKinds", [])
+            if str(kind).strip()
+        }
+        for source_pack in payload["sourcePacks"]:
+            source_pack_kind = string_field(source_pack, "sourcePackKind").replace("-", "_").lower()
+            if source_pack_kind not in allowed_source_kinds:
+                continue
+
+            pack_audience = string_field(source_pack, "audience")
+            if not pack_audience:
+                raise LaunchValidationError(
+                    f"artifact-factory source-pack batch request source pack '{source_pack.get('sourcePackId')}' must include audience for {family}."
+                )
+
+            allowed_audiences = [item.strip() for item in pack_audience.split(",") if item.strip()]
+            if audience not in allowed_audiences:
+                raise LaunchValidationError(
+                    f"artifact-factory source-pack batch request source pack '{source_pack.get('sourcePackId')}' audience does not allow requested audience '{audience}'."
+                )
+
+            pack_locale = string_field(source_pack, "locale")
+            if not pack_locale:
+                raise LaunchValidationError(
+                    f"artifact-factory source-pack batch request source pack '{source_pack.get('sourcePackId')}' must include locale for {family}."
+                )
+
+            if pack_locale.lower() != locale.lower():
+                raise LaunchValidationError(
+                    f"artifact-factory source-pack batch request source pack '{source_pack.get('sourcePackId')}' locale '{pack_locale}' does not match requested locale '{locale}'."
+                )
+
+            require_campaign_proof_anchor(source_pack, "audience", audience)
+            require_campaign_proof_anchor(source_pack, "locale", locale)
+
+
+def require_campaign_proof_anchor(source_pack: dict[str, Any], anchor_prefix: str, expected_value: str) -> None:
+    expected_ref = f"{anchor_prefix}:{expected_value}".lower()
+    evidence_refs = {
+        str(evidence_ref).strip().lower()
+        for evidence_ref in source_pack.get("evidenceRefs", []) or []
+        if isinstance(evidence_ref, str) and evidence_ref.strip()
+    }
+    if expected_ref in evidence_refs:
+        return
+
+    raise LaunchValidationError(
+        "artifact-factory source-pack batch request source pack "
+        f"'{source_pack.get('sourcePackId')}' must include evidenceRef '{anchor_prefix}:{expected_value}' "
+        "for audience-safe campaign artifact requests."
+    )
+
+
+def validate_source_pack_refs(source_pack: dict[str, Any]) -> None:
+    source_pack_id = string_field(source_pack, "sourcePackId")
+    if not source_pack_id:
+        raise LaunchValidationError("artifact-factory source-pack batch request sourcePacks must include sourcePackId.")
+
+    reject_provider_specific_ref(source_pack_id, source_pack_id, "sourcePackId")
+    reject_provider_specific_ref(source_pack_id, string_field(source_pack, "provenanceRef"), "provenanceRef")
+
+    public_shelf_ref = string_field(source_pack, "publicShelfRef")
+    if public_shelf_ref:
+        reject_provider_specific_ref(source_pack_id, public_shelf_ref, "publicShelfRef")
+        reject_non_local_public_shelf_ref(source_pack_id, public_shelf_ref, "publicShelfRef")
+
+    evidence_refs = source_pack.get("evidenceRefs", []) or []
+    if not isinstance(evidence_refs, list):
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch request source pack '{source_pack_id}' evidenceRefs must be an array when provided."
+        )
+
+    for evidence_ref in evidence_refs:
+        if not isinstance(evidence_ref, str) or not evidence_ref.strip():
+            continue
+
+        reject_provider_specific_ref(source_pack_id, evidence_ref.strip(), "evidenceRef")
+        if evidence_ref.strip().lower().startswith("public-shelf:"):
+            reject_non_local_public_shelf_ref(source_pack_id, evidence_ref.split(":", 1)[1], "evidenceRef")
+
+
+def reject_provider_specific_ref(source_pack_id: str, value: str, field_name: str) -> None:
+    normalized = value.strip()
+    if not normalized:
+        if field_name == "provenanceRef":
+            raise LaunchValidationError(
+                f"artifact-factory source-pack batch request source pack '{source_pack_id}' must include provenanceRef."
+            )
+        return
+
+    if normalized.lower().startswith(("http://", "https://")) or (
+        "://" in normalized and not is_external_public_shelf_evidence_ref(normalized, field_name)
+    ):
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch request source pack '{source_pack_id}' has external absolute URI {field_name}; "
+            "jobs must launch from approved source-pack receipts instead of one-off provider flows."
+        )
+
+    prefix = first_ref_prefix(normalized)
+    if (
+        normalized.lower() in PROVIDER_SPECIFIC_REF_PREFIXES
+        or prefix.lower() in PROVIDER_SPECIFIC_REF_PREFIXES
+        or (
+            not is_external_public_shelf_evidence_ref(normalized, field_name)
+            and contains_provider_specific_token(normalized)
+        )
+    ):
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch request source pack '{source_pack_id}' has provider-specific {field_name}; "
+            "jobs must launch from approved source-pack receipts instead of one-off provider flows."
+        )
+
+
+def first_ref_prefix(normalized: str) -> str:
+    if normalized.startswith("/"):
+        return ""
+
+    colon_index = normalized.find(":")
+    slash_index = normalized.find("/")
+    indexes = [index for index in (colon_index, slash_index) if index >= 0]
+    return normalized[: min(indexes)].strip() if indexes else ""
+
+
+def is_external_public_shelf_evidence_ref(normalized: str, field_name: str) -> bool:
+    return field_name == "evidenceRef" and normalized.lower().startswith("public-shelf:") and not normalized.split(":", 1)[1].lstrip().startswith("/")
+
+
+def contains_provider_specific_token(value: str) -> bool:
+    lower = value.lower()
+    return any(contains_delimited_token(lower, token.lower()) for token in PROVIDER_SPECIFIC_REF_PREFIXES)
+
+
+def contains_delimited_token(value: str, token: str) -> bool:
+    start_index = 0
+    while True:
+        index = value.find(token, start_index)
+        if index < 0:
+            return False
+
+        end_index = index + len(token)
+        if is_provider_token_boundary(value, index - 1) and is_provider_token_boundary(value, end_index):
+            return True
+
+        start_index = index + 1
+
+
+def is_provider_token_boundary(value: str, index: int) -> bool:
+    return index < 0 or index >= len(value) or value[index] in {":", "/", "\\", "-", "_", "."}
+
+
+def reject_non_local_public_shelf_ref(source_pack_id: str, value: str, field_name: str) -> None:
+    public_shelf_ref = value.strip()
+    if not public_shelf_ref.startswith("/") or public_shelf_ref.startswith("//"):
+        raise LaunchValidationError(
+            f"artifact-factory source-pack batch request source pack '{source_pack_id}' has non-local public proof shelf {field_name}; "
+            "artifact factory output refs must stay on the Chummer public proof shelf."
+        )
 
 
 def string_field(source_pack: dict[str, Any], field_name: str) -> str:
