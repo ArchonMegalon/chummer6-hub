@@ -204,7 +204,9 @@
         => !string.IsNullOrWhiteSpace(route)
             && route.StartsWith("/", StringComparison.Ordinal)
             && !route.StartsWith("//", StringComparison.Ordinal)
-            && !route.Contains('\\', StringComparison.Ordinal);
+            && !route.Contains('\\', StringComparison.Ordinal)
+            && !route.Contains('?', StringComparison.Ordinal)
+            && !route.Contains('#', StringComparison.Ordinal);
 
     static string DescribeRecoveryRouteAction(string? route)
         => route switch
