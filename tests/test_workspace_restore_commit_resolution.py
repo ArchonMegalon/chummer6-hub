@@ -243,6 +243,8 @@ class WorkspaceRestoreCommitResolutionTests(unittest.TestCase):
         self.assertIn("commit da9bb74c pins the blank restore conflict summary proof", script_text)
         self.assertIn('"fdac7b2f"', script_text)
         self.assertIn("commit fdac7b2f tightens the M105 closed queue action guard", script_text)
+        self.assertIn('"afea8813"', script_text)
+        self.assertIn("commit afea8813 tightens M105 typed recovery actions", script_text)
         self.assertIn("/docker/chummercomplete/chummer6-hub/tests/test_workspace_restore_queue_frontier_guard.py", script_text)
 
     def test_all_registry_and_queue_commit_citations_are_required_to_resolve(self) -> None:
