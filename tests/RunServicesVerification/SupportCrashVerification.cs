@@ -7,12 +7,14 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using Chummer.Run.Api.Controllers;
+using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.AI.Services.Ops;
 using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -32,12 +34,34 @@ internal static class SupportCrashVerification
             IConfiguration configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = Path.Combine(tempRoot, "downloads"),
                     ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
                     ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(tempRoot, "install-linking-store.json"),
                     ["FLEET_INTERNAL_API_TOKEN"] = "verify-token",
                     ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "false",
                 })
                 .Build();
+            Directory.CreateDirectory(configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]!);
+            PublicReleaseArtifactDto currentArtifact = new(
+                Id: "avalonia-linux-x64-installer",
+                Platform: "linux",
+                Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                Sha256: "sha-current",
+                SizeBytes: 42,
+                Head: "avalonia",
+                PlatformId: "linux",
+                Arch: "x64",
+                Kind: "installer",
+                FileName: "chummer-avalonia-linux-x64-installer.deb",
+                InstallAccessClass: InstallAccessClasses.AccountRequired);
+            PublicReleaseManifestDto manifest = new(
+                Version: "1.1.1",
+                Channel: "preview",
+                PublishedAt: DateTimeOffset.Parse("2026-04-20T00:00:00Z"),
+                Downloads: [currentArtifact]);
+            File.WriteAllText(
+                Path.Combine(configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]!, "releases.json"),
+                JsonSerializer.Serialize(manifest, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
 
             InstallLinkingStore installStore = new(configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinkingService installLinking = new(installStore, configuration);
@@ -50,8 +74,11 @@ internal static class SupportCrashVerification
                 configuration,
                 NullLogger<SupportProgressEmailWorkflowService>.Instance);
             SupportCaseService supportCases = new(store, attachments, rewards, progressEmails, NullLogger<SupportCaseService>.Instance);
+            SupportCasePresentationService supportPresentation = new();
+            SupportConciergePacketService conciergePackets = new(new PublicReleaseManifestService(configuration), supportPresentation);
             CrashSupportService service = new(store, supportCases, installLinking, NullLogger<CrashSupportService>.Instance);
             SeedInstallationGrant(installStore, "install-verified", "usr_linked", "subject.linked", "grant-active");
+            SeedInstallationGrant(installStore, "install-1", "usr_runner", "subject.runner", "grant-runner");
 
             CrashIntakeAcceptedResponse first = service.Submit(CreateEnvelope("crash-1", "1.0.0", "fingerprint-a"));
             CrashIntakeAcceptedResponse second = service.Submit(CreateEnvelope("crash-2", "1.1.0", "fingerprint-a"));
@@ -125,7 +152,7 @@ internal static class SupportCrashVerification
                     Kind: SupportCaseKinds.BugReport,
                     Title: "Updater note is confusing",
                     Summary: "Release copy does not explain the staged restart clearly.",
-                    Detail: "The page should explain what was staged and whether the update already downloaded.",
+                    Detail: "The page should explain what was staged and whether the update already downloaded.\n\nInstalled build receipt: receipt-install-1",
                     InstallationId: "install-1",
                     ApplicationVersion: "1.1.0",
                     ReleaseChannel: "preview",
@@ -207,6 +234,21 @@ internal static class SupportCrashVerification
                     Channel: "account_history"));
             VerificationAssert.Equal(SupportCaseStatuses.UserNotified, notified.Status, "Notification hooks should move the case into user_notified.");
             VerificationAssert.True(notified.UserNotifiedAtUtc.HasValue, "Notification hooks should stamp the notification time.");
+
+            InstallAwareSupportConciergePacket conciergePacket = conciergePackets.Build(
+                notified,
+                installLinking.GetSummary("usr_runner", "subject.runner"));
+            VerificationAssert.Equal("chummer6-hub.install_aware_support_concierge.v1", conciergePacket.ContractName, "M111 support concierge packet should publish a stable contract name.");
+            VerificationAssert.Equal("next90-m111-hub-support-concierge", conciergePacket.PackageId, "M111 support concierge packet should cite the assigned package.");
+            VerificationAssert.True(conciergePacket.IsInstallAware, "Support concierge packet should require installed build, channel, device, and support-case truth.");
+            VerificationAssert.Equal("receipt-install-1", conciergePacket.InstalledBuildTruth.InstalledBuildReceiptId ?? string.Empty, "Support concierge packet should carry the installed-build receipt from support truth.");
+            VerificationAssert.Equal("1.1.0", conciergePacket.InstalledBuildTruth.ApplicationVersion, "Support concierge packet should preserve the affected installed build.");
+            VerificationAssert.Equal("preview", conciergePacket.InstalledBuildTruth.ReleaseChannel, "Support concierge packet should preserve the affected installed channel.");
+            VerificationAssert.Equal("avalonia-linux-x64-installer", conciergePacket.ReleaseTruth.CurrentArtifactId ?? string.Empty, "Release explainer packet should resolve the current published artifact for the install.");
+            VerificationAssert.True(conciergePacket.ReleaseTruth.ChannelAgreesWithInstalledBuild, "Release explainer packet should prove channel agreement before public wrapper promotion.");
+            VerificationAssert.True(conciergePacket.SupportClosure.FirstPartyRoutes.Contains("/api/v1/install-linking/continuation/support"), "Support closure packet should keep native support follow-through in first-party routes.");
+            VerificationAssert.True(conciergePacket.ReleaseExplainer.CorrectnessBasis.Contains("receipt-install-1", StringComparison.Ordinal), "Release explainer packet should cite installed-build receipt truth.");
+            VerificationAssert.True(conciergePacket.PublicTrustWrapper.FirstPartyOnlyTruth, "Public wrapper must not become the source of installed-build or support-case truth.");
 
             SupportStore reloadedStore = new(configuration, NullLogger<SupportStore>.Instance);
             SupportAttachmentStorageService reloadedAttachments = new(configuration);
@@ -299,14 +341,14 @@ internal static class SupportCrashVerification
                 UserId: userId,
                 SubjectId: subjectId,
                 PublicKey: "public-key",
-                ClaimTicketId: "ticket-1",
+                ClaimTicketId: $"ticket-{installationId}",
                 HeadId: "avalonia",
                 Platform: "linux",
                 Arch: "x64",
                 HostLabel: "verify-host",
-                GrantId: "grant-1");
+                GrantId: $"grant-{installationId}");
             InstallationGrantDto grant = new(
-                GrantId: "grant-1",
+                GrantId: $"grant-{installationId}",
                 InstallationId: installationId,
                 Status: InstallationGrantStates.Active,
                 AccessToken: accessToken,

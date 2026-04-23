@@ -66,6 +66,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SupportAttachmentStorageService>();
         services.AddSingleton<SupportCaseService>();
         services.AddSingleton<SupportCasePresentationService>();
+        services.AddSingleton<SupportConciergePacketService>();
         services.AddSingleton<SupportAssistantService>();
         services.AddSingleton<CrashSupportService>();
         services.AddHttpClient<SupportProgressEmailWorkflowService>();
