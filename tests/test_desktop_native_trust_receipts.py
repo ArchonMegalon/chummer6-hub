@@ -643,7 +643,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 payload["successor_queue_packages_by_id"]["next90-m102-hub-desktop-native-trust"],
             )
             self.assertEqual("complete", m102_package["status"])
-            self.assertEqual(2594403904, m102_package["frontier_id"])
+            self.assertEqual(2897065929, m102_package["frontier_id"])
             self.assertEqual("160af58f", m102_package["landed_commit"])
             self.assertEqual(
                 "Unify claim, install, update, and support recovery into one desktop-native flow",
@@ -660,7 +660,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 if receipt["package_id"] == "next90-m102-hub-desktop-native-trust"
             ]
             self.assertEqual(2, len(m102_receipts))
-            self.assertTrue(all(receipt["frontier_id"] == 2594403904 for receipt in m102_receipts))
+            self.assertTrue(all(receipt["frontier_id"] == 2897065929 for receipt in m102_receipts))
             m105_package = next(
                 item
                 for item in payload["successor_queue_packages"]
@@ -721,7 +721,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                         "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                         "    package_id: next90-m102-hub-desktop-native-trust",
-                        "    frontier_id: 2594403904",
+                        "    frontier_id: 2897065929",
                         "    milestone_id: 102",
                         "    wave: W6",
                         "    repo: chummer6-hub",
@@ -743,7 +743,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                         "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                         "    package_id: next90-m102-hub-desktop-native-trust",
-                        "    frontier_id: 2594403904",
+                        "    frontier_id: 2897065929",
                         "    milestone_id: 102",
                         "    wave: W6",
                         "    repo: chummer6-hub",
@@ -798,7 +798,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -854,7 +854,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -918,7 +918,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -937,7 +937,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 ]
             )
             queue_path.write_text(
-                complete_queue.replace("    frontier_id: 2594403904\n", "") + "\n",
+                complete_queue.replace("    frontier_id: 2897065929\n", "") + "\n",
                 encoding="utf-8",
             )
             design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
@@ -961,7 +961,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
 
             self.assertNotEqual(0, result.returncode)
-            self.assertIn("canonical successor queue staging block missing marker: frontier_id: 2594403904", result.stderr)
+            self.assertIn("canonical successor queue staging block missing marker: frontier_id: 2897065929", result.stderr)
 
     def test_verifier_fail_closes_successor_queue_eta_status_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -974,7 +974,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -993,8 +993,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 ]
             )
             eta_drift_queue = complete_queue.replace(
-                "    frontier_id: 2594403904\n",
-                "    frontier_id: 2594403904\n    eta: 5.6d-2w\n",
+                "    frontier_id: 2897065929\n",
+                "    frontier_id: 2897065929\n    eta: 5.6d-2w\n",
             )
             queue_path.write_text(eta_drift_queue + "\n", encoding="utf-8")
             design_queue_path.write_text(eta_drift_queue + "\n", encoding="utf-8")
@@ -1038,7 +1038,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1101,7 +1101,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1157,7 +1157,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1218,7 +1218,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1274,7 +1274,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1334,7 +1334,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1399,7 +1399,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1457,7 +1457,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1644,7 +1644,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1701,7 +1701,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2594403904",
+                    "    frontier_id: 2897065929",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",

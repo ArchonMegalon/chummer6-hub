@@ -97,7 +97,7 @@ def main() -> int:
         {
             "package_id": "next90-m102-hub-desktop-native-trust",
             "milestone_id": 102,
-            "frontier_id": 2594403904,
+            "frontier_id": 2897065929,
             "repo": "chummer6-hub",
             "status": "complete",
             "completion_action": "verify_closed_package_only",
@@ -217,7 +217,7 @@ def main() -> int:
                 "receipt_id": "desktop_native_claim_and_recovery",
                 "package_id": "next90-m102-hub-desktop-native-trust",
                 "milestone_id": 102,
-                "frontier_id": 2594403904,
+                "frontier_id": 2897065929,
                 "summary": "Claim and recovery continuation now have installer/app-native receipts: guided setup is the default, claim codes are recovery fallback only, and the claimed desktop app can call the grant-bound continuation endpoint without a browser redemption ritual.",
                 "routes": [
                     "/downloads/install/avalonia-linux-x64-installer/continue.json",
@@ -234,7 +234,7 @@ def main() -> int:
                 "receipt_id": "support_followthrough:install_truth",
                 "package_id": "next90-m102-hub-desktop-native-trust",
                 "milestone_id": 102,
-                "frontier_id": 2594403904,
+                "frontier_id": 2897065929,
                 "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
                 "routes": [
                     "/api/v1/install-linking/continuation",
