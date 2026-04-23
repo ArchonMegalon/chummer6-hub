@@ -164,6 +164,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer6-hub commit 7be45a1b hardens M102 encoded hash separator secret redaction.",
     "      - /docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
     "      - /docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
+    "      - /docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -325,6 +326,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer6-hub commit 7be45a1b hardens M102 encoded hash separator secret redaction.",
     "          - /docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
     "          - /docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
+    "          - /docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -398,11 +400,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("43e273e9", verifier._current_local_proof_floor_commit())
+        self.assertEqual("d86cce39", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "fix(hub): harden M102 native support secret redaction",
+            "Tighten M102 successor frontier proof",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("d86cce39", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("43e273e9", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("e054d2f1", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("7be45a1b", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -511,6 +514,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         )
         self.assertTrue(
             any("commit 43e273e9 hardens M102 native support secret redaction" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        )
+        self.assertTrue(
+            any("commit d86cce39 tightens the M102 successor frontier proof" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        )
+        self.assertTrue(
+            any("commit d86cce39 tightens the M102 successor frontier proof" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -2960,6 +2969,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "7be45a1b",
                 "e054d2f1",
                 "43e273e9",
+                "d86cce39",
             ],
             verifier._required_resolving_commits(),
         )
