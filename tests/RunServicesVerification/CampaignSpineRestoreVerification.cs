@@ -28,6 +28,7 @@ internal static class CampaignSpineRestoreVerification
         VerifyServerPlaneNextSafeActionSurfacesRecoverableProvenance();
         VerifyServerPlaneRestoreReceiptStatusSummarizesBlockingRecovery();
         VerifyServerPlaneRestoreReceiptStatusFallsBackToRecoverableProvenanceLead();
+        VerifyRestoreReceiptStatusEmitsTypedRecoveryActions();
         VerifyEntitlementSyncReceiptStatusUsesStandaloneScopeDefaults();
         VerifyEntitlementSyncProjectionStaysExplicitAndRecoverable();
         VerifyRestoreReceiptSurfaceProjectionCountsStayExplicit();
@@ -824,6 +825,132 @@ internal static class CampaignSpineRestoreVerification
                 && status.ReviewBeforeContinueConflictCount == 0
                 && status.BlockingConflictCount == 0,
             "Restore receipt status should keep recoverable stale workspace restore posture explicit even without a conflict receipt.");
+    }
+
+    private static void VerifyRestoreReceiptStatusEmitsTypedRecoveryActions()
+    {
+        MethodInfo projectMethod = typeof(CampaignWorkspaceServerPlaneService).GetMethod(
+            "BuildRestoreReceiptStatusProjection",
+            BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("Expected restore receipt status projection method.");
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        IReadOnlyList<WorkspaceRestoreProvenanceReceipt> provenanceReceipts =
+        [
+            new(
+                ReceiptId: "workspace-current-action",
+                Kind: "restore_inventory_snapshot",
+                SubjectId: "workspace-safe",
+                Surface: "workspace_restore",
+                Summary: "Workspace inventory is current.",
+                Proof: "inventory",
+                ObservedAtUtc: now.AddMinutes(1)),
+            new(
+                ReceiptId: "entitlement-stale-action",
+                Kind: "entitlement_replication_stale_claim",
+                SubjectId: "grant-stale",
+                Surface: "entitlement_sync",
+                Summary: "Grant points at stale claim state.",
+                Proof: "grant-stale",
+                ObservedAtUtc: now)
+        ];
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> provenanceRecoveryReceipts =
+        [
+            new(
+                ReceiptId: "workspace-current-action",
+                Kind: "restore_inventory_snapshot",
+                SubjectId: "workspace-safe",
+                Surface: "workspace_restore",
+                Summary: "Workspace inventory is current.",
+                Proof: "inventory",
+                ObservedAtUtc: now.AddMinutes(1),
+                Authority: "hub_campaign_spine_projection",
+                StalenessPosture: "current_receipt",
+                RecoverabilityPosture: "recoverable_with_receipt",
+                RecoveryHint: "Review the restore rail if inventory drifts.",
+                RecoveryRoute: "/account/work",
+                RecoverySummary: "Inventory is current on the restore rail.",
+                ContinuePosture: "safe_to_continue_with_receipt"),
+            new(
+                ReceiptId: "entitlement-stale-action",
+                Kind: "entitlement_replication_stale_claim",
+                SubjectId: "grant-stale",
+                Surface: "entitlement_sync",
+                Summary: "Grant points at stale claim state.",
+                Proof: "grant-stale",
+                ObservedAtUtc: now,
+                Authority: "hub_entitlement_ledger",
+                StalenessPosture: "stale_state",
+                RecoverabilityPosture: "recoverable_by_refresh",
+                RecoveryHint: "Refresh account access before continuing.",
+                RecoveryRoute: "/account/access",
+                RecoverySummary: "Refresh grant-stale through /account/access before continuing from this restored workspace.",
+                ContinuePosture: "refresh_before_continue")
+        ];
+        IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> conflictReceipts =
+        [
+            new(
+                ReceiptId: "blocking-entitlement-action",
+                Severity: "blocking",
+                Kind: "entitlement_replication_duplicate_grant",
+                Surface: "entitlement_sync",
+                Authority: "hub_entitlement_ledger",
+                SubjectId: "install-duplicate",
+                Summary: "Duplicate entitlement receipts block restore continuation.",
+                Resolution: "Open account access and rotate duplicate grants.",
+                ConflictPosture: "blocking_conflict",
+                RecoverabilityPosture: "recoverable_by_account_access_before_continue",
+                RecoveryRoute: "/account/access",
+                RecoveryHint: "Open account access and refresh entitlement replication.",
+                RecoverySummary: "Resolve install-duplicate through /account/access before continuing from this restored workspace.",
+                ContinuePosture: "blocked_until_receipt_resolved",
+                ObservedAtUtc: now.AddMinutes(2),
+                BlocksContinue: true)
+        ];
+
+        Type scopeType = projectMethod.GetParameters()[3].ParameterType;
+        WorkspaceRestoreReceiptStatusProjection status =
+            projectMethod.Invoke(
+                null,
+                [provenanceReceipts, provenanceRecoveryReceipts, conflictReceipts, Enum.Parse(scopeType, "Restore")]) as WorkspaceRestoreReceiptStatusProjection
+            ?? throw new InvalidOperationException("Expected restore receipt status projection.");
+        WorkspaceRestoreReceiptStatusProjection emptyEntitlementStatus =
+            projectMethod.Invoke(
+                null,
+                [
+                    Array.Empty<WorkspaceRestoreProvenanceReceipt>(),
+                    Array.Empty<WorkspaceRestoreProvenanceRecoveryProjection>(),
+                    Array.Empty<WorkspaceRestoreConflictReceiptProjection>(),
+                    Enum.Parse(scopeType, "EntitlementSync")
+                ]) as WorkspaceRestoreReceiptStatusProjection
+            ?? throw new InvalidOperationException("Expected fallback entitlement sync status projection.");
+
+        VerificationAssert.True(
+            status.RecoveryActions.Count >= 3
+                && status.RecoveryActions[0].BlocksContinue
+                && string.Equals(status.RecoveryActions[0].ReceiptId, "blocking-entitlement-action", StringComparison.Ordinal)
+                && string.Equals(status.RecoveryActions[0].Authority, "hub_entitlement_ledger", StringComparison.Ordinal)
+                && string.Equals(status.RecoveryActions[0].Route, "/account/access", StringComparison.Ordinal)
+                && string.Equals(status.RecoveryActions[0].ContinuePosture, "blocked_until_receipt_resolved", StringComparison.Ordinal)
+                && status.RecoveryActions.Any(item =>
+                    string.Equals(item.ReceiptId, "entitlement-stale-action", StringComparison.Ordinal)
+                    && string.Equals(item.Authority, "hub_entitlement_ledger", StringComparison.Ordinal)
+                    && string.Equals(item.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal)
+                    && string.Equals(item.Label, "Open account access", StringComparison.Ordinal))
+                && status.RecoveryActions.Any(item =>
+                    string.Equals(item.ReceiptId, "workspace-current-action", StringComparison.Ordinal)
+                    && string.Equals(item.Authority, "hub_campaign_spine_projection", StringComparison.Ordinal)
+                    && string.Equals(item.Route, "/account/work", StringComparison.Ordinal)
+                    && string.Equals(item.ContinuePosture, "safe_to_continue_with_receipt", StringComparison.Ordinal)),
+            "Restore receipt status should emit typed recovery actions with authority for blocking conflicts, stale provenance, and current workspace receipts so clients do not parse summaries.");
+        VerificationAssert.True(
+            emptyEntitlementStatus.RecoveryActions.Count == 1
+                && string.Equals(emptyEntitlementStatus.RecoveryActions[0].ActionId, "entitlement-sync:review-required", StringComparison.Ordinal)
+                && string.Equals(emptyEntitlementStatus.RecoveryActions[0].Authority, "hub_entitlement_ledger", StringComparison.Ordinal)
+                && string.Equals(emptyEntitlementStatus.RecoveryActions[0].Surface, "entitlement_sync", StringComparison.Ordinal)
+                && string.Equals(emptyEntitlementStatus.RecoveryActions[0].Route, "/account/access", StringComparison.Ordinal)
+                && string.Equals(emptyEntitlementStatus.RecoveryActions[0].ContinuePosture, "review_before_continue", StringComparison.Ordinal),
+            "Empty entitlement sync status should still emit one typed account-access review action instead of leaving recovery implicit.");
     }
 
     private static void VerifyEntitlementSyncReceiptStatusUsesStandaloneScopeDefaults()

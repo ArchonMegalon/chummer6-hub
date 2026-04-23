@@ -61,6 +61,7 @@ public sealed record WorkspaceRestoreReceiptStatusProjection(
     string RecoveryRoute,
     string RecoveryActionLabel,
     string RecoverySummary,
+    IReadOnlyList<WorkspaceRestoreReceiptActionProjection> RecoveryActions,
     int CurrentProvenanceReceiptCount,
     int StaleOrDriftProvenanceReceiptCount,
     int WorkspaceRestoreProvenanceCount,
@@ -71,6 +72,17 @@ public sealed record WorkspaceRestoreReceiptStatusProjection(
     int RefreshBeforeContinueCount,
     int ReviewBeforeContinueConflictCount,
     int BlockingConflictCount);
+
+public sealed record WorkspaceRestoreReceiptActionProjection(
+    string ActionId,
+    string Label,
+    string Authority,
+    string Surface,
+    string ReceiptId,
+    string Route,
+    string Summary,
+    string ContinuePosture,
+    bool BlocksContinue);
 
 public sealed record WorkspaceRestoreProvenanceRecoveryProjection(
     string ReceiptId,

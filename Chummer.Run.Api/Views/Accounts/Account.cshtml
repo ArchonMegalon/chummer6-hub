@@ -201,7 +201,10 @@
         };
 
     static bool IsNavigableAccountRoute(string? route)
-        => !string.IsNullOrWhiteSpace(route) && route.StartsWith("/", StringComparison.Ordinal);
+        => !string.IsNullOrWhiteSpace(route)
+            && route.StartsWith("/", StringComparison.Ordinal)
+            && !route.StartsWith("//", StringComparison.Ordinal)
+            && !route.Contains('\\', StringComparison.Ordinal);
 
     static string DescribeRecoveryRouteAction(string? route)
         => route switch
@@ -1016,6 +1019,26 @@
                                             <span><a href="@surface.Status.RecoveryRoute">@DescribeRecoveryRouteAction(surface.Status.RecoveryRoute)</a></span>
                                         }
                                         <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue with receipt")</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                        @if (entitlementSyncReceipts.ReceiptStatus.RecoveryActions.Count > 0)
+                        {
+                            <ul class="muted-copy">
+                                @foreach (var action in entitlementSyncReceipts.ReceiptStatus.RecoveryActions)
+                                {
+                                    <li>
+                                        <strong>@action.Label:</strong> @action.Summary
+                                        <span>Receipt: @action.ReceiptId</span>
+                                        <span>Authority: @HumanizeStatus(action.Authority, "hub_entitlement_ledger")</span>
+                                        <span>Surface: @HumanizeStatus(action.Surface, "entitlement_sync")</span>
+                                        <span>Route: @action.Route</span>
+                                        <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Review before continuing")</span>
+                                        @if (IsNavigableAccountRoute(action.Route))
+                                        {
+                                            <span><a href="@action.Route">@DescribeRecoveryRouteAction(action.Route)</a></span>
+                                        }
                                     </li>
                                 }
                             </ul>
@@ -1952,6 +1975,26 @@
                                                     <span><a href="@surface.Status.RecoveryRoute">@DescribeRecoveryRouteAction(surface.Status.RecoveryRoute)</a></span>
                                                 }
                                                 <span>@HumanizeStatus(surface.Status.ContinuePosture, "Safe to continue with receipt")</span>
+                                            </li>
+                                        }
+                                    </ul>
+                                }
+                                @if (selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryActions.Count > 0)
+                                {
+                                    <ul class="muted-copy">
+                                        @foreach (var action in selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryActions)
+                                        {
+                                            <li>
+                                                <strong>@action.Label:</strong> @action.Summary
+                                                <span>Receipt: @action.ReceiptId</span>
+                                                <span>Authority: @HumanizeStatus(action.Authority, "hub_campaign_spine_projection")</span>
+                                                <span>Surface: @HumanizeStatus(action.Surface, "workspace_restore")</span>
+                                                <span>Route: @action.Route</span>
+                                                <span>@HumanizeStatus(action.ContinuePosture, action.BlocksContinue ? "Continue blocked" : "Safe to continue with receipt")</span>
+                                                @if (IsNavigableAccountRoute(action.Route))
+                                                {
+                                                    <span><a href="@action.Route">@DescribeRecoveryRouteAction(action.Route)</a></span>
+                                                }
                                             </li>
                                         }
                                     </ul>

@@ -280,6 +280,52 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
         self.assertIn("string ConflictSummary,", result.stderr)
         self.assertIn("string RecoveryActionLabel,", result.stderr)
 
+    def test_verifier_fails_closed_when_typed_recovery_actions_are_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="workspace-restore-typed-actions-") as temp_dir:
+            temp_root = Path(temp_dir)
+            contract_path = temp_root / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.parent.mkdir(parents=True)
+            source_contract_path = REPO_ROOT / "Chummer.Run.Api" / "Contracts" / "CampaignWorkspaceServerPlaneContracts.cs"
+            contract_path.write_text(
+                source_contract_path.read_text(encoding="utf-8")
+                .replace("    IReadOnlyList<WorkspaceRestoreReceiptActionProjection> RecoveryActions,\n", "", 1)
+                .replace("public sealed record WorkspaceRestoreReceiptActionProjection(\n", "", 1),
+                encoding="utf-8",
+            )
+
+            verification_path = temp_root / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.parent.mkdir(parents=True)
+            source_verification_path = REPO_ROOT / "tests" / "RunServicesVerification" / "CampaignSpineRestoreVerification.cs"
+            verification_path.write_text(
+                source_verification_path.read_text(encoding="utf-8")
+                .replace("VerifyRestoreReceiptStatusEmitsTypedRecoveryActions();", "", 1)
+                .replace(
+                    "Restore receipt status should emit typed recovery actions with authority for blocking conflicts, stale provenance, and current workspace receipts so clients do not parse summaries.",
+                    "Removed typed recovery action assertion.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["CHUMMER_WORKSPACE_RESTORE_RECEIPTS_ROOT"] = str(temp_root)
+
+            result = subprocess.run(
+                ["python3", str(SCRIPT)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("CampaignWorkspaceServerPlaneContracts.cs", result.stderr)
+        self.assertIn("IReadOnlyList<WorkspaceRestoreReceiptActionProjection> RecoveryActions,", result.stderr)
+        self.assertIn("public sealed record WorkspaceRestoreReceiptActionProjection(", result.stderr)
+        self.assertIn("CampaignSpineRestoreVerification.cs", result.stderr)
+        self.assertIn("VerifyRestoreReceiptStatusEmitsTypedRecoveryActions", result.stderr)
+
     def test_verifier_fails_closed_when_surface_breakdown_contracts_are_removed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="workspace-restore-surface-breakdown-") as temp_dir:
             temp_root = Path(temp_dir)
