@@ -557,6 +557,19 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         self.assertIn("active-run helper commands", markers)
         self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
 
+    def test_forbidden_active_run_marker_matching_decodes_base64_text(self) -> None:
+        verifier = load_verifier_module()
+
+        markers = verifier._forbidden_markers_in_text(
+            "VEFTS19MT0NBTF9URUxFTUVUUlkuZ2VuZXJhdGVkLmpzb24= "
+            "YWN0aXZlLXJ1biBoZWxwZXIgY29tbWFuZHM "
+            "cnVuX29vZGFfZGVzaWduX3N1cGVydmlzb3JfdW50aWxfcXVpZXQ"
+        )
+
+        self.assertIn("TASK_LOCAL_TELEMETRY", markers)
+        self.assertIn("active-run helper commands", markers)
+        self.assertIn("run_ooda_design_supervisor_until_quiet", markers)
+
     def test_canonical_yaml_block_rejects_encoded_active_run_markers(self) -> None:
         verifier = load_verifier_module()
 
