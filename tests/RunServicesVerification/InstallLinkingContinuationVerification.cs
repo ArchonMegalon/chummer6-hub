@@ -737,6 +737,24 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(!htmlEqualsSecretCase.Detail.Contains("hex-equals-claim", StringComparison.Ordinal), "Native support case should not persist claim-code values after HTML entity equals separators.");
             VerificationAssert.True(!htmlEqualsSecretCase.Detail.Contains("html-equals-receipt", StringComparison.Ordinal), "Native support case should not persist installed-build receipt values after HTML entity equals separators.");
 
+            ActionResult<DesktopInstallNativeSupportResponse> bootstrapTicketSupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app bootstrap ticket label",
+                    Summary: "The app sent a short-lived install bootstrap ticket while filing native support.",
+                    Detail: "Desktop payload carried a bootstrap ticket query from the install/download handoff.",
+                    RequestedActionHref: "/downloads/install/avalonia-linux-x64-installer/bootstrap.sh?ticket=bootstrap-ticket-secret&state=desktop"));
+            ObjectResult bootstrapTicketAccepted = bootstrapTicketSupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with a bootstrap ticket action hint.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, bootstrapTicketAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop requested-action hints carry bootstrap tickets.");
+            DesktopInstallNativeSupportResponse bootstrapTicketSupport = bootstrapTicketAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed bootstrap-ticket response.");
+            SupportCaseProjection? bootstrapTicketCase = supportCases.GetForReporter(bootstrapTicketSupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(bootstrapTicketCase is not null, "Native support continuation should create the bootstrap-ticket support case.");
+            VerificationAssert.True(bootstrapTicketCase!.Detail.Contains("ticket=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact short-lived bootstrap ticket query values from requested-action hints.");
+            VerificationAssert.True(!bootstrapTicketCase.Detail.Contains("bootstrap-ticket-secret", StringComparison.Ordinal), "Native support case should not persist short-lived bootstrap ticket values from requested-action hints.");
+
             ActionResult<DesktopInstallNativeSupportResponse> semicolonSecretSupportResult = controller.SubmitClaimedInstallSupport(
                 new DesktopInstallNativeSupportRequest(
                     InstallationId: "install-native",

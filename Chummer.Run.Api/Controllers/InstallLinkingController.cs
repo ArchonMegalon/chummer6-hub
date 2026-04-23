@@ -43,6 +43,7 @@ public sealed class InstallLinkingController : ControllerBase
         "platformId",
         "arch",
         "publicKey",
+        "ticket",
         "ticketId",
         "version",
         "installLinkMode",
