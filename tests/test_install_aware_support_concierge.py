@@ -67,7 +67,7 @@ class InstallAwareSupportConciergeProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('[HttpGet("{caseId}/concierge")]', result.stderr)
 
-    def test_verifier_fails_when_present_queue_frontier_or_status_is_wrong(self) -> None:
+    def test_verifier_fails_when_closed_queue_authority_is_not_explicit(self) -> None:
         with tempfile.TemporaryDirectory(prefix="support-concierge-queue-") as temp_dir:
             queue_path = Path(temp_dir) / "queue.yaml"
             queue_path.write_text(
@@ -80,7 +80,10 @@ items:
     frontier_id: 1
     wave: W9
     repo: chummer6-hub
-    status: stale
+    status: in_progress
+    landed_commit: stale123
+    completion_action: keep_working
+    do_not_reopen_reason: ""
     allowed_paths:
       - Chummer.Run.Api
       - scripts
@@ -104,7 +107,10 @@ items:
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("frontier_id must be 2746902416", result.stderr)
-        self.assertIn("status must be 'in_progress' or 'complete'", result.stderr)
+        self.assertIn("status must be 'complete'", result.stderr)
+        self.assertIn("landed_commit must be '3fb14923'", result.stderr)
+        self.assertIn("completion_action must be 'verify_closed_package_only'", result.stderr)
+        self.assertIn("do_not_reopen_reason must tell future shards to verify instead of reopening", result.stderr)
 
     def test_verifier_fails_when_design_queue_public_wrapper_surface_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="support-concierge-design-queue-") as temp_dir:

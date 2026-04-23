@@ -11,6 +11,8 @@ import yaml
 PACKAGE_ID = "next90-m111-hub-support-concierge"
 FRONTIER_ID = 2746902416
 MILESTONE_ID = 111
+LANDED_COMMIT = "3fb14923"
+COMPLETION_ACTION = "verify_closed_package_only"
 OWNED_SURFACES = ["install_aware_support_concierge", "release_concierge:hub"]
 DESIGN_OWNED_SURFACES = [*OWNED_SURFACES, "public_concierge_wrapper:hub"]
 ALLOWED_PATHS = ["Chummer.Run.Api", "scripts", "tests"]
@@ -170,8 +172,15 @@ def verify_queue_authority(
             missing.append(f"{label} {PACKAGE_ID} {key} must be {value!r}: {path}")
     if "frontier_id" in item and item.get("frontier_id") != FRONTIER_ID:
         missing.append(f"{label} {PACKAGE_ID} frontier_id must be {FRONTIER_ID}: {path}")
-    if "status" in item and item.get("status") not in {"in_progress", "complete"}:
-        missing.append(f"{label} {PACKAGE_ID} status must be 'in_progress' or 'complete': {path}")
+    if item.get("status") != "complete":
+        missing.append(f"{label} {PACKAGE_ID} status must be 'complete': {path}")
+    if item.get("landed_commit") != LANDED_COMMIT:
+        missing.append(f"{label} {PACKAGE_ID} landed_commit must be {LANDED_COMMIT!r}: {path}")
+    if item.get("completion_action") != COMPLETION_ACTION:
+        missing.append(f"{label} {PACKAGE_ID} completion_action must be {COMPLETION_ACTION!r}: {path}")
+    do_not_reopen_reason = str(item.get("do_not_reopen_reason") or "")
+    if "do not reopen" not in do_not_reopen_reason.lower() and "future shards must verify" not in do_not_reopen_reason.lower():
+        missing.append(f"{label} {PACKAGE_ID} do_not_reopen_reason must tell future shards to verify instead of reopening: {path}")
     if item.get("allowed_paths") != ALLOWED_PATHS:
         missing.append(f"{label} {PACKAGE_ID} allowed_paths drifted: {path}")
     if item.get("owned_surfaces") != expected_owned_surfaces:
