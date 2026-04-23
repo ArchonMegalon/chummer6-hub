@@ -162,6 +162,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer6-hub commit 2fc1d739 pins the M102 current proof floor.",
     "      - /docker/chummercomplete/chummer6-hub commit f233069f hardens M102 native support requested-action secret redaction.",
     "      - /docker/chummercomplete/chummer6-hub commit 7be45a1b hardens M102 encoded hash separator secret redaction.",
+    "      - /docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -321,6 +322,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer6-hub commit 2fc1d739 pins the M102 current proof floor.",
     "          - /docker/chummercomplete/chummer6-hub commit f233069f hardens M102 native support requested-action secret redaction.",
     "          - /docker/chummercomplete/chummer6-hub commit 7be45a1b hardens M102 encoded hash separator secret redaction.",
+    "          - /docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -394,11 +396,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("7be45a1b", verifier._current_local_proof_floor_commit())
+        self.assertEqual("e054d2f1", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "fix(hub): harden M102 encoded hash secret redaction",
+            "test(hub): pin M102 encoded hash proof floor",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("e054d2f1", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("7be45a1b", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("f233069f", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("2fc1d739", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -493,6 +496,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         )
         self.assertTrue(
             any("commit 7be45a1b hardens M102 encoded hash separator secret redaction" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        )
+        self.assertTrue(
+            any("commit e054d2f1 pins the M102 encoded hash proof floor" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        )
+        self.assertTrue(
+            any("commit e054d2f1 pins the M102 encoded hash proof floor" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -625,6 +634,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 payload["successor_queue_packages_by_id"]["next90-m102-hub-desktop-native-trust"],
             )
             self.assertEqual("complete", m102_package["status"])
+            self.assertEqual(2594403904, m102_package["frontier_id"])
             self.assertEqual("160af58f", m102_package["landed_commit"])
             self.assertEqual(
                 "Unify claim, install, update, and support recovery into one desktop-native flow",
@@ -635,6 +645,13 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "Claim, update, rollback, recovery, and support followthrough happen from the installer or app, not as browser ritual.",
                 m102_package["exit_criterion"],
             )
+            m102_receipts = [
+                receipt
+                for receipt in payload["proof_receipts"]
+                if receipt["package_id"] == "next90-m102-hub-desktop-native-trust"
+            ]
+            self.assertEqual(2, len(m102_receipts))
+            self.assertTrue(all(receipt["frontier_id"] == 2594403904 for receipt in m102_receipts))
             m105_package = next(
                 item
                 for item in payload["successor_queue_packages"]
@@ -695,7 +712,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                         "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                         "    package_id: next90-m102-hub-desktop-native-trust",
-                        "    frontier_id: 2897065929",
+                        "    frontier_id: 2594403904",
                         "    milestone_id: 102",
                         "    wave: W6",
                         "    repo: chummer6-hub",
@@ -717,7 +734,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                         "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                         "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                         "    package_id: next90-m102-hub-desktop-native-trust",
-                        "    frontier_id: 2897065929",
+                        "    frontier_id: 2594403904",
                         "    milestone_id: 102",
                         "    wave: W6",
                         "    repo: chummer6-hub",
@@ -772,7 +789,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -828,7 +845,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -892,7 +909,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -911,7 +928,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 ]
             )
             queue_path.write_text(
-                complete_queue.replace("    frontier_id: 2897065929\n", "") + "\n",
+                complete_queue.replace("    frontier_id: 2594403904\n", "") + "\n",
                 encoding="utf-8",
             )
             design_queue_path.write_text(complete_queue + "\n", encoding="utf-8")
@@ -935,7 +952,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             )
 
             self.assertNotEqual(0, result.returncode)
-            self.assertIn("canonical successor queue staging block missing marker: frontier_id: 2897065929", result.stderr)
+            self.assertIn("canonical successor queue staging block missing marker: frontier_id: 2594403904", result.stderr)
 
     def test_verifier_fail_closes_successor_queue_eta_status_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -948,7 +965,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -967,8 +984,8 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 ]
             )
             eta_drift_queue = complete_queue.replace(
-                "    frontier_id: 2897065929\n",
-                "    frontier_id: 2897065929\n    eta: 5.6d-2w\n",
+                "    frontier_id: 2594403904\n",
+                "    frontier_id: 2594403904\n    eta: 5.6d-2w\n",
             )
             queue_path.write_text(eta_drift_queue + "\n", encoding="utf-8")
             design_queue_path.write_text(eta_drift_queue + "\n", encoding="utf-8")
@@ -1012,7 +1029,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1075,7 +1092,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1131,7 +1148,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1192,7 +1209,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1248,7 +1265,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1308,7 +1325,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1373,7 +1390,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1431,7 +1448,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1618,7 +1635,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -1675,7 +1692,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     "  - title: Unify claim, install, update, and support recovery into one desktop-native flow",
                     "    task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
                     "    package_id: next90-m102-hub-desktop-native-trust",
-                    "    frontier_id: 2897065929",
+                    "    frontier_id: 2594403904",
                     "    milestone_id: 102",
                     "    wave: W6",
                     "    repo: chummer6-hub",
@@ -2932,6 +2949,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "2fc1d739",
                 "f233069f",
                 "7be45a1b",
+                "e054d2f1",
             ],
             verifier._required_resolving_commits(),
         )
@@ -3203,6 +3221,151 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn(
                 "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
                 "HasSupportCaseInstallTruth(supportCase)",
+                errors,
+            )
+
+    def test_verifier_fail_closes_insecure_public_native_action_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("tests/RunServicesVerification/InstallLinkingContinuationVerification.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != "Native support action sanitizer should fail closed instead of preserving insecure public Hub-native actions."
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "tests/RunServicesVerification/InstallLinkingContinuationVerification.cs missing marker: "
+                "Native support action sanitizer should fail closed instead of preserving insecure public Hub-native actions.",
+                errors,
+            )
+
+    def test_verifier_fail_closes_native_query_state_action_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != "NativeInstallRailPathForValidation(trimmed)"
+                    ]
+                if relative_path == Path("tests/RunServicesVerification/InstallLinkingContinuationVerification.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != "Native support action sanitizer should preserve native support paths when encoded slash state appears only in query or fragment context."
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
+                "NativeInstallRailPathForValidation(trimmed)",
+                errors,
+            )
+            self.assertIn(
+                "tests/RunServicesVerification/InstallLinkingContinuationVerification.cs missing marker: "
+                "Native support action sanitizer should preserve native support paths when encoded slash state appears only in query or fragment context.",
+                errors,
+            )
+
+    def test_verifier_fail_closes_html_entity_equals_candidate_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != 'component.Contains("&equals;", StringComparison.OrdinalIgnoreCase)'
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
+                'component.Contains("&equals;", StringComparison.OrdinalIgnoreCase)',
+                errors,
+            )
+
+    def test_verifier_fail_closes_untyped_native_support_or_rollback_action_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("tests/RunServicesVerification/InstallLinkingContinuationVerification.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker
+                        not in {
+                            "Native support action sanitizer should not preserve native support intake without reporter-needed support state.",
+                            "Native support action sanitizer should not preserve native rollback without rollback-specific support state.",
+                        }
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "tests/RunServicesVerification/InstallLinkingContinuationVerification.cs missing marker: "
+                "Native support action sanitizer should not preserve native support intake without reporter-needed support state.",
+                errors,
+            )
+            self.assertIn(
+                "tests/RunServicesVerification/InstallLinkingContinuationVerification.cs missing marker: "
+                "Native support action sanitizer should not preserve native rollback without rollback-specific support state.",
+                errors,
+            )
+
+    def test_verifier_fail_closes_app_local_fragment_callback_state_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != "QueryHelpers.ParseQuery(component[prefix.Length..])"
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
+                "QueryHelpers.ParseQuery(component[prefix.Length..])",
                 errors,
             )
 
