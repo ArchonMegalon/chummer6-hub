@@ -551,6 +551,7 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://unexpected.example/support/case-123"), "Native support action sanitizer should fail closed when support presentation returns an unexpected external action.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://unexpected.example/api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving absolute native-looking actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("https://chummer.run/api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed to the continuation rail when support presentation returns an absolute Hub-native update action.");
+            VerificationAssert.Equal("/api/v1/install-linking/continuation/update", BuildNativeSupportCaseActionHrefForVerification("https://chummer.run/api/v1/install-linking/continuation/update", needsInstallUpdate: true), "Native support action sanitizer should only use native update when install-readiness requires an update.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation/support", BuildNativeSupportCaseActionHrefForVerification("http://127.0.0.1:47761/api/v1/install-linking/continuation/support", reporterActionNeeded: true), "Native support action sanitizer should preserve trusted app-local native support actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("//api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving scheme-relative native-looking actions.");
             VerificationAssert.Equal("/api/v1/install-linking/continuation", BuildNativeSupportCaseActionHrefForVerification("///api/v1/install-linking/continuation/update"), "Native support action sanitizer should fail closed instead of preserving repeated-slash native-looking actions.");
@@ -632,6 +633,100 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(!mixedQueryAndFragmentCase.Detail.Contains("fragment-access-token", StringComparison.Ordinal), "Native support case should not persist fragment access tokens when query state is also present.");
             VerificationAssert.True(!mixedQueryAndFragmentCase.Detail.Contains("fragment-grant", StringComparison.Ordinal), "Native support case should not persist fragment grant ids when query state is also present.");
             VerificationAssert.True(!mixedQueryAndFragmentCase.Detail.Contains("fragment-claim", StringComparison.Ordinal), "Native support case should not persist fragment claim codes when query state is also present.");
+
+            ActionResult<DesktopInstallNativeSupportResponse> encodedSecretSupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app encoded secret label",
+                    Summary: "The app sent encoded install-link secret keys while filing native support.",
+                    Detail: "Desktop payload carried encoded reserved callback keys.",
+                    RequestedActionHref: "/install-link/callback?state=desktop&access%54oken=encoded-access-token&grant%49d=encoded-grant#claim%43ode=encoded-claim&installedBuildReceipt%49d=encoded-installed-receipt"));
+            ObjectResult encodedSecretAccepted = encodedSecretSupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with encoded reserved keys.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, encodedSecretAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop requested-action keys are encoded.");
+            DesktopInstallNativeSupportResponse encodedSecretSupport = encodedSecretAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed encoded-secret response.");
+            SupportCaseProjection? encodedSecretCase = supportCases.GetForReporter(encodedSecretSupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(encodedSecretCase is not null, "Native support continuation should create the encoded-secret support case.");
+            VerificationAssert.True(encodedSecretCase!.Detail.Contains("access%54oken=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact encoded query access-token keys from the requested action.");
+            VerificationAssert.True(encodedSecretCase.Detail.Contains("grant%49d=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact encoded query grant-id keys from the requested action.");
+            VerificationAssert.True(encodedSecretCase.Detail.Contains("claim%43ode=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact encoded fragment claim-code keys from the requested action.");
+            VerificationAssert.True(encodedSecretCase.Detail.Contains("installedBuildReceipt%49d=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact encoded fragment installed-build receipt keys from the requested action.");
+            VerificationAssert.True(!encodedSecretCase.Detail.Contains("encoded-access-token", StringComparison.Ordinal), "Native support case should not persist encoded access-token values from requested-action hints.");
+            VerificationAssert.True(!encodedSecretCase.Detail.Contains("encoded-grant", StringComparison.Ordinal), "Native support case should not persist encoded grant values from requested-action hints.");
+            VerificationAssert.True(!encodedSecretCase.Detail.Contains("encoded-claim", StringComparison.Ordinal), "Native support case should not persist encoded claim-code values from requested-action hints.");
+            VerificationAssert.True(!encodedSecretCase.Detail.Contains("encoded-installed-receipt", StringComparison.Ordinal), "Native support case should not persist encoded installed-build receipt values from requested-action hints.");
+
+            ActionResult<DesktopInstallNativeSupportResponse> doubleEncodedKeySupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app double-encoded key label",
+                    Summary: "The app sent double-encoded install-link secret keys while filing native support.",
+                    Detail: "Desktop payload carried double-encoded reserved callback keys.",
+                    RequestedActionHref: "/install-link/callback?state=desktop&access%2554oken=double-encoded-access-token&grant%2549d=double-encoded-grant#claim%2543ode=double-encoded-claim&installedBuildReceipt%2549d=double-encoded-installed-receipt"));
+            ObjectResult doubleEncodedKeyAccepted = doubleEncodedKeySupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with double-encoded reserved keys.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, doubleEncodedKeyAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop requested-action keys are double-encoded.");
+            DesktopInstallNativeSupportResponse doubleEncodedKeySupport = doubleEncodedKeyAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed double-encoded-key response.");
+            SupportCaseProjection? doubleEncodedKeyCase = supportCases.GetForReporter(doubleEncodedKeySupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(doubleEncodedKeyCase is not null, "Native support continuation should create the double-encoded-key support case.");
+            VerificationAssert.True(doubleEncodedKeyCase!.Detail.Contains("access%2554oken=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact double-encoded query access-token keys from the requested action.");
+            VerificationAssert.True(doubleEncodedKeyCase.Detail.Contains("grant%2549d=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact double-encoded query grant-id keys from the requested action.");
+            VerificationAssert.True(doubleEncodedKeyCase.Detail.Contains("claim%2543ode=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact double-encoded fragment claim-code keys from the requested action.");
+            VerificationAssert.True(doubleEncodedKeyCase.Detail.Contains("installedBuildReceipt%2549d=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact double-encoded fragment installed-build receipt keys from the requested action.");
+            VerificationAssert.True(!doubleEncodedKeyCase.Detail.Contains("double-encoded-access-token", StringComparison.Ordinal), "Native support case should not persist double-encoded access-token values from requested-action hints.");
+            VerificationAssert.True(!doubleEncodedKeyCase.Detail.Contains("double-encoded-grant", StringComparison.Ordinal), "Native support case should not persist double-encoded grant values from requested-action hints.");
+            VerificationAssert.True(!doubleEncodedKeyCase.Detail.Contains("double-encoded-claim", StringComparison.Ordinal), "Native support case should not persist double-encoded claim-code values from requested-action hints.");
+            VerificationAssert.True(!doubleEncodedKeyCase.Detail.Contains("double-encoded-installed-receipt", StringComparison.Ordinal), "Native support case should not persist double-encoded installed-build receipt values from requested-action hints.");
+
+            ActionResult<DesktopInstallNativeSupportResponse> semicolonSecretSupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app semicolon secret label",
+                    Summary: "The app sent semicolon-separated install-link secrets while filing native support.",
+                    Detail: "Desktop payload carried semicolon-separated reserved callback keys.",
+                    RequestedActionHref: "/install-link/callback?state=desktop;accessToken=semicolon-access-token;grantId=semicolon-grant#claimCode=semicolon-claim;installedBuildReceiptId=semicolon-installed-receipt"));
+            ObjectResult semicolonSecretAccepted = semicolonSecretSupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with semicolon-separated secrets.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, semicolonSecretAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop requested-action keys use semicolon separators.");
+            DesktopInstallNativeSupportResponse semicolonSecretSupport = semicolonSecretAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed semicolon-secret response.");
+            SupportCaseProjection? semicolonSecretCase = supportCases.GetForReporter(semicolonSecretSupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(semicolonSecretCase is not null, "Native support continuation should create the semicolon-secret support case.");
+            VerificationAssert.True(semicolonSecretCase!.Detail.Contains("accessToken=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact semicolon-separated query access-token keys from the requested action.");
+            VerificationAssert.True(semicolonSecretCase.Detail.Contains("grantId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact semicolon-separated query grant-id keys from the requested action.");
+            VerificationAssert.True(semicolonSecretCase.Detail.Contains("claimCode=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact semicolon-separated fragment claim-code keys from the requested action.");
+            VerificationAssert.True(semicolonSecretCase.Detail.Contains("installedBuildReceiptId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact semicolon-separated fragment installed-build receipt keys from the requested action.");
+            VerificationAssert.True(!semicolonSecretCase.Detail.Contains("semicolon-access-token", StringComparison.Ordinal), "Native support case should not persist semicolon-separated access-token values from requested-action hints.");
+            VerificationAssert.True(!semicolonSecretCase.Detail.Contains("semicolon-grant", StringComparison.Ordinal), "Native support case should not persist semicolon-separated grant values from requested-action hints.");
+            VerificationAssert.True(!semicolonSecretCase.Detail.Contains("semicolon-claim", StringComparison.Ordinal), "Native support case should not persist semicolon-separated claim-code values from requested-action hints.");
+            VerificationAssert.True(!semicolonSecretCase.Detail.Contains("semicolon-installed-receipt", StringComparison.Ordinal), "Native support case should not persist semicolon-separated installed-build receipt values from requested-action hints.");
+
+            ActionResult<DesktopInstallNativeSupportResponse> encodedSeparatorSecretSupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app encoded separator secret label",
+                    Summary: "The app sent encoded separators before install-link secrets while filing native support.",
+                    Detail: "Desktop payload carried encoded query and fragment separators.",
+                    RequestedActionHref: "/install-link/callback?state=desktop%3BaccessToken=encoded-separator-access%26grantId=encoded-separator-grant#state=desktop%253BclaimCode=double-encoded-separator-claim%2526installedBuildReceiptId=double-encoded-separator-receipt"));
+            ObjectResult encodedSeparatorSecretAccepted = encodedSeparatorSecretSupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with encoded secret separators.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, encodedSeparatorSecretAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop requested-action separators are encoded.");
+            DesktopInstallNativeSupportResponse encodedSeparatorSecretSupport = encodedSeparatorSecretAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed encoded-separator-secret response.");
+            SupportCaseProjection? encodedSeparatorSecretCase = supportCases.GetForReporter(encodedSeparatorSecretSupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(encodedSeparatorSecretCase is not null, "Native support continuation should create the encoded-separator-secret support case.");
+            VerificationAssert.True(encodedSeparatorSecretCase!.Detail.Contains("state=desktop%3BaccessToken=%5Bredacted-install-link-secret%5D%26grantId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact query secrets after encoded separators.");
+            VerificationAssert.True(encodedSeparatorSecretCase.Detail.Contains("#state=desktop%253BclaimCode=%5Bredacted-install-link-secret%5D%2526installedBuildReceiptId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact fragment secrets after double-encoded separators.");
+            VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("encoded-separator-access", StringComparison.Ordinal), "Native support case should not persist access-token values after encoded separators.");
+            VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("encoded-separator-grant", StringComparison.Ordinal), "Native support case should not persist grant values after encoded separators.");
+            VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("double-encoded-separator-claim", StringComparison.Ordinal), "Native support case should not persist claim-code values after double-encoded separators.");
+            VerificationAssert.True(!encodedSeparatorSecretCase.Detail.Contains("double-encoded-separator-receipt", StringComparison.Ordinal), "Native support case should not persist installed-build receipt values after double-encoded separators.");
 
             ActionResult<DesktopInstallNativeContinuationResponse> unauthorizedResult = controller.ContinueClaimedInstall(
                 new DesktopInstallNativeContinuationRequest("install-native", "wrong-token"));

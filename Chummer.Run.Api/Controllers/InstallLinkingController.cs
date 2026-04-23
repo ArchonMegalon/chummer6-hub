@@ -577,6 +577,33 @@ public sealed class InstallLinkingController : ControllerBase
         string trimmed = href.Trim();
         string sanitized = trimmed;
         bool redacted = false;
+
+        int fragmentIndex = sanitized.IndexOf('#');
+        string beforeFragment = fragmentIndex >= 0 ? sanitized[..fragmentIndex] : sanitized;
+        string fragment = fragmentIndex >= 0 ? sanitized[fragmentIndex..] : string.Empty;
+        int queryIndex = beforeFragment.IndexOf('?');
+        if (queryIndex >= 0)
+        {
+            string query = beforeFragment[queryIndex..];
+            string sanitizedQuery = SanitizeInstallLinkSecretQueryComponent(query, "?", out bool queryRedacted);
+            if (queryRedacted)
+            {
+                beforeFragment = $"{beforeFragment[..queryIndex]}{sanitizedQuery}";
+                redacted = true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(fragment))
+        {
+            string sanitizedFragment = SanitizeInstallLinkSecretQueryComponent(fragment, "#", out bool fragmentRedacted);
+            if (fragmentRedacted)
+            {
+                fragment = sanitizedFragment;
+                redacted = true;
+            }
+        }
+
+        sanitized = $"{beforeFragment}{fragment}";
         string replacement = Uri.EscapeDataString("[redacted-install-link-secret]");
 
         foreach (string key in InstallLinkCallbackReservedQueryKeys)
@@ -594,7 +621,7 @@ public sealed class InstallLinkingController : ControllerBase
                 if (keyIndex > 0)
                 {
                     char separator = sanitized[keyIndex - 1];
-                    if (separator != '?' && separator != '&' && separator != '#')
+                    if (separator != '?' && separator != '&' && separator != '#' && separator != ';')
                     {
                         searchIndex = keyIndex + needle.Length;
                         continue;
@@ -605,7 +632,8 @@ public sealed class InstallLinkingController : ControllerBase
                 int valueEnd = valueStart;
                 while (valueEnd < sanitized.Length
                     && sanitized[valueEnd] != '&'
-                    && sanitized[valueEnd] != '#')
+                    && sanitized[valueEnd] != '#'
+                    && sanitized[valueEnd] != ';')
                 {
                     valueEnd++;
                 }
@@ -631,41 +659,26 @@ public sealed class InstallLinkingController : ControllerBase
         }
 
         string body = component[prefix.Length..];
-        string[] parts = body.Split('&', StringSplitOptions.None);
-        string[] sanitizedParts = new string[parts.Length];
+        var sanitizedParts = new List<string>();
+        var separators = new List<string>();
+        int partStart = 0;
 
-        for (int index = 0; index < parts.Length; index++)
+        while (partStart <= body.Length)
         {
-            string part = parts[index];
-            if (string.IsNullOrEmpty(part))
+            (int separatorIndex, int separatorLength) = FindNextInstallLinkSecretSeparator(body, partStart);
+            string part = separatorIndex >= 0
+                ? body[partStart..separatorIndex]
+                : body[partStart..];
+            sanitizedParts.Add(SanitizeInstallLinkSecretQueryPart(part, out bool partRedacted));
+            redacted |= partRedacted;
+
+            if (separatorIndex < 0)
             {
-                sanitizedParts[index] = part;
-                continue;
+                break;
             }
 
-            int equalsIndex = part.IndexOf('=');
-            string rawKey = equalsIndex >= 0
-                ? part[..equalsIndex]
-                : part;
-            string decodedKey;
-            try
-            {
-                decodedKey = Uri.UnescapeDataString(rawKey.Replace("+", "%20", StringComparison.Ordinal));
-            }
-            catch (UriFormatException)
-            {
-                decodedKey = rawKey;
-            }
-
-            if (!InstallLinkCallbackReservedQueryKeys.Contains(decodedKey))
-            {
-                sanitizedParts[index] = part;
-                continue;
-            }
-
-            string encodedValue = Uri.EscapeDataString("[redacted-install-link-secret]");
-            sanitizedParts[index] = $"{rawKey}={encodedValue}";
-            redacted = true;
+            separators.Add(body.Substring(separatorIndex, separatorLength));
+            partStart = separatorIndex + separatorLength;
         }
 
         if (!redacted)
@@ -673,7 +686,97 @@ public sealed class InstallLinkingController : ControllerBase
             return component;
         }
 
-        return $"{prefix}{string.Join("&", sanitizedParts)}";
+        string sanitizedBody = sanitizedParts[0];
+        for (int index = 0; index < separators.Count; index++)
+        {
+            sanitizedBody = $"{sanitizedBody}{separators[index]}{sanitizedParts[index + 1]}";
+        }
+
+        return $"{prefix}{sanitizedBody}";
+    }
+
+    private static (int Index, int Length) FindNextInstallLinkSecretSeparator(string body, int startIndex)
+    {
+        for (int index = startIndex; index < body.Length; index++)
+        {
+            char current = body[index];
+            if (current is '&' or ';')
+            {
+                return (index, 1);
+            }
+
+            if (index + 2 < body.Length
+                && current == '%'
+                && (body.AsSpan(index, 3).Equals("%26", StringComparison.OrdinalIgnoreCase)
+                    || body.AsSpan(index, 3).Equals("%3B", StringComparison.OrdinalIgnoreCase)))
+            {
+                return (index, 3);
+            }
+
+            if (index + 4 < body.Length
+                && body.AsSpan(index, 5).Equals("%2526", StringComparison.OrdinalIgnoreCase))
+            {
+                return (index, 5);
+            }
+
+            if (index + 4 < body.Length
+                && body.AsSpan(index, 5).Equals("%253B", StringComparison.OrdinalIgnoreCase))
+            {
+                return (index, 5);
+            }
+        }
+
+        return (-1, 0);
+    }
+
+    private static string SanitizeInstallLinkSecretQueryPart(string part, out bool redacted)
+    {
+        redacted = false;
+        if (string.IsNullOrEmpty(part))
+        {
+            return part;
+        }
+
+        int equalsIndex = part.IndexOf('=');
+        string rawKey = equalsIndex >= 0
+            ? part[..equalsIndex]
+            : part;
+        string decodedKey = DecodeInstallLinkSecretKey(rawKey);
+
+        if (!InstallLinkCallbackReservedQueryKeys.Contains(decodedKey))
+        {
+            return part;
+        }
+
+        string encodedValue = Uri.EscapeDataString("[redacted-install-link-secret]");
+        redacted = true;
+        return $"{rawKey}={encodedValue}";
+    }
+
+    private static string DecodeInstallLinkSecretKey(string rawKey)
+    {
+        string decodedKey = rawKey;
+        for (int index = 0; index < 4; index++)
+        {
+            string next;
+            try
+            {
+                next = Uri.UnescapeDataString(decodedKey.Replace("+", "%20", StringComparison.Ordinal));
+            }
+            catch (UriFormatException)
+            {
+                return decodedKey;
+            }
+
+            if (string.Equals(next, decodedKey, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            decodedKey = next;
+        }
+
+        return decodedKey;
     }
 
     private static string AppendNativeRouteReceiptDetail(string detail)
@@ -831,11 +934,7 @@ public sealed class InstallLinkingController : ControllerBase
             return NativeContinuationHref;
         }
 
-        string? nativeActionHref = NormalizeNativeInstallRailHref(item.PrimaryActionHref);
-        bool primaryActionIsBrowserRail = IsBrowserRailHref(item.PrimaryActionHref);
-        return !primaryActionIsBrowserRail && nativeActionHref is not null
-            ? nativeActionHref
-            : NativeContinuationHref;
+        return NativeContinuationHref;
     }
 
     private static string BuildNativeSupportNextSafeAction(SupportCasePresentationViewModel item, bool updateAvailable)
@@ -859,9 +958,9 @@ public sealed class InstallLinkingController : ControllerBase
 
         string? nativeActionHref = NormalizeNativeInstallRailHref(item.PrimaryActionHref);
         bool primaryActionIsBrowserRail = IsBrowserRailHref(item.PrimaryActionHref);
-        if (!primaryActionIsBrowserRail && nativeActionHref is not null)
+        if (!primaryActionIsBrowserRail && string.Equals(nativeActionHref, NativeContinuationHref, StringComparison.Ordinal))
         {
-            return "Continue on the grant-bound native install rail for this claimed desktop install.";
+            return "Continue on the grant-bound desktop continuation rail for this claimed install.";
         }
 
         return "Stay on the grant-bound desktop continuation rail for this claimed install; account, downloads, and public support browser links are human fallback only.";
