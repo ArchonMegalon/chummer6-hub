@@ -485,6 +485,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "commit 65ac67a8",
         "commit e0121780",
         "commit 700343bc",
+        "commit 65484700",
         "test_verifier_fails_closed_when_proof_commit_anchor_is_not_on_current_branch",
         "test_verifier_fails_closed_when_branch_guard_commit_pin_is_missing",
         "test_verifier_fails_closed_when_output_shelf_pin_commit_is_missing",
@@ -587,6 +588,7 @@ QUEUE_MARKERS = [
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof",
     "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor",
+    "/docker/chummercomplete/chummer6-hub commit 65484700 tightens M107 artifact factory source-pack family proof",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
 ]
 
@@ -638,6 +640,7 @@ SUCCESSOR_REGISTRY_MARKERS = [
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof",
     "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor",
+    "/docker/chummercomplete/chummer6-hub commit 65484700 tightens M107 artifact factory source-pack family proof",
     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention",
     "/docker/chummercomplete/chummer6-hub/scripts/launch_artifact_factory_source_pack_batch.py preflights approved source-pack batches against the internal recipe catalog before launch.",
@@ -738,6 +741,7 @@ REQUIRED_QUEUE_PROOF = {
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof.",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof.",
     "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor.",
+    "/docker/chummercomplete/chummer6-hub commit 65484700 tightens M107 artifact factory source-pack family proof.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
 }
 REQUIRED_REGISTRY_EVIDENCE = {
@@ -785,6 +789,7 @@ REQUIRED_REGISTRY_EVIDENCE = {
     "/docker/chummercomplete/chummer6-hub commit 9349395d tightens M107 source-pack batch preflight proof.",
     "/docker/chummercomplete/chummer6-hub commit a7c54b30 tightens M107 source-pack batch format-scope proof.",
     "/docker/chummercomplete/chummer6-hub commit 700343bc pins M107 format scope proof floor.",
+    "/docker/chummercomplete/chummer6-hub commit 65484700 tightens M107 artifact factory source-pack family proof.",
     "successor frontier 1421219975 pinned for next90-m107-hub-artifact-factory repeat prevention.",
     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ArtifactFactoryOrchestrationService.cs rejects unapproved or provider-specific source packs and emits media-factory output bindings for preview, caption, packet, audio, and video formats.",
     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/InternalArtifactFactoryController.cs and Chummer.Run.Api/ServiceCollectionBoundedContextExtensions.cs bind the recipe-backed job launcher to the internal authenticated Hub orchestration endpoint.",
