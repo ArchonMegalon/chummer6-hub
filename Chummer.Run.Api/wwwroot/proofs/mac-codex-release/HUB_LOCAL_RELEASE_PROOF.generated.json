@@ -27,7 +27,7 @@
     {
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
-      "frontier_id": 2897065929,
+      "frontier_id": 2594403904,
       "repo": "chummer6-hub",
       "status": "complete",
       "completion_action": "verify_closed_package_only",
@@ -92,7 +92,7 @@
     "next90-m102-hub-desktop-native-trust": {
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
-      "frontier_id": 2897065929,
+      "frontier_id": 2594403904,
       "repo": "chummer6-hub",
       "status": "complete",
       "completion_action": "verify_closed_package_only",
@@ -153,9 +153,9 @@
       "exit_criterion": "Claimed users can restore workspace, entitlement, last context, and safe continuation with explicit stale and conflict posture."
     }
   },
-  "base_url": "http://127.0.0.1:8091",
-  "compose_file": "docker-compose.public-edge.yml",
-  "playwright_timeout_seconds": 300,
+  "base_url": "https://chummer.run",
+  "compose_file": "docker-compose.yml",
+  "playwright_timeout_seconds": 120,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
@@ -168,9 +168,11 @@
     "/downloads/install/avalonia-linux-x64-installer",
     "/home/access",
     "/home/work",
+    "/account/access",
     "/account/work",
     "/account/support",
     "/contact",
+    "/downloads",
     "/downloads/install/avalonia-osx-arm64-installer",
     "/downloads/install/avalonia-win-x64-installer"
   ],
@@ -179,7 +181,7 @@
       "receipt_id": "desktop_native_claim_and_recovery",
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
-      "frontier_id": 2897065929,
+      "frontier_id": 2594403904,
       "summary": "Claim and recovery continuation now have installer/app-native receipts: guided setup is the default, claim codes are recovery fallback only, and the claimed desktop app can call the grant-bound continuation endpoint without a browser redemption ritual.",
       "routes": [
         "/downloads/install/avalonia-linux-x64-installer/continue.json",
@@ -196,7 +198,7 @@
       "receipt_id": "support_followthrough:install_truth",
       "package_id": "next90-m102-hub-desktop-native-trust",
       "milestone_id": 102,
-      "frontier_id": 2897065929,
+      "frontier_id": 2594403904,
       "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
       "routes": [
         "/api/v1/install-linking/continuation",
@@ -232,13 +234,15 @@
       "package_id": "next90-m105-hub-workspace-continuity",
       "milestone_id": 105,
       "frontier_id": 4623636482,
-      "summary": "Workspace restore continuity emits provenance receipts for claimed installs, recent artifacts, rule environments, and restore inventory on the shared account workspace surfaces.",
+      "summary": "Workspace restore continuity emits provenance receipts and typed recovery actions for claimed installs, recent artifacts, rule environments, and restore inventory on the shared account workspace surfaces.",
       "routes": [
         "/home/work",
-        "/account/work"
+        "/account/work",
+        "/account/access"
       ],
       "surfaces": [
         "workspace_restore:provenance",
+        "workspace_restore:recoverable_actions",
         "workspace_restore",
         "account_workspace_detail"
       ]
@@ -248,18 +252,21 @@
       "package_id": "next90-m105-hub-workspace-continuity",
       "milestone_id": 105,
       "frontier_id": 4623636482,
-      "summary": "Entitlement drift, stale claims, missing grants, and continue-blocking conflicts emit recoverable receipts on the same restore lane instead of falling back to support folklore.",
+      "summary": "Entitlement drift, stale claims, missing grants, and continue-blocking conflicts emit recoverable receipts and typed account-access actions on the same restore lane instead of falling back to support folklore.",
       "routes": [
         "/home/work",
-        "/account/work"
+        "/account/work",
+        "/account/access",
+        "/downloads"
       ],
       "surfaces": [
         "entitlement_sync:conflict_receipts",
+        "entitlement_sync:recoverable_actions",
         "entitlement_sync",
         "workspace_restore"
       ]
     }
   ],
-  "generated_at": "2026-04-22T05:39:48Z",
-  "generatedAt": "2026-04-22T05:39:48Z"
+  "generated_at": "2026-04-23T11:27:53Z",
+  "generatedAt": "2026-04-23T11:27:53Z"
 }

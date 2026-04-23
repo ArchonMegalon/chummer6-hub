@@ -710,6 +710,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         string recoverySummary = leadConflict?.RecoverySummary
             ?? leadRecoverableProvenance?.RecoverySummary
             ?? ResolveRestoreReceiptStatusFallbackRecoverySummary(scope);
+        IReadOnlyList<WorkspaceRestoreReceiptActionProjection> recoveryActions = BuildRestoreReceiptRecoveryActions(
+            provenanceRecoveryReceipts,
+            conflictReceipts,
+            scope,
+            leadReceiptId,
+            leadSurface,
+            recoveryRoute,
+            recoveryActionLabel,
+            recoverySummary,
+            leadAuthority,
+            continuePosture);
         string summary = BuildRestoreReceiptStatusSummary(
             provenanceReceipts.Count,
             conflictReceipts.Count,
@@ -754,6 +765,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             RecoveryRoute: recoveryRoute,
             RecoveryActionLabel: recoveryActionLabel,
             RecoverySummary: recoverySummary,
+            RecoveryActions: recoveryActions,
             CurrentProvenanceReceiptCount: currentProvenanceReceiptCount,
             StaleOrDriftProvenanceReceiptCount: staleOrDriftProvenanceReceiptCount,
             WorkspaceRestoreProvenanceCount: workspaceRestoreProvenanceCount,
@@ -764,6 +776,77 @@ public sealed class CampaignWorkspaceServerPlaneService
             RefreshBeforeContinueCount: refreshBeforeContinueCount,
             ReviewBeforeContinueConflictCount: reviewBeforeContinueConflictCount,
             BlockingConflictCount: blockingConflictCount);
+    }
+
+    private static IReadOnlyList<WorkspaceRestoreReceiptActionProjection> BuildRestoreReceiptRecoveryActions(
+        IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> provenanceRecoveryReceipts,
+        IReadOnlyList<ApiWorkspaceRestoreConflictReceiptProjection> conflictReceipts,
+        RestoreReceiptStatusScope scope,
+        string fallbackReceiptId,
+        string fallbackSurface,
+        string fallbackRoute,
+        string fallbackActionLabel,
+        string fallbackSummary,
+        string fallbackAuthority,
+        string fallbackContinuePosture)
+    {
+        WorkspaceRestoreReceiptActionProjection[] conflictActions = conflictReceipts
+            .Select(receipt => new WorkspaceRestoreReceiptActionProjection(
+                ActionId: $"restore-conflict:{NormalizeReceiptToken(receipt.Surface)}:{NormalizeReceiptToken(receipt.ReceiptId)}",
+                Label: DescribeRestoreReceiptRecoveryAction(receipt.RecoveryRoute),
+                Authority: receipt.Authority,
+                Surface: receipt.Surface,
+                ReceiptId: receipt.ReceiptId,
+                Route: receipt.RecoveryRoute,
+                Summary: receipt.RecoverySummary,
+                ContinuePosture: receipt.ContinuePosture,
+                BlocksContinue: receipt.BlocksContinue))
+            .ToArray();
+        WorkspaceRestoreReceiptActionProjection[] provenanceActions = provenanceRecoveryReceipts
+            .Select(receipt => new WorkspaceRestoreReceiptActionProjection(
+                ActionId: $"restore-provenance:{NormalizeReceiptToken(receipt.Surface)}:{NormalizeReceiptToken(receipt.ReceiptId)}",
+                Label: DescribeRestoreReceiptRecoveryAction(receipt.RecoveryRoute),
+                Authority: receipt.Authority,
+                Surface: receipt.Surface,
+                ReceiptId: receipt.ReceiptId,
+                Route: receipt.RecoveryRoute,
+                Summary: receipt.RecoverySummary,
+                ContinuePosture: receipt.ContinuePosture,
+                BlocksContinue: false))
+            .ToArray();
+
+        WorkspaceRestoreReceiptActionProjection[] actions = conflictActions
+            .Concat(provenanceActions)
+            .GroupBy(static action => action.ActionId, StringComparer.Ordinal)
+            .Select(static group => group.First())
+            .OrderByDescending(static action => action.BlocksContinue)
+            .ThenBy(static action => string.Equals(action.ContinuePosture, "refresh_before_continue", StringComparison.Ordinal) ? 0 : 1)
+            .ThenBy(static action => string.Equals(action.ContinuePosture, "review_before_continue", StringComparison.Ordinal) ? 0 : 1)
+            .ThenBy(static action => action.Surface, StringComparer.Ordinal)
+            .Take(4)
+            .ToArray();
+
+        if (actions.Length > 0)
+        {
+            return actions;
+        }
+
+        string fallbackActionId = scope == RestoreReceiptStatusScope.EntitlementSync
+            ? "entitlement-sync:review-required"
+            : "workspace-restore:review-required";
+        return
+        [
+            new WorkspaceRestoreReceiptActionProjection(
+                ActionId: fallbackActionId,
+                Label: fallbackActionLabel,
+                Authority: fallbackAuthority,
+                Surface: fallbackSurface,
+                ReceiptId: fallbackReceiptId,
+                Route: fallbackRoute,
+                Summary: fallbackSummary,
+                ContinuePosture: fallbackContinuePosture,
+                BlocksContinue: false)
+        ];
     }
 
     private static string BuildRestoreReceiptStatusSummary(
