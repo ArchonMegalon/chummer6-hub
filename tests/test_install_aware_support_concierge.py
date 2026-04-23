@@ -67,6 +67,92 @@ class InstallAwareSupportConciergeProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('[HttpGet("{caseId}/concierge")]', result.stderr)
 
+    def test_verifier_fails_when_structured_release_delta_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-delta-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            service_path = temp_root / "Chummer.Run.Api/Services/Support/SupportConciergePacketService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace("InstalledToReleaseDelta: installedToReleaseDelta", "FirstPartyRoutes: routes"),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("InstalledToReleaseDelta: installedToReleaseDelta", result.stderr)
+
+    def test_verifier_fails_when_fixed_channel_agreement_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-channel-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            service_path = temp_root / "Chummer.Run.Api/Services/Support/SupportConciergePacketService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "BuildChannelAgreement(supportChannel, supportCase.FixedChannel, manifest.Channel)",
+                    "string.Equals(supportChannel, releaseChannel, StringComparison.OrdinalIgnoreCase)",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("BuildChannelAgreement(supportChannel, supportCase.FixedChannel, manifest.Channel)", result.stderr)
+
+    def test_verifier_fails_when_concrete_installed_truth_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-installed-truth-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            service_path = temp_root / "Chummer.Run.Api/Services/Support/SupportConciergePacketService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace("private static bool HasConcreteInstalledValue(string? value)", "private static bool HasAnyInstalledValue(string? value)"),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private static bool HasConcreteInstalledValue(string? value)", result.stderr)
+
+    def test_verifier_fails_when_installed_build_receipt_completeness_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-receipt-complete-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            service_path = temp_root / "Chummer.Run.Api/Services/Support/SupportConciergePacketService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    "           && !string.IsNullOrWhiteSpace(installedTruth.Arch)\n           && HasConcreteInstalledReceiptId(installedTruth.InstalledBuildReceiptId);",
+                    "           && !string.IsNullOrWhiteSpace(installedTruth.Arch);",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("HasConcreteInstalledReceiptId(installedTruth.InstalledBuildReceiptId)", result.stderr)
+
+    def test_verifier_fails_when_placeholder_receipt_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="support-concierge-placeholder-receipt-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            service_path = temp_root / "Chummer.Run.Api/Services/Support/SupportConciergePacketService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace("private static bool HasConcreteInstalledReceiptId(string? receiptId)", "private static bool HasAnyInstalledReceiptId(string? receiptId)"),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("private static bool HasConcreteInstalledReceiptId(string? receiptId)", result.stderr)
+
     def test_verifier_fails_when_closed_queue_authority_is_not_explicit(self) -> None:
         with tempfile.TemporaryDirectory(prefix="support-concierge-queue-") as temp_dir:
             queue_path = Path(temp_dir) / "queue.yaml"
