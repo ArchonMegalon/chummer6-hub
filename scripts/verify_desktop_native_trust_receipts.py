@@ -11,14 +11,15 @@ import subprocess
 import sys
 import tempfile
 import urllib.parse
+import zlib
 from pathlib import Path
 
 
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
-CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "aa318f30"
-CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 encoded proof marker guard"
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "607139bc"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Harden M102 HTML hash separator redaction"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -759,6 +760,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
         "/docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
         "/docker/chummercomplete/chummer6-hub commit aa318f30 tightens the M102 encoded proof marker guard.",
+        "/docker/chummercomplete/chummer6-hub commit 607139bc hardens M102 HTML hash separator redaction.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -918,6 +920,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
         "/docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
         "/docker/chummercomplete/chummer6-hub commit aa318f30 tightens the M102 encoded proof marker guard.",
+        "/docker/chummercomplete/chummer6-hub commit 607139bc hardens M102 HTML hash separator redaction.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -1156,6 +1159,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "43e273e9",
     "d86cce39",
     "aa318f30",
+    "607139bc",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")
@@ -1620,15 +1624,18 @@ def _base64_decode_token_variants(token: str) -> list[str]:
             continue
 
         if not raw or any(byte < 9 or (13 < byte < 32) for byte in raw):
+            for compressed_text in _compressed_decoded_text_variants(raw):
+                if compressed_text not in variants:
+                    variants.append(compressed_text)
             continue
 
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            continue
+        for text in _decoded_text_variants_from_bytes(raw):
+            if text not in variants:
+                variants.append(text)
 
-        if text not in variants:
-            variants.append(text)
+        for compressed_text in _compressed_decoded_text_variants(raw):
+            if compressed_text not in variants:
+                variants.append(compressed_text)
 
     return variants
 
@@ -1682,6 +1689,21 @@ def _base85_decode_token_variants(token: str) -> list[str]:
                 variants.append(candidate)
 
     return variants
+
+
+def _compressed_decoded_text_variants(raw: bytes) -> list[str]:
+    decoded: list[str] = []
+    for wbits in (zlib.MAX_WBITS, 16 + zlib.MAX_WBITS, -zlib.MAX_WBITS):
+        try:
+            inflated = zlib.decompress(raw, wbits)
+        except zlib.error:
+            continue
+
+        for candidate in _decoded_text_variants_from_bytes(inflated):
+            if candidate not in decoded:
+                decoded.append(candidate)
+
+    return decoded
 
 
 def _decoded_text_variants_from_bytes(raw: bytes) -> list[str]:
