@@ -166,6 +166,7 @@ QUEUE_PROOF_LINES = [
     "      - /docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
     "      - /docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
     "      - /docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
+    "      - /docker/chummercomplete/chummer6-hub commit aa318f30 tightens the M102 encoded proof marker guard.",
     "      - python3 scripts/verify_desktop_native_trust_receipts.py",
     "      - python3 -m unittest tests/test_desktop_native_trust_receipts.py",
     '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -328,6 +329,7 @@ REGISTRY_102_1_LINES = [
     "          - /docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
     "          - /docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
     "          - /docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
+    "          - /docker/chummercomplete/chummer6-hub commit aa318f30 tightens the M102 encoded proof marker guard.",
     "          - python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
     '          - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
 ]
@@ -401,11 +403,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
     def test_verifier_default_current_floor_matches_latest_canonical_guard(self) -> None:
         verifier = load_verifier_module()
 
-        self.assertEqual("d86cce39", verifier._current_local_proof_floor_commit())
+        self.assertEqual("aa318f30", verifier._current_local_proof_floor_commit())
         self.assertEqual(
-            "Tighten M102 successor frontier proof",
+            "Tighten M102 encoded proof marker guard",
             verifier.CURRENT_LOCAL_PROOF_FLOOR_SUBJECT,
         )
+        self.assertIn("aa318f30", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("d86cce39", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("43e273e9", verifier.REQUIRED_RESOLVING_COMMITS)
         self.assertIn("e054d2f1", verifier.REQUIRED_RESOLVING_COMMITS)
@@ -521,6 +524,12 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
         )
         self.assertTrue(
             any("commit d86cce39 tightens the M102 successor frontier proof" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
+        )
+        self.assertTrue(
+            any("commit aa318f30 tightens the M102 encoded proof marker guard" in value for value in verifier.REQUIRED_CANONICAL_QUEUE_LISTS["proof"])
+        )
+        self.assertTrue(
+            any("commit aa318f30 tightens the M102 encoded proof marker guard" in value for value in verifier.REQUIRED_CANONICAL_REGISTRY_LISTS["evidence"])
         )
 
     def test_forbidden_active_run_marker_matching_normalizes_separators(self) -> None:
@@ -2998,6 +3007,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 "e054d2f1",
                 "43e273e9",
                 "d86cce39",
+                "aa318f30",
             ],
             verifier._required_resolving_commits(),
         )
@@ -3355,6 +3365,42 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             self.assertIn(
                 "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
                 'component.Contains("&equals;", StringComparison.OrdinalIgnoreCase)',
+                errors,
+            )
+
+    def test_verifier_fail_closes_html_numeric_hash_separator_drift(self) -> None:
+        verifier = load_verifier_module()
+
+        with tempfile.TemporaryDirectory() as temp_root:
+            repo_root = Path(temp_root)
+            for relative_path, markers in verifier.REQUIRED_SOURCE_MARKERS.items():
+                path = repo_root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                if relative_path == Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != 'remaining.StartsWith("&#35;", StringComparison.OrdinalIgnoreCase)'
+                    ]
+                if relative_path == Path("tests/RunServicesVerification/InstallLinkingContinuationVerification.cs"):
+                    markers = [
+                        marker
+                        for marker in markers
+                        if marker != "Native support case should redact claim-code values after HTML decimal hash separators."
+                    ]
+                path.write_text("\n".join(markers) + "\n", encoding="utf-8")
+
+            errors: list[str] = []
+            verifier._verify_required_source_markers(errors, repo_root)
+
+            self.assertIn(
+                "Chummer.Run.Api/Controllers/InstallLinkingController.cs missing marker: "
+                'remaining.StartsWith("&#35;", StringComparison.OrdinalIgnoreCase)',
+                errors,
+            )
+            self.assertIn(
+                "tests/RunServicesVerification/InstallLinkingContinuationVerification.cs missing marker: "
+                "Native support case should redact claim-code values after HTML decimal hash separators.",
                 errors,
             )
 

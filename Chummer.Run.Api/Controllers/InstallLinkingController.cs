@@ -816,6 +816,7 @@ public sealed class InstallLinkingController : ControllerBase
         }
 
         if (remaining.StartsWith("&#38;", StringComparison.OrdinalIgnoreCase)
+            || remaining.StartsWith("&#35;", StringComparison.OrdinalIgnoreCase)
             || remaining.StartsWith("&#59;", StringComparison.OrdinalIgnoreCase)
             || remaining.StartsWith("&num;", StringComparison.OrdinalIgnoreCase))
         {
@@ -823,6 +824,7 @@ public sealed class InstallLinkingController : ControllerBase
         }
 
         if (remaining.StartsWith("&#x26;", StringComparison.OrdinalIgnoreCase)
+            || remaining.StartsWith("&#x23;", StringComparison.OrdinalIgnoreCase)
             || remaining.StartsWith("&#x3b;", StringComparison.OrdinalIgnoreCase))
         {
             return (true, 6);
