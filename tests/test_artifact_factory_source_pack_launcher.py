@@ -52,6 +52,20 @@ class _RecordingHandler(BaseHTTPRequestHandler):
                     "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
                     "requiredReceiptPrefixes": ["publication", "moderation", "public-shelf"],
                 },
+                {
+                    "family": "campaign_cold_open",
+                    "recipeId": "campaign-cold-open-bundle",
+                    "allowedSourceKinds": ["campaign_primer", "campaign_pack", "campaign_cold_open_pack"],
+                    "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
+                    "requiredReceiptPrefixes": ["campaign", "primer", "audience", "locale"],
+                },
+                {
+                    "family": "mission_briefing",
+                    "recipeId": "mission-briefing-reel",
+                    "allowedSourceKinds": ["mission_pack", "mission_briefing", "mission_briefing_pack"],
+                    "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
+                    "requiredReceiptPrefixes": ["mission", "briefing", "audience", "locale"],
+                },
             ],
         },
         "/api/internal/artifact-factory/source-pack-batches": {
@@ -146,6 +160,20 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
                         "allowedSourceKinds": ["publication", "creator_publication", "campaign_recap", "runtime_bundle"],
                         "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
                         "requiredReceiptPrefixes": ["publication", "moderation", "public-shelf"],
+                    },
+                    {
+                        "family": "campaign_cold_open",
+                        "recipeId": "campaign-cold-open-bundle",
+                        "allowedSourceKinds": ["campaign_primer", "campaign_pack", "campaign_cold_open_pack"],
+                        "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
+                        "requiredReceiptPrefixes": ["campaign", "primer", "audience", "locale"],
+                    },
+                    {
+                        "family": "mission_briefing",
+                        "recipeId": "mission-briefing-reel",
+                        "allowedSourceKinds": ["mission_pack", "mission_briefing", "mission_briefing_pack"],
+                        "allowedFormats": ["preview_card", "caption", "packet", "short_video", "audio"],
+                        "requiredReceiptPrefixes": ["mission", "briefing", "audience", "locale"],
                     },
                 ],
             },
@@ -969,6 +997,321 @@ class ArtifactFactorySourcePackLauncherTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(1, len(_RecordingHandler.requests))
         self.assertIn("no approved source packs for required recipe family/families: release", result.stderr)
+
+    def test_fails_provider_specific_source_pack_refs_before_launch(self) -> None:
+        payload = {
+            "batchId": "next90-m107-source-pack-wave",
+            "requestedBy": "fleet.release",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "release-pack-20260415",
+                    "sourcePackKind": "desktop_release",
+                    "approvalState": "approved",
+                    "provenanceRef": "heygen:render-job-11709",
+                    "evidenceRefs": [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:/downloads/install/avalonia-linux-x64-installer",
+                    ],
+                    "releaseArtifactId": "avalonia-linux-x64-installer",
+                }
+            ],
+            "requiredFamilies": ["release"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(1, len(_RecordingHandler.requests))
+        self.assertIn("provider-specific provenanceRef", result.stderr)
+        self.assertIn("one-off provider flows", result.stderr)
+
+    def test_fails_external_public_shelf_evidence_before_launch(self) -> None:
+        payload = {
+            "batchId": "next90-m107-source-pack-wave",
+            "requestedBy": "fleet.release",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "release-pack-20260415",
+                    "sourcePackKind": "desktop_release",
+                    "approvalState": "approved",
+                    "provenanceRef": "release-channel:preview:run-20260415",
+                    "evidenceRefs": [
+                        "release:run-20260415",
+                        "promotion:startup-smoke:avalonia-linux-x64",
+                        "public-shelf:https://example.invalid/downloads/install/avalonia-linux-x64-installer",
+                    ],
+                    "releaseArtifactId": "avalonia-linux-x64-installer",
+                }
+            ],
+            "requiredFamilies": ["release"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(1, len(_RecordingHandler.requests))
+        self.assertIn("non-local public proof shelf evidenceRef", result.stderr)
+        self.assertIn("Chummer public proof shelf", result.stderr)
+
+    def test_launches_campaign_cold_open_and_mission_briefing_from_locale_matched_packs(self) -> None:
+        _RecordingHandler.response_payloads_by_path["/api/internal/artifact-factory/source-pack-batches"] = {
+            "contractName": "chummer.run.artifact_factory.recipe_job.v1",
+            "recipeVersion": "2026-04-15",
+            "state": "queued",
+            "jobCount": 2,
+            "families": ["campaign_cold_open", "mission_briefing"],
+            "requiredFamilies": ["campaign_cold_open", "mission_briefing"],
+            "recipeIds": ["campaign-cold-open-bundle", "mission-briefing-reel"],
+            "jobIds": ["artifact-job-campaign-cold-open-12345678", "artifact-job-mission-briefing-12345678"],
+            "sourcePackIds": ["campaign-primer-redmond-01", "mission-pack-arcology-01"],
+            "jobs": [
+                {"jobId": "artifact-job-campaign-cold-open-12345678", "family": "campaign_cold_open"},
+                {"jobId": "artifact-job-mission-briefing-12345678", "family": "mission_briefing"},
+            ],
+            "mediaFactoryRequests": [
+                {"recipeId": "campaign-cold-open-bundle"},
+                {"recipeId": "mission-briefing-reel"},
+            ],
+        }
+        payload = {
+            "batchId": "next90-m108-campaign-briefing-wave",
+            "requestedBy": "campaign.ops",
+            "audience": "players",
+            "locale": "de-AT",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "campaign-primer-redmond-01",
+                    "sourcePackKind": "campaign_primer",
+                    "approvalState": "approved",
+                    "provenanceRef": "campaign:redmond-01:primer:v2",
+                    "evidenceRefs": [
+                        "campaign:redmond-01",
+                        "primer:approved:redmond-01",
+                        "audience:players",
+                        "locale:de-AT",
+                    ],
+                    "campaignId": "redmond-01",
+                    "audience": "players,gm",
+                    "locale": "de-AT",
+                },
+                {
+                    "sourcePackId": "mission-pack-arcology-01",
+                    "sourcePackKind": "mission_pack",
+                    "approvalState": "approved",
+                    "provenanceRef": "mission:arcology-01:briefing:v1",
+                    "evidenceRefs": [
+                        "mission:arcology-01",
+                        "briefing:approved:arcology-01",
+                        "audience:players",
+                        "locale:de-AT",
+                    ],
+                    "missionId": "arcology-01",
+                    "audience": "players",
+                    "locale": "de-AT",
+                },
+            ],
+            "requiredFamilies": ["campaign_cold_open", "mission_briefing"],
+        }
+
+        result = subprocess.run(
+            [
+                "python3",
+                str(SCRIPT),
+                "--base-url",
+                self.base_url,
+                "--token",
+                "expected-token",
+                "--request-file",
+                "-",
+            ],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(["campaign_cold_open", "mission_briefing"], _RecordingHandler.requests[1]["body"]["requiredFamilies"])
+        self.assertEqual("players", _RecordingHandler.requests[1]["body"]["audience"])
+        self.assertEqual("de-AT", _RecordingHandler.requests[1]["body"]["locale"])
+        self.assertEqual(["campaign-cold-open-bundle", "mission-briefing-reel"], json.loads(result.stdout)["recipeIds"])
+
+    def test_fails_campaign_briefing_preflight_when_locale_drifts(self) -> None:
+        payload = {
+            "batchId": "next90-m108-campaign-briefing-wave",
+            "requestedBy": "campaign.ops",
+            "audience": "players",
+            "locale": "fr-FR",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "campaign-primer-redmond-01",
+                    "sourcePackKind": "campaign_primer",
+                    "approvalState": "approved",
+                    "provenanceRef": "campaign:redmond-01:primer:v2",
+                    "evidenceRefs": ["campaign:redmond-01", "primer:approved:redmond-01", "audience:players", "locale:de-AT"],
+                    "campaignId": "redmond-01",
+                    "audience": "players",
+                    "locale": "de-AT",
+                }
+            ],
+            "requiredFamilies": ["campaign_cold_open"],
+        }
+
+        result = subprocess.run(
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(1, len(_RecordingHandler.requests))
+        self.assertIn("locale 'de-AT' does not match requested locale 'fr-FR'", result.stderr)
+
+    def test_fails_campaign_briefing_preflight_when_audience_is_not_allowed(self) -> None:
+        payload = {
+            "batchId": "next90-m108-campaign-briefing-wave",
+            "requestedBy": "campaign.ops",
+            "audience": "players",
+            "locale": "de-AT",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "mission-pack-arcology-01",
+                    "sourcePackKind": "mission_pack",
+                    "approvalState": "approved",
+                    "provenanceRef": "mission:arcology-01:briefing:v1",
+                    "evidenceRefs": ["mission:arcology-01", "briefing:approved:arcology-01", "audience:gm", "locale:de-AT"],
+                    "missionId": "arcology-01",
+                    "audience": "gm",
+                    "locale": "de-AT",
+                }
+            ],
+            "requiredFamilies": ["mission_briefing"],
+        }
+
+        result = subprocess.run(
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(1, len(_RecordingHandler.requests))
+        self.assertIn("audience does not allow requested audience 'players'", result.stderr)
+
+    def test_fails_campaign_briefing_preflight_when_audience_anchor_drifts(self) -> None:
+        payload = {
+            "batchId": "next90-m108-campaign-briefing-wave",
+            "requestedBy": "campaign.ops",
+            "audience": "players",
+            "locale": "de-AT",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "campaign-primer-redmond-01",
+                    "sourcePackKind": "campaign_primer",
+                    "approvalState": "approved",
+                    "provenanceRef": "campaign:redmond-01:primer:v2",
+                    "evidenceRefs": ["campaign:redmond-01", "primer:approved:redmond-01", "audience:gm", "locale:de-AT"],
+                    "campaignId": "redmond-01",
+                    "audience": "players",
+                    "locale": "de-AT",
+                }
+            ],
+            "requiredFamilies": ["campaign_cold_open"],
+        }
+
+        result = subprocess.run(
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(1, len(_RecordingHandler.requests))
+        self.assertIn("must include evidenceRef 'audience:players'", result.stderr)
+
+    def test_fails_campaign_briefing_preflight_when_locale_anchor_drifts(self) -> None:
+        payload = {
+            "batchId": "next90-m108-campaign-briefing-wave",
+            "requestedBy": "campaign.ops",
+            "audience": "players",
+            "locale": "de-AT",
+            "sourcePacks": [
+                {
+                    "sourcePackId": "mission-pack-arcology-01",
+                    "sourcePackKind": "mission_pack",
+                    "approvalState": "approved",
+                    "provenanceRef": "mission:arcology-01:briefing:v1",
+                    "evidenceRefs": ["mission:arcology-01", "briefing:approved:arcology-01", "audience:players", "locale:fr-FR"],
+                    "missionId": "arcology-01",
+                    "audience": "players",
+                    "locale": "de-AT",
+                }
+            ],
+            "requiredFamilies": ["mission_briefing"],
+        }
+
+        result = subprocess.run(
+            ["python3", str(SCRIPT), "--base-url", self.base_url, "--token", "expected-token", "--request-file", "-"],
+            cwd=REPO_ROOT,
+            input=json.dumps(payload),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(1, len(_RecordingHandler.requests))
+        self.assertIn("must include evidenceRef 'locale:de-AT'", result.stderr)
 
     def test_fails_closed_without_internal_token(self) -> None:
         env = os.environ.copy()

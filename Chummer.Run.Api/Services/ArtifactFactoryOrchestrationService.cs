@@ -21,7 +21,11 @@ public sealed record ApprovedArtifactSourcePack(
     string? ReleaseArtifactId = null,
     string? SupportCaseId = null,
     string? PublicationId = null,
-    string? PublicShelfRef = null);
+    string? PublicShelfRef = null,
+    string? CampaignId = null,
+    string? MissionId = null,
+    string? Audience = null,
+    string? Locale = null);
 
 public sealed record ArtifactFactoryJobLaunchResult(
     string JobId,
@@ -93,7 +97,9 @@ public sealed record ArtifactFactoryOutputBinding(
     string ReceiptRef,
     string? ReleaseArtifactId,
     string? SupportCaseId,
-    string? PublicationId);
+    string? PublicationId,
+    string? CampaignId,
+    string? MissionId);
 
 public sealed record ArtifactFactoryMediaSourcePack(
     string SourcePackId,
@@ -103,7 +109,11 @@ public sealed record ArtifactFactoryMediaSourcePack(
     string? ReleaseArtifactId,
     string? SupportCaseId,
     string? PublicationId,
-    string? PublicShelfRef);
+    string? PublicShelfRef,
+    string? CampaignId,
+    string? MissionId,
+    string? Audience,
+    string? Locale);
 
 public sealed record ArtifactFactoryRecipeCatalogResult(
     string ContractName,
@@ -138,6 +148,8 @@ public sealed class ArtifactFactoryOrchestrationService
         };
 
     private static readonly JsonSerializerOptions HashJsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly IReadOnlySet<string> DefaultBatchFamilies =
+        new HashSet<string>(["fix", "publication", "release", "support"], StringComparer.OrdinalIgnoreCase);
     private static readonly IReadOnlyDictionary<string, ArtifactFactoryRecipe> Recipes =
         new Dictionary<string, ArtifactFactoryRecipe>(StringComparer.OrdinalIgnoreCase)
         {
@@ -168,12 +180,27 @@ public sealed class ArtifactFactoryOrchestrationService
                 DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
                 RequiredReceiptPrefixes: ["publication", "moderation", "public-shelf"],
-                RequiredAnchorDescription: "a publication id or public proof shelf ref")
+                RequiredAnchorDescription: "a publication id or public proof shelf ref"),
+            ["campaign_cold_open"] = new(
+                RecipeId: "campaign-cold-open-bundle",
+                AllowedSourceKinds: ["campaign_primer", "campaign_pack", "campaign_cold_open_pack"],
+                DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                RequiredReceiptPrefixes: ["campaign", "primer", "audience", "locale"],
+                RequiredAnchorDescription: "a campaign id or campaign proof shelf ref"),
+            ["mission_briefing"] = new(
+                RecipeId: "mission-briefing-reel",
+                AllowedSourceKinds: ["mission_pack", "mission_briefing", "mission_briefing_pack"],
+                DefaultFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                AllowedFormats: ["preview_card", "caption", "packet", "short_video", "audio"],
+                RequiredReceiptPrefixes: ["mission", "briefing", "audience", "locale"],
+                RequiredAnchorDescription: "a mission id or mission proof shelf ref")
         };
 
     public ArtifactFactoryRecipeCatalogResult ListRecipes()
     {
         ArtifactFactoryRecipeDefinition[] recipes = Recipes
+            .Where(static item => DefaultBatchFamilies.Contains(item.Key))
             .OrderBy(static item => item.Key, StringComparer.OrdinalIgnoreCase)
             .Select(static item => new ArtifactFactoryRecipeDefinition(
                 Family: item.Key,
@@ -473,6 +500,10 @@ public sealed class ArtifactFactoryOrchestrationService
             RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.ReleaseArtifactId, "releaseArtifactId");
             RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.SupportCaseId, "supportCaseId");
             RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.PublicationId, "publicationId");
+            RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.CampaignId, "campaignId");
+            RejectUnsafePublicPathId(normalizedSourcePackId, sourcePack.MissionId, "missionId");
+            RejectOptionalMetadataToken(normalizedSourcePackId, sourcePack.Audience, "audience");
+            RejectOptionalMetadataToken(normalizedSourcePackId, sourcePack.Locale, "locale");
         }
     }
 
@@ -536,6 +567,7 @@ public sealed class ArtifactFactoryOrchestrationService
         if (requiredFamilies is null || requiredFamilies.Count == 0)
         {
             return Recipes.Keys
+                .Where(static family => DefaultBatchFamilies.Contains(family))
                 .Order(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -612,7 +644,11 @@ public sealed class ArtifactFactoryOrchestrationService
                 ReleaseArtifactId: NormalizeOptional(sourcePack.ReleaseArtifactId),
                 SupportCaseId: NormalizeOptional(sourcePack.SupportCaseId),
                 PublicationId: NormalizeOptional(sourcePack.PublicationId),
-                PublicShelfRef: NormalizeOptional(sourcePack.PublicShelfRef)));
+                PublicShelfRef: NormalizeOptional(sourcePack.PublicShelfRef),
+                CampaignId: NormalizeOptional(sourcePack.CampaignId),
+                MissionId: NormalizeOptional(sourcePack.MissionId),
+                Audience: NormalizeOptional(sourcePack.Audience),
+                Locale: NormalizeOptional(sourcePack.Locale)));
 
             foreach (string evidenceRef in evidenceRefs)
             {
@@ -640,6 +676,14 @@ public sealed class ArtifactFactoryOrchestrationService
             {
                 publicProofShelfRefs.Add($"/artifacts/publications/{Uri.EscapeDataString(sourcePack.PublicationId.Trim())}");
             }
+            else if (!string.IsNullOrWhiteSpace(sourcePack.CampaignId))
+            {
+                publicProofShelfRefs.Add($"/artifacts/campaigns/{Uri.EscapeDataString(sourcePack.CampaignId.Trim())}/cold-open");
+            }
+            else if (!string.IsNullOrWhiteSpace(sourcePack.MissionId))
+            {
+                publicProofShelfRefs.Add($"/artifacts/missions/{Uri.EscapeDataString(sourcePack.MissionId.Trim())}/briefing");
+            }
         }
 
         ValidateRecipeAnchors(family, request.SourcePacks, recipe);
@@ -656,6 +700,7 @@ public sealed class ArtifactFactoryOrchestrationService
         string[] outputFormats = NormalizeOutputFormats(request.RequestedFormats, recipe);
         string audience = NormalizeAudience(request.Audience);
         string locale = NormalizeLocale(request.Locale);
+        ValidateCampaignAudienceAndLocale(family, request.SourcePacks, audience, locale);
         string jobId = BuildJobId(family, sourcePacks, outputFormats, audience, locale);
         string[] receiptRefs = requiredReceiptRefs.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         ArtifactFactoryOutputBinding[] outputBindings = BuildOutputBindings(family, jobId, sourcePacks, outputFormats);
@@ -730,6 +775,10 @@ public sealed class ArtifactFactoryOrchestrationService
         RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.ReleaseArtifactId, "releaseArtifactId");
         RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.SupportCaseId, "supportCaseId");
         RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.PublicationId, "publicationId");
+        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.CampaignId, "campaignId");
+        RejectUnsafePublicPathId(sourcePack.SourcePackId, sourcePack.MissionId, "missionId");
+        RejectOptionalMetadataToken(sourcePack.SourcePackId, sourcePack.Audience, "audience");
+        RejectOptionalMetadataToken(sourcePack.SourcePackId, sourcePack.Locale, "locale");
     }
 
     private static void ValidateRecipeAnchors(
@@ -749,6 +798,12 @@ public sealed class ArtifactFactoryOrchestrationService
                 !string.IsNullOrWhiteSpace(pack.SupportCaseId)),
             "publication" => sourcePacks.Any(static pack =>
                 !string.IsNullOrWhiteSpace(pack.PublicationId)
+                || !string.IsNullOrWhiteSpace(pack.PublicShelfRef)),
+            "campaign_cold_open" => sourcePacks.Any(static pack =>
+                !string.IsNullOrWhiteSpace(pack.CampaignId)
+                || !string.IsNullOrWhiteSpace(pack.PublicShelfRef)),
+            "mission_briefing" => sourcePacks.Any(static pack =>
+                !string.IsNullOrWhiteSpace(pack.MissionId)
                 || !string.IsNullOrWhiteSpace(pack.PublicShelfRef)),
             _ => false
         };
@@ -936,6 +991,8 @@ public sealed class ArtifactFactoryOrchestrationService
             "fix" => ["/account/support/", "/account/fix-followthrough/", "/downloads/install/", "/artifacts/release-bundles/"],
             "support" => ["/account/support/", "/account/support-packets/"],
             "publication" => ["/artifacts/publications/"],
+            "campaign_cold_open" => ["/artifacts/campaigns/"],
+            "mission_briefing" => ["/artifacts/missions/"],
             _ => []
         };
 
@@ -1021,6 +1078,20 @@ public sealed class ArtifactFactoryOrchestrationService
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has unsafe fix public proof shelf {fieldName} '{publicShelfRef}'; fix bundle anchors must resolve to exactly one support case or release artifact segment.");
         }
+
+        if (family.Equals("campaign_cold_open", StringComparison.OrdinalIgnoreCase)
+            && !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/campaigns/", allowBundlesSuffix: true))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe campaign public proof shelf {fieldName} '{publicShelfRef}'; campaign cold-open anchors must resolve to one campaign segment with an optional bundles shelf.");
+        }
+
+        if (family.Equals("mission_briefing", StringComparison.OrdinalIgnoreCase)
+            && !HasResourceShelfAnchorShape(publicShelfRef, "/artifacts/missions/", allowBundlesSuffix: true))
+        {
+            throw new InvalidDataException(
+                $"source pack '{sourcePackId}' has unsafe mission public proof shelf {fieldName} '{publicShelfRef}'; mission briefing anchors must resolve to one mission segment with an optional bundles shelf.");
+        }
     }
 
     private static bool HasAnyResourceShelfAnchorShape(string publicShelfRef, IReadOnlyList<string> prefixes, bool allowBundlesSuffix)
@@ -1080,6 +1151,17 @@ public sealed class ArtifactFactoryOrchestrationService
             throw new InvalidDataException(
                 $"source pack '{sourcePackId}' has unsafe {fieldName} '{value}'; artifact factory path ids must use stable public proof shelf segment characters.");
         }
+    }
+
+    private static void RejectOptionalMetadataToken(string sourcePackId, string? value, string fieldName)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        RejectProviderSpecificRef(sourcePackId, value, fieldName);
+        RejectUnsafeJobToken(value, fieldName, allowComma: fieldName.Equals("audience", StringComparison.Ordinal));
     }
 
     private static void RejectUnsafeSourcePackId(string sourcePackId)
@@ -1263,7 +1345,11 @@ public sealed class ArtifactFactoryOrchestrationService
                     item.ReleaseArtifactId,
                     item.SupportCaseId,
                     item.PublicationId,
-                    item.PublicShelfRef
+                    item.PublicShelfRef,
+                    item.CampaignId,
+                    item.MissionId,
+                    item.Audience,
+                    item.Locale
                 }),
             outputFormats,
             audience,
@@ -1290,7 +1376,9 @@ public sealed class ArtifactFactoryOrchestrationService
                 ReceiptRef: $"artifact-factory:{jobId}:{format}",
                 ReleaseArtifactId: anchor.ReleaseArtifactId,
                 SupportCaseId: anchor.SupportCaseId,
-                PublicationId: anchor.PublicationId))
+                PublicationId: anchor.PublicationId,
+                CampaignId: anchor.CampaignId,
+                MissionId: anchor.MissionId))
             .OrderBy(static item => item.Format, StringComparer.OrdinalIgnoreCase)
             .ToArray();
     }
@@ -1321,12 +1409,18 @@ public sealed class ArtifactFactoryOrchestrationService
                 "support" => !string.IsNullOrWhiteSpace(pack.SupportCaseId),
                 "publication" => !string.IsNullOrWhiteSpace(pack.PublicationId)
                     || !string.IsNullOrWhiteSpace(pack.PublicShelfRef),
+                "campaign_cold_open" => !string.IsNullOrWhiteSpace(pack.CampaignId)
+                    || !string.IsNullOrWhiteSpace(pack.PublicShelfRef),
+                "mission_briefing" => !string.IsNullOrWhiteSpace(pack.MissionId)
+                    || !string.IsNullOrWhiteSpace(pack.PublicShelfRef),
                 _ => false
             })
             .OrderBy(pack => family switch
             {
                 "release" when !string.IsNullOrWhiteSpace(pack.ReleaseArtifactId) => 0,
                 "publication" when !string.IsNullOrWhiteSpace(pack.PublicationId) => 0,
+                "campaign_cold_open" when !string.IsNullOrWhiteSpace(pack.CampaignId) => 0,
+                "mission_briefing" when !string.IsNullOrWhiteSpace(pack.MissionId) => 0,
                 _ => 1
             })
             .ThenBy(static item => item.SourcePackId, StringComparer.OrdinalIgnoreCase)
@@ -1357,6 +1451,16 @@ public sealed class ArtifactFactoryOrchestrationService
             return $"/artifacts/publications/{Uri.EscapeDataString(anchor.PublicationId)}/bundles";
         }
 
+        if (!string.IsNullOrWhiteSpace(anchor.CampaignId))
+        {
+            return $"/artifacts/campaigns/{Uri.EscapeDataString(anchor.CampaignId)}/cold-open";
+        }
+
+        if (!string.IsNullOrWhiteSpace(anchor.MissionId))
+        {
+            return $"/artifacts/missions/{Uri.EscapeDataString(anchor.MissionId)}/briefing";
+        }
+
         if (!string.IsNullOrWhiteSpace(anchor.PublicShelfRef))
         {
             string shelfRef = anchor.PublicShelfRef.Trim().TrimEnd('/');
@@ -1378,6 +1482,80 @@ public sealed class ArtifactFactoryOrchestrationService
         }
 
         return $"/artifacts/release-bundles/{Uri.EscapeDataString(jobId)}";
+    }
+
+    private static void ValidateCampaignAudienceAndLocale(
+        string family,
+        IReadOnlyList<ApprovedArtifactSourcePack> sourcePacks,
+        string audience,
+        string locale)
+    {
+        if (!family.Equals("campaign_cold_open", StringComparison.OrdinalIgnoreCase)
+            && !family.Equals("mission_briefing", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (audience.Equals("public-proof-shelf", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                $"recipe {Recipes[family].RecipeId} requires an explicit audience token for audience-safe campaign artifact requests.");
+        }
+
+        foreach (ApprovedArtifactSourcePack sourcePack in sourcePacks)
+        {
+            if (!SourcePackCanFeedRecipe(sourcePack, Recipes[family]))
+            {
+                continue;
+            }
+
+            string? packAudience = NormalizeOptional(sourcePack.Audience);
+            if (packAudience is null)
+            {
+                throw new InvalidDataException(
+                    $"source pack '{sourcePack.SourcePackId}' must include an audience token for recipe {Recipes[family].RecipeId}.");
+            }
+
+            string[] allowedAudiences = packAudience
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (!allowedAudiences.Contains(audience, StringComparer.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"source pack '{sourcePack.SourcePackId}' audience '{packAudience}' does not allow requested audience '{audience}'.");
+            }
+
+            string? packLocale = NormalizeOptional(sourcePack.Locale);
+            if (packLocale is null)
+            {
+                throw new InvalidDataException(
+                    $"source pack '{sourcePack.SourcePackId}' must include a locale token for recipe {Recipes[family].RecipeId}.");
+            }
+
+            if (!packLocale.Equals(locale, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    $"source pack '{sourcePack.SourcePackId}' locale '{packLocale}' does not match requested locale '{locale}'.");
+            }
+
+            RequireCampaignProofAnchor(sourcePack, audience, "audience");
+            RequireCampaignProofAnchor(sourcePack, locale, "locale");
+        }
+    }
+
+    private static void RequireCampaignProofAnchor(
+        ApprovedArtifactSourcePack sourcePack,
+        string expectedValue,
+        string anchorPrefix)
+    {
+        string expectedRef = $"{anchorPrefix}:{expectedValue}";
+        if ((sourcePack.EvidenceRefs ?? Array.Empty<string>())
+            .Any(receipt => string.Equals(receipt?.Trim(), expectedRef, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        throw new InvalidDataException(
+            $"source pack '{sourcePack.SourcePackId}' must include evidenceRef '{expectedRef}' for audience-safe campaign artifact requests.");
     }
 
     private static bool TryBuildReleaseBundleRefFromDownloadShelfRef(string shelfRef, out string releaseBundleRef)
