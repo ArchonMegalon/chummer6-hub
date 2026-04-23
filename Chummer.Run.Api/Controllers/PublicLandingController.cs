@@ -612,8 +612,8 @@ public sealed class PublicLandingController : Controller
             BuildMacBootstrapFileName(context.Artifact));
     }
 
-    [HttpGet("/install-{scriptId}.sh")]
-    [HttpGet("/install-{scriptId}-{renderedScriptSha256}.sh")]
+    [HttpGet("/install-{scriptId:minlength(24):maxlength(24)}.sh")]
+    [HttpGet("/install-{scriptId:minlength(24):maxlength(24)}-{renderedScriptSha256:minlength(64):maxlength(64)}.sh")]
     [Produces("text/x-shellscript", "application/problem+json")]
     public IActionResult DownloadDispatchPersonalizedMacBootstrapScript(
         [FromRoute] string scriptId,

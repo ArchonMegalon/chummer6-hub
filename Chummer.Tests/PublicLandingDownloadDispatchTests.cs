@@ -3,6 +3,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
@@ -71,6 +72,62 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Contains("Confirmed linked installs", script, StringComparison.Ordinal);
         Assert.Contains("claimCode=", script, StringComparison.Ordinal);
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
+    }
+
+    [Fact]
+    public async Task BootstrapScriptPrefersCanonicalShelfWhenRuntimeRegistryViewDropsMatchingMacArtifact()
+    {
+        using Fixture fixture = new(
+            runtimeManifestJson:
+            """
+            {
+              "product": "chummer",
+              "channelId": "preview",
+              "version": "run-test",
+              "publishedAt": "2026-04-02T20:56:19Z",
+              "status": "published",
+              "artifacts": [
+                {
+                  "artifactId": "avalonia-osx-arm64-installer",
+                  "head": "avalonia",
+                  "platform": "macos",
+                  "arch": "arm64",
+                  "kind": "dmg",
+                  "platformLabel": "Avalonia Desktop macOS ARM64 Installer",
+                  "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
+                  "downloadUrl": "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                  "sha256": "a1",
+                  "sizeBytes": 101,
+                  "installAccessClass": "account_required"
+                }
+              ]
+            }
+            """);
+        var manifest = fixture.ManifestService.LoadManifest();
+        var artifact = Assert.Single(manifest.Downloads, item => string.Equals(item.Id, "avalonia-osx-arm64-installer", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(manifest.Downloads, item => string.Equals(item.Id, "blazor-desktop-osx-arm64-installer", StringComparison.OrdinalIgnoreCase));
+        IReadOnlyList<PublicReleaseArtifactDto> guidedArtifacts = PublicLandingController.ResolveGuidedBootstrapArtifacts(manifest, artifact);
+        Assert.Contains(guidedArtifacts, item => string.Equals(item.Id, "blazor-desktop-osx-arm64-installer", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(guidedArtifacts, item => string.Equals(item.Id, "avalonia-osx-x64-installer", StringComparison.OrdinalIgnoreCase));
+        var ticket = fixture.InstallBootstrapTickets.Issue(
+            artifact.Id,
+            ["avalonia-osx-arm64-installer", "blazor-desktop-osx-arm64-installer", "avalonia-osx-x64-installer"],
+            "user-archon",
+            "subject-archon");
+
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+        fixture.Controller.ControllerContext.HttpContext.Request.QueryString = new QueryString(
+            $"?ticket={Uri.EscapeDataString(ticket.Ticket)}");
+
+        IActionResult result = await fixture.Controller.DownloadDispatchBootstrapScript("avalonia-osx-arm64-installer", CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        Assert.Equal("Chummer Setup.command", file.FileDownloadName);
     }
 
     [Fact]
@@ -229,7 +286,7 @@ public sealed class PublicLandingDownloadDispatchTests
     {
         private readonly string _root;
 
-        public Fixture(bool authenticated = false)
+        public Fixture(bool authenticated = false, string? runtimeManifestJson = null)
         {
             _root = Path.Combine(Path.GetTempPath(), "public-landing-dispatch-tests", Guid.NewGuid().ToString("N"));
             string downloadsRoot = Path.Combine(_root, "downloads");
@@ -458,21 +515,30 @@ public sealed class PublicLandingDownloadDispatchTests
                 }
                 """);
 
+            Dictionary<string, string?> settings = new()
+            {
+                ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
+                ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking.json"),
+                ["CHUMMER_INSTALL_BOOTSTRAP_TICKET_LIFETIME_MINUTES"] = "20",
+                ["CHUMMER_INSTALL_CLAIM_TICKET_LIFETIME_HOURS"] = "24",
+                ["CHUMMER_PERSONALIZED_INSTALL_SCRIPT_LIFETIME_HOURS"] = "24",
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
+                ["IDENTITY_SERVICE_BASE_URL"] = "http://identity.example"
+            };
+            if (!string.IsNullOrWhiteSpace(runtimeManifestJson))
+            {
+                settings["CHUMMER_RELEASE_REGISTRY_CURRENT_URL"] = "https://registry.local/api/v1/registry/release-channel/current";
+            }
+
             Configuration = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = downloadsRoot,
-                    ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root,
-                    ["CHUMMER_INSTALL_LINKING_STORE_PATH"] = Path.Combine(_root, "install-linking.json"),
-                    ["CHUMMER_INSTALL_BOOTSTRAP_TICKET_LIFETIME_MINUTES"] = "20",
-                    ["CHUMMER_INSTALL_CLAIM_TICKET_LIFETIME_HOURS"] = "24",
-                    ["CHUMMER_PERSONALIZED_INSTALL_SCRIPT_LIFETIME_HOURS"] = "24",
-                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(_root, "community-store.json"),
-                    ["IDENTITY_SERVICE_BASE_URL"] = "http://identity.example"
-                })
+                .AddInMemoryCollection(settings)
                 .Build();
 
-            ManifestService = new PublicReleaseManifestService(Configuration);
+            HttpClient? runtimeManifestClient = string.IsNullOrWhiteSpace(runtimeManifestJson)
+                ? null
+                : new HttpClient(new StaticJsonHandler(runtimeManifestJson));
+            ManifestService = new PublicReleaseManifestService(Configuration, runtimeManifestClient);
             ReleaseSelection = new ReleaseSelectionService(new PublicCanonFileLoader(Configuration));
             HubIdentityClient identity = new(
                 new HttpClient(new IdentityHandler(authenticated))
@@ -581,6 +647,22 @@ public sealed class PublicLandingDownloadDispatchTests
                 {
                     Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
                 };
+        }
+
+        private sealed class StaticJsonHandler : HttpMessageHandler
+        {
+            private readonly string _payload;
+
+            public StaticJsonHandler(string payload)
+            {
+                _payload = payload;
+            }
+
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+                => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(_payload, Encoding.UTF8, "application/json")
+                });
         }
 
         public void Dispose()
