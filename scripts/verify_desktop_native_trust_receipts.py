@@ -17,8 +17,8 @@ from pathlib import Path
 PACKAGE_ID = "next90-m102-hub-desktop-native-trust"
 LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
-CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "d86cce39"
-CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 successor frontier proof"
+CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "aa318f30"
+CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 encoded proof marker guard"
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -150,6 +150,8 @@ REQUIRED_SOURCE_MARKERS = {
         'remaining.StartsWith("&amp;", StringComparison.OrdinalIgnoreCase)',
         'remaining.StartsWith("&semi;", StringComparison.OrdinalIgnoreCase)',
         'remaining.StartsWith("&num;", StringComparison.OrdinalIgnoreCase)',
+        'remaining.StartsWith("&#35;", StringComparison.OrdinalIgnoreCase)',
+        'remaining.StartsWith("&#x23;", StringComparison.OrdinalIgnoreCase)',
         'body.AsSpan(index, 3).Equals("%23", StringComparison.OrdinalIgnoreCase)',
         'body.AsSpan(index, 3).Equals("%3B", StringComparison.OrdinalIgnoreCase)',
         'body.AsSpan(index, 5).Equals("%2523", StringComparison.OrdinalIgnoreCase)',
@@ -363,6 +365,8 @@ REQUIRED_SOURCE_MARKERS = {
         "Native support case should redact encoded query grant-id keys after HTML numeric ampersand separators.",
         "Native support case should redact encoded fragment claim-code keys after HTML semicolon separators.",
         "Native support case should redact fragment receipt keys after HTML hash separators.",
+        "Native support case should redact claim-code values after HTML decimal hash separators.",
+        "Native support case should redact receipt values after HTML hex hash separators.",
         "Native support case should not persist access-token values after encoded separators.",
         "Native support case should not persist installed-build receipt values after double-encoded separators.",
         "Native support case should not persist claim-code values after encoded hash separators.",
@@ -371,6 +375,8 @@ REQUIRED_SOURCE_MARKERS = {
         "Native support case should not persist grant values after HTML entity separators.",
         "Native support case should not persist claim-code values after HTML entity separators.",
         "Native support case should not persist receipt values after HTML entity separators.",
+        "Native support case should not persist claim-code values after HTML decimal hash separators.",
+        "Native support case should not persist receipt values after HTML hex hash separators.",
         "Native support case should redact query access-token values after HTML named equals separators.",
         "Native support case should redact query grant-id values after HTML numeric equals separators.",
         "Native support case should redact fragment claim-code values after HTML hex equals separators.",
@@ -752,6 +758,7 @@ REQUIRED_CANONICAL_REGISTRY_LISTS = {
         "/docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
         "/docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
         "/docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
+        "/docker/chummercomplete/chummer6-hub commit aa318f30 tightens the M102 encoded proof marker guard.",
         "python3 scripts/verify_desktop_native_trust_receipts.py and python3 -m unittest tests/test_desktop_native_trust_receipts.py exit 0.",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore exits 0 for net10.0 and net10.0-windows.',
     ],
@@ -910,6 +917,7 @@ REQUIRED_CANONICAL_QUEUE_LISTS = {
         "/docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.",
         "/docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.",
         "/docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.",
+        "/docker/chummercomplete/chummer6-hub commit aa318f30 tightens the M102 encoded proof marker guard.",
         "python3 scripts/verify_desktop_native_trust_receipts.py",
         "python3 -m unittest tests/test_desktop_native_trust_receipts.py",
         'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "DesktopInstallRailTests|PublicLandingClaimRecoveryFlowTests|InstallLinkingContinuationVerification|InstallLinkingControllerBrowserCallbackTests" --no-restore',
@@ -1147,6 +1155,7 @@ REQUIRED_RESOLVING_COMMITS = [
     "e054d2f1",
     "43e273e9",
     "d86cce39",
+    "aa318f30",
 ]
 
 DEFAULT_PROOF_PATH = Path(".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json")

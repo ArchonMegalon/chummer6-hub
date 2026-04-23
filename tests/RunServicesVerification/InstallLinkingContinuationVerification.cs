@@ -829,6 +829,26 @@ internal static class InstallLinkingContinuationVerification
             VerificationAssert.True(!htmlEntitySeparatorSecretCase.Detail.Contains("html-entity-claim", StringComparison.Ordinal), "Native support case should not persist claim-code values after HTML entity separators.");
             VerificationAssert.True(!htmlEntitySeparatorSecretCase.Detail.Contains("html-entity-receipt", StringComparison.Ordinal), "Native support case should not persist receipt values after HTML entity separators.");
 
+            ActionResult<DesktopInstallNativeSupportResponse> numericHtmlHashSecretSupportResult = controller.SubmitClaimedInstallSupport(
+                new DesktopInstallNativeSupportRequest(
+                    InstallationId: "install-native",
+                    AccessToken: "grant-token",
+                    Title: "Native app HTML numeric hash separator secret label",
+                    Summary: "The app sent HTML numeric hash separators before install-link secrets while filing native support.",
+                    Detail: "Desktop payload carried HTML numeric hash separators.",
+                    RequestedActionHref: "/install-link/callback?state=desktop&#35;claimCode=decimal-hash-claim&#x23;receiptId=hex-hash-receipt"));
+            ObjectResult numericHtmlHashSecretAccepted = numericHtmlHashSecretSupportResult.Result as ObjectResult
+                ?? throw new InvalidOperationException("Native support continuation should accept a valid install grant with HTML numeric hash separators.");
+            VerificationAssert.Equal(StatusCodes.Status202Accepted, numericHtmlHashSecretAccepted.StatusCode ?? 0, "Native support continuation should still file support when desktop requested-action separators are HTML numeric hashes.");
+            DesktopInstallNativeSupportResponse numericHtmlHashSecretSupport = numericHtmlHashSecretAccepted.Value as DesktopInstallNativeSupportResponse
+                ?? throw new InvalidOperationException("Native support continuation should return a typed HTML-numeric-hash-separator response.");
+            SupportCaseProjection? numericHtmlHashSecretCase = supportCases.GetForReporter(numericHtmlHashSecretSupport.CaseId, "usr-native", "subject.native");
+            VerificationAssert.True(numericHtmlHashSecretCase is not null, "Native support continuation should create the HTML-numeric-hash-separator support case.");
+            VerificationAssert.True(numericHtmlHashSecretCase!.Detail.Contains("&#35;claimCode=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact claim-code values after HTML decimal hash separators.");
+            VerificationAssert.True(numericHtmlHashSecretCase.Detail.Contains("&#x23;receiptId=%5Bredacted-install-link-secret%5D", StringComparison.Ordinal), "Native support case should redact receipt values after HTML hex hash separators.");
+            VerificationAssert.True(!numericHtmlHashSecretCase.Detail.Contains("decimal-hash-claim", StringComparison.Ordinal), "Native support case should not persist claim-code values after HTML decimal hash separators.");
+            VerificationAssert.True(!numericHtmlHashSecretCase.Detail.Contains("hex-hash-receipt", StringComparison.Ordinal), "Native support case should not persist receipt values after HTML hex hash separators.");
+
             ActionResult<DesktopInstallNativeContinuationResponse> unauthorizedResult = controller.ContinueClaimedInstall(
                 new DesktopInstallNativeContinuationRequest("install-native", "wrong-token"));
             ObjectResult unauthorized = unauthorizedResult.Result as ObjectResult
