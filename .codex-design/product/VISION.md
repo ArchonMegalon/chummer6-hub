@@ -41,6 +41,12 @@ The daily product promises should be legible in plain language:
 These are not marketing garnish.
 They are the user-facing interpretation of deterministic truth, explainability, and campaign memory.
 
+At campaign scale, the same promise becomes:
+
+* the world remembers what the runners did
+* the table can see why the consequence changed
+* the city talks back through receipts instead of hidden simulation
+
 ## Three rings
 
 ### Ring 1 — Must be excellent first
@@ -60,13 +66,18 @@ This is the product users judge immediately:
 This is the durable differentiation:
 
 * campaign ledger
+* live action economy and turn assist
 * GM session console
+* GM Runboard
 * player mobile and session shell
+* source anchors and local rulebook binding
 * roster and advancement continuity
+* runner resume and goal pins
 * downtime, travel, and state history
 * replay and recovery
 * cross-device continuation
 * conflict resolution with receipts
+* GM-approved world consequence through BLACK LEDGER
 
 ### Ring 3 — Horizons and extensions
 
@@ -185,6 +196,11 @@ Every canonical number, legality outcome, and reducer transition is deterministi
 
 Reconnect, replay, resume, campaign continuity, and the campaign ledger are first-class.
 The shell should let the table recover state without panic, settle disputes with receipts instead of memory, and carry campaign context forward across sessions and devices.
+
+### Living consequence
+
+BLACK LEDGER and adjacent campaign-world loops should begin as GM-approved, receipt-backed consequence.
+The world may react, but only through approved deltas, visible receipts, and player-safe feedback.
 
 ### Knowledge Fabric
 

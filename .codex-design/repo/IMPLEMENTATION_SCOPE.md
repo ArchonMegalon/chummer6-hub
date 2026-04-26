@@ -2,7 +2,7 @@
 
 ## Mission
 
-`chummer6-hub` owns the relationship/orchestration plane for Chummer6 plus the initial bounded home of campaign and product-control domains.
+`chummer6-hub` owns the relationship/orchestration plane for Chummer6 plus the initial bounded home of campaign, product-control, and world-state domains.
 
 ## Owns
 
@@ -14,6 +14,7 @@
 * sponsorship / participation UX for Fleet premium burst lanes
 * fact ledger, reward journal, and entitlement journal for community participation
 * campaign spine truth for runner dossier, crew, campaign, run, scene, objective, and replay-safe continuity
+* bounded world-state, mission-market, and campaign-adjacent consequence semantics
 * leaderboards, quests, badges, and community-side entitlement views
 * the `chummer.run` public landing, proof shelf, public status, and signed-in home overlays
 * registry-backed downloads, channel selection, and install guidance UX
@@ -49,6 +50,7 @@ Canonical hosted package plane:
 * `Chummer.Run.Contracts`
 * `Chummer.Campaign.Contracts`
 * `Chummer.Control.Contracts`
+* `Chummer.World.Contracts`
 
 Mixed contract planes are temporary debt, not acceptable end state.
 
@@ -70,7 +72,7 @@ Registry and media execution ownership are physically out of this repo.
 
 The remaining work is future product depth and physical cleanup, not pretending hub still owns every hosted surface or still lacks authority proof.
 Participation UX for premium burst lanes belongs here, but the resulting Codex auth cache stays lane-local on Fleet rather than being stored in hub identity or hub databases.
-Campaign continuity and product control may start here as bounded contexts, but they must stay explicit enough that later extraction remains possible if the domains outgrow Hub.
+Campaign continuity, product control, and world-state semantics may start here as bounded contexts, but they must stay explicit enough that later extraction remains possible if the domains outgrow Hub.
 
 The first-class sponsor/consent/device-auth/lane/receipt lifecycle is defined centrally in `products/chummer/PARTICIPATION_AND_BOOSTER_WORKFLOW.md`.
 The first-class linked-identity and channel-linking posture is defined centrally in `products/chummer/IDENTITY_AND_CHANNEL_LINKING_MODEL.md`.
@@ -86,11 +88,12 @@ Desktop download and install guidance may live here, but the public update feed 
 
 ## Bounded-context rule
 
-Hub currently carries three adjacent but distinct bounded contexts:
+Hub currently carries four adjacent but distinct bounded contexts:
 
 1. relationship plane: identity, users, groups, entitlements, participation, and delivery
 2. campaign spine: runner dossier, crew, campaign, run, scene, objective, and continuity truth
 3. product control: support cases, signal packets, closure notices, and control-plane projections
+4. world state: world frames, mission-market packets, world ticks, and campaign-adjacent consequence receipts
 
 Those contexts may share a repo for now.
 They must not collapse back into one unnamed hosted blob.

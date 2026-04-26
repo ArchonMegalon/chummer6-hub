@@ -47,6 +47,21 @@ Rules, catalog, and data-facing labels that historically came from the Chummer l
 
 User-visible generated output that leaves the immediate UI shell, such as exported sheets, visible update/help packets, or bounded release/support projections.
 
+This domain also includes campaign cold-open and mission-briefing siblings:
+
+* captions
+* preview copy
+* primer packets
+* mission packets
+* explicit text fallbacks when localized media is unavailable
+
+It also includes Build and Explain companion siblings:
+
+* narrated compare summaries
+* import-followthrough captions and text fallbacks
+* blocker companion captions and text fallbacks
+* receipt-anchor labels and inspectable sibling actions
+
 ### Companion runtime text
 
 First-party companion barks, action chips, evidence-drawer labels, voice opt-in copy, and rare scene fallback text that render inside desktop or mobile runtime surfaces.
@@ -73,8 +88,22 @@ Phase 1 runtime language behavior is intentionally boring:
 * numbers, dates, and similar culture-sensitive formatting follow the chosen locale when supported
 * missing keys must not silently create mixed-language public surfaces
 * companion text, chips, evidence drawers, and voice-mode affordances must resolve in the chosen locale
+* campaign cold-open and mission-briefing launch labels, captions, preview cards, and sibling packet copy must resolve through one deterministic locale chain
+* Build and Explain companion launch labels, captions, preview cards, and inspectable sibling actions must resolve through one deterministic locale chain
 * if EA compile output, a companion locale pack, or a media attachment is unavailable, runtime falls back to the first-party local template for that locale and then to `en-US`
 * denied or unavailable microphone access keeps the same localized text-first path instead of hiding actions or surfacing ad hoc English prompts
+
+Campaign artifact locale fallback is:
+
+1. requested user locale
+2. campaign default locale
+3. `en-US`
+
+Locale fallback may degrade presentation polish.
+It may not widen spoiler scope, change audience class, or silently mix translated and untranslated campaign artifact siblings.
+
+For Build and Explain companions, locale fallback also may not drop receipt-anchor labels, paraphrase away blocker severity, or replace inspectable packet references with freer narration.
+It also may not swap packet revision ids, approval-state labels, or rule-environment badges for locale-specific marketing copy that makes the artifact look more final than the underlying receipt truth.
 
 If a locale or string is unavailable, the product must fall back deterministically to `en-US` instead of rendering ad hoc partial state.
 

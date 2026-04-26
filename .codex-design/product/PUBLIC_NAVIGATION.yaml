@@ -14,6 +14,16 @@ primary_nav:
     href: /artifacts
   - label: Participate
     href: /participate
+public_signal_nav:
+  - label: Feedback
+    href: /feedback
+    fallback_href: /help/feedback
+  - label: Roadmap
+    href: /roadmap
+    fallback_href: /horizons
+  - label: Changelog
+    href: /changelog
+    fallback_href: /now
 secondary_nav:
   - label: Status
     href: /status

@@ -82,9 +82,10 @@ Required live sequence:
 `docker compose --env-file .env -p chummer6-hub -f docker-compose.public-edge.yml up -d --build chummer-portal`
 2. Verify the live bootstrap matches the deployed source and the legacy path redirects cleanly:
 `bash scripts/verify-live-mac-bootstrap.sh`
-3. Rebuild the current unified shelf bundle:
+3. For a Mac release runner, open `https://chummer.run/downloads/release-upload` in a signed-in browser, copy the generated `Command` block, and paste that exact command into the Mac shell. That generated command includes the short-lived upload ticket; do not run the raw `bootstrap.sh` URL for promotion because it has no upload credential.
+4. Rebuild the current unified shelf bundle:
 `bash scripts/materialize-public-downloads-bundle.sh`
-4. Upload the rebuilt bundle to the live shelf:
+5. Upload the rebuilt bundle to the live shelf:
 `RUNBOOK_MODE=downloads-upload-http DOWNLOAD_BUNDLE_DIR=/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads bash scripts/runbook.sh`
    - If `CHUMMER_RELEASE_UPLOAD_TOKEN` is unset, the upload step now prompts for it with hidden input instead of requiring an inline shell assignment.
    - Canonical post-publish success is gated on `RELEASE_CHANNEL.generated.json`. Set `CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION=1` only if you intentionally want `releases.json` compatibility drift to fail the run.

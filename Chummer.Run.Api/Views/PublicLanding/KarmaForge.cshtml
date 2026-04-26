@@ -1,0 +1,280 @@
+@model KarmaForgeIntakePageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-karma-forge";
+    bool hasErrors = Model.Form.ValidationErrors.Count > 0;
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>@Model.CanonicalLane</span>
+            <span>@Model.EntryLane</span>
+            <span>@Model.Dashboard.TotalPackets packet(s) normalized so far</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="#karma-forge-intake">Start the intake</a>
+        <a class="button-like button-like--secondary" href="/roadmap/karma-forge">Read the horizon brief</a>
+        <a class="button-like button-like--ghost" href="/participate">Back to participate</a>
+    </div>
+</section>
+
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
+<section class="trust-rail-section">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Loop state</p>
+        <h2 class="editorial-title">The full product loop is visible before any rules work starts.</h2>
+        <p class="editorial-copy">Hub owns the intake and receipts. Icanpreneur-style questions sharpen the demand. EA clustering and Product Governor decisions happen after Chummer-owned packets exist.</p>
+    </div>
+    <div class="trust-rail-list">
+        <article class="trust-rail">
+            <span class="tag">Queue</span>
+            <p>@Model.Dashboard.GovernorQueueCount packet(s) already normalized for Product Governor review.</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Follow-up</span>
+            <p>@Model.Dashboard.FollowUpCandidateCount packet(s) are strong enough for a likely Icanpreneur or Lunacal follow-up.</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Shareable</span>
+            <p>@Model.Dashboard.ShareablePacketCount packet(s) currently look reusable across tables instead of staying campaign-local.</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Core gap</span>
+            <p>@Model.Dashboard.CoreRulesetGapCount packet(s) already look closer to core-ruleset review than KARMA FORGE packaging work.</p>
+        </article>
+    </div>
+</section>
+
+<section class="compact-rail">
+    @foreach (var step in Model.DiscoverySteps)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>@step</h3>
+                <p>The loop stays visible and named instead of vanishing into generic feedback intake.</p>
+            </div>
+        </article>
+    }
+</section>
+
+<section class="trust-page-layout">
+    <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE sections">
+        <a href="#karma-forge-intake">Intake</a>
+        <a href="#track-questions">Track questions</a>
+        <a href="#candidate-decisions">Governor routes</a>
+        <a href="#recent-packets">Recent packets</a>
+    </aside>
+    <div class="trust-page-sections">
+        <article class="trust-page-section trust-page-section--form" id="karma-forge-intake">
+            <p class="eyebrow">Deftform-style intake</p>
+            <h2>Pre-screen the table pain before it turns into canon talk.</h2>
+            <p>Tell Chummer what the table is doing today, what is breaking trust or pace, and whether follow-up is allowed. The Hub will normalize the result into Chummer-owned packets instead of leaving it as loose future-signal chatter.</p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Form.SubmissionNotice))
+            {
+                <p class="status-copy @(hasErrors ? "status-copy--error" : "status-copy--success")">@Model.Form.SubmissionNotice</p>
+            }
+            @if (Model.Form.ValidationErrors.Count > 0)
+            {
+                <div class="status-copy status-copy--error">
+                    <strong>Fix these first:</strong>
+                    <ul>
+                        @foreach (var error in Model.Form.ValidationErrors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <form class="settings-form" method="post" action="@Model.Form.ActionHref">
+                @Html.AntiForgeryToken()
+                <div class="field">
+                    <label for="trackKey">Icanpreneur track</label>
+                    <select id="trackKey" name="TrackKey" required>
+                        @foreach (var option in Model.Form.TrackOptions)
+                        {
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultTrackKey, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                    <p class="muted-copy">@Model.SelectedTrack.Family prompts are currently loaded below.</p>
+                </div>
+                <div class="field">
+                    <label for="respondentRole">Respondent role</label>
+                    <select id="respondentRole" name="RespondentRole" required>
+                        @foreach (var option in Model.Form.RoleOptions)
+                        {
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultRespondentRole, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="edition">Edition</label>
+                    <input id="edition" name="Edition" maxlength="64" value="@Model.Form.DefaultEdition" placeholder="SR6" required />
+                </div>
+                <div class="field">
+                    <label for="tableType">Table type</label>
+                    <select id="tableType" name="TableType" required>
+                        @foreach (var option in Model.Form.TableTypeOptions)
+                        {
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultTableType, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="ruleCategory">Rule category</label>
+                    <select id="ruleCategory" name="RuleCategory" required>
+                        @foreach (var option in Model.Form.RuleCategoryOptions)
+                        {
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultRuleCategory, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="severity">Severity</label>
+                    <select id="severity" name="Severity" required>
+                        @foreach (var option in Model.Form.SeverityOptions)
+                        {
+                            <option value="@option.Value" selected="@(string.Equals(Model.Form.DefaultSeverity, option.Value, StringComparison.OrdinalIgnoreCase) ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="feedbackPrompt">Prompt or one-line frame</label>
+                    <input id="feedbackPrompt" name="FeedbackPrompt" maxlength="280" value="@Model.Form.DefaultFeedbackPrompt" placeholder="Our table needs campaign-scoped gear unlocks without hidden legality changes." />
+                </div>
+                <div class="field">
+                    <label for="userWordsSummary">User words</label>
+                    <textarea id="userWordsSummary" name="UserWordsSummary" rows="4" placeholder="What did the table actually ask for?" required>@Model.Form.DefaultUserWordsSummary</textarea>
+                </div>
+                <div class="field">
+                    <label for="currentWorkaround">Current workaround</label>
+                    <textarea id="currentWorkaround" name="CurrentWorkaround" rows="4" placeholder="How are you handling this today?" required>@Model.Form.DefaultCurrentWorkaround</textarea>
+                </div>
+                <details class="details-drawer">
+                    <summary>Optional synthesis fields</summary>
+                    <div class="field">
+                        <label for="interpretedNeedSummary">Interpreted need</label>
+                        <textarea id="interpretedNeedSummary" name="InterpretedNeedSummary" rows="4" placeholder="Rewrite the need into a Chummer-owned summary.">@Model.Form.DefaultInterpretedNeedSummary</textarea>
+                    </div>
+                    <div class="field">
+                        <label for="impactNotes">Trust and impact notes</label>
+                        <textarea id="impactNotes" name="ImpactNotes" rows="4" placeholder="Call out build impact, rollback, player visibility, approvals, and portability.">@Model.Form.DefaultImpactNotes</textarea>
+                    </div>
+                    <div class="field">
+                        <label for="shareabilityNotes">Shareability notes</label>
+                        <textarea id="shareabilityNotes" name="ShareabilityNotes" rows="4" placeholder="Is this campaign-local, reusable, publishable, or version-sensitive?">@Model.Form.DefaultShareabilityNotes</textarea>
+                    </div>
+                </details>
+                @if (!Model.Form.Authenticated)
+                {
+                    <div class="field">
+                        <label for="replyEmail">Reply email</label>
+                        <input id="replyEmail" name="ReplyEmail" type="email" value="@Model.Form.DefaultReplyEmail" placeholder="runner@example.com" />
+                    </div>
+                }
+                <details class="details-drawer">
+                    <summary>Consent and boundaries</summary>
+                    <p class="muted-copy">Do not paste raw copyrighted sourcebook text. Use your own wording, examples from your table, and lawful source references only when needed.</p>
+                    <div class="field">
+                        <label>
+                            <input name="FollowUpAllowed" type="checkbox" value="true" checked="@Model.Form.DefaultFollowUpAllowed" />
+                            Chummer may follow up through the reply route I provided if this packet looks high-signal.
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label>
+                            <input name="QuoteAllowed" type="checkbox" value="true" checked="@Model.Form.DefaultQuoteAllowed" />
+                            Chummer may use an anonymous quote or paraphrase in discovery closeout materials.
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label>
+                            <input name="ConsentAccepted" type="checkbox" value="true" checked="@Model.Form.DefaultConsentAccepted" required />
+                            I understand this may inform Chummer design, but it does not become feature truth or backlog ownership by itself.
+                        </label>
+                    </div>
+                </details>
+                <div class="stacked-actions">
+                    <button class="button-like button-like--primary" type="submit">Normalize into KARMA FORGE packets</button>
+                    <a class="button-like button-like--ghost" href="/contact#support-intake">This is really a normal support issue</a>
+                </div>
+            </form>
+        </article>
+
+        <article class="trust-page-section" id="track-questions">
+            <p class="eyebrow">Icanpreneur prompts</p>
+            <h2>@Model.SelectedTrack.Title</h2>
+            <p>These are the next questions Chummer will use to sharpen the need without letting interview tooling become truth or package ownership.</p>
+            <ul class="trust-page-section__list">
+                @foreach (var question in Model.SelectedTrack.Questions)
+                {
+                    <li>@question</li>
+                }
+            </ul>
+        </article>
+
+        <article class="trust-page-section" id="candidate-decisions">
+            <p class="eyebrow">Product Governor routes</p>
+            <h2>Every packet still has to land on a named decision.</h2>
+            <p>Discovery does not skip directly to implementation. It has to become a reject, document lane, governed candidate, or core-ruleset review with reasons.</p>
+            <p class="muted-copy">The normalized output is explicit: HouseRuleDemandPacket, KarmaForgeCandidate, and RuleEnvironmentImpactHypothesis stay visible before any governor routing or follow-up.</p>
+            <div class="settings-summary-list">
+                @foreach (var decision in Model.CandidateDecisions)
+                {
+                    <div class="settings-summary-row">
+                        <span>@decision.Key</span>
+                        <strong>@decision.Meaning</strong>
+                    </div>
+                }
+            </div>
+            <section class="compact-rail">
+                @foreach (var output in Model.CanonicalOutputs)
+                {
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>@output</h3>
+                            <p>Chummer-owned output only. Raw interview notes and vendor summaries stay non-canonical.</p>
+                        </div>
+                    </article>
+                }
+            </section>
+        </article>
+
+        <article class="trust-page-section" id="recent-packets">
+            <p class="eyebrow">Signed-in history</p>
+            <h2>Your recent KARMA FORGE packets</h2>
+            <p>@(Model.Form.Authenticated ? "Signed-in submissions stay visible here with their current queue posture." : "Sign in if you want your future KARMA FORGE packets tied to an account-visible history instead of only a receipt link.")</p>
+            @if (Model.RecentSubmissions.Count == 0)
+            {
+                <p class="muted-copy">No signed-in KARMA FORGE packets are visible on this account yet.</p>
+            }
+            else
+            {
+                <div class="settings-summary-list">
+                    @foreach (var packet in Model.RecentSubmissions)
+                    {
+                        <div class="settings-summary-row">
+                            <span><a class="inline-link" href="/participate/karma-forge/submitted/@packet.SubmissionId">@packet.Title</a></span>
+                            <strong>@packet.SubmittedLabel · @packet.CandidateDecision · @packet.QueueStatus</strong>
+                        </div>
+                    }
+                </div>
+            }
+        </article>
+    </div>
+</section>
