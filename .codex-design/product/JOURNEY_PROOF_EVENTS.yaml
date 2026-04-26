@@ -45,4 +45,3 @@ events:
     journey: world_tick_distribution
   - key: email_digest_sent
     journey: world_tick_distribution
-

@@ -47,4 +47,3 @@ boundaries:
   - player_safe_artifacts_require_review
   - raw_transcripts_have_short_retention
   - no_public_reputation_from_analysis_tools
-

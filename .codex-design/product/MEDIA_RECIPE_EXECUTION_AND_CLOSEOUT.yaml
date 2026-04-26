@@ -31,4 +31,3 @@ forbidden:
   - public_publish_without_approval
   - vendor_dashboard_as_publication_truth
   - media_metrics_as_product_truth
-

@@ -2223,7 +2223,7 @@ milestones:
       owner: chummer6-design
       title: Finalize BLACK LEDGER MVP receipt semantics, spoiler policy, and adoption confidence gates in canonical design.
   - id: 123
-    title: Open Runs and Shadowcasters Network table-formation loop
+    title: Open Runs and Community Hub table-formation loop
     wave: W16
     owners:
     - chummer6-hub
@@ -2263,7 +2263,7 @@ milestones:
       title: Render open-run cards, briefing previews, route/share assets, and post-run newsreel siblings from approved manifests.
     - id: '123.6'
       owner: chummer6-design
-      title: Bind Shadowcasters Network authority, join policy, provider handoff, and closeout rules into canon and release
+      title: Bind Community Hub authority, join policy, provider handoff, and closeout rules into canon and release
         gates.
   - id: 124
     title: Switch companion runtime and bounded table-pulse moments
@@ -2374,7 +2374,7 @@ milestones:
     exit_criteria:
     - Each public-eligible horizon with demand has an owner handoff gate, bounded research packet, executable proof requirement,
       and explicit rule for when it may become implementation backlog.
-    - NEXUS-PAN, ALICE, KARMA FORGE, Table Pulse, Open Runs, Shadowcasters, creator/publication, and media horizons cannot be
+    - NEXUS-PAN, ALICE, KARMA FORGE, Table Pulse, Open Runs, Community Hub, creator/publication, and media horizons cannot be
       described as shipped until owner proof exists.
     - Fleet can schedule horizon-conversion slices only when Chummer-owned canon names the repo owner, allowed surfaces, proof
       gate, public claim posture, and stop condition.
@@ -2392,7 +2392,7 @@ milestones:
         horizons.
     - id: '126.4'
       owner: chummer6-hub
-      title: Define hosted proof contracts for Open Runs, Shadowcasters, public signal, community, and account-aware horizon
+      title: Define hosted proof contracts for Open Runs, Community Hub, public signal, community, and account-aware horizon
         conversions.
     - id: '126.5'
       owner: chummer6-ui
@@ -2682,7 +2682,7 @@ milestones:
       title: Close deterministic horizon canon, public claim language, owner handoff gates, and build-path promotion criteria.
   - id: 133
     title: 'Media and social horizon implementation tranche: JACKPOINT, RUNBOOK PRESS, GHOSTWIRE, RUNSITE, TABLE PULSE, and
-      Shadowcasters'
+      Community Hub'
     wave: W21
     owners:
     - chummer6-hub
@@ -2703,7 +2703,7 @@ milestones:
     - 124
     - 126
     exit_criteria:
-    - JACKPOINT, RUNBOOK PRESS, GHOSTWIRE, RUNSITE, TABLE PULSE, and Shadowcasters Network become bounded implementation lanes
+    - JACKPOINT, RUNBOOK PRESS, GHOSTWIRE, RUNSITE, TABLE PULSE, and Community Hub become bounded implementation lanes
       with first-party manifests, consent, provenance, publication, and revocation truth.
     - Replay/forensics, route/spatial artifacts, creator press, narrated recap, table coaching, public open-run discovery, and
       artifact studio outputs remain source-backed and inspectable.
@@ -2712,7 +2712,7 @@ milestones:
     - id: '133.1'
       owner: chummer6-hub
       title: Implement hosted orchestration for JACKPOINT artifact studio, RUNBOOK PRESS creator workflows, RUNSITE packs, TABLE
-        PULSE, GHOSTWIRE, and Shadowcasters surfaces.
+        PULSE, GHOSTWIRE, and Community Hub surfaces.
     - id: '133.2'
       owner: chummer6-hub-registry
       title: Publish lineage, publication, moderation, route, consent, replay, recap, revocation, and compatibility refs for
@@ -2723,11 +2723,11 @@ milestones:
         from approved manifests.
     - id: '133.4'
       owner: chummer6-ui
-      title: Surface artifact studio, creator press, replay/forensics, route packs, table-pulse, and Shadowcasters entry points
+      title: Surface artifact studio, creator press, replay/forensics, route packs, table-pulse, and Community Hub entry points
         on desktop.
     - id: '133.5'
       owner: chummer6-mobile
-      title: Surface mobile travel, route, recap, observer, table-pulse, and Shadowcasters horizon moments with consent and
+      title: Surface mobile travel, route, recap, observer, table-pulse, and Community Hub horizon moments with consent and
         offline posture.
     - id: '133.6'
       owner: executive-assistant

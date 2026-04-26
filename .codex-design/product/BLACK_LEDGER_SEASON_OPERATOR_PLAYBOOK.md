@@ -50,4 +50,3 @@ collect intel and resolution reports
 - support closure
 
 Those require typed source, authority, and review.
-

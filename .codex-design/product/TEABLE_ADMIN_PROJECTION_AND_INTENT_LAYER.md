@@ -189,4 +189,3 @@ Teable cannot become active for a workflow until:
 
 Teable is a first-class admin workbench for Chummer.
 It is not a canonical database.
-

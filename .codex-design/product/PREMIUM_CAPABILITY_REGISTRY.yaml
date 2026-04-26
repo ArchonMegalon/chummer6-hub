@@ -22,4 +22,3 @@ candidate_capabilities:
     value_type: media_capacity
   - key: human_gm_clinic
     value_type: human_service
-

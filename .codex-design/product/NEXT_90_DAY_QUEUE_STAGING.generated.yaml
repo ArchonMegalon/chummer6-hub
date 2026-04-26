@@ -3445,9 +3445,9 @@ items:
   - scripts
   owned_surfaces:
   - render_open_run_cards_briefing:media_factory
-- title: Bind Shadowcasters Network authority, join policy, provider handoff, and closeout rules into canon and release gates.
-  task: Bind Shadowcasters Network authority, join policy, provider handoff, and closeout rules into canon and release gates.
-  package_id: next90-m123-design-bind-shadowcasters-network-authority-join-policy-provide
+- title: Bind Community Hub authority, join policy, provider handoff, and closeout rules into canon and release gates.
+  task: Bind Community Hub authority, join policy, provider handoff, and closeout rules into canon and release gates.
+  package_id: next90-m123-design-bind-community-hub-authority-join-policy-provide
   work_task_id: '123.6'
   frontier_id: 5548841470
   milestone_id: 123
@@ -3459,7 +3459,7 @@ items:
   - scripts
   - feedback
   owned_surfaces:
-  - bind_shadowcasters_network_authority_join:design
+  - bind_community_hub_authority_join:design
 - title: Emit Build Lab, rule-environment, explain, and action-economy CompanionPacket trigger truth from deterministic receipts.
   task: Emit Build Lab, rule-environment, explain, and action-economy CompanionPacket trigger truth from deterministic receipts.
   package_id: next90-m124-core-emit-build-lab-rule-environment-explain-and-action-econo
@@ -3699,8 +3699,8 @@ items:
   - scripts
   owned_surfaces:
   - define_deterministic_proof_contracts_for:core
-- title: Define hosted proof contracts for Open Runs, Shadowcasters, public signal, community, and account-aware horizon conversions.
-  task: Define hosted proof contracts for Open Runs, Shadowcasters, public signal, community, and account-aware horizon conversions.
+- title: Define hosted proof contracts for Open Runs, Community Hub, public signal, community, and account-aware horizon conversions.
+  task: Define hosted proof contracts for Open Runs, Community Hub, public signal, community, and account-aware horizon conversions.
   package_id: next90-m126-hub-define-hosted-proof-contracts-for-open-runs-shadowcaster
   work_task_id: '126.4'
   frontier_id: 6966685835
@@ -4370,9 +4370,9 @@ items:
   owned_surfaces:
   - close_deterministic_horizon_canon_public:design
 - title: Implement hosted orchestration for JACKPOINT artifact studio, RUNBOOK PRESS creator workflows, RUNSITE packs, TABLE
-    PULSE, GHOSTWIRE, and Shadowcasters surfaces.
+    PULSE, GHOSTWIRE, and Community Hub surfaces.
   task: Implement hosted orchestration for JACKPOINT artifact studio, RUNBOOK PRESS creator workflows, RUNSITE packs, TABLE
-    PULSE, GHOSTWIRE, and Shadowcasters surfaces.
+    PULSE, GHOSTWIRE, and Community Hub surfaces.
   package_id: next90-m133-hub-implement-hosted-orchestration-for-jackpoint-artifact-st
   work_task_id: '133.1'
   frontier_id: 3358131499
@@ -4421,9 +4421,9 @@ items:
   - scripts
   owned_surfaces:
   - render_route_preview_narrated_recap:media_factory
-- title: Surface artifact studio, creator press, replay/forensics, route packs, table-pulse, and Shadowcasters entry points
+- title: Surface artifact studio, creator press, replay/forensics, route packs, table-pulse, and Community Hub entry points
     on desktop.
-  task: Surface artifact studio, creator press, replay/forensics, route packs, table-pulse, and Shadowcasters entry points
+  task: Surface artifact studio, creator press, replay/forensics, route packs, table-pulse, and Community Hub entry points
     on desktop.
   package_id: next90-m133-ui-surface-artifact-studio-creator-press-replay-forensics-r
   work_task_id: '133.4'
@@ -4439,9 +4439,9 @@ items:
   - scripts
   owned_surfaces:
   - surface_artifact_studio_creator_press:ui
-- title: Surface mobile travel, route, recap, observer, table-pulse, and Shadowcasters horizon moments with consent and offline
+- title: Surface mobile travel, route, recap, observer, table-pulse, and Community Hub horizon moments with consent and offline
     posture.
-  task: Surface mobile travel, route, recap, observer, table-pulse, and Shadowcasters horizon moments with consent and offline
+  task: Surface mobile travel, route, recap, observer, table-pulse, and Community Hub horizon moments with consent and offline
     posture.
   package_id: next90-m133-mobile-surface-mobile-travel-route-recap-observer-table-pulse-a
   work_task_id: '133.5'

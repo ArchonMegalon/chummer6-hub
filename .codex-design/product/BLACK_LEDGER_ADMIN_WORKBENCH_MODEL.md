@@ -104,4 +104,3 @@ The workbench must prevent:
 ## Success criteria
 
 The workbench is working when operators can review and close a world tick without using ad hoc spreadsheets, every accepted edit has an AdminIntentReceipt, public artifacts match Hub publication truth, and disabling Teable leaves Hub canonical state intact.
-

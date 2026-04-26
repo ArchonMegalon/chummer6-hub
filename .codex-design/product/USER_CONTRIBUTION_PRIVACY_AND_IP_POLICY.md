@@ -80,4 +80,3 @@ Every contribution class must define:
 - what must be retained as a receipt
 - when raw payload is summarized
 - when public artifacts are retired or superseded
-
