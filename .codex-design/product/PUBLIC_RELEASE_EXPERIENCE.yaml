@@ -5,6 +5,7 @@ guest_readable_channels:
   - stable
   - preview
 release_notes_summary: The current preview centers one clear public download, a visible proof trail, and help that matches the posted shelf you can actually use today without letting artifact explainers or fallback routes masquerade as the main route.
+download_authority_summary: chummer.run is the only official client download source. GitHub is source and development evidence only, never a public binary release shelf for installers, archives, update payloads, or preview clients.
 proof_scope_summary: Public proof language is scoped to the files, named flows, and recent checks posted on the current shelf that a person can inspect today; it is not a blanket flagship-grade claim.
 flagship_claim_summary: Flagship wording is reserved for surfaces that currently satisfy FLAGSHIP_RELEASE_ACCEPTANCE.yaml; preview artifacts, proof cards, captions, packet siblings, artifact-factory explainers, and fallback routes do not earn that claim by proximity.
 flagship_grade_summary: A public release is only truly ready when downloads, install/update help, recovery, support, and the product surfaces behind them feel like one premium, honest product rather than a technically functional preview bundle.
@@ -27,6 +28,8 @@ update_posture_summary: The release page is the source of truth for the current 
 public_concierge_summary: Public concierge widgets may appear only as bounded preview overlays on low-risk public surfaces; the fixed release route, visible fallback path, and recovery guidance remain first-party and must still work when the widget is disabled.
 flagship_release_rules:
   - The shelf must present one obvious primary download path per supported platform.
+  - Every official client download or install handoff must start from chummer.run and resolve through registry-backed release truth.
+  - GitHub releases, GitHub Actions artifacts, repo attachments, and repo-hosted binary shelves must not be used as public client download sources.
   - Avalonia is the flagship desktop head. Blazor Desktop is only a compatibility fallback when the platform matrix and release copy both say so.
   - If Blazor Desktop is the only visible desktop head for a lane or the recommended download, the release page must treat it as the flagship route and require flagship proof rather than fallback proof.
   - Public proof shelf wording is limited to posted files, recent checks, and inspectable trails; it must not imply that all current product surfaces are flagship-ready.

@@ -33,6 +33,7 @@ The landing surface must let a normal person understand, in one visit:
 * Public status is advisory and explanatory; it does not overrule canonical design truth.
 * Provider names may appear only on dedicated auth and account-security surfaces, not on the landing hero or proof cards.
 * Download-facing copy and CTA labels must follow `PUBLIC_DOWNLOADS_POLICY.md` and `PUBLIC_AUTO_UPDATE_POLICY.md`.
+* Client acquisition must route through `chummer.run`; GitHub may link to source or to `chummer.run`, but it must not host public client binaries as the download path.
 * Proof-shelf language is scoped to posted files, named flows, and recent checks a person can inspect today; it must not silently upgrade a preview lane into a flagship claim.
 * Fallback heads, archive packages, manual commands, and recovery routes must read as bounded compatibility, backup, or recovery paths rather than equal defaults.
 * Artifact-factory explainers, preview cards, captions, packet siblings, and proof-gallery artifacts may deepen inspection, but they must not be framed as the recommended install path, the authority over the install shelf, or as proof that the whole product is flagship-ready.

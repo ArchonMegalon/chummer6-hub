@@ -11,6 +11,12 @@ The downloads surface is a proof shelf first:
 * clear release posture
 * no archive-collector framing on the front path
 
+## Download authority
+
+`chummer.run` is the only official client download source.
+
+Build artifacts, installers, archives, update payloads, and preview clients must not be published directly to GitHub releases, GitHub Actions artifacts, repo attachments, or other repo-hosted binary shelves as an end-user download path. GitHub may host source, issues, and development evidence, but public acquisition must route through `chummer.run` download or install handoff surfaces backed by registry release truth.
+
 ## CTA labels
 
 Allowed primary CTA labels include:
@@ -33,6 +39,7 @@ Forbidden primary labels include:
 The public shelf must:
 
 * lead with one recommended build per supported platform
+* serve official client downloads only from `chummer.run` routes backed by registry truth
 * show channel and version clearly
 * separate installer media from advanced fallback assets
 * distinguish posted proof from whole-product flagship status
@@ -48,6 +55,7 @@ The public shelf must:
 The public shelf must not:
 
 * read like a raw artifact bucket
+* send users to GitHub releases, GitHub Actions artifacts, or repo-hosted binaries to download the client
 * bury the recommended build beneath archives
 * imply sign-in is required for open public installers
 * pretend portable archives are the default when canon says installer-first
@@ -75,6 +83,7 @@ Download-facing copy must say:
 
 * what the build is
 * what channel it belongs to
+* that the official client download or install handoff starts from `chummer.run`
 * whether it is preview or stable
 * what current proof actually covers
 * what platforms are supported today
@@ -88,6 +97,7 @@ Download-facing copy must not say:
 
 * per-user installer
 * personalized build
+* download from GitHub
 * instant fix availability from merged code
 * auto-update guarantees that outrun registry or UI truth
 * tell users to double-click an unsigned downloaded `.command` when the actual supported path is a copy-paste Terminal command
