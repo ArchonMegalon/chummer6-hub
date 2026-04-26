@@ -576,6 +576,6 @@ cards:
     audience: public
     image_family: facility_exterior
     render_mode: external_explainer
-    fallback_route: https://github.com/ArchonMegalon/Chummer6/releases
-    fallback_label: Open GitHub releases
+    fallback_route: https://chummer.run/downloads/
+    fallback_label: Open chummer.run downloads
     external_ok: true

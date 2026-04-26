@@ -117,7 +117,8 @@ pages:
     - current build matrix
     - honest artifact format
     - checksums
-    - raw release fallback
+    - chummer.run download authority
+    - bounded fallback and recovery routes
   deep_source_trail:
     source: products/chummer/PUBLIC_GUIDE_PAGE_REGISTRY.yaml
     include:
