@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Contracts;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
@@ -220,6 +221,87 @@ public sealed record ReleaseUploadPageViewModel(
     string ReadmeUrl,
     string VerifyUrl,
     string WindowsUploadNote,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record KarmaForgeIntakePageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CanonicalLane,
+    string EntryLane,
+    KarmaForgeDashboardSummary Dashboard,
+    IReadOnlyList<string> DiscoverySteps,
+    KarmaForgeIntakeFormViewModel Form,
+    KarmaForgeTrackDefinition SelectedTrack,
+    IReadOnlyList<KarmaForgeCandidateDecisionViewModel> CandidateDecisions,
+    IReadOnlyList<string> CanonicalOutputs,
+    IReadOnlyList<KarmaForgeRecentSubmissionViewModel> RecentSubmissions,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record KarmaForgeIntakeFormViewModel(
+    string ActionHref,
+    bool Authenticated,
+    string? SubmissionNotice,
+    IReadOnlyList<string> ValidationErrors,
+    IReadOnlyList<KarmaForgeOptionDefinition> TrackOptions,
+    IReadOnlyList<KarmaForgeOptionDefinition> RoleOptions,
+    IReadOnlyList<KarmaForgeOptionDefinition> TableTypeOptions,
+    IReadOnlyList<KarmaForgeOptionDefinition> RuleCategoryOptions,
+    IReadOnlyList<KarmaForgeOptionDefinition> SeverityOptions,
+    string DefaultTrackKey,
+    string DefaultRespondentRole,
+    string DefaultEdition,
+    string DefaultTableType,
+    string DefaultRuleCategory,
+    string DefaultSeverity,
+    string DefaultFeedbackPrompt,
+    string DefaultUserWordsSummary,
+    string DefaultCurrentWorkaround,
+    string DefaultInterpretedNeedSummary,
+    string DefaultImpactNotes,
+    string DefaultShareabilityNotes,
+    string DefaultReplyEmail,
+    bool DefaultFollowUpAllowed,
+    bool DefaultQuoteAllowed,
+    bool DefaultConsentAccepted);
+
+public sealed record KarmaForgeCandidateDecisionViewModel(
+    string Key,
+    string Meaning);
+
+public sealed record KarmaForgeRecentSubmissionViewModel(
+    string SubmissionId,
+    string Title,
+    string SubmittedLabel,
+    string CandidateDecision,
+    string QueueStatus);
+
+public sealed record KarmaForgeSubmittedPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string SubmissionId,
+    string TrackTitle,
+    string QueueStatus,
+    IReadOnlyList<TrustPageActionViewModel> Actions,
+    string PacketTitle,
+    string QueueSummary,
+    string CandidateDecision,
+    string CandidateDecisionMeaning,
+    string ReporterNextAction,
+    string ConsentSummary,
+    IReadOnlyList<string> Highlights,
+    bool FollowUpAllowed,
+    IReadOnlyList<string> NextQuestions,
+    IReadOnlyList<string> NextSteps,
+    bool QuoteAllowed,
+    string PacketJson,
+    string CandidateJson,
+    string ImpactHypothesisJson,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 

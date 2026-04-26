@@ -120,6 +120,24 @@ platforms:
     }
 
     [Fact]
+    public void PublicReleaseExperienceCanonAcceptsCurrentProofBoundaryFields()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var loader = new PublicCanonFileLoader(configuration);
+        var document = loader.LoadRequiredYaml<PublicReleaseExperienceDocument>(".codex-design/product/PUBLIC_RELEASE_EXPERIENCE.yaml");
+
+        Assert.Contains("posted", document.ProofScopeSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Flagship", document.FlagshipClaimSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("concierge", document.PublicConciergeSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void BuildExperienceMarksUnsupportedRequestedPlatformAsUnavailableWithoutPretendingItIsRecommended()
     {
         var configuration = new ConfigurationBuilder()

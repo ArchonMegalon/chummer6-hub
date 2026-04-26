@@ -1,0 +1,15 @@
+<Project>
+  <Target Name="EnsureRuntimeMetadataForReferencingProjects"
+          BeforeTargets="AddDepsJsonAndRuntimeConfigToCopyItemsForReferencingProjects"
+          DependsOnTargets="GenerateBuildDependencyFile;GenerateBuildRuntimeConfigurationFiles"
+          Condition="'$(HasRuntimeOutput)' == 'true' and ('$(GenerateDependencyFile)' == 'true' or '$(GenerateRuntimeConfigurationFiles)' == 'true')" />
+
+  <Target Name="MaterializeReferenceAssemblyFallback"
+          AfterTargets="Build"
+          Condition="'$(ProduceReferenceAssembly)' == 'true' and '$(TargetRefPath)' != '' and Exists('$(TargetPath)') and !Exists('$(TargetRefPath)')">
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(TargetRefPath)'))" />
+    <Copy SourceFiles="$(TargetPath)"
+          DestinationFiles="$(TargetRefPath)"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

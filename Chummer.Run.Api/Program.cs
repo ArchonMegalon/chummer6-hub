@@ -102,36 +102,6 @@ app.Use(async (context, next) =>
 });
 app.Use(async (context, next) =>
 {
-    if (IsPublicReleaseUploadBootstrapPath(context.Request.Path))
-    {
-        string webRoot = app.Environment.WebRootPath
-            ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
-        string bootstrapPath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
-
-        if (!File.Exists(bootstrapPath))
-        {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            context.Response.ContentType = "application/problem+json; charset=utf-8";
-            await context.Response.WriteAsJsonAsync(new ProblemDetails
-            {
-                Title = "Release upload bootstrap unavailable.",
-                Type = "https://chummer.run/problems/release-upload-bootstrap-unavailable",
-                Status = StatusCodes.Status503ServiceUnavailable,
-                Detail = "The release upload bootstrap is temporarily unavailable. Refresh the handoff page and try again."
-            });
-            return;
-        }
-
-        context.Response.ContentType = "text/x-shellscript; charset=utf-8";
-        if (HttpMethods.IsHead(context.Request.Method))
-        {
-            return;
-        }
-
-        await context.Response.SendFileAsync(bootstrapPath);
-        return;
-    }
-
     if (IsLegacyMacReleaseBootstrapArtifactPath(context.Request.Path))
     {
         context.Response.Redirect("/downloads/release-upload/bootstrap.sh", permanent: false);
@@ -163,11 +133,6 @@ static bool RequiresNoStoreHeaders(PathString path)
         || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
-}
-
-static bool IsPublicReleaseUploadBootstrapPath(PathString path)
-{
-    return path.Equals("/downloads/release-upload/bootstrap.sh", StringComparison.OrdinalIgnoreCase);
 }
 
 static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)

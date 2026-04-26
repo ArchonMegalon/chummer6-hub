@@ -6,6 +6,8 @@ style_epoch:
   comparison_between_builds: allowed
   note: A full landing build pass should share one major visual family, while later passes may intentionally compare different epochs.
 render_rules:
+  semantic_ar_policy: >-
+    Semantic AR only: labels must describe visible reality, not invented telemetry; if an anchor is not visible, omit the overlay.
   raster_only: true
   no_svg: true
   master_format: png
@@ -267,8 +269,8 @@ visual_contract:
       - consequence or rollback machinery required
       - provenance seals or rule cassettes required
     required_overlay_schema:
-      - DIFF
-      - APPROVAL
+      - seal drift
+      - approval rail
       - PROVENANCE
       - ROLLBACK
     required_action_posture:
@@ -410,12 +412,14 @@ asset_overlay_contracts:
       - ambient_diegetic
     overlay_geometry:
       - hazard brackets
-      - provenance traces
-      - crate-edge pings
-      - threshold arrows
+      - provenance halo
+      - case-edge pings
+      - floor route arrows
+      - wrist sync rails
     overlay_actionability_rule: >
-      Keep warning traces welded to crate edges, hazard tape, shutter seams,
-      or street threshold geometry; never let a giant signboard do the job.
+      Keep warning traces welded to hardcase edges, data-chip provenance,
+      wrist cyberware, hazard tape, or wet floor route geometry; never let a
+      giant signboard do the job.
     overlay_render_strategy: verified_post_composite_public
     render_layers:
       - base_scene

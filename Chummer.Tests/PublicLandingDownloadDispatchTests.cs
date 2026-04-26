@@ -13,6 +13,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Xunit;
 
@@ -20,6 +21,9 @@ namespace Chummer.Tests;
 
 public sealed class PublicLandingDownloadDispatchTests
 {
+    private static string ComputeSha256Hex(string value)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
     [Fact]
     public void DownloadDispatchPage_Advertises_Head_And_Get_For_Probe_Safe_Install_Handoff()
     {
@@ -186,6 +190,74 @@ public sealed class PublicLandingDownloadDispatchTests
 
         var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal(renderedScript, Encoding.UTF8.GetString(file.FileContents));
+    }
+
+    [Fact]
+    public void PersonalizedMacBootstrapScriptDigestMatchesStoredScriptBytes()
+    {
+        using Fixture fixture = new();
+        const string renderedScript = "#!/usr/bin/env bash\nprintf 'ok\\n'\n";
+        string expectedDigest = ComputeSha256Hex(renderedScript);
+        var issue = fixture.PersonalizedInstallScripts.IssueMacScript(
+            "avalonia-osx-arm64-installer",
+            ["avalonia-osx-arm64-installer"],
+            "user-archon",
+            "subject-archon",
+            renderedScript);
+
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+
+        IActionResult result = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId, issue.Link.RenderedScriptSha256);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        string servedScript = Encoding.UTF8.GetString(file.FileContents);
+        Assert.Equal(renderedScript, servedScript);
+        Assert.Equal(expectedDigest, issue.Link.RenderedScriptSha256);
+        Assert.Equal(expectedDigest, ComputeSha256Hex(servedScript));
+    }
+
+    [Fact]
+    public void PersonalizedMacBootstrapScriptRepairsLegacyTrimmedScriptWhenDigestPinnedTrailingNewline()
+    {
+        using Fixture fixture = new();
+        const string renderedScript = "#!/usr/bin/env bash\nprintf 'ok\\n'\n";
+        string legacyTrimmedScript = renderedScript.TrimEnd('\n');
+        string expectedDigest = ComputeSha256Hex(renderedScript);
+        var issue = fixture.PersonalizedInstallScripts.IssueMacScript(
+            "avalonia-osx-arm64-installer",
+            ["avalonia-osx-arm64-installer"],
+            "user-archon",
+            "subject-archon",
+            legacyTrimmedScript);
+
+        lock (fixture.InstallLinkingStore.Gate)
+        {
+            fixture.InstallLinkingStore.PersonalizedInstallScriptsById[issue.ScriptId] = issue.Link with
+            {
+                RenderedScript = legacyTrimmedScript,
+                RenderedScriptSha256 = expectedDigest
+            };
+            fixture.InstallLinkingStore.PersistLocked();
+        }
+
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+
+        IActionResult result = fixture.Controller.DownloadDispatchPersonalizedMacBootstrapScript(issue.ScriptId, expectedDigest);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        string servedScript = Encoding.UTF8.GetString(file.FileContents);
+        Assert.Equal(renderedScript, servedScript);
+        Assert.Equal(expectedDigest, ComputeSha256Hex(servedScript));
     }
 
     [Fact]
@@ -549,11 +621,11 @@ public sealed class PublicLandingDownloadDispatchTests
                 NullLogger<HubIdentityClient>.Instance);
             CommunityStore communityStore = new(Configuration, NullLogger<CommunityStore>.Instance);
             Accounts = new AccountService(communityStore);
-            var installLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
-            InstallLinking = new InstallLinkingService(installLinkingStore, Configuration);
+            InstallLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
+            InstallLinking = new InstallLinkingService(InstallLinkingStore, Configuration);
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
             InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtectionProvider, Configuration);
-            PersonalizedInstallScripts = new PersonalizedInstallScriptService(installLinkingStore, Configuration);
+            PersonalizedInstallScripts = new PersonalizedInstallScriptService(InstallLinkingStore, Configuration);
             Controller = new PublicLandingController(
                 landing: null!,
                 releases: ManifestService,
@@ -593,6 +665,8 @@ public sealed class PublicLandingDownloadDispatchTests
         public ReleaseSelectionService ReleaseSelection { get; }
 
         public InstallLinkingService InstallLinking { get; }
+
+        public InstallLinkingStore InstallLinkingStore { get; }
 
         public InstallBootstrapTicketService InstallBootstrapTickets { get; }
 

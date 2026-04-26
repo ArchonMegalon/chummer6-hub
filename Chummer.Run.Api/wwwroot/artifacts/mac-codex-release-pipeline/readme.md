@@ -4,18 +4,16 @@ Purpose: let a Codex session running on a Mac build a public-ready desktop artif
 
 ## Preferred operator entry points
 
-Signed-in prompt-safe path:
+Signed-in self-contained path:
 
-1. Run:
+1. Open `https://chummer.run/downloads/release-upload` in a signed-in browser.
+2. Copy the generated `Command` block from that page.
+3. Paste that exact command into the Mac release shell.
 
-```bash
-curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.command | bash
-```
-
-If that call returns an auth error, open `https://chummer.run/downloads/release-upload` in a signed-in browser once, then rerun.
-
-That signed-in handoff is the source of truth for live publication because it serves the current hosted bootstrap, pins the bootstrap digest in the one-liner, and pre-authenticates the short-lived upload handoff in the generated command.
-The bootstrap file itself now carries the pinned repo refs, so the signed-in, public curl, and repo-local wrapper paths all execute the same pinned checkout plan.
+That signed-in handoff is the source of truth for live publication because it serves the current hosted bootstrap, pins the bootstrap digest in the one-liner, and embeds the short-lived upload handoff in the generated command.
+The bootstrap file itself now carries the pinned repo refs, so the signed-in generated command, authenticated command endpoint, and repo-local wrapper paths all execute the same pinned checkout plan.
+Do not run `https://chummer.run/downloads/release-upload/bootstrap.sh` directly for live promotion; it can pass SHA-256 verification and still stop at upload time because a raw public script has no upload credential.
+Do not paste `curl -fsSL https://chummer.run/downloads/release-upload/bootstrap.command | bash` as the install command unless you have explicitly attached `?ticket=...` or `?apiToken=...`; a terminal curl does not inherit the browser sign-in session.
 
 Repo-local checkout path, if you already cloned `chummer.run-services` somewhere on the Mac:
 
@@ -24,11 +22,10 @@ repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 ```
 
-If `CHUMMER_RELEASE_UPLOAD_TOKEN` (or `CHUMMER_RELEASE_UPLOAD_TOKEN_FILE`) is set, the wrapper runs fully non-interactive and never prompts for input.
+If `CHUMMER_RELEASE_UPLOAD_TOKEN`, `CHUMMER_RELEASE_UPLOAD_TICKET`, or one of their `*_FILE` variants is set, the wrapper runs fully non-interactive and never prompts for input.
 
 ```bash
-export CHUMMER_RELEASE_UPLOAD_TOKEN=...            # or CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=/path/to/token
-export CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=
+export CHUMMER_RELEASE_UPLOAD_TICKET=...           # or CHUMMER_RELEASE_UPLOAD_TOKEN=...
 repo_root="$(git rev-parse --show-toplevel)"
 bash "$repo_root/scripts/run-mac-release-bootstrap.sh"
 ```
@@ -62,7 +59,7 @@ Before running it, the Mac environment should already have:
 6. `curl`
 7. Apple signing identity in the keychain for signed public-ready releases
 8. `xcrun notarytool` credentials stored in a keychain profile for signed public-ready releases
-9. a signed-in release-upload handoff code or an explicit upload token that is allowed to call the internal promotion endpoint
+9. a signed-in generated command from `/downloads/release-upload`, or an explicit upload ticket/token that is allowed to call the internal promotion endpoint
 
 ## Minimum environment variables
 

@@ -1,0 +1,57 @@
+{
+  "contract_name": "chummer6-hub.next90_m113_hub_roster_ops",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m113-hub-roster-ops",
+    "title": "Land crew, roster, and event movement APIs",
+    "task": "Make dossiers move between rosters, campaigns, groups, and events with ownership and audit receipts.",
+    "frontier_id": 1469041280,
+    "milestone_id": 113,
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "crew_roster_ops",
+      "campaign_group_event_movement"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "surfaces_passed": [
+    "campaign_group_event_movement",
+    "crew_roster_ops"
+  ],
+  "required_markers": {
+    "campaign_group_event_movement": [
+      "var dossierMovementPlanResult = await campaignSpineController.GetMyCampaignWorkspaceDossierMovementPlan(workspaceId, CancellationToken.None);",
+      "dossierMovementPlanPayload.TargetGroups.Count >= 1",
+      "dossierMovementPlanPayload.TargetGroups.SelectMany(item => item.CampaignOptions).Any(item => item.EventOptions.Count >= 1)",
+      "var dossierMovementResult = await campaignSpineController.MoveMyDossier(",
+      "Assert(dossierMovementPayload is not null && string.Equals(dossierMovementPayload.DossierId, sourceDossier.DossierId, StringComparison.Ordinal)",
+      "Assert(dossierMovementPayload!.GroupChanged, \"campaign spine dossier-movement api should report when the governed roster group changes.\")",
+      "Assert(dossierMovementPayload.EventChanged, \"campaign spine dossier-movement api should report when the governed run or scene changes.\")",
+      "string.Equals(dossierMovementPayload.TargetRunTitle, \"Dockside handoff\", StringComparison.Ordinal)",
+      "string.Equals(dossierMovementPayload.TargetSceneTitle, \"Pier 3 exchange\", StringComparison.Ordinal)",
+      "dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, \"target_run\", StringComparison.Ordinal))",
+      "dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, \"target_scene\", StringComparison.Ordinal))",
+      "var dossierMovementsResult = await campaignSpineController.GetMyCampaignWorkspaceDossierMovements(workspaceId, CancellationToken.None);",
+      "dossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true",
+      "outsiderDossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true"
+    ],
+    "crew_roster_ops": [
+      "var rosterTransferPlanResult = await campaignSpineController.GetMyCampaignWorkspaceRosterTransferPlan(workspaceId, CancellationToken.None);",
+      "rosterTransferPlanPayload.TargetGroups.Count >= 1",
+      "var rosterTransferResult = await campaignSpineController.TransferMyRoster(",
+      "string.Equals(rosterTransferPayload!.CurrentOwnerUserId, transferTargetUser.UserId, StringComparison.Ordinal)",
+      "rosterTransferPayload.Summary.Contains(\"ownership transferred\", StringComparison.OrdinalIgnoreCase)",
+      "outsiderWorkspace is not null && outsiderWorkspace.RosterTransfers?.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true",
+      "outsiderWorkspaceServerPlanePayload is not null && outsiderWorkspaceServerPlanePayload.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal))",
+      "operatorWorkModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true",
+      "postTransferWorkHomeModel?.LeadWorkspaceServerPlane?.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true",
+      "postTransferWorkHomeModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true"
+    ]
+  },
+  "generated_at": "2026-04-23T23:17:31Z"
+}

@@ -105,26 +105,26 @@ if [[ -z "$auth_mode" ]]; then
   cat >&2 <<'EOF'
 [chummer-mac-release-wrapper] ERROR: no release-upload auth was supplied.
 
-This runner defaults to hosted command mode. It can only fetch
-`/downloads/release-upload/bootstrap.command` non-interactively when one of these is set:
+This wrapper cannot mint a signed-in release ticket by itself. The zero-extra-env path is:
+
+  1. open https://chummer.run/downloads/release-upload in a signed-in browser
+  2. copy the generated Command block
+  3. paste that exact command into the Mac release shell
+
+That generated command already carries the short-lived upload ticket, pins the hosted
+bootstrap SHA-256, and should not stop later for CHUMMER_RELEASE_UPLOAD_TICKET or
+CHUMMER_RELEASE_UPLOAD_TOKEN.
+
+For repo-local automation, set one of these before running the wrapper:
 
   * CHUMMER_RELEASE_UPLOAD_TOKEN=...
   * CHUMMER_RELEASE_UPLOAD_TICKET=...
   * CHUMMER_RELEASE_UPLOAD_TOKEN_FILE=... (one-line secret file)
   * CHUMMER_RELEASE_UPLOAD_TICKET_FILE=... (one-line ticket file)
 
-Run this wrapper from a real chummer.run-services checkout, or use one of the hosted entry points instead:
-
-  Signed-in release upload handoff:
-    https://chummer.run/downloads/release-upload
-
-  Direct hosted command endpoint:
-    curl -fsSL ${bootstrap_command_url} | bash
-
-  Non-interactive hosted bootstrap:
-    set CHUMMER_RELEASE_UPLOAD_TOKEN=... or export CHUMMER_RELEASE_UPLOAD_TICKET=...
-    # this wrapper resolves them into the hosted command endpoint automatically
-    bash "$script_dir/run-mac-release-bootstrap.sh"
+Do not run the public bootstrap.sh URL directly for release promotion; it can verify
+integrity but it has no upload credential unless the signed-in page or this wrapper
+attaches one first.
 EOF
   exit 1
 fi

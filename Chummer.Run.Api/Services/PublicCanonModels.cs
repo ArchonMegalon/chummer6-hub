@@ -6,6 +6,7 @@ internal sealed class PublicNavigationDocument
     public string Surface { get; init; } = string.Empty;
     public int Version { get; init; }
     public List<PublicNavigationLinkDocument>? PrimaryNav { get; init; }
+    public List<PublicNavigationLinkDocument>? PublicSignalNav { get; init; }
     public List<PublicNavigationLinkDocument>? SecondaryNav { get; init; }
     public List<PublicNavigationLinkDocument>? UtilityNav { get; init; }
 }
@@ -14,6 +15,7 @@ internal sealed class PublicNavigationLinkDocument
 {
     public string Label { get; init; } = string.Empty;
     public string Href { get; init; } = string.Empty;
+    public string? FallbackHref { get; init; }
 }
 
 internal sealed class PublicLandingManifestDocument
@@ -36,6 +38,8 @@ internal sealed class PublicLandingManifestDocument
     public string? ProductProofSecondaryLabel { get; init; }
     public string? ProductProofSecondaryHref { get; init; }
     public string? ProductProofToplineLabel { get; init; }
+    public string? ProductProofScopeLine { get; init; }
+    public string? ProductFlagshipBoundaryLine { get; init; }
     public string? ProductProofResultTitle { get; init; }
     public string? ProductProofResultSummary { get; init; }
     public List<string>? ProductProofTrail { get; init; }
@@ -251,6 +255,8 @@ internal sealed class PublicReleaseExperienceDocument
     public int Version { get; init; }
     public List<string>? GuestReadableChannels { get; init; }
     public string ReleaseNotesSummary { get; init; } = string.Empty;
+    public string? ProofScopeSummary { get; init; }
+    public string? FlagshipClaimSummary { get; init; }
     public string? FlagshipGradeSummary { get; init; }
     public string? FlagshipAcceptanceSource { get; init; }
     public string? DesktopFlagshipHead { get; init; }
@@ -258,6 +264,7 @@ internal sealed class PublicReleaseExperienceDocument
     public string? DesktopCutSummary { get; init; }
     public List<string>? FlagshipReleaseRules { get; init; }
     public List<string>? SupportedLocaleTargets { get; init; }
+    public string? PublicConciergeSummary { get; init; }
     public string KnownIssuesLabel { get; init; } = string.Empty;
     public string KnownIssuesHref { get; init; } = string.Empty;
     public string InstallHelpLabel { get; init; } = string.Empty;

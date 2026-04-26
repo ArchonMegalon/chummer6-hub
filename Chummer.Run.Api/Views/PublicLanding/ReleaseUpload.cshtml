@@ -11,7 +11,7 @@
         <div class="recommended-download__copy">
             <span class="tag">Mac Codex one-liner</span>
             <h2>Run this in your mac release shell</h2>
-            <p>The command clones repos, builds the osx-arm64 desktop artifact, runs startup smoke checks, publishes the signed upload bundle, and prompts for the current short-lived upload handoff code only after the bootstrap is already running.</p>
+            <p>The command clones repos, builds the osx-arm64 desktop artifact, runs startup smoke checks, publishes the signed upload bundle, and carries the current short-lived upload handoff code so non-interactive runners do not stop after the integrity check.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Command</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadCommand">@Model.Command</pre>
@@ -19,7 +19,7 @@
                     <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadCommandButton">Copy command</button>
                     <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open bootstrap script</a>
                 </div>
-                <p class="status-copy">This command intentionally omits the handoff code so it does not land in shell history. Paste the code below only when the bootstrap prompts for it.</p>
+                <p class="status-copy">This signed-in command contains a short-lived handoff code. Use it in the release shell that will run the bootstrap, and do not paste it into logs or shared chat.</p>
                 <p class="status-copy" id="releaseUploadCommandNotice" hidden></p>
             </div>
         </div>
@@ -30,15 +30,15 @@
     <article class="recommended-download__card">
         <div class="recommended-download__copy">
             <span class="tag">Short-lived handoff code</span>
-            <h2>Paste this only when the bootstrap prompts</h2>
-            <p>The bootstrap reads this value with hidden terminal input, writes the auth header into a locked temp curl config, and clears the shell environment afterward.</p>
+            <h2>Backup handoff code</h2>
+            <p>The command above already includes this value. Keep it available only for recovery or for a manually downloaded bootstrap script that still prompts for upload authorization.</p>
             <div class="code-panel">
                 <div class="code-panel__label">Handoff code</div>
                 <pre class="code-panel__value mono-receipt" id="releaseUploadHandoffCode">@Model.HandoffCode</pre>
                 <div class="stacked-actions">
                     <button class="button-like button-like--secondary" type="button" id="copyReleaseUploadHandoffCodeButton">Copy handoff code</button>
                 </div>
-                <p class="status-copy">Treat the handoff code as sensitive until it expires. It should never be added to the command line or exported in shell startup files.</p>
+                <p class="status-copy">Treat the handoff code as sensitive until it expires. Never export it in shell startup files.</p>
                 <p class="status-copy" id="releaseUploadHandoffCodeNotice" hidden></p>
             </div>
         </div>

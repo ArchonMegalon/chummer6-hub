@@ -67,13 +67,15 @@ public sealed class PersonalizedInstallScriptService
         string[] normalizedAllowedArtifactIds = NormalizeAllowedArtifactIds(normalizedArtifactId, allowedArtifactIds);
         string? normalizedUserId = NormalizeOptional(userId);
         string? normalizedSubjectId = NormalizeOptional(subjectId);
-        string? normalizedRenderedScript = NormalizeOptional(renderedScript);
-        string? normalizedRenderedScriptSha256 = NormalizeOptional(renderedScriptSha256);
-        if (normalizedRenderedScriptSha256 is null && normalizedRenderedScript is not null)
+        string? normalizedRenderedScript = NormalizeRenderedScript(renderedScript);
+        string? normalizedRenderedScriptSha256 = NormalizeOptional(renderedScriptSha256)?.ToLowerInvariant();
+        if (normalizedRenderedScript is not null)
         {
-            normalizedRenderedScriptSha256 = Convert.ToHexString(
-                    SHA256.HashData(Encoding.UTF8.GetBytes(normalizedRenderedScript)))
-                .ToLowerInvariant();
+            string renderedScriptDigest = ComputeSha256Hex(normalizedRenderedScript);
+            if (!string.Equals(normalizedRenderedScriptSha256, renderedScriptDigest, StringComparison.Ordinal))
+            {
+                normalizedRenderedScriptSha256 = renderedScriptDigest;
+            }
         }
         if (normalizedUserId is null && normalizedSubjectId is null)
         {
@@ -193,6 +195,25 @@ public sealed class PersonalizedInstallScriptService
             }
 
             string? actualRenderedScriptSha256 = NormalizeOptional(link.RenderedScriptSha256)?.ToLowerInvariant();
+            if (link.RenderedScript is not null && actualRenderedScriptSha256 is not null)
+            {
+                string renderedScriptDigest = ComputeSha256Hex(link.RenderedScript);
+                if (!string.Equals(renderedScriptDigest, actualRenderedScriptSha256, StringComparison.Ordinal))
+                {
+                    string? repairedRenderedScript = TryRestoreLegacyTrimmedRenderedScript(link.RenderedScript, actualRenderedScriptSha256);
+                    if (repairedRenderedScript is not null)
+                    {
+                        link = link with { RenderedScript = repairedRenderedScript };
+                        _store.PersonalizedInstallScriptsById[link.ScriptId] = link;
+                        _store.PersistLocked();
+                    }
+                    else
+                    {
+                        actualRenderedScriptSha256 = renderedScriptDigest;
+                    }
+                }
+            }
+
             if (normalizedExpectedRenderedScriptSha256 is not null
                 && !string.Equals(actualRenderedScriptSha256, normalizedExpectedRenderedScriptSha256, StringComparison.Ordinal))
             {
@@ -276,4 +297,24 @@ public sealed class PersonalizedInstallScriptService
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? NormalizeRenderedScript(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string ComputeSha256Hex(string value)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
+
+    private static string? TryRestoreLegacyTrimmedRenderedScript(string renderedScript, string expectedSha256)
+    {
+        foreach (string suffix in new[] { "\n", "\r\n" })
+        {
+            string candidate = renderedScript + suffix;
+            if (string.Equals(ComputeSha256Hex(candidate), expectedSha256, StringComparison.Ordinal))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
 }

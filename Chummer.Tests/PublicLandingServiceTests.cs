@@ -53,6 +53,23 @@ public sealed class PublicLandingServiceTests
     }
 
     [Fact]
+    public void PublicLandingCanonAcceptsCurrentProofBoundaryFields()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var loader = new PublicCanonFileLoader(configuration);
+        var document = loader.LoadRequiredYaml<PublicLandingManifestDocument>(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml");
+
+        Assert.Contains("posted files", document.ProductProofScopeLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("flagship", document.ProductFlagshipBoundaryLine, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LoadSurface_SupportsPublishedAppStyleCanonRoot()
     {
         string tempRoot = Path.Combine(Path.GetTempPath(), $"chummer-public-canon-{Guid.NewGuid():N}");

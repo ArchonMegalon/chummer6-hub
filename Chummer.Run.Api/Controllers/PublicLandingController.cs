@@ -24,6 +24,9 @@ namespace Chummer.Run.Api.Controllers;
 [Route("api/v1/public")]
 public sealed class PublicLandingController : Controller
 {
+    private const string ReleaseUploadTicketEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TICKET";
+    private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
+
     private readonly PublicLandingService _landing;
     private readonly PublicReleaseManifestService _releases;
     private readonly CampaignOsLocalProofService _campaignOsProof;
@@ -278,16 +281,18 @@ public sealed class PublicLandingController : Controller
             string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
             string command = BuildReleaseUploadBootstrapCommand(
                 bootstrapUrl,
-                ComputeSha256Hex(bootstrapTemplate));
+                ComputeSha256Hex(bootstrapTemplate),
+                ReleaseUploadTicketEnvironmentVariable,
+                ticket.Ticket);
             var model = new ReleaseUploadPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(
                     "Release upload handoff",
-                    "Mint a short-lived upload handoff code and hand a digest-pinned bootstrap command to the Mac or Windows release runner.",
+                    "Mint a short-lived upload handoff code and hand a digest-pinned, self-contained bootstrap command to the Mac or Windows release runner.",
                     currentPath,
                     user.DisplayName,
                     user.Email),
                 Heading: "Signed-in release upload handoff",
-                Summary: "This page mints a short-lived upload handoff code, keeps it off the copied bootstrap command, and lets the release runner paste it only after the bootstrap is already running with temp-file auth handling.",
+                Summary: "This page mints a short-lived upload handoff code and embeds it only in the signed-in bootstrap command so non-interactive Mac release runners can build, publish, and verify without stopping for a second secret paste.",
                 Command: command,
                 HandoffCode: ticket.Ticket,
                 BootstrapUrl: bootstrapUrl,
@@ -324,7 +329,131 @@ public sealed class PublicLandingController : Controller
         }
 
         Response.Headers["Cache-Control"] = "private, no-store";
-        return Content(System.IO.File.ReadAllText(templatePath), "text/x-shellscript; charset=utf-8", Encoding.UTF8);
+        string bootstrapScript = System.IO.File.ReadAllText(templatePath);
+        string? releaseUploadAuth = ResolveReleaseUploadCommandAuth(
+            ticket,
+            apiToken,
+            out string releaseUploadAuthEnvironmentVariable,
+            out IActionResult? failure);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        if (!string.IsNullOrWhiteSpace(releaseUploadAuth))
+        {
+            bootstrapScript =
+                "# Release upload authorization was attached by the signed-in chummer.run handoff.\n" +
+                "export " + releaseUploadAuthEnvironmentVariable + "=" + SingleQuoteShellValue(releaseUploadAuth) + "\n" +
+                bootstrapScript;
+        }
+
+        return Content(bootstrapScript, "text/x-shellscript; charset=utf-8", Encoding.UTF8);
+    }
+
+    [HttpGet("/downloads/release-upload/bootstrap.command")]
+    [Produces("text/x-shellscript", "application/problem+json")]
+    public async Task<IActionResult> ReleaseUploadBootstrapCommand(
+        [FromQuery] string? ticket,
+        [FromQuery] string? apiToken,
+        CancellationToken cancellationToken)
+    {
+        string? releaseUploadAuth = ResolveReleaseUploadCommandAuth(
+            ticket,
+            apiToken,
+            out string releaseUploadAuthEnvironmentVariable,
+            out IActionResult? failure);
+        if (failure is not null)
+        {
+            return failure;
+        }
+
+        if (string.IsNullOrWhiteSpace(releaseUploadAuth))
+        {
+            try
+            {
+                var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+                if (!ReleaseUploadAccessPolicy.CanAccess(subject.Email))
+                {
+                    return NotFound();
+                }
+
+                releaseUploadAuth = _releaseUploadTickets.Issue(subject).Ticket;
+                releaseUploadAuthEnvironmentVariable = ReleaseUploadTicketEnvironmentVariable;
+            }
+            catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+            {
+                return Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    detail: "Sign in at /downloads/release-upload or provide a valid ticket/apiToken query value before fetching the release upload command.");
+            }
+            catch (HubRequestAuthException ex)
+            {
+                _logger.LogWarning(ex, "Release upload command could not confirm the signed-in identity.");
+                return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+            }
+        }
+
+        string webRoot = _webHostEnvironment.WebRootPath
+            ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
+        string templatePath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+        if (!System.IO.File.Exists(templatePath))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
+        }
+
+        string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
+        string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
+        string command = BuildReleaseUploadBootstrapCommand(
+            bootstrapUrl,
+            ComputeSha256Hex(bootstrapTemplate),
+            releaseUploadAuthEnvironmentVariable,
+            releaseUploadAuth);
+
+        Response.Headers["Cache-Control"] = "private, no-store";
+        return Content(command + "\n", "text/x-shellscript; charset=utf-8", Encoding.UTF8);
+    }
+
+    private string? ResolveReleaseUploadCommandAuth(
+        string? ticket,
+        string? apiToken,
+        out string environmentVariable,
+        out IActionResult? failure)
+    {
+        environmentVariable = ReleaseUploadTicketEnvironmentVariable;
+        failure = null;
+
+        string cleanToken = (apiToken ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(cleanToken))
+        {
+            string expectedToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(expectedToken) || !FixedTimeEquals(cleanToken, expectedToken))
+            {
+                failure = Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    detail: "The supplied release upload apiToken is not valid for this chummer.run instance.");
+                return null;
+            }
+
+            environmentVariable = ReleaseUploadTokenEnvironmentVariable;
+            return cleanToken;
+        }
+
+        string cleanTicket = (ticket ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(cleanTicket))
+        {
+            if (!_releaseUploadTickets.TryValidate(cleanTicket, out _))
+            {
+                failure = Problem(
+                    statusCode: StatusCodes.Status401Unauthorized,
+                    detail: "The supplied release upload ticket is expired or invalid. Refresh /downloads/release-upload and copy a new command.");
+                return null;
+            }
+
+            return cleanTicket;
+        }
+
+        return null;
     }
 
     private static bool FixedTimeEquals(string left, string right)
@@ -838,6 +967,22 @@ public sealed class PublicLandingController : Controller
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
+
+    [HttpGet("/feedback")]
+    public IActionResult FeedbackPage()
+        => Redirect("/participate#productlift-feedback");
+
+    [HttpGet("/help/feedback")]
+    public IActionResult FeedbackHelpPage()
+        => Redirect("/feedback");
+
+    [HttpGet("/roadmap")]
+    public IActionResult RoadmapPage()
+        => Redirect("/horizons");
+
+    [HttpGet("/changelog")]
+    public IActionResult ChangelogPage()
+        => Redirect("/now");
 
     [HttpGet("/status")]
     [Produces("text/html")]
@@ -5065,7 +5210,11 @@ echo "Help: ${HELP_URL}"
     private static string SingleQuoteShellLiteral(string value)
         => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
 
-    private static string BuildReleaseUploadBootstrapCommand(string bootstrapUrl, string bootstrapSha256)
+    private static string BuildReleaseUploadBootstrapCommand(
+        string bootstrapUrl,
+        string bootstrapSha256,
+        string releaseUploadAuthEnvironmentVariable,
+        string releaseUploadAuth)
     {
         return "set -euo pipefail; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
@@ -5080,6 +5229,7 @@ echo "Help: ${HELP_URL}"
             "CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0' " +
             "CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4' " +
             "CHUMMER_BOOTSTRAP_EXPECTED_SHA256=" + SingleQuoteShellValue(bootstrapSha256) + " " +
+            releaseUploadAuthEnvironmentVariable + "=" + SingleQuoteShellValue(releaseUploadAuth) + " " +
             "bash \"$TMP_BOOTSTRAP_SCRIPT\"";
     }
 
