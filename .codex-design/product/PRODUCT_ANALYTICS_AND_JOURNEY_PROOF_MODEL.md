@@ -93,4 +93,3 @@ The model is working when Chummer can answer:
 - whether ProductLift voters hear back when work ships
 - whether BLACK LEDGER campaigns create playable outcomes
 - whether errors and crashes correlate with failed journeys
-

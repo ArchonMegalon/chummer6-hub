@@ -75,4 +75,3 @@ Teable may show:
 - ProductLift request references
 
 Teable edits return as AdminIntent and do not directly change runtime line packs.
-

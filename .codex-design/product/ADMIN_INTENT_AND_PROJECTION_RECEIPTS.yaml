@@ -53,4 +53,3 @@ validation_requirements:
   - idempotency_check
   - kill_switch_check
   - privacy_policy_check
-

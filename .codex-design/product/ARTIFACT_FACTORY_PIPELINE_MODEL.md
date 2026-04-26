@@ -29,7 +29,7 @@ Approved source packet
 
 - BLACK LEDGER city update
 - KARMA FORGE house-rule explainer
-- Shadowcasters open-run announcement
+- Community Hub open-run announcement
 - mission briefing reel
 - campaign primer
 - season recap
@@ -60,4 +60,3 @@ The artifact factory must not:
 - convert private support state into public claims
 - treat video/social metrics as product truth
 - skip accessibility, captions, and locale review where public
-

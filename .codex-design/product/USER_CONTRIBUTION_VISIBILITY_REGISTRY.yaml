@@ -23,4 +23,3 @@ forbidden_public_payloads:
   - account_or_entitlement_state
   - raw_transcripts
   - faction_secret_state
-

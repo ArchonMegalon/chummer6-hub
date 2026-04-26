@@ -170,7 +170,7 @@ Exit: an existing table can adopt current campaign state, a runner can pin and u
 
 ## Wave 16 - make public run network and companion runtime real
 
-### 123. Open Runs and Shadowcasters Network table-formation loop
+### 123. Open Runs and Community Hub table-formation loop
 Owners: `chummer6-hub`, `chummer6-hub-registry`, `chummer6-ui`, `chummer6-mobile`, `chummer6-media-factory`, `chummer6-design`
 Exit: a GM can open a run, players can request seats with compatible runners, schedule and meeting handoff stay Chummer-owned, and run closeout can feed BLACK LEDGER, newsreel, reputation, and artifact shelves.
 
@@ -224,7 +224,7 @@ Exit: source anchors, rulebook binding, house-rule demand, amend-package promoti
 
 ## Wave 21 - implement media, run-network, and table-social horizon tranche
 
-### 133. Media and social horizon implementation tranche: JACKPOINT, RUNBOOK PRESS, GHOSTWIRE, RUNSITE, TABLE PULSE, and Shadowcasters
+### 133. Media and social horizon implementation tranche: JACKPOINT, RUNBOOK PRESS, GHOSTWIRE, RUNSITE, TABLE PULSE, and Community Hub
 Owners: `chummer6-hub`, `chummer6-hub-registry`, `chummer6-media-factory`, `chummer6-ui`, `chummer6-mobile`, `executive-assistant`, `fleet`, `chummer6-design`
 Exit: media/social horizons become bounded implementation lanes with first-party manifests, consent, provenance, publication, revocation, inspectable artifacts, and unsupported-claim guards.
 
