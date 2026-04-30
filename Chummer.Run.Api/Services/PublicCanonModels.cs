@@ -255,6 +255,7 @@ internal sealed class PublicReleaseExperienceDocument
     public int Version { get; init; }
     public List<string>? GuestReadableChannels { get; init; }
     public string ReleaseNotesSummary { get; init; } = string.Empty;
+    public string? DownloadAuthoritySummary { get; init; }
     public string? ProofScopeSummary { get; init; }
     public string? FlagshipClaimSummary { get; init; }
     public string? FlagshipGradeSummary { get; init; }

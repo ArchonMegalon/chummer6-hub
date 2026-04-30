@@ -9,12 +9,14 @@
     var platformShelfNotice = !string.IsNullOrWhiteSpace(release.PlatformShelfNoticeSummary);
     var requestedPlatformUnavailable = platformShelfNotice && !release.RequestedPlatformHasPublicDownload;
     var deviceLabel = release.RequestedPlatformLabel ?? "this device";
+    var signedInWindowsBuilds = Model.SignedInWindowsBuilds ?? Array.Empty<ReleaseOptionViewModel>();
+    var hasSignedInWindowsBuilds = Model.Chrome.Authenticated && signedInWindowsBuilds.Count > 0;
     var windowsProofInstallers = Model.WindowsProofInstallers ?? Array.Empty<WindowsProofInstallerRecord>();
     var hasWindowsProofRail = windowsProofInstallers.Count > 0;
     var requestedWindowsUnavailable = requestedPlatformUnavailable && string.Equals(deviceLabel, "Windows", StringComparison.OrdinalIgnoreCase);
     var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0;
     var showPlatformShelf = release.PlatformAvailability.Count > 0;
-    var hasAdvancedPanels = hasAdvancedDownloads || hasWindowsProofRail;
+    var hasAdvancedPanels = hasAdvancedDownloads || hasSignedInWindowsBuilds || hasWindowsProofRail;
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)
@@ -55,8 +57,10 @@
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
-                ? requestedWindowsUnavailable && hasWindowsProofRail
-                    ? "Windows is not promoted for this browser on the current public shelf. Check the main platform downloads below, and use the Windows verification rail only if support points you there."
+                ? requestedWindowsUnavailable && hasSignedInWindowsBuilds
+                    ? "Windows is not promoted for guests on the current public shelf, but signed-in users can still open the latest Windows build below."
+                    : requestedWindowsUnavailable && hasWindowsProofRail
+                        ? "Windows is not promoted for this browser on the current public shelf. Check the main platform downloads below, and use the Windows verification rail only if support points you there."
                     : release.PlatformShelfNoticeSummary
                 : recommendedUsesMacSetupScript
                         ? "On macOS, the default path is the signed-in setup handoff. It gives you one Terminal command for this install."
@@ -109,7 +113,11 @@ else
                     {
                         <a class="button-like button-like--primary" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                         <a class="button-like button-like--secondary" href="#platform-shelf">See other platforms</a>
-                        @if (requestedWindowsUnavailable && hasWindowsProofRail)
+                        @if (requestedWindowsUnavailable && hasSignedInWindowsBuilds)
+                        {
+                            <a class="button-like button-like--ghost" href="#signed-in-windows-builds">Open signed-in Windows build</a>
+                        }
+                        else if (requestedWindowsUnavailable && hasWindowsProofRail)
                         {
                             <a class="button-like button-like--ghost" href="#windows-verification-rail">Open Windows verification rail</a>
                         }
@@ -226,6 +234,32 @@ else
                             <a class="button-like button-like--ghost" href="/now">Open what works today</a>
                         </div>
                     </div>
+
+                    @if (hasSignedInWindowsBuilds)
+                    {
+                        <div class="downloads-advanced-group" id="signed-in-windows-builds">
+                            <h3 class="downloads-subheading">Signed-in Windows builds</h3>
+                            <p class="muted-copy">Windows is not on the guest shelf right now, but signed-in users can still open the latest Windows install handoff here.</p>
+                            <div class="evidence-row-list">
+                                @foreach (var option in signedInWindowsBuilds)
+                                {
+                                    <article class="evidence-row evidence-row--download">
+                                        <div class="evidence-row__copy">
+                                            <h3>@option.Title</h3>
+                                            <p>@option.SupportLine</p>
+                                        </div>
+                                        <div class="download-row__meta">
+                                            <span class="platform-pill">Signed-in only</span>
+                                            <span class="muted-copy">@option.PlatformLabel</span>
+                                            <span class="muted-copy">@option.HeadLabel</span>
+                                            <code class="mono-receipt">@option.SizeLabel</code>
+                                        </div>
+                                        <a class="button-like button-like--ghost" href="@option.DispatchHref">@option.ActionLabel</a>
+                                    </article>
+                                }
+                            </div>
+                        </div>
+                    }
 
                     @if (hasWindowsProofRail)
                     {

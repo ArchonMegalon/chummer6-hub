@@ -40,6 +40,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.DoesNotContain("preview rollout", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Create account to get preview", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Main platform downloads", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Signed-in Windows builds", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Open signed-in Windows build", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Windows verification and support rail", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Open Windows verification rail", downloadsView, StringComparison.Ordinal);
     }

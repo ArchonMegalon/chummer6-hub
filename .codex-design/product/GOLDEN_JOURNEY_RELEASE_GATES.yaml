@@ -438,6 +438,26 @@ journey_gates:
             - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexSr6DesignerCoverage")
             - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexHouseRuleLane")
             - DesktopDialogFieldValueParser.GetValue(dialog, "masterIndexSr6SuccessorReceipt")
+        - repo: chummer6-ui
+          path: .codex-studio/published/USER_JOURNEY_TESTER_AUDIT.generated.json
+          json_must_equal:
+            contract_name: chummer6-ui.user_journey_tester_audit
+            status: pass
+            evidence.linux_binary_under_test: true
+            evidence.used_internal_apis: false
+            evidence.fix_shard_separate: true
+            evidence.open_blocking_findings_count: 0
+          must_contain:
+            - '"master_index_search_focus_stability"'
+            - '"file_new_character_visible_workspace"'
+            - '"minimal_character_build_save_reload"'
+            - '"major_navigation_sanity"'
+            - '"validation_or_export_smoke"'
+            - '"screenshots"'
+            - '"screenshotReview"'
+            - '"focus_preserved_after_typing"'
+            - '"new_character_action_opened_visible_workspace"'
+            - '"validation_or_export_action_completed"'
       required_project_posture:
         - project_id: core
           minimum_stage: pre_repo_local_complete
