@@ -205,6 +205,7 @@ public sealed record DownloadsPageViewModel(
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
     ReleaseExperienceViewModel ReleaseExperience,
+    IReadOnlyList<ReleaseOptionViewModel>? SignedInWindowsBuilds = null,
     IReadOnlyList<WindowsProofInstallerRecord>? WindowsProofInstallers = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);

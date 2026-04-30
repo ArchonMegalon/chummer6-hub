@@ -230,14 +230,20 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> DownloadsPage(CancellationToken cancellationToken)
     {
         var surface = _landing.LoadSurface();
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var rawManifest = _releases.LoadManifest();
+        var manifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var signedInWindowsBuilds = authenticated
+            ? _releaseSelection.BuildSignedInOnlyWindowsOptions(rawManifest)
+            : Array.Empty<ReleaseOptionViewModel>();
+        var surfacedWindowsArtifactIds = manifest.Downloads
+            .Select(static download => download.Id)
+            .Concat(signedInWindowsBuilds.Select(static option => option.Artifact.Id))
+            .Where(static artifactId => !string.IsNullOrWhiteSpace(artifactId))
+            .ToArray();
         var windowsProofInstallers = _windowsProofInstallers.LoadCatalog(
-            manifest.Downloads
-                .Select(static download => download.Id)
-                .Where(static artifactId => !string.IsNullOrWhiteSpace(artifactId))
-                .ToArray());
+            surfacedWindowsArtifactIds);
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var model = new DownloadsPageViewModel(
@@ -246,6 +252,7 @@ public sealed class PublicLandingController : Controller
             Assets: new AssetCatalogViewModel(surface.Assets),
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
+            SignedInWindowsBuilds: signedInWindowsBuilds,
             WindowsProofInstallers: windowsProofInstallers,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));

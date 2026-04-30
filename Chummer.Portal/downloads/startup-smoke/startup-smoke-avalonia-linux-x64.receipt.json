@@ -1,7 +1,7 @@
 {
   "headId": "avalonia",
-  "version": "run-20260420-072339",
-  "releaseVersion": "run-20260420-072339",
+  "version": "run-20260429-233209",
+  "releaseVersion": "run-20260429-233209",
   "channelId": "preview",
   "platform": "linux",
   "arch": "x64",
@@ -23,5 +23,6 @@
   "artifactInstallWrapperCapturePath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/installed-wrapper-avalonia-linux-x64.sh",
   "artifactInstallDesktopEntryCapturePath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/installed-desktop-entry-avalonia-linux-x64.desktop",
   "artifactPath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-avalonia-linux-x64-installer.deb",
-  "status": "pass"
+  "status": "pass",
+  "channel": "preview"
 }

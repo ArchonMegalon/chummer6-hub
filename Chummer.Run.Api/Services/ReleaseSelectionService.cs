@@ -120,6 +120,32 @@ public sealed class ReleaseSelectionService
             SystemRequirements: RequirementsFor(experience, recommended, requestedPlatform, shelfNotice is not null));
     }
 
+    public IReadOnlyList<ReleaseOptionViewModel> BuildSignedInOnlyWindowsOptions(PublicReleaseManifestDto manifest)
+    {
+        var experience = LoadExperience();
+        var platformAcceptance = LoadPlatformAcceptance();
+        var publicManifest = ApplyAccessPolicy(manifest, experience, platformAcceptance);
+        var publicIds = publicManifest.Downloads
+            .Where(static download => !string.IsNullOrWhiteSpace(download.Id))
+            .Select(static download => download.Id.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return manifest.Downloads
+            .Where(static download => !string.IsNullOrWhiteSpace(download.Id))
+            .Where(download => !publicIds.Contains(download.Id.Trim()))
+            .Where(download => string.Equals(PlatformFamily(download), "windows", StringComparison.OrdinalIgnoreCase))
+            .Where(IsInstaller)
+            .Select(download => download with
+            {
+                InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, download, experience)
+            })
+            .OrderBy(HeadPriority)
+            .ThenBy(static download => string.Equals((download.Arch ?? string.Empty).Trim(), "x64", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(static download => download.Platform, StringComparer.OrdinalIgnoreCase)
+            .Select(static download => BuildNormalizedOption(download, authenticated: true, recommended: false))
+            .ToArray();
+    }
+
     public PublicLandingActionDto BuildPublicPrimaryAction(PublicReleaseManifestDto manifest, string userAgent, bool authenticated)
     {
         var release = BuildExperience(manifest, userAgent, authenticated);

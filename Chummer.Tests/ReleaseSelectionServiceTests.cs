@@ -384,6 +384,140 @@ platforms:
     }
 
     [Fact]
+    public void BuildSignedInOnlyWindowsOptionsSurfacesHiddenWindowsInstallerWhenPublicShelfVisibilitySuppressesIt()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "release-selection-hidden-windows-tests", Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            string productRoot = Path.Combine(root, ".codex-design", "product");
+            Directory.CreateDirectory(productRoot);
+            File.Copy(
+                RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_RELEASE_EXPERIENCE.yaml"),
+                Path.Combine(productRoot, "PUBLIC_RELEASE_EXPERIENCE.yaml"));
+            File.WriteAllText(
+                Path.Combine(productRoot, "DESKTOP_PLATFORM_ACCEPTANCE_MATRIX.yaml"),
+                """
+product: chummer
+surface: desktop_delivery
+version: 1
+flagship_head: Chummer.Avalonia
+fallback_head: Chummer.Blazor.Desktop
+gold_release_head_policy:
+  primary_public_route_must_be_unique: true
+  independent_flagship_proof_required_for_all_shipped_heads: true
+  secondary_head_must_not_ship_on_thinner_proof: true
+  preview_only_fallback_exceptions_do_not_satisfy_gold: true
+platforms:
+  - id: windows
+    public_shelf_status: promoted_preview
+    primary_package_kind: installer
+    startup_smoke_gate: required
+    signing_posture: required_for_promoted_release
+    updater_mode: in_app_apply_helper
+    supportability: primary
+    public_manifest_visibility: visible_after_signed_notarized_promotion
+""");
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_PUBLIC_CANON_ROOT"] = root
+                })
+                .Build();
+
+            var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+            var manifest = new PublicReleaseManifestDto(
+                Version: "run-20260429-170000",
+                Channel: "preview",
+                PublishedAt: DateTimeOffset.Parse("2026-04-29T17:00:00Z"),
+                Downloads:
+                [
+                    new PublicReleaseArtifactDto(
+                        Id: "avalonia-win-x64-installer",
+                        Platform: "Avalonia Desktop Windows x64 Installer",
+                        Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                        Sha256: "win-hidden",
+                        SizeBytes: 404,
+                        Head: "avalonia",
+                        PlatformId: "win-x64",
+                        Arch: "x64",
+                        Kind: "installer",
+                        FileName: "chummer-avalonia-win-x64-installer.exe",
+                        InstallAccessClass: "account_required")
+                ],
+                ProofStatus: "failed",
+                ProofRoutes:
+                [
+                    "/downloads/install/avalonia-linux-x64-installer"
+                ]);
+
+            var guest = service.BuildExperience(
+                manifest,
+                userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                authenticated: false);
+
+            Assert.False(guest.RequestedPlatformHasPublicDownload);
+
+            var hidden = service.BuildSignedInOnlyWindowsOptions(manifest);
+
+            var option = Assert.Single(hidden);
+            Assert.Equal("avalonia-win-x64-installer", option.Artifact.Id);
+            Assert.Equal("/downloads/install/avalonia-win-x64-installer", option.DispatchHref);
+            Assert.Equal("Install on Windows", option.ActionLabel);
+            Assert.Contains("setup .exe", option.SupportLine, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void BuildSignedInOnlyWindowsOptionsOmitsWindowsInstallerAlreadyOnPublicShelf()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260429-173000",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-29T17:30:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows x64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "win-public",
+                    SizeBytes: 404,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "account_required")
+            ],
+            ProofStatus: "passed",
+            ProofRoutes:
+            [
+                "/downloads/install/avalonia-win-x64-installer"
+            ]);
+
+        var hidden = service.BuildSignedInOnlyWindowsOptions(manifest);
+
+        Assert.Empty(hidden);
+    }
+
+    [Fact]
     public void BuildExperienceUsesLinuxSetupScriptForAuthenticatedLinuxUsers()
     {
         var configuration = new ConfigurationBuilder()
