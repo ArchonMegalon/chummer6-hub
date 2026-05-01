@@ -821,7 +821,12 @@ public sealed class PublicReleaseManifestService
             requiredPlatforms = ToJsonStringList(coverage["requiredPlatformIds"]);
         }
 
-        if (requiredPlatforms.Count == 0)
+        List<string> derivedRequiredPlatforms = DeriveRequiredDesktopPlatforms(artifacts);
+        if (derivedRequiredPlatforms.Count > 0)
+        {
+            requiredPlatforms = derivedRequiredPlatforms;
+        }
+        else if (requiredPlatforms.Count == 0)
         {
             requiredPlatforms = [.. RequiredDesktopPlatforms];
         }
@@ -1022,6 +1027,20 @@ public sealed class PublicReleaseManifestService
             })
             .OrderBy(static value => value, StringComparer.Ordinal)
             .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static List<string> DeriveRequiredDesktopPlatforms(IReadOnlyList<ManifestArtifactShape> artifacts)
+    {
+        HashSet<string> promotedPlatforms = artifacts
+            .Where(artifact =>
+                RequiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
+                && IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
+            .Select(artifact => artifact.Platform)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return RequiredDesktopPlatforms
+            .Where(platform => promotedPlatforms.Contains(platform))
             .ToList();
     }
 

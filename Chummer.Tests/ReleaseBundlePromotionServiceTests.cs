@@ -445,6 +445,41 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncDowngradesPassedReleaseProofWhenItPredatesCurrentPublicationWindow()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260501-040136",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-win-x64-installer",
+                    Head: "avalonia",
+                    Platform: "windows",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    Bytes: "windows"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ],
+            publishedAt: "2026-05-01T04:01:36Z",
+            proofGeneratedAt: "2026-04-25T22:43:00Z");
+
+        await fixture.PromoteAsync(bundlePath);
+
+        using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+
+        Assert.Equal("review_required", compatibility.RootElement.GetProperty("releaseProof").GetProperty("status").GetString());
+        Assert.Equal("review_required", canonical.RootElement.GetProperty("releaseProof").GetProperty("status").GetString());
+        Assert.Equal("review_required", compatibility.RootElement.GetProperty("supportabilityState").GetString());
+    }
+
+    [Fact]
     public async Task PromoteAsyncNormalizesExistingCanonicalArtifactsToIncomingChannelAndVersion()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
@@ -576,7 +611,9 @@ public sealed class ReleaseBundlePromotionServiceTests
             string version,
             IReadOnlyList<BundleArtifact> artifacts,
             bool includePromotionEvidence = true,
-            IReadOnlyList<ProofArtifact>? proofArtifacts = null)
+            IReadOnlyList<ProofArtifact>? proofArtifacts = null,
+            string publishedAt = "2026-04-01T20:00:00Z",
+            string proofGeneratedAt = "2026-04-01T20:00:00Z")
         {
             string bundleRoot = Path.Combine(_root, "bundle-" + Guid.NewGuid().ToString("N"));
             string filesRoot = Path.Combine(bundleRoot, "files");
@@ -647,11 +684,15 @@ public sealed class ReleaseBundlePromotionServiceTests
             WriteCompatibilityManifest(
                 Path.Combine(bundleRoot, "releases.json"),
                 version,
-                compatibilityArtifacts);
+                compatibilityArtifacts,
+                publishedAt,
+                proofGeneratedAt);
             WriteCanonicalManifest(
                 Path.Combine(bundleRoot, "RELEASE_CHANNEL.generated.json"),
                 version,
-                canonicalArtifacts);
+                canonicalArtifacts,
+                publishedAt,
+                proofGeneratedAt);
 
             if (includePromotionEvidence)
             {
@@ -727,7 +768,12 @@ public sealed class ReleaseBundlePromotionServiceTests
             File.WriteAllText(path, canonical.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         }
 
-        private static void WriteCompatibilityManifest(string path, string version, IReadOnlyList<CompatibilityArtifact> downloads)
+        private static void WriteCompatibilityManifest(
+            string path,
+            string version,
+            IReadOnlyList<CompatibilityArtifact> downloads,
+            string publishedAt = "2026-04-01T20:00:00Z",
+            string proofGeneratedAt = "2026-04-01T20:00:00Z")
         {
             File.WriteAllText(
                 path,
@@ -735,12 +781,25 @@ public sealed class ReleaseBundlePromotionServiceTests
                 {
                     version,
                     channel = "preview",
-                    publishedAt = "2026-04-01T20:00:00Z",
+                    publishedAt,
+                    releaseProof = new
+                    {
+                        status = "passed",
+                        generatedAt = proofGeneratedAt,
+                        baseUrl = "https://chummer.run",
+                        journeysPassed = new[] { "build_explain_publish" },
+                        proofRoutes = downloads.Select(static download => $"/downloads/install/{download.Id}").ToArray()
+                    },
                     downloads
                 }, TestJsonOptions));
         }
 
-        private static void WriteCanonicalManifest(string path, string version, IReadOnlyList<CanonicalArtifact> artifacts)
+        private static void WriteCanonicalManifest(
+            string path,
+            string version,
+            IReadOnlyList<CanonicalArtifact> artifacts,
+            string publishedAt = "2026-04-01T20:00:00Z",
+            string proofGeneratedAt = "2026-04-01T20:00:00Z")
         {
             string[] proofRoutes = artifacts
                 .Select(static artifact => $"/downloads/install/{artifact.ArtifactId}")
@@ -754,12 +813,12 @@ public sealed class ReleaseBundlePromotionServiceTests
                     product = "chummer",
                     channelId = "preview",
                     version,
-                    publishedAt = "2026-04-01T20:00:00Z",
+                    publishedAt,
                     status = "published",
                     releaseProof = new
                     {
                         status = "passed",
-                        generatedAt = "2026-04-01T20:00:00Z",
+                        generatedAt = proofGeneratedAt,
                         baseUrl = "https://chummer.run",
                         journeysPassed = new[] { "build_explain_publish" },
                         proofRoutes

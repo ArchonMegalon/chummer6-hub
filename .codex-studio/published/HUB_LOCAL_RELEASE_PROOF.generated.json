@@ -300,8 +300,8 @@
     }
   },
   "base_url": "https://chummer.run",
-  "compose_file": "docker-compose.yml",
-  "playwright_timeout_seconds": 120,
+  "compose_file": "docker-compose.public-edge.yml",
+  "playwright_timeout_seconds": 300,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
@@ -578,6 +578,6 @@
       ]
     }
   ],
-  "generated_at": "2026-04-25T22:43:00Z",
-  "generatedAt": "2026-04-25T22:43:00Z"
+  "generated_at": "2026-05-01T05:02:11Z",
+  "generatedAt": "2026-05-01T05:02:11Z"
 }
