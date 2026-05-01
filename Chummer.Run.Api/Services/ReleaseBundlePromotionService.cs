@@ -30,6 +30,7 @@ public sealed class ReleaseBundlePromotionService
     private const string CanonicalManifestName = "RELEASE_CHANNEL.generated.json";
     private const string PromotionEvidenceRelativePath = "release-evidence/public-promotion.json";
     private const string PublicBaseUrlKey = "GOOGLE_OIDC_REDIRECT_URI";
+    private static readonly TimeSpan MaximumReleaseProofPublicationLag = TimeSpan.FromHours(24);
     private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
     private static readonly string[] RequiredDesktopHeads = ["avalonia"];
     private static readonly string[] DesktopRouteTruthHeads = ["avalonia", "blazor-desktop"];
@@ -745,6 +746,9 @@ public sealed class ReleaseBundlePromotionService
         PublicReleaseManifestDto mergedCompatibilityManifest,
         JsonObject mergedCanonicalManifest)
     {
+        string normalizedProofStatus = NormalizeReleaseProofForPublication(
+            mergedCanonicalManifest,
+            mergedCompatibilityManifest.PublishedAt);
         string canonicalChannel = NormalizeToken(mergedCompatibilityManifest.Channel);
         string canonicalVersion = mergedCompatibilityManifest.Version?.Trim() ?? string.Empty;
         JsonArray mergedArtifacts = mergedCanonicalManifest["artifacts"] as JsonArray ?? [];
@@ -757,7 +761,7 @@ public sealed class ReleaseBundlePromotionService
             knownIssueSummary: mergedCompatibilityManifest.KnownIssueSummary);
 
         bool desktopCoverageComplete = DesktopTupleCoverageIsComplete(coverage);
-        string proofStatus = ExtractProofStatus(mergedCanonicalManifest);
+        string proofStatus = normalizedProofStatus;
         IReadOnlyList<string> proofJourneys = ExtractProofJourneys(mergedCanonicalManifest);
         bool proofPassed = ProofPassed(proofStatus);
         string rolloutState = DeriveRolloutState(
@@ -801,6 +805,9 @@ public sealed class ReleaseBundlePromotionService
             SupportabilitySummary = supportabilitySummary,
             KnownIssueSummary = knownIssueSummary,
             FixAvailabilitySummary = fixAvailabilitySummary,
+            ProofStatus = string.IsNullOrWhiteSpace(proofStatus)
+                ? null
+                : proofStatus,
             DesktopTupleCoverage = JsonSerializer.SerializeToElement(coverage, JsonOptions)
         };
 
@@ -838,6 +845,32 @@ public sealed class ReleaseBundlePromotionService
         return (normalizedCompatibilityManifest, normalizedCanonicalManifest);
     }
 
+    private static string NormalizeReleaseProofForPublication(
+        JsonObject manifest,
+        DateTimeOffset publishedAt)
+    {
+        JsonObject? proof = manifest["releaseProof"] as JsonObject;
+        string proofStatus = ExtractProofStatus(manifest);
+        if (!ProofPassed(proofStatus))
+        {
+            return proofStatus;
+        }
+
+        DateTimeOffset? proofGeneratedAt = TryGetJsonDateTimeOffset(proof?["generatedAt"]);
+        if (proofGeneratedAt is null
+            || publishedAt - proofGeneratedAt.Value > MaximumReleaseProofPublicationLag)
+        {
+            if (proof is not null)
+            {
+                proof["status"] = "review_required";
+            }
+
+            return "review_required";
+        }
+
+        return proofStatus;
+    }
+
     private static JsonObject BuildDesktopTupleCoverage(
         JsonArray artifacts,
         JsonElement? sourceCoverageElement,
@@ -852,23 +885,28 @@ public sealed class ReleaseBundlePromotionService
             : null;
 
         List<CanonicalArtifactState> artifactRows = ExtractCanonicalArtifactRows(artifacts);
+        List<string> requiredDesktopPlatforms = DeriveRequiredDesktopPlatforms(artifactRows);
+        if (requiredDesktopPlatforms.Count == 0)
+        {
+            requiredDesktopPlatforms = [.. RequiredDesktopPlatforms];
+        }
         List<Dictionary<string, string>> promotedInstallerTuples = [];
         HashSet<string> promotedHeadTokens = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> promotedPlatformTokens = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> promotedPairs = new(StringComparer.OrdinalIgnoreCase);
         HashSet<string> promotedPlatformHeadRidTuples = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, List<string>> promotedPlatformHeads = RequiredDesktopPlatforms.ToDictionary(
+        Dictionary<string, List<string>> promotedPlatformHeads = requiredDesktopPlatforms.ToDictionary(
             static platform => platform,
             static _ => new List<string>(),
             StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, HashSet<string>> promotedPlatformHeadsSeen = RequiredDesktopPlatforms.ToDictionary(
+        Dictionary<string, HashSet<string>> promotedPlatformHeadsSeen = requiredDesktopPlatforms.ToDictionary(
             static platform => platform,
             static _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
 
         foreach (CanonicalArtifactState artifact in artifactRows)
         {
-            if (!RequiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
+            if (!requiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
                 || !IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
             {
                 continue;
@@ -909,25 +947,25 @@ public sealed class ReleaseBundlePromotionService
             .ThenBy(static row => row["rid"], StringComparer.Ordinal)
             .ThenBy(static row => row["artifactId"], StringComparer.Ordinal)
             .ToList();
-        foreach (string platform in RequiredDesktopPlatforms)
+        foreach (string platform in requiredDesktopPlatforms)
         {
             promotedPlatformHeads[platform] = promotedPlatformHeads[platform]
                 .OrderBy(static value => value, StringComparer.Ordinal)
                 .ToList();
         }
 
-        List<string> missingRequiredPlatforms = RequiredDesktopPlatforms
+        List<string> missingRequiredPlatforms = requiredDesktopPlatforms
             .Where(platform => !promotedPlatformTokens.Contains(platform))
             .ToList();
         List<string> missingRequiredHeads = RequiredDesktopHeads
             .Where(head => !promotedHeadTokens.Contains(head))
             .ToList();
-        List<string> missingRequiredPlatformHeadPairs = RequiredDesktopPlatforms
+        List<string> missingRequiredPlatformHeadPairs = requiredDesktopPlatforms
             .SelectMany(platform => RequiredDesktopHeads.Select(head => $"{head}:{platform}"))
             .Where(pair => !promotedPairs.Contains(pair))
             .ToList();
 
-        Dictionary<string, HashSet<string>> promotedRidsByPlatform = RequiredDesktopPlatforms.ToDictionary(
+        Dictionary<string, HashSet<string>> promotedRidsByPlatform = requiredDesktopPlatforms.ToDictionary(
             static platform => platform,
             static _ => new HashSet<string>(StringComparer.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
@@ -940,7 +978,7 @@ public sealed class ReleaseBundlePromotionService
             }
         }
 
-        List<string> requiredDesktopPlatformHeadRidTuples = RequiredDesktopPlatforms
+        List<string> requiredDesktopPlatformHeadRidTuples = requiredDesktopPlatforms
             .SelectMany(platform =>
             {
                 IEnumerable<string> rids = DefaultRequiredDesktopPlatformRids.TryGetValue(platform, out string[]? requiredRids)
@@ -965,7 +1003,7 @@ public sealed class ReleaseBundlePromotionService
 
         JsonObject coverage = new()
         {
-            ["requiredDesktopPlatforms"] = JsonSerializer.SerializeToNode(RequiredDesktopPlatforms, JsonOptions),
+            ["requiredDesktopPlatforms"] = JsonSerializer.SerializeToNode(requiredDesktopPlatforms, JsonOptions),
             ["requiredDesktopHeads"] = JsonSerializer.SerializeToNode(RequiredDesktopHeads, JsonOptions),
             ["promotedInstallerTuples"] = JsonSerializer.SerializeToNode(promotedInstallerTuples, JsonOptions),
             ["promotedPlatformHeads"] = JsonSerializer.SerializeToNode(promotedPlatformHeads, JsonOptions),
@@ -991,6 +1029,20 @@ public sealed class ReleaseBundlePromotionService
         };
 
         return coverage;
+    }
+
+    private static List<string> DeriveRequiredDesktopPlatforms(IReadOnlyList<CanonicalArtifactState> artifacts)
+    {
+        HashSet<string> promotedPlatforms = artifacts
+            .Where(artifact =>
+                RequiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
+                && IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
+            .Select(artifact => artifact.Platform)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return RequiredDesktopPlatforms
+            .Where(platform => promotedPlatforms.Contains(platform))
+            .ToList();
     }
 
     private static JsonArray FilterExternalProofRequests(JsonObject? sourceCoverage, HashSet<string> missingTupleIds)
@@ -1489,6 +1541,14 @@ public sealed class ReleaseBundlePromotionService
 
     private static bool ProofPassed(string? proofStatus)
         => string.Equals(NormalizeToken(proofStatus), "passed", StringComparison.Ordinal);
+
+    private static DateTimeOffset? TryGetJsonDateTimeOffset(JsonNode? node)
+    {
+        string raw = GetJsonString(node);
+        return DateTimeOffset.TryParse(raw, out DateTimeOffset parsed)
+            ? parsed
+            : null;
+    }
 
     private static string ExtractProofStatus(JsonObject manifest)
         => NormalizeToken(GetJsonString((manifest["releaseProof"] as JsonObject)?["status"]));
