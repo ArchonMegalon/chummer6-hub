@@ -134,10 +134,13 @@ Notes:
 10. The hosted bootstrap now defaults temporary packaging work to `$work_root/tmp` and exports `CHUMMER_DESKTOP_INSTALLER_TMPDIR="$TMPDIR/desktop-installer"` for `hdiutil`.
    - Override `CHUMMER_MAC_RELEASE_TMPDIR` when the default workspace volume is not the right disk for temporary DMG work.
    - Override `CHUMMER_DESKTOP_INSTALLER_TMPDIR` separately only when you intentionally want installer-image temp files on a different volume.
-11. If upload session requests return 4xx/5xx, upload now retries those requests first. Direct multipart promotion is available only when you opt in with `CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1`.
+11. After a successful upload or a failed run, delete the local temporary release artifacts again so the Mac SSD does not fill up.
+   - At minimum, clean the per-run work root under `$HOME/work/chummer-release/run-...` plus any custom `CHUMMER_MAC_RELEASE_TMPDIR` and `CHUMMER_DESKTOP_INSTALLER_TMPDIR` trees.
+   - Keep those artifacts only while you are actively debugging a packaging, notarization, or upload failure.
+12. If upload session requests return 4xx/5xx, upload now retries those requests first. Direct multipart promotion is available only when you opt in with `CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK=1`.
    - 400/401/403 responses are surfaced immediately with a parsed payload summary and stop-retry guidance.
-12. Post-publish success is gated on the canonical `RELEASE_CHANNEL.generated.json` projection. `releases.json` is still fetched and checked, but compatibility drift is warning-only unless you set `CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION=1`.
-``` 
+13. Post-publish success is gated on the canonical `RELEASE_CHANNEL.generated.json` projection. `releases.json` is still fetched and checked, but compatibility drift is warning-only unless you set `CHUMMER_RELEASE_VERIFY_REQUIRE_COMPATIBILITY_PROJECTION=1`.
+```
 
 Single-head overrides are still supported:
 
