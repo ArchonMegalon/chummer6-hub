@@ -445,6 +445,46 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncPublishesCanonicalRouteTruthWithRevokeSource()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260502-214500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-route-truth"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        await fixture.PromoteAsync(bundlePath);
+
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+        JsonElement[] rows = canonical.RootElement
+            .GetProperty("desktopTupleCoverage")
+            .GetProperty("desktopRouteTruth")
+            .EnumerateArray()
+            .ToArray();
+
+        Assert.NotEmpty(rows);
+        foreach (JsonElement row in rows)
+        {
+            Assert.True(row.TryGetProperty("revokeSource", out JsonElement revokeSource));
+            Assert.Equal("none", revokeSource.GetString());
+        }
+    }
+
+    [Fact]
     public async Task PromoteAsyncDowngradesPassedReleaseProofWhenItPredatesCurrentPublicationWindow()
     {
         using var fixture = new ReleaseBundlePromotionFixture();

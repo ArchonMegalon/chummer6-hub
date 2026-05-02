@@ -1136,6 +1136,15 @@ public sealed class ReleaseBundlePromotionService
                         rolloutState,
                         rolloutReason,
                         knownIssueSummary);
+                    string revokeSource = artifact is null
+                        ? string.Equals(revoke.RevokeState, "revoked", StringComparison.Ordinal)
+                            ? "channel"
+                            : "none"
+                        : DesktopRouteArtifactIsRevoked(artifact)
+                            ? "artifact"
+                            : string.Equals(revoke.RevokeState, "revoked", StringComparison.Ordinal)
+                                ? "channel"
+                                : "none";
                     string revokeReason = revoke.RevokeState == "revoked"
                         ? $"Registry revoke marker is active for {routeTupleLabel}: {revoke.RevokeReason}"
                         : $"No registry revoke marker is active for {routeTupleLabel}.";
@@ -1274,6 +1283,7 @@ public sealed class ReleaseBundlePromotionService
                         ["rollbackReasonCode"] = rollbackReasonCode,
                         ["rollbackReason"] = rollbackReason,
                         ["revokeState"] = revoke.RevokeState,
+                        ["revokeSource"] = revokeSource,
                         ["revokeReasonCode"] = revoke.RevokeState == "revoked"
                             ? "registry_revoke_marker_active"
                             : "no_registry_revoke_marker",
