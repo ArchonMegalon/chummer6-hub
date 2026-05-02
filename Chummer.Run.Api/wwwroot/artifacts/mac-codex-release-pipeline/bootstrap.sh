@@ -130,6 +130,8 @@ ensure_dotnet_resolver() {
 
 required_sdk_prefix() {
   local repo_root="$1"
+  local global_json="$repo_root/global.json"
+  [[ -f "$global_json" ]] || die "required sdk descriptor is missing: $global_json. repo checkout likely failed before SDK verification."
   python3 - "$repo_root" <<'PY'
 import json
 import pathlib
@@ -1362,8 +1364,8 @@ clone_or_update() {
   local target_dir="$2"
   local ref="$3"
   local expected_commit="${4:-}"
-  local low_speed_limit="${CHUMMER_GIT_HTTP_LOW_SPEED_LIMIT:-1000}"
-  local low_speed_time="${CHUMMER_GIT_HTTP_LOW_SPEED_TIME:-30}"
+  local low_speed_limit="${CHUMMER_GIT_HTTP_LOW_SPEED_LIMIT:-100}"
+  local low_speed_time="${CHUMMER_GIT_HTTP_LOW_SPEED_TIME:-120}"
   local max_attempts="${CHUMMER_GIT_MAX_ATTEMPTS:-4}"
   local retry_sleep="${CHUMMER_GIT_RETRY_SLEEP_SECONDS:-5}"
 
@@ -1377,11 +1379,15 @@ clone_or_update() {
     shift
 
     while true; do
-      if run_git_cmd "$@"; then
+      local status=0
+      set +e
+      run_git_cmd "$@"
+      status=$?
+      set -e
+      if (( status == 0 )); then
         return 0
       fi
 
-      local status=$?
       if (( attempt >= max_attempts )); then
         return "$status"
       fi
@@ -1396,6 +1402,13 @@ clone_or_update() {
     GIT_HTTP_LOW_SPEED_LIMIT="$low_speed_limit" \
     GIT_HTTP_LOW_SPEED_TIME="$low_speed_time" \
     "$@"
+  }
+
+  clone_branch_checkout() {
+    rm -rf "$target_dir"
+    with_git_transport_tuning \
+      git \
+      clone --single-branch --depth 1 --branch "$ref" "$repo_url" "$target_dir"
   }
 
   fetch_checkout_target() {
@@ -1418,6 +1431,79 @@ clone_or_update() {
       checkout -q FETCH_HEAD
   }
 
+  initial_fetch_checkout_target() {
+    rm -rf "$target_dir"
+    run_git_cmd mkdir -p "$target_dir"
+    run_git_cmd git -C "$target_dir" init -q
+    run_git_cmd git -C "$target_dir" remote add origin "$repo_url"
+    fetch_checkout_target
+  }
+
+  github_archive_url_for_ref() {
+    local normalized_repo_url="${repo_url%.git}"
+    local encoded_ref
+    case "$normalized_repo_url" in
+      https://github.com/*/*)
+        encoded_ref="$(python3 - "$ref" <<'PY'
+from urllib.parse import quote
+import sys
+
+print(quote(sys.argv[1], safe=""))
+PY
+)"
+        printf 'https://codeload.github.com/%s/tar.gz/%s' "${normalized_repo_url#https://github.com/}" "$encoded_ref"
+        return 0
+        ;;
+    esac
+    return 1
+  }
+
+  download_github_archive_checkout() {
+    local archive_url
+    local archive_root
+    local archive_path
+    local unpack_root
+    local extracted_dir
+    local archive_retries=$(( max_attempts - 1 ))
+
+    archive_url="$(github_archive_url_for_ref)" || return 1
+    archive_root="$(mktemp -d "${TMPDIR:-/tmp}/chummer-bootstrap-archive.XXXXXX")" || return 1
+    archive_path="$archive_root/repo.tar.gz"
+    unpack_root="$archive_root/unpack"
+    mkdir -p "$unpack_root"
+
+    log "git clone exhausted retries; downloading source archive for $(basename "$target_dir") -> $ref"
+    if ! curl \
+      --fail \
+      --location \
+      --retry "$archive_retries" \
+      --retry-delay "$retry_sleep" \
+      --connect-timeout 15 \
+      --speed-limit "$low_speed_limit" \
+      --speed-time "$low_speed_time" \
+      "$archive_url" \
+      -o "$archive_path"; then
+      rm -rf "$archive_root"
+      return 1
+    fi
+
+    rm -rf "$target_dir"
+    if ! tar -xzf "$archive_path" -C "$unpack_root"; then
+      rm -rf "$archive_root"
+      return 1
+    fi
+
+    extracted_dir="$(find "$unpack_root" -mindepth 1 -maxdepth 1 -type d | sort | head -n 1)"
+    if [[ -z "$extracted_dir" || ! -d "$extracted_dir" ]]; then
+      rm -rf "$archive_root"
+      return 1
+    fi
+
+    mv "$extracted_dir" "$target_dir"
+    rm -rf "$archive_root"
+    return 0
+  }
+
   if [[ -d "$target_dir/.git" ]]; then
     log "updating $(basename "$target_dir") -> $ref"
     run_git_cmd git -C "$target_dir" remote set-url origin "$repo_url"
@@ -1434,17 +1520,23 @@ clone_or_update() {
 
   if [[ -n "$expected_commit" ]]; then
     log "cloning $(basename "$target_dir") -> $ref (pinned $expected_commit)"
-    run_git_cmd mkdir -p "$target_dir"
-    run_git_cmd git -C "$target_dir" init -q
-    run_git_cmd git -C "$target_dir" remote add origin "$repo_url"
-    fetch_checkout_target
-  else
-    log "cloning $(basename "$target_dir") -> $ref"
     run_git_cmd_with_retries \
       "cloning $(basename "$target_dir")" \
-      with_git_transport_tuning \
-      git \
-      clone --depth 1 --branch "$ref" "$repo_url" "$target_dir"
+      initial_fetch_checkout_target
+  else
+    log "cloning $(basename "$target_dir") -> $ref"
+    local clone_status=0
+    set +e
+    run_git_cmd_with_retries \
+      "cloning $(basename "$target_dir")" \
+      clone_branch_checkout
+    clone_status=$?
+    set -e
+    if (( clone_status != 0 )); then
+      if ! download_github_archive_checkout; then
+        die "checkout failed for $(basename "$target_dir") -> $ref after ${max_attempts} git clone attempts and GitHub archive fallback"
+      fi
+    fi
   fi
   verify_checkout_expected_commit "$target_dir" "$ref" "$expected_commit"
 }
