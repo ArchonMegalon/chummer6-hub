@@ -481,6 +481,12 @@ public sealed class ReleaseBundlePromotionServiceTests
         {
             Assert.True(row.TryGetProperty("revokeSource", out JsonElement revokeSource));
             Assert.Equal("none", revokeSource.GetString());
+
+            if (row.GetProperty("promotionState").GetString() == "promoted")
+            {
+                string artifactId = row.GetProperty("artifactId").GetString()!;
+                Assert.Contains(artifactId, row.GetProperty("installPostureReason").GetString());
+            }
         }
     }
 
