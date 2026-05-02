@@ -478,11 +478,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("bootstrap integrity verified", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("staged upload token:", bootstrap, StringComparison.Ordinal);
         Assert.Contains("verify_checkout_expected_commit", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_UI_EXPECTED_COMMIT", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_UI_KIT_EXPECTED_COMMIT", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT", bootstrap, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_UI_REF='main'", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_HUB_REF='release-upload-hub-proof-routes-20260419'", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REF='main'", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_KIT_REF='main'", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_UI_EXPECTED_COMMIT=", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_UI_KIT_EXPECTED_COMMIT=", bootstrap, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT=", bootstrap, StringComparison.Ordinal);
         Assert.Contains("umask 077", bootstrap, StringComparison.Ordinal);
         Assert.Contains("\"--config\"", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", bootstrap, StringComparison.Ordinal);
@@ -521,9 +522,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("run-mac-release-bootstrap.sh", publicReadme, StringComparison.Ordinal);
         Assert.Contains("Copy the generated `Command` block", publicReadme, StringComparison.Ordinal);
         Assert.Contains("a raw public script has no upload credential", publicReadme, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_UI_EXPECTED_COMMIT", publicReadme, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_UI_KIT_EXPECTED_COMMIT", publicReadme, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("latest pushed `main` branch", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", publicReadme, StringComparison.Ordinal);
