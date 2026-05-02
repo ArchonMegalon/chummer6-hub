@@ -467,6 +467,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("recovery-only code", view, StringComparison.Ordinal);
         Assert.Contains("carries the current short-lived upload handoff code", view, StringComparison.Ordinal);
         Assert.Contains("This signed-in command contains a short-lived handoff code", view, StringComparison.Ordinal);
+        Assert.Contains("delete the local release work root and temporary packaging artifacts again", view, StringComparison.Ordinal);
         Assert.Contains("Short-lived handoff code", view, StringComparison.Ordinal);
         Assert.Contains("Backup handoff code", view, StringComparison.Ordinal);
         Assert.Contains("releaseUploadHandoffCode", view, StringComparison.Ordinal);
@@ -509,6 +510,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("run-mac-release-bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("copying the generated `Command` block", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("raw public script has no upload credential", maintenanceReadme, StringComparison.Ordinal);
+        Assert.Contains("Cleanup after every run", maintenanceReadme, StringComparison.Ordinal);
+        Assert.Contains("delete the local temporary release artifacts again", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("RELEASE_CHANNEL.generated.json", maintenanceReadme, StringComparison.Ordinal);
         Assert.DoesNotContain("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/artifacts/mac-codex-release-pipeline/bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", selfHostedRunbook, StringComparison.Ordinal);
@@ -528,6 +531,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("delete the local temporary release artifacts again", publicReadme, StringComparison.Ordinal);
         Assert.Contains("LOCAL_BOOTSTRAP_PATH", liveVerifier, StringComparison.Ordinal);
         Assert.Contains("/downloads/release-upload/bootstrap.sh", liveVerifier, StringComparison.Ordinal);
         Assert.Contains("/artifacts/mac-codex-release-pipeline/bootstrap.sh", liveVerifier, StringComparison.Ordinal);

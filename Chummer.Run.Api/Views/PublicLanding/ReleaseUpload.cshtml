@@ -20,6 +20,7 @@
                     <a class="button-like button-like--ghost" href="@Model.BootstrapUrl">Open bootstrap script</a>
                 </div>
                 <p class="status-copy">This signed-in command contains a short-lived handoff code. Use it in the release shell that will run the bootstrap, and do not paste it into logs or shared chat.</p>
+                <p class="status-copy">After a successful upload or a failed run, delete the local release work root and temporary packaging artifacts again so the Mac SSD does not fill up. Typical cleanup targets are the `run-...` workspace under `$HOME/work/chummer-release` plus any `CHUMMER_MAC_RELEASE_TMPDIR` and `CHUMMER_DESKTOP_INSTALLER_TMPDIR` contents.</p>
                 <p class="status-copy" id="releaseUploadCommandNotice" hidden></p>
             </div>
         </div>
