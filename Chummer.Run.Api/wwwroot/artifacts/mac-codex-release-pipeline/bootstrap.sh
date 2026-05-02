@@ -103,6 +103,83 @@ require_min_free_space_gib() {
   fi
 }
 
+prune_packaging_build_intermediates() {
+  local root="$1"
+  python3 - "$root" <<'PY'
+from __future__ import annotations
+
+import os
+import shutil
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+removed = 0
+freed = 0
+seen: set[Path] = set()
+
+for current_root, dir_names, _file_names in os.walk(root):
+    current_path = Path(current_root)
+    filtered_dir_names: list[str] = []
+    for dir_name in dir_names:
+        if dir_name not in {"bin", "obj"}:
+            filtered_dir_names.append(dir_name)
+            continue
+        candidate = current_path / dir_name
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        for nested_root, _nested_dirs, nested_files in os.walk(candidate):
+            for nested_file in nested_files:
+                try:
+                    freed += (Path(nested_root) / nested_file).stat().st_size
+                except FileNotFoundError:
+                    pass
+        shutil.rmtree(candidate, ignore_errors=True)
+        removed += 1
+    dir_names[:] = filtered_dir_names
+
+print(f"{removed}|{freed}")
+PY
+}
+
+ensure_packaging_headroom() {
+  local work_root="$1"
+  local temp_root="$2"
+  local minimum_gib="$3"
+  local available_work_kib available_temp_kib
+
+  available_work_kib="$(free_space_kib "$work_root")"
+  available_temp_kib="$(free_space_kib "$temp_root")"
+  if (( available_work_kib >= minimum_gib * 1024 * 1024 )) && (( available_temp_kib >= minimum_gib * 1024 * 1024 )); then
+    return 0
+  fi
+
+  log "packaging headroom below ${minimum_gib} GiB; pruning repo-local build intermediates before retry"
+  local reclaim_result removed_count freed_bytes freed_mib
+  reclaim_result="$(prune_packaging_build_intermediates "$work_root")"
+  IFS='|' read -r removed_count freed_bytes <<< "$reclaim_result"
+  freed_mib="$(python3 - "$freed_bytes" <<'PY'
+import sys
+value = int(sys.argv[1] or "0")
+print(f"{value / 1024 / 1024:.1f} MiB")
+PY
+)"
+  log "packaging cleanup removed ${removed_count:-0} bin/obj directories and reclaimed ${freed_mib}"
+  log_disk_space "$work_root" "release work root after packaging cleanup"
+  log_disk_space "$temp_root" "temporary packaging root after packaging cleanup"
+
+  available_work_kib="$(free_space_kib "$work_root")"
+  if (( available_work_kib < minimum_gib * 1024 * 1024 )); then
+    die "release work root needs at least ${minimum_gib} GiB free before macOS packaging/notarization work even after cleanup. Available at $work_root: $(format_gib_from_kib "$available_work_kib"). Set CHUMMER_MAC_RELEASE_TMPDIR to a roomier volume or lower CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB only if you intentionally accept tighter headroom."
+  fi
+
+  available_temp_kib="$(free_space_kib "$temp_root")"
+  if (( available_temp_kib < minimum_gib * 1024 * 1024 )); then
+    die "temporary packaging root needs at least ${minimum_gib} GiB free before macOS packaging/notarization work even after cleanup. Available at $temp_root: $(format_gib_from_kib "$available_temp_kib"). Set CHUMMER_MAC_RELEASE_TMPDIR or CHUMMER_DESKTOP_INSTALLER_TMPDIR to a roomier volume or lower CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB only if you intentionally accept tighter headroom."
+  fi
+}
+
 prepend_path_if_missing() {
   local candidate="$1"
   [[ -n "$candidate" ]] || return 0
@@ -3215,6 +3292,7 @@ main() {
   local release_version="${CHUMMER_RELEASE_VERSION:-run-$(date -u +%Y%m%d-%H%M%S)}"
   local allow_unsigned_preview="${CHUMMER_ALLOW_UNSIGNED_PREVIEW:-0}"
   local minimum_free_gib="${CHUMMER_MAC_RELEASE_MIN_FREE_GIB:-20}"
+  local packaging_minimum_free_gib="${CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB:-8}"
   local temp_root="${CHUMMER_MAC_RELEASE_TMPDIR:-$work_root/tmp}"
   local publish_mode
   publish_mode="$(infer_publish_mode)"
@@ -3555,8 +3633,7 @@ main() {
 
     log_disk_space "$work_root" "release work root before packaging $head"
     log_disk_space "$TMPDIR" "temporary packaging root before packaging $head"
-    require_min_free_space_gib "$work_root" "release work root before packaging $head" "$minimum_free_gib"
-    require_min_free_space_gib "$TMPDIR" "temporary packaging root before packaging $head" "$minimum_free_gib"
+    ensure_packaging_headroom "$work_root" "$TMPDIR" "$packaging_minimum_free_gib"
 
     log "packaging dmg for $head"
     log "build-desktop-installer inputs: publish=$out_dir, rid=$rid, output=$dist_dir/chummer-$head-$rid-installer.dmg"

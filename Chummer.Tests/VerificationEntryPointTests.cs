@@ -525,6 +525,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("latest pushed `main` branch", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", publicReadme, StringComparison.Ordinal);
         Assert.Contains("LOCAL_BOOTSTRAP_PATH", liveVerifier, StringComparison.Ordinal);
@@ -650,11 +651,13 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("log_disk_space", bootstrap, StringComparison.Ordinal);
         Assert.Contains("hdiutil create for signed repack", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", bootstrap, StringComparison.Ordinal);
         Assert.Contains("export TMPDIR=\"$temp_root\"", bootstrap, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_DESKTOP_INSTALLER_TMPDIR=\"$TMPDIR/desktop-installer\"", bootstrap, StringComparison.Ordinal);
         Assert.Contains("temporary packaging root: $TMPDIR", bootstrap, StringComparison.Ordinal);
         Assert.Contains("desktop installer temp root: $CHUMMER_DESKTOP_INSTALLER_TMPDIR", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("pruning repo-local build intermediates before retry", bootstrap, StringComparison.Ordinal);
         Assert.Contains("json_generated_at_health()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("generate_hub_local_release_proof()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("generate_ui_localization_release_gate()", bootstrap, StringComparison.Ordinal);
