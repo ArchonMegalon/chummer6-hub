@@ -1,19 +1,12 @@
 #!/usr/bin/env bash
-# Pinned repo refs for every release-upload entry point: signed-in, public curl, and repo-local wrapper.
+# Release-upload bootstrap defaults to GitHub main for the active repos; callers can still override refs or pin explicit commits via env.
 export CHUMMER_UI_REF='main'
-export CHUMMER_UI_EXPECTED_COMMIT='ee693310b35a0574e000eabdf86461b7c1f2664e'
 export CHUMMER_CORE_REF='main'
-export CHUMMER_CORE_EXPECTED_COMMIT='ae55923f1cb6c8fdf40748f7e2600815be123e1e'
 export CHUMMER_HUB_REF='main'
-export CHUMMER_HUB_EXPECTED_COMMIT='5dcde8a9746ecb2f02c70e8181be662f198af84d'
 export CHUMMER_UI_KIT_REF='main'
-export CHUMMER_UI_KIT_EXPECTED_COMMIT='7fe7265d84b5574b7a02fb56dd1015efadf44312'
 export CHUMMER_HUB_REGISTRY_REF='main'
-export CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT='6efcceb44dc1cafe4d5d141f402f79c35d15b1ef'
 export CHUMMER_MEDIA_FACTORY_REF='main'
-export CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT='e16286ca8c9bad84ff217466c72721ebcdbf48b5'
 export CHUMMER_LEGACY_REF='Docker'
-export CHUMMER_LEGACY_EXPECTED_COMMIT='0b8636d5a852e375409bf565b9ac9b4180ba4524'
 set -euo pipefail
 umask 077
 
@@ -3110,11 +3103,11 @@ main() {
   require_cmd ditto
 
   local work_root="${CHUMMER_MAC_RELEASE_WORK_ROOT:-$HOME/work/chummer-release/run-$(date -u +%Y%m%d-%H%M%S)}"
-  local ui_ref="${CHUMMER_UI_REF:-fleet/ui}"
-  local core_ref="${CHUMMER_CORE_REF:-fleet/core}"
-  local hub_ref="${CHUMMER_HUB_REF:-fleet/hub}"
-  local ui_kit_ref="${CHUMMER_UI_KIT_REF:-fleet/ui-kit}"
-  local registry_ref="${CHUMMER_HUB_REGISTRY_REF:-fleet/hub-registry}"
+  local ui_ref="${CHUMMER_UI_REF:-main}"
+  local core_ref="${CHUMMER_CORE_REF:-main}"
+  local hub_ref="${CHUMMER_HUB_REF:-main}"
+  local ui_kit_ref="${CHUMMER_UI_KIT_REF:-main}"
+  local registry_ref="${CHUMMER_HUB_REGISTRY_REF:-main}"
   local media_factory_ref="${CHUMMER_MEDIA_FACTORY_REF:-main}"
   local legacy_ref="${CHUMMER_LEGACY_REF:-Docker}"
   local ui_expected_commit="${CHUMMER_UI_EXPECTED_COMMIT:-}"

@@ -275,19 +275,19 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.DoesNotContain("export CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH=", script, StringComparison.Ordinal);
         Assert.DoesNotContain("CHUMMER_RELEASE_UPLOAD_TOKEN='", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_UI_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_EXPECTED_COMMIT='ee693310b35a0574e000eabdf86461b7c1f2664e'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_CORE_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_CORE_EXPECTED_COMMIT='ae55923f1cb6c8fdf40748f7e2600815be123e1e'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_HUB_REF='release-upload-hub-proof-routes-20260419'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_HUB_EXPECTED_COMMIT='5dcde8a9746ecb2f02c70e8181be662f198af84d'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_KIT_REF='fleet/ui-kit'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_UI_KIT_EXPECTED_COMMIT='7fe7265d84b5574b7a02fb56dd1015efadf44312'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_HUB_REF='main'", script, StringComparison.Ordinal);
+        Assert.Contains("export CHUMMER_UI_KIT_REF='main'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_HUB_REGISTRY_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT='6efcceb44dc1cafe4d5d141f402f79c35d15b1ef'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_MEDIA_FACTORY_REF='main'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT='e16286ca8c9bad84ff217466c72721ebcdbf48b5'", script, StringComparison.Ordinal);
         Assert.Contains("export CHUMMER_LEGACY_REF='Docker'", script, StringComparison.Ordinal);
-        Assert.Contains("export CHUMMER_LEGACY_EXPECTED_COMMIT='0b8636d5a852e375409bf565b9ac9b4180ba4524'", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_UI_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_CORE_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_HUB_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_UI_KIT_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_HUB_REGISTRY_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_MEDIA_FACTORY_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("export CHUMMER_LEGACY_EXPECTED_COMMIT=", script, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -422,7 +422,7 @@ public sealed class PublicLandingMacBootstrapScriptTests
     }
 
     [Fact]
-    public void ReleaseUploadBootstrapTemplatePinsCheckedOutRefsAndKeepsUploadAuthOutOfCurlArgv()
+    public void ReleaseUploadBootstrapTemplateTracksMainRefsByDefaultAndKeepsUploadAuthOutOfCurlArgv()
     {
         string templatePath = Path.GetFullPath(Path.Combine(
             AppContext.BaseDirectory,
@@ -440,7 +440,6 @@ public sealed class PublicLandingMacBootstrapScriptTests
 
         Assert.Contains("verify_checkout_expected_commit", template, StringComparison.Ordinal);
         Assert.Contains("local expected_commit=\"${4:-}\"", template, StringComparison.Ordinal);
-        Assert.Contains("local ui_expected_commit=\"${CHUMMER_UI_EXPECTED_COMMIT:-}\"", template, StringComparison.Ordinal);
         Assert.Contains("local fetch_target=\"$ref\"", template, StringComparison.Ordinal);
         Assert.Contains("fetch_target=\"$expected_commit\"", template, StringComparison.Ordinal);
         Assert.Contains("fetch --depth 1 origin \"$fetch_target\"", template, StringComparison.Ordinal);
@@ -448,6 +447,11 @@ public sealed class PublicLandingMacBootstrapScriptTests
         Assert.Contains("git -C \"$target_dir\" init -q", template, StringComparison.Ordinal);
         Assert.Contains("git -C \"$target_dir\" remote add origin \"$repo_url\"", template, StringComparison.Ordinal);
         Assert.Contains("cloning $(basename \"$target_dir\") -> $ref (pinned $expected_commit)", template, StringComparison.Ordinal);
+        Assert.Contains("local ui_ref=\"${CHUMMER_UI_REF:-main}\"", template, StringComparison.Ordinal);
+        Assert.Contains("local core_ref=\"${CHUMMER_CORE_REF:-main}\"", template, StringComparison.Ordinal);
+        Assert.Contains("local hub_ref=\"${CHUMMER_HUB_REF:-main}\"", template, StringComparison.Ordinal);
+        Assert.Contains("local ui_kit_ref=\"${CHUMMER_UI_KIT_REF:-main}\"", template, StringComparison.Ordinal);
+        Assert.Contains("local registry_ref=\"${CHUMMER_HUB_REGISTRY_REF:-main}\"", template, StringComparison.Ordinal);
         Assert.Contains("umask 077", template, StringComparison.Ordinal);
         Assert.Contains("request_common=(", template, StringComparison.Ordinal);
         Assert.Contains("\"--config\"", template, StringComparison.Ordinal);
