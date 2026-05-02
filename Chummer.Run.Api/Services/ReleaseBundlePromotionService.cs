@@ -1163,7 +1163,7 @@ public sealed class ReleaseBundlePromotionService
                             ? $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted because the flagship head is present on the registry shelf and passed independent startup-smoke and release-proof gates for this channel."
                             : $"{promotionSubject} tuple {routeTupleLabel} for {tupleLabel} is promoted for recovery/manual routing because it is present on the registry shelf and passed the current startup-smoke and release-proof gates for this channel.";
                         installPosture = "installer_first";
-                        installPostureReason = $"Promoted installer media is present for {AppLabels[head]} tuple {routeTupleLabel} on {tupleLabel}.";
+                        installPostureReason = $"Promoted installer media {artifactId} is present for {AppLabels[head]} tuple {routeTupleLabel} on {tupleLabel}.";
                     }
                     else
                     {
