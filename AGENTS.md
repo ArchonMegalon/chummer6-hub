@@ -1,7 +1,7 @@
 # Agent Runtime Instructions
 
 ## Persistent Memory
-- Always load and follow `AGENT_MEMORY.md` before starting work.
+- Load and follow `AGENT_MEMORY.md` before starting work only when the active run prompt does not already provide a fleet/shard worker contract with exact first commands.
 - Treat entries in `AGENT_MEMORY.md` as active user preferences until the user changes them.
 
 ## Execution Rule
@@ -11,6 +11,6 @@
 
 <!-- fleet-design-mirror:start -->
 ## Fleet Design Mirror
-- Load `.codex-design/product/README.md`, `.codex-design/repo/IMPLEMENTATION_SCOPE.md`, and `.codex-design/review/REVIEW_CONTEXT.md` when present.
+- Load `.codex-design/product/README.md`, `.codex-design/repo/IMPLEMENTATION_SCOPE.md`, and `.codex-design/review/REVIEW_CONTEXT.md` when present, unless the active run prompt already names `TASK_LOCAL_TELEMETRY.generated.json`, `ACTIVE_RUN_HANDOFF.generated.md`, or exact first commands.
 - Treat `.codex-design/` as the approved local mirror of the cross-repo Chummer design front door.
 <!-- fleet-design-mirror:end -->
