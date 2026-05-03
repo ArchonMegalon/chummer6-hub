@@ -90,7 +90,7 @@ def main() -> int:
     proof_max_age_seconds = _parse_int_env(
         "CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS",
         "CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
-        default=604800,
+        default=86400,
     )
     proof_max_future_skew_seconds = _parse_int_env(
         "CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",

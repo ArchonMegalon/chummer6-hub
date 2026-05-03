@@ -3418,7 +3418,7 @@ main() {
   local ui_localization_release_gate_path
   local sanitized_release_proof_path
   local sanitized_ui_localization_release_gate_path
-  local release_proof_max_age_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS:-604800}}"
+  local release_proof_max_age_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS:-86400}}"
   local release_proof_max_future_skew_seconds="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS:-300}}"
   local localization_gate_max_age_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_AGE_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_AGE_SECONDS:-604800}}"
   local localization_gate_max_future_skew_seconds="${CHUMMER_VERIFY_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-${CHUMMER_UI_LOCALIZATION_GATE_MAX_FUTURE_SKEW_SECONDS:-300}}"
