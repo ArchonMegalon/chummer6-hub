@@ -213,13 +213,9 @@ verify_route() {
 build_default_verify_routes() {
   cat <<EOF
 $PUBLIC_BASE_URL/downloads/install/avalonia-osx-arm64-installer
-$PUBLIC_BASE_URL/downloads/install/blazor-desktop-osx-arm64-installer
 $PUBLIC_BASE_URL/downloads/install/avalonia-win-x64-installer
-$PUBLIC_BASE_URL/downloads/install/blazor-desktop-win-x64-installer
 $PUBLIC_BASE_URL/downloads/install/avalonia-win-x64-installer/proof
-$PUBLIC_BASE_URL/downloads/install/blazor-desktop-win-x64-installer/proof
 $PUBLIC_BASE_URL/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe
-$PUBLIC_BASE_URL/downloads/proof/windows/chummer-blazor-desktop-win-x64-installer.exe
 EOF
 }
 

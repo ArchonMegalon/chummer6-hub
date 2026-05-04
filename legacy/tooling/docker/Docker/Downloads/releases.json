@@ -21,21 +21,6 @@
       "installAccessClass": "open_public"
     },
     {
-      "id": "blazor-desktop-linux-x64-installer",
-      "platform": "Blazor Desktop Linux X64 Installer",
-      "url": "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
-      "sha256": "b36624a7b8a5a1b4e06cac6ead3040d86db542dd8dfe5694252d3b5cc54e6f56",
-      "sizeBytes": 36411366,
-      "format": "deb",
-      "flavor": "installer",
-      "kind": "installer",
-      "head": "blazor-desktop",
-      "platformId": "linux-x64",
-      "arch": "x64",
-      "fileName": "chummer-blazor-desktop-linux-x64-installer.deb",
-      "installAccessClass": "open_public"
-    },
-    {
       "id": "avalonia-win-x64-installer",
       "platform": "Avalonia Desktop Windows X64 Installer",
       "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
@@ -48,21 +33,6 @@
       "platformId": "windows-x64",
       "arch": "x64",
       "fileName": "chummer-avalonia-win-x64-installer.exe",
-      "installAccessClass": "account_required"
-    },
-    {
-      "id": "blazor-desktop-win-x64-installer",
-      "platform": "Blazor Desktop Windows X64 Installer",
-      "url": "/downloads/files/chummer-blazor-desktop-win-x64-installer.exe",
-      "sha256": "420df5ac80ec449a774e2f6536c84933a28ca95f80b4219ec914d60e99fc46de",
-      "sizeBytes": 103188557,
-      "format": "exe",
-      "flavor": "installer",
-      "kind": "installer",
-      "head": "blazor-desktop",
-      "platformId": "windows-x64",
-      "arch": "x64",
-      "fileName": "chummer-blazor-desktop-win-x64-installer.exe",
       "installAccessClass": "account_required"
     }
   ],
@@ -239,8 +209,7 @@
       "macos"
     ],
     "requiredDesktopHeads": [
-      "avalonia",
-      "blazor-desktop"
+      "avalonia"
     ],
     "promotedInstallerTuples": [
       {
@@ -253,15 +222,6 @@
         "artifactId": "avalonia-linux-x64-installer"
       },
       {
-        "tupleId": "blazor-desktop:linux:linux-x64",
-        "head": "blazor-desktop",
-        "platform": "linux",
-        "rid": "linux-x64",
-        "arch": "x64",
-        "kind": "installer",
-        "artifactId": "blazor-desktop-linux-x64-installer"
-      },
-      {
         "tupleId": "avalonia:windows:win-x64",
         "head": "avalonia",
         "platform": "windows",
@@ -269,17 +229,6 @@
         "arch": "x64",
         "kind": "installer",
         "artifactId": "avalonia-win-x64-installer"
-      },
-      {
-        "tupleId": "blazor-desktop:windows:win-x64",
-        "head": "blazor-desktop",
-        "platform": "windows",
-        "rid": "win-x64",
-        "arch": "x64",
-        "kind": "installer",
-        "artifactId": "blazor-desktop-win-x64-installer",
-        "sha256": "420df5ac80ec449a774e2f6536c84933a28ca95f80b4219ec914d60e99fc46de",
-        "sizeBytes": 103188557
       }
     ],
     "promotedPlatformHeads": {
@@ -296,28 +245,21 @@
     "requiredDesktopPlatformHeadRidTuples": [
       "avalonia:linux-x64:linux",
       "avalonia:osx-arm64:macos",
-      "avalonia:win-x64:windows",
-      "blazor-desktop:linux-x64:linux",
-      "blazor-desktop:osx-arm64:macos",
-      "blazor-desktop:win-x64:windows"
+      "avalonia:win-x64:windows"
     ],
     "promotedPlatformHeadRidTuples": [
       "avalonia:linux-x64:linux",
-      "avalonia:win-x64:windows",
-      "blazor-desktop:linux-x64:linux",
-      "blazor-desktop:win-x64:windows"
+      "avalonia:win-x64:windows"
     ],
     "missingRequiredPlatforms": [
       "macos"
     ],
     "missingRequiredHeads": [],
     "missingRequiredPlatformHeadPairs": [
-      "avalonia:macos",
-      "blazor-desktop:macos"
+      "avalonia:macos"
     ],
     "missingRequiredPlatformHeadRidTuples": [
-      "avalonia:osx-arm64:macos",
-      "blazor-desktop:osx-arm64:macos"
+      "avalonia:osx-arm64:macos"
     ],
     "externalProofRequests": [
       {
@@ -351,40 +293,6 @@
         },
         "proofCaptureCommands": [
           "cd /docker/chummercomplete/chummer6-ui && CHUMMER_DESKTOP_STARTUP_SMOKE_HOST_CLASS=macos-host CHUMMER_DESKTOP_STARTUP_SMOKE_OPERATING_SYSTEM=macOS ./scripts/run-desktop-startup-smoke.sh /docker/chummercomplete/chummer6-ui/Docker/Downloads/files/chummer-avalonia-osx-arm64-installer.dmg avalonia osx-arm64 Chummer.Avalonia /docker/chummercomplete/chummer6-ui/Docker/Downloads/startup-smoke",
-          "cd /docker/chummercomplete/chummer6-ui && ./scripts/generate-releases-manifest.sh"
-        ]
-      },
-      {
-        "tupleId": "blazor-desktop:osx-arm64:macos",
-        "channelId": "preview",
-        "head": "blazor-desktop",
-        "platform": "macos",
-        "rid": "osx-arm64",
-        "requiredHost": "macos",
-        "requiredProofs": [
-          "promoted_installer_artifact",
-          "startup_smoke_receipt"
-        ],
-        "expectedArtifactId": "blazor-desktop-osx-arm64-installer",
-        "expectedInstallerFileName": "chummer-blazor-desktop-osx-arm64-installer.dmg",
-        "expectedInstallerRelativePath": "files/chummer-blazor-desktop-osx-arm64-installer.dmg",
-        "expectedInstallerSha256": "",
-        "expectedPublicInstallRoute": "/downloads/install/blazor-desktop-osx-arm64-installer",
-        "expectedStartupSmokeReceiptPath": "startup-smoke/startup-smoke-blazor-desktop-osx-arm64.receipt.json",
-        "startupSmokeReceiptContract": {
-          "statusAnyOf": [
-            "pass",
-            "passed",
-            "ready"
-          ],
-          "readyCheckpoint": "pre_ui_event_loop",
-          "headId": "blazor-desktop",
-          "platform": "macos",
-          "rid": "osx-arm64",
-          "hostClassContains": "macos"
-        },
-        "proofCaptureCommands": [
-          "cd /docker/chummercomplete/chummer6-ui && CHUMMER_DESKTOP_STARTUP_SMOKE_HOST_CLASS=macos-host CHUMMER_DESKTOP_STARTUP_SMOKE_OPERATING_SYSTEM=macOS ./scripts/run-desktop-startup-smoke.sh /docker/chummercomplete/chummer6-ui/Docker/Downloads/files/chummer-blazor-desktop-osx-arm64-installer.dmg blazor-desktop osx-arm64 Chummer.Blazor.Desktop /docker/chummercomplete/chummer6-ui/Docker/Downloads/startup-smoke",
           "cd /docker/chummercomplete/chummer6-ui && ./scripts/generate-releases-manifest.sh"
         ]
       }
