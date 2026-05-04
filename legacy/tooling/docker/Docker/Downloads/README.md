@@ -7,7 +7,7 @@ Expected contents:
 - `RELEASE_CHANNEL.generated.json`
 - `releases.json`
 - `files/`
-- desktop artifacts under `files/` (for example `chummer-avalonia-win-x64-installer.exe` and `chummer-blazor-desktop-linux-x64-installer.deb`)
+- desktop artifacts under `files/` (for example `chummer-avalonia-win-x64-installer.exe`)
 
 The portal prefers `RELEASE_CHANNEL.generated.json` from this directory as the canonical registry-owned release projection, serves `/downloads/releases.json` as the compatibility manifest, and resolves `/downloads/files/<artifact>` from the same root.
 

@@ -104,13 +104,9 @@ Dry run:
 Required post-publish checks:
 1. `https://chummer.run/downloads/RELEASE_CHANNEL.generated.json`
 2. `https://chummer.run/downloads/install/avalonia-osx-arm64-installer`
-3. `https://chummer.run/downloads/install/blazor-desktop-osx-arm64-installer`
-4. `https://chummer.run/downloads/install/avalonia-win-x64-installer`
-5. `https://chummer.run/downloads/install/blazor-desktop-win-x64-installer`
-6. `https://chummer.run/downloads/install/avalonia-win-x64-installer/proof`
-7. `https://chummer.run/downloads/install/blazor-desktop-win-x64-installer/proof`
-8. `https://chummer.run/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe`
-9. `https://chummer.run/downloads/proof/windows/chummer-blazor-desktop-win-x64-installer.exe`
+3. `https://chummer.run/downloads/install/avalonia-win-x64-installer`
+4. `https://chummer.run/downloads/install/avalonia-win-x64-installer/proof`
+5. `https://chummer.run/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe`
 
 ## Strict Test Gate Commands (host-side)
 
