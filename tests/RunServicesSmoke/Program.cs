@@ -4823,6 +4823,18 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "public_signal", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit public-signal proof on the governed Participate route.");
     Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "community_hub", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit community-hub proof on the signed-in work rail.");
     Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "account_aware_horizon_conversion", StringComparison.Ordinal) && string.Equals(item.ComparisonRoute, "/account/access", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Devices & access route.");
+    var registryTruthBindings = new RegistryTruthBindingService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService())).Build(new RegistryTruthBindingContext(
+        InstallLinking: linkedSummaryPayload,
+        SupportCases:
+        [
+            supportCase
+        ],
+        Locale: "en-US"));
+    Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "downloads", StringComparison.Ordinal) && string.Equals(item.Route, "/downloads", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep downloads on the registry-backed shelf.");
+    Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "install_help", StringComparison.Ordinal) && string.Equals(item.ComparisonRoute, "/status", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep install help on the registry-backed status lane.");
+    Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "account_aware_guidance", StringComparison.Ordinal) && string.Equals(item.Route, "/account/access", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep account-aware guidance on the Devices & access rail.");
+    Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "support_recovery", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/install-linking/continuation/support", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep support recovery on the install continuation support rail.");
+    Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "public_release_shelf", StringComparison.Ordinal) && string.Equals(item.Route, "/now", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep the public release shelf on the registry-backed current-release route.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(

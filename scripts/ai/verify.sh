@@ -2365,5 +2365,8 @@ python3 -m unittest tests/test_next90_m125_hub_public_signal_packets.py
 python3 scripts/materialize_next90_m126_hub_hosted_proof_contracts_proof.py
 python3 scripts/verify_next90_m126_hub_hosted_proof_contracts.py
 python3 -m unittest tests/test_next90_m126_hub_hosted_proof_contracts.py
+python3 scripts/materialize_next90_m127_hub_registry_truth_binding_proof.py
+python3 scripts/verify_next90_m127_hub_registry_truth_binding.py
+python3 -m unittest tests/test_next90_m127_hub_registry_truth_binding.py
 
 bash scripts/ai/run_services_smoke.sh

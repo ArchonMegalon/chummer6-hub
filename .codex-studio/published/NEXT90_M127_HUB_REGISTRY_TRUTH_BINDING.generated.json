@@ -1,0 +1,33 @@
+{
+  "contract_name": "chummer6-hub.next90_m127_hub_registry_truth_binding",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m127-hub-keep-downloads-install-help-account-aware-guidance-suppo",
+    "work_task_id": "127.3",
+    "milestone_id": 127,
+    "frontier_id": 6974083833,
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "wave": "W18",
+    "task": "Keep downloads, install help, account-aware guidance, support recovery, and public release shelf UX bound to registry truth.",
+    "title": "Keep downloads, install help, account-aware guidance, support recovery, and public release shelf UX bound to registry truth.",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "keep_downloads_install_help_account:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "required_markers": [
+    "var registryTruthBindings = new RegistryTruthBindingService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService())).Build(new RegistryTruthBindingContext(",
+    "campaign spine registry truth bindings should keep downloads on the registry-backed shelf.",
+    "campaign spine registry truth bindings should keep install help on the registry-backed status lane.",
+    "campaign spine registry truth bindings should keep account-aware guidance on the Devices & access rail.",
+    "campaign spine registry truth bindings should keep support recovery on the install continuation support rail.",
+    "campaign spine registry truth bindings should keep the public release shelf on the registry-backed current-release route."
+  ]
+}
