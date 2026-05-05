@@ -2639,20 +2639,35 @@ public sealed class CampaignWorkspaceServerPlaneService
         CreatorPublicationProjection? creatorPublication,
         bool creatorLinked)
     {
+        string auditSummary;
         if (!string.IsNullOrWhiteSpace(item.AuditSummary))
         {
-            return item.AuditSummary!;
+            auditSummary = item.AuditSummary!;
         }
-
-        DateTimeOffset updatedAtUtc = creatorLinked
+        else
+        {
+            DateTimeOffset updatedAtUtc = creatorLinked
             ? creatorPublication?.UpdatedAtUtc ?? DateTimeOffset.UtcNow
             : workspace.LatestContinuity?.CapturedAtUtc
                 ?? workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc
                 ?? DateTimeOffset.UtcNow;
-        string auditSource = creatorLinked
+            string auditSource = creatorLinked
             ? "publication review and campaign return"
             : "campaign return";
-        return $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
+            auditSummary = $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
+        }
+
+        return creatorLinked
+            ? EnsureManifestBackedAuditSummary(auditSummary)
+            : auditSummary;
+    }
+
+    private static string EnsureManifestBackedAuditSummary(string auditSummary)
+    {
+        string normalized = auditSummary.Trim();
+        return normalized.Contains("manifest-authority-backed", StringComparison.OrdinalIgnoreCase)
+            ? normalized
+            : $"manifest-authority-backed; {normalized}";
     }
 
     private static string DescribeRecapShelfCompatibilitySummary(

@@ -3,11 +3,14 @@ using System.Text;
 using System.Text.Json;
 using Chummer.Campaign.Contracts;
 using Chummer.Contracts.Rulesets;
+using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
+using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Registry.Services;
+using Chummer.Run.Api.Services.Support;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -32,16 +35,19 @@ public sealed class CampaignSpineService
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
     private readonly CampaignArtifactRegistryBridge _artifactRegistry;
     private readonly IHubPublicationDraftService? _publicationDrafts;
+    private readonly SupportStore _supportStore;
 
     public CampaignSpineService(
         CommunityStore store,
         WorkspaceLifecyclePolicyService lifecyclePolicy,
         CampaignArtifactRegistryBridge artifactRegistry,
+        SupportStore supportStore,
         IHubPublicationDraftService? publicationDrafts = null)
     {
         _store = store;
         _lifecyclePolicy = lifecyclePolicy;
         _artifactRegistry = artifactRegistry;
+        _supportStore = supportStore;
         _publicationDrafts = publicationDrafts;
     }
 
@@ -158,10 +164,12 @@ public sealed class CampaignSpineService
                         RecentLeagueAuditLines: BuildGroupRecentLeagueAuditLines(recentSponsorSessions, recentJoinCodes, recentBoostCodes, seasonBoardEntries, recentRosterTransfers),
                         SeasonBoardEntries: seasonBoardEntries,
                         Watchouts: BuildGroupOperatorWatchouts(groupWorkspaces),
-                        RecentRosterTransfers: recentRosterTransfers);
+                        RecentRosterTransfers: recentRosterTransfers,
+                        ArtifactPublicationSummary: ResolveGroupArtifactPublicationSummary(groupWorkspaces),
+                        SupportEscalationSummary: ResolveGroupSupportEscalationSummary(user));
                 })
-                .OrderByDescending(static operation => ResolveCommunityOperatorFreshnessUtc(operation))
-                .ThenByDescending(static operation => ResolveCommunityOperatorActivityBreadth(operation))
+                .OrderByDescending(operation => ResolveCommunityOperatorFreshnessUtc(operation))
+                .ThenByDescending(operation => ResolveCommunityOperatorActivityBreadth(operation))
                 .ThenByDescending(static operation => operation.ActiveCampaignCount)
                 .ThenByDescending(static operation => operation.ActiveSponsorSessionCount)
                 .ThenBy(static operation => operation.GroupName, StringComparer.OrdinalIgnoreCase)
@@ -189,6 +197,25 @@ public sealed class CampaignSpineService
 
     public WorkspaceRestoreProjection GetRestoreProjection(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
         => GetAccountSummary(user, installLinking).Restore;
+
+    public OrganizerOperationsDashboardProjection GetOrganizerOperations(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
+        IReadOnlyList<OrganizerSupportCaseProjection> supportCases = BuildOrganizerSupportCases(user);
+
+        lock (_store.Gate)
+        {
+            var items = summary.CommunityOperations
+                .Select(operation => BuildOrganizerOperationProjectionLocked(user, summary, operation, supportCases))
+                .OrderByDescending(static item => item.EventRail.SeasonBoardCount)
+                .ThenByDescending(static item => item.Roster.ActiveCampaignCount)
+                .ThenBy(static item => item.GroupName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return new OrganizerOperationsDashboardProjection(DateTimeOffset.UtcNow, items);
+        }
+    }
 
     public CampaignWorkspaceProjection? GetWorkspace(HubUserDto user, string workspaceId, InstallLinkingSummaryDto? installLinking = null)
     {
@@ -2300,6 +2327,47 @@ public sealed class CampaignSpineService
         return $"{groupWorkspaces.Count} campaign return(s) keep the governed {railLabel} on the same account/control backbone; {liveRunSummary}, {carryForwardSummary}, and {aftermathSummary}.";
     }
 
+    private static string ResolveGroupArtifactPublicationSummary(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+    {
+        var shelfEntries = groupWorkspaces
+            .SelectMany(static workspace => workspace.RecapShelf)
+            .ToArray();
+        if (shelfEntries.Length == 0)
+        {
+            return "No governed artifact publication receipt is attached to this operator rail yet.";
+        }
+
+        int readyCount = shelfEntries.Count(static item =>
+            string.Equals(item.PublicationState, "ready", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.PublicationState, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase));
+        int discoverableCount = shelfEntries.Count(static item => item.Discoverable);
+        PublicationSafeProjection latest = shelfEntries[0];
+        string latestSummary = string.IsNullOrWhiteSpace(latest.PublicationSummary)
+            ? latest.Summary
+            : latest.PublicationSummary!;
+        return $"{shelfEntries.Length} governed artifact receipt(s) stay on the same operator rail; {readyCount} ready or published, {discoverableCount} discoverable, latest is {latest.Label}: {latestSummary}";
+    }
+
+    private string ResolveGroupSupportEscalationSummary(HubUserDto user)
+    {
+        lock (_supportStore.Gate)
+        {
+            var cases = _supportStore.CasesById.Values
+                .Where(item =>
+                    string.Equals(item.ReporterUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(item.Status, SupportCaseStatuses.UserNotified, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            if (cases.Length == 0)
+            {
+                return "No tracked support escalation is blocking this operator rail right now.";
+            }
+
+            SupportCaseProjection latest = cases[0];
+            return $"{cases.Length} tracked support case(s) stay on the same operator rail; latest is {HumanizeSupportValue(latest.Kind)} ({HumanizeSupportValue(latest.Status)}).";
+        }
+    }
+
     private static IReadOnlyList<string> BuildGroupRecentEventSummaries(IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
     {
         List<(DateTimeOffset UpdatedAtUtc, string Summary)> lines = [];
@@ -2393,6 +2461,14 @@ public sealed class CampaignSpineService
             .ToArray();
     }
 
+    private static string HumanizeSupportValue(string? value)
+    {
+        var normalized = AccountService.NormalizeOptional(value);
+        return normalized is null
+            ? "Unknown"
+            : string.Join(' ', normalized.Split('_', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
     private static IReadOnlyList<CommunityInviteCampaignProjection> BuildGroupInviteCampaigns(IReadOnlyList<CampaignProjection> groupCampaigns)
         => groupCampaigns
             .Select(static campaign => new CommunityInviteCampaignProjection(
@@ -2400,6 +2476,202 @@ public sealed class CampaignSpineService
                 CampaignName: campaign.Name,
                 Status: campaign.Status))
             .ToArray();
+
+    private OrganizerOperationProjection BuildOrganizerOperationProjectionLocked(
+        HubUserDto user,
+        AccountCampaignSummary summary,
+        CommunityOperatorProjection operation,
+        IReadOnlyList<OrganizerSupportCaseProjection> supportCases)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(summary);
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(supportCases);
+
+        var group = _store.GroupsById.GetValueOrDefault(operation.GroupId);
+        var groupCampaignIds = _store.CampaignSpinesById.Values
+            .Where(item => string.Equals(item.GroupId, operation.GroupId, StringComparison.OrdinalIgnoreCase))
+            .Select(static item => item.CampaignId)
+            .Concat(operation.SeasonBoardEntries.Select(static entry => entry.CampaignId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var groupWorkspaces = summary.Workspaces
+            .Where(workspace => groupCampaignIds.Contains(workspace.CampaignId))
+            .OrderByDescending(static workspace => ResolveWorkspaceFreshnessUtc(workspace))
+            .ToArray();
+        var roles = BuildOrganizerRoleAssignmentsLocked(group);
+        var permissions = BuildOrganizerPermissions(operation);
+        var publicationReceipts = BuildOrganizerArtifactPublicationReceipts(groupWorkspaces);
+        var seasonLanes = operation.SeasonBoardEntries
+            .Select(static entry => new OrganizerSeasonLaneProjection(
+                CampaignId: entry.CampaignId,
+                WorkspaceId: entry.WorkspaceId,
+                CampaignName: entry.CampaignName,
+                RunTitle: entry.RunTitle,
+                LatestEventSummary: entry.LatestEventSummary,
+                NextSafeAction: entry.NextSafeAction,
+                RecapSummary: entry.RecapSummary,
+                ConsequenceSummary: entry.ConsequenceSummary,
+                CampaignMemorySummary: entry.CampaignMemorySummary,
+                WatchoutSummary: entry.WatchoutSummary,
+                UpdatedAtUtc: entry.UpdatedAtUtc))
+            .ToArray();
+        var roster = new OrganizerRosterContractProjection(
+            Summary: $"{operation.OperationsSummary} {operation.CampaignReturnSummary}",
+            MemberCount: operation.MemberCount,
+            ActiveCampaignCount: operation.ActiveCampaignCount,
+            RecentTransferCount: operation.RecentRosterTransfers?.Count ?? 0,
+            CampaignNames: operation.CampaignNames,
+            RecentTransferSummaries: (operation.RecentRosterTransfers ?? Array.Empty<RosterTransferProjection>())
+                .Select(static transfer => $"{transfer.RunnerHandle}: {transfer.Summary}")
+                .Take(5)
+                .ToArray());
+        var eventRail = new OrganizerEventRailContractProjection(
+            Summary: $"{operation.LeagueOperationsSummary} {operation.SeasonEventSummary}",
+            SeasonBoardCount: operation.SeasonBoardEntries.Count,
+            RecentEventCount: operation.RecentEventSummaries.Count,
+            ActiveSponsorSessionCount: operation.ActiveSponsorSessionCount,
+            SeasonLanes: seasonLanes,
+            RecentEventSummaries: operation.RecentEventSummaries,
+            AuditLines: operation.RecentLeagueAuditLines);
+        var artifactPublication = new OrganizerArtifactPublicationContractProjection(
+            Summary: operation.ArtifactPublicationSummary ?? ResolveGroupArtifactPublicationSummary(groupWorkspaces),
+            ReceiptCount: publicationReceipts.Count,
+            ReadyOrPublishedCount: publicationReceipts.Count(static receipt =>
+                string.Equals(receipt.PublicationState, "ready", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(receipt.PublicationState, "published", StringComparison.OrdinalIgnoreCase)),
+            DiscoverableCount: publicationReceipts.Count(static receipt => receipt.Discoverable),
+            Receipts: publicationReceipts);
+        var supportEscalation = new OrganizerSupportEscalationContractProjection(
+            Summary: operation.SupportEscalationSummary ?? ResolveGroupSupportEscalationSummary(user),
+            OpenCaseCount: supportCases.Count,
+            Cases: supportCases);
+        return new OrganizerOperationProjection(
+            GroupId: operation.GroupId,
+            GroupName: operation.GroupName,
+            GroupType: operation.GroupType,
+            Visibility: operation.Visibility,
+            OperatorRole: operation.OperatorRole,
+            Roles: roles,
+            Permissions: permissions,
+            Roster: roster,
+            EventRail: eventRail,
+            ArtifactPublication: artifactPublication,
+            SupportEscalation: supportEscalation,
+            AuditLines: BuildOrganizerAuditLines(operation, publicationReceipts, supportCases));
+    }
+
+    private IReadOnlyList<OrganizerSupportCaseProjection> BuildOrganizerSupportCases(HubUserDto user)
+    {
+        lock (_supportStore.Gate)
+        {
+            return _supportStore.CasesById.Values
+                .Where(item =>
+                    string.Equals(item.ReporterUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(item.Status, SupportCaseStatuses.UserNotified, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .Take(5)
+                .Select(static item => new OrganizerSupportCaseProjection(
+                    CaseId: item.CaseId,
+                    Kind: item.Kind,
+                    Status: item.Status,
+                    Title: item.Title,
+                    Summary: item.Summary,
+                    Source: item.Source,
+                    UpdatedAtUtc: item.UpdatedAtUtc,
+                    ReleaseChannel: item.ReleaseChannel,
+                    Platform: item.Platform,
+                    InstallationId: item.InstallationId,
+                    FixedChannel: item.FixedChannel,
+                    FixedVersion: item.FixedVersion,
+                    Timeline: item.Timeline))
+                .ToArray();
+        }
+    }
+
+    private IReadOnlyList<OrganizerRoleAssignmentProjection> BuildOrganizerRoleAssignmentsLocked(GroupDto? group)
+    {
+        if (group is null)
+        {
+            return Array.Empty<OrganizerRoleAssignmentProjection>();
+        }
+
+        return group.Memberships
+            .OrderByDescending(static membership => OperatorRolePriority(membership.Role))
+            .ThenBy(membership => _store.UsersById.GetValueOrDefault(membership.UserId)?.DisplayName ?? membership.UserId, StringComparer.OrdinalIgnoreCase)
+            .Select(membership =>
+            {
+                var memberUser = _store.UsersById.GetValueOrDefault(membership.UserId);
+                bool canManageMembers = string.Equals(membership.Role, "owner", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(membership.Role, "organizer", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(membership.Role, "gm", StringComparison.OrdinalIgnoreCase);
+                bool canIssueCodes = canManageMembers
+                    || string.Equals(membership.Role, "booster", StringComparison.OrdinalIgnoreCase);
+                return new OrganizerRoleAssignmentProjection(
+                    UserId: membership.UserId,
+                    DisplayName: memberUser?.DisplayName ?? membership.UserId,
+                    Role: membership.Role,
+                    JoinedAtUtc: membership.JoinedAtUtc,
+                    CanManageMembers: canManageMembers,
+                    CanIssueCodes: canIssueCodes);
+            })
+            .ToArray();
+    }
+
+    private static IReadOnlyList<OrganizerPermissionProjection> BuildOrganizerPermissions(CommunityOperatorProjection operation)
+        => operation.Capabilities
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(static capability => new OrganizerPermissionProjection(
+                Capability: capability,
+                Label: capability.Replace('_', ' '),
+                Summary: capability switch
+                {
+                    "can_manage_members" => "Manage organizer roles, roster authority, and member recovery on the same governed account rail.",
+                    "can_issue_join_codes" => "Issue governed join codes for league, convention, and season entry without chat-only recovery.",
+                    "can_issue_boost_codes" => "Issue sponsorship codes that stay attached to the governed community lane.",
+                    "can_hold_shared_entitlements" => "Carry community-scale entitlements without collapsing them into personal install state.",
+                    "campaign_workspace" => "Open shared campaign workspaces and multi-campaign season boards from the same operator contract.",
+                    "creator_publication" => "Track artifact-publication posture and public-safe publication follow-through on the operator rail.",
+                    "support_closure" => "Keep human escalation and tracked support closure visible on the same operator contract.",
+                    _ => "Keep this governed operator permission explicit instead of burying it in ad hoc admin folklore."
+                }))
+            .ToArray();
+
+    private static IReadOnlyList<OrganizerArtifactPublicationReceiptProjection> BuildOrganizerArtifactPublicationReceipts(
+        IReadOnlyList<CampaignWorkspaceProjection> groupWorkspaces)
+        => groupWorkspaces
+            .SelectMany(static workspace => workspace.RecapShelf)
+            .OrderByDescending(static entry => entry.Label, StringComparer.OrdinalIgnoreCase)
+            .Take(5)
+            .Select(static entry => new OrganizerArtifactPublicationReceiptProjection(
+                EntryId: entry.ProjectionId,
+                Label: entry.Label,
+                Summary: entry.Summary,
+                Audience: entry.Audience,
+                PublicationState: entry.PublicationState,
+                TrustBand: entry.TrustBand,
+                Discoverable: entry.Discoverable,
+                PublicationSummary: entry.PublicationSummary,
+                NextSafeAction: entry.NextSafeAction,
+                AuditSummary: entry.AuditSummary))
+            .ToArray();
+
+    private static IReadOnlyList<string> BuildOrganizerAuditLines(
+        CommunityOperatorProjection operation,
+        IReadOnlyList<OrganizerArtifactPublicationReceiptProjection> publicationReceipts,
+        IReadOnlyList<OrganizerSupportCaseProjection> supportCases)
+    {
+        List<string> lines =
+        [
+            $"Roles: {operation.OperatorRole} across {operation.MemberCount} member(s).",
+            $"Permissions: {(operation.Capabilities.Count == 0 ? "none" : string.Join(", ", operation.Capabilities))}.",
+            $"Roster: {(operation.RecentRosterTransfers?.Count ?? 0)} recent transfer(s) across {operation.ActiveCampaignCount} active campaign(s).",
+            $"Events: {operation.SeasonBoardEntries.Count} season lane(s) and {operation.RecentEventSummaries.Count} recent event summary line(s).",
+            $"Artifact publication: {publicationReceipts.Count} bounded receipt(s) on the operator rail.",
+            $"Support escalation: {supportCases.Count} tracked case(s) remain attached to the same account-bound closure lane."
+        ];
+        return lines;
+    }
 
     private static IReadOnlyList<CommunityJoinCodeProjection> BuildGroupRecentJoinCodes(
         IEnumerable<JoinCodeDto> joinCodes,
@@ -5374,20 +5646,35 @@ public sealed class CampaignSpineService
         CreatorPublicationProjection? creatorPublication,
         bool creatorLinked)
     {
+        string auditSummary;
         if (!string.IsNullOrWhiteSpace(item.AuditSummary))
         {
-            return item.AuditSummary!;
+            auditSummary = item.AuditSummary!;
         }
-
-        DateTimeOffset updatedAtUtc = creatorLinked
+        else
+        {
+            DateTimeOffset updatedAtUtc = creatorLinked
             ? creatorPublication?.UpdatedAtUtc ?? DateTimeOffset.UtcNow
             : workspace.LatestContinuity?.CapturedAtUtc
                 ?? workspace.AftermathPackages?.FirstOrDefault()?.GeneratedAtUtc
                 ?? DateTimeOffset.UtcNow;
-        string auditSource = creatorLinked
+            string auditSource = creatorLinked
             ? "publication review and campaign return"
             : "campaign return";
-        return $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
+            auditSummary = $"Updated {updatedAtUtc:yyyy-MM-dd HH:mm} UTC on the governed {auditSource} lane for {workspace.CampaignName}.";
+        }
+
+        return creatorLinked
+            ? EnsureManifestBackedAuditSummary(auditSummary)
+            : auditSummary;
+    }
+
+    private static string EnsureManifestBackedAuditSummary(string auditSummary)
+    {
+        string normalized = auditSummary.Trim();
+        return normalized.Contains("manifest-authority-backed", StringComparison.OrdinalIgnoreCase)
+            ? normalized
+            : $"manifest-authority-backed; {normalized}";
     }
 
     private static string DescribeRecapShelfCompatibilitySummary(

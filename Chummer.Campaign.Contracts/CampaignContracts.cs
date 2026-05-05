@@ -332,7 +332,9 @@ public sealed record CommunityOperatorProjection(
     IReadOnlyList<string> RecentLeagueAuditLines,
     IReadOnlyList<CommunitySeasonBoardEntryProjection> SeasonBoardEntries,
     IReadOnlyList<string> Watchouts,
-    IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null);
+    IReadOnlyList<RosterTransferProjection>? RecentRosterTransfers = null,
+    string? ArtifactPublicationSummary = null,
+    string? SupportEscalationSummary = null);
 
 public sealed record CommunityInviteCampaignProjection(
     string CampaignId,

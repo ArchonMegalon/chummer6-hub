@@ -31,15 +31,22 @@ public sealed class PublicCreatorPublicationDiscoveryService
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         return _drafts.ListDrafts(state: HubPublicationStates.Published)
             .Items
-            .OrderByDescending(static item => item.UpdatedAtUtc)
-            .ThenBy(static item => item.DraftId, StringComparer.OrdinalIgnoreCase)
-            .Select(ResolvePublication)
+            .Select(draft => new
+            {
+                Draft = draft,
+                Detail = _drafts.GetDraftDetail(draft.DraftId)
+            })
+            .Where(static item => HasApprovedManifestAuthority(item.Draft, item.Detail))
+            .Select(item => ResolvePublication(item.Draft))
             .Where(static item => item is not null)
             .Select(static item => item!)
             .Where(item =>
                 item.Discoverable
                 && string.Equals(item.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
                 && seen.Add(item.PublicationId))
+            .OrderByDescending(item => RankTrustBand(item.TrustBand))
+            .ThenByDescending(static item => item.UpdatedAtUtc)
+            .ThenBy(static item => item.Title, StringComparer.OrdinalIgnoreCase)
             .Take(limit)
             .ToArray();
     }
@@ -52,12 +59,13 @@ public sealed class PublicCreatorPublicationDiscoveryService
         }
 
         HubPublishDraftReceipt? draft = _drafts.GetDraft(publicationId);
-        if (draft is null || !string.Equals(draft.State, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase))
+        HubDraftDetailProjection? detail = _drafts.GetDraftDetail(publicationId);
+        if (!HasApprovedManifestAuthority(draft, detail))
         {
             return null;
         }
 
-        CreatorPublicationProjection? publication = ResolvePublication(draft);
+        CreatorPublicationProjection? publication = ResolvePublication(draft!);
         return publication is { Discoverable: true }
             && string.Equals(publication.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
             ? publication
@@ -69,4 +77,33 @@ public sealed class PublicCreatorPublicationDiscoveryService
         HubUserDto? owner = _accounts.GetById(draft.OwnerId);
         return owner is null ? null : _campaignSpine.GetCreatorPublication(owner, draft.DraftId);
     }
+
+    private static bool HasApprovedManifestAuthority(HubPublishDraftReceipt? draft, HubDraftDetailProjection? detail)
+    {
+        if (draft is null
+            || detail is null
+            || !string.Equals(draft.State, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        string description = detail.Description ?? string.Empty;
+        return description.Contains("Publication kind:", StringComparison.Ordinal)
+            && description.Contains("Audit:", StringComparison.Ordinal)
+            && description.Contains("Manifest authority: approved-shared-publication-manifest;", StringComparison.Ordinal)
+            && !description.Contains("Manifest authority: missing-audit-receipt", StringComparison.Ordinal);
+    }
+
+    private static int RankTrustBand(string? trustBand)
+        => trustBand?.Trim().ToLowerInvariant() switch
+        {
+            "curated-live" => 6,
+            "restricted-live" => 5,
+            "approval-backed" => 4,
+            "review-pending" => 3,
+            "needs-revision" => 2,
+            "retained-history" => 1,
+            "delisted-caution" => 0,
+            _ => -1
+        };
 }
