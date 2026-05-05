@@ -175,7 +175,8 @@ public sealed record SupportAssistantCitation(
     string Label,
     string Summary,
     string? Status = null,
-    string? Href = null);
+    string? Href = null,
+    string? ReceiptId = null);
 
 public sealed record SupportAssistantAction(
     string ActionId,
