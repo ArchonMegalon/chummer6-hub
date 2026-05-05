@@ -42,6 +42,11 @@ public sealed class CampaignSpineService
     private const string ResolutionReportApprovalSourceKind = "resolution_report_approval";
     private const string WorldTickSourceKind = "world_tick";
     private const string PlayerSafeNewsSourceKind = "player_safe_news";
+    private const string OpenRunListingSourceKind = "open_run_listing";
+    private const string OpenRunJoinRequestSourceKind = "open_run_join_request";
+    private const string OpenRunScheduleSourceKind = "open_run_schedule";
+    private const string OpenRunMeetingHandoffSourceKind = "open_run_meeting_handoff";
+    private const string OpenRunCloseoutSourceKind = "open_run_closeout";
 
     private readonly CommunityStore _store;
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
@@ -257,6 +262,547 @@ public sealed class CampaignSpineService
     {
         ArgumentNullException.ThrowIfNull(user);
         return GetAccountSummary(user, installLinking).Workspaces.FirstOrDefault();
+    }
+
+    public IReadOnlyList<OpenRunListingProjection> GetOpenRuns(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
+        HashSet<string> accessibleCampaignIds = summary.Workspaces
+            .Select(static item => item.CampaignId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        lock (_store.Gate)
+        {
+            return _store.OpenRuns
+                .Where(item => IsOpenRunVisibleToUser(item, user.UserId, accessibleCampaignIds, _store.OpenRunJoinRequests, _store.OpenRunRoster))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+        }
+    }
+
+    public OpenRunOrchestrationProjection? GetOpenRun(HubUserDto user, string openRunId, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
+
+        AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
+        HashSet<string> accessibleCampaignIds = summary.Workspaces
+            .Select(static item => item.CampaignId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        string normalizedOpenRunId = AccountService.NormalizeOptional(openRunId)
+            ?? throw new ArgumentException("openRunId is required.", nameof(openRunId));
+
+        lock (_store.Gate)
+        {
+            OpenRunListingProjection? listing = _store.OpenRuns
+                .FirstOrDefault(item => string.Equals(item.OpenRunId, normalizedOpenRunId, StringComparison.OrdinalIgnoreCase));
+            if (listing is null
+                || !IsOpenRunVisibleToUser(listing, user.UserId, accessibleCampaignIds, _store.OpenRunJoinRequests, _store.OpenRunRoster))
+            {
+                return null;
+            }
+
+            return BuildOpenRunOrchestrationLocked(listing);
+        }
+    }
+
+    public OpenRunListingProjection CreateOpenRun(
+        HubUserDto user,
+        string workspaceId,
+        OpenRunCreateRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        CampaignWorkspaceProjection workspace = GetWorkspace(user, workspaceId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown workspace: {workspaceId}");
+        string normalizedRunId = AccountService.NormalizeOptional(request.RunId)
+            ?? workspace.Runs.FirstOrDefault()?.RunId
+            ?? throw new InvalidOperationException($"{workspace.CampaignName} does not have a governed run to publish.");
+        RunProjection run = workspace.Runs.FirstOrDefault(item => string.Equals(item.RunId, normalizedRunId, StringComparison.OrdinalIgnoreCase))
+            ?? throw new KeyNotFoundException($"Unknown run {normalizedRunId} for workspace {workspace.WorkspaceId}.");
+        string normalizedListingTitle = AccountService.NormalizeOptional(request.ListingTitle)
+            ?? throw new ArgumentException("open run listing_title is required.", nameof(request));
+        string normalizedVisibility = AccountService.NormalizeOptional(request.Visibility) ?? "community";
+        string normalizedTableContractSummary = AccountService.NormalizeOptional(request.TableContractSummary)
+            ?? throw new ArgumentException("open run table_contract_summary is required.", nameof(request));
+        string normalizedAdmissionMode = AccountService.NormalizeOptional(request.AdmissionMode) ?? "request_to_join";
+        string normalizedSchedulingMode = AccountService.NormalizeOptional(request.SchedulingMode) ?? "lunacal_slots";
+        string normalizedPlatform = AccountService.NormalizeOptional(request.Platform) ?? "discord";
+        string normalizedObserverMode = AccountService.NormalizeOptional(request.ObserverMode) ?? "manual_markers";
+        string? normalizedSummary = AccountService.NormalizeOptional(request.Summary);
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        if (request.SeatsTotal <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "open run seats_total must be positive.");
+        }
+
+        if (request.ExpectedDurationMinutes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "open run expected_duration_minutes must be positive.");
+        }
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            IReadOnlyList<string> reservedSeatRoles = FinalizeLines(request.ReservedSeatRoles ?? Array.Empty<string>());
+            var joinPolicy = new OpenRunJoinPolicyProjection(
+                AdmissionMode: normalizedAdmissionMode,
+                SeatsTotal: request.SeatsTotal,
+                ReservedSeatRoles: reservedSeatRoles,
+                RequireRunnerDossier: request.RequireRunnerDossier,
+                AllowQuickstartRunner: request.AllowQuickstartRunner,
+                RuleEnvironmentFingerprint: workspace.RuleEnvironment.CompatibilityFingerprint,
+                SchedulingMode: normalizedSchedulingMode,
+                ExpectedDurationMinutes: request.ExpectedDurationMinutes,
+                CommunicationPlatform: normalizedPlatform,
+                VoiceRequired: request.VoiceRequired,
+                ObserverMode: normalizedObserverMode,
+                Summary: $"{normalizedAdmissionMode.Replace('_', ' ')} · {request.SeatsTotal} seats · {normalizedPlatform} · {workspace.RuleEnvironment.CompatibilityFingerprint}");
+            var listing = new OpenRunListingProjection(
+                OpenRunId: StableId("open-run", $"{workspace.WorkspaceId}:{run.RunId}:{normalizedListingTitle}:{now.ToUnixTimeMilliseconds()}"),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                RunId: run.RunId,
+                RunTitle: run.Title,
+                ListingTitle: normalizedListingTitle,
+                Visibility: normalizedVisibility,
+                Status: "listed",
+                Summary: normalizedSummary ?? $"{run.Title} is open for governed recruitment, scheduling, and closeout on the shared hub lane.",
+                TableContractSummary: normalizedTableContractSummary,
+                JoinPolicy: joinPolicy,
+                SchedulingPosture: "No scheduling receipt is attached yet; Chummer still owns the eventual session time and meeting handoff truth.",
+                QuickstartAllowed: request.AllowQuickstartRunner,
+                EvidenceLines: FinalizeLines(
+                [
+                    $"{normalizedListingTitle} attaches {run.Title} to a governed open-run listing.",
+                    $"Source kind: {OpenRunListingSourceKind}.",
+                    $"Table contract: {normalizedTableContractSummary}",
+                    $"Join policy: {joinPolicy.Summary}",
+                    $"Observer mode: {normalizedObserverMode}.",
+                    "Discord, calendar, Teams, and VTT providers remain projection-only surfaces instead of run authority.",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                CreatedByUserId: user.UserId,
+                CreatedAtUtc: now,
+                UpdatedAtUtc: now);
+
+            UpsertOpenRunListingLocked(_store, listing);
+            _store.PersistLocked();
+            return listing;
+        }
+    }
+
+    public OpenRunJoinRequestProjection SubmitOpenRunJoinRequest(
+        HubUserDto user,
+        string openRunId,
+        OpenRunJoinRequestCommand request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
+        AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
+        string? normalizedDossierId = AccountService.NormalizeOptional(request.DossierId);
+        string? normalizedQuickstartPackId = AccountService.NormalizeOptional(request.QuickstartPackId);
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        RunnerDossierProjection? dossier = normalizedDossierId is null
+            ? null
+            : summary.Dossiers.FirstOrDefault(item => string.Equals(item.DossierId, normalizedDossierId, StringComparison.OrdinalIgnoreCase));
+        if (normalizedDossierId is not null && dossier is null)
+        {
+            throw new CommunityAccessDeniedException($"Runner dossier {normalizedDossierId} is not available on this account.");
+        }
+
+        if (dossier is null && normalizedQuickstartPackId is null)
+        {
+            throw new ArgumentException("join request needs a runner dossier or quickstart pack.", nameof(request));
+        }
+
+        List<string> conflicts = [];
+        List<string> warnings = [];
+        if (!request.TableContractAcknowledged)
+        {
+            conflicts.Add("The table contract still needs explicit acknowledgement before this join request can reach GM review.");
+        }
+
+        if (openRun.Listing.JoinPolicy.VoiceRequired && !request.VoiceConsentAcknowledged)
+        {
+            conflicts.Add("Voice-required handoff still needs explicit acknowledgement before roster review.");
+        }
+
+        if (!request.PlatformReady)
+        {
+            warnings.Add("Platform readiness still needs confirmation before the meeting handoff can stay green.");
+        }
+
+        if (dossier is not null
+            && !string.Equals(dossier.RuleEnvironment.CompatibilityFingerprint, openRun.Listing.JoinPolicy.RuleEnvironmentFingerprint, StringComparison.OrdinalIgnoreCase))
+        {
+            conflicts.Add($"Runner dossier {dossier.RunnerHandle} is pinned to {dossier.RuleEnvironment.CompatibilityFingerprint}, but {openRun.Listing.ListingTitle} requires {openRun.Listing.JoinPolicy.RuleEnvironmentFingerprint}.");
+        }
+
+        if (dossier is null && !openRun.Listing.QuickstartAllowed)
+        {
+            conflicts.Add("This open run does not allow the quickstart participation path.");
+        }
+
+        string preflightSummary = conflicts.Count == 0
+            ? $"{(dossier?.RunnerHandle ?? normalizedQuickstartPackId)} clears legality, table-contract, and handoff preflight for {openRun.Listing.ListingTitle}."
+            : $"{openRun.Listing.ListingTitle} still has {conflicts.Count} explainable preflight conflict(s) before GM review can accept this join request.";
+        string nextSafeAction = conflicts.Count == 0
+            ? "Wait for the GM to review the join request on the governed open-run lane."
+            : "Resolve the explainable preflight conflicts before the GM locks the roster.";
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var joinRequest = new OpenRunJoinRequestProjection(
+            RequestId: StableId("open-run-request", $"{openRun.Listing.OpenRunId}:{user.UserId}"),
+            OpenRunId: openRun.Listing.OpenRunId,
+            ApplicantUserId: user.UserId,
+            ApplicantDisplayName: user.DisplayName,
+            DossierId: dossier?.DossierId,
+            RunnerHandle: dossier?.RunnerHandle,
+            QuickstartPackId: normalizedQuickstartPackId,
+            PreflightSummary: preflightSummary,
+            Conflicts: conflicts,
+            Warnings: warnings,
+            NextSafeAction: nextSafeAction,
+            Status: conflicts.Count == 0 ? "pending_review" : "preflight_attention",
+            EvidenceLines: FinalizeLines(
+            [
+                preflightSummary,
+                $"Source kind: {OpenRunJoinRequestSourceKind}.",
+                dossier is null
+                    ? $"Quickstart path: {normalizedQuickstartPackId}."
+                    : $"Runner dossier: {dossier.RunnerHandle} / {dossier.RuleEnvironment.CompatibilityFingerprint}.",
+                $"Table contract acknowledged: {(request.TableContractAcknowledged ? "yes" : "no")}.",
+                $"Voice handoff acknowledged: {(request.VoiceConsentAcknowledged ? "yes" : "no")}.",
+                request.PlatformReady ? "Platform readiness is already confirmed." : "Platform readiness still needs confirmation.",
+                conflicts.Count == 0 ? "No legality or consent conflicts remain on the governed preflight rail." : $"Preflight conflicts: {string.Join("; ", conflicts)}",
+                warnings.Count == 0 ? string.Empty : $"Preflight warnings: {string.Join("; ", warnings)}",
+                normalizedNote is null ? string.Empty : $"Applicant note: {normalizedNote}"
+            ]),
+            SubmittedAtUtc: now,
+            UpdatedAtUtc: now);
+
+        lock (_store.Gate)
+        {
+            UpsertOpenRunJoinRequestLocked(_store, joinRequest);
+            _store.PersistLocked();
+            return joinRequest;
+        }
+    }
+
+    public OpenRunJoinRequestProjection ReviewOpenRunJoinRequest(
+        HubUserDto user,
+        string openRunId,
+        string requestId,
+        OpenRunJoinReviewRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
+        if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CommunityAccessDeniedException("Only the open-run owner can review join requests.");
+        }
+
+        string normalizedRequestId = AccountService.NormalizeOptional(requestId)
+            ?? throw new ArgumentException("requestId is required.", nameof(requestId));
+        string normalizedDecision = AccountService.NormalizeOptional(request.Decision)?.ToLowerInvariant() switch
+        {
+            "accepted" => "accepted",
+            "waitlisted" => "waitlisted",
+            "rejected" => "rejected",
+            _ => throw new ArgumentException($"Unsupported open-run review decision: {request.Decision}", nameof(request))
+        };
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+
+        lock (_store.Gate)
+        {
+            OpenRunJoinRequestProjection existingRequest = _store.OpenRunJoinRequests
+                .FirstOrDefault(item =>
+                    string.Equals(item.OpenRunId, openRun.Listing.OpenRunId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.RequestId, normalizedRequestId, StringComparison.OrdinalIgnoreCase))
+                ?? throw new KeyNotFoundException($"Unknown join request {normalizedRequestId} for {openRun.Listing.ListingTitle}.");
+            if (string.Equals(normalizedDecision, "accepted", StringComparison.OrdinalIgnoreCase) && existingRequest.Conflicts.Count > 0)
+            {
+                throw new InvalidOperationException("Join requests with explainable preflight conflicts cannot be accepted until the conflicts are resolved.");
+            }
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var reviewedRequest = existingRequest with
+            {
+                Status = normalizedDecision,
+                EvidenceLines = FinalizeLines(existingRequest.EvidenceLines.Concat(
+                [
+                    $"GM review decision: {normalizedDecision}.",
+                    normalizedNote is null ? string.Empty : $"GM review note: {normalizedNote}"
+                ])),
+                UpdatedAtUtc = now
+            };
+            UpsertOpenRunJoinRequestLocked(_store, reviewedRequest);
+
+            _store.OpenRunRoster.RemoveAll(item =>
+                string.Equals(item.OpenRunId, openRun.Listing.OpenRunId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.UserId, reviewedRequest.ApplicantUserId, StringComparison.OrdinalIgnoreCase));
+            if (!string.Equals(normalizedDecision, "rejected", StringComparison.OrdinalIgnoreCase))
+            {
+                _store.OpenRunRoster.Add(new OpenRunRosterEntryProjection(
+                    EntryId: StableId("open-run-roster", $"{openRun.Listing.OpenRunId}:{reviewedRequest.ApplicantUserId}"),
+                    OpenRunId: openRun.Listing.OpenRunId,
+                    UserId: reviewedRequest.ApplicantUserId,
+                    DisplayName: reviewedRequest.ApplicantDisplayName,
+                    DossierId: reviewedRequest.DossierId,
+                    RunnerHandle: reviewedRequest.RunnerHandle,
+                    SeatStatus: normalizedDecision,
+                    SeatSummary: string.Equals(normalizedDecision, "accepted", StringComparison.OrdinalIgnoreCase)
+                        ? $"{reviewedRequest.ApplicantDisplayName} is accepted onto the governed roster for {openRun.Listing.ListingTitle}."
+                        : $"{reviewedRequest.ApplicantDisplayName} stays waitlisted on the governed roster for {openRun.Listing.ListingTitle}.",
+                    UpdatedAtUtc: now));
+                _store.OpenRunRoster.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+            }
+
+            int acceptedCount = _store.OpenRunRoster.Count(item =>
+                string.Equals(item.OpenRunId, openRun.Listing.OpenRunId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.SeatStatus, "accepted", StringComparison.OrdinalIgnoreCase));
+            string listingStatus = acceptedCount >= openRun.Listing.JoinPolicy.SeatsTotal
+                ? "roster_locked"
+                : acceptedCount > 0
+                    ? "roster_forming"
+                    : "listed";
+            UpsertOpenRunListingLocked(_store, openRun.Listing with
+            {
+                Status = listingStatus,
+                UpdatedAtUtc = now
+            });
+
+            _store.PersistLocked();
+            return reviewedRequest;
+        }
+    }
+
+    public OpenRunScheduleReceiptProjection ScheduleOpenRun(
+        HubUserDto user,
+        string openRunId,
+        OpenRunScheduleRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
+        if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CommunityAccessDeniedException("Only the open-run owner can schedule this run.");
+        }
+
+        string normalizedTimezone = AccountService.NormalizeOptional(request.Timezone) ?? "UTC";
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        if (request.StartsAtUtc <= DateTimeOffset.UtcNow.AddMinutes(-1))
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "open run schedule must stay in the future.");
+        }
+
+        IReadOnlyList<OpenRunRosterEntryProjection> acceptedRoster = openRun.Roster
+            .Where(item => string.Equals(item.SeatStatus, "accepted", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (acceptedRoster.Count == 0)
+        {
+            throw new InvalidOperationException("Open runs need at least one accepted roster entry before scheduling.");
+        }
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var receipt = new OpenRunScheduleReceiptProjection(
+            ReceiptId: StableId("open-run-schedule", openRun.Listing.OpenRunId),
+            OpenRunId: openRun.Listing.OpenRunId,
+            SchedulingMode: openRun.Listing.JoinPolicy.SchedulingMode,
+            StartsAtUtc: request.StartsAtUtc,
+            ExpectedDurationMinutes: openRun.Listing.JoinPolicy.ExpectedDurationMinutes,
+            Platform: openRun.Listing.JoinPolicy.CommunicationPlatform,
+            Timezone: normalizedTimezone,
+            Summary: $"{openRun.Listing.ListingTitle} is scheduled for {request.StartsAtUtc:yyyy-MM-dd HH:mm} {normalizedTimezone} with {acceptedRoster.Count} accepted seat(s) on the governed {openRun.Listing.JoinPolicy.CommunicationPlatform} lane.",
+            EvidenceLines: FinalizeLines(
+            [
+                $"Source kind: {OpenRunScheduleSourceKind}.",
+                $"Accepted roster: {acceptedRoster.Count} seat(s).",
+                $"Scheduling mode: {openRun.Listing.JoinPolicy.SchedulingMode}.",
+                $"Platform: {openRun.Listing.JoinPolicy.CommunicationPlatform}.",
+                normalizedNote is null ? string.Empty : $"GM scheduling note: {normalizedNote}"
+            ]),
+            ScheduledByUserId: user.UserId,
+            ScheduledAtUtc: now);
+
+        lock (_store.Gate)
+        {
+            UpsertOpenRunScheduleLocked(_store, receipt);
+            UpsertOpenRunListingLocked(_store, openRun.Listing with
+            {
+                Status = "scheduled",
+                SchedulingPosture = receipt.Summary,
+                UpdatedAtUtc = now
+            });
+            _store.PersistLocked();
+            return receipt;
+        }
+    }
+
+    public OpenRunMeetingHandoffProjection CreateOpenRunMeetingHandoff(
+        HubUserDto user,
+        string openRunId,
+        OpenRunMeetingHandoffRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
+        if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CommunityAccessDeniedException("Only the open-run owner can issue a meeting handoff.");
+        }
+
+        OpenRunScheduleReceiptProjection schedule = openRun.Schedule
+            ?? throw new InvalidOperationException("Open runs need a governed scheduling receipt before meeting handoff.");
+        string normalizedProviderKind = AccountService.NormalizeOptional(request.ProviderKind)
+            ?? throw new ArgumentException("meeting handoff provider_kind is required.", nameof(request));
+        string normalizedProviderLabel = AccountService.NormalizeOptional(request.ProviderLabel)
+            ?? throw new ArgumentException("meeting handoff provider_label is required.", nameof(request));
+        string normalizedAccessPolicy = AccountService.NormalizeOptional(request.AccessPolicy)
+            ?? throw new ArgumentException("meeting handoff access_policy is required.", nameof(request));
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        if (request.ExpiresAtUtc <= DateTimeOffset.UtcNow)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "meeting handoff expiry must stay in the future.");
+        }
+
+        IReadOnlyList<string> acceptedUserIds = openRun.Roster
+            .Where(item => string.Equals(item.SeatStatus, "accepted", StringComparison.OrdinalIgnoreCase))
+            .Select(static item => item.UserId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (acceptedUserIds.Count == 0)
+        {
+            throw new InvalidOperationException("Meeting handoff requires at least one accepted roster seat.");
+        }
+
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var handoff = new OpenRunMeetingHandoffProjection(
+            HandoffId: StableId("open-run-handoff", openRun.Listing.OpenRunId),
+            OpenRunId: openRun.Listing.OpenRunId,
+            ProviderKind: normalizedProviderKind,
+            ProviderLabel: normalizedProviderLabel,
+            AccessPolicy: normalizedAccessPolicy,
+            ExpiresAtUtc: request.ExpiresAtUtc,
+            AcceptedUserIds: acceptedUserIds,
+            Summary: $"{normalizedProviderLabel} is the projection-only meeting handoff for {openRun.Listing.ListingTitle}; accepted roster and consent truth stay in Chummer until {request.ExpiresAtUtc:yyyy-MM-dd HH:mm} UTC.",
+            EvidenceLines: FinalizeLines(
+            [
+                $"Source kind: {OpenRunMeetingHandoffSourceKind}.",
+                $"Provider kind: {normalizedProviderKind}.",
+                $"Access policy: {normalizedAccessPolicy}.",
+                $"Scheduling anchor: {schedule.Summary}",
+                $"Accepted users: {string.Join(", ", acceptedUserIds)}.",
+                normalizedNote is null ? string.Empty : $"GM handoff note: {normalizedNote}"
+            ]),
+            CreatedByUserId: user.UserId,
+            CreatedAtUtc: now);
+
+        lock (_store.Gate)
+        {
+            UpsertOpenRunMeetingHandoffLocked(_store, handoff);
+            UpsertOpenRunListingLocked(_store, openRun.Listing with
+            {
+                Status = "handoff_ready",
+                UpdatedAtUtc = now
+            });
+            _store.PersistLocked();
+            return handoff;
+        }
+    }
+
+    public OpenRunCloseoutProjection CloseOutOpenRun(
+        HubUserDto user,
+        string openRunId,
+        OpenRunCloseoutRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(openRunId);
+        ArgumentNullException.ThrowIfNull(request);
+
+        OpenRunOrchestrationProjection openRun = GetOpenRun(user, openRunId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown open run: {openRunId}");
+        if (!string.Equals(openRun.Listing.CreatedByUserId, user.UserId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CommunityAccessDeniedException("Only the open-run owner can close out this run.");
+        }
+
+        if (openRun.Schedule is null || openRun.MeetingHandoff is null)
+        {
+            throw new InvalidOperationException("Open run closeout requires scheduling and meeting handoff receipts before world-memory promotion.");
+        }
+
+        CampaignWorkspaceProjection workspace = GetWorkspace(user, openRun.Listing.WorkspaceId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown workspace: {openRun.Listing.WorkspaceId}");
+        ResolutionReportApprovalProjection approval = ApproveResolutionReport(user, workspace, new ResolutionReportApprovalRequest(
+            RunId: openRun.Listing.RunId,
+            Summary: request.Summary,
+            WorldTickSummary: request.WorldTickSummary,
+            ConsequenceSummary: request.ConsequenceSummary,
+            NewsTitle: request.NewsTitle,
+            NewsSummary: request.NewsSummary,
+            NewsSource: request.NewsSource,
+            NewsUrl: request.NewsUrl,
+            NextSafeAction: request.NextSafeAction,
+            Note: request.Note));
+
+        lock (_store.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            var closeout = new OpenRunCloseoutProjection(
+                CloseoutId: StableId("open-run-closeout", openRun.Listing.OpenRunId),
+                OpenRunId: openRun.Listing.OpenRunId,
+                ResolutionApprovalId: approval.ApprovalId,
+                WorldTickId: approval.WorldTickId,
+                PlayerSafeNewsId: approval.NewsId,
+                Summary: request.Summary,
+                EvidenceLines: FinalizeLines(
+                [
+                    request.Summary,
+                    $"Source kind: {OpenRunCloseoutSourceKind}.",
+                    $"Resolution approval: {approval.ApprovalId}.",
+                    $"WorldTick: {approval.WorldTickId}.",
+                    $"Player-safe news: {approval.NewsId}.",
+                    "Closeout feeds world-memory and player-safe follow-through without making meeting or calendar providers authoritative."
+                ]),
+                ClosedByUserId: user.UserId,
+                ClosedAtUtc: now);
+
+            UpsertOpenRunCloseoutLocked(_store, closeout);
+            UpsertOpenRunListingLocked(_store, openRun.Listing with
+            {
+                Status = "closed",
+                UpdatedAtUtc = now
+            });
+            _store.PersistLocked();
+            return closeout;
+        }
     }
 
     public CampaignAdoptionLoopProjection? GetCampaignAdoptionLoop(HubUserDto user, string workspaceId, InstallLinkingSummaryDto? installLinking = null)
@@ -6341,6 +6887,133 @@ public sealed class CampaignSpineService
         }
 
         return $"Bound {packetTitle} to {targetRun.Title} / {targetScene.Title} without recreating local shadow prep notes.";
+    }
+
+    private OpenRunOrchestrationProjection BuildOpenRunOrchestrationLocked(OpenRunListingProjection listing)
+    {
+        OpenRunJoinRequestProjection[] joinRequests = _store.OpenRunJoinRequests
+            .Where(item => string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        OpenRunRosterEntryProjection[] roster = _store.OpenRunRoster
+            .Where(item => string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        OpenRunScheduleReceiptProjection? schedule = _store.OpenRunSchedules
+            .Where(item => string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.ScheduledAtUtc)
+            .FirstOrDefault();
+        OpenRunMeetingHandoffProjection? handoff = _store.OpenRunMeetingHandoffs
+            .Where(item => string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.CreatedAtUtc)
+            .FirstOrDefault();
+        OpenRunCloseoutProjection? closeout = _store.OpenRunCloseouts
+            .Where(item => string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.ClosedAtUtc)
+            .FirstOrDefault();
+
+        return new OpenRunOrchestrationProjection(
+            Listing: listing,
+            JoinRequests: joinRequests,
+            Roster: roster,
+            Schedule: schedule,
+            MeetingHandoff: handoff,
+            Closeout: closeout);
+    }
+
+    private static bool IsOpenRunVisibleToUser(
+        OpenRunListingProjection listing,
+        string userId,
+        IReadOnlySet<string> accessibleCampaignIds,
+        IReadOnlyList<OpenRunJoinRequestProjection> joinRequests,
+        IReadOnlyList<OpenRunRosterEntryProjection> roster)
+    {
+        if (string.Equals(listing.CreatedByUserId, userId, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (accessibleCampaignIds.Contains(listing.CampaignId))
+        {
+            return true;
+        }
+
+        if (joinRequests.Any(item =>
+                string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.ApplicantUserId, userId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (roster.Any(item =>
+                string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.UserId, userId, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return AccountService.NormalizeOptional(listing.Visibility)?.ToLowerInvariant() switch
+        {
+            "community" => true,
+            "public" => true,
+            "public_preview" => true,
+            _ => false
+        };
+    }
+
+    private static void UpsertOpenRunListingLocked(CommunityStore store, OpenRunListingProjection listing)
+    {
+        store.OpenRuns.RemoveAll(item => string.Equals(item.OpenRunId, listing.OpenRunId, StringComparison.OrdinalIgnoreCase));
+        store.OpenRuns.Add(listing);
+        store.OpenRuns.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+        if (store.OpenRuns.Count > 128)
+        {
+            store.OpenRuns.RemoveRange(128, store.OpenRuns.Count - 128);
+        }
+    }
+
+    private static void UpsertOpenRunJoinRequestLocked(CommunityStore store, OpenRunJoinRequestProjection joinRequest)
+    {
+        store.OpenRunJoinRequests.RemoveAll(item => string.Equals(item.RequestId, joinRequest.RequestId, StringComparison.OrdinalIgnoreCase));
+        store.OpenRunJoinRequests.Add(joinRequest);
+        store.OpenRunJoinRequests.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+        if (store.OpenRunJoinRequests.Count > 256)
+        {
+            store.OpenRunJoinRequests.RemoveRange(256, store.OpenRunJoinRequests.Count - 256);
+        }
+    }
+
+    private static void UpsertOpenRunScheduleLocked(CommunityStore store, OpenRunScheduleReceiptProjection schedule)
+    {
+        store.OpenRunSchedules.RemoveAll(item => string.Equals(item.ReceiptId, schedule.ReceiptId, StringComparison.OrdinalIgnoreCase));
+        store.OpenRunSchedules.Add(schedule);
+        store.OpenRunSchedules.Sort(static (left, right) => right.ScheduledAtUtc.CompareTo(left.ScheduledAtUtc));
+        if (store.OpenRunSchedules.Count > 128)
+        {
+            store.OpenRunSchedules.RemoveRange(128, store.OpenRunSchedules.Count - 128);
+        }
+    }
+
+    private static void UpsertOpenRunMeetingHandoffLocked(CommunityStore store, OpenRunMeetingHandoffProjection handoff)
+    {
+        store.OpenRunMeetingHandoffs.RemoveAll(item => string.Equals(item.HandoffId, handoff.HandoffId, StringComparison.OrdinalIgnoreCase));
+        store.OpenRunMeetingHandoffs.Add(handoff);
+        store.OpenRunMeetingHandoffs.Sort(static (left, right) => right.CreatedAtUtc.CompareTo(left.CreatedAtUtc));
+        if (store.OpenRunMeetingHandoffs.Count > 128)
+        {
+            store.OpenRunMeetingHandoffs.RemoveRange(128, store.OpenRunMeetingHandoffs.Count - 128);
+        }
+    }
+
+    private static void UpsertOpenRunCloseoutLocked(CommunityStore store, OpenRunCloseoutProjection closeout)
+    {
+        store.OpenRunCloseouts.RemoveAll(item => string.Equals(item.CloseoutId, closeout.CloseoutId, StringComparison.OrdinalIgnoreCase));
+        store.OpenRunCloseouts.Add(closeout);
+        store.OpenRunCloseouts.Sort(static (left, right) => right.ClosedAtUtc.CompareTo(left.ClosedAtUtc));
+        if (store.OpenRunCloseouts.Count > 128)
+        {
+            store.OpenRunCloseouts.RemoveRange(128, store.OpenRunCloseouts.Count - 128);
+        }
     }
 
     private static CampaignConsequenceProjection BuildGovernedCampaignConsequenceProjection(
