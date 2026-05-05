@@ -277,6 +277,27 @@ def main() -> int:
             ],
             "exit_criterion": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state.",
         },
+        {
+            "package_id": "next90-m119-hub-first-session-onboarding",
+            "work_task_id": "119.1",
+            "milestone_id": 119,
+            "frontier_id": 1130567614,
+            "repo": "chummer6-hub",
+            "status": "in_progress",
+            "wave": "W14",
+            "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+            "title": "Orchestrate guided first-playable-session onboarding",
+            "allowed_paths": [
+                "Chummer.Run.Api",
+                "scripts",
+                "tests",
+            ],
+            "owned_surfaces": [
+                "first_playable_session:onboarding",
+                "starter_lane:hub",
+            ],
+            "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+        },
     ]
 
     payload = {
@@ -654,21 +675,24 @@ def main() -> int:
                 "summary": "Hub now serves one governed artifact shelf lane for signed-in personal, campaign, creator, and public views, keeping recap lineage, publication state, trust posture, and public publication detail on the same inspectable surface instead of splitting them into unrelated routes.",
                 "routes": [
                     "/artifacts",
+                    "/api/v1/public/artifacts/shelf",
                     "/artifacts/publications/{publicationId}",
+                    "/api/v1/public/artifacts/publications/{publicationId}",
                     "/home/work",
                     "/account/work",
                 ],
                 "surfaces": [
                     "artifact_shelf:v2",
+                    "artifact_shelf_api",
                     "signed_in_return_shelf",
                     "public_creator_discovery",
                     "creator_publication_detail",
                 ],
                 "evidence": [
-                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs serves the governed artifact shelf, public creator publication detail route, and signed-in overlay projections from one bounded controller path.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs serves the governed artifact shelf, public shelf APIs, public creator publication detail route, and signed-in overlay projections from one bounded controller path.",
                     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs keeps public creator discovery published-only and manifest-authority-backed before the shared shelf surfaces it.",
                     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml renders signed-in return shelf entries and public creator discovery with audience, publication, trust, discovery, lineage, moderation, and next-step posture kept together.",
-                    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves personal, campaign, creator, and public artifact views keep the right recap, creator-publication, and public-publication truth visible on the shared shelf.",
+                    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves personal, campaign, creator, and public artifact views plus the mirrored shelf APIs keep proof, preview, caption, sibling-packet, locale, retention, and publication-state truth visible on the shared shelf.",
                 ],
             },
             {
@@ -695,6 +719,53 @@ def main() -> int:
                     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs and CampaignSpineService.cs stamp creator-linked recap entries with campaign, personal, and creator audience plus publication state before the shelf view filters them.",
                     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs requires approved manifest-backed audit authority before creator-publication moderation and publication can widen onto the public shelf.",
                     "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py fail-closes queue, registry, and source-proof drift if artifact shelf audience filtering or signed-in view controls regress.",
+                ],
+            },
+            {
+                "receipt_id": "first_playable_session:onboarding",
+                "package_id": "next90-m119-hub-first-session-onboarding",
+                "milestone_id": 119,
+                "frontier_id": 1130567614,
+                "summary": "Hub now keeps signed-in install return, starter-workspace seeding, campaign-primer-backed first-session proof, and support-safe recovery on one bounded first-playable-session onboarding lane instead of a separate onboarding ritual.",
+                "routes": [
+                    "/home",
+                    "/home/work",
+                    "/account/work",
+                    "/api/v1/campaign-spine/me",
+                    "/api/v1/campaign-spine/me/workspaces/starter",
+                ],
+                "surfaces": [
+                    "first_playable_session:onboarding",
+                    "campaign_onboarding",
+                    "install_claim_restore_continue",
+                ],
+                "evidence": [
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs exposes the bounded starter-workspace seeding route so the signed-in starter lane reuses campaign-spine truth instead of inventing a second onboarding API.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects first-playable-session summaries, legal-runner proof, understandable-return proof, and primer-safe publication titles on the same campaign return lane.",
+                    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves landing, home, account, and starter-workspace API surfaces keep the first-session lane grounded on the shared campaign projection.",
+                ],
+            },
+            {
+                "receipt_id": "starter_lane:hub",
+                "package_id": "next90-m119-hub-first-session-onboarding",
+                "milestone_id": 119,
+                "frontier_id": 1130567614,
+                "summary": "The hub-owned starter lane now gives signed-in users one calmer route from linked install into first-session proof, build follow-through, campaign-primer follow-through, and install support without hiding the next safe action behind deeper admin-only pages.",
+                "routes": [
+                    "/home/work",
+                    "/account/work",
+                    "/account/access",
+                    "/contact",
+                ],
+                "surfaces": [
+                    "starter_lane:hub",
+                    "first_session:proof_drawer",
+                    "starter_build:follow_through",
+                ],
+                "evidence": [
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml wires starter-workspace seeding to the campaign-spine starter endpoint and keeps first-session proof, build-path follow-through, and claimed-device return on the signed-in Home rail.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml keeps the selected first-session drawer, legal-runner and return proof, and install-support follow-through on the shared account work route.",
+                    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes the starter lane as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet.",
                 ],
             },
         ],
