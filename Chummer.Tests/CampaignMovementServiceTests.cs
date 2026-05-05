@@ -1,6 +1,7 @@
 using Chummer.Campaign.Contracts;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -29,10 +30,12 @@ public sealed class CampaignMovementServiceTests
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
             GroupService groups = new(store, accounts);
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
             CampaignSpineService campaignSpine = new(
                 store,
                 new WorkspaceLifecyclePolicyService(configuration),
-                new CampaignArtifactRegistryBridge(store));
+                new CampaignArtifactRegistryBridge(store),
+                supportStore);
 
             var operatorUser = accounts.EnsureUser("subject.demo", "Demo Operator", "demo@example.invalid");
             var sourceWorkspace = campaignSpine.GetStarterWorkspace(operatorUser)
@@ -106,10 +109,12 @@ public sealed class CampaignMovementServiceTests
             Assert.Contains(returnTransfer.Receipts, item => string.Equals(item.SourceKind, "target_run", StringComparison.OrdinalIgnoreCase));
 
             CommunityStore reloadedStore = new(configuration, NullLogger<CommunityStore>.Instance);
+            SupportStore reloadedSupportStore = new(configuration, NullLogger<SupportStore>.Instance);
             CampaignSpineService reloadedSpine = new(
                 reloadedStore,
                 new WorkspaceLifecyclePolicyService(configuration),
-                new CampaignArtifactRegistryBridge(reloadedStore));
+                new CampaignArtifactRegistryBridge(reloadedStore),
+                reloadedSupportStore);
             IReadOnlyList<DossierMovementReceiptProjection> reloadedReceipts = reloadedSpine.GetDossierMovements(operatorUser, targetWorkspace.WorkspaceId);
             Assert.True(reloadedReceipts.Count >= 2);
             Assert.Contains(reloadedReceipts, item => string.Equals(item.MovementId, movement.MovementId, StringComparison.OrdinalIgnoreCase));

@@ -4382,6 +4382,48 @@ async Task VerifyPublicLandingProjectionAsync()
     var sourceOwnerSummary = campaignSpine.GetAccountSummary(linkedUser);
     var sourceDossier = sourceOwnerSummary.Dossiers.FirstOrDefault();
     Assert(sourceDossier is not null, "signed-in owners should have a governed dossier before a GM moves roster state.");
+    var dossierMovementPlanResult = await campaignSpineController.GetMyCampaignWorkspaceDossierMovementPlan(workspaceId, CancellationToken.None);
+    var dossierMovementPlanPayload = (dossierMovementPlanResult.Result as OkObjectResult)?.Value as DossierMovementPlannerProjection ?? dossierMovementPlanResult.Value;
+    Assert(dossierMovementPlanPayload is not null, "campaign spine movement planner api should expose governed dossier movement targets on the starter workspace.");
+    Assert(dossierMovementPlanPayload.TargetGroups.Count >= 1, "campaign spine movement planner api should keep at least one governed target group visible.");
+    Assert(dossierMovementPlanPayload.TargetGroups.SelectMany(item => item.CampaignOptions).Any(item => item.EventOptions.Count >= 1), "campaign spine movement planner api should expose at least one target event option for governed dossier movement.");
+    var dossierMovementResult = await campaignSpineController.MoveMyDossier(
+        new DossierMovementRequest(
+            DossierId: sourceDossier!.DossierId,
+            TargetGroupId: transferGroup.GroupId,
+            TargetCampaignId: transferCampaign.CampaignId,
+            TargetCampaignTitle: transferCampaign.Title,
+            TargetRunTitle: "Dockside handoff",
+            TargetSceneTitle: "Pier 3 exchange",
+            TargetOwnerUserId: transferTargetUser.UserId,
+            Note: "GM handoff for the next run."),
+        CancellationToken.None);
+    var dossierMovementPayload = (dossierMovementResult.Result as OkObjectResult)?.Value as DossierMovementReceiptProjection ?? dossierMovementResult.Value;
+    var dossierMovementStatusCode = (dossierMovementResult.Result as ObjectResult)?.StatusCode;
+    var dossierMovementProblemDetail = ((dossierMovementResult.Result as ObjectResult)?.Value as ProblemDetails)?.Detail;
+    Assert(dossierMovementPayload is not null && string.Equals(dossierMovementPayload.TargetRunTitle, "Dockside handoff", StringComparison.Ordinal), $"campaign spine movement api should materialize a governed target run receipt. status={dossierMovementStatusCode?.ToString() ?? "<null>"} detail={dossierMovementProblemDetail ?? "<none>"}");
+    Assert(string.Equals(dossierMovementPayload.TargetSceneTitle, "Pier 3 exchange", StringComparison.Ordinal), "campaign spine movement api should materialize a governed target scene receipt.");
+    Assert(dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, "target_run", StringComparison.Ordinal)), "campaign spine movement api should preserve the governed target-run receipt on the transfer continuity packet.");
+    Assert(dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, "target_scene", StringComparison.Ordinal)), "campaign spine dossier-movement api should emit a durable governed target-scene receipt.");
+    var dossierMovementsResult = await campaignSpineController.GetMyCampaignWorkspaceDossierMovements(workspaceId, CancellationToken.None);
+    var dossierMovementsPayload = (dossierMovementsResult.Result as OkObjectResult)?.Value as IReadOnlyList<DossierMovementReceiptProjection> ?? dossierMovementsResult.Value;
+    Assert(dossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true, "campaign spine movement history api should retain the new governed dossier movement receipt.");
+    sourceOwnerSummary = campaignSpine.GetAccountSummary(linkedUser);
+    sourceDossier = sourceOwnerSummary.Dossiers.FirstOrDefault(item => !string.Equals(item.DossierId, dossierMovementPayload.DossierId, StringComparison.Ordinal));
+    if (sourceDossier is null)
+    {
+        var relaySeedGroup = groups.CreateGroup(new CreateGroupRequest(
+            SubjectId: "subject.demo",
+            Name: "Saturday Crew Seed",
+            GroupType: "campaign",
+            Visibility: "group",
+            Capabilities: null));
+        groups.GetOrCreateCampaign(relaySeedGroup.GroupId, "hub", "Saturday Crew Seed");
+        sourceOwnerSummary = campaignSpine.GetAccountSummary(linkedUser);
+        sourceDossier = sourceOwnerSummary.Dossiers.FirstOrDefault(item => !string.Equals(item.DossierId, dossierMovementPayload.DossierId, StringComparison.Ordinal))
+            ?? sourceOwnerSummary.Dossiers.FirstOrDefault();
+    }
+    Assert(sourceDossier is not null, "signed-in owners should still have a governed dossier available for roster transfer after movement proof coverage.");
     var rosterTransferResult = await campaignSpineController.TransferMyRoster(
         new RosterTransferRequest(
             DossierId: sourceDossier!.DossierId,
@@ -4421,6 +4463,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(outsiderCampaignSummaryPayload is not null && outsiderCampaignSummaryPayload.Dossiers.Any(item => string.Equals(item.DossierId, sourceDossier.DossierId, StringComparison.Ordinal) && string.Equals(item.OwnerUserId, transferTargetUser.UserId, StringComparison.Ordinal)), "new owner should see the transferred dossier on their campaign summary.");
     var outsiderWorkspace = outsiderCampaignSummaryPayload!.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, transferCampaign.CampaignId, StringComparison.OrdinalIgnoreCase));
     Assert(outsiderWorkspace is not null && outsiderWorkspace.RosterTransfers?.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true, "target workspace should surface the roster-transfer audit receipt.");
+    var outsiderDossierMovementsResult = await outsiderCampaignSpineController.GetMyCampaignWorkspaceDossierMovements(outsiderWorkspace!.WorkspaceId, CancellationToken.None);
+    var outsiderDossierMovementsPayload = (outsiderDossierMovementsResult.Result as OkObjectResult)?.Value as IReadOnlyList<DossierMovementReceiptProjection> ?? outsiderDossierMovementsResult.Value;
+    Assert(outsiderDossierMovementsPayload?.Any(item => string.Equals(item.MovementId, dossierMovementPayload.MovementId, StringComparison.Ordinal)) == true, "target owner should see governed dossier movement receipts on the target workspace history.");
     var outsiderWorkspaceServerPlaneResult = await outsiderCampaignSpineController.GetMyCampaignWorkspaceServerPlane(outsiderWorkspace!.WorkspaceId, CancellationToken.None);
     var outsiderWorkspaceServerPlanePayload = (outsiderWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? outsiderWorkspaceServerPlaneResult.Value;
     Assert(outsiderWorkspaceServerPlanePayload is not null && outsiderWorkspaceServerPlanePayload.RosterTransfers.Any(item => string.Equals(item.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)), "target workspace server plane should preserve the roster-transfer receipt.");
