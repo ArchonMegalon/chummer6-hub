@@ -35,7 +35,8 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     IReadOnlyList<WorkspaceRestoreProvenanceReceipt> RestoreProvenanceReceipts,
     IReadOnlyList<WorkspaceRestoreProvenanceRecoveryProjection> RestoreProvenanceRecoveryReceipts,
     IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> RestoreConflictReceipts,
-    DateTimeOffset GeneratedAtUtc);
+    DateTimeOffset GeneratedAtUtc,
+    CampaignAdoptionLoopProjection? CampaignAdoptionLoop = null);
 
 public sealed record CampaignConsequenceTruthProjection(
     string WorkspaceId,

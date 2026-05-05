@@ -3745,10 +3745,90 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.ObjectiveSummary.Contains("GM runboard", StringComparison.Ordinal) == true, "campaign spine server plane api should prefer the persisted runboard-state summary once continuity is stored.");
     Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.Blockers.Any(item => item.Contains("loading-dock mooks", StringComparison.Ordinal)) == true, "campaign spine server plane api should project persisted blocker lines on the runboard summary.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runboard_continuity", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runboard continuity onto the bounded what-changed rail.");
+    var campaignAdoptionResult = await campaignSpineController.UpsertMyCampaignWorkspaceCampaignAdoption(
+        workspaceId,
+        new CampaignAdoptionUpdateRequest(
+            SafeToPlay: true,
+            ConfidencePercent: 82,
+            RunnerCount: workspacePayload?.Dossiers.Count ?? 0,
+            ActiveJobCount: 1,
+            ContactCount: 3,
+            HouseRuleCount: workspacePayload?.RuleEnvironment.HouseRulePacks.Count ?? 0,
+            ExplicitUnknowns:
+            [
+                "Two legacy contact modifiers still need manual provenance review.",
+                "One retired house rule stays preserved as unknown provenance rather than silently dropped."
+            ],
+            RecommendedNextActions:
+            [
+                "Keep future changes only and preserve legacy notes on the governed return lane.",
+                "Reconcile the last unproven contact modifier before you reopen the next season handoff."
+            ],
+            Summary: "Campaign adoption wizard says this workspace is safe to play while unknown provenance stays explicit.",
+            NextSafeAction: "Review the adoption wizard on /account/work#adoption before you reopen the next campaign return.",
+            Note: "M122 adoption proof."),
+        CancellationToken.None);
+    var campaignAdoptionPayload = (campaignAdoptionResult.Result as OkObjectResult)?.Value as CampaignAdoptionProjection ?? campaignAdoptionResult.Value;
+    Assert(campaignAdoptionPayload is not null && campaignAdoptionPayload.SafeToPlay, "campaign spine campaign-adoption api should persist the adoption wizard posture for the governed workspace.");
+    Assert(campaignAdoptionPayload.ConfidencePercent == 82, "campaign spine campaign-adoption api should preserve the explicit adoption confidence percentage.");
+    var runnerGoalResult = await campaignSpineController.UpsertMyCampaignWorkspaceRunnerGoal(
+        workspaceId,
+        new RunnerGoalUpdateRequest(
+            DossierId: workspacePayload?.Dossiers.FirstOrDefault()?.DossierId ?? string.Empty,
+            Label: "Delta-grade wired reflexes fund",
+            TargetKind: "upgrade_fund",
+            TargetReference: "wired_reflexes_delta",
+            SavedNuyen: 18500,
+            NuyenRequired: 217000,
+            KarmaReserved: 12,
+            DowntimeDays: 4,
+            ApprovalStatus: "gm_review",
+            NextSafeAction: "Review runner goal pins on /account/work#runner-goals before you close the next ResolutionReport.",
+            Note: "M122 goal pin proof."),
+        CancellationToken.None);
+    var runnerGoalPayload = (runnerGoalResult.Result as OkObjectResult)?.Value as RunnerGoalProjection ?? runnerGoalResult.Value;
+    Assert(runnerGoalPayload is not null && string.Equals(runnerGoalPayload.TargetReference, "wired_reflexes_delta", StringComparison.Ordinal), "campaign spine runner-goals api should persist the governed runner goal pin for the selected dossier.");
+    Assert(runnerGoalPayload.SavedNuyen == 18500, "campaign spine runner-goals api should preserve resource progress on the governed goal pin.");
+    var resolutionReportApprovalResult = await campaignSpineController.ApproveMyCampaignWorkspaceResolutionReport(
+        workspaceId,
+        new ResolutionReportApprovalRequest(
+            RunId: runId,
+            Summary: "ResolutionReport approval closes the courier extraction on the governed hub lane.",
+            WorldTickSummary: "Dockside courier fallout becomes the first BLACK LEDGER WorldTick for Tacoma.",
+            ConsequenceSummary: "Heat escalates across Tacoma after the courier extraction closes out.",
+            NewsTitle: "Tacoma grid rumor points to a vanished courier",
+            NewsSummary: "Player-safe reports say a courier vanished after a dockside outage, but the source stays preview-only.",
+            NewsSource: "Tacoma Shadowfeed",
+            NewsUrl: "https://example.invalid/news/tacoma-courier-rumor",
+            NextSafeAction: "Review the first WorldTick and player-safe news item on /account/work#campaign-memory before you reopen the runboard.",
+            Note: "M122 BLACK LEDGER proof."),
+        CancellationToken.None);
+    var resolutionReportApprovalPayload = (resolutionReportApprovalResult.Result as OkObjectResult)?.Value as ResolutionReportApprovalProjection ?? resolutionReportApprovalResult.Value;
+    Assert(resolutionReportApprovalPayload is not null && string.Equals(resolutionReportApprovalPayload.RunId, runId, StringComparison.Ordinal), "campaign spine resolution-report-approvals api should close out the active governed run.");
+    Assert(!string.IsNullOrWhiteSpace(resolutionReportApprovalPayload.WorldTickId), "campaign spine resolution-report-approvals api should project the first WorldTick receipt.");
+    Assert(!string.IsNullOrWhiteSpace(resolutionReportApprovalPayload.NewsId), "campaign spine resolution-report-approvals api should project the first player-safe news receipt.");
+    var adoptionLoopResult = await campaignSpineController.GetMyCampaignWorkspaceAdoptionLoop(workspaceId, CancellationToken.None);
+    var adoptionLoopPayload = (adoptionLoopResult.Result as OkObjectResult)?.Value as CampaignAdoptionLoopProjection ?? adoptionLoopResult.Value;
+    Assert(adoptionLoopPayload is not null && adoptionLoopPayload.Adoption is not null, "campaign spine adoption-loop api should surface the governed adoption wizard posture.");
+    Assert(adoptionLoopPayload.RunnerGoals.Any(item => string.Equals(item.GoalId, runnerGoalPayload!.GoalId, StringComparison.Ordinal)), "campaign spine adoption-loop api should surface persisted runner goal pins.");
+    Assert(adoptionLoopPayload.ResolutionReportApproval is not null && string.Equals(adoptionLoopPayload.ResolutionReportApproval.ApprovalId, resolutionReportApprovalPayload!.ApprovalId, StringComparison.Ordinal), "campaign spine adoption-loop api should surface the governed ResolutionReport approval.");
+    Assert(adoptionLoopPayload.WorldTicks.Any(item => string.Equals(item.WorldTickId, resolutionReportApprovalPayload.WorldTickId, StringComparison.Ordinal)), "campaign spine adoption-loop api should surface the first BLACK LEDGER WorldTick.");
+    Assert(adoptionLoopPayload.PlayerSafeNews.Any(item => string.Equals(item.NewsId, resolutionReportApprovalPayload.NewsId, StringComparison.Ordinal)), "campaign spine adoption-loop api should surface the player-safe news preview without turning it into world truth.");
+    var m122WorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
+    var m122WorkspaceServerPlanePayload = (m122WorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? m122WorkspaceServerPlaneResult.Value;
+    Assert(m122WorkspaceServerPlanePayload?.CampaignAdoptionLoop is not null, "campaign spine server plane api should project the combined campaign adoption loop on the bounded workspace plane.");
+    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "campaign_adoption", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the campaign adoption wizard onto the bounded what-changed rail.");
+    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runner goal pins onto the bounded what-changed rail.");
+    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "resolution_report_approval", StringComparison.Ordinal)) == true, "campaign spine server plane api should project ResolutionReport approvals onto the bounded what-changed rail.");
+    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "world_tick", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the first BLACK LEDGER WorldTick onto the bounded what-changed rail.");
+    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "player_safe_news", StringComparison.Ordinal)) == true, "campaign spine server plane api should project player-safe news previews onto the bounded what-changed rail.");
+    Assert(m122WorkspaceServerPlanePayload?.RecapShelf.Any(item => string.Equals(item.EntryId, resolutionReportApprovalPayload!.NewsId, StringComparison.Ordinal)) == true, "campaign spine server plane api should attach player-safe news previews to the richer recap shelf.");
+    Assert(m122WorkspaceServerPlanePayload?.CampaignMemory?.Summary.Contains("BLACK LEDGER", StringComparison.OrdinalIgnoreCase) == true, "campaign spine server plane api should keep the first BLACK LEDGER WorldTick on the governed campaign-memory lane.");
+    Assert(m122WorkspaceServerPlanePayload?.NextSessionCarryForward?.EvidenceLines.Any(item => item.Contains("Tacoma grid rumor", StringComparison.Ordinal)) == true, "campaign spine server plane api should keep player-safe news follow-through attached to the next-session return.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
-    Assert(runPayload.RunboardContinuity is not null && string.Equals(runPayload.RunboardContinuity.ResolutionReportDraft.Status, "draft", StringComparison.Ordinal), "campaign spine run detail api should surface the persisted ResolutionReport draft continuity on the active run.");
+    Assert(runPayload.RunboardContinuity is not null && string.Equals(runPayload.RunboardContinuity.ResolutionReportDraft.Status, "approved", StringComparison.Ordinal), "campaign spine run detail api should surface the approved ResolutionReport continuity on the active run.");
     var handoffResult = await campaignSpineController.GetMyBuildLabHandoff(handoffId, CancellationToken.None);
     var handoffPayload = (handoffResult.Result as OkObjectResult)?.Value as BuildLabHandoffProjection ?? handoffResult.Value;
     Assert(handoffPayload is not null && handoffPayload.Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "campaign spine api should expose the customer-facing build-path handoff detail.");
@@ -4548,8 +4628,13 @@ async Task VerifyPublicLandingProjectionAsync()
     var reloadedRun = NotNull(reloadedCampaignSpine.GetRun(linkedUser, runId), "campaign spine runboard continuity should survive a community-store reload on the active run.");
     Assert(reloadedRun.RunboardContinuity is not null, "campaign spine runboard continuity should persist across a community-store reload.");
     Assert(reloadedRun.RunboardContinuity!.TurnLedgerHandoff.EvidenceLines.Any(item => item.Contains("without replaying engine math", StringComparison.Ordinal)), "campaign spine runboard continuity should preserve the no-engine-math boundary across reload.");
-    Assert(string.Equals(reloadedRun.RunboardContinuity.ResolutionReportDraft.Status, "draft", StringComparison.Ordinal), "campaign spine runboard continuity should preserve the ResolutionReport draft status across reload.");
+    Assert(string.Equals(reloadedRun.RunboardContinuity.ResolutionReportDraft.Status, "approved", StringComparison.Ordinal), "campaign spine runboard continuity should preserve the ResolutionReport approval status across reload.");
     Assert(reloadedRun.RunboardContinuity.RunboardState.Blockers.Any(item => item.Contains("loading-dock mooks", StringComparison.Ordinal)), "campaign spine runboard continuity should preserve blocker lines across reload.");
+    var reloadedAdoptionLoop = NotNull(reloadedCampaignSpine.GetCampaignAdoptionLoop(linkedUser, workspaceId), "campaign spine adoption loop should survive a community-store reload.");
+    Assert(reloadedAdoptionLoop.Adoption is not null && reloadedAdoptionLoop.Adoption.ConfidencePercent == 82, "campaign spine adoption loop should preserve adoption confidence across reload.");
+    Assert(reloadedAdoptionLoop.RunnerGoals.Any(item => item.Label.Contains("Delta-grade wired reflexes fund", StringComparison.Ordinal)), "campaign spine adoption loop should preserve runner goal pins across reload.");
+    Assert(reloadedAdoptionLoop.WorldTicks.Any(item => item.Summary.Contains("BLACK LEDGER WorldTick", StringComparison.Ordinal)), "campaign spine adoption loop should preserve the first WorldTick across reload.");
+    Assert(reloadedAdoptionLoop.PlayerSafeNews.Any(item => item.Title.Contains("Tacoma grid rumor", StringComparison.Ordinal)), "campaign spine adoption loop should preserve the player-safe news preview across reload.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(

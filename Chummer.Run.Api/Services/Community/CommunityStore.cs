@@ -53,6 +53,11 @@ public sealed class CommunityStore
     public List<GovernedPrepLaunchProjection> PrepLaunches { get; } = new();
     public List<TravelPrefetchReceiptProjection> TravelPrefetchReceipts { get; } = new();
     public List<AftermathRecapPackageProjection> AftermathPackages { get; } = new();
+    public List<CampaignAdoptionProjection> CampaignAdoptions { get; } = new();
+    public List<RunnerGoalProjection> RunnerGoals { get; } = new();
+    public List<ResolutionReportApprovalProjection> ResolutionReportApprovals { get; } = new();
+    public List<WorldTickProjection> WorldTicks { get; } = new();
+    public List<PlayerSafeNewsProjection> PlayerSafeNews { get; } = new();
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
@@ -86,6 +91,11 @@ public sealed class CommunityStore
             PrepLaunches: PrepLaunches.OrderByDescending(static item => item.LaunchedAtUtc).ToArray(),
             TravelPrefetchReceipts: TravelPrefetchReceipts.OrderByDescending(static item => item.StagedAtUtc).ToArray(),
             AftermathPackages: AftermathPackages.OrderByDescending(static item => item.GeneratedAtUtc).ToArray(),
+            CampaignAdoptions: CampaignAdoptions.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            RunnerGoals: RunnerGoals.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            ResolutionReportApprovals: ResolutionReportApprovals.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            WorldTicks: WorldTicks.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            PlayerSafeNews: PlayerSafeNews.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
             RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
@@ -143,6 +153,11 @@ public sealed class CommunityStore
         PrepLaunches.Clear();
         TravelPrefetchReceipts.Clear();
         AftermathPackages.Clear();
+        CampaignAdoptions.Clear();
+        RunnerGoals.Clear();
+        ResolutionReportApprovals.Clear();
+        WorldTicks.Clear();
+        PlayerSafeNews.Clear();
         RestoreByUserId.Clear();
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
@@ -221,6 +236,11 @@ public sealed class CommunityStore
         PrepLaunches.AddRange(snapshot.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>());
         TravelPrefetchReceipts.AddRange(snapshot.TravelPrefetchReceipts ?? Array.Empty<TravelPrefetchReceiptProjection>());
         AftermathPackages.AddRange(snapshot.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>());
+        CampaignAdoptions.AddRange(snapshot.CampaignAdoptions ?? Array.Empty<CampaignAdoptionProjection>());
+        RunnerGoals.AddRange(snapshot.RunnerGoals ?? Array.Empty<RunnerGoalProjection>());
+        ResolutionReportApprovals.AddRange(snapshot.ResolutionReportApprovals ?? Array.Empty<ResolutionReportApprovalProjection>());
+        WorldTicks.AddRange(snapshot.WorldTicks ?? Array.Empty<WorldTickProjection>());
+        PlayerSafeNews.AddRange(snapshot.PlayerSafeNews ?? Array.Empty<PlayerSafeNewsProjection>());
 
         foreach (var restore in snapshot.RestoreSummaries ?? Array.Empty<WorkspaceRestoreProjection>())
         {
@@ -319,6 +339,11 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
     IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetchReceipts = null,
     IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null,
+    IReadOnlyList<CampaignAdoptionProjection>? CampaignAdoptions = null,
+    IReadOnlyList<RunnerGoalProjection>? RunnerGoals = null,
+    IReadOnlyList<ResolutionReportApprovalProjection>? ResolutionReportApprovals = null,
+    IReadOnlyList<WorldTickProjection>? WorldTicks = null,
+    IReadOnlyList<PlayerSafeNewsProjection>? PlayerSafeNews = null,
     IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null);
 
 internal sealed record SponsorSessionStateSnapshot(

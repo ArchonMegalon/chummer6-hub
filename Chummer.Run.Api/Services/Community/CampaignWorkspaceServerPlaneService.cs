@@ -554,7 +554,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             RestoreProvenanceReceipts: ProjectRestoreProvenanceReceipts(context.Restore.ProvenanceReceipts),
             RestoreProvenanceRecoveryReceipts: ProjectRestoreProvenanceRecoveryReceipts(context.Restore.ProvenanceReceipts),
             RestoreConflictReceipts: ProjectRestoreConflictReceipts(context.Restore.ConflictReceipts),
-            GeneratedAtUtc: context.GeneratedAtUtc);
+            GeneratedAtUtc: context.GeneratedAtUtc,
+            CampaignAdoptionLoop: context.Workspace.CampaignAdoptionLoop);
     }
 
     public IReadOnlyList<CampaignConsequenceProjection>? GetWorkspaceConsequences(
@@ -638,6 +639,56 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
         return context?.LeadRun?.RunboardContinuity;
+    }
+
+    public CampaignAdoptionLoopProjection? GetWorkspaceCampaignAdoptionLoop(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context?.Workspace.CampaignAdoptionLoop;
+    }
+
+    public CampaignAdoptionProjection? UpsertCampaignAdoption(
+        HubUserDto user,
+        string workspaceId,
+        CampaignAdoptionUpdateRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context is null ? null : _campaignSpine.UpsertCampaignAdoption(user, context.Workspace, request);
+    }
+
+    public RunnerGoalProjection? UpsertRunnerGoal(
+        HubUserDto user,
+        string workspaceId,
+        RunnerGoalUpdateRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context is null ? null : _campaignSpine.UpsertRunnerGoal(user, context.Workspace, request);
+    }
+
+    public ResolutionReportApprovalProjection? ApproveResolutionReport(
+        HubUserDto user,
+        string workspaceId,
+        ResolutionReportApprovalRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context is null ? null : _campaignSpine.ApproveResolutionReport(user, context.Workspace, request);
     }
 
     public RunboardContinuityProjection? UpsertRunboardContinuity(

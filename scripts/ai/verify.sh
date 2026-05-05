@@ -2350,5 +2350,8 @@ python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py
 python3 scripts/materialize_next90_m121_hub_runboard_continuity_proof.py
 python3 scripts/verify_next90_m121_hub_runboard_continuity.py
 python3 -m unittest tests/test_next90_m121_hub_runboard_continuity.py
+python3 scripts/materialize_next90_m122_hub_campaign_adoption_loop_proof.py
+python3 scripts/verify_next90_m122_hub_campaign_adoption_loop.py
+python3 -m unittest tests/test_next90_m122_hub_campaign_adoption_loop.py
 
 bash scripts/ai/run_services_smoke.sh

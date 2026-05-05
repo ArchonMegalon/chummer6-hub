@@ -432,6 +432,98 @@ public sealed record NextSessionCarryForwardProjection(
     IReadOnlyList<string> EvidenceLines,
     DateTimeOffset UpdatedAtUtc);
 
+public sealed record CampaignAdoptionProjection(
+    string AdoptionId,
+    string WorkspaceId,
+    string CampaignId,
+    bool SafeToPlay,
+    int ConfidencePercent,
+    int RunnerCount,
+    int ActiveJobCount,
+    int ContactCount,
+    int HouseRuleCount,
+    IReadOnlyList<string> ExplicitUnknowns,
+    IReadOnlyList<string> RecommendedNextActions,
+    string Summary,
+    string NextSafeAction,
+    IReadOnlyList<string> EvidenceLines,
+    string UpdatedByUserId,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record RunnerGoalProjection(
+    string GoalId,
+    string WorkspaceId,
+    string CampaignId,
+    string DossierId,
+    string RunnerHandle,
+    string Label,
+    string TargetKind,
+    string TargetReference,
+    int SavedNuyen,
+    int NuyenRequired,
+    int KarmaReserved,
+    int DowntimeDays,
+    string RuleEnvironmentFingerprint,
+    string ApprovalStatus,
+    string NextSafeAction,
+    IReadOnlyList<string> EvidenceLines,
+    string UpdatedByUserId,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record ResolutionReportApprovalProjection(
+    string ApprovalId,
+    string WorkspaceId,
+    string CampaignId,
+    string RunId,
+    string RunTitle,
+    string Summary,
+    string NextSafeAction,
+    string WorldTickId,
+    string NewsId,
+    IReadOnlyList<string> EvidenceLines,
+    string UpdatedByUserId,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record WorldTickProjection(
+    string WorldTickId,
+    string WorkspaceId,
+    string CampaignId,
+    string RunId,
+    string RunTitle,
+    string Summary,
+    string ConsequenceSummary,
+    IReadOnlyList<string> EvidenceLines,
+    string UpdatedByUserId,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record PlayerSafeNewsProjection(
+    string NewsId,
+    string WorkspaceId,
+    string CampaignId,
+    string WorldTickId,
+    string Title,
+    string Source,
+    string Summary,
+    string Url,
+    string SpoilerPolicy,
+    string PublicationSummary,
+    IReadOnlyList<string> EvidenceLines,
+    string UpdatedByUserId,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record CampaignAdoptionLoopProjection(
+    string WorkspaceId,
+    string CampaignId,
+    string Summary,
+    string NextSafeAction,
+    CampaignAdoptionProjection? Adoption,
+    IReadOnlyList<RunnerGoalProjection> RunnerGoals,
+    ResolutionReportApprovalProjection? ResolutionReportApproval,
+    IReadOnlyList<WorldTickProjection> WorldTicks,
+    IReadOnlyList<PlayerSafeNewsProjection> PlayerSafeNews,
+    IReadOnlyList<string> EvidenceLines,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed record CampaignWorkspaceProjection(
     string WorkspaceId,
     string CampaignId,
@@ -455,7 +547,8 @@ public sealed record CampaignWorkspaceProjection(
     IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null,
     NextSessionCarryForwardProjection? NextSessionCarryForward = null,
     FirstPlayableSessionProjection? FirstPlayableSession = null,
-    CampaignMemoryProjection? CampaignMemory = null);
+    CampaignMemoryProjection? CampaignMemory = null,
+    CampaignAdoptionLoopProjection? CampaignAdoptionLoop = null);
 
 public sealed record CampaignWorkspaceDigestProjection(
     string WorkspaceId,
