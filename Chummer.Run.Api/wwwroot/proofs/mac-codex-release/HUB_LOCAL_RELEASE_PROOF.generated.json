@@ -159,6 +159,72 @@
         "release_concierge:hub"
       ],
       "exit_criterion": "Compile support closure and release explainer packets from installed build, channel, and support-case truth."
+    },
+    {
+      "package_id": "next90-m114-hub-rule-environment-receipts",
+      "work_task_id": "114.3",
+      "milestone_id": 114,
+      "frontier_id": 4934642390,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "wave": "W12",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M114 chummer6-hub rule-environment receipts are complete; future shards must verify this package receipt, registry row, queue row, and design-queue row instead of reopening the campaign/support/install-aware receipt lane.",
+      "task": "Keep campaign, support, and install-aware diagnostics tied to the same rule-environment receipts.",
+      "title": "Keep campaign, support, and install-aware diagnostics tied to the same rule-environment receipts",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "campaign_rule_environment_receipts",
+        "support_rule_environment_receipts",
+        "install_aware_support_receipts"
+      ],
+      "exit_criterion": "Keep campaign, support, and install-aware diagnostics tied to the same rule-environment receipts."
+    },
+    {
+      "package_id": "next90-m117-hub-artifact-shelf-v2",
+      "work_task_id": "117.1",
+      "milestone_id": 117,
+      "frontier_id": 4041187890,
+      "repo": "chummer6-hub",
+      "status": "in_progress",
+      "wave": "W13",
+      "task": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state.",
+      "title": "Build artifact shelf APIs and audience filters",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "artifact_shelf:v2",
+        "artifact_audience_filters"
+      ],
+      "exit_criterion": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state."
+    },
+    {
+      "package_id": "next90-m119-hub-first-session-onboarding",
+      "work_task_id": "119.1",
+      "milestone_id": 119,
+      "frontier_id": 1130567614,
+      "repo": "chummer6-hub",
+      "status": "in_progress",
+      "wave": "W14",
+      "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+      "title": "Orchestrate guided first-playable-session onboarding",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "first_playable_session:onboarding",
+        "starter_lane:hub"
+      ],
+      "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
     }
   ],
   "successor_queue_packages_by_id": {
@@ -297,6 +363,72 @@
         "release_concierge:hub"
       ],
       "exit_criterion": "Compile support closure and release explainer packets from installed build, channel, and support-case truth."
+    },
+    "next90-m114-hub-rule-environment-receipts": {
+      "package_id": "next90-m114-hub-rule-environment-receipts",
+      "work_task_id": "114.3",
+      "milestone_id": 114,
+      "frontier_id": 4934642390,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "wave": "W12",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M114 chummer6-hub rule-environment receipts are complete; future shards must verify this package receipt, registry row, queue row, and design-queue row instead of reopening the campaign/support/install-aware receipt lane.",
+      "task": "Keep campaign, support, and install-aware diagnostics tied to the same rule-environment receipts.",
+      "title": "Keep campaign, support, and install-aware diagnostics tied to the same rule-environment receipts",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "campaign_rule_environment_receipts",
+        "support_rule_environment_receipts",
+        "install_aware_support_receipts"
+      ],
+      "exit_criterion": "Keep campaign, support, and install-aware diagnostics tied to the same rule-environment receipts."
+    },
+    "next90-m117-hub-artifact-shelf-v2": {
+      "package_id": "next90-m117-hub-artifact-shelf-v2",
+      "work_task_id": "117.1",
+      "milestone_id": 117,
+      "frontier_id": 4041187890,
+      "repo": "chummer6-hub",
+      "status": "in_progress",
+      "wave": "W13",
+      "task": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state.",
+      "title": "Build artifact shelf APIs and audience filters",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "artifact_shelf:v2",
+        "artifact_audience_filters"
+      ],
+      "exit_criterion": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state."
+    },
+    "next90-m119-hub-first-session-onboarding": {
+      "package_id": "next90-m119-hub-first-session-onboarding",
+      "work_task_id": "119.1",
+      "milestone_id": 119,
+      "frontier_id": 1130567614,
+      "repo": "chummer6-hub",
+      "status": "in_progress",
+      "wave": "W14",
+      "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+      "title": "Orchestrate guided first-playable-session onboarding",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "first_playable_session:onboarding",
+        "starter_lane:hub"
+      ],
+      "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
     }
   },
   "base_url": "https://chummer.run",
@@ -576,8 +708,177 @@
         "release_explainer_packets",
         "public_concierge_trust_wrapper"
       ]
+    },
+    {
+      "receipt_id": "campaign_rule_environment_receipts",
+      "package_id": "next90-m114-hub-rule-environment-receipts",
+      "milestone_id": 114,
+      "frontier_id": 4934642390,
+      "summary": "Campaign rules answers, workspace readiness cues, and rule-environment studio lifecycle all keep the same explain-entry receipts visible on signed-in campaign surfaces instead of splitting campaign truth into separate support-only interpretations.",
+      "routes": [
+        "/home",
+        "/account/work",
+        "/api/v1/campaign-spine/me",
+        "/api/v1/campaign-spine/me/rules/{entryId}"
+      ],
+      "surfaces": [
+        "campaign_rule_environment_receipts",
+        "rules_navigator",
+        "rule_environment_studio:hub"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects rules navigator answers with stable ExplainEntryId values, before/after diffs, and rule-environment studio lifecycle posture on the signed-in campaign rail.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves signed-in account and home surfaces keep grounded rules navigator answers and studio stages visible.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m114_hub_rule_environment_receipts.py fail-closes queue, registry, and proof drift if campaign rule-environment receipts stop sharing the same explain-entry ids with support diagnostics."
+      ]
+    },
+    {
+      "receipt_id": "support_rule_environment_receipts",
+      "package_id": "next90-m114-hub-rule-environment-receipts",
+      "milestone_id": 114,
+      "frontier_id": 4934642390,
+      "summary": "Signed-in support assistant answers now carry the same rule-environment explain-entry receipts that campaign surfaces expose, so support questions about visibility, permissions, and campaign return posture cite campaign-owned rules truth instead of parallel help copy.",
+      "routes": [
+        "/api/v1/support/cases/assistant",
+        "/home",
+        "/api/v1/campaign-spine/me/rules/{entryId}"
+      ],
+      "surfaces": [
+        "support_rule_environment_receipts",
+        "support_assistant",
+        "rules_truth"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Support/SupportAssistantService.cs forwards RulesNavigator ExplainEntryId values into support citations for grounded rules questions.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Control.Contracts/SupportContracts.cs preserves optional citation receipt ids so support routes can name the same explain receipts without inventing a second contract.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves rules-truth assistant answers expose the same explain receipt ids surfaced by campaign rules navigator entries."
+      ]
+    },
+    {
+      "receipt_id": "install_aware_support_receipts",
+      "package_id": "next90-m114-hub-rule-environment-receipts",
+      "milestone_id": 114,
+      "frontier_id": 4934642390,
+      "summary": "Install-aware support diagnostics keep installation-scoped support questions on the same receipt-backed rule-environment lane, so signed-in assistant answers can pivot from a linked install back to the grounded campaign or build explain receipt instead of drifting into install-only folklore.",
+      "routes": [
+        "/api/v1/support/cases/assistant",
+        "/account/access",
+        "/account/work",
+        "/home"
+      ],
+      "surfaces": [
+        "install_aware_support_receipts",
+        "support_assistant",
+        "install_aware_diagnostics"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Support/SupportAssistantService.cs keeps installation-aware rules and build questions tied to open_home and open_work actions while carrying shared explain-entry receipt ids.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves install-aware rules and build assistant requests route back to the signed-in home and work surfaces instead of a detached diagnostic lane.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m114_hub_rule_environment_receipts.py rejects release-proof drift when install-aware support receipts stop naming the shared rule-environment support lane."
+      ]
+    },
+    {
+      "receipt_id": "artifact_shelf:v2",
+      "package_id": "next90-m117-hub-artifact-shelf-v2",
+      "milestone_id": 117,
+      "frontier_id": 4041187890,
+      "summary": "Hub now serves one governed artifact shelf lane for signed-in personal, campaign, creator, and public views, keeping recap lineage, publication state, trust posture, and public publication detail on the same inspectable surface instead of splitting them into unrelated routes.",
+      "routes": [
+        "/artifacts",
+        "/api/v1/public/artifacts/shelf",
+        "/artifacts/publications/{publicationId}",
+        "/api/v1/public/artifacts/publications/{publicationId}",
+        "/home/work",
+        "/account/work"
+      ],
+      "surfaces": [
+        "artifact_shelf:v2",
+        "artifact_shelf_api",
+        "signed_in_return_shelf",
+        "public_creator_discovery",
+        "creator_publication_detail"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs serves the governed artifact shelf, public shelf APIs, public creator publication detail route, and signed-in overlay projections from one bounded controller path.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs keeps public creator discovery published-only and manifest-authority-backed before the shared shelf surfaces it.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml renders signed-in return shelf entries and public creator discovery with audience, publication, trust, discovery, lineage, moderation, and next-step posture kept together.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves personal, campaign, creator, and public artifact views plus the mirrored shelf APIs keep proof, preview, caption, sibling-packet, locale, retention, and publication-state truth visible on the shared shelf."
+      ]
+    },
+    {
+      "receipt_id": "artifact_audience_filters",
+      "package_id": "next90-m117-hub-artifact-shelf-v2",
+      "milestone_id": 117,
+      "frontier_id": 4041187890,
+      "summary": "Signed-in artifact shelf filters now fail closed to all, personal, campaign, or creator while workspace and campaign projections stamp recap entries with audience and publication posture before the public shelf renders them.",
+      "routes": [
+        "/artifacts",
+        "/home/work",
+        "/account/work"
+      ],
+      "surfaces": [
+        "artifact_audience_filters",
+        "artifact_view:all",
+        "artifact_view:personal",
+        "artifact_view:campaign",
+        "artifact_view:creator",
+        "artifact_view:public"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs normalizes the signed-in view query, filters recap and creator-publication overlays, and falls unknown filters back to the all-views shelf.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs and CampaignSpineService.cs stamp creator-linked recap entries with campaign, personal, and creator audience plus publication state before the shelf view filters them.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs requires approved manifest-backed audit authority before creator-publication moderation and publication can widen onto the public shelf.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py fail-closes queue, registry, and source-proof drift if artifact shelf audience filtering or signed-in view controls regress."
+      ]
+    },
+    {
+      "receipt_id": "first_playable_session:onboarding",
+      "package_id": "next90-m119-hub-first-session-onboarding",
+      "milestone_id": 119,
+      "frontier_id": 1130567614,
+      "summary": "Hub now keeps signed-in install return, starter-workspace seeding, campaign-primer-backed first-session proof, and support-safe recovery on one bounded first-playable-session onboarding lane instead of a separate onboarding ritual.",
+      "routes": [
+        "/home",
+        "/home/work",
+        "/account/work",
+        "/api/v1/campaign-spine/me",
+        "/api/v1/campaign-spine/me/workspaces/starter"
+      ],
+      "surfaces": [
+        "first_playable_session:onboarding",
+        "campaign_onboarding",
+        "install_claim_restore_continue"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs exposes the bounded starter-workspace seeding route so the signed-in starter lane reuses campaign-spine truth instead of inventing a second onboarding API.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects first-playable-session summaries, legal-runner proof, understandable-return proof, and primer-safe publication titles on the same campaign return lane.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves landing, home, account, and starter-workspace API surfaces keep the first-session lane grounded on the shared campaign projection."
+      ]
+    },
+    {
+      "receipt_id": "starter_lane:hub",
+      "package_id": "next90-m119-hub-first-session-onboarding",
+      "milestone_id": 119,
+      "frontier_id": 1130567614,
+      "summary": "The hub-owned starter lane now gives signed-in users one calmer route from linked install into first-session proof, build follow-through, campaign-primer follow-through, and install support without hiding the next safe action behind deeper admin-only pages.",
+      "routes": [
+        "/home/work",
+        "/account/work",
+        "/account/access",
+        "/contact"
+      ],
+      "surfaces": [
+        "starter_lane:hub",
+        "first_session:proof_drawer",
+        "starter_build:follow_through"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml wires starter-workspace seeding to the campaign-spine starter endpoint and keeps first-session proof, build-path follow-through, and claimed-device return on the signed-in Home rail.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml keeps the selected first-session drawer, legal-runner and return proof, and install-support follow-through on the shared account work route.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes the starter lane as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet."
+      ]
     }
   ],
-  "generated_at": "2026-04-25T22:43:00Z",
-  "generatedAt": "2026-04-25T22:43:00Z"
+  "generated_at": "2026-05-05T10:51:59Z",
+  "generatedAt": "2026-05-05T10:51:59Z"
 }

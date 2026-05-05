@@ -2335,5 +2335,7 @@ python3 scripts/verify_next90_m117_hub_artifact_shelf_v2.py
 python3 -m unittest tests/test_next90_m117_hub_artifact_shelf_v2.py
 python3 scripts/verify_next90_m118_hub_organizer_ops.py
 python3 -m unittest tests/test_next90_m118_hub_organizer_ops.py
+python3 scripts/verify_next90_m119_hub_first_session_onboarding.py
+python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py
 
 bash scripts/ai/run_services_smoke.sh
