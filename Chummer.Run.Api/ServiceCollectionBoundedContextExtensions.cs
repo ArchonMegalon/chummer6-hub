@@ -71,6 +71,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SupportConciergePacketService>();
         services.AddSingleton<HostedCompanionPacketService>();
         services.AddSingleton<HostedProofContractService>();
+        services.AddSingleton<HostedBoundedContextCoverageService>();
         services.AddSingleton<RegistryTruthBindingService>();
         services.AddSingleton<PrivacyBoundedSupportStatusService>();
         services.AddSingleton<PublicSignalToCanonPacketService>();

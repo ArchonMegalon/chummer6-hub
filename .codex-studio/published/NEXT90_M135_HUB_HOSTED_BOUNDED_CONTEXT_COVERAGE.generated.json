@@ -1,0 +1,35 @@
+{
+  "contract_name": "chummer6-hub.next90_m135_hub_hosted_bounded_context_coverage",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m135-hub-close-hosted-bounded-context-campaign-account-support-pu",
+    "work_task_id": "135.4",
+    "milestone_id": 135,
+    "frontier_id": 1932284114,
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "wave": "W22",
+    "task": "Close hosted bounded-context, campaign, account, support, public, community, and orchestration-boundary coverage.",
+    "title": "Close hosted bounded-context, campaign, account, support, public, community, and orchestration-boundary coverage.",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "close_hosted_bounded_context_campaign:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "required_markers": [
+    "var boundedContextCoverage = new HostedBoundedContextCoverageService(releases).Build(new HostedBoundedContextCoverageContext(",
+    "hub bounded-context coverage should keep public context proof on the guest-readable landing rail.",
+    "hub bounded-context coverage should keep account context proof on the signed-in account rail.",
+    "hub bounded-context coverage should keep community context proof on the signed-in community rail.",
+    "hub bounded-context coverage should keep campaign context proof on the workspace continuity rail.",
+    "hub bounded-context coverage should keep support context proof on the tracked support rail.",
+    "hub bounded-context coverage should keep orchestration boundary proof on the install entry rail.",
+    "hub bounded-context coverage should keep closure proof on the public progress rail."
+  ]
+}
