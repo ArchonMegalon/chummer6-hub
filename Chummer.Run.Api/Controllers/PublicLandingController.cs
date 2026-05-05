@@ -8,6 +8,7 @@ using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Campaign.Contracts;
+using Chummer.Hub.Registry.Contracts;
 using Chummer.Run.Contracts.Community;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
@@ -961,7 +962,7 @@ public sealed class PublicLandingController : Controller
     {
         var surface = _landing.LoadSurface();
         var cards = _landing.CardsForBucket(surface, "participate");
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Participate", "Two clean lanes: public feedback and an optional signed-in Codex path that uses your OpenAI account in ChatGPT.", "/participate", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Participate", "Public product signal stays visible here, while signed-in Codex access remains an optional account-linked lane.", "/participate", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         var model = new ParticipatePageViewModel(
@@ -977,7 +978,7 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/feedback")]
     public IActionResult FeedbackPage()
-        => Redirect("/participate#productlift-feedback");
+        => Redirect("/participate?productlift=feedback#productlift-feedback");
 
     [HttpGet("/help/feedback")]
     public IActionResult FeedbackHelpPage()
@@ -985,11 +986,11 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/roadmap")]
     public IActionResult RoadmapPage()
-        => Redirect("/horizons");
+        => Redirect("/horizons?productlift=roadmap#productlift-roadmap-projection");
 
     [HttpGet("/changelog")]
     public IActionResult ChangelogPage()
-        => Redirect("/now");
+        => Redirect("/now?productlift=changelog#productlift-shipped-closeout");
 
     [HttpGet("/status")]
     [Produces("text/html")]
@@ -1668,6 +1669,11 @@ public sealed class PublicLandingController : Controller
         {
             "all" => items,
             "creator" => items,
+            "public" => items
+                .Where(static item =>
+                    item.Discoverable
+                    && string.Equals(item.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase))
+                .ToArray(),
             _ => Array.Empty<CreatorPublicationProjection>()
         };
     }
@@ -1696,6 +1702,7 @@ public sealed class PublicLandingController : Controller
                 "personal" => "personal",
                 "campaign" => "campaign",
                 "creator" => "creator",
+                "public" => "public",
                 _ => "all"
             };
 
@@ -2051,8 +2058,8 @@ public sealed class PublicLandingController : Controller
             Options:
             [
                 new SupportIntakeOptionViewModel(SupportCaseKinds.InstallHelp, "Install or update", "Choose this when the installer, updater, or download handoff is the problem."),
-                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, or product regressions."),
-                new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Use this when the product direction is right but the current surface is getting in your way.")
+                new SupportIntakeOptionViewModel(SupportCaseKinds.BugReport, "Product bug", "Use this for broken behavior, bad routing, regressions, or cases that need private logs and tracked follow-up."),
+                new SupportIntakeOptionViewModel(SupportCaseKinds.Feedback, "Feature request or UX feedback", "Safe public feedback should start on Fixer Board. Choose this form only when the issue needs private or account-linked follow-up.")
             ],
             DefaultKind: overrides.Kind,
             DefaultTitle: overrides.Title,

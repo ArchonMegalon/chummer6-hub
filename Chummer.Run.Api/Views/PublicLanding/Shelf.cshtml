@@ -83,6 +83,7 @@
         "personal" => "Personal view",
         "campaign" => "Campaign view",
         "creator" => "Creator view",
+        "public" => "Public view",
         _ => "All views"
     };
     static string ArtifactViewSummary(string view) => view switch
@@ -90,6 +91,7 @@
         "personal" => "Keep the account-side runner and return artifacts visible without losing the shared record they already ride on.",
         "campaign" => "Stay on the shared crew and continuity rail for campaign-owned artifacts, prep packets, and aftermath or replay follow-through.",
         "creator" => "Inspect only the creator-linked lineage, trust ranking, availability, and next step for published or publication-ready artifacts.",
+        "public" => "Inspect only the published shared-publication lane so discoverable creator packets, trust posture, and publication detail stay on the same public rail while you are signed in.",
         _ => "When you are signed in, the artifact shelf keeps your live aftermath, replay, and linked creator-publication record together instead of splitting them into separate artifact stories."
     };
 }
@@ -128,7 +130,7 @@
             <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
         </div>
         <div class="stacked-actions">
-            @foreach (var view in new[] { "all", "personal", "campaign", "creator" })
+            @foreach (var view in new[] { "all", "personal", "campaign", "creator", "public" })
             {
                 var selected = string.Equals(selectedSignedInArtifactView, view, StringComparison.Ordinal);
                 <a class="button-like @(selected ? "button-like--primary" : "button-like--ghost")" href="@ArtifactViewHref(view)">@ArtifactViewTitle(view)</a>

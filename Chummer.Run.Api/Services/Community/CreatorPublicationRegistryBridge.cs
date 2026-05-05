@@ -57,6 +57,7 @@ public sealed class CreatorPublicationRegistryBridge
         CampaignWorkspaceProjection? workspace,
         string? notes = null)
     {
+        EnsureManifestAuthority(publication, workspace);
         GetOrCreatePublicationLane(user, publication, workspace);
         _drafts.SubmitProject(
             publication.PublicationId,
@@ -71,6 +72,7 @@ public sealed class CreatorPublicationRegistryBridge
         CampaignWorkspaceProjection? workspace,
         string? notes = null)
     {
+        EnsureManifestAuthority(publication, workspace);
         CreatorPublicationRegistryProjection current = GetOrCreatePublicationLane(user, publication, workspace);
         string caseId = current.DraftDetail.Moderation?.CaseId
             ?? throw new InvalidOperationException("There is no pending moderation case to approve.");
@@ -87,6 +89,7 @@ public sealed class CreatorPublicationRegistryBridge
         CampaignWorkspaceProjection? workspace,
         string? notes = null)
     {
+        EnsureManifestAuthority(publication, workspace);
         CreatorPublicationRegistryProjection current = GetOrCreatePublicationLane(user, publication, workspace);
         string caseId = current.DraftDetail.Moderation?.CaseId
             ?? throw new InvalidOperationException("There is no pending moderation case to reject.");
@@ -103,6 +106,7 @@ public sealed class CreatorPublicationRegistryBridge
         CampaignWorkspaceProjection? workspace,
         string? notes = null)
     {
+        EnsureManifestAuthority(publication, workspace);
         GetOrCreatePublicationLane(user, publication, workspace);
         _drafts.PublishProject(
             publication.PublicationId,
@@ -238,7 +242,20 @@ public sealed class CreatorPublicationRegistryBridge
             lines.Add($"Audit: {linkedShelfEntry.AuditSummary}");
         }
 
+        lines.Add($"Manifest authority: {BuildManifestAuthority(publication, workspace, linkedShelfEntry)}");
+
         return string.Join(" ", lines.Where(static line => !string.IsNullOrWhiteSpace(line)));
+    }
+
+    private static void EnsureManifestAuthority(
+        CreatorPublicationProjection publication,
+        CampaignWorkspaceProjection? workspace)
+    {
+        PublicationSafeProjection? linkedShelfEntry = ResolveLinkedShelfEntry(publication, workspace);
+        if (ResolveApprovedManifestAuditSummary(linkedShelfEntry) is null)
+        {
+            throw new InvalidOperationException("Creator publication moderation requires an approved manifest-backed audit receipt before submission, correction, approval, or publication.");
+        }
     }
 
     private static PublicationSafeProjection? ResolveLinkedShelfEntry(
@@ -248,6 +265,31 @@ public sealed class CreatorPublicationRegistryBridge
             string.Equals(item.CreatorPublicationId, publication.PublicationId, StringComparison.OrdinalIgnoreCase)
             || (!string.IsNullOrWhiteSpace(publication.ArtifactId)
                 && string.Equals(item.ArtifactId, publication.ArtifactId, StringComparison.OrdinalIgnoreCase)));
+
+    private static string BuildManifestAuthority(
+        CreatorPublicationProjection publication,
+        CampaignWorkspaceProjection? workspace,
+        PublicationSafeProjection? linkedShelfEntry)
+    {
+        string? approvedAuditSummary = ResolveApprovedManifestAuditSummary(linkedShelfEntry);
+        if (approvedAuditSummary is not null)
+        {
+            string workspaceId = workspace?.WorkspaceId ?? "unknown-workspace";
+            string artifactId = string.IsNullOrWhiteSpace(publication.ArtifactId) ? publication.PublicationId : publication.ArtifactId;
+            return $"approved-shared-publication-manifest; workspace:{workspaceId}; artifact:{artifactId}; audit:{approvedAuditSummary}";
+        }
+
+        return "missing-audit-receipt";
+    }
+
+    private static string? ResolveApprovedManifestAuditSummary(PublicationSafeProjection? linkedShelfEntry)
+    {
+        string? auditSummary = NormalizeOptional(linkedShelfEntry?.AuditSummary);
+        return auditSummary is not null
+            && auditSummary.Contains("manifest-authority-backed", StringComparison.OrdinalIgnoreCase)
+            ? auditSummary
+            : null;
+    }
 
     private static string ResolvePublicationKindLabel(
         CreatorPublicationProjection publication,

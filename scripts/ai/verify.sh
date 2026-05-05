@@ -2329,5 +2329,9 @@ python3 -m unittest tests/test_artifact_factory_orchestration.py
 python3 -m unittest tests/test_artifact_factory_source_pack_launcher.py
 python3 scripts/verify_install_aware_support_concierge.py
 python3 -m unittest tests/test_install_aware_support_concierge.py
+python3 scripts/verify_next90_m116_hub_creator_publication.py
+python3 -m unittest tests/test_next90_m116_hub_creator_publication.py
+python3 scripts/verify_next90_m117_hub_artifact_shelf_v2.py
+python3 -m unittest tests/test_next90_m117_hub_artifact_shelf_v2.py
 
 bash scripts/ai/run_services_smoke.sh
