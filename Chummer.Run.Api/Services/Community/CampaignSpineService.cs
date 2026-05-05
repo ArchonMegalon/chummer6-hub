@@ -37,6 +37,11 @@ public sealed class CampaignSpineService
     private const string TurnLedgerHandoffSourceKind = "turn_ledger_handoff";
     private const string RunboardStateSourceKind = "runboard_state";
     private const string ResolutionReportDraftSourceKind = "resolution_report_draft";
+    private const string CampaignAdoptionSourceKind = "campaign_adoption";
+    private const string RunnerGoalSourceKind = "runner_goal";
+    private const string ResolutionReportApprovalSourceKind = "resolution_report_approval";
+    private const string WorldTickSourceKind = "world_tick";
+    private const string PlayerSafeNewsSourceKind = "player_safe_news";
 
     private readonly CommunityStore _store;
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
@@ -104,8 +109,23 @@ public sealed class CampaignSpineService
             var aftermathPackages = _store.AftermathPackages
                 .OrderByDescending(static item => item.GeneratedAtUtc)
                 .ToArray();
+            var campaignAdoptions = _store.CampaignAdoptions
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            var runnerGoals = _store.RunnerGoals
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            var resolutionReportApprovals = _store.ResolutionReportApprovals
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            var worldTicks = _store.WorldTicks
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            var playerSafeNews = _store.PlayerSafeNews
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
             var workspaces = campaigns
-                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches, travelPrefetchReceipts, aftermathPackages))
+                .Select(campaign => BuildWorkspaceProjection(campaign, dossiers, runs, crews, restore, transfers, prepLaunches, travelPrefetchReceipts, aftermathPackages, campaignAdoptions, runnerGoals, resolutionReportApprovals, worldTicks, playerSafeNews))
                 .OrderByDescending(static workspace => ResolveWorkspaceFreshnessUtc(workspace))
                 .ThenByDescending(static workspace => ResolveWorkspaceActivityBreadth(workspace))
                 .ThenByDescending(static workspace => workspace.AftermathPackages?.Count ?? 0)
@@ -237,6 +257,14 @@ public sealed class CampaignSpineService
     {
         ArgumentNullException.ThrowIfNull(user);
         return GetAccountSummary(user, installLinking).Workspaces.FirstOrDefault();
+    }
+
+    public CampaignAdoptionLoopProjection? GetCampaignAdoptionLoop(HubUserDto user, string workspaceId, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
+
+        return GetWorkspace(user, workspaceId, installLinking)?.CampaignAdoptionLoop;
     }
 
     public GovernedPrepLaunchProjection RecordPrepLaunch(
@@ -635,6 +663,387 @@ public sealed class CampaignSpineService
 
             _store.PersistLocked();
             return continuity;
+        }
+    }
+
+    public CampaignAdoptionProjection UpsertCampaignAdoption(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        CampaignAdoptionUpdateRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(request);
+
+        string normalizedSummary = AccountService.NormalizeOptional(request.Summary)
+            ?? throw new ArgumentException("campaign adoption summary is required.", nameof(request));
+        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        if (request.ConfidencePercent is < 0 or > 100)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "campaign adoption confidence_percent must stay within 0..100.");
+        }
+
+        if (request.RunnerCount < 0 || request.ActiveJobCount < 0 || request.ContactCount < 0 || request.HouseRuleCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "campaign adoption counts cannot be negative.");
+        }
+
+        lock (_store.Gate)
+        {
+            if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
+            {
+                throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
+            }
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            IReadOnlyList<string> explicitUnknowns = FinalizeLines(request.ExplicitUnknowns ?? Array.Empty<string>());
+            IReadOnlyList<string> recommendedNextActions = FinalizeLines(request.RecommendedNextActions ?? Array.Empty<string>());
+            string nextSafeAction = normalizedNextSafeAction
+                ?? recommendedNextActions.FirstOrDefault()
+                ?? (request.SafeToPlay
+                    ? "Open the governed workspace return on /account/work."
+                    : "Resolve the adoption unknowns before reopening the shared campaign return on /account/work.");
+
+            var adoption = new CampaignAdoptionProjection(
+                AdoptionId: StableId("campaign-adoption", workspace.WorkspaceId),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                SafeToPlay: request.SafeToPlay,
+                ConfidencePercent: request.ConfidencePercent,
+                RunnerCount: request.RunnerCount,
+                ActiveJobCount: request.ActiveJobCount,
+                ContactCount: request.ContactCount,
+                HouseRuleCount: request.HouseRuleCount,
+                ExplicitUnknowns: explicitUnknowns,
+                RecommendedNextActions: recommendedNextActions,
+                Summary: normalizedSummary,
+                NextSafeAction: nextSafeAction,
+                EvidenceLines: FinalizeLines(
+                [
+                    normalizedSummary,
+                    $"Source kind: {CampaignAdoptionSourceKind}.",
+                    $"Safe to play: {(request.SafeToPlay ? "yes" : "not yet")}.",
+                    $"Confidence: {request.ConfidencePercent}%.",
+                    $"Known counts: {request.RunnerCount} runner(s), {request.ActiveJobCount} active job(s), {request.ContactCount} contact(s), {request.HouseRuleCount} house-rule pack(s).",
+                    explicitUnknowns.Count == 0 ? "Unknown provenance remains empty for the current adoption pass." : $"Explicit unknowns: {string.Join("; ", explicitUnknowns)}",
+                    recommendedNextActions.Count == 0 ? string.Empty : $"Recommended next actions: {string.Join("; ", recommendedNextActions)}",
+                    $"Next safe action: {nextSafeAction}",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                UpdatedByUserId: user.UserId,
+                UpdatedAtUtc: now);
+
+            _store.CampaignAdoptions.RemoveAll(item => string.Equals(item.AdoptionId, adoption.AdoptionId, StringComparison.OrdinalIgnoreCase));
+            _store.CampaignAdoptions.Add(adoption);
+            _store.CampaignAdoptions.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+            if (_store.CampaignAdoptions.Count > 64)
+            {
+                _store.CampaignAdoptions.RemoveRange(64, _store.CampaignAdoptions.Count - 64);
+            }
+
+            _store.CampaignSpinesById[campaign.CampaignId] = campaign with
+            {
+                UpdatedAtUtc = now,
+            };
+
+            _store.PersistLocked();
+            return adoption;
+        }
+    }
+
+    public RunnerGoalProjection UpsertRunnerGoal(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        RunnerGoalUpdateRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(request);
+
+        string normalizedDossierId = AccountService.NormalizeOptional(request.DossierId)
+            ?? throw new ArgumentException("runner goal dossier_id is required.", nameof(request));
+        string normalizedLabel = AccountService.NormalizeOptional(request.Label)
+            ?? throw new ArgumentException("runner goal label is required.", nameof(request));
+        string normalizedTargetKind = AccountService.NormalizeOptional(request.TargetKind)
+            ?? throw new ArgumentException("runner goal target_kind is required.", nameof(request));
+        string normalizedTargetReference = AccountService.NormalizeOptional(request.TargetReference)
+            ?? throw new ArgumentException("runner goal target_reference is required.", nameof(request));
+        string normalizedApprovalStatus = AccountService.NormalizeOptional(request.ApprovalStatus)
+            ?? throw new ArgumentException("runner goal approval_status is required.", nameof(request));
+        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+        if (request.SavedNuyen < 0 || request.NuyenRequired < 0 || request.KarmaReserved < 0 || request.DowntimeDays < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "runner goal resource values cannot be negative.");
+        }
+
+        lock (_store.Gate)
+        {
+            if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
+            {
+                throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
+            }
+
+            if (!_store.DossiersById.TryGetValue(normalizedDossierId, out var dossier)
+                || !string.Equals(dossier.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new KeyNotFoundException($"Unknown dossier {normalizedDossierId} for workspace {workspace.WorkspaceId}.");
+            }
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string nextSafeAction = normalizedNextSafeAction
+                ?? $"Advance {dossier.RunnerHandle}'s goal pin on /account/work#runner-goals before the next governed closeout.";
+            var goal = new RunnerGoalProjection(
+                GoalId: StableId("runner-goal", $"{workspace.WorkspaceId}:{normalizedDossierId}:{normalizedTargetKind}:{normalizedTargetReference}"),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                DossierId: dossier.DossierId,
+                RunnerHandle: dossier.RunnerHandle,
+                Label: normalizedLabel,
+                TargetKind: normalizedTargetKind,
+                TargetReference: normalizedTargetReference,
+                SavedNuyen: request.SavedNuyen,
+                NuyenRequired: request.NuyenRequired,
+                KarmaReserved: request.KarmaReserved,
+                DowntimeDays: request.DowntimeDays,
+                RuleEnvironmentFingerprint: workspace.RuleEnvironment.CompatibilityFingerprint,
+                ApprovalStatus: normalizedApprovalStatus,
+                NextSafeAction: nextSafeAction,
+                EvidenceLines: FinalizeLines(
+                [
+                    $"{dossier.RunnerHandle}: {normalizedLabel}.",
+                    $"Source kind: {RunnerGoalSourceKind}.",
+                    $"Target: {normalizedTargetKind} / {normalizedTargetReference}.",
+                    $"Resources: {request.SavedNuyen}/{request.NuyenRequired} nuyen saved, {request.KarmaReserved} karma reserved, {request.DowntimeDays} downtime day(s).",
+                    $"Rule environment: {workspace.RuleEnvironment.CompatibilityFingerprint}.",
+                    $"Approval posture: {normalizedApprovalStatus}.",
+                    $"Next safe action: {nextSafeAction}",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                UpdatedByUserId: user.UserId,
+                UpdatedAtUtc: now);
+
+            _store.RunnerGoals.RemoveAll(item => string.Equals(item.GoalId, goal.GoalId, StringComparison.OrdinalIgnoreCase));
+            _store.RunnerGoals.Add(goal);
+            _store.RunnerGoals.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+            if (_store.RunnerGoals.Count > 128)
+            {
+                _store.RunnerGoals.RemoveRange(128, _store.RunnerGoals.Count - 128);
+            }
+
+            _store.CampaignSpinesById[campaign.CampaignId] = campaign with
+            {
+                UpdatedAtUtc = now,
+            };
+
+            _store.PersistLocked();
+            return goal;
+        }
+    }
+
+    public ResolutionReportApprovalProjection ApproveResolutionReport(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        ResolutionReportApprovalRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(request);
+
+        string normalizedRunId = AccountService.NormalizeOptional(request.RunId)
+            ?? workspace.Runs.FirstOrDefault()?.RunId
+            ?? throw new InvalidOperationException($"{workspace.CampaignName} does not have a governed run to close out.");
+        string normalizedSummary = AccountService.NormalizeOptional(request.Summary)
+            ?? throw new ArgumentException("resolution-report approval summary is required.", nameof(request));
+        string normalizedWorldTickSummary = AccountService.NormalizeOptional(request.WorldTickSummary)
+            ?? throw new ArgumentException("world-tick summary is required.", nameof(request));
+        string normalizedConsequenceSummary = AccountService.NormalizeOptional(request.ConsequenceSummary)
+            ?? throw new ArgumentException("consequence summary is required.", nameof(request));
+        string normalizedNewsTitle = AccountService.NormalizeOptional(request.NewsTitle)
+            ?? throw new ArgumentException("news title is required.", nameof(request));
+        string normalizedNewsSummary = AccountService.NormalizeOptional(request.NewsSummary)
+            ?? throw new ArgumentException("news summary is required.", nameof(request));
+        string normalizedNewsSource = AccountService.NormalizeOptional(request.NewsSource) ?? "BLACK LEDGER";
+        string normalizedNewsUrl = AccountService.NormalizeOptional(request.NewsUrl)
+            ?? $"https://example.invalid/chummer/world-tick/{workspace.CampaignId}/{normalizedRunId}";
+        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+
+        lock (_store.Gate)
+        {
+            if (!_store.RunsById.TryGetValue(normalizedRunId, out var storedRun)
+                || !string.Equals(storedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new KeyNotFoundException($"Unknown run {normalizedRunId} for workspace {workspace.WorkspaceId}.");
+            }
+
+            if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
+            {
+                throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
+            }
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string nextSafeAction = normalizedNextSafeAction
+                ?? "Review the first governed WorldTick and player-safe news item on /account/work before reopening the shared runboard.";
+            string worldTickId = StableId("world-tick", $"{workspace.WorkspaceId}:{storedRun.RunId}");
+            string newsId = StableId("player-safe-news", $"{workspace.WorkspaceId}:{storedRun.RunId}");
+
+            var worldTick = new WorldTickProjection(
+                WorldTickId: worldTickId,
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                RunId: storedRun.RunId,
+                RunTitle: storedRun.Title,
+                Summary: normalizedWorldTickSummary,
+                ConsequenceSummary: normalizedConsequenceSummary,
+                EvidenceLines: FinalizeLines(
+                [
+                    normalizedWorldTickSummary,
+                    $"Source kind: {WorldTickSourceKind}.",
+                    $"GM-approved closeout anchors the first BLACK LEDGER tick for {storedRun.Title}.",
+                    $"Consequence proof: {normalizedConsequenceSummary}",
+                    $"Next safe action: {nextSafeAction}",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                UpdatedByUserId: user.UserId,
+                UpdatedAtUtc: now);
+
+            var playerSafeNews = new PlayerSafeNewsProjection(
+                NewsId: newsId,
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                WorldTickId: worldTickId,
+                Title: normalizedNewsTitle,
+                Source: normalizedNewsSource,
+                Summary: normalizedNewsSummary,
+                Url: normalizedNewsUrl,
+                SpoilerPolicy: "player_safe_preview_only",
+                PublicationSummary: "Player-safe news stays previewable for runners without becoming world truth.",
+                EvidenceLines: FinalizeLines(
+                [
+                    $"{normalizedNewsTitle}: {normalizedNewsSummary}",
+                    $"Source kind: {PlayerSafeNewsSourceKind}.",
+                    $"Origin: {normalizedNewsSource}.",
+                    "Spoiler policy: player-safe preview only; rendered news is not world truth.",
+                    $"WorldTick anchor: {worldTickId}.",
+                    $"Next safe action: {nextSafeAction}",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                UpdatedByUserId: user.UserId,
+                UpdatedAtUtc: now);
+
+            var approval = new ResolutionReportApprovalProjection(
+                ApprovalId: StableId("resolution-report-approval", $"{workspace.WorkspaceId}:{storedRun.RunId}"),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                RunId: storedRun.RunId,
+                RunTitle: storedRun.Title,
+                Summary: normalizedSummary,
+                NextSafeAction: nextSafeAction,
+                WorldTickId: worldTickId,
+                NewsId: newsId,
+                EvidenceLines: FinalizeLines(
+                [
+                    normalizedSummary,
+                    $"Source kind: {ResolutionReportApprovalSourceKind}.",
+                    $"WorldTick: {normalizedWorldTickSummary}",
+                    $"Player-safe news: {normalizedNewsTitle}",
+                    $"Next safe action: {nextSafeAction}",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                UpdatedByUserId: user.UserId,
+                UpdatedAtUtc: now);
+
+            RunboardContinuityProjection? updatedContinuity = storedRun.RunboardContinuity is null
+                ? null
+                : storedRun.RunboardContinuity with
+                {
+                    ResolutionReportDraft = storedRun.RunboardContinuity.ResolutionReportDraft with
+                    {
+                        Status = "approved",
+                        Summary = normalizedSummary,
+                        Notes = FinalizeLines(
+                            storedRun.RunboardContinuity.ResolutionReportDraft.Notes.Concat(
+                            [
+                                normalizedWorldTickSummary,
+                                normalizedNewsSummary,
+                                normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                            ])),
+                        NextSafeAction = nextSafeAction,
+                        EvidenceLines = FinalizeLines(
+                            storedRun.RunboardContinuity.ResolutionReportDraft.EvidenceLines.Concat(
+                            [
+                                $"ResolutionReport approval: {normalizedSummary}",
+                                $"Source kind: {ResolutionReportApprovalSourceKind}.",
+                                $"First WorldTick: {normalizedWorldTickSummary}",
+                                $"Player-safe news: {normalizedNewsTitle}",
+                                $"Next safe action: {nextSafeAction}"
+                            ])),
+                        UpdatedAtUtc = now
+                    },
+                    Summary = $"{storedRun.Title} keeps an approved ResolutionReport, first WorldTick, and player-safe news item on the governed hub lane.",
+                    EvidenceLines = FinalizeLines(
+                        storedRun.RunboardContinuity.EvidenceLines.Concat(
+                        [
+                            $"ResolutionReport approval: {normalizedSummary}",
+                            $"WorldTick: {normalizedWorldTickSummary}",
+                            $"Player-safe news: {normalizedNewsTitle}",
+                            "Boundary: player-safe news previews stay separate from world truth.",
+                            $"Next safe action: {nextSafeAction}"
+                        ])),
+                    UpdatedByUserId = user.UserId,
+                    UpdatedAtUtc = now
+                };
+
+            CampaignConsequenceProjection consequence = BuildGovernedCampaignConsequenceProjection(
+                workspace,
+                "heat",
+                "escalated",
+                normalizedConsequenceSummary,
+                "Review BLACK LEDGER fallout",
+                null,
+                normalizedNote,
+                now);
+
+            _store.RunsById[storedRun.RunId] = storedRun with
+            {
+                UpdatedAtUtc = now,
+                RunboardContinuity = updatedContinuity
+            };
+            _store.CampaignSpinesById[campaign.CampaignId] = campaign with
+            {
+                ActiveRunId = storedRun.RunId,
+                UpdatedAtUtc = now,
+                Consequences = UpsertGovernedCampaignConsequence(campaign.Consequences, consequence),
+            };
+
+            _store.ResolutionReportApprovals.RemoveAll(item => string.Equals(item.ApprovalId, approval.ApprovalId, StringComparison.OrdinalIgnoreCase));
+            _store.ResolutionReportApprovals.Add(approval);
+            _store.ResolutionReportApprovals.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+            if (_store.ResolutionReportApprovals.Count > 64)
+            {
+                _store.ResolutionReportApprovals.RemoveRange(64, _store.ResolutionReportApprovals.Count - 64);
+            }
+
+            _store.WorldTicks.RemoveAll(item => string.Equals(item.WorldTickId, worldTick.WorldTickId, StringComparison.OrdinalIgnoreCase));
+            _store.WorldTicks.Add(worldTick);
+            _store.WorldTicks.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+            if (_store.WorldTicks.Count > 64)
+            {
+                _store.WorldTicks.RemoveRange(64, _store.WorldTicks.Count - 64);
+            }
+
+            _store.PlayerSafeNews.RemoveAll(item => string.Equals(item.NewsId, playerSafeNews.NewsId, StringComparison.OrdinalIgnoreCase));
+            _store.PlayerSafeNews.Add(playerSafeNews);
+            _store.PlayerSafeNews.Sort(static (left, right) => right.UpdatedAtUtc.CompareTo(left.UpdatedAtUtc));
+            if (_store.PlayerSafeNews.Count > 64)
+            {
+                _store.PlayerSafeNews.RemoveRange(64, _store.PlayerSafeNews.Count - 64);
+            }
+
+            _store.PersistLocked();
+            return approval;
         }
     }
 
@@ -2947,7 +3356,12 @@ public sealed class CampaignSpineService
         IReadOnlyList<RosterTransferProjection> transfers,
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
         IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
-        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
+        IReadOnlyList<CampaignAdoptionProjection> campaignAdoptions,
+        IReadOnlyList<RunnerGoalProjection> runnerGoals,
+        IReadOnlyList<ResolutionReportApprovalProjection> resolutionReportApprovals,
+        IReadOnlyList<WorldTickProjection> worldTicks,
+        IReadOnlyList<PlayerSafeNewsProjection> playerSafeNews)
     {
         var workspaceCrews = crews
             .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
@@ -2981,6 +3395,39 @@ public sealed class CampaignSpineService
                 || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(static item => item.GeneratedAtUtc)
             .ToArray();
+        var workspaceCampaignAdoptions = campaignAdoptions
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        var workspaceRunnerGoals = runnerGoals
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        var workspaceResolutionReportApprovals = resolutionReportApprovals
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        var workspaceWorldTicks = worldTicks
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        var workspacePlayerSafeNews = playerSafeNews
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        CampaignAdoptionLoopProjection? campaignAdoptionLoop = BuildCampaignAdoptionLoopProjection(
+            workspaceId,
+            campaign,
+            workspaceCampaignAdoptions,
+            workspaceRunnerGoals,
+            workspaceResolutionReportApprovals,
+            workspaceWorldTicks,
+            workspacePlayerSafeNews);
 
         var readinessCues = new List<CampaignReadinessCue>();
         if (restore.ConflictSummaries.Count > 0)
@@ -3077,9 +3524,34 @@ public sealed class CampaignSpineService
                 Title: "Aftermath package rail is attached",
                 Summary: $"{workspaceAftermathPackages.Length} governed aftermath package(s) keep return, replay review, and next-session carry-forward reviewable instead of falling back to prose alone."));
         }
+        if (campaignAdoptionLoop?.Adoption is not null)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:adoption"),
+                Severity: campaignAdoptionLoop.Adoption.SafeToPlay && campaignAdoptionLoop.Adoption.ConfidencePercent >= 70 ? "ready" : "review",
+                Title: "Campaign adoption wizard is attached",
+                Summary: $"{campaignAdoptionLoop.Adoption.ConfidencePercent}% confidence with explicit unknown provenance kept on the governed adoption lane for {campaign.Name}."));
+        }
+        if (campaignAdoptionLoop?.RunnerGoals.Count > 0)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:runner-goals"),
+                Severity: "ready",
+                Title: "Runner goal pins are attached",
+                Summary: $"{campaignAdoptionLoop.RunnerGoals.Count} governed runner goal pin(s) stay attached to the shared workspace instead of local-only notes."));
+        }
+        if (campaignAdoptionLoop?.ResolutionReportApproval is not null)
+        {
+            readinessCues.Add(new CampaignReadinessCue(
+                CueId: StableId("cue", $"{campaign.CampaignId}:world-tick"),
+                Severity: "ready",
+                Title: "BLACK LEDGER follow-through is attached",
+                Summary: "ResolutionReport approval, first WorldTick, and player-safe news stay on one governed hub lane without turning preview copy into world truth."));
+        }
 
         var recapShelf = workspaceAftermathPackages
             .Select(BuildAftermathRecapShelfProjection)
+            .Concat(workspacePlayerSafeNews.Select(BuildPlayerSafeNewsRecapShelfProjection))
             .Concat(workspaceDossiers
             .SelectMany(static item => item.Projections)
             .Where(item => item.Kind.Contains("recap", StringComparison.OrdinalIgnoreCase)
@@ -3098,9 +3570,9 @@ public sealed class CampaignSpineService
         var nextSafeAction = ResolveWorkspaceNextSafeAction(campaign, restore, recapShelf, readinessCues, leadRun, activeScene, leadObjective);
         var enrichedRecapShelf = EnrichWorkspaceRecapShelf(campaign, workspaceId, recapShelf, nextSafeAction);
         var firstPlayableSession = BuildFirstPlayableSession(campaign, restore, readinessCues, workspaceCrews, workspaceDossiers, leadRun, activeScene, leadObjective, nextSafeAction, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
-        var nextSessionCarryForward = BuildNextSessionCarryForward(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages);
-        var campaignMemory = BuildCampaignMemory(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
-        var changePackets = BuildWorkspaceChangePackets(campaign, enrichedRecapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward);
+        var nextSessionCarryForward = BuildNextSessionCarryForward(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, campaignAdoptionLoop);
+        var campaignMemory = BuildCampaignMemory(campaign, nextSafeAction, leadRun, activeScene, leadObjective, consequences, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward, campaignAdoptionLoop);
+        var changePackets = BuildWorkspaceChangePackets(campaign, enrichedRecapShelf, leadRun, activeScene, leadObjective, rosterTransfers, workspacePrepLaunches, workspaceTravelPrefetches, workspaceAftermathPackages, nextSessionCarryForward, campaignAdoptionLoop);
 
         return new CampaignWorkspaceProjection(
             WorkspaceId: workspaceId,
@@ -3125,7 +3597,8 @@ public sealed class CampaignSpineService
             AftermathPackages: workspaceAftermathPackages,
             NextSessionCarryForward: nextSessionCarryForward,
             FirstPlayableSession: firstPlayableSession,
-            CampaignMemory: campaignMemory);
+            CampaignMemory: campaignMemory,
+            CampaignAdoptionLoop: campaignAdoptionLoop);
     }
 
     private static bool IsOperatorRole(string role)
@@ -4974,6 +5447,86 @@ public sealed class CampaignSpineService
         return value.Trim().Replace('_', ' ');
     }
 
+    private static CampaignAdoptionLoopProjection? BuildCampaignAdoptionLoopProjection(
+        string workspaceId,
+        CampaignProjection campaign,
+        IReadOnlyList<CampaignAdoptionProjection> campaignAdoptions,
+        IReadOnlyList<RunnerGoalProjection> runnerGoals,
+        IReadOnlyList<ResolutionReportApprovalProjection> resolutionReportApprovals,
+        IReadOnlyList<WorldTickProjection> worldTicks,
+        IReadOnlyList<PlayerSafeNewsProjection> playerSafeNews)
+    {
+        CampaignAdoptionProjection? adoption = campaignAdoptions
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        RunnerGoalProjection[] orderedGoals = runnerGoals
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        ResolutionReportApprovalProjection? approval = resolutionReportApprovals
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        WorldTickProjection[] orderedWorldTicks = worldTicks
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        PlayerSafeNewsProjection[] orderedPlayerSafeNews = playerSafeNews
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+        if (adoption is null
+            && orderedGoals.Length == 0
+            && approval is null
+            && orderedWorldTicks.Length == 0
+            && orderedPlayerSafeNews.Length == 0)
+        {
+            return null;
+        }
+
+        DateTimeOffset updatedAtUtc = new[]
+            {
+                adoption?.UpdatedAtUtc,
+                orderedGoals.FirstOrDefault()?.UpdatedAtUtc,
+                approval?.UpdatedAtUtc,
+                orderedWorldTicks.FirstOrDefault()?.UpdatedAtUtc,
+                orderedPlayerSafeNews.FirstOrDefault()?.UpdatedAtUtc
+            }
+            .Where(static item => item.HasValue)
+            .Select(static item => item!.Value)
+            .DefaultIfEmpty(DateTimeOffset.UtcNow)
+            .Max();
+        string nextSafeAction = approval?.NextSafeAction
+            ?? orderedGoals.FirstOrDefault()?.NextSafeAction
+            ?? adoption?.NextSafeAction
+            ?? "Open the governed workspace return on /account/work.";
+        string summary = approval is not null
+            ? $"{campaign.Name} keeps campaign adoption, runner-goal pins, ResolutionReport closeout, and the first BLACK LEDGER WorldTick on one governed return lane."
+            : adoption is not null && orderedGoals.Length > 0
+                ? $"{campaign.Name} keeps campaign adoption and {orderedGoals.Length} runner-goal pin(s) on one governed return lane."
+                : adoption?.Summary
+                    ?? $"{campaign.Name} keeps the adoption loop attached to the shared workspace.";
+
+        return new CampaignAdoptionLoopProjection(
+            WorkspaceId: workspaceId,
+            CampaignId: campaign.CampaignId,
+            Summary: summary,
+            NextSafeAction: nextSafeAction,
+            Adoption: adoption,
+            RunnerGoals: orderedGoals,
+            ResolutionReportApproval: approval,
+            WorldTicks: orderedWorldTicks,
+            PlayerSafeNews: orderedPlayerSafeNews,
+            EvidenceLines: FinalizeLines(
+            new[]
+            {
+                adoption?.Summary ?? string.Empty,
+                adoption is null ? string.Empty : $"Adoption confidence: {adoption.ConfidencePercent}% with {(adoption.SafeToPlay ? "safe-to-play" : "not-safe-yet")} posture.",
+                orderedGoals.FirstOrDefault() is null ? string.Empty : $"{orderedGoals[0].RunnerHandle}: {orderedGoals[0].Label}.",
+                approval?.Summary ?? string.Empty,
+                orderedWorldTicks.FirstOrDefault()?.Summary ?? string.Empty,
+                orderedPlayerSafeNews.FirstOrDefault() is null ? string.Empty : $"{orderedPlayerSafeNews[0].Title}: {orderedPlayerSafeNews[0].Summary}",
+                $"Next safe action: {nextSafeAction}"
+            }),
+            UpdatedAtUtc: updatedAtUtc);
+    }
+
     private static NextSessionCarryForwardProjection? BuildNextSessionCarryForward(
         CampaignProjection campaign,
         string nextSafeAction,
@@ -4983,7 +5536,8 @@ public sealed class CampaignSpineService
         IReadOnlyList<CampaignConsequenceProjection> consequences,
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
         IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
-        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages)
+        IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
+        CampaignAdoptionLoopProjection? campaignAdoptionLoop)
     {
         ContinuitySnapshotRef? continuity = campaign.LatestContinuity;
         CampaignConsequenceProjection? leadConsequence = consequences
@@ -4998,12 +5552,28 @@ public sealed class CampaignSpineService
         AftermathRecapPackageProjection? leadAftermathPackage = aftermathPackages
             .OrderByDescending(static item => item.GeneratedAtUtc)
             .FirstOrDefault();
+        CampaignAdoptionProjection? leadAdoption = campaignAdoptionLoop?.Adoption;
+        RunnerGoalProjection? leadRunnerGoal = campaignAdoptionLoop?.RunnerGoals
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        ResolutionReportApprovalProjection? leadResolutionApproval = campaignAdoptionLoop?.ResolutionReportApproval;
+        WorldTickProjection? leadWorldTick = campaignAdoptionLoop?.WorldTicks
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        PlayerSafeNewsProjection? leadPlayerSafeNews = campaignAdoptionLoop?.PlayerSafeNews
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
 
         if (continuity is null
             && leadConsequence is null
             && leadPrepLaunch is null
             && leadTravelPrefetch is null
             && leadAftermathPackage is null
+            && leadAdoption is null
+            && leadRunnerGoal is null
+            && leadResolutionApproval is null
+            && leadWorldTick is null
+            && leadPlayerSafeNews is null
             && activeScene is null
             && leadObjective is null)
         {
@@ -5029,6 +5599,18 @@ public sealed class CampaignSpineService
                 ? $"{leadAftermathPackage.Title} is pinned as the replay-safe carry-forward packet for {campaign.Name}."
                 : $"{leadAftermathPackage.Title} is pinned as the recap-safe carry-forward packet for {campaign.Name}.";
         }
+        else if (leadResolutionApproval is not null && leadWorldTick is not null)
+        {
+            summary = $"{leadWorldTick.Summary} stays pinned with player-safe follow-through before {leadRun?.Title ?? campaign.Name} resumes.";
+        }
+        else if (leadRunnerGoal is not null)
+        {
+            summary = $"{leadRunnerGoal.RunnerHandle} keeps {leadRunnerGoal.Label} pinned for the next governed return.";
+        }
+        else if (leadAdoption is not null)
+        {
+            summary = leadAdoption.Summary;
+        }
         else if (leadConsequence is not null)
         {
             summary = $"{leadConsequence.Label} stays attached to the next-session return for {campaign.Name}.";
@@ -5050,7 +5632,12 @@ public sealed class CampaignSpineService
                 leadConsequence?.UpdatedAtUtc,
                 leadPrepLaunch?.LaunchedAtUtc,
                 leadTravelPrefetch?.StagedAtUtc,
-                leadAftermathPackage?.GeneratedAtUtc
+                leadAftermathPackage?.GeneratedAtUtc,
+                leadAdoption?.UpdatedAtUtc,
+                leadRunnerGoal?.UpdatedAtUtc,
+                leadResolutionApproval?.UpdatedAtUtc,
+                leadWorldTick?.UpdatedAtUtc,
+                leadPlayerSafeNews?.UpdatedAtUtc
             }
             .Where(static item => item.HasValue)
             .Select(static item => item!.Value)
@@ -5079,6 +5666,11 @@ public sealed class CampaignSpineService
                 activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun?.Title ?? campaign.Name} at {activeScene.Revision}.",
                 leadObjective is null ? string.Empty : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.",
                 leadAftermathPackage is null ? string.Empty : $"{leadAftermathPackage.Title}: {leadAftermathPackage.Summary}",
+                campaignAdoptionLoop?.Summary ?? string.Empty,
+                leadRunnerGoal is null ? string.Empty : $"{leadRunnerGoal.RunnerHandle}: {leadRunnerGoal.Label} ({leadRunnerGoal.SavedNuyen}/{leadRunnerGoal.NuyenRequired} nuyen).",
+                leadResolutionApproval?.Summary ?? string.Empty,
+                leadWorldTick?.Summary ?? string.Empty,
+                leadPlayerSafeNews is null ? string.Empty : $"{leadPlayerSafeNews.Title}: {leadPlayerSafeNews.Summary}",
                 leadConsequence?.EvidenceLines.FirstOrDefault() ?? leadConsequence?.Summary ?? string.Empty,
                 prepBindingSummary,
                 travelSummary,
@@ -5098,7 +5690,8 @@ public sealed class CampaignSpineService
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
         IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
-        NextSessionCarryForwardProjection? nextSessionCarryForward)
+        NextSessionCarryForwardProjection? nextSessionCarryForward,
+        CampaignAdoptionLoopProjection? campaignAdoptionLoop)
     {
         ContinuitySnapshotRef? continuity = campaign.LatestContinuity;
         CampaignConsequenceProjection? leadConsequence = consequences
@@ -5129,6 +5722,16 @@ public sealed class CampaignSpineService
         {
             leadAftermathPackage = null;
         }
+        CampaignAdoptionProjection? leadAdoption = campaignAdoptionLoop?.Adoption;
+        RunnerGoalProjection? leadRunnerGoal = campaignAdoptionLoop?.RunnerGoals
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        WorldTickProjection? leadWorldTick = campaignAdoptionLoop?.WorldTicks
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        PlayerSafeNewsProjection? leadPlayerSafeNews = campaignAdoptionLoop?.PlayerSafeNews
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
 
         if (continuity is null
             && nextSessionCarryForward is null
@@ -5138,6 +5741,10 @@ public sealed class CampaignSpineService
             && leadTravelPrefetch is null
             && leadAftermathPackage is null
             && leadDowntimePackage is null
+            && leadAdoption is null
+            && leadRunnerGoal is null
+            && leadWorldTick is null
+            && leadPlayerSafeNews is null
             && activeScene is null
             && leadObjective is null)
         {
@@ -5154,6 +5761,10 @@ public sealed class CampaignSpineService
                 leadTravelPrefetch?.StagedAtUtc,
                 leadAftermathPackage?.GeneratedAtUtc,
                 leadDowntimePackage?.GeneratedAtUtc,
+                leadAdoption?.UpdatedAtUtc,
+                leadRunnerGoal?.UpdatedAtUtc,
+                leadWorldTick?.UpdatedAtUtc,
+                leadPlayerSafeNews?.UpdatedAtUtc,
                 activeScene?.UpdatedAtUtc,
                 leadObjective?.UpdatedAtUtc
             }
@@ -5165,7 +5776,7 @@ public sealed class CampaignSpineService
         return new CampaignMemoryProjection(
             MemoryId: StableId("campaign-memory", $"{campaign.CampaignId}:{updatedAtUtc.ToUnixTimeMilliseconds()}"),
             Label: "Campaign memory",
-            Summary: BuildCampaignMemorySummary(campaign.Name, nextSessionCarryForward, leadConsequence, leadTransfer, leadPrepLaunch, leadTravelPrefetch, leadAftermathPackage, leadDowntimePackage),
+            Summary: BuildCampaignMemorySummary(campaign.Name, nextSessionCarryForward, leadConsequence, leadTransfer, leadPrepLaunch, leadTravelPrefetch, leadAftermathPackage, leadDowntimePackage, leadAdoption, leadRunnerGoal, leadWorldTick, leadPlayerSafeNews),
             ReturnSummary: nextSessionCarryForward?.ReturnSummary ?? continuity?.Summary ?? campaign.Summary,
             NextSafeAction: nextSessionCarryForward?.NextSafeAction ?? nextSafeAction,
             EvidenceLines: FinalizeLines(
@@ -5177,6 +5788,10 @@ public sealed class CampaignSpineService
                 nextSessionCarryForward?.Summary ?? string.Empty,
                 leadAftermathPackage is null ? string.Empty : $"{leadAftermathPackage.Title}: {leadAftermathPackage.Summary}",
                 leadDowntimePackage is null ? string.Empty : $"{leadDowntimePackage.Title}: {leadDowntimePackage.Summary}",
+                campaignAdoptionLoop?.Summary ?? string.Empty,
+                leadRunnerGoal is null ? string.Empty : $"{leadRunnerGoal.RunnerHandle}: {leadRunnerGoal.Label}.",
+                leadWorldTick?.Summary ?? string.Empty,
+                leadPlayerSafeNews is null ? string.Empty : $"{leadPlayerSafeNews.Title}: {leadPlayerSafeNews.Summary}",
                 leadConsequence is null ? string.Empty : $"{leadConsequence.Label}: {leadConsequence.Summary}",
                 leadTransfer?.Summary ?? string.Empty,
                 leadPrepLaunch?.Summary ?? string.Empty,
@@ -5194,7 +5809,11 @@ public sealed class CampaignSpineService
         GovernedPrepLaunchProjection? leadPrepLaunch,
         TravelPrefetchReceiptProjection? leadTravelPrefetch,
         AftermathRecapPackageProjection? leadAftermathPackage,
-        AftermathRecapPackageProjection? leadDowntimePackage)
+        AftermathRecapPackageProjection? leadDowntimePackage,
+        CampaignAdoptionProjection? leadAdoption,
+        RunnerGoalProjection? leadRunnerGoal,
+        WorldTickProjection? leadWorldTick,
+        PlayerSafeNewsProjection? leadPlayerSafeNews)
     {
         List<string> anchors = [];
         if (nextSessionCarryForward is not null)
@@ -5220,6 +5839,26 @@ public sealed class CampaignSpineService
         if (leadDowntimePackage is not null)
         {
             anchors.Add("downtime brief");
+        }
+
+        if (leadAdoption is not null)
+        {
+            anchors.Add("adoption wizard");
+        }
+
+        if (leadRunnerGoal is not null)
+        {
+            anchors.Add("runner goal pins");
+        }
+
+        if (leadWorldTick is not null)
+        {
+            anchors.Add("BLACK LEDGER world tick");
+        }
+
+        if (leadPlayerSafeNews is not null)
+        {
+            anchors.Add("player-safe news");
         }
 
         if (leadPrepLaunch is not null)
@@ -5264,7 +5903,8 @@ public sealed class CampaignSpineService
         IReadOnlyList<GovernedPrepLaunchProjection> prepLaunches,
         IReadOnlyList<TravelPrefetchReceiptProjection> travelPrefetchReceipts,
         IReadOnlyList<AftermathRecapPackageProjection> aftermathPackages,
-        NextSessionCarryForwardProjection? nextSessionCarryForward)
+        NextSessionCarryForwardProjection? nextSessionCarryForward,
+        CampaignAdoptionLoopProjection? campaignAdoptionLoop)
     {
         List<WorkspaceChangePacketProjection> packets = [];
         if (nextSessionCarryForward is not null)
@@ -5314,6 +5954,65 @@ public sealed class CampaignSpineService
                 Label: "Runboard continuity",
                 Summary: leadRun.RunboardContinuity.Summary,
                 UpdatedAtUtc: leadRun.RunboardContinuity.UpdatedAtUtc));
+        }
+
+        if (campaignAdoptionLoop?.Adoption is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:campaign-adoption:{campaignAdoptionLoop.Adoption.AdoptionId}"),
+                Kind: "campaign_adoption",
+                Label: "Campaign adoption",
+                Summary: campaignAdoptionLoop.Adoption.Summary,
+                UpdatedAtUtc: campaignAdoptionLoop.Adoption.UpdatedAtUtc));
+        }
+
+        RunnerGoalProjection? runnerGoal = campaignAdoptionLoop?.RunnerGoals
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        if (runnerGoal is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:runner-goal:{runnerGoal.GoalId}"),
+                Kind: "runner_goal",
+                Label: "Runner goal pin",
+                Summary: $"{runnerGoal.RunnerHandle}: {runnerGoal.Label}.",
+                UpdatedAtUtc: runnerGoal.UpdatedAtUtc));
+        }
+
+        if (campaignAdoptionLoop?.ResolutionReportApproval is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:resolution-approval:{campaignAdoptionLoop.ResolutionReportApproval.ApprovalId}"),
+                Kind: "resolution_report_approval",
+                Label: "ResolutionReport approval",
+                Summary: campaignAdoptionLoop.ResolutionReportApproval.Summary,
+                UpdatedAtUtc: campaignAdoptionLoop.ResolutionReportApproval.UpdatedAtUtc));
+        }
+
+        WorldTickProjection? worldTick = campaignAdoptionLoop?.WorldTicks
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        if (worldTick is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:world-tick:{worldTick.WorldTickId}"),
+                Kind: "world_tick",
+                Label: "WorldTick",
+                Summary: worldTick.Summary,
+                UpdatedAtUtc: worldTick.UpdatedAtUtc));
+        }
+
+        PlayerSafeNewsProjection? playerSafeNews = campaignAdoptionLoop?.PlayerSafeNews
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+        if (playerSafeNews is not null)
+        {
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:player-safe-news:{playerSafeNews.NewsId}"),
+                Kind: "player_safe_news",
+                Label: playerSafeNews.Title,
+                Summary: playerSafeNews.Summary,
+                UpdatedAtUtc: playerSafeNews.UpdatedAtUtc));
         }
 
         if (leadObjective is not null)
@@ -5437,6 +6136,25 @@ public sealed class CampaignSpineService
             AuditSummary: string.IsNullOrWhiteSpace(package.AuditSummary)
                 ? BuildAftermathRecapAuditSummary(package)
                 : package.AuditSummary);
+
+    private static PublicationSafeProjection BuildPlayerSafeNewsRecapShelfProjection(PlayerSafeNewsProjection item)
+        => new(
+            ProjectionId: item.NewsId,
+            Kind: "player_safe_news",
+            Label: item.Title,
+            Summary: item.Summary,
+            ArtifactId: item.NewsId,
+            Audience: "campaign, creator",
+            OwnershipSummary: "Player-safe news preview stays attached to the shared campaign return without becoming world truth.",
+            PublicationState: "preview_ready",
+            TrustBand: "player-safe-preview",
+            Discoverable: false,
+            PublicationSummary: item.PublicationSummary,
+            NextSafeAction: "Review the player-safe preview before you reopen the shared runboard.",
+            ProvenanceSummary: $"{item.Source} preview stays anchored to WorldTick {item.WorldTickId}.",
+            AuditSummary: item.SpoilerPolicy,
+            CompatibilitySummary: "Player-safe preview only; rendered news remains separate from world truth.",
+            LineageSummary: $"WorldTick lineage: {item.WorldTickId}.");
 
     private static IReadOnlyList<PublicationSafeProjection> EnrichWorkspaceRecapShelf(
         CampaignProjection campaign,

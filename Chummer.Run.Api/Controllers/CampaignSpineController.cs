@@ -307,6 +307,27 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/workspaces/{workspaceId}/adoption-loop")]
+    [ProducesResponseType<CampaignAdoptionLoopProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignAdoptionLoopProjection>> GetMyCampaignWorkspaceAdoptionLoop(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var adoptionLoop = _workspaceServerPlane.GetWorkspaceCampaignAdoptionLoop(user, workspaceId, installLinking);
+            return adoptionLoop is null ? NotFound() : Ok(adoptionLoop);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/workspaces/{workspaceId}/prep-library")]
     [ProducesResponseType<CampaignPrepLibrarySearchResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -552,6 +573,111 @@ public sealed class CampaignSpineController : ControllerBase
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var continuity = _workspaceServerPlane.UpsertRunboardContinuity(user, workspaceId, request, installLinking);
             return continuity is null ? NotFound() : Ok(continuity);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/workspaces/{workspaceId}/campaign-adoption")]
+    [ProducesResponseType<CampaignAdoptionProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignAdoptionProjection>> UpsertMyCampaignWorkspaceCampaignAdoption(
+        [FromRoute] string workspaceId,
+        [FromBody] CampaignAdoptionUpdateRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("campaign adoption payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var adoption = _workspaceServerPlane.UpsertCampaignAdoption(user, workspaceId, request, installLinking);
+            return adoption is null ? NotFound() : Ok(adoption);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentOutOfRangeException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/workspaces/{workspaceId}/runner-goals")]
+    [ProducesResponseType<RunnerGoalProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<RunnerGoalProjection>> UpsertMyCampaignWorkspaceRunnerGoal(
+        [FromRoute] string workspaceId,
+        [FromBody] RunnerGoalUpdateRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("runner goal payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var goal = _workspaceServerPlane.UpsertRunnerGoal(user, workspaceId, request, installLinking);
+            return goal is null ? NotFound() : Ok(goal);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentOutOfRangeException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/workspaces/{workspaceId}/resolution-report-approvals")]
+    [ProducesResponseType<ResolutionReportApprovalProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ResolutionReportApprovalProjection>> ApproveMyCampaignWorkspaceResolutionReport(
+        [FromRoute] string workspaceId,
+        [FromBody] ResolutionReportApprovalRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("resolution report approval payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var approval = _workspaceServerPlane.ApproveResolutionReport(user, workspaceId, request, installLinking);
+            return approval is null ? NotFound() : Ok(approval);
         }
         catch (CommunityAccessDeniedException ex)
         {
