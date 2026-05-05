@@ -3533,6 +3533,96 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downtimeBriefPayload!.Summary.Contains("downtime brief", StringComparison.OrdinalIgnoreCase), "campaign spine downtime brief api should describe the governed downtime packet it generated.");
     Assert(downtimeBriefPayload.EvidenceLines.Any(item => item.Contains("Continuity:", StringComparison.OrdinalIgnoreCase)), "campaign spine downtime brief api should carry bounded continuity evidence lines.");
     Assert(string.Equals(downtimeBriefPayload.ArtifactKind, "RecapPackage", StringComparison.Ordinal), "campaign spine downtime brief api should register durable recap artifacts on the same registry seam.");
+    var consequenceUpdateResult = await campaignSpineController.UpsertMyCampaignWorkspaceConsequence(
+        workspaceId,
+        new CampaignConsequenceUpdateRequest(
+            Kind: "heat",
+            State: "high",
+            Summary: "Heat pressure stays elevated until the fallout review returns to the shared campaign lane.",
+            ReturnLoopAction: null,
+            ReturnLoopRoute: null,
+            Note: "Keep the heat review governed."),
+        CancellationToken.None);
+    var consequenceUpdatePayload = (consequenceUpdateResult.Result as OkObjectResult)?.Value as CampaignConsequenceProjection ?? consequenceUpdateResult.Value;
+    Assert(consequenceUpdatePayload is not null && string.Equals(consequenceUpdatePayload.Kind, "heat", StringComparison.Ordinal), "campaign spine consequence api should return the governed heat consequence for the selected workspace.");
+    Assert(consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "governed_consequence_update", StringComparison.Ordinal)), "campaign spine consequence api should emit a durable governed consequence update receipt.");
+    Assert(consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review heat fallout", StringComparison.Ordinal)), "campaign spine consequence api should derive a governed heat return-loop action when the caller does not override it.");
+    Assert(consequenceUpdatePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(item.ReceiptId, "/account/work", StringComparison.Ordinal)), "campaign spine consequence api should attach a governed return-loop route receipt.");
+    var factionConsequenceResult = await campaignSpineController.UpsertMyCampaignWorkspaceConsequence(
+        workspaceId,
+        new CampaignConsequenceUpdateRequest(
+            Kind: "faction",
+            State: "strained",
+            Summary: "Faction standing needs a deliberate check-in before the next table return.",
+            ReturnLoopAction: null,
+            ReturnLoopRoute: null,
+            Note: null),
+        CancellationToken.None);
+    var factionConsequencePayload = (factionConsequenceResult.Result as OkObjectResult)?.Value as CampaignConsequenceProjection ?? factionConsequenceResult.Value;
+    Assert(factionConsequencePayload is not null && string.Equals(factionConsequencePayload.Kind, "faction", StringComparison.Ordinal), "campaign spine consequence api should return the governed faction consequence for the selected workspace.");
+    Assert(factionConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Confirm faction standing", StringComparison.Ordinal)), "campaign spine consequence api should derive a governed faction return-loop action when the caller does not override it.");
+    var contactConsequenceResult = await campaignSpineController.UpsertMyCampaignWorkspaceConsequence(
+        workspaceId,
+        new CampaignConsequenceUpdateRequest(
+            Kind: "contact",
+            State: "fragile",
+            Summary: "Contact fallout needs a governed follow-up before this workspace drifts.",
+            ReturnLoopAction: null,
+            ReturnLoopRoute: null,
+            Note: null),
+        CancellationToken.None);
+    var contactConsequencePayload = (contactConsequenceResult.Result as OkObjectResult)?.Value as CampaignConsequenceProjection ?? contactConsequenceResult.Value;
+    Assert(contactConsequencePayload is not null && string.Equals(contactConsequencePayload.Kind, "contact", StringComparison.Ordinal), "campaign spine consequence api should return the governed contact consequence for the selected workspace.");
+    Assert(contactConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review contact fallout", StringComparison.Ordinal)), "campaign spine consequence api should derive a governed contact return-loop action when the caller does not override it.");
+    var downtimeConsequenceResult = await campaignSpineController.UpsertMyCampaignWorkspaceConsequence(
+        workspaceId,
+        new CampaignConsequenceUpdateRequest(
+            Kind: "downtime",
+            State: "queued",
+            Summary: "Downtime obligations are queued for governed return review.",
+            ReturnLoopAction: null,
+            ReturnLoopRoute: null,
+            Note: null),
+        CancellationToken.None);
+    var downtimeConsequencePayload = (downtimeConsequenceResult.Result as OkObjectResult)?.Value as CampaignConsequenceProjection ?? downtimeConsequenceResult.Value;
+    Assert(downtimeConsequencePayload is not null && string.Equals(downtimeConsequencePayload.Kind, "downtime", StringComparison.Ordinal), "campaign spine consequence api should return the governed downtime consequence for the selected workspace.");
+    Assert(downtimeConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(item.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal)), "campaign spine consequence api should default downtime return-loop routes onto the governed aftermath rail.");
+    var reputationConsequenceResult = await campaignSpineController.UpsertMyCampaignWorkspaceConsequence(
+        workspaceId,
+        new CampaignConsequenceUpdateRequest(
+            Kind: "reputation",
+            State: "under_review",
+            Summary: "Reputation fallout is still under governed review before the next publish-safe return.",
+            ReturnLoopAction: null,
+            ReturnLoopRoute: null,
+            Note: null),
+        CancellationToken.None);
+    var reputationConsequencePayload = (reputationConsequenceResult.Result as OkObjectResult)?.Value as CampaignConsequenceProjection ?? reputationConsequenceResult.Value;
+    Assert(reputationConsequencePayload is not null && string.Equals(reputationConsequencePayload.Kind, "reputation", StringComparison.Ordinal), "campaign spine consequence api should return the governed reputation consequence for the selected workspace.");
+    Assert(reputationConsequencePayload.Receipts.Any(item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.Ordinal) && item.Summary.Contains("Review reputation fallout", StringComparison.Ordinal)), "campaign spine consequence api should derive a governed reputation return-loop action when the caller does not override it.");
+    var invalidRouteConsequenceResult = await campaignSpineController.UpsertMyCampaignWorkspaceConsequence(
+        workspaceId,
+        new CampaignConsequenceUpdateRequest(
+            Kind: "heat",
+            State: "high",
+            Summary: "This invalid route should be rejected.",
+            ReturnLoopAction: null,
+            ReturnLoopRoute: "/account/downloads",
+            Note: null),
+        CancellationToken.None);
+    var invalidRouteProblemDetail = (invalidRouteConsequenceResult.Result as BadRequestObjectResult)?.Value switch
+    {
+        ProblemDetails details => details.Detail ?? details.Title,
+        string value => value,
+        _ => null
+    };
+    int? invalidRouteStatusCode = invalidRouteConsequenceResult.Result switch
+    {
+        BadRequestObjectResult badRequest => badRequest.StatusCode ?? StatusCodes.Status400BadRequest,
+        ObjectResult objectResult => objectResult.StatusCode,
+        _ => null
+    };
+    Assert(invalidRouteStatusCode == StatusCodes.Status400BadRequest, $"campaign spine consequence api should reject non-canonical governed return-loop routes. status={invalidRouteStatusCode?.ToString() ?? "<null>"} detail={invalidRouteProblemDetail ?? "<none>"}");
     var replayTimelineResult = await campaignSpineController.GenerateMyCampaignWorkspaceAftermathRecapPackage(
         workspaceId,
         new AftermathRecapPackageRequest(
@@ -3560,6 +3650,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project downtime brief packets after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, replayTimelinePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should project replay timeline packages after generation.");
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "replay_package", StringComparison.Ordinal)) == true, "campaign spine server plane api should name replay packages explicitly on the bounded what-changed rail.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true, "campaign spine server plane api should promote downtime brief packages into durable governed downtime consequences.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "aftermath", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true, "campaign spine server plane api should promote aftermath packages into durable governed aftermath consequences.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && string.Equals(item.State, "high", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_consequence_update", StringComparison.Ordinal))) == true, "campaign spine server plane api should project governed consequence updates back onto the shared campaign workspace.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && string.Equals(item.State, "strained", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Confirm faction standing", StringComparison.Ordinal))) == true, "campaign spine server plane api should project governed faction updates with explicit return-loop action receipts.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "contact", StringComparison.Ordinal) && string.Equals(item.State, "fragile", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review contact fallout", StringComparison.Ordinal))) == true, "campaign spine server plane api should project governed contact updates with explicit return-loop action receipts.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal) && string.Equals(item.State, "queued", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))) == true, "campaign spine server plane api should project governed downtime return-loop routes back onto the shared campaign workspace.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Consequences.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && string.Equals(item.State, "under_review", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))) == true, "campaign spine server plane api should project governed reputation updates with explicit return-loop action receipts.");
     Assert(refreshedWorkspaceServerPlanePayload?.RecapShelf.Any(item => string.Equals(item.EntryId, replayTimelinePayload.PackageId, StringComparison.Ordinal)) == true, "campaign spine server plane api should attach replay packages to the same richer return shelf.");
     var replayShelfPayload = refreshedWorkspaceServerPlanePayload?.RecapShelf
         .FirstOrDefault(item => string.Equals(item.EntryId, replayTimelinePayload.PackageId, StringComparison.Ordinal));
@@ -3571,6 +3668,38 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "next_session_carry_forward", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the next-session carry-forward packet on the bounded what-changed rail.");
     Assert(refreshedWorkspaceServerPlanePayload?.CampaignMemory is not null, "campaign spine server plane api should refresh campaign memory after governed follow-through lands.");
     Assert(refreshedWorkspaceServerPlanePayload?.CampaignMemory?.Summary.Contains("governed memory lane", StringComparison.OrdinalIgnoreCase) == true, "campaign spine server plane api should keep the long-lived campaign-memory summary explicit after governed follow-through lands.");
+    var consequencesListResult = await campaignSpineController.GetMyCampaignWorkspaceConsequences(workspaceId, CancellationToken.None);
+    var consequencesListPayload = (consequencesListResult.Result as OkObjectResult)?.Value as IReadOnlyList<CampaignConsequenceProjection> ?? consequencesListResult.Value;
+    Assert(consequencesListPayload?.Any(item => string.Equals(item.Kind, "aftermath", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true, "campaign spine consequence listing api should surface aftermath consequence truth with durable package receipts.");
+    Assert(consequencesListPayload?.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))) == true, "campaign spine consequence listing api should keep downtime return-loop routes on the governed aftermath rail.");
+    Assert(consequencesListPayload?.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_consequence_update", StringComparison.Ordinal))) == true, "campaign spine consequence listing api should surface heat consequence truth with governed update receipts.");
+    Assert(consequencesListPayload?.Any(item => string.Equals(item.Kind, "faction", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Confirm faction standing", StringComparison.Ordinal))) == true, "campaign spine consequence listing api should surface faction consequence truth with explicit return-loop actions.");
+    Assert(consequencesListPayload?.Any(item => string.Equals(item.Kind, "contact", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review contact fallout", StringComparison.Ordinal))) == true, "campaign spine consequence listing api should surface contact consequence truth with explicit return-loop actions.");
+    Assert(consequencesListPayload?.Any(item => string.Equals(item.Kind, "reputation", StringComparison.Ordinal) && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal) && receipt.Summary.Contains("Review reputation fallout", StringComparison.Ordinal))) == true, "campaign spine consequence listing api should surface reputation consequence truth with explicit return-loop actions.");
+    var consequenceTruthResult = await campaignSpineController.GetMyCampaignWorkspaceConsequenceTruth(workspaceId, CancellationToken.None);
+    var consequenceTruthPayload = (consequenceTruthResult.Result as OkObjectResult)?.Value as CampaignConsequenceTruthProjection ?? consequenceTruthResult.Value;
+    Assert(consequenceTruthPayload is not null && string.Equals(consequenceTruthPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine consequence-truth api should expose a governed consequence summary for the selected workspace.");
+    Assert(consequenceTruthPayload!.ConsequenceCount >= 6, "campaign spine consequence-truth api should summarize the promoted heat, faction, contact, reputation, downtime, and aftermath states.");
+    Assert(consequenceTruthPayload.States.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && string.Equals(item.ReturnLoopRoute, "/account/work", StringComparison.Ordinal)), "campaign spine consequence-truth api should keep heat state pinned to the governed workspace return rail.");
+    Assert(consequenceTruthPayload.ReturnLoopActions.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)), "campaign spine consequence-truth api should surface downtime return-loop actions on the governed summary.");
+    var aftermathPackagesListResult = await campaignSpineController.GetMyCampaignWorkspaceAftermathRecapPackages(workspaceId, CancellationToken.None);
+    var aftermathPackagesListPayload = (aftermathPackagesListResult.Result as OkObjectResult)?.Value as IReadOnlyList<AftermathRecapPackageProjection> ?? aftermathPackagesListResult.Value;
+    Assert(aftermathPackagesListPayload?.Any(item => string.Equals(item.PackageId, aftermathPackagePayload.PackageId, StringComparison.Ordinal) && string.Equals(item.ArtifactKind, "RecapPackage", StringComparison.Ordinal)) == true, "campaign spine aftermath listing api should surface governed recap packages with registry-backed artifact posture.");
+    Assert(aftermathPackagesListPayload?.Any(item => string.Equals(item.PackageId, downtimeBriefPayload.PackageId, StringComparison.Ordinal) && item.EvidenceLines.Any(line => line.StartsWith("Registry artifact:", StringComparison.OrdinalIgnoreCase))) == true, "campaign spine aftermath listing api should surface downtime packages with registry artifact evidence.");
+    Assert(aftermathPackagesListPayload?.Any(item => string.Equals(item.PackageId, replayTimelinePayload.PackageId, StringComparison.Ordinal) && string.Equals(item.ArtifactKind, "ReplayPackage", StringComparison.Ordinal)) == true, "campaign spine aftermath listing api should surface replay packages on the same governed aftermath rail.");
+    var downtimeAftermathResult = await campaignSpineController.GetMyCampaignWorkspaceDowntimeAftermath(workspaceId, CancellationToken.None);
+    var downtimeAftermathPayload = (downtimeAftermathResult.Result as OkObjectResult)?.Value as DowntimeAftermathApiProjection ?? downtimeAftermathResult.Value;
+    Assert(downtimeAftermathPayload is not null && string.Equals(downtimeAftermathPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign spine downtime-aftermath api should expose a governed downtime and aftermath summary for the selected workspace.");
+    Assert(string.Equals(downtimeAftermathPayload.ReturnLoopRoute, "/account/work#aftermath-packages", StringComparison.Ordinal), "campaign spine downtime-aftermath api should pin the governed return route to the aftermath rail.");
+    Assert(downtimeAftermathPayload.ReturnLoopActions.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)), "campaign spine downtime-aftermath api should surface downtime return-loop actions.");
+    var campaignMemoryResult = await campaignSpineController.GetMyCampaignWorkspaceCampaignMemory(workspaceId, CancellationToken.None);
+    var campaignMemoryPayload = (campaignMemoryResult.Result as OkObjectResult)?.Value as CampaignMemoryProjection ?? campaignMemoryResult.Value;
+    Assert(campaignMemoryPayload?.EvidenceLines.Any(item => item.Contains("Review heat fallout", StringComparison.Ordinal) || item.Contains("Review reputation fallout", StringComparison.Ordinal)) == true, "campaign spine campaign-memory api should surface governed consequence return-loop evidence.");
+    Assert(campaignMemoryPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true, "campaign spine campaign-memory api should keep downtime consequence truth attached to the return lane.");
+    var carryForwardResult = await campaignSpineController.GetMyCampaignWorkspaceNextSessionCarryForward(workspaceId, CancellationToken.None);
+    var carryForwardPayload = (carryForwardResult.Result as OkObjectResult)?.Value as NextSessionCarryForwardProjection ?? carryForwardResult.Value;
+    Assert(carryForwardPayload?.EvidenceLines.Any(item => item.Contains("Review heat fallout", StringComparison.Ordinal) || item.Contains("Review reputation fallout", StringComparison.Ordinal)) == true, "campaign spine carry-forward api should surface governed consequence return-loop evidence.");
+    Assert(carryForwardPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true, "campaign spine carry-forward api should keep downtime consequence truth attached to the next-session return.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");

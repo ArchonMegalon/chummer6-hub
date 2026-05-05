@@ -43,6 +43,7 @@ internal static class CampaignSpineRestoreVerification
         VerifyServerPlaneActionsRecoverBlankBlockingConflictResolutions();
         VerifyRestoreReceiptsSurviveCommunityStoreReload();
         VerifyAftermathArtifactMetadataSurvivesReload();
+        VerifyGovernedCampaignConsequenceTruthSurvivesReload();
         return Task.CompletedTask;
     }
 
@@ -1869,6 +1870,193 @@ internal static class CampaignSpineRestoreVerification
             VerificationAssert.True(!string.IsNullOrWhiteSpace(reloadedPackage.ProvenanceSummary), "Reloaded aftermath packages should preserve provenance summaries.");
             VerificationAssert.True(!string.IsNullOrWhiteSpace(reloadedPackage.AuditSummary), "Reloaded aftermath packages should preserve audit summaries.");
             VerificationAssert.True(reloadedPackage.EvidenceLines.Any(item => item.StartsWith("Registry artifact:", StringComparison.OrdinalIgnoreCase)), "Reloaded aftermath packages should preserve registry artifact evidence.");
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    private static void VerifyGovernedCampaignConsequenceTruthSurvivesReload()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), "run-services-verification", "campaign-spine-consequence-truth", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(tempRoot);
+
+        try
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(tempRoot, "community-store.json"),
+                    ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(tempRoot, "support-store.json"),
+                    ["CHUMMER_SUPPORT_PROGRESS_EMAIL_ENABLED"] = "false",
+                    ["CHUMMER_WORKSPACE_RESTORE_RETENTION_DAYS"] = "30"
+                })
+                .Build();
+
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            RewardService rewards = new(store);
+            WorkspaceLifecyclePolicyService lifecycle = new(configuration);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
+            SupportProgressEmailWorkflowService progressEmails = new(
+                new HttpClient(new DisabledEmailHandler()),
+                configuration,
+                NullLogger<SupportProgressEmailWorkflowService>.Instance);
+            CampaignWorkspaceServerPlaneService workspaceServerPlane = new(
+                campaignSpine,
+                new SupportCaseService(
+                    supportStore,
+                    new SupportAttachmentStorageService(configuration),
+                    rewards,
+                    progressEmails,
+                    NullLogger<SupportCaseService>.Instance),
+                new SupportCasePresentationService());
+
+            HubUserDto user = accounts.EnsureUser("subject.consequence.truth", "Truth Rail", "truth@example.invalid");
+            CampaignWorkspaceProjection workspace = campaignSpine.GetStarterWorkspace(user)
+                ?? throw new InvalidOperationException("Expected a starter workspace.");
+            RunProjection? run = workspace.Runs.FirstOrDefault();
+
+            campaignSpine.UpsertCampaignConsequence(user, workspace, new CampaignConsequenceUpdateRequest(
+                Kind: "heat",
+                State: "high",
+                Summary: "Heat review is still active on the governed return rail.",
+                ReturnLoopAction: null,
+                ReturnLoopRoute: null));
+            campaignSpine.UpsertCampaignConsequence(user, workspace, new CampaignConsequenceUpdateRequest(
+                Kind: "faction",
+                State: "strained",
+                Summary: "Faction standing needs another governed check-in.",
+                ReturnLoopAction: null,
+                ReturnLoopRoute: null));
+            campaignSpine.UpsertCampaignConsequence(user, workspace, new CampaignConsequenceUpdateRequest(
+                Kind: "contact",
+                State: "fragile",
+                Summary: "Contact fallout is still waiting on the shared lane.",
+                ReturnLoopAction: null,
+                ReturnLoopRoute: null));
+            campaignSpine.UpsertCampaignConsequence(user, workspace, new CampaignConsequenceUpdateRequest(
+                Kind: "reputation",
+                State: "under_review",
+                Summary: "Reputation review remains governed before the next publish-safe return.",
+                ReturnLoopAction: null,
+                ReturnLoopRoute: null));
+            campaignSpine.UpsertCampaignConsequence(user, workspace, new CampaignConsequenceUpdateRequest(
+                Kind: "downtime",
+                State: "queued",
+                Summary: "Downtime obligations are queued on the governed aftermath rail.",
+                ReturnLoopAction: null,
+                ReturnLoopRoute: null));
+            campaignSpine.RecordAftermathRecapPackage(
+                user,
+                workspace,
+                run,
+                "downtime_brief",
+                "Reload downtime brief",
+                "Governed downtime package for reload proof.",
+                [
+                    $"Run scope: {run?.Title ?? workspace.CampaignName}.",
+                    "Continuity: governed return lane remains attached to the same campaign spine.",
+                    "Package kind: downtime_brief."
+                ]);
+            campaignSpine.RecordAftermathRecapPackage(
+                user,
+                workspace,
+                run,
+                "session_recap",
+                "Reload aftermath recap",
+                "Governed aftermath package for reload proof.",
+                [
+                    $"Run scope: {run?.Title ?? workspace.CampaignName}.",
+                    "Continuity: governed return lane remains attached to the same campaign spine.",
+                    "Package kind: session_recap."
+                ]);
+
+            CommunityStore reloadedStore = new(configuration, NullLogger<CommunityStore>.Instance);
+            RewardService reloadedRewards = new(reloadedStore);
+            CampaignSpineService reloadedCampaignSpine = new(reloadedStore, new WorkspaceLifecyclePolicyService(configuration), new CampaignArtifactRegistryBridge(reloadedStore));
+            SupportStore reloadedSupportStore = new(configuration, NullLogger<SupportStore>.Instance);
+            SupportProgressEmailWorkflowService reloadedProgressEmails = new(
+                new HttpClient(new DisabledEmailHandler()),
+                configuration,
+                NullLogger<SupportProgressEmailWorkflowService>.Instance);
+            CampaignWorkspaceServerPlaneService reloadedWorkspaceServerPlane = new(
+                reloadedCampaignSpine,
+                new SupportCaseService(
+                    reloadedSupportStore,
+                    new SupportAttachmentStorageService(configuration),
+                    reloadedRewards,
+                    reloadedProgressEmails,
+                    NullLogger<SupportCaseService>.Instance),
+                new SupportCasePresentationService());
+            CampaignWorkspaceProjection reloadedWorkspace = reloadedCampaignSpine.GetStarterWorkspace(user)
+                ?? throw new InvalidOperationException("Expected a reloaded starter workspace.");
+
+            VerificationAssert.True(
+                reloadedWorkspace.Consequences?.Any(item =>
+                    string.Equals(item.Kind, "heat", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_consequence_update", StringComparison.Ordinal))) == true
+                && reloadedWorkspace.Consequences.Any(item =>
+                    string.Equals(item.Kind, "faction", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal)))
+                && reloadedWorkspace.Consequences.Any(item =>
+                    string.Equals(item.Kind, "contact", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal)))
+                && reloadedWorkspace.Consequences.Any(item =>
+                    string.Equals(item.Kind, "reputation", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_action", StringComparison.Ordinal)))
+                && reloadedWorkspace.Consequences.Any(item =>
+                    string.Equals(item.Kind, "downtime", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))),
+                "Governed campaign consequence updates should survive a community-store reload with durable heat, faction, contact, reputation, and downtime return-loop receipts.");
+            VerificationAssert.True(
+                reloadedWorkspace.Consequences.Any(item =>
+                    string.Equals(item.Kind, "downtime", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))),
+                "Downtime package generation should mint a durable governed downtime consequence that survives reload.");
+
+            CampaignMemoryProjection reloadedCampaignMemory = reloadedWorkspaceServerPlane.GetWorkspaceCampaignMemory(user, reloadedWorkspace.WorkspaceId)
+                ?? throw new InvalidOperationException("Expected reloaded campaign memory.");
+            NextSessionCarryForwardProjection reloadedCarryForward = reloadedWorkspaceServerPlane.GetWorkspaceNextSessionCarryForward(user, reloadedWorkspace.WorkspaceId)
+                ?? throw new InvalidOperationException("Expected reloaded next-session carry-forward.");
+            CampaignWorkspaceServerPlaneProjection reloadedWorkspaceServerPlaneProjection = reloadedWorkspaceServerPlane.GetWorkspaceServerPlane(user, reloadedWorkspace.WorkspaceId)
+                ?? throw new InvalidOperationException("Expected reloaded workspace server plane.");
+            CampaignConsequenceTruthProjection consequenceTruth = reloadedWorkspaceServerPlane.GetWorkspaceConsequenceTruth(user, reloadedWorkspace.WorkspaceId)
+                ?? throw new InvalidOperationException("Expected reloaded consequence truth.");
+            DowntimeAftermathApiProjection downtimeAftermath = reloadedWorkspaceServerPlane.GetWorkspaceDowntimeAftermath(user, reloadedWorkspace.WorkspaceId)
+                ?? throw new InvalidOperationException("Expected reloaded downtime aftermath projection.");
+
+            VerificationAssert.True(
+                reloadedCampaignMemory.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal))
+                && reloadedCarryForward.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)),
+                "Workspace server plane should keep governed consequence return-loop evidence attached to campaign memory and next-session carry-forward after reload.");
+            VerificationAssert.True(
+                reloadedWorkspaceServerPlaneProjection.Consequences.Any(item =>
+                    string.Equals(item.Kind, "heat", StringComparison.Ordinal)
+                    && string.Equals(item.State, "high", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_consequence_update", StringComparison.Ordinal))),
+                "Workspace server plane should project the reloaded governed heat consequence on the campaign API surface.");
+            VerificationAssert.True(
+                reloadedWorkspaceServerPlaneProjection.Consequences.Any(item =>
+                    string.Equals(item.Kind, "downtime", StringComparison.Ordinal)
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))),
+                "Workspace server plane should keep downtime consequence routes pinned to the governed aftermath return rail.");
+            VerificationAssert.True(
+                consequenceTruth.ConsequenceCount >= 6
+                && consequenceTruth.States.Any(item => string.Equals(item.Kind, "heat", StringComparison.Ordinal) && string.Equals(item.ReturnLoopRoute, "/account/work", StringComparison.Ordinal))
+                && consequenceTruth.ReturnLoopActions.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)),
+                "Governed consequence truth API should summarize promoted heat, faction, contact, reputation, downtime, and aftermath state with explicit return-loop posture.");
+            VerificationAssert.True(
+                string.Equals(downtimeAftermath.ReturnLoopRoute, "/account/work#aftermath-packages", StringComparison.Ordinal)
+                && downtimeAftermath.ReturnLoopActions.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal))
+                && downtimeAftermath.Consequences.Any(item => string.Equals(item.Kind, "downtime", StringComparison.Ordinal))
+                && downtimeAftermath.EvidenceLines.Any(item => item.Contains("Return-loop route: /account/work#aftermath-packages.", StringComparison.Ordinal)),
+                "Downtime aftermath API should keep downtime receipts, consequence state, and return-loop evidence on the governed aftermath rail.");
         }
         finally
         {

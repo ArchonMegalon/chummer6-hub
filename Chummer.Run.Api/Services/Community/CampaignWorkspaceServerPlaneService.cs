@@ -557,6 +557,191 @@ public sealed class CampaignWorkspaceServerPlaneService
             GeneratedAtUtc: context.GeneratedAtUtc);
     }
 
+    public IReadOnlyList<CampaignConsequenceProjection>? GetWorkspaceConsequences(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context?.Workspace.Consequences?
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray()
+            ?? (context is null ? null : Array.Empty<CampaignConsequenceProjection>());
+    }
+
+    public CampaignConsequenceTruthProjection? GetWorkspaceConsequenceTruth(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context is null ? null : BuildWorkspaceConsequenceTruthProjection(context.Workspace);
+    }
+
+    public IReadOnlyList<AftermathRecapPackageProjection>? GetWorkspaceAftermathRecapPackages(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context?.Workspace.AftermathPackages?
+            .OrderByDescending(static item => item.GeneratedAtUtc)
+            .ToArray()
+            ?? (context is null ? null : Array.Empty<AftermathRecapPackageProjection>());
+    }
+
+    public DowntimeAftermathApiProjection? GetWorkspaceDowntimeAftermath(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context is null ? null : BuildWorkspaceDowntimeAftermathProjection(context.Workspace);
+    }
+
+    public CampaignMemoryProjection? GetWorkspaceCampaignMemory(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context?.Workspace.CampaignMemory;
+    }
+
+    public NextSessionCarryForwardProjection? GetWorkspaceNextSessionCarryForward(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context?.Workspace.NextSessionCarryForward;
+    }
+
+    public CampaignConsequenceProjection? UpsertCampaignConsequence(
+        HubUserDto user,
+        string workspaceId,
+        CampaignConsequenceUpdateRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context is null ? null : _campaignSpine.UpsertCampaignConsequence(user, context.Workspace, request);
+    }
+
+    private static CampaignConsequenceTruthProjection BuildWorkspaceConsequenceTruthProjection(
+        CampaignWorkspaceProjection workspace)
+    {
+        GovernedCampaignConsequenceStateProjection[] states = DeduplicateSemanticCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .OrderByDescending(static item => item.UpdatedAtUtc))
+            .Select(BuildGovernedCampaignConsequenceStateProjection)
+            .ToArray();
+        IReadOnlyList<string> returnLoopActions = states
+            .Select(static item => item.ReturnLoopAction)
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        IReadOnlyList<string> returnLoopRoutes = states
+            .Select(static item => item.ReturnLoopRoute)
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return new CampaignConsequenceTruthProjection(
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            Summary: states.Length == 0
+                ? $"{workspace.CampaignName} has not promoted governed consequence state yet."
+                : $"{states.Length} governed consequence state projection(s) stay attached to {workspace.CampaignName} with explicit return-loop posture.",
+            ConsequenceCount: states.Length,
+            States: states,
+            ReturnLoopActions: returnLoopActions,
+            ReturnLoopRoutes: returnLoopRoutes,
+            GeneratedAtUtc: DateTimeOffset.UtcNow);
+    }
+
+    private static GovernedCampaignConsequenceStateProjection BuildGovernedCampaignConsequenceStateProjection(
+        CampaignConsequenceProjection consequence)
+    {
+        return new GovernedCampaignConsequenceStateProjection(
+            ConsequenceId: consequence.ConsequenceId,
+            Kind: consequence.Kind,
+            State: consequence.State,
+            Summary: consequence.Summary,
+            ReturnLoopAction: ResolveConsequenceReturnLoopAction(consequence),
+            ReturnLoopRoute: ResolveConsequenceReturnLoopRoute(consequence),
+            EvidenceLines: consequence.EvidenceLines,
+            Receipts: consequence.Receipts,
+            UpdatedAtUtc: consequence.UpdatedAtUtc);
+    }
+
+    private static DowntimeAftermathApiProjection BuildWorkspaceDowntimeAftermathProjection(
+        CampaignWorkspaceProjection workspace)
+    {
+        AftermathRecapPackageProjection[] packages = DeduplicateSemanticAftermathPackageVersions(
+                (workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>())
+                .OrderByDescending(static item => item.GeneratedAtUtc))
+            .ToArray();
+        CampaignConsequenceProjection[] consequences = DeduplicateSemanticCampaignConsequenceVersions(
+                (workspace.Consequences ?? Array.Empty<CampaignConsequenceProjection>())
+                .Where(static item =>
+                    string.Equals(item.Kind, "downtime", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.Kind, "aftermath", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc))
+            .ToArray();
+        IReadOnlyList<string> returnLoopActions = consequences
+            .Select(ResolveConsequenceReturnLoopAction)
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        IReadOnlyList<string> evidenceLines = packages
+            .SelectMany(static item => item.EvidenceLines)
+            .Concat(consequences.SelectMany(static item => item.EvidenceLines))
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return new DowntimeAftermathApiProjection(
+            WorkspaceId: workspace.WorkspaceId,
+            CampaignId: workspace.CampaignId,
+            Summary: packages.Length == 0
+                ? $"{workspace.CampaignName} has no governed downtime or aftermath packages yet."
+                : $"{packages.Length} governed downtime and aftermath package(s) stay attached to the shared return rail.",
+            ReturnLoopRoute: "/account/work#aftermath-packages",
+            ReturnLoopActions: returnLoopActions,
+            Packages: packages,
+            Consequences: consequences,
+            EvidenceLines: evidenceLines,
+            GeneratedAtUtc: DateTimeOffset.UtcNow);
+    }
+
+    private static string? ResolveConsequenceReturnLoopAction(CampaignConsequenceProjection consequence)
+        => consequence.Receipts
+            .FirstOrDefault(static item => string.Equals(item.SourceKind, "return_loop_action", StringComparison.OrdinalIgnoreCase))
+            ?.Summary;
+
+    private static string? ResolveConsequenceReturnLoopRoute(CampaignConsequenceProjection consequence)
+        => consequence.Receipts
+            .FirstOrDefault(static item => string.Equals(item.SourceKind, "return_loop_route", StringComparison.OrdinalIgnoreCase))
+            ?.ReceiptId;
+
     public EntitlementSyncReceiptProjection GetEntitlementSyncReceiptProjection(
         HubUserDto user,
         InstallLinkingSummaryDto? installLinking = null)
