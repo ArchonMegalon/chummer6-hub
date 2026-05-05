@@ -49,6 +49,23 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/organizer-ops")]
+    [ProducesResponseType<OrganizerOperationsDashboardProjection>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<OrganizerOperationsDashboardProjection>> GetMyOrganizerOperations(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.GetOrganizerOperations(user, installLinking));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/restore")]
     [ProducesResponseType<WorkspaceRestoreProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<WorkspaceRestoreProjection>> GetMyRestoreProjection(CancellationToken cancellationToken)
