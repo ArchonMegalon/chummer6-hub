@@ -286,6 +286,27 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/workspaces/{workspaceId}/runboard-continuity")]
+    [ProducesResponseType<RunboardContinuityProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<RunboardContinuityProjection>> GetMyCampaignWorkspaceRunboardContinuity(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var continuity = _workspaceServerPlane.GetWorkspaceRunboardContinuity(user, workspaceId, installLinking);
+            return continuity is null ? NotFound() : Ok(continuity);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/workspaces/{workspaceId}/prep-library")]
     [ProducesResponseType<CampaignPrepLibrarySearchResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -496,6 +517,41 @@ public sealed class CampaignSpineController : ControllerBase
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var consequence = _workspaceServerPlane.UpsertCampaignConsequence(user, workspaceId, request, installLinking);
             return consequence is null ? NotFound() : Ok(consequence);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/workspaces/{workspaceId}/runboard-continuity")]
+    [ProducesResponseType<RunboardContinuityProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<RunboardContinuityProjection>> UpsertMyCampaignWorkspaceRunboardContinuity(
+        [FromRoute] string workspaceId,
+        [FromBody] RunboardContinuityUpdateRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("runboard continuity payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var continuity = _workspaceServerPlane.UpsertRunboardContinuity(user, workspaceId, request, installLinking);
+            return continuity is null ? NotFound() : Ok(continuity);
         }
         catch (CommunityAccessDeniedException ex)
         {

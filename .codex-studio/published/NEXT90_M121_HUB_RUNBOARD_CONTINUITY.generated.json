@@ -1,0 +1,33 @@
+{
+  "contract_name": "chummer6-hub.next90_m121_hub_runboard_continuity",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m121-hub-persist-session-turn-ledger-handoff-runboard-state-and-r",
+    "work_task_id": "121.5",
+    "milestone_id": 121,
+    "frontier_id": 7165194744,
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "wave": "W15",
+    "task": "Persist session turn-ledger handoff, runboard state, and ResolutionReport draft continuity without owning engine math.",
+    "title": "Persist session turn-ledger handoff, runboard state, and ResolutionReport draft continuity without owning engine math.",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "persist_session_turn_ledger_handoff:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "required_markers": [
+    "var runboardContinuityUpdateResult = await campaignSpineController.UpsertMyCampaignWorkspaceRunboardContinuity(",
+    "TurnLedgerSummary: \"Minor-action handoff stays pinned before the next opposition pass.\"",
+    "ResolutionReportStatus: \"draft\"",
+    "campaign spine runboard-continuity api should persist the active run continuity on the governed workspace.",
+    "campaign spine server plane api should project persisted runboard continuity on the bounded runboard summary.",
+    "campaign spine runboard continuity should persist across a community-store reload."
+  ]
+}

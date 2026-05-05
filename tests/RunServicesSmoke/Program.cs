@@ -3700,9 +3700,55 @@ async Task VerifyPublicLandingProjectionAsync()
     var carryForwardPayload = (carryForwardResult.Result as OkObjectResult)?.Value as NextSessionCarryForwardProjection ?? carryForwardResult.Value;
     Assert(carryForwardPayload?.EvidenceLines.Any(item => item.Contains("Review heat fallout", StringComparison.Ordinal) || item.Contains("Review reputation fallout", StringComparison.Ordinal)) == true, "campaign spine carry-forward api should surface governed consequence return-loop evidence.");
     Assert(carryForwardPayload?.EvidenceLines.Any(item => item.Contains("Review downtime obligations", StringComparison.Ordinal)) == true, "campaign spine carry-forward api should keep downtime consequence truth attached to the next-session return.");
+    var runboardContinuityUpdateResult = await campaignSpineController.UpsertMyCampaignWorkspaceRunboardContinuity(
+        workspaceId,
+        new RunboardContinuityUpdateRequest(
+            RunId: runId,
+            ActiveSceneId: workspacePayload?.Runs.FirstOrDefault(item => string.Equals(item.RunId, runId, StringComparison.Ordinal))?.ActiveSceneId,
+            TurnLedgerSummary: "Minor-action handoff stays pinned before the next opposition pass.",
+            TurnLedgerEvidenceLines:
+            [
+                "Player lane confirmed the last spend on the governed turn ledger.",
+                "Hub persisted the same handoff without replaying engine math."
+            ],
+            RunboardStateSummary: "Two blockers and the same extraction objective stay pinned on the GM runboard.",
+            ObjectiveLines:
+            [
+                "Extract the courier without spiking public awareness.",
+                "Keep the matrix relay stable until exfiltration."
+            ],
+            Blockers:
+            [
+                "Suppress the loading-dock mooks before the next pass.",
+                "Resolve overwatch pressure before the courier leaves the van."
+            ],
+            ResolutionReportStatus: "draft",
+            ResolutionReportSummary: "ResolutionReport draft keeps the courier handoff and matrix fallout continuity on one hub lane.",
+            ResolutionNotes:
+            [
+                "Spoiler-safe notes stay bounded to the same closeout draft.",
+                "No VTT map state or engine math is owned by hub here."
+            ],
+            NextSafeAction: "Open ResolutionReport and keep the same return lane on /account/work#runboard.",
+            Note: "GM closeout continuity proof for M121."),
+        CancellationToken.None);
+    var runboardContinuityPayload = (runboardContinuityUpdateResult.Result as OkObjectResult)?.Value as RunboardContinuityProjection ?? runboardContinuityUpdateResult.Value;
+    Assert(runboardContinuityPayload is not null && string.Equals(runboardContinuityPayload.RunId, runId, StringComparison.Ordinal), "campaign spine runboard-continuity api should persist the active run continuity on the governed workspace.");
+    Assert(string.Equals(runboardContinuityPayload.ResolutionReportDraft.Status, "draft", StringComparison.Ordinal), "campaign spine runboard-continuity api should persist the ResolutionReport draft state.");
+    Assert(runboardContinuityPayload.RunboardState.Blockers.Any(item => item.Contains("overwatch pressure", StringComparison.Ordinal)), "campaign spine runboard-continuity api should persist blocker lines on the GM runboard state.");
+    var runboardContinuityGetResult = await campaignSpineController.GetMyCampaignWorkspaceRunboardContinuity(workspaceId, CancellationToken.None);
+    var runboardContinuityGetPayload = (runboardContinuityGetResult.Result as OkObjectResult)?.Value as RunboardContinuityProjection ?? runboardContinuityGetResult.Value;
+    Assert(runboardContinuityGetPayload is not null && string.Equals(runboardContinuityGetPayload.ContinuityId, runboardContinuityPayload.ContinuityId, StringComparison.Ordinal), "campaign spine runboard-continuity detail api should return the persisted continuity payload for the workspace.");
+    Assert(runboardContinuityGetPayload.TurnLedgerHandoff.EvidenceLines.Any(item => item.Contains("without replaying engine math", StringComparison.Ordinal)), "campaign spine runboard-continuity detail api should keep the no-engine-math boundary explicit on the turn-ledger handoff.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.Continuity is not null, "campaign spine server plane api should project persisted runboard continuity on the bounded runboard summary.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.Continuity?.ResolutionReportDraft.Notes.Any(item => item.Contains("Spoiler-safe notes", StringComparison.Ordinal)) == true, "campaign spine server plane api should keep ResolutionReport draft notes attached to the runboard continuity summary.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.ObjectiveSummary.Contains("GM runboard", StringComparison.Ordinal) == true, "campaign spine server plane api should prefer the persisted runboard-state summary once continuity is stored.");
+    Assert(refreshedWorkspaceServerPlanePayload?.Runboard?.Blockers.Any(item => item.Contains("loading-dock mooks", StringComparison.Ordinal)) == true, "campaign spine server plane api should project persisted blocker lines on the runboard summary.");
+    Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runboard_continuity", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runboard continuity onto the bounded what-changed rail.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
+    Assert(runPayload.RunboardContinuity is not null && string.Equals(runPayload.RunboardContinuity.ResolutionReportDraft.Status, "draft", StringComparison.Ordinal), "campaign spine run detail api should surface the persisted ResolutionReport draft continuity on the active run.");
     var handoffResult = await campaignSpineController.GetMyBuildLabHandoff(handoffId, CancellationToken.None);
     var handoffPayload = (handoffResult.Result as OkObjectResult)?.Value as BuildLabHandoffProjection ?? handoffResult.Value;
     Assert(handoffPayload is not null && handoffPayload.Title.Contains("build path", StringComparison.OrdinalIgnoreCase), "campaign spine api should expose the customer-facing build-path handoff detail.");
@@ -4499,6 +4545,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(reloadedAftermathPackage.ArtifactId, retainedAftermathPayload!.ArtifactId, StringComparison.Ordinal), "campaign spine aftermath packages should preserve the durable artifact id across reload.");
     Assert(!string.IsNullOrWhiteSpace(reloadedAftermathPackage.ProvenanceSummary), "campaign spine aftermath packages should preserve artifact provenance across reload.");
     Assert(!string.IsNullOrWhiteSpace(reloadedAftermathPackage.AuditSummary), "campaign spine aftermath packages should preserve artifact audit posture across reload.");
+    var reloadedRun = NotNull(reloadedCampaignSpine.GetRun(linkedUser, runId), "campaign spine runboard continuity should survive a community-store reload on the active run.");
+    Assert(reloadedRun.RunboardContinuity is not null, "campaign spine runboard continuity should persist across a community-store reload.");
+    Assert(reloadedRun.RunboardContinuity!.TurnLedgerHandoff.EvidenceLines.Any(item => item.Contains("without replaying engine math", StringComparison.Ordinal)), "campaign spine runboard continuity should preserve the no-engine-math boundary across reload.");
+    Assert(string.Equals(reloadedRun.RunboardContinuity.ResolutionReportDraft.Status, "draft", StringComparison.Ordinal), "campaign spine runboard continuity should preserve the ResolutionReport draft status across reload.");
+    Assert(reloadedRun.RunboardContinuity.RunboardState.Blockers.Any(item => item.Contains("loading-dock mooks", StringComparison.Ordinal)), "campaign spine runboard continuity should preserve blocker lines across reload.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(

@@ -629,6 +629,30 @@ public sealed class CampaignWorkspaceServerPlaneService
         return context?.Workspace.NextSessionCarryForward;
     }
 
+    public RunboardContinuityProjection? GetWorkspaceRunboardContinuity(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context?.LeadRun?.RunboardContinuity;
+    }
+
+    public RunboardContinuityProjection? UpsertRunboardContinuity(
+        HubUserDto user,
+        string workspaceId,
+        RunboardContinuityUpdateRequest request,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(request);
+
+        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        return context is null ? null : _campaignSpine.UpsertRunboardContinuity(user, context.Workspace, request);
+    }
+
     public CampaignConsequenceProjection? UpsertCampaignConsequence(
         HubUserDto user,
         string workspaceId,
@@ -2375,9 +2399,16 @@ public sealed class CampaignWorkspaceServerPlaneService
                         && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
                     .OrderByDescending(static item => item.UpdatedAtUtc))
             .ToArray();
-        string objectiveSummary = openObjectives.Count == 0
-            ? "No open objective is pinned right now."
-            : $"{openObjectives.Count} objective(s) still need attention before the next recap-safe handoff.";
+        string objectiveSummary = leadRun.RunboardContinuity?.RunboardState.Summary
+            ?? (openObjectives.Count == 0
+                ? "No open objective is pinned right now."
+                : $"{openObjectives.Count} objective(s) still need attention before the next recap-safe handoff.");
+        IReadOnlyList<string> blockers = leadRun.RunboardContinuity?.RunboardState.Blockers?.Count > 0
+            ? leadRun.RunboardContinuity.RunboardState.Blockers
+            : openObjectives
+                .Take(4)
+                .Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure.")
+                .ToArray();
 
         return new RunboardSummary(
             RunId: leadRun.RunId,
@@ -2386,11 +2417,9 @@ public sealed class CampaignWorkspaceServerPlaneService
             ActiveSceneId: leadRun.ActiveSceneId,
             ActiveSceneSummary: workspace.ActiveSceneSummary,
             ObjectiveSummary: objectiveSummary,
-            Blockers: openObjectives
-                .Take(4)
-                .Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure.")
-                .ToArray(),
-            ReturnSummary: workspace.ReturnSummary);
+            Blockers: blockers,
+            ReturnSummary: leadRun.RunboardContinuity?.ResolutionReportDraft.NextSafeAction ?? workspace.ReturnSummary,
+            Continuity: leadRun.RunboardContinuity);
     }
 
     private static IReadOnlyList<ContinuityConflictCue> BuildContinuityConflicts(
