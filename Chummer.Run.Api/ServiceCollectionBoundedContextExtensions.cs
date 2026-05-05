@@ -40,6 +40,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<IdentityLinkService>();
         services.AddSingleton<UserExperienceService>();
         services.AddSingleton<GroupService>();
+        services.AddSingleton<ReusableAccountFlowService>();
         services.AddSingleton<RewardService>();
         services.AddSingleton<EntitlementService>();
         services.AddSingleton<LeaderboardService>();

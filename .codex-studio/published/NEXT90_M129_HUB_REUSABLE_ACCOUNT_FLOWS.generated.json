@@ -1,0 +1,35 @@
+{
+  "contract_name": "chummer6-hub.next90_m129_hub_reusable_account_flows",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m129-hub-build-reusable-account-profile-group-membership-join-cod",
+    "work_task_id": "129.1",
+    "milestone_id": 129,
+    "frontier_id": 1246056730,
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "wave": "W19",
+    "task": "Build reusable account, profile, group, membership, join-code, boost-code, reward-journal, and entitlement-journal flows.",
+    "title": "Build reusable account, profile, group, membership, join-code, boost-code, reward-journal, and entitlement-journal flows.",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "build_reusable_account_profile_group:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "required_markers": [
+    "var reusableAccountFlows = new ReusableAccountFlowService(releases).Build(new ReusableAccountFlowContext(",
+    "community reusable account flow should keep account profile on the signed-in account rail.",
+    "community reusable account flow should keep group profile on the governed group rail.",
+    "community reusable account flow should keep membership status on the governed group rail.",
+    "community reusable account flow should keep join-code issuance on the governed group api rail.",
+    "community reusable account flow should keep boost-code issuance on the governed boost-code rail.",
+    "community reusable account flow should keep reward-journal followthrough on the signed-in rewards rail.",
+    "community reusable account flow should keep entitlement-journal followthrough on the signed-in entitlements rail."
+  ]
+}

@@ -1095,6 +1095,28 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         ProjectId: "hub",
         Label: "alpha"));
     groups.RedeemBoostCode(new RedeemBoostCodeRequest("subject.demo", boostCode.Code));
+    var reusableAccountFlows = new ReusableAccountFlowService(releases).Build(new ReusableAccountFlowContext(
+        User: currentUser,
+        Groups: groups.ListGroupsForUser(currentUser.SubjectId),
+        JoinCodes:
+        [
+            ownerJoinCode
+        ],
+        BoostCodes:
+        [
+            boostCode
+        ],
+        Rewards: rewards.ListRewardsForUser(currentUser.UserId),
+        Badges: rewards.ListBadgesForUser(currentUser.UserId),
+        Entitlements: entitlements.ListForUser(currentUser.UserId),
+        Locale: "en-US"));
+    Assert(reusableAccountFlows.Projections.Any(item => string.Equals(item.SurfaceId, "account_profile", StringComparison.Ordinal) && string.Equals(item.Route, "/account", StringComparison.Ordinal)), "community reusable account flow should keep account profile on the signed-in account rail.");
+    Assert(reusableAccountFlows.Projections.Any(item => string.Equals(item.SurfaceId, "group_profile", StringComparison.Ordinal) && string.Equals(item.Route, $"/groups/{ownerGroup.GroupId}", StringComparison.Ordinal)), "community reusable account flow should keep group profile on the governed group rail.");
+    Assert(reusableAccountFlows.Projections.Any(item => string.Equals(item.SurfaceId, "membership_status", StringComparison.Ordinal) && string.Equals(item.Route, $"/groups/{ownerGroup.GroupId}", StringComparison.Ordinal)), "community reusable account flow should keep membership status on the governed group rail.");
+    Assert(reusableAccountFlows.Projections.Any(item => string.Equals(item.SurfaceId, "join_code", StringComparison.Ordinal) && string.Equals(item.Route, $"/api/v1/groups/{ownerGroup.GroupId}/join-codes", StringComparison.Ordinal)), "community reusable account flow should keep join-code issuance on the governed group api rail.");
+    Assert(reusableAccountFlows.Projections.Any(item => string.Equals(item.SurfaceId, "boost_code", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/boost-codes", StringComparison.Ordinal)), "community reusable account flow should keep boost-code issuance on the governed boost-code rail.");
+    Assert(reusableAccountFlows.Projections.Any(item => string.Equals(item.SurfaceId, "reward_journal", StringComparison.Ordinal) && string.Equals(item.Route, "/rewards", StringComparison.Ordinal)), "community reusable account flow should keep reward-journal followthrough on the signed-in rewards rail.");
+    Assert(reusableAccountFlows.Projections.Any(item => string.Equals(item.SurfaceId, "entitlement_journal", StringComparison.Ordinal) && string.Equals(item.Route, $"/api/v1/entitlements/me?subjectId={currentUser.SubjectId}", StringComparison.Ordinal)), "community reusable account flow should keep entitlement-journal followthrough on the signed-in entitlements rail.");
     var reloadedStore = new CommunityStore(configuration, loggerFactory.CreateLogger<CommunityStore>());
     var reloadedAccounts = new AccountService(reloadedStore);
     var reloadedGroups = new GroupService(reloadedStore, reloadedAccounts);
