@@ -34,6 +34,9 @@ public sealed class CampaignSpineService
     private const string ReturnLoopActionSourceKind = "return_loop_action";
     private const string ReturnLoopRouteSourceKind = "return_loop_route";
     private const string GovernedAftermathPackageSourceKind = "governed_aftermath_package";
+    private const string TurnLedgerHandoffSourceKind = "turn_ledger_handoff";
+    private const string RunboardStateSourceKind = "runboard_state";
+    private const string ResolutionReportDraftSourceKind = "resolution_report_draft";
 
     private readonly CommunityStore _store;
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
@@ -479,6 +482,159 @@ public sealed class CampaignSpineService
 
             _store.PersistLocked();
             return consequence;
+        }
+    }
+
+    public RunboardContinuityProjection UpsertRunboardContinuity(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        RunboardContinuityUpdateRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(request);
+
+        string normalizedRunId = AccountService.NormalizeOptional(request.RunId)
+            ?? workspace.Runs.FirstOrDefault()?.RunId
+            ?? throw new InvalidOperationException($"{workspace.CampaignName} does not have a governed run to persist.");
+        string normalizedTurnLedgerSummary = AccountService.NormalizeOptional(request.TurnLedgerSummary)
+            ?? throw new ArgumentException("turn-ledger summary is required.", nameof(request));
+        string normalizedRunboardStateSummary = AccountService.NormalizeOptional(request.RunboardStateSummary)
+            ?? throw new ArgumentException("runboard state summary is required.", nameof(request));
+        string normalizedResolutionStatus = AccountService.NormalizeOptional(request.ResolutionReportStatus)
+            ?? throw new ArgumentException("resolution-report status is required.", nameof(request));
+        string normalizedResolutionSummary = AccountService.NormalizeOptional(request.ResolutionReportSummary)
+            ?? throw new ArgumentException("resolution-report summary is required.", nameof(request));
+        string? normalizedNextSafeAction = AccountService.NormalizeOptional(request.NextSafeAction);
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+
+        lock (_store.Gate)
+        {
+            if (!_store.RunsById.TryGetValue(normalizedRunId, out var storedRun)
+                || !string.Equals(storedRun.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new KeyNotFoundException($"Unknown run {normalizedRunId} for workspace {workspace.WorkspaceId}.");
+            }
+
+            if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
+            {
+                throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
+            }
+
+            string? normalizedSceneId = AccountService.NormalizeOptional(request.ActiveSceneId);
+            SceneProjection? activeScene = normalizedSceneId is null
+                ? storedRun.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, storedRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+                    ?? storedRun.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault()
+                : storedRun.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, normalizedSceneId, StringComparison.OrdinalIgnoreCase));
+            if (normalizedSceneId is not null && activeScene is null)
+            {
+                throw new KeyNotFoundException($"Run {storedRun.RunId} does not contain scene {normalizedSceneId}.");
+            }
+
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            IReadOnlyList<string> objectiveLines = FinalizeLines(
+                (request.ObjectiveLines ?? Array.Empty<string>())
+                    .Concat(
+                        storedRun.Objectives
+                            .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
+                            .Select(static item => $"{item.Title} stays {item.Status} with {item.Pressure} pressure.")));
+            IReadOnlyList<string> blockerLines = FinalizeLines(
+                (request.Blockers ?? Array.Empty<string>())
+                    .Concat(
+                        storedRun.Objectives
+                            .Where(static item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase))
+                            .Select(static item => $"Clear {item.Title} before you close the current runboard handoff.")));
+            string nextSafeAction = normalizedNextSafeAction
+                ?? $"Open ResolutionReport for {storedRun.Title} and keep the next governed return on /account/work.";
+            IReadOnlyList<string> turnLedgerEvidenceLines = FinalizeLines(
+                new[]
+                {
+                    normalizedTurnLedgerSummary,
+                    $"Source kind: {TurnLedgerHandoffSourceKind}.",
+                    activeScene is null
+                        ? $"Turn ledger handoff stays pinned to {storedRun.Title} without replaying engine math inside hub."
+                        : $"Turn ledger handoff stays pinned to {storedRun.Title} / {activeScene.Title} without replaying engine math inside hub.",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                }.Concat(request.TurnLedgerEvidenceLines ?? Array.Empty<string>()));
+            IReadOnlyList<string> runboardStateEvidenceLines = FinalizeLines(
+            [
+                normalizedRunboardStateSummary,
+                $"Source kind: {RunboardStateSourceKind}.",
+                $"{objectiveLines.Count} objective line(s) and {blockerLines.Count} blocker line(s) stay on the same governed campaign spine.",
+                $"Next safe action: {nextSafeAction}"
+            ]);
+            IReadOnlyList<string> resolutionNotes = FinalizeLines(
+                new[]
+                {
+                    normalizedResolutionSummary
+                }.Concat(request.ResolutionNotes ?? Array.Empty<string>()));
+            IReadOnlyList<string> resolutionEvidenceLines = FinalizeLines(
+            [
+                normalizedResolutionSummary,
+                $"Source kind: {ResolutionReportDraftSourceKind}.",
+                $"ResolutionReport draft remains {normalizedResolutionStatus} for {storedRun.Title} on the hub continuity lane.",
+                $"Next safe action: {nextSafeAction}"
+            ]);
+
+            var continuity = new RunboardContinuityProjection(
+                ContinuityId: StableId("runboard-continuity", $"{workspace.WorkspaceId}:{storedRun.RunId}"),
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignId: workspace.CampaignId,
+                RunId: storedRun.RunId,
+                RunTitle: storedRun.Title,
+                ActiveSceneId: activeScene?.SceneId,
+                ActiveSceneTitle: activeScene?.Title,
+                TurnLedgerHandoff: new TurnLedgerHandoffProjection(
+                    HandoffId: StableId("turn-ledger", $"{workspace.WorkspaceId}:{storedRun.RunId}"),
+                    Summary: normalizedTurnLedgerSummary,
+                    EvidenceLines: turnLedgerEvidenceLines,
+                    UpdatedAtUtc: now),
+                RunboardState: new RunboardStateProjection(
+                    StateId: StableId("runboard-state", $"{workspace.WorkspaceId}:{storedRun.RunId}"),
+                    Summary: normalizedRunboardStateSummary,
+                    ObjectiveLines: objectiveLines,
+                    Blockers: blockerLines,
+                    NextSafeAction: nextSafeAction,
+                    EvidenceLines: runboardStateEvidenceLines,
+                    UpdatedAtUtc: now),
+                ResolutionReportDraft: new ResolutionReportDraftProjection(
+                    DraftId: StableId("resolution-report-draft", $"{workspace.WorkspaceId}:{storedRun.RunId}"),
+                    Status: normalizedResolutionStatus,
+                    Summary: normalizedResolutionSummary,
+                    Notes: resolutionNotes,
+                    NextSafeAction: nextSafeAction,
+                    EvidenceLines: resolutionEvidenceLines,
+                    UpdatedAtUtc: now),
+                Summary: $"{storedRun.Title} keeps a persisted turn-ledger handoff, runboard state, and ResolutionReport draft on the governed hub lane.",
+                EvidenceLines: FinalizeLines(
+                [
+                    $"Turn ledger handoff: {normalizedTurnLedgerSummary}",
+                    $"Runboard state: {normalizedRunboardStateSummary}",
+                    $"ResolutionReport draft: {normalizedResolutionSummary}",
+                    $"Boundary: hub persists continuity and draft posture without replaying engine math.",
+                    activeScene is null ? string.Empty : $"Active scene: {activeScene.Title}.",
+                    $"Next safe action: {nextSafeAction}",
+                    normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
+                ]),
+                UpdatedByUserId: user.UserId,
+                UpdatedAtUtc: now);
+
+            _store.RunsById[storedRun.RunId] = storedRun with
+            {
+                ActiveSceneId = activeScene?.SceneId ?? storedRun.ActiveSceneId,
+                UpdatedAtUtc = now,
+                RunboardContinuity = continuity,
+            };
+            _store.CampaignSpinesById[campaign.CampaignId] = campaign with
+            {
+                ActiveRunId = storedRun.RunId,
+                UpdatedAtUtc = now,
+            };
+
+            _store.PersistLocked();
+            return continuity;
         }
     }
 
@@ -5145,6 +5301,19 @@ public sealed class CampaignSpineService
                 Label: "Active scene",
                 Summary: $"{activeScene.Title} is live on {leadRun.Title} at {activeScene.Revision}.",
                 UpdatedAtUtc: activeScene.UpdatedAtUtc));
+        }
+
+        if (leadRun?.RunboardContinuity is not null)
+        {
+            string continuityId = ResolveChangePacketIdentity(
+                leadRun.RunboardContinuity.ContinuityId,
+                StableId("runboard-continuity", campaign.CampaignId));
+            packets.Add(new WorkspaceChangePacketProjection(
+                PacketId: StableId("packet", $"{campaign.CampaignId}:runboard:{continuityId}"),
+                Kind: "runboard_continuity",
+                Label: "Runboard continuity",
+                Summary: leadRun.RunboardContinuity.Summary,
+                UpdatedAtUtc: leadRun.RunboardContinuity.UpdatedAtUtc));
         }
 
         if (leadObjective is not null)

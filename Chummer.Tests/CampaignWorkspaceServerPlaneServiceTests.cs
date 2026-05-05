@@ -7591,6 +7591,58 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RunboardSummaryIncludesPersistedContinuity_WhenHubStoresTurnLedgerAndDraftState()
+    {
+        CampaignWorkspaceProjection seed = BuildWorkspaceWithRosterSignalsOnly();
+        RunProjection run = Assert.Single(seed.Runs);
+        RunProjection updatedRun = run with
+        {
+            RunboardContinuity = new RunboardContinuityProjection(
+                ContinuityId: "runboard-continuity:test",
+                WorkspaceId: seed.WorkspaceId,
+                CampaignId: seed.CampaignId,
+                RunId: run.RunId,
+                RunTitle: run.Title,
+                ActiveSceneId: run.ActiveSceneId,
+                ActiveSceneTitle: run.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, run.ActiveSceneId, StringComparison.Ordinal))?.Title,
+                TurnLedgerHandoff: new TurnLedgerHandoffProjection(
+                    HandoffId: "turn-ledger:test",
+                    Summary: "Minor actions stay committed before the next opponent pass.",
+                    EvidenceLines: ["Hub keeps the handoff receipt without replaying engine math."],
+                    UpdatedAtUtc: DateTimeOffset.UtcNow),
+                RunboardState: new RunboardStateProjection(
+                    StateId: "runboard-state:test",
+                    Summary: "Three blockers stay pinned on the GM runboard.",
+                    ObjectiveLines: ["Secure the courier", "Keep Knight Errant off the comms"],
+                    Blockers: ["Suppress the west stairwell", "Resolve matrix overwatch before extraction"],
+                    NextSafeAction: "Open ResolutionReport and confirm the same return lane.",
+                    EvidenceLines: ["Same workspace rail, same governed runboard state."],
+                    UpdatedAtUtc: DateTimeOffset.UtcNow),
+                ResolutionReportDraft: new ResolutionReportDraftProjection(
+                    DraftId: "resolution:test",
+                    Status: "draft",
+                    Summary: "Closeout draft captures the courier handoff and matrix fallout.",
+                    Notes: ["Keep spoiler-safe notes bounded to the closeout draft."],
+                    NextSafeAction: "Open ResolutionReport and confirm the same return lane.",
+                    EvidenceLines: ["ResolutionReport draft continuity is persisted on hub."],
+                    UpdatedAtUtc: DateTimeOffset.UtcNow),
+                Summary: "Hub persists runboard continuity on the governed campaign lane.",
+                EvidenceLines: ["Boundary: no engine math is replayed here."],
+                UpdatedByUserId: "user:test",
+                UpdatedAtUtc: DateTimeOffset.UtcNow)
+        };
+
+        RunboardSummary? summary = InvokeBuildRunboardSummary(seed with { Runs = [updatedRun] }, updatedRun);
+
+        Assert.NotNull(summary);
+        Assert.NotNull(summary!.Continuity);
+        Assert.Equal("Three blockers stay pinned on the GM runboard.", summary.ObjectiveSummary);
+        Assert.Contains("Resolve matrix overwatch before extraction", summary.Blockers);
+        Assert.Equal("Open ResolutionReport and confirm the same return lane.", summary.ReturnSummary);
+        Assert.Equal("Minor actions stay committed before the next opponent pass.", summary.Continuity!.TurnLedgerHandoff.Summary);
+    }
+
+    [Fact]
     public void PrepLibraryOrderingPrioritizesOppositionAndRosterPacketsAheadOfNewerOpsReceipts()
     {
         CampaignWorkspaceProjection oppositionWorkspace = BuildWorkspaceWithOppositionChangeSignalsOnly();

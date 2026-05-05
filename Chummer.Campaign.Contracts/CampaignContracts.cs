@@ -272,7 +272,8 @@ public sealed record RunProjection(
     IReadOnlyList<SceneProjection> Scenes,
     ContinuitySnapshotRef? LatestContinuity,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    RunboardContinuityProjection? RunboardContinuity = null);
 
 public sealed record CampaignProjection(
     string CampaignId,
@@ -523,7 +524,8 @@ public sealed record RunboardSummary(
     string? ActiveSceneSummary,
     string ObjectiveSummary,
     IReadOnlyList<string> Blockers,
-    string ReturnSummary);
+    string ReturnSummary,
+    RunboardContinuityProjection? Continuity = null);
 
 public sealed record ContinuityConflictCue(
     string CueId,
