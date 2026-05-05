@@ -2576,6 +2576,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var supportConciergePackets = new SupportConciergePacketService(releases, supportPresentation);
     var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
+    var campaignFederation = new CampaignFederationOrchestrationService(campaignSpine, new ArtifactFactoryOrchestrationService());
     var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
     var installBootstrapTickets = new InstallBootstrapTicketService(
         DataProtectionProvider.Create(Path.Combine(tempRoot, "install-bootstrap-tickets")),
@@ -2678,7 +2679,8 @@ async Task VerifyPublicLandingProjectionAsync()
         accounts,
         installLinking,
         campaignSpine,
-        workspaceServerPlane)
+        workspaceServerPlane,
+        campaignFederation)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -4095,6 +4097,36 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(publishedDossierPublicationDetailModel?.SelectedCreatorPublication?.Kind, "dossier", StringComparison.Ordinal), "published dossier publications should stay typed as dossier on the shared projection.");
     Assert(publishedDossierPublicationDetailModel?.SelectedCreatorPublication?.Discoverable == true, "published dossier publications should become discoverable once the governed public shelf promotion lands.");
     Assert(publishedDossierPublicationDetailModel?.SelectedCreatorPublication?.TrustSummary?.Contains("live on governed discovery", StringComparison.OrdinalIgnoreCase) == true, "published dossier publications should explain live governed discovery on the shared projection.");
+    var federationBatchResult = await campaignSpineController.LaunchMyCampaignWorkspaceFederationBatch(
+        workspaceId,
+        new CampaignFederationBatchRequest(
+            SourceIds:
+            [
+                dossierPublicationId,
+                replayTimelinePayload.PackageId
+            ],
+            RequestedFormats:
+            [
+                "caption",
+                "packet"
+            ],
+            Audience: "creator,gm",
+            Locale: "en-US"),
+        CancellationToken.None);
+    var federationBatchPayload = (federationBatchResult.Result as OkObjectResult)?.Value as CampaignFederationBatchProjection ?? federationBatchResult.Value;
+    Assert(federationBatchPayload is not null && string.Equals(federationBatchPayload.WorkspaceId, workspaceId, StringComparison.Ordinal), "campaign federation api should bind the launched publication batch onto the selected governed workspace.");
+    Assert(federationBatchPayload!.SourcePacks.Count == 2, "campaign federation api should launch from the selected dossier and replay governed source packs.");
+    Assert(federationBatchPayload.SourcePacks.Any(item => string.Equals(item.PublicationKind, "dossier", StringComparison.Ordinal)), "campaign federation api should include the dossier publication as a creator-publication source pack.");
+    Assert(federationBatchPayload.SourcePacks.Any(item => string.Equals(item.SourcePackKind, "campaign_recap", StringComparison.Ordinal)), "campaign federation api should include replay or recap flows as campaign-recap source packs.");
+    Assert(federationBatchPayload.SourcePacks.All(item => item.PublicShelfRef.StartsWith("/artifacts/publications/", StringComparison.Ordinal)), "campaign federation api should keep every selected source pack anchored to a governed publication shelf.");
+    Assert(federationBatchPayload.Batch.JobCount == 1, "campaign federation api should compose one governed publication batch for the selected dossier and replay source packs.");
+    Assert(federationBatchPayload.Batch.Families.Contains("publication", StringComparer.OrdinalIgnoreCase), "campaign federation api should force the publication-family orchestration lane.");
+    Assert(federationBatchPayload.Batch.RequiredFamilies.Contains("publication", StringComparer.OrdinalIgnoreCase), "campaign federation api should keep the selected federation batch pinned to the publication family.");
+    Assert(federationBatchPayload.Batch.Jobs.Single().OutputFormats.SequenceEqual(["caption", "packet"], StringComparer.OrdinalIgnoreCase), "campaign federation api should preserve the requested publication bundle formats.");
+    Assert(federationBatchPayload.Batch.Jobs.Single().SourcePackIds.Count == 2, "campaign federation api should hand both governed source pack ids into the launched publication job.");
+    Assert(federationBatchPayload.Batch.RequiredReceiptRefs.Any(item => string.Equals(item, $"public-shelf:/artifacts/publications/{dossierPublicationId}", StringComparison.Ordinal)), "campaign federation api should require the governed dossier publication shelf anchor on the launched batch.");
+    Assert(federationBatchPayload.Batch.RequiredReceiptRefs.Any(item => item.StartsWith("replay:", StringComparison.Ordinal)), "campaign federation api should keep replay-safe receipt evidence on the launched batch.");
+    Assert(federationBatchPayload.Watchouts.Any(item => item.Contains("preview ready", StringComparison.OrdinalIgnoreCase)), "campaign federation api should keep preview-bounded watchouts when replay publication review has not been promoted yet.");
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
@@ -4377,7 +4409,8 @@ async Task VerifyPublicLandingProjectionAsync()
         accounts,
         installLinking,
         campaignSpine,
-        workspaceServerPlane)
+        workspaceServerPlane,
+        campaignFederation)
     {
         ControllerContext = AuthenticatedControllerContext("outsider-token")
     };
