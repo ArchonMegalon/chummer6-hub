@@ -3825,6 +3825,125 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(m122WorkspaceServerPlanePayload?.RecapShelf.Any(item => string.Equals(item.EntryId, resolutionReportApprovalPayload!.NewsId, StringComparison.Ordinal)) == true, "campaign spine server plane api should attach player-safe news previews to the richer recap shelf.");
     Assert(m122WorkspaceServerPlanePayload?.CampaignMemory?.Summary.Contains("BLACK LEDGER", StringComparison.OrdinalIgnoreCase) == true, "campaign spine server plane api should keep the first BLACK LEDGER WorldTick on the governed campaign-memory lane.");
     Assert(m122WorkspaceServerPlanePayload?.NextSessionCarryForward?.EvidenceLines.Any(item => item.Contains("Tacoma grid rumor", StringComparison.Ordinal)) == true, "campaign spine server plane api should keep player-safe news follow-through attached to the next-session return.");
+    var openRunCreateResult = await campaignSpineController.CreateMyCampaignWorkspaceOpenRun(
+        workspaceId,
+        new OpenRunCreateRequest(
+            RunId: runId,
+            ListingTitle: "Tacoma docks night extraction",
+            Summary: "A governed community open run for one night of extraction fallout.",
+            Visibility: "community",
+            TableContractSummary: "Beginner-friendly table with explicit safety tool acknowledgement and spoiler-safe closeout.",
+            AdmissionMode: "request_to_join",
+            SeatsTotal: 4,
+            RequireRunnerDossier: true,
+            AllowQuickstartRunner: true,
+            SchedulingMode: "lunacal_slots",
+            ExpectedDurationMinutes: 240,
+            Platform: "discord",
+            VoiceRequired: true,
+            ObserverMode: "manual_markers",
+            ReservedSeatRoles:
+            [
+                "decker",
+                "face"
+            ],
+            Note: "M123 open-run proof."),
+        CancellationToken.None);
+    var openRunListingPayload = (openRunCreateResult.Result as OkObjectResult)?.Value as OpenRunListingProjection ?? openRunCreateResult.Value;
+    Assert(openRunListingPayload is not null && string.Equals(openRunListingPayload.Visibility, "community", StringComparison.Ordinal), "campaign spine open-run creation api should publish a governed community open-run listing.");
+    Assert(openRunListingPayload!.JoinPolicy.AllowQuickstartRunner, "campaign spine open-run creation api should preserve quickstart policy on the governed listing.");
+    var openRunOutsiderUser = accounts.EnsureUser("subject.openrun.outsider", "OpenRun Outsider", "openrun-outsider@example.invalid");
+    var openRunOutsiderWorkspace = campaignSpine.GetStarterWorkspace(openRunOutsiderUser);
+    var openRunOutsiderIdentityClient = new HubIdentityClient(new HttpClient(new StubHttpMessageHandler(request =>
+    {
+        var body = request.Content is null ? string.Empty : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+        return body.Contains("openrun-outsider-token", StringComparison.Ordinal)
+            ? JsonResponse(new IdentityIntrospectionResponse(true, "session-openrun-outsider", "subject.openrun.outsider", new[] { "player" }, DateTimeOffset.UtcNow.AddHours(1)))
+            : JsonResponse(new IdentityIntrospectionResponse(false, null, null, Array.Empty<string>(), null), HttpStatusCode.Unauthorized);
+    })), configuration);
+    var openRunOutsiderController = new CampaignSpineController(
+        openRunOutsiderIdentityClient,
+        accounts,
+        installLinking,
+        campaignSpine,
+        workspaceServerPlane,
+        campaignFederation)
+    {
+        ControllerContext = AuthenticatedControllerContext("openrun-outsider-token")
+    };
+    var openRunsResult = await openRunOutsiderController.GetMyOpenRuns(CancellationToken.None);
+    var openRunsPayload = (openRunsResult.Result as OkObjectResult)?.Value as IReadOnlyList<OpenRunListingProjection> ?? openRunsResult.Value;
+    Assert(openRunsPayload?.Any(item => string.Equals(item.OpenRunId, openRunListingPayload.OpenRunId, StringComparison.Ordinal)) == true, "community visibility should let an outsider discover the governed open-run listing.");
+    var outsiderOpenRunResult = await openRunOutsiderController.GetMyOpenRun(openRunListingPayload.OpenRunId, CancellationToken.None);
+    var outsiderOpenRunPayload = (outsiderOpenRunResult.Result as OkObjectResult)?.Value as OpenRunOrchestrationProjection ?? outsiderOpenRunResult.Value;
+    Assert(outsiderOpenRunPayload is not null && string.Equals(outsiderOpenRunPayload.Listing.ListingTitle, "Tacoma docks night extraction", StringComparison.Ordinal), "open-run detail api should expose the governed table contract and join policy to a discoverable outsider.");
+    var openRunJoinRequestResult = await openRunOutsiderController.SubmitMyOpenRunJoinRequest(
+        openRunListingPayload.OpenRunId,
+        new OpenRunJoinRequestCommand(
+            DossierId: openRunOutsiderWorkspace?.Dossiers.FirstOrDefault()?.DossierId,
+            QuickstartPackId: null,
+            TableContractAcknowledged: true,
+            VoiceConsentAcknowledged: true,
+            PlatformReady: true,
+            Note: "Outsider can make the Discord handoff."),
+        CancellationToken.None);
+    var openRunJoinRequestPayload = (openRunJoinRequestResult.Result as OkObjectResult)?.Value as OpenRunJoinRequestProjection ?? openRunJoinRequestResult.Value;
+    Assert(openRunJoinRequestPayload is not null && string.Equals(openRunJoinRequestPayload.Status, "pending_review", StringComparison.Ordinal), "open-run join-request api should keep explainable preflight green for a compatible runner dossier.");
+    var reviewOpenRunJoinRequestResult = await campaignSpineController.ReviewMyOpenRunJoinRequest(
+        openRunListingPayload.OpenRunId,
+        openRunJoinRequestPayload!.RequestId,
+        new OpenRunJoinReviewRequest(
+            Decision: "accepted",
+            Note: "Runner fits the governed role and rules posture."),
+        CancellationToken.None);
+    var reviewedOpenRunJoinRequestPayload = (reviewOpenRunJoinRequestResult.Result as OkObjectResult)?.Value as OpenRunJoinRequestProjection ?? reviewOpenRunJoinRequestResult.Value;
+    Assert(reviewedOpenRunJoinRequestPayload is not null && string.Equals(reviewedOpenRunJoinRequestPayload.Status, "accepted", StringComparison.Ordinal), "open-run GM review api should accept a compatible governed join request without re-deriving legality from chat.");
+    var openRunScheduleResult = await campaignSpineController.ScheduleMyOpenRun(
+        openRunListingPayload.OpenRunId,
+        new OpenRunScheduleRequest(
+            StartsAtUtc: DateTimeOffset.UtcNow.AddDays(2),
+            Timezone: "Europe/Vienna",
+            Note: "Lock the Saturday night slot."),
+        CancellationToken.None);
+    var openRunSchedulePayload = (openRunScheduleResult.Result as OkObjectResult)?.Value as OpenRunScheduleReceiptProjection ?? openRunScheduleResult.Value;
+    Assert(openRunSchedulePayload is not null && openRunSchedulePayload.Summary.Contains("scheduled", StringComparison.OrdinalIgnoreCase), "open-run schedule api should persist one Chummer-owned scheduling receipt.");
+    var openRunMeetingHandoffResult = await campaignSpineController.CreateMyOpenRunMeetingHandoff(
+        openRunListingPayload.OpenRunId,
+        new OpenRunMeetingHandoffRequest(
+            ProviderKind: "discord_event",
+            ProviderLabel: "Shadowcasters Tacoma Table",
+            AccessPolicy: "accepted_players_only",
+            ExpiresAtUtc: DateTimeOffset.UtcNow.AddDays(2).AddHours(8),
+            Note: "Discord event is only a projection lane."),
+        CancellationToken.None);
+    var openRunMeetingHandoffPayload = (openRunMeetingHandoffResult.Result as OkObjectResult)?.Value as OpenRunMeetingHandoffProjection ?? openRunMeetingHandoffResult.Value;
+    Assert(openRunMeetingHandoffPayload is not null && openRunMeetingHandoffPayload.AcceptedUserIds.Any(item => string.Equals(item, openRunOutsiderUser.UserId, StringComparison.Ordinal)), "open-run meeting-handoff api should keep accepted roster truth in Chummer even when Discord is the projection lane.");
+    var openRunCloseoutResult = await campaignSpineController.CloseOutMyOpenRun(
+        openRunListingPayload.OpenRunId,
+        new OpenRunCloseoutRequest(
+            Summary: "Open-run closeout files ResolutionReport and keeps world-memory grounded on the governed hub lane.",
+            WorldTickSummary: "Tacoma docks fallout becomes a governed WorldTick after the open run closes.",
+            ConsequenceSummary: "Heat escalates across Tacoma after the community open run closes out.",
+            NewsTitle: "Tacoma docks rumor points to an extraction crew",
+            NewsSummary: "Player-safe reports mention a dockside extraction crew, but the preview stays separate from world truth.",
+            NewsSource: "Tacoma Shadowfeed",
+            NewsUrl: "https://example.invalid/open-run/tacoma-docks",
+            NextSafeAction: "Review the governed WorldTick and player-safe preview before the next open-run listing ships.",
+            Note: "M123 open-run proof."),
+        CancellationToken.None);
+    var openRunCloseoutPayload = (openRunCloseoutResult.Result as OkObjectResult)?.Value as OpenRunCloseoutProjection ?? openRunCloseoutResult.Value;
+    Assert(openRunCloseoutPayload is not null && !string.IsNullOrWhiteSpace(openRunCloseoutPayload.WorldTickId), "open-run closeout api should bridge directly into governed world-memory receipts.");
+    var gmOpenRunDetailResult = await campaignSpineController.GetMyOpenRun(openRunListingPayload.OpenRunId, CancellationToken.None);
+    var gmOpenRunDetailPayload = (gmOpenRunDetailResult.Result as OkObjectResult)?.Value as OpenRunOrchestrationProjection ?? gmOpenRunDetailResult.Value;
+    Assert(gmOpenRunDetailPayload is not null && string.Equals(gmOpenRunDetailPayload.Listing.Status, "closed", StringComparison.Ordinal), "open-run detail api should keep the listing, roster, schedule, handoff, and closeout on one governed orchestration view.");
+    Assert(gmOpenRunDetailPayload!.Roster.Any(item => string.Equals(item.UserId, openRunOutsiderUser.UserId, StringComparison.Ordinal) && string.Equals(item.SeatStatus, "accepted", StringComparison.Ordinal)), "open-run detail api should preserve accepted roster truth after GM review.");
+    Assert(gmOpenRunDetailPayload.Schedule is not null, "open-run detail api should preserve the Chummer-owned scheduling receipt.");
+    Assert(gmOpenRunDetailPayload.MeetingHandoff is not null, "open-run detail api should preserve the governed meeting handoff.");
+    Assert(gmOpenRunDetailPayload.Closeout is not null && string.Equals(gmOpenRunDetailPayload.Closeout.PlayerSafeNewsId, openRunCloseoutPayload!.PlayerSafeNewsId, StringComparison.Ordinal), "open-run detail api should preserve closeout bridge ids into WorldTick and player-safe news.");
+    var postOpenRunWorkspaceServerPlaneResult = await campaignSpineController.GetMyCampaignWorkspaceServerPlane(workspaceId, CancellationToken.None);
+    var postOpenRunWorkspaceServerPlanePayload = (postOpenRunWorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? postOpenRunWorkspaceServerPlaneResult.Value;
+    Assert(postOpenRunWorkspaceServerPlanePayload?.CampaignAdoptionLoop?.WorldTicks.Any(item => string.Equals(item.WorldTickId, openRunCloseoutPayload!.WorldTickId, StringComparison.Ordinal)) == true, "open-run closeout should feed the governed WorldTick back onto the bounded campaign workspace plane.");
+    Assert(postOpenRunWorkspaceServerPlanePayload?.CampaignAdoptionLoop?.PlayerSafeNews.Any(item => string.Equals(item.NewsId, openRunCloseoutPayload!.PlayerSafeNewsId, StringComparison.Ordinal)) == true, "open-run closeout should feed player-safe preview news back onto the bounded campaign workspace plane.");
     var runResult = await campaignSpineController.GetMyRun(runId, CancellationToken.None);
     var runPayload = (runResult.Result as OkObjectResult)?.Value as RunProjection ?? runResult.Value;
     Assert(runPayload is not null && string.Equals(runPayload.RunId, runId, StringComparison.Ordinal), "campaign spine api should expose the active run detail.");
@@ -4635,6 +4754,11 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(reloadedAdoptionLoop.RunnerGoals.Any(item => item.Label.Contains("Delta-grade wired reflexes fund", StringComparison.Ordinal)), "campaign spine adoption loop should preserve runner goal pins across reload.");
     Assert(reloadedAdoptionLoop.WorldTicks.Any(item => item.Summary.Contains("BLACK LEDGER WorldTick", StringComparison.Ordinal)), "campaign spine adoption loop should preserve the first WorldTick across reload.");
     Assert(reloadedAdoptionLoop.PlayerSafeNews.Any(item => item.Title.Contains("Tacoma grid rumor", StringComparison.Ordinal)), "campaign spine adoption loop should preserve the player-safe news preview across reload.");
+    var reloadedOpenRunDetail = NotNull(reloadedCampaignSpine.GetOpenRun(linkedUser, openRunListingPayload!.OpenRunId), "campaign spine open-run orchestration should survive a community-store reload.");
+    Assert(string.Equals(reloadedOpenRunDetail.Listing.Status, "closed", StringComparison.Ordinal), "campaign spine open-run orchestration should preserve listing closeout posture across reload.");
+    Assert(reloadedOpenRunDetail.Schedule is not null, "campaign spine open-run orchestration should preserve the scheduling receipt across reload.");
+    Assert(reloadedOpenRunDetail.MeetingHandoff is not null, "campaign spine open-run orchestration should preserve the meeting handoff across reload.");
+    Assert(reloadedOpenRunDetail.Closeout is not null && string.Equals(reloadedOpenRunDetail.Closeout.WorldTickId, openRunCloseoutPayload!.WorldTickId, StringComparison.Ordinal), "campaign spine open-run orchestration should preserve the world-memory bridge across reload.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(

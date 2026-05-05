@@ -58,6 +58,12 @@ public sealed class CommunityStore
     public List<ResolutionReportApprovalProjection> ResolutionReportApprovals { get; } = new();
     public List<WorldTickProjection> WorldTicks { get; } = new();
     public List<PlayerSafeNewsProjection> PlayerSafeNews { get; } = new();
+    public List<OpenRunListingProjection> OpenRuns { get; } = new();
+    public List<OpenRunJoinRequestProjection> OpenRunJoinRequests { get; } = new();
+    public List<OpenRunRosterEntryProjection> OpenRunRoster { get; } = new();
+    public List<OpenRunScheduleReceiptProjection> OpenRunSchedules { get; } = new();
+    public List<OpenRunMeetingHandoffProjection> OpenRunMeetingHandoffs { get; } = new();
+    public List<OpenRunCloseoutProjection> OpenRunCloseouts { get; } = new();
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public void PersistLocked()
@@ -96,6 +102,12 @@ public sealed class CommunityStore
             ResolutionReportApprovals: ResolutionReportApprovals.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
             WorldTicks: WorldTicks.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
             PlayerSafeNews: PlayerSafeNews.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            OpenRuns: OpenRuns.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            OpenRunJoinRequests: OpenRunJoinRequests.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            OpenRunRoster: OpenRunRoster.OrderByDescending(static item => item.UpdatedAtUtc).ToArray(),
+            OpenRunSchedules: OpenRunSchedules.OrderByDescending(static item => item.ScheduledAtUtc).ToArray(),
+            OpenRunMeetingHandoffs: OpenRunMeetingHandoffs.OrderByDescending(static item => item.CreatedAtUtc).ToArray(),
+            OpenRunCloseouts: OpenRunCloseouts.OrderByDescending(static item => item.ClosedAtUtc).ToArray(),
             RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray());
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
@@ -158,6 +170,12 @@ public sealed class CommunityStore
         ResolutionReportApprovals.Clear();
         WorldTicks.Clear();
         PlayerSafeNews.Clear();
+        OpenRuns.Clear();
+        OpenRunJoinRequests.Clear();
+        OpenRunRoster.Clear();
+        OpenRunSchedules.Clear();
+        OpenRunMeetingHandoffs.Clear();
+        OpenRunCloseouts.Clear();
         RestoreByUserId.Clear();
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
@@ -241,6 +259,12 @@ public sealed class CommunityStore
         ResolutionReportApprovals.AddRange(snapshot.ResolutionReportApprovals ?? Array.Empty<ResolutionReportApprovalProjection>());
         WorldTicks.AddRange(snapshot.WorldTicks ?? Array.Empty<WorldTickProjection>());
         PlayerSafeNews.AddRange(snapshot.PlayerSafeNews ?? Array.Empty<PlayerSafeNewsProjection>());
+        OpenRuns.AddRange(snapshot.OpenRuns ?? Array.Empty<OpenRunListingProjection>());
+        OpenRunJoinRequests.AddRange(snapshot.OpenRunJoinRequests ?? Array.Empty<OpenRunJoinRequestProjection>());
+        OpenRunRoster.AddRange(snapshot.OpenRunRoster ?? Array.Empty<OpenRunRosterEntryProjection>());
+        OpenRunSchedules.AddRange(snapshot.OpenRunSchedules ?? Array.Empty<OpenRunScheduleReceiptProjection>());
+        OpenRunMeetingHandoffs.AddRange(snapshot.OpenRunMeetingHandoffs ?? Array.Empty<OpenRunMeetingHandoffProjection>());
+        OpenRunCloseouts.AddRange(snapshot.OpenRunCloseouts ?? Array.Empty<OpenRunCloseoutProjection>());
 
         foreach (var restore in snapshot.RestoreSummaries ?? Array.Empty<WorkspaceRestoreProjection>())
         {
@@ -344,6 +368,12 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<ResolutionReportApprovalProjection>? ResolutionReportApprovals = null,
     IReadOnlyList<WorldTickProjection>? WorldTicks = null,
     IReadOnlyList<PlayerSafeNewsProjection>? PlayerSafeNews = null,
+    IReadOnlyList<OpenRunListingProjection>? OpenRuns = null,
+    IReadOnlyList<OpenRunJoinRequestProjection>? OpenRunJoinRequests = null,
+    IReadOnlyList<OpenRunRosterEntryProjection>? OpenRunRoster = null,
+    IReadOnlyList<OpenRunScheduleReceiptProjection>? OpenRunSchedules = null,
+    IReadOnlyList<OpenRunMeetingHandoffProjection>? OpenRunMeetingHandoffs = null,
+    IReadOnlyList<OpenRunCloseoutProjection>? OpenRunCloseouts = null,
     IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null);
 
 internal sealed record SponsorSessionStateSnapshot(

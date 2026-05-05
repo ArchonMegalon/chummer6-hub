@@ -307,6 +307,42 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/open-runs")]
+    [ProducesResponseType<IReadOnlyList<OpenRunListingProjection>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<OpenRunListingProjection>>> GetMyOpenRuns(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.GetOpenRuns(user, installLinking));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/open-runs/{openRunId}")]
+    [ProducesResponseType<OpenRunOrchestrationProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OpenRunOrchestrationProjection>> GetMyOpenRun([FromRoute] string openRunId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var openRun = _campaignSpine.GetOpenRun(user, openRunId, installLinking);
+            return openRun is null ? NotFound() : Ok(openRun);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/workspaces/{workspaceId}/adoption-loop")]
     [ProducesResponseType<CampaignAdoptionLoopProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -688,6 +724,211 @@ public sealed class CampaignSpineController : ControllerBase
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
         catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/workspaces/{workspaceId}/open-runs")]
+    [ProducesResponseType<OpenRunListingProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OpenRunListingProjection>> CreateMyCampaignWorkspaceOpenRun(
+        [FromRoute] string workspaceId,
+        [FromBody] OpenRunCreateRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("open run payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.CreateOpenRun(user, workspaceId, request, installLinking));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentOutOfRangeException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/open-runs/{openRunId}/join-requests")]
+    [ProducesResponseType<OpenRunJoinRequestProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OpenRunJoinRequestProjection>> SubmitMyOpenRunJoinRequest(
+        [FromRoute] string openRunId,
+        [FromBody] OpenRunJoinRequestCommand? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("open run join request payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.SubmitOpenRunJoinRequest(user, openRunId, request, installLinking));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/open-runs/{openRunId}/join-requests/{requestId}/reviews")]
+    [ProducesResponseType<OpenRunJoinRequestProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OpenRunJoinRequestProjection>> ReviewMyOpenRunJoinRequest(
+        [FromRoute] string openRunId,
+        [FromRoute] string requestId,
+        [FromBody] OpenRunJoinReviewRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("open run join review payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.ReviewOpenRunJoinRequest(user, openRunId, requestId, request, installLinking));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/open-runs/{openRunId}/schedule")]
+    [ProducesResponseType<OpenRunScheduleReceiptProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OpenRunScheduleReceiptProjection>> ScheduleMyOpenRun(
+        [FromRoute] string openRunId,
+        [FromBody] OpenRunScheduleRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("open run schedule payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.ScheduleOpenRun(user, openRunId, request, installLinking));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException or ArgumentOutOfRangeException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/open-runs/{openRunId}/meeting-handoff")]
+    [ProducesResponseType<OpenRunMeetingHandoffProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OpenRunMeetingHandoffProjection>> CreateMyOpenRunMeetingHandoff(
+        [FromRoute] string openRunId,
+        [FromBody] OpenRunMeetingHandoffRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("open run meeting handoff payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.CreateOpenRunMeetingHandoff(user, openRunId, request, installLinking));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException or ArgumentOutOfRangeException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/open-runs/{openRunId}/closeout")]
+    [ProducesResponseType<OpenRunCloseoutProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<OpenRunCloseoutProjection>> CloseOutMyOpenRun(
+        [FromRoute] string openRunId,
+        [FromBody] OpenRunCloseoutRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("open run closeout payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.CloseOutOpenRun(user, openRunId, request, installLinking));
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException or ArgumentException)
         {
             return CommunityApiProblemMapper.FromException(this, ex);
         }
