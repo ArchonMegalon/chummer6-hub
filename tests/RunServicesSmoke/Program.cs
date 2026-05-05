@@ -663,6 +663,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         CountryCode: "AT"));
     var experience = new UserExperienceService(store, accounts);
     var supportPresentation = new SupportCasePresentationService();
+    var hostedCompanionPackets = new HostedCompanionPacketService(releases, new SupportConciergePacketService(releases, supportPresentation));
     var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
     var entitlementsController = new EntitlementsController(accounts, identityClient, entitlements, installLinking, rewards, workspaceServerPlane)
@@ -4759,6 +4760,51 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(reloadedOpenRunDetail.Schedule is not null, "campaign spine open-run orchestration should preserve the scheduling receipt across reload.");
     Assert(reloadedOpenRunDetail.MeetingHandoff is not null, "campaign spine open-run orchestration should preserve the meeting handoff across reload.");
     Assert(reloadedOpenRunDetail.Closeout is not null && string.Equals(reloadedOpenRunDetail.Closeout.WorldTickId, openRunCloseoutPayload!.WorldTickId, StringComparison.Ordinal), "campaign spine open-run orchestration should preserve the world-memory bridge across reload.");
+    var hostedCompanionSummary = reloadedCampaignSpine.GetAccountSummary(linkedUser, linkedSummaryPayload);
+    var hostedCompanionPackets = new HostedCompanionPacketService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService()));
+    var hostedCompanionPacketBundle = hostedCompanionPackets.Build(new HostedCompanionPacketContext(
+        Restore: hostedCompanionSummary.Restore,
+        Workspaces: hostedCompanionSummary.Workspaces,
+        Publications:
+        [
+            new CreatorPublicationProjection(
+                PublicationId: publicationPayload!.PublicationId,
+                Title: publicationPayload.Title,
+                Kind: publicationPayload.Kind,
+                Summary: publicationPayload.Summary,
+                CampaignId: publicationPayload.CampaignId,
+                DossierId: publicationPayload.DossierId,
+                ArtifactId: publicationPayload.ArtifactId,
+                ProvenanceSummary: publicationPayload.ProvenanceSummary,
+                DiscoverySummary: publicationPayload.DiscoverySummary,
+                Visibility: publicationPayload.Visibility,
+                PublicationStatus: publicationPayload.PublicationStatus,
+                TrustBand: publicationPayload.TrustBand,
+                Discoverable: publicationPayload.Discoverable,
+                UpdatedAtUtc: publicationPayload.UpdatedAtUtc,
+                NextSafeAction: publicationPayload.NextSafeAction,
+                CampaignReturnSummary: publicationPayload.CampaignReturnSummary,
+                SupportClosureSummary: publicationPayload.SupportClosureSummary,
+                BuildHandoffId: publicationPayload.BuildHandoffId,
+                Watchouts: publicationPayload.Watchouts,
+                LineageSummary: publicationPayload.LineageSummary,
+                TrustSummary: publicationPayload.TrustSummary,
+                ComparisonSummary: publicationPayload.ComparisonSummary,
+                ModerationSummary: publicationPayload.ModerationSummary)
+        ],
+        SupportCases:
+        [
+            supportCase
+        ],
+        InstallLinking: linkedSummaryPayload,
+        Locale: "en-US"));
+    Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "install", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit install truth from claimed-install posture.");
+    Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "update", StringComparison.Ordinal) && string.Equals(item.TriggerClass, "preview_scout_warning", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit update truth from the hosted release shelf.");
+    Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "support", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit support truth from the install-aware concierge lane.");
+    Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "restore", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit restore truth from first-party continuity receipts.");
+    Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "campaign_workspace", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit campaign workspace truth from governed change packets.");
+    Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "publication", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit publication truth from governed creator-publication posture.");
+    Assert(hostedCompanionPacketBundle.PublicHubPackets.Any(item => string.Equals(item.OwningDomain, "public_hub", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit public-hub truth from the hosted downloads and support posture.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(
