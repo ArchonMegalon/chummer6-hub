@@ -4835,6 +4835,47 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "account_aware_guidance", StringComparison.Ordinal) && string.Equals(item.Route, "/account/access", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep account-aware guidance on the Devices & access rail.");
     Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "support_recovery", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/install-linking/continuation/support", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep support recovery on the install continuation support rail.");
     Assert(registryTruthBindings.Bindings.Any(item => string.Equals(item.SurfaceId, "public_release_shelf", StringComparison.Ordinal) && string.Equals(item.Route, "/now", StringComparison.Ordinal)), "campaign spine registry truth bindings should keep the public release shelf on the registry-backed current-release route.");
+    var privacyBoundedSupportStatus = new PrivacyBoundedSupportStatusService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService())).Build(new PrivacyBoundedSupportStatusContext(
+        SupportCases:
+        [
+            supportCase
+        ],
+        CrashWorkItems:
+        [
+            new CrashWorkItemProjection(
+                WorkItemId: "crash-work-smoke-001",
+                ClusterId: "crash-cluster-smoke-001",
+                Status: "queued_for_triage",
+                Summary: "Bounded crash triage keeps user-safe status without exposing raw diagnostics.",
+                CandidateOwnerRepo: "chummer6-ui",
+                RegressionSuspected: true,
+                OccurrenceCount: 2,
+                FirstSeenAtUtc: DateTimeOffset.UtcNow.AddDays(-1),
+                LastSeenAtUtc: DateTimeOffset.UtcNow,
+                RegistryContext: new CrashRegistryContextProjection(
+                    ApplicationVersion: linkedSummaryPayload.ClaimedInstallations.FirstOrDefault()?.Version ?? "0.6.1-smoke",
+                    ReleaseChannel: linkedSummaryPayload.ClaimedInstallations.FirstOrDefault()?.Channel ?? "preview",
+                    Platform: linkedSummaryPayload.ClaimedInstallations.FirstOrDefault()?.Platform ?? "linux",
+                    ProcessArchitecture: linkedSummaryPayload.ClaimedInstallations.FirstOrDefault()?.Arch ?? "x64",
+                    DesktopHead: linkedSummaryPayload.ClaimedInstallations.FirstOrDefault()?.HeadId ?? "avalonia",
+                    RuntimeHead: "sr6.preview.v1",
+                    UpdateAvailable: false,
+                    UpdateTargetVersion: null,
+                    Source: "smoke"),
+                IncidentIds:
+                [
+                    "crash-inc-smoke-001"
+                ])
+        ],
+        PublicSignals: publicSignalPackets,
+        InstallLinking: linkedSummaryPayload,
+        Locale: "en-US"));
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "support_status", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep support status on the account support rail.");
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "crash_status", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/support/crashes/work-items", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep crash status on the crash work-item rail.");
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/participate?productlift=feedback#productlift-feedback", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep feedback status on the governed Participate feedback lane.");
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "telemetry_rollup", StringComparison.Ordinal) && string.Equals(item.Route, "/progress", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep telemetry rollups on the privacy-bounded progress route.");
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "retention_clocks", StringComparison.Ordinal) && string.Equals(item.Route, "/privacy", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep retention clocks on the privacy boundary route.");
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "case_status_followthrough", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep case-status followthrough on the tracked support rail.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(

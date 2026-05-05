@@ -1,0 +1,34 @@
+{
+  "contract_name": "chummer6-hub.next90_m128_hub_privacy_bounded_support_status",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m128-hub-implement-privacy-bounded-support-crash-feedback-telemet",
+    "work_task_id": "128.4",
+    "milestone_id": 128,
+    "frontier_id": 4025965979,
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "wave": "W18",
+    "task": "Implement privacy-bounded support, crash, feedback, telemetry rollups, retention clocks, and case-status followthrough.",
+    "title": "Implement privacy-bounded support, crash, feedback, telemetry rollups, retention clocks, and case-status followthrough.",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "implement_privacy_bounded_support_crash:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "required_markers": [
+    "var privacyBoundedSupportStatus = new PrivacyBoundedSupportStatusService(releases, new SupportConciergePacketService(releases, new SupportCasePresentationService())).Build(new PrivacyBoundedSupportStatusContext(",
+    "campaign spine privacy-bounded support status should keep support status on the account support rail.",
+    "campaign spine privacy-bounded support status should keep crash status on the crash work-item rail.",
+    "campaign spine privacy-bounded support status should keep feedback status on the governed Participate feedback lane.",
+    "campaign spine privacy-bounded support status should keep telemetry rollups on the privacy-bounded progress route.",
+    "campaign spine privacy-bounded support status should keep retention clocks on the privacy boundary route.",
+    "campaign spine privacy-bounded support status should keep case-status followthrough on the tracked support rail."
+  ]
+}
