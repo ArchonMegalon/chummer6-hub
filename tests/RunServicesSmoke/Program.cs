@@ -3043,14 +3043,16 @@ async Task VerifyPublicLandingProjectionAsync()
         new SupportAssistantRequest(Query: "Why did the rule environment change for my campaign visibility posture?", InstallationId: "install-smoke-001"));
     Assert(rulesAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "rules_truth", StringComparison.Ordinal)), "support assistant should reuse rules navigator truth for grounded campaign-rule questions.");
     AccountCampaignSummary supportRulesSummary = campaignSpine.GetAccountSummary(linkedUser, installLinking.GetSummary(linkedUser.UserId, "subject.demo"));
-    Assert(!string.IsNullOrWhiteSpace(rulesAssistant.Citations.FirstOrDefault(static item => string.Equals(item.SourceKind, "rules_truth", StringComparison.Ordinal))?.Href), "support assistant should keep a direct rules route on grounded campaign-rule citations.");
+    string? sharedRulesReceiptId = rulesAssistant.Citations.FirstOrDefault(static item => string.Equals(item.SourceKind, "rules_truth", StringComparison.Ordinal))?.ReceiptId;
+    Assert(!string.IsNullOrWhiteSpace(sharedRulesReceiptId), "support assistant should keep a shared rules receipt id on grounded campaign-rule citations.");
+    Assert(supportRulesSummary.RulesNavigator.Any(item => string.Equals(item.ExplainEntryId, sharedRulesReceiptId, StringComparison.Ordinal)), "support assistant should keep the same explain receipt ids surfaced by campaign rules navigator entries.");
     Assert(rulesAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_home", StringComparison.Ordinal)), "support assistant should route grounded rules questions back to the signed-in home cockpit.");
     var buildAssistant = supportAssistant.Answer(
         reporterUserId: linkedUser.UserId,
         reporterSubjectId: "subject.demo",
         new SupportAssistantRequest(Query: "What is the safest build handoff before I export this dossier back into the campaign?", InstallationId: "install-smoke-001"));
     Assert(buildAssistant.Citations.Any(static item => string.Equals(item.SourceKind, "build_truth", StringComparison.Ordinal)), "support assistant should reuse build-path truth for dossier handoff questions.");
-    Assert(!string.IsNullOrWhiteSpace(buildAssistant.Citations.FirstOrDefault(static item => string.Equals(item.SourceKind, "build_truth", StringComparison.Ordinal))?.Href), "support assistant should keep a direct build route on install-aware build citations.");
+    Assert(!string.IsNullOrWhiteSpace(buildAssistant.Citations.FirstOrDefault(static item => string.Equals(item.SourceKind, "build_truth", StringComparison.Ordinal))?.ReceiptId), "support assistant should keep shared build receipt ids on install-aware build citations.");
     Assert(buildAssistant.Actions.Any(static item => string.Equals(item.ActionId, "open_work", StringComparison.Ordinal)), "support assistant should route build-path questions back to the signed-in work surface.");
     SupportCaseProjection rejectedSupportCase = supportCases.Submit(
         linkedUser.UserId,

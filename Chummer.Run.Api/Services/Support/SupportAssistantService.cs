@@ -95,7 +95,8 @@ public sealed class SupportAssistantService
                 Label: item.Case.Title,
                 Summary: TrimForSummary($"{item.StageLabel}. {item.ReleaseProgressSummary} {item.VerificationSummary}"),
                 Status: item.Case.Status,
-                Href: item.DetailHref));
+                Href: item.DetailHref,
+                ReceiptId: $"support.case.{item.Case.CaseId}"));
         }
 
         foreach (var citation in BuildRulesTruthCitations(reporterUserId, reporterSubjectId, tokens, maxCitations - citations.Count))
@@ -190,7 +191,8 @@ public sealed class SupportAssistantService
                                 : null,
                             $"Evidence: {string.Join(" | ", entry.EvidenceLines.Take(2))}"
                         }.Where(static item => !string.IsNullOrWhiteSpace(item)))),
-                    Href: "/home"))
+                    Href: "/home",
+                    ReceiptId: entry.ExplainEntryId))
                 .ToArray();
         }
         catch (Exception ex)
@@ -244,7 +246,8 @@ public sealed class SupportAssistantService
                             $"Return: {entry.CampaignReturnSummary ?? entry.ProgressionLabel}",
                             $"Support: {entry.SupportClosureSummary ?? string.Join(" | ", entry.ProgressionOutcomes.Take(1))}"
                         }.Where(static item => !string.IsNullOrWhiteSpace(item)))),
-                    Href: "/account/work"))
+                    Href: "/account/work",
+                    ReceiptId: entry.ExplainEntryId))
                 .ToArray();
         }
         catch (Exception ex)
