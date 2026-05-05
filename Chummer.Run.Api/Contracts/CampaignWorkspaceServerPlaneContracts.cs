@@ -37,6 +37,46 @@ public sealed record CampaignWorkspaceServerPlaneProjection(
     IReadOnlyList<WorkspaceRestoreConflictReceiptProjection> RestoreConflictReceipts,
     DateTimeOffset GeneratedAtUtc);
 
+public sealed record CampaignConsequenceTruthProjection(
+    string WorkspaceId,
+    string CampaignId,
+    string Summary,
+    int ConsequenceCount,
+    IReadOnlyList<GovernedCampaignConsequenceStateProjection> States,
+    IReadOnlyList<string> ReturnLoopActions,
+    IReadOnlyList<string> ReturnLoopRoutes,
+    DateTimeOffset GeneratedAtUtc);
+
+public sealed record GovernedCampaignConsequenceStateProjection(
+    string ConsequenceId,
+    string Kind,
+    string State,
+    string Summary,
+    string? ReturnLoopAction,
+    string? ReturnLoopRoute,
+    IReadOnlyList<string> EvidenceLines,
+    IReadOnlyList<CampaignConsequenceReceipt> Receipts,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record DowntimeAftermathApiProjection(
+    string WorkspaceId,
+    string CampaignId,
+    string Summary,
+    string ReturnLoopRoute,
+    IReadOnlyList<string> ReturnLoopActions,
+    IReadOnlyList<AftermathRecapPackageProjection> Packages,
+    IReadOnlyList<CampaignConsequenceProjection> Consequences,
+    IReadOnlyList<string> EvidenceLines,
+    DateTimeOffset GeneratedAtUtc);
+
+public sealed record CampaignConsequenceUpdateRequest(
+    string Kind,
+    string State,
+    string Summary,
+    string? ReturnLoopAction,
+    string? ReturnLoopRoute,
+    string? Note = null);
+
 public sealed record WorkspaceRestoreReceiptSurfaceProjection(
     string Surface,
     string Label,

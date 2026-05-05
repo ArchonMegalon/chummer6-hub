@@ -161,6 +161,30 @@
       "exit_criterion": "Compile support closure and release explainer packets from installed build, channel, and support-case truth."
     },
     {
+      "package_id": "next90-m112-hub-campaign-consequence-truth",
+      "work_task_id": "112.1",
+      "milestone_id": 112,
+      "frontier_id": 4730880976,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "wave": "W11",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M112 chummer6-hub campaign consequence truth is complete; future shards must verify the governed campaign consequence proof, local release proof receipts, registry row, queue row, and design queue row instead of reopening this package.",
+      "landed_commit": "f2b0b5a6",
+      "title": "Promote campaign consequence state into governed campaign APIs",
+      "task": "Land downtime, aftermath, heat, faction, contact, and reputation state with receipts and return-loop actions.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "campaign_memory:consequence_truth",
+        "downtime_aftermath:api"
+      ],
+      "exit_criterion": "Land downtime, aftermath, heat, faction, contact, and reputation state with receipts and return-loop actions."
+    },
+    {
       "package_id": "next90-m114-hub-rule-environment-receipts",
       "work_task_id": "114.3",
       "milestone_id": 114,
@@ -364,6 +388,30 @@
       ],
       "exit_criterion": "Compile support closure and release explainer packets from installed build, channel, and support-case truth."
     },
+    "next90-m112-hub-campaign-consequence-truth": {
+      "package_id": "next90-m112-hub-campaign-consequence-truth",
+      "work_task_id": "112.1",
+      "milestone_id": 112,
+      "frontier_id": 4730880976,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "wave": "W11",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M112 chummer6-hub campaign consequence truth is complete; future shards must verify the governed campaign consequence proof, local release proof receipts, registry row, queue row, and design queue row instead of reopening this package.",
+      "landed_commit": "f2b0b5a6",
+      "title": "Promote campaign consequence state into governed campaign APIs",
+      "task": "Land downtime, aftermath, heat, faction, contact, and reputation state with receipts and return-loop actions.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "campaign_memory:consequence_truth",
+        "downtime_aftermath:api"
+      ],
+      "exit_criterion": "Land downtime, aftermath, heat, faction, contact, and reputation state with receipts and return-loop actions."
+    },
     "next90-m114-hub-rule-environment-receipts": {
       "package_id": "next90-m114-hub-rule-environment-receipts",
       "work_task_id": "114.3",
@@ -431,10 +479,10 @@
       "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
     }
   },
-  "base_url": "https://chummer.run",
+  "base_url": "http://127.0.0.1:8091",
   "compose_file": "docker-compose.public-edge.yml",
   "playwright_timeout_seconds": 300,
-  "edge_rebuild_skipped": false,
+  "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
     "build_explain_publish",
@@ -710,6 +758,40 @@
       ]
     },
     {
+      "receipt_id": "campaign_memory:consequence_truth",
+      "package_id": "next90-m112-hub-campaign-consequence-truth",
+      "milestone_id": 112,
+      "frontier_id": 4730880976,
+      "summary": "Campaign memory and governed consequence truth now stay on one bounded return-loop lane so heat, faction, contact, reputation, downtime, and aftermath posture remain inspectable on the signed-in work surface.",
+      "routes": [
+        "/api/v1/campaign-spine/me/workspaces/{workspaceId}/campaign-memory",
+        "/api/v1/campaign-spine/me/workspaces/{workspaceId}/consequence-truth",
+        "/account/work#campaign-consequences"
+      ],
+      "surfaces": [
+        "campaign_memory:consequence_truth",
+        "campaign_consequence_truth",
+        "campaign_return_loop"
+      ]
+    },
+    {
+      "receipt_id": "downtime_aftermath:api",
+      "package_id": "next90-m112-hub-campaign-consequence-truth",
+      "milestone_id": 112,
+      "frontier_id": 4730880976,
+      "summary": "Downtime and aftermath state now ship with governed package receipts, explicit return-loop actions, and one aftermath rail instead of recap prose alone.",
+      "routes": [
+        "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
+        "/api/v1/campaign-spine/me/workspaces/{workspaceId}/downtime-aftermath",
+        "/account/work#aftermath-packages"
+      ],
+      "surfaces": [
+        "downtime_aftermath:api",
+        "governed_aftermath_package",
+        "return_loop_action"
+      ]
+    },
+    {
       "receipt_id": "campaign_rule_environment_receipts",
       "package_id": "next90-m114-hub-rule-environment-receipts",
       "milestone_id": 114,
@@ -879,6 +961,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-05T10:55:51Z",
-  "generatedAt": "2026-05-05T10:55:51Z"
+  "generated_at": "2026-05-05T12:17:09Z",
+  "generatedAt": "2026-05-05T12:17:09Z"
 }

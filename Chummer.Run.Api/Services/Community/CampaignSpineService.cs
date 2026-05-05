@@ -30,6 +30,10 @@ public sealed class CampaignSpineService
         "creator_publication",
         "support_closure"
     ];
+    private const string GovernedConsequenceUpdateSourceKind = "governed_consequence_update";
+    private const string ReturnLoopActionSourceKind = "return_loop_action";
+    private const string ReturnLoopRouteSourceKind = "return_loop_route";
+    private const string GovernedAftermathPackageSourceKind = "governed_aftermath_package";
 
     private readonly CommunityStore _store;
     private readonly WorkspaceLifecyclePolicyService _lifecyclePolicy;
@@ -418,8 +422,63 @@ public sealed class CampaignSpineService
                 _store.AftermathPackages.RemoveRange(0, _store.AftermathPackages.Count - 64);
             }
 
+            if (_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
+            {
+                CampaignConsequenceProjection? aftermathConsequence = BuildAftermathConsequenceProjection(workspace, run, package);
+                _store.CampaignSpinesById[campaign.CampaignId] = campaign with
+                {
+                    UpdatedAtUtc = now,
+                    Consequences = UpsertGovernedCampaignConsequence(campaign.Consequences, aftermathConsequence),
+                };
+            }
+
             _store.PersistLocked();
             return package;
+        }
+    }
+
+    public CampaignConsequenceProjection UpsertCampaignConsequence(
+        HubUserDto user,
+        CampaignWorkspaceProjection workspace,
+        CampaignConsequenceUpdateRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentNullException.ThrowIfNull(workspace);
+        ArgumentNullException.ThrowIfNull(request);
+
+        string normalizedKind = NormalizeGovernedConsequenceKind(request.Kind);
+        string normalizedState = AccountService.NormalizeOptional(request.State)
+            ?? throw new ArgumentException("campaign consequence state is required.", nameof(request));
+        string normalizedSummary = AccountService.NormalizeOptional(request.Summary)
+            ?? throw new ArgumentException("campaign consequence summary is required.", nameof(request));
+        string? normalizedNote = AccountService.NormalizeOptional(request.Note);
+
+        lock (_store.Gate)
+        {
+            if (!_store.CampaignSpinesById.TryGetValue(workspace.CampaignId, out var campaign))
+            {
+                throw new KeyNotFoundException($"Unknown campaign: {workspace.CampaignId}");
+            }
+
+            DateTimeOffset observedAtUtc = DateTimeOffset.UtcNow;
+            CampaignConsequenceProjection consequence = BuildGovernedCampaignConsequenceProjection(
+                workspace,
+                normalizedKind,
+                normalizedState,
+                normalizedSummary,
+                request.ReturnLoopAction,
+                request.ReturnLoopRoute,
+                normalizedNote,
+                observedAtUtc);
+
+            _store.CampaignSpinesById[campaign.CampaignId] = campaign with
+            {
+                UpdatedAtUtc = observedAtUtc,
+                Consequences = UpsertGovernedCampaignConsequence(campaign.Consequences, consequence),
+            };
+
+            _store.PersistLocked();
+            return consequence;
         }
     }
 
@@ -2828,7 +2887,7 @@ public sealed class CampaignSpineService
                 CueId: StableId("cue", $"{campaign.CampaignId}:consequences"),
                 Severity: "ready",
                 Title: "Consequence ledger is attached",
-                Summary: $"{consequences.Length} governed faction, heat, contact, and reputation signal(s) stay attached to the shared campaign view with receipt-backed evidence."));
+                Summary: $"{consequences.Length} governed faction, heat, contact, and reputation signal(s) stay attached to the shared campaign view with receipt-backed evidence and explicit return-loop actions."));
         }
         if (rosterTransfers.Length > 0)
         {
@@ -4858,7 +4917,8 @@ public sealed class CampaignSpineService
             ReturnSummary: continuity?.Summary ?? campaign.Summary,
             NextSafeAction: nextSafeAction,
             EvidenceLines: FinalizeLines(
-            [
+            new[]
+            {
                 continuity?.Summary ?? campaign.Summary,
                 activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun?.Title ?? campaign.Name} at {activeScene.Revision}.",
                 leadObjective is null ? string.Empty : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.",
@@ -4867,7 +4927,7 @@ public sealed class CampaignSpineService
                 prepBindingSummary,
                 travelSummary,
                 nextSafeAction
-            ]),
+            }.Concat(BuildGovernedConsequenceReturnLoopEvidenceLines(consequences))),
             UpdatedAtUtc: updatedAtUtc);
     }
 
@@ -4953,7 +5013,8 @@ public sealed class CampaignSpineService
             ReturnSummary: nextSessionCarryForward?.ReturnSummary ?? continuity?.Summary ?? campaign.Summary,
             NextSafeAction: nextSessionCarryForward?.NextSafeAction ?? nextSafeAction,
             EvidenceLines: FinalizeLines(
-            [
+            new[]
+            {
                 continuity?.Summary ?? campaign.Summary,
                 activeScene is null ? string.Empty : $"{activeScene.Title} is still live on {(leadRun?.Title ?? campaign.Name)} at {activeScene.Revision}.",
                 leadObjective is null ? string.Empty : $"{leadObjective.Title} remains {leadObjective.Status} with {leadObjective.Pressure} pressure.",
@@ -4965,7 +5026,7 @@ public sealed class CampaignSpineService
                 leadPrepLaunch?.Summary ?? string.Empty,
                 leadTravelPrefetch?.PrefetchSummary ?? string.Empty,
                 nextSessionCarryForward?.NextSafeAction ?? nextSafeAction
-            ]),
+            }.Concat(BuildGovernedConsequenceReturnLoopEvidenceLines(consequences))),
             UpdatedAtUtc: updatedAtUtc);
     }
 
@@ -5393,6 +5454,217 @@ public sealed class CampaignSpineService
         }
 
         return $"Bound {packetTitle} to {targetRun.Title} / {targetScene.Title} without recreating local shadow prep notes.";
+    }
+
+    private static CampaignConsequenceProjection BuildGovernedCampaignConsequenceProjection(
+        CampaignWorkspaceProjection workspace,
+        string normalizedKind,
+        string normalizedState,
+        string normalizedSummary,
+        string? returnLoopAction,
+        string? returnLoopRoute,
+        string? note,
+        DateTimeOffset observedAtUtc)
+    {
+        string label = ResolveGovernedConsequenceLabel(normalizedKind);
+        string normalizedAction = AccountService.NormalizeOptional(returnLoopAction) ?? ResolveGovernedConsequenceReturnLoopAction(normalizedKind);
+        string? normalizedRoute = NormalizeGovernedConsequenceReturnLoopRoute(normalizedKind, returnLoopRoute);
+
+        return new CampaignConsequenceProjection(
+            ConsequenceId: StableId("consequence", $"{workspace.CampaignId}:{normalizedKind}"),
+            Kind: normalizedKind,
+            Label: label,
+            State: normalizedState,
+            Summary: normalizedSummary,
+            EvidenceLines: FinalizeLines(
+            [
+                normalizedSummary,
+                $"Return-loop action: {normalizedAction}.",
+                $"Return-loop route: {normalizedRoute}.",
+                $"Workspace: {workspace.CampaignName}.",
+                note is null ? string.Empty : $"Operator note: {note}"
+            ]),
+            Receipts:
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: StableId("consequence-update", $"{workspace.WorkspaceId}:{normalizedKind}:{observedAtUtc.ToUnixTimeMilliseconds()}"),
+                    SourceKind: GovernedConsequenceUpdateSourceKind,
+                    Summary: normalizedSummary),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: StableId("consequence-return-loop-action", $"{workspace.WorkspaceId}:{normalizedKind}:{normalizedAction}"),
+                    SourceKind: ReturnLoopActionSourceKind,
+                    Summary: normalizedAction),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: normalizedRoute,
+                    SourceKind: ReturnLoopRouteSourceKind,
+                    Summary: $"Return-loop route: {normalizedRoute}.")
+            ],
+            UpdatedAtUtc: observedAtUtc);
+    }
+
+    private static CampaignConsequenceProjection? BuildAftermathConsequenceProjection(
+        CampaignWorkspaceProjection workspace,
+        RunProjection? run,
+        AftermathRecapPackageProjection package)
+    {
+        string normalizedPackageKind = NormalizeAftermathPackageKind(package.PackageKind);
+        string? normalizedKind = normalizedPackageKind switch
+        {
+            "downtime_brief" => "downtime",
+            "session_recap" or "after_action_report" or "replay_timeline" => "aftermath",
+            _ => null
+        };
+        if (normalizedKind is null)
+        {
+            return null;
+        }
+
+        string label = string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
+            ? "Downtime posture"
+            : "Aftermath posture";
+        string state = string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
+            ? "queued"
+            : "reviewable";
+        string summary = string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
+            ? $"{package.Title} keeps downtime obligations reviewable for {run?.Title ?? workspace.CampaignName}."
+            : $"{package.Title} keeps aftermath follow-through reviewable for {run?.Title ?? workspace.CampaignName}.";
+
+        var evidenceLines = new List<string>(package.EvidenceLines);
+        if (string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "aftermath", StringComparison.OrdinalIgnoreCase))
+        {
+            evidenceLines.Add("Return-loop route: /account/work#aftermath-packages.");
+        }
+
+        evidenceLines.Add("Return-loop action: Review downtime obligations.");
+
+        return new CampaignConsequenceProjection(
+            ConsequenceId: StableId("consequence", $"{workspace.CampaignId}:{normalizedKind}"),
+            Kind: normalizedKind,
+            Label: label,
+            State: state,
+            Summary: summary,
+            EvidenceLines: FinalizeLines(evidenceLines),
+            Receipts:
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: package.PackageId,
+                    SourceKind: GovernedAftermathPackageSourceKind,
+                    Summary: package.Summary),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: StableId("consequence-return-loop-action", $"{workspace.WorkspaceId}:{normalizedKind}:review_downtime_obligations"),
+                    SourceKind: ReturnLoopActionSourceKind,
+                    Summary: "Review downtime obligations"),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: "/account/work#aftermath-packages",
+                    SourceKind: ReturnLoopRouteSourceKind,
+                    Summary: "Return-loop route: /account/work#aftermath-packages.")
+            ],
+            UpdatedAtUtc: package.GeneratedAtUtc);
+    }
+
+    private static IReadOnlyList<CampaignConsequenceProjection> UpsertGovernedCampaignConsequence(
+        IReadOnlyList<CampaignConsequenceProjection>? consequences,
+        CampaignConsequenceProjection? consequence)
+    {
+        IReadOnlyList<CampaignConsequenceProjection> existingConsequences = consequences ?? Array.Empty<CampaignConsequenceProjection>();
+        if (consequence is null)
+        {
+            return existingConsequences
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+        }
+
+        CampaignConsequenceProjection? existing = existingConsequences
+            .FirstOrDefault(item => string.Equals(item.Kind, consequence.Kind, StringComparison.OrdinalIgnoreCase));
+        CampaignConsequenceProjection mergedConsequence = existing is null
+            ? consequence
+            : consequence with
+            {
+                EvidenceLines = FinalizeLines(existing.EvidenceLines.Concat(consequence.EvidenceLines)),
+                Receipts = existing.Receipts
+                    .Concat(consequence.Receipts)
+                    .GroupBy(static item => $"{item.SourceKind}|{item.ReceiptId}|{item.Summary}", StringComparer.OrdinalIgnoreCase)
+                    .Select(static group => group.Last())
+                    .ToArray()
+            };
+
+        return existingConsequences
+            .Where(item => !string.Equals(item.Kind, mergedConsequence.Kind, StringComparison.OrdinalIgnoreCase))
+            .Concat([mergedConsequence])
+            .OrderByDescending(static item => item.UpdatedAtUtc)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string> BuildGovernedConsequenceReturnLoopEvidenceLines(
+        IEnumerable<CampaignConsequenceProjection> consequences)
+        => consequences
+            .SelectMany(static consequence => consequence.Receipts)
+            .Where(static receipt =>
+                string.Equals(receipt.SourceKind, ReturnLoopActionSourceKind, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(receipt.SourceKind, ReturnLoopRouteSourceKind, StringComparison.OrdinalIgnoreCase))
+            .Select(static receipt => receipt.Summary)
+            .Where(static summary => !string.IsNullOrWhiteSpace(summary))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static string ResolveGovernedConsequenceLabel(string normalizedKind)
+        => normalizedKind switch
+        {
+            "heat" => "Heat posture",
+            "faction" => "Faction standing",
+            "contact" => "Contact network",
+            "reputation" => "Reputation posture",
+            "downtime" => "Downtime posture",
+            "aftermath" => "Aftermath posture",
+            _ => "Governed consequence"
+        };
+
+    private static string ResolveGovernedConsequenceReturnLoopAction(string normalizedKind)
+        => normalizedKind switch
+        {
+            "heat" => "Review heat fallout",
+            "faction" => "Confirm faction standing",
+            "contact" => "Review contact fallout",
+            "reputation" => "Review reputation fallout",
+            "downtime" or "aftermath" => "Review downtime obligations",
+            _ => "Review governed consequence"
+        };
+
+    private static string NormalizeGovernedConsequenceKind(string kind)
+        => AccountService.NormalizeOptional(kind)?.ToLowerInvariant() switch
+        {
+            "heat" => "heat",
+            "faction" => "faction",
+            "contact" => "contact",
+            "reputation" => "reputation",
+            "downtime" => "downtime",
+            "aftermath" => "aftermath",
+            "downtime_brief" => "downtime",
+            "session_recap" or "after_action_report" or "replay_timeline" => "aftermath",
+            _ => throw new ArgumentException($"campaign consequence kind is not supported: {kind}", nameof(kind))
+        };
+
+    private static string NormalizeGovernedConsequenceReturnLoopRoute(string consequenceKind, string? returnLoopRoute)
+    {
+        string canonicalRoute = consequenceKind switch
+        {
+            "downtime" or "aftermath" => "/account/work#aftermath-packages",
+            _ => "/account/work"
+        };
+
+        string? normalizedRoute = AccountService.NormalizeOptional(returnLoopRoute);
+        if (normalizedRoute is null)
+        {
+            return canonicalRoute;
+        }
+
+        if (!string.Equals(normalizedRoute, canonicalRoute, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"campaign consequence return-loop route must stay on the governed local route {canonicalRoute} for {consequenceKind}.");
+        }
+
+        return canonicalRoute;
     }
 
     private static IReadOnlyList<CampaignConsequenceProjection> BuildCampaignConsequences(

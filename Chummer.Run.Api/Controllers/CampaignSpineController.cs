@@ -160,6 +160,132 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/workspaces/{workspaceId}/consequences")]
+    [ProducesResponseType<IReadOnlyList<CampaignConsequenceProjection>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<CampaignConsequenceProjection>>> GetMyCampaignWorkspaceConsequences(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var consequences = _workspaceServerPlane.GetWorkspaceConsequences(user, workspaceId, installLinking);
+            return consequences is null ? NotFound() : Ok(consequences);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/workspaces/{workspaceId}/consequence-truth")]
+    [ProducesResponseType<CampaignConsequenceTruthProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignConsequenceTruthProjection>> GetMyCampaignWorkspaceConsequenceTruth(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var consequenceTruth = _workspaceServerPlane.GetWorkspaceConsequenceTruth(user, workspaceId, installLinking);
+            return consequenceTruth is null ? NotFound() : Ok(consequenceTruth);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/workspaces/{workspaceId}/aftermath-recap-packages")]
+    [ProducesResponseType<IReadOnlyList<AftermathRecapPackageProjection>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<AftermathRecapPackageProjection>>> GetMyCampaignWorkspaceAftermathRecapPackages(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var packages = _workspaceServerPlane.GetWorkspaceAftermathRecapPackages(user, workspaceId, installLinking);
+            return packages is null ? NotFound() : Ok(packages);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/workspaces/{workspaceId}/downtime-aftermath")]
+    [ProducesResponseType<DowntimeAftermathApiProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DowntimeAftermathApiProjection>> GetMyCampaignWorkspaceDowntimeAftermath(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var downtimeAftermath = _workspaceServerPlane.GetWorkspaceDowntimeAftermath(user, workspaceId, installLinking);
+            return downtimeAftermath is null ? NotFound() : Ok(downtimeAftermath);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/workspaces/{workspaceId}/campaign-memory")]
+    [ProducesResponseType<CampaignMemoryProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignMemoryProjection>> GetMyCampaignWorkspaceCampaignMemory(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var campaignMemory = _workspaceServerPlane.GetWorkspaceCampaignMemory(user, workspaceId, installLinking);
+            return campaignMemory is null ? NotFound() : Ok(campaignMemory);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/workspaces/{workspaceId}/next-session-carry-forward")]
+    [ProducesResponseType<NextSessionCarryForwardProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<NextSessionCarryForwardProjection>> GetMyCampaignWorkspaceNextSessionCarryForward(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var carryForward = _workspaceServerPlane.GetWorkspaceNextSessionCarryForward(user, workspaceId, installLinking);
+            return carryForward is null ? NotFound() : Ok(carryForward);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/workspaces/{workspaceId}/prep-library")]
     [ProducesResponseType<CampaignPrepLibrarySearchResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -335,6 +461,41 @@ public sealed class CampaignSpineController : ControllerBase
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var package = _workspaceServerPlane.GenerateAftermathRecapPackage(user, workspaceId, request, installLinking);
             return package is null ? NotFound() : Ok(package);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/workspaces/{workspaceId}/consequences")]
+    [ProducesResponseType<CampaignConsequenceProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignConsequenceProjection>> UpsertMyCampaignWorkspaceConsequence(
+        [FromRoute] string workspaceId,
+        [FromBody] CampaignConsequenceUpdateRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("campaign consequence payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var consequence = _workspaceServerPlane.UpsertCampaignConsequence(user, workspaceId, request, installLinking);
+            return consequence is null ? NotFound() : Ok(consequence);
         }
         catch (CommunityAccessDeniedException ex)
         {

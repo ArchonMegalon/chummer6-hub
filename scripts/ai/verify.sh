@@ -2329,6 +2329,8 @@ python3 -m unittest tests/test_artifact_factory_orchestration.py
 python3 -m unittest tests/test_artifact_factory_source_pack_launcher.py
 python3 scripts/verify_install_aware_support_concierge.py
 python3 -m unittest tests/test_install_aware_support_concierge.py
+python3 scripts/verify_campaign_consequence_truth.py
+python3 -m unittest tests/test_campaign_consequence_truth.py
 python3 scripts/materialize_next90_m113_hub_roster_ops_proof.py
 python3 scripts/verify_next90_m113_hub_roster_ops.py
 python3 -m unittest tests/test_next90_m113_hub_roster_ops.py
