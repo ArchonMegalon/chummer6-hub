@@ -3254,6 +3254,16 @@ async Task VerifyPublicLandingProjectionAsync()
     var campaignSummaryResult = await campaignSpineController.GetMyCampaignSummary(CancellationToken.None);
     var campaignSummaryPayload = (campaignSummaryResult.Result as OkObjectResult)?.Value as AccountCampaignSummary ?? campaignSummaryResult.Value;
     Assert(campaignSummaryPayload is not null, "campaign spine api should return the signed-in campaign summary.");
+    var organizerOpsResult = await campaignSpineController.GetMyOrganizerOperations(CancellationToken.None);
+    var organizerOpsPayload = (organizerOpsResult.Result as OkObjectResult)?.Value as OrganizerOperationsDashboardProjection ?? organizerOpsResult.Value;
+    Assert(organizerOpsPayload is not null, "campaign spine api should return the organizer operations dashboard.");
+    Assert(organizerOpsPayload!.Items.Count >= 1, "campaign spine api should return at least one organizer rail when the account carries community operations.");
+    Assert(organizerOpsPayload.Items[0].Roles.Count >= 1, "organizer operations api should surface explicit organizer role assignments.");
+    Assert(organizerOpsPayload.Items[0].Permissions.Count >= 1, "organizer operations api should surface explicit organizer permissions.");
+    Assert(organizerOpsPayload.Items[0].Roster.RecentTransferSummaries.Count >= 1, "organizer operations api should surface recent governed roster movement on the operator contract.");
+    Assert(organizerOpsPayload.Items[0].EventRail.SeasonLanes.Count >= 1, "organizer operations api should surface governed season and event lanes.");
+    Assert(organizerOpsPayload.Items[0].ArtifactPublication.Receipts.Count >= 1, "organizer operations api should surface artifact publication receipts on the operator contract.");
+    Assert(organizerOpsPayload.Items[0].SupportEscalation.Cases.Count >= 1, "organizer operations api should keep tracked support escalation cases on the operator contract.");
     var freshPreviewUser = accounts.EnsureUser("subject.preview", "Preview Bootstrap", "preview-bootstrap@example.invalid");
     var freshPreviewSummary = campaignSpine.GetAccountSummary(freshPreviewUser);
     Assert(freshPreviewSummary.Workspaces.Count >= 1, "freshly created accounts should receive a seeded preview campaign workspace instead of an empty work shell.");

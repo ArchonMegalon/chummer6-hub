@@ -2333,5 +2333,7 @@ python3 scripts/verify_next90_m116_hub_creator_publication.py
 python3 -m unittest tests/test_next90_m116_hub_creator_publication.py
 python3 scripts/verify_next90_m117_hub_artifact_shelf_v2.py
 python3 -m unittest tests/test_next90_m117_hub_artifact_shelf_v2.py
+python3 scripts/verify_next90_m118_hub_organizer_ops.py
+python3 -m unittest tests/test_next90_m118_hub_organizer_ops.py
 
 bash scripts/ai/run_services_smoke.sh
