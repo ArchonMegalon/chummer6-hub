@@ -4811,6 +4811,18 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?productlift=changelog#productlift-shipped-closeout", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.");
     Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal) && string.Equals(item.Route, "/contact", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.");
     Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.");
+    var hostedProofContracts = new HostedProofContractService(releases).Build(new HostedProofContractContext(
+        OpenRun: reloadedOpenRunDetail,
+        PublicSignals: publicSignalPackets,
+        InstallLinking: linkedSummaryPayload,
+        CommunityHubRoute: "/account/work#community-ops",
+        CommunityWorkspaceRoute: $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}",
+        Locale: "en-US"));
+    Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "open_runs", StringComparison.Ordinal) && string.Equals(item.Route, $"/api/v1/campaign-spine/me/open-runs/{openRunListingPayload.OpenRunId}", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit open-run proof on the governed open-run route.");
+    Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "shadowcasters", StringComparison.Ordinal) && string.Equals(item.Route, "/roadmap/shadowcasters-network", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit Shadowcasters horizon proof on the public roadmap route.");
+    Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "public_signal", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit public-signal proof on the governed Participate route.");
+    Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "community_hub", StringComparison.Ordinal) && string.Equals(item.Route, "/account/work#community-ops", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit community-hub proof on the signed-in work rail.");
+    Assert(hostedProofContracts.Contracts.Any(item => string.Equals(item.SurfaceId, "account_aware_horizon_conversion", StringComparison.Ordinal) && string.Equals(item.ComparisonRoute, "/account/access", StringComparison.Ordinal)), "campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Devices & access route.");
 
     var transferTargetUser = accounts.EnsureUser("subject.outsider", "Outsider Demo");
     var transferGroup = groups.CreateGroup(new CreateGroupRequest(

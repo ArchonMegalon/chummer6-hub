@@ -69,6 +69,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<SupportCasePresentationService>();
         services.AddSingleton<SupportConciergePacketService>();
         services.AddSingleton<HostedCompanionPacketService>();
+        services.AddSingleton<HostedProofContractService>();
         services.AddSingleton<PublicSignalToCanonPacketService>();
         services.AddSingleton<SupportAssistantService>();
         services.AddSingleton<CrashSupportService>();

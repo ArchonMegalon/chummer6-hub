@@ -1,0 +1,33 @@
+{
+  "contract_name": "chummer6-hub.next90_m126_hub_hosted_proof_contracts",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m126-hub-define-hosted-proof-contracts-for-open-runs-shadowcaster",
+    "work_task_id": "126.4",
+    "milestone_id": 126,
+    "frontier_id": 6966685835,
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "wave": "W17",
+    "task": "Define hosted proof contracts for Open Runs, Shadowcasters, public signal, community, and account-aware horizon conversions.",
+    "title": "Define hosted proof contracts for Open Runs, Shadowcasters, public signal, community, and account-aware horizon conversions.",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "define_hosted_proof_contracts_for:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "required_markers": [
+    "var hostedProofContracts = new HostedProofContractService(releases).Build(new HostedProofContractContext(",
+    "campaign spine hosted proof contracts should emit open-run proof on the governed open-run route.",
+    "campaign spine hosted proof contracts should emit Shadowcasters horizon proof on the public roadmap route.",
+    "campaign spine hosted proof contracts should emit public-signal proof on the governed Participate route.",
+    "campaign spine hosted proof contracts should emit community-hub proof on the signed-in work rail.",
+    "campaign spine hosted proof contracts should emit account-aware horizon conversion proof on the Devices & access route."
+  ]
+}
