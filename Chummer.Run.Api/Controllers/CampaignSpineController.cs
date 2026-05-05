@@ -17,19 +17,22 @@ public sealed class CampaignSpineController : ControllerBase
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
+    private readonly CampaignFederationOrchestrationService _campaignFederation;
 
     public CampaignSpineController(
         HubIdentityClient identity,
         AccountService accounts,
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
-        CampaignWorkspaceServerPlaneService workspaceServerPlane)
+        CampaignWorkspaceServerPlaneService workspaceServerPlane,
+        CampaignFederationOrchestrationService campaignFederation)
     {
         _identity = identity;
         _accounts = accounts;
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
+        _campaignFederation = campaignFederation;
     }
 
     [HttpGet("me")]
@@ -290,6 +293,41 @@ public sealed class CampaignSpineController : ControllerBase
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var package = _workspaceServerPlane.GenerateAftermathRecapPackage(user, workspaceId, request, installLinking);
             return package is null ? NotFound() : Ok(package);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/workspaces/{workspaceId}/federation-batches")]
+    [ProducesResponseType<CampaignFederationBatchProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignFederationBatchProjection>> LaunchMyCampaignWorkspaceFederationBatch(
+        [FromRoute] string workspaceId,
+        [FromBody] CampaignFederationBatchRequest? request,
+        CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("campaign federation payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var batch = _campaignFederation.LaunchWorkspaceFederationBatch(user, workspaceId, request, installLinking);
+            return batch is null ? NotFound() : Ok(batch);
         }
         catch (CommunityAccessDeniedException ex)
         {
