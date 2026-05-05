@@ -1,0 +1,33 @@
+{
+  "contract_name": "chummer6-hub.next90_m125_hub_public_signal_packets",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m125-hub-build-public-feedback-roadmap-changelog-support-and-sign",
+    "work_task_id": "125.1",
+    "milestone_id": 125,
+    "frontier_id": 4030850391,
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "wave": "W17",
+    "task": "Build public feedback, roadmap, changelog, support, and signal-intake surfaces that emit governed SignalToCanon packets.",
+    "title": "Build public feedback, roadmap, changelog, support, and signal-intake surfaces that emit governed SignalToCanon packets.",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "build_public_feedback_roadmap_changelog:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "required_markers": [
+    "var publicSignalPackets = new PublicSignalToCanonPacketService(releases).Build(supportCase, \"en-US\");",
+    "campaign spine public signal packets should emit governed feedback packets for the public ProductLift lane.",
+    "campaign spine public signal packets should emit governed roadmap packets for the public horizons projection.",
+    "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.",
+    "campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.",
+    "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface."
+  ]
+}
