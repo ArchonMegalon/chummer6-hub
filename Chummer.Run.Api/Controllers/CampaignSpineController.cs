@@ -203,6 +203,48 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/workspaces/{workspaceId}/dossier-movement-plan")]
+    [ProducesResponseType<DossierMovementPlannerProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<DossierMovementPlannerProjection>> GetMyCampaignWorkspaceDossierMovementPlan(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var dossierMovementPlan = _campaignSpine.GetDossierMovementPlan(user, workspaceId, installLinking);
+            return dossierMovementPlan is null ? NotFound() : Ok(dossierMovementPlan);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/workspaces/{workspaceId}/dossier-movements")]
+    [ProducesResponseType<IReadOnlyList<DossierMovementReceiptProjection>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<IReadOnlyList<DossierMovementReceiptProjection>>> GetMyCampaignWorkspaceDossierMovements(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var workspace = _campaignSpine.GetWorkspace(user, workspaceId, installLinking);
+            return workspace is null ? NotFound() : Ok(_campaignSpine.GetDossierMovements(user, workspaceId, installLinking));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpPost("me/workspaces/{workspaceId}/prep-library/launches")]
     [ProducesResponseType<GovernedPrepLaunchProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -328,6 +370,35 @@ public sealed class CampaignSpineController : ControllerBase
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var batch = _campaignFederation.LaunchWorkspaceFederationBatch(user, workspaceId, request, installLinking);
             return batch is null ? NotFound() : Ok(batch);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            return CommunityApiProblemMapper.FromException(this, ex);
+        }
+    }
+
+    [HttpPost("me/dossier-movements")]
+    [ProducesResponseType<DossierMovementReceiptProjection>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<DossierMovementReceiptProjection>> MoveMyDossier([FromBody] DossierMovementRequest? request, CancellationToken cancellationToken)
+    {
+        if (request is null)
+        {
+            return BadRequest("dossier-movement payload is required.");
+        }
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_campaignSpine.MoveDossier(user, request));
         }
         catch (CommunityAccessDeniedException ex)
         {

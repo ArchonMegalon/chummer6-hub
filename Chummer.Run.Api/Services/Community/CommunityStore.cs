@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Chummer.Campaign.Contracts;
+using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Entitlements;
@@ -48,6 +49,7 @@ public sealed class CommunityStore
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, RunProjection> RunsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<RosterTransferProjection> RosterTransfers { get; } = new();
+    public List<DossierMovementReceiptProjection> DossierMovements { get; } = new();
     public List<GovernedPrepLaunchProjection> PrepLaunches { get; } = new();
     public List<TravelPrefetchReceiptProjection> TravelPrefetchReceipts { get; } = new();
     public List<AftermathRecapPackageProjection> AftermathPackages { get; } = new();
@@ -80,6 +82,7 @@ public sealed class CommunityStore
             CampaignSpines: CampaignSpinesById.Values.OrderBy(static item => item.CampaignId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Runs: RunsById.Values.OrderBy(static item => item.RunId, StringComparer.OrdinalIgnoreCase).ToArray(),
             RosterTransfers: RosterTransfers.OrderByDescending(static item => item.TransferredAtUtc).ToArray(),
+            DossierMovements: DossierMovements.OrderByDescending(static item => item.MovedAtUtc).ToArray(),
             PrepLaunches: PrepLaunches.OrderByDescending(static item => item.LaunchedAtUtc).ToArray(),
             TravelPrefetchReceipts: TravelPrefetchReceipts.OrderByDescending(static item => item.StagedAtUtc).ToArray(),
             AftermathPackages: AftermathPackages.OrderByDescending(static item => item.GeneratedAtUtc).ToArray(),
@@ -136,6 +139,7 @@ public sealed class CommunityStore
         CampaignSpinesById.Clear();
         RunsById.Clear();
         RosterTransfers.Clear();
+        DossierMovements.Clear();
         PrepLaunches.Clear();
         TravelPrefetchReceipts.Clear();
         AftermathPackages.Clear();
@@ -213,6 +217,7 @@ public sealed class CommunityStore
         }
 
         RosterTransfers.AddRange(snapshot.RosterTransfers ?? Array.Empty<RosterTransferProjection>());
+        DossierMovements.AddRange(snapshot.DossierMovements ?? Array.Empty<DossierMovementReceiptProjection>());
         PrepLaunches.AddRange(snapshot.PrepLaunches ?? Array.Empty<GovernedPrepLaunchProjection>());
         TravelPrefetchReceipts.AddRange(snapshot.TravelPrefetchReceipts ?? Array.Empty<TravelPrefetchReceiptProjection>());
         AftermathPackages.AddRange(snapshot.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>());
@@ -310,6 +315,7 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,
     IReadOnlyList<RunProjection>? Runs = null,
     IReadOnlyList<RosterTransferProjection>? RosterTransfers = null,
+    IReadOnlyList<DossierMovementReceiptProjection>? DossierMovements = null,
     IReadOnlyList<GovernedPrepLaunchProjection>? PrepLaunches = null,
     IReadOnlyList<TravelPrefetchReceiptProjection>? TravelPrefetchReceipts = null,
     IReadOnlyList<AftermathRecapPackageProjection>? AftermathPackages = null,

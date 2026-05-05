@@ -168,8 +168,8 @@ public sealed class CampaignSpineService
                         ArtifactPublicationSummary: ResolveGroupArtifactPublicationSummary(groupWorkspaces),
                         SupportEscalationSummary: ResolveGroupSupportEscalationSummary(user));
                 })
-                .OrderByDescending(operation => ResolveCommunityOperatorFreshnessUtc(operation))
-                .ThenByDescending(operation => ResolveCommunityOperatorActivityBreadth(operation))
+                .OrderByDescending(static operation => ResolveCommunityOperatorFreshnessUtc(operation))
+                .ThenByDescending(static operation => ResolveCommunityOperatorActivityBreadth(operation))
                 .ThenByDescending(static operation => operation.ActiveCampaignCount)
                 .ThenByDescending(static operation => operation.ActiveSponsorSessionCount)
                 .ThenBy(static operation => operation.GroupName, StringComparer.OrdinalIgnoreCase)
@@ -551,6 +551,231 @@ public sealed class CampaignSpineService
         }
     }
 
+    public DossierMovementPlannerProjection? GetDossierMovementPlan(HubUserDto user, string workspaceId, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
+
+        AccountCampaignSummary summary = GetAccountSummary(user, installLinking);
+        CampaignWorkspaceProjection? workspace = summary.Workspaces
+            .FirstOrDefault(item => string.Equals(item.WorkspaceId, workspaceId, StringComparison.OrdinalIgnoreCase));
+        if (workspace is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<RunnerDossierProjection> workspaceDossiers = summary.Dossiers
+            .Where(item => string.Equals(item.CampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.RunnerHandle, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        lock (_store.Gate)
+        {
+            var sourceCampaign = _store.CampaignSpinesById.GetValueOrDefault(workspace.CampaignId);
+            var sourceGroup = sourceCampaign is null
+                ? null
+                : _store.GroupsById.GetValueOrDefault(sourceCampaign.GroupId);
+            if (sourceCampaign is null || sourceGroup is null)
+            {
+                return null;
+            }
+
+            var dossierOptions = workspaceDossiers
+                .Select(dossier =>
+                {
+                    var currentOwner = _store.UsersById.GetValueOrDefault(dossier.OwnerUserId);
+                    return new RosterTransferCandidateProjection(
+                        DossierId: dossier.DossierId,
+                        RunnerHandle: dossier.RunnerHandle,
+                        DisplayName: dossier.DisplayName,
+                        CurrentOwnerUserId: dossier.OwnerUserId,
+                        CurrentOwnerDisplayName: currentOwner?.DisplayName ?? dossier.OwnerUserId,
+                        CurrentCampaignId: sourceCampaign.CampaignId,
+                        CurrentCampaignName: sourceCampaign.Name);
+                })
+                .ToArray();
+
+            var targetGroups = _store.GroupsById.Values
+                .Where(group => CanManageRosterGroup(group, user.UserId))
+                .OrderBy(group => group.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new DossierMovementTargetGroupProjection(
+                    GroupId: group.GroupId,
+                    GroupName: group.Name,
+                    GroupType: group.GroupType,
+                    OperatorRole: ResolveOperatorRole(group, user.UserId),
+                    SuggestedCampaignTitle: ResolveSuggestedTransferCampaignTitleLocked(group),
+                    OwnerOptions: group.Memberships
+                        .OrderByDescending(member => OperatorRolePriority(member.Role))
+                        .ThenBy(member => _store.UsersById.GetValueOrDefault(member.UserId)?.DisplayName ?? member.UserId, StringComparer.OrdinalIgnoreCase)
+                        .Select(member =>
+                        {
+                            var memberUser = _store.UsersById.GetValueOrDefault(member.UserId);
+                            return new RosterTransferOwnerOptionProjection(
+                                UserId: member.UserId,
+                                DisplayName: memberUser?.DisplayName ?? member.UserId,
+                                Role: member.Role);
+                        })
+                        .DistinctBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
+                        .ToArray(),
+                    CampaignOptions: _store.CampaignsById.Values
+                        .Where(item => string.Equals(item.GroupId, group.GroupId, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(item => item.CreatedAtUtc)
+                        .ThenBy(item => item.CampaignId, StringComparer.OrdinalIgnoreCase)
+                        .Select(item => new DossierMovementTargetCampaignProjection(
+                            CampaignId: item.CampaignId,
+                            CampaignName: item.Title,
+                            Status: item.Status,
+                            Suggested: string.Equals(item.Status, CampaignStatuses.Active, StringComparison.OrdinalIgnoreCase),
+                            EventOptions: BuildDossierMovementEventOptionsLocked(item)))
+                        .ToArray()))
+                .ToArray();
+
+            return new DossierMovementPlannerProjection(
+                WorkspaceId: workspace.WorkspaceId,
+                SourceGroupId: sourceGroup.GroupId,
+                SourceGroupName: sourceGroup.Name,
+                SourceCampaignId: sourceCampaign.CampaignId,
+                SourceCampaignName: sourceCampaign.Name,
+                Summary: "Move a governed dossier between rosters, campaigns, runs, scenes, and owners without losing the same dossier id or explicit continuity receipts.",
+                DossierOptions: dossierOptions,
+                TargetGroups: targetGroups);
+        }
+    }
+
+    public IReadOnlyList<DossierMovementReceiptProjection> GetDossierMovements(HubUserDto user, string workspaceId, InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
+
+        CampaignWorkspaceProjection? workspace = GetWorkspace(user, workspaceId, installLinking);
+        if (workspace is null)
+        {
+            return Array.Empty<DossierMovementReceiptProjection>();
+        }
+
+        lock (_store.Gate)
+        {
+            return _store.DossierMovements
+                .Where(item =>
+                    string.Equals(item.SourceCampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(item.TargetCampaignId, workspace.CampaignId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(item => item.MovedAtUtc)
+                .ThenBy(item => item.MovementId, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+    }
+
+    public DossierMovementReceiptProjection MoveDossier(HubUserDto requester, DossierMovementRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(requester);
+        ArgumentNullException.ThrowIfNull(request);
+
+        var command = new DossierMovementCommand(
+            DossierId: ResolveRosterTransferRequestIdentity(request.DossierId, "dossier"),
+            TargetGroupId: ResolveRosterTransferRequestIdentity(request.TargetGroupId, "target group"),
+            TargetCampaignId: AccountService.NormalizeOptional(request.TargetCampaignId),
+            TargetCampaignTitle: AccountService.NormalizeOptional(request.TargetCampaignTitle),
+            TargetRunId: AccountService.NormalizeOptional(request.TargetRunId),
+            TargetRunTitle: AccountService.NormalizeOptional(request.TargetRunTitle),
+            TargetSceneId: AccountService.NormalizeOptional(request.TargetSceneId),
+            TargetSceneTitle: AccountService.NormalizeOptional(request.TargetSceneTitle),
+            TargetOwnerUserId: AccountService.NormalizeOptional(request.TargetOwnerUserId),
+            Note: AccountService.NormalizeOptional(request.Note));
+
+        lock (_store.Gate)
+        {
+            MovementResolution movement = ExecuteDossierMovementLocked(requester, command);
+            bool groupChanged = !string.Equals(movement.SourceGroup.GroupId, movement.TargetGroup.GroupId, StringComparison.OrdinalIgnoreCase);
+            bool campaignChanged = !string.Equals(movement.SourceCampaign.CampaignId, movement.TargetCampaign.CampaignId, StringComparison.OrdinalIgnoreCase);
+            bool ownershipChanged = !string.Equals(movement.PreviousOwnerUserId, movement.CurrentOwnerUserId, StringComparison.OrdinalIgnoreCase);
+            bool eventChanged = !string.Equals(movement.SourceRun?.RunId, movement.TargetEvent.Run.RunId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(movement.SourceScene?.SceneId, movement.TargetEvent.Scene.SceneId, StringComparison.OrdinalIgnoreCase);
+            string note = string.IsNullOrWhiteSpace(command.Note) ? string.Empty : $" Note: {command.Note}";
+
+            List<CampaignConsequenceReceipt> movementReceipts =
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: movement.SourceGroup.GroupId,
+                    SourceKind: "source_group",
+                    Summary: movement.SourceGroup.Name),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: movement.TargetGroup.GroupId,
+                    SourceKind: "target_group",
+                    Summary: movement.TargetGroup.Name),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: movement.SourceCampaign.CampaignId,
+                    SourceKind: "source_campaign",
+                    Summary: movement.SourceCampaign.Name),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: movement.TargetCampaign.CampaignId,
+                    SourceKind: "target_campaign",
+                    Summary: movement.TargetCampaign.Title),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: movement.TargetEvent.Run.RunId,
+                    SourceKind: "target_run",
+                    Summary: movement.TargetEvent.Run.Title),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: movement.TargetEvent.Scene.SceneId,
+                    SourceKind: "target_scene",
+                    Summary: movement.TargetEvent.Scene.Title),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: movement.Continuity.SnapshotId,
+                    SourceKind: "continuity",
+                    Summary: movement.Continuity.Summary)
+            ];
+
+            var receipt = new DossierMovementReceiptProjection(
+                MovementId: StableId("movement", $"{movement.TransferredDossier.DossierId}:{movement.TargetCampaign.CampaignId}:{movement.TargetEvent.Run.RunId}:{movement.TargetEvent.Scene.SceneId}:{movement.Now.ToUnixTimeSeconds()}"),
+                DossierId: movement.TransferredDossier.DossierId,
+                RunnerHandle: movement.TransferredDossier.RunnerHandle,
+                PreviousOwnerUserId: movement.PreviousOwnerUserId,
+                CurrentOwnerUserId: movement.CurrentOwnerUserId,
+                SourceGroupId: movement.SourceGroup.GroupId,
+                SourceGroupName: movement.SourceGroup.Name,
+                SourceCampaignId: movement.SourceCampaign.CampaignId,
+                SourceCampaignName: movement.SourceCampaign.Name,
+                SourceRunId: movement.SourceRun?.RunId,
+                SourceRunTitle: movement.SourceRun?.Title,
+                SourceSceneId: movement.SourceScene?.SceneId,
+                SourceSceneTitle: movement.SourceScene?.Title,
+                TargetGroupId: movement.TargetGroup.GroupId,
+                TargetGroupName: movement.TargetGroup.Name,
+                TargetCampaignId: movement.TargetCampaign.CampaignId,
+                TargetCampaignName: movement.TargetCampaign.Title,
+                TargetRunId: movement.TargetEvent.Run.RunId,
+                TargetRunTitle: movement.TargetEvent.Run.Title,
+                TargetSceneId: movement.TargetEvent.Scene.SceneId,
+                TargetSceneTitle: movement.TargetEvent.Scene.Title,
+                OwnershipChanged: ownershipChanged,
+                CampaignChanged: campaignChanged,
+                GroupChanged: groupChanged,
+                EventChanged: eventChanged,
+                InitiatedByUserId: requester.UserId,
+                Summary: ownershipChanged
+                    ? $"{movement.TransferredDossier.DisplayName} moved into {movement.TargetCampaign.Title} / {movement.TargetEvent.Run.Title} / {movement.TargetEvent.Scene.Title}, and ownership transferred to {movement.CurrentOwner.DisplayName}.{note}"
+                    : $"{movement.TransferredDossier.DisplayName} moved into {movement.TargetCampaign.Title} / {movement.TargetEvent.Run.Title} / {movement.TargetEvent.Scene.Title} without losing governed ownership.{note}",
+                AuditLines: FinalizeLines(
+                [
+                    $"{requester.DisplayName} initiated the dossier move from {movement.SourceGroup.Name} to {movement.TargetGroup.Name}.",
+                    $"Campaign return now pins {movement.TransferredDossier.DisplayName} to {movement.TargetCampaign.Title}.",
+                    $"Run continuity now lands on {movement.TargetEvent.Run.Title}.",
+                    $"Scene continuity now lands on {movement.TargetEvent.Scene.Title}.",
+                    ownershipChanged
+                        ? $"Ownership moved from {movement.PreviousOwner?.DisplayName ?? movement.PreviousOwnerUserId} to {movement.CurrentOwner.DisplayName} with the same dossier id preserved."
+                        : $"Ownership stayed with {movement.CurrentOwner.DisplayName} while campaign continuity moved.",
+                    command.Note is null ? string.Empty : $"Operator note: {command.Note}"
+                ]),
+                Receipts: movementReceipts,
+                MovedAtUtc: movement.Now,
+                TransferReceipt: movement.TransferReceipt);
+            _store.DossierMovements.RemoveAll(item => string.Equals(item.MovementId, receipt.MovementId, StringComparison.OrdinalIgnoreCase));
+            _store.DossierMovements.Add(receipt);
+            _store.PersistLocked();
+            return receipt;
+        }
+    }
+
     public RosterTransferProjection TransferRoster(HubUserDto requester, RosterTransferRequest request)
     {
         ArgumentNullException.ThrowIfNull(requester);
@@ -602,6 +827,10 @@ public sealed class CampaignSpineService
             string targetSceneId = StableId("scene", targetCampaign.CampaignId);
             var targetCrew = _store.CrewsById.GetValueOrDefault(targetCrewId);
             var sourceCrew = _store.CrewsById.GetValueOrDefault(dossier.CrewId ?? string.Empty);
+            var sourceRun = string.IsNullOrWhiteSpace(dossier.CurrentRunId)
+                ? null
+                : _store.RunsById.GetValueOrDefault(dossier.CurrentRunId);
+            var sourceScene = sourceRun?.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, dossier.CurrentSceneId, StringComparison.OrdinalIgnoreCase));
 
             if (targetGroup.Memberships.All(member => !string.Equals(member.UserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)))
             {
@@ -683,6 +912,44 @@ public sealed class CampaignSpineService
             };
             _store.DossiersById[transferredDossier.DossierId] = transferredDossier;
 
+            List<CampaignConsequenceReceipt> transferReceipts =
+            [
+                new CampaignConsequenceReceipt(
+                    ReceiptId: sourceGroup.GroupId,
+                    SourceKind: "source_group",
+                    Summary: sourceGroup.Name),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: targetGroup.GroupId,
+                    SourceKind: "target_group",
+                    Summary: targetGroup.Name),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: sourceCampaign.CampaignId,
+                    SourceKind: "source_campaign",
+                    Summary: sourceCampaign.Name),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: targetCampaign.CampaignId,
+                    SourceKind: "target_campaign",
+                    Summary: targetCampaign.Title),
+                new CampaignConsequenceReceipt(
+                    ReceiptId: continuity.SnapshotId,
+                    SourceKind: "continuity",
+                    Summary: continuity.Summary)
+            ];
+            if (sourceRun is not null)
+            {
+                transferReceipts.Add(new CampaignConsequenceReceipt(
+                    ReceiptId: sourceRun.RunId,
+                    SourceKind: "target_run",
+                    Summary: sourceRun.Title));
+            }
+            if (sourceScene is not null)
+            {
+                transferReceipts.Add(new CampaignConsequenceReceipt(
+                    ReceiptId: sourceScene.SceneId,
+                    SourceKind: "target_scene",
+                    Summary: sourceScene.Title));
+            }
+
             var receipt = new RosterTransferProjection(
                 TransferId: StableId("transfer", $"{transferredDossier.DossierId}:{targetCampaign.CampaignId}:{now.ToUnixTimeSeconds()}"),
                 DossierId: transferredDossier.DossierId,
@@ -713,29 +980,7 @@ public sealed class CampaignSpineService
                         ? $"Ownership stayed with {currentOwner.DisplayName} while roster and campaign assignment changed."
                         : $"Ownership moved from {previousOwner?.DisplayName ?? previousOwnerUserId} to {currentOwner.DisplayName} with the same dossier id preserved."
                 ],
-                Receipts:
-                [
-                    new CampaignConsequenceReceipt(
-                        ReceiptId: sourceGroup.GroupId,
-                        SourceKind: "source_group",
-                        Summary: sourceGroup.Name),
-                    new CampaignConsequenceReceipt(
-                        ReceiptId: targetGroup.GroupId,
-                        SourceKind: "target_group",
-                        Summary: targetGroup.Name),
-                    new CampaignConsequenceReceipt(
-                        ReceiptId: sourceCampaign.CampaignId,
-                        SourceKind: "source_campaign",
-                        Summary: sourceCampaign.Name),
-                    new CampaignConsequenceReceipt(
-                        ReceiptId: targetCampaign.CampaignId,
-                        SourceKind: "target_campaign",
-                        Summary: targetCampaign.Title),
-                    new CampaignConsequenceReceipt(
-                        ReceiptId: continuity.SnapshotId,
-                        SourceKind: "continuity",
-                        Summary: continuity.Summary)
-                ],
+                Receipts: transferReceipts,
                 TransferredAtUtc: now);
             _store.RosterTransfers.RemoveAll(item => string.Equals(item.TransferId, receipt.TransferId, StringComparison.OrdinalIgnoreCase));
             _store.RosterTransfers.Add(receipt);
@@ -749,6 +994,47 @@ public sealed class CampaignSpineService
             {
                 EnsureCampaignsLocked(currentOwner, now);
             }
+
+            var targetRun = _store.RunsById.GetValueOrDefault(targetRunId);
+            var targetScene = targetRun?.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, targetSceneId, StringComparison.OrdinalIgnoreCase));
+            string targetRunTitle = targetRun?.Title ?? $"{targetCampaign.Title} kickoff";
+            string targetSceneTitle = targetScene?.Title ?? "Campaign brief";
+            bool movementEventChanged = !string.Equals(sourceRun?.RunId, targetRunId, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(sourceScene?.SceneId, targetSceneId, StringComparison.OrdinalIgnoreCase);
+            var movementReceipt = new DossierMovementReceiptProjection(
+                MovementId: StableId("movement", receipt.TransferId),
+                DossierId: transferredDossier.DossierId,
+                RunnerHandle: transferredDossier.RunnerHandle,
+                PreviousOwnerUserId: previousOwnerUserId,
+                CurrentOwnerUserId: currentOwnerUserId,
+                SourceGroupId: sourceGroup.GroupId,
+                SourceGroupName: sourceGroup.Name,
+                SourceCampaignId: sourceCampaign.CampaignId,
+                SourceCampaignName: sourceCampaign.Name,
+                SourceRunId: sourceRun?.RunId,
+                SourceRunTitle: sourceRun?.Title,
+                SourceSceneId: sourceScene?.SceneId,
+                SourceSceneTitle: sourceScene?.Title,
+                TargetGroupId: targetGroup.GroupId,
+                TargetGroupName: targetGroup.Name,
+                TargetCampaignId: targetCampaign.CampaignId,
+                TargetCampaignName: targetCampaign.Title,
+                TargetRunId: targetRunId,
+                TargetRunTitle: targetRunTitle,
+                TargetSceneId: targetSceneId,
+                TargetSceneTitle: targetSceneTitle,
+                OwnershipChanged: !string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase),
+                CampaignChanged: !string.Equals(sourceCampaign.CampaignId, targetCampaign.CampaignId, StringComparison.OrdinalIgnoreCase),
+                GroupChanged: !string.Equals(sourceGroup.GroupId, targetGroup.GroupId, StringComparison.OrdinalIgnoreCase),
+                EventChanged: movementEventChanged,
+                InitiatedByUserId: requester.UserId,
+                Summary: receipt.Summary,
+                AuditLines: receipt.AuditLines,
+                Receipts: receipt.Receipts,
+                MovedAtUtc: now,
+                TransferReceipt: receipt);
+            _store.DossierMovements.RemoveAll(item => string.Equals(item.MovementId, movementReceipt.MovementId, StringComparison.OrdinalIgnoreCase));
+            _store.DossierMovements.Add(movementReceipt);
 
             _store.PersistLocked();
             return receipt;
@@ -926,6 +1212,447 @@ public sealed class CampaignSpineService
         _store.CampaignsById[created.CampaignId] = created;
         return created;
     }
+
+    private IReadOnlyList<DossierMovementEventProjection> BuildDossierMovementEventOptionsLocked(BoostCampaignDto campaign)
+    {
+        RunProjection? run = _store.RunsById.Values
+            .Where(item => string.Equals(item.CampaignId, campaign.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .ThenBy(item => item.RunId, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
+        SceneProjection? scene = run?.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, run.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
+            ?? run?.Scenes.FirstOrDefault();
+
+        if (run is null)
+        {
+            return
+            [
+                new DossierMovementEventProjection(
+                    RunId: StableId("run", campaign.CampaignId),
+                    RunTitle: $"{campaign.Title} kickoff",
+                    RunStatus: RunStatuses.Active,
+                    SceneId: StableId("scene", campaign.CampaignId),
+                    SceneTitle: "Campaign brief",
+                    SceneStatus: "active",
+                    SceneRevision: "r1",
+                    Active: true)
+            ];
+        }
+
+        scene ??= new SceneProjection(
+            SceneId: StableId("scene", campaign.CampaignId),
+            RunId: run.RunId,
+            Title: "Campaign brief",
+            Revision: "r1",
+            Status: "active",
+            Summary: "Shared entry scene for planning, continuity, and handoff.",
+            UpdatedAtUtc: run.UpdatedAtUtc);
+        return
+        [
+            new DossierMovementEventProjection(
+                RunId: run.RunId,
+                RunTitle: run.Title,
+                RunStatus: run.Status,
+                SceneId: scene.SceneId,
+                SceneTitle: scene.Title,
+                SceneStatus: scene.Status,
+                SceneRevision: scene.Revision,
+                Active: string.Equals(run.ActiveSceneId, scene.SceneId, StringComparison.OrdinalIgnoreCase))
+        ];
+    }
+
+    private MovementResolution ExecuteDossierMovementLocked(HubUserDto requester, DossierMovementCommand command)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        var dossier = _store.DossiersById.GetValueOrDefault(command.DossierId)
+            ?? throw new KeyNotFoundException($"Unknown dossier: {command.DossierId}");
+        var sourceCampaign = _store.CampaignSpinesById.GetValueOrDefault(dossier.CampaignId ?? string.Empty)
+            ?? throw new KeyNotFoundException($"Unknown source campaign: {dossier.CampaignId}");
+        var sourceGroup = _store.GroupsById.GetValueOrDefault(sourceCampaign.GroupId)
+            ?? throw new KeyNotFoundException($"Unknown source group: {sourceCampaign.GroupId}");
+        if (!CanManageRosterGroup(sourceGroup, requester.UserId))
+        {
+            throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm on the source group to move dossier state.");
+        }
+
+        var targetGroup = _store.GroupsById.GetValueOrDefault(command.TargetGroupId)
+            ?? throw new KeyNotFoundException($"Unknown target group: {command.TargetGroupId}");
+        if (!CanManageRosterGroup(targetGroup, requester.UserId))
+        {
+            throw new CommunityAccessDeniedException("requester must be an owner, manager, admin, or gm on the target group to move dossier state.");
+        }
+
+        string previousOwnerUserId = dossier.OwnerUserId;
+        var previousOwner = _store.UsersById.GetValueOrDefault(previousOwnerUserId);
+        string currentOwnerUserId = command.TargetOwnerUserId ?? dossier.OwnerUserId;
+        var currentOwner = _store.UsersById.GetValueOrDefault(currentOwnerUserId)
+            ?? throw new KeyNotFoundException($"Unknown target owner: {currentOwnerUserId}");
+        var targetCampaign = ResolveOrCreateTransferCampaignLocked(targetGroup, command.TargetCampaignId, command.TargetCampaignTitle, now);
+        if (!string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
+            && _store.DossiersById.Values.Any(item =>
+                !string.Equals(item.DossierId, dossier.DossierId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.OwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.CampaignId, targetCampaign.CampaignId, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("target owner already has a governed dossier in the selected campaign; transfer would overwrite assignment truth.");
+        }
+
+        if (targetGroup.Memberships.All(member => !string.Equals(member.UserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)))
+        {
+            _store.GroupsById[targetGroup.GroupId] = targetGroup with
+            {
+                Memberships = targetGroup.Memberships
+                    .Concat(
+                    [
+                        new GroupMembershipDto(
+                            MembershipId: AccountService.NewId("mbr"),
+                            GroupId: targetGroup.GroupId,
+                            UserId: currentOwnerUserId,
+                            Role: "member",
+                            JoinedAtUtc: now)
+                    ])
+                    .ToArray(),
+                UpdatedAtUtc = now
+            };
+            targetGroup = _store.GroupsById[targetGroup.GroupId];
+        }
+        if (_store.UsersById.TryGetValue(currentOwnerUserId, out var currentOwnerRecord)
+            && currentOwnerRecord.GroupIds.All(groupId => !string.Equals(groupId, targetGroup.GroupId, StringComparison.OrdinalIgnoreCase)))
+        {
+            _store.UsersById[currentOwnerUserId] = currentOwnerRecord with
+            {
+                GroupIds = currentOwnerRecord.GroupIds.Concat([targetGroup.GroupId]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                UpdatedAtUtc = now
+            };
+            currentOwner = _store.UsersById[currentOwnerUserId];
+        }
+
+        var sourceCrew = _store.CrewsById.GetValueOrDefault(dossier.CrewId ?? string.Empty);
+        var sourceRun = string.IsNullOrWhiteSpace(dossier.CurrentRunId)
+            ? null
+            : _store.RunsById.GetValueOrDefault(dossier.CurrentRunId);
+        var sourceScene = sourceRun?.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, dossier.CurrentSceneId, StringComparison.OrdinalIgnoreCase));
+        MovementTargetEvent targetEvent = ResolveOrCreateMovementTargetEventLocked(
+            targetCampaign,
+            command.TargetRunId,
+            command.TargetRunTitle,
+            command.TargetSceneId,
+            command.TargetSceneTitle,
+            now);
+
+        var continuity = new ContinuitySnapshotRef(
+            SnapshotId: StableId("snapshot", $"{dossier.DossierId}:{targetCampaign.CampaignId}:{targetEvent.Run.RunId}:{targetEvent.Scene.SceneId}:{now.ToUnixTimeSeconds()}"),
+            CapturedAtUtc: now,
+            Summary: $"{dossier.DisplayName} now returns through {targetCampaign.Title} / {targetEvent.Run.Title} / {targetEvent.Scene.Title}.",
+            RestoreState: "dossier_moved",
+            SessionId: targetEvent.Run.RunId,
+            SceneId: targetEvent.Scene.SceneId,
+            RecapArtifactId: StableId("recap", targetCampaign.CampaignId));
+        string targetCrewId = ResolveCrewIdLocked(targetCampaign.CampaignId);
+        var transferredDossier = dossier with
+        {
+            OwnerUserId = currentOwnerUserId,
+            CrewId = targetCrewId,
+            CampaignId = targetCampaign.CampaignId,
+            CurrentRunId = targetEvent.Run.RunId,
+            CurrentSceneId = targetEvent.Scene.SceneId,
+            RuleEnvironment = DefaultRuleEnvironment($"campaign:{targetCampaign.CampaignId}", "campaign"),
+            LatestContinuity = continuity,
+            Projections =
+            [
+                new PublicationSafeProjection(
+                    ProjectionId: StableId("projection", $"{currentOwnerUserId}:{targetCampaign.CampaignId}"),
+                    Kind: "campaign_recap",
+                    Label: "Campaign-ready dossier",
+                    Summary: "This runner can move through build, play, recap, and return without losing identity.",
+                    ArtifactId: continuity.RecapArtifactId),
+                new PublicationSafeProjection(
+                    ProjectionId: StableId("projection", $"{currentOwnerUserId}:{targetCampaign.CampaignId}:dossier"),
+                    Kind: "dossier_card",
+                    Label: "Living dossier packet",
+                    Summary: "Living dossier truth, campaign continuity, and governed publication detail stay attached to one shared artifact lane.",
+                    ArtifactId: dossier.DossierId),
+                new PublicationSafeProjection(
+                    ProjectionId: StableId("projection", $"{currentOwnerUserId}:{targetCampaign.CampaignId}:ops"),
+                    Kind: "runboard_packet",
+                    Label: "Runboard continuity packet",
+                    Summary: "GM-facing continuity and recap-safe state for the active campaign return.",
+                    ArtifactId: StableId("ops", targetCampaign.CampaignId)),
+                new PublicationSafeProjection(
+                    ProjectionId: StableId("projection", $"{currentOwnerUserId}:{targetCampaign.CampaignId}:primer"),
+                    Kind: "player_primer",
+                    Label: "Campaign primer",
+                    Summary: "Session-zero onboarding and table-start guidance stay attached to the same governed campaign truth.",
+                    ArtifactId: StableId("primer", targetCampaign.CampaignId))
+            ],
+            SnapshotIds = dossier.SnapshotIds.Concat([continuity.SnapshotId]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            UpdatedAtUtc = now
+        };
+        _store.DossiersById[transferredDossier.DossierId] = transferredDossier;
+
+        if (previousOwner is not null)
+        {
+            EnsureCampaignsLocked(previousOwner, now);
+        }
+
+        if (!string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase))
+        {
+            EnsureCampaignsLocked(currentOwner, now);
+        }
+
+        targetEvent = ResolveOrCreateMovementTargetEventLocked(
+            targetCampaign,
+            command.TargetRunId,
+            command.TargetRunTitle,
+            command.TargetSceneId,
+            command.TargetSceneTitle,
+            now);
+        bool eventChanged = !string.Equals(sourceRun?.RunId, targetEvent.Run.RunId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(sourceScene?.SceneId, targetEvent.Scene.SceneId, StringComparison.OrdinalIgnoreCase);
+        transferredDossier = _store.DossiersById[transferredDossier.DossierId] with
+        {
+            CurrentRunId = targetEvent.Run.RunId,
+            CurrentSceneId = targetEvent.Scene.SceneId,
+            LatestContinuity = continuity with
+            {
+                SessionId = targetEvent.Run.RunId,
+                SceneId = targetEvent.Scene.SceneId
+            },
+            UpdatedAtUtc = now
+        };
+        _store.DossiersById[transferredDossier.DossierId] = transferredDossier;
+
+        List<CampaignConsequenceReceipt> transferReceipts =
+        [
+            new CampaignConsequenceReceipt(
+                ReceiptId: sourceGroup.GroupId,
+                SourceKind: "source_group",
+                Summary: sourceGroup.Name),
+            new CampaignConsequenceReceipt(
+                ReceiptId: targetGroup.GroupId,
+                SourceKind: "target_group",
+                Summary: targetGroup.Name),
+            new CampaignConsequenceReceipt(
+                ReceiptId: sourceCampaign.CampaignId,
+                SourceKind: "source_campaign",
+                Summary: sourceCampaign.Name),
+            new CampaignConsequenceReceipt(
+                ReceiptId: targetCampaign.CampaignId,
+                SourceKind: "target_campaign",
+                Summary: targetCampaign.Title),
+            new CampaignConsequenceReceipt(
+                ReceiptId: targetEvent.Run.RunId,
+                SourceKind: "target_run",
+                Summary: targetEvent.Run.Title),
+            new CampaignConsequenceReceipt(
+                ReceiptId: targetEvent.Scene.SceneId,
+                SourceKind: "target_scene",
+                Summary: targetEvent.Scene.Title),
+            new CampaignConsequenceReceipt(
+                ReceiptId: continuity.SnapshotId,
+                SourceKind: "continuity",
+                Summary: continuity.Summary)
+        ];
+        string note = string.IsNullOrWhiteSpace(command.Note) ? string.Empty : $" Note: {command.Note}";
+        var transferReceipt = new RosterTransferProjection(
+            TransferId: StableId("transfer", $"{transferredDossier.DossierId}:{targetCampaign.CampaignId}:{targetEvent.Run.RunId}:{targetEvent.Scene.SceneId}:{now.ToUnixTimeSeconds()}"),
+            DossierId: transferredDossier.DossierId,
+            RunnerHandle: transferredDossier.RunnerHandle,
+            PreviousOwnerUserId: previousOwnerUserId,
+            CurrentOwnerUserId: currentOwnerUserId,
+            SourceGroupId: sourceGroup.GroupId,
+            SourceGroupName: sourceGroup.Name,
+            SourceCampaignId: sourceCampaign.CampaignId,
+            SourceCampaignName: sourceCampaign.Name,
+            SourceCrewId: sourceCrew?.CrewId ?? ResolveCrewIdLocked(sourceCampaign.CampaignId),
+            SourceCrewName: sourceCrew?.Name ?? $"{sourceGroup.Name} crew",
+            TargetGroupId: targetGroup.GroupId,
+            TargetGroupName: targetGroup.Name,
+            TargetCampaignId: targetCampaign.CampaignId,
+            TargetCampaignName: targetCampaign.Title,
+            TargetCrewId: targetCrewId,
+            TargetCrewName: $"{targetGroup.Name} crew",
+            InitiatedByUserId: requester.UserId,
+            Summary: string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
+                ? $"{transferredDossier.DisplayName} moved from {sourceCampaign.Name} into {targetCampaign.Title} / {targetEvent.Run.Title} / {targetEvent.Scene.Title} without losing governed ownership.{note}"
+                : $"{transferredDossier.DisplayName} moved from {sourceCampaign.Name} into {targetCampaign.Title} / {targetEvent.Run.Title} / {targetEvent.Scene.Title}, and ownership transferred to {currentOwner.DisplayName}.{note}",
+            AuditLines:
+            [
+                $"{requester.DisplayName} initiated the move from {sourceGroup.Name} to {targetGroup.Name}.",
+                $"Campaign return now pins {transferredDossier.DisplayName} to {targetCampaign.Title}.",
+                $"Run continuity now lands on {targetEvent.Run.Title}.",
+                $"Scene continuity now lands on {targetEvent.Scene.Title}.",
+                string.Equals(previousOwnerUserId, currentOwnerUserId, StringComparison.OrdinalIgnoreCase)
+                    ? $"Ownership stayed with {currentOwner.DisplayName} while campaign, run, and scene assignment changed."
+                    : $"Ownership moved from {previousOwner?.DisplayName ?? previousOwnerUserId} to {currentOwner.DisplayName} with the same dossier id preserved."
+            ],
+            Receipts: transferReceipts,
+            TransferredAtUtc: now);
+        return new MovementResolution(
+            Now: now,
+            SourceGroup: sourceGroup,
+            TargetGroup: targetGroup,
+            SourceCampaign: sourceCampaign,
+            TargetCampaign: targetCampaign,
+            SourceRun: sourceRun,
+            SourceScene: sourceScene,
+            TargetEvent: targetEvent,
+            EventChanged: eventChanged,
+            PreviousOwnerUserId: previousOwnerUserId,
+            CurrentOwnerUserId: currentOwnerUserId,
+            PreviousOwner: previousOwner,
+            CurrentOwner: currentOwner,
+            Continuity: continuity,
+            TransferredDossier: transferredDossier,
+            TransferReceipt: transferReceipt);
+    }
+
+    private MovementTargetEvent ResolveOrCreateMovementTargetEventLocked(
+        BoostCampaignDto targetCampaign,
+        string? targetRunId,
+        string? targetRunTitle,
+        string? targetSceneId,
+        string? targetSceneTitle,
+        DateTimeOffset now)
+    {
+        string runId = AccountService.NormalizeOptional(targetRunId) ?? StableId("run", targetCampaign.CampaignId);
+        string sceneId = AccountService.NormalizeOptional(targetSceneId) ?? StableId("scene", targetCampaign.CampaignId);
+        string runTitle = string.IsNullOrWhiteSpace(targetRunTitle) ? $"{targetCampaign.Title} kickoff" : targetRunTitle.Trim();
+        string sceneTitle = string.IsNullOrWhiteSpace(targetSceneTitle) ? "Campaign brief" : targetSceneTitle.Trim();
+        _store.RunsById.TryGetValue(runId, out var existingRun);
+        SceneProjection? existingScene = existingRun?.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, sceneId, StringComparison.OrdinalIgnoreCase));
+        string objectiveId = existingRun?.Objectives.FirstOrDefault()?.ObjectiveId ?? StableId("obj", $"{targetCampaign.CampaignId}:{runId}");
+        var scene = new SceneProjection(
+            SceneId: sceneId,
+            RunId: runId,
+            Title: sceneTitle,
+            Revision: existingScene?.Revision ?? "r1",
+            Status: "active",
+            Summary: $"{sceneTitle} keeps governed dossier continuity visible on the shared campaign plane.",
+            UpdatedAtUtc: now);
+        var runContinuity = existingRun?.LatestContinuity is null
+            ? new ContinuitySnapshotRef(
+                SnapshotId: StableId("snapshot", $"{targetCampaign.CampaignId}:{runId}"),
+                CapturedAtUtc: now,
+                Summary: $"{runTitle} keeps governed dossier continuity active for {targetCampaign.Title}.",
+                RestoreState: "synced",
+                SessionId: runId,
+                SceneId: sceneId,
+                RecapArtifactId: StableId("recap", targetCampaign.CampaignId))
+            : existingRun.LatestContinuity with
+            {
+                CapturedAtUtc = now,
+                Summary = $"{runTitle} keeps governed dossier continuity active for {targetCampaign.Title}.",
+                RestoreState = "synced",
+                SessionId = runId,
+                SceneId = sceneId,
+                RecapArtifactId = existingRun.LatestContinuity.RecapArtifactId ?? StableId("recap", targetCampaign.CampaignId)
+            };
+        var run = new RunProjection(
+            RunId: runId,
+            CampaignId: targetCampaign.CampaignId,
+            Title: runTitle,
+            Status: RunStatuses.Active,
+            Summary: $"{runTitle} anchors governed dossier continuity for {targetCampaign.Title}.",
+            ActiveSceneId: sceneId,
+            Objectives: existingRun?.Objectives is { Count: > 0 }
+                ? existingRun.Objectives
+                :
+                [
+                    new ObjectiveProjection(
+                        ObjectiveId: objectiveId,
+                        Title: "Keep the crew aligned",
+                        Status: "open",
+                        Pressure: "medium",
+                        Summary: "Use the same dossier, rule environment, and recap spine across surfaces.",
+                        UpdatedAtUtc: now)
+                ],
+            Scenes: (existingRun?.Scenes ?? Array.Empty<SceneProjection>())
+                .Where(item => !string.Equals(item.SceneId, sceneId, StringComparison.OrdinalIgnoreCase))
+                .Concat([scene])
+                .ToArray(),
+            LatestContinuity: runContinuity,
+            CreatedAtUtc: existingRun?.CreatedAtUtc ?? now,
+            UpdatedAtUtc: now);
+        _store.RunsById[runId] = run;
+
+        var targetGroup = _store.GroupsById.GetValueOrDefault(targetCampaign.GroupId);
+        if (_store.CampaignSpinesById.TryGetValue(targetCampaign.CampaignId, out var existingCampaign))
+        {
+            _store.CampaignSpinesById[targetCampaign.CampaignId] = existingCampaign with
+            {
+                ActiveRunId = runId,
+                RunIds = existingCampaign.RunIds.Concat([runId]).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+                LatestContinuity = existingCampaign.LatestContinuity is null
+                    ? runContinuity
+                    : existingCampaign.LatestContinuity with
+                    {
+                        CapturedAtUtc = now,
+                        Summary = runContinuity.Summary,
+                        RestoreState = runContinuity.RestoreState,
+                        SessionId = runId,
+                        SceneId = sceneId,
+                        RecapArtifactId = existingCampaign.LatestContinuity.RecapArtifactId ?? runContinuity.RecapArtifactId
+                    },
+                UpdatedAtUtc = now
+            };
+        }
+        else if (targetGroup is not null)
+        {
+            _store.CampaignSpinesById[targetCampaign.CampaignId] = new CampaignProjection(
+                CampaignId: targetCampaign.CampaignId,
+                GroupId: targetGroup.GroupId,
+                Name: targetCampaign.Title,
+                Status: CampaignStatuses.Active,
+                Visibility: targetGroup.Visibility,
+                Summary: "Campaign continuity, roster posture, and shared rule environment live together here.",
+                RuleEnvironment: DefaultRuleEnvironment($"campaign:{targetCampaign.CampaignId}", "campaign"),
+                ActiveRunId: runId,
+                CrewIds: [ResolveCrewIdLocked(targetCampaign.CampaignId)],
+                DossierIds: Array.Empty<string>(),
+                RunIds: [runId],
+                LatestContinuity: runContinuity,
+                CreatedAtUtc: targetCampaign.CreatedAtUtc,
+                UpdatedAtUtc: now,
+                Consequences: null);
+        }
+
+        return new MovementTargetEvent(run, scene);
+    }
+
+    private sealed record DossierMovementCommand(
+        string DossierId,
+        string TargetGroupId,
+        string? TargetCampaignId,
+        string? TargetCampaignTitle,
+        string? TargetRunId,
+        string? TargetRunTitle,
+        string? TargetSceneId,
+        string? TargetSceneTitle,
+        string? TargetOwnerUserId,
+        string? Note);
+
+    private sealed record MovementTargetEvent(
+        RunProjection Run,
+        SceneProjection Scene);
+
+    private sealed record MovementResolution(
+        DateTimeOffset Now,
+        GroupDto SourceGroup,
+        GroupDto TargetGroup,
+        CampaignProjection SourceCampaign,
+        BoostCampaignDto TargetCampaign,
+        RunProjection? SourceRun,
+        SceneProjection? SourceScene,
+        MovementTargetEvent TargetEvent,
+        bool EventChanged,
+        string PreviousOwnerUserId,
+        string CurrentOwnerUserId,
+        HubUserDto? PreviousOwner,
+        HubUserDto CurrentOwner,
+        ContinuitySnapshotRef Continuity,
+        RunnerDossierProjection TransferredDossier,
+        RosterTransferProjection TransferReceipt);
 
     private bool EnsureSeedDataLocked(HubUserDto user, InstallLinkingSummaryDto? installLinking, DateTimeOffset now)
     {

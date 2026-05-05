@@ -1,6 +1,7 @@
 using Chummer.Campaign.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -21,7 +22,8 @@ public sealed class CampaignSpineRestoreReceiptTests
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
-            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store), supportStore);
 
             HubUserDto user = accounts.EnsureUser("subject.restore", "Rook", "rook@example.invalid");
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -174,7 +176,8 @@ public sealed class CampaignSpineRestoreReceiptTests
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
-            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store), supportStore);
 
             HubUserDto user = accounts.EnsureUser("subject.restore.stale", "Switch", "switch@example.invalid");
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -267,7 +270,8 @@ public sealed class CampaignSpineRestoreReceiptTests
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
-            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store), supportStore);
 
             HubUserDto user = accounts.EnsureUser("subject.restore.drift", "Switch", "switch@example.invalid");
             DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -357,7 +361,8 @@ public sealed class CampaignSpineRestoreReceiptTests
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
             AccountService accounts = new(store);
             WorkspaceLifecyclePolicyService lifecycle = new(configuration);
-            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store));
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
+            CampaignSpineService campaignSpine = new(store, lifecycle, new CampaignArtifactRegistryBridge(store), supportStore);
 
             HubUserDto user = accounts.EnsureUser("subject.restore.reload", "Relay", "relay@example.invalid");
             DateTimeOffset now = DateTimeOffset.UtcNow;
