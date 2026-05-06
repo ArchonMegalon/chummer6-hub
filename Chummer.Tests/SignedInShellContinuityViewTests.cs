@@ -14,6 +14,10 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("Continuity cockpit", view, StringComparison.Ordinal);
         Assert.Contains("What changed for me", view, StringComparison.Ordinal);
         Assert.Contains("Use as guest or link this copy later.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep the whole route in view, not just the current install.", view, StringComparison.Ordinal);
+        Assert.Contains("home-hub-and-registry", view, StringComparison.Ordinal);
+        Assert.Contains("home-mobile-play-shell", view, StringComparison.Ordinal);
+        Assert.Contains("home-ui-kit-and-flagship-polish", view, StringComparison.Ordinal);
     }
 
     [Fact]

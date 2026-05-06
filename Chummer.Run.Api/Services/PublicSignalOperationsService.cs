@@ -401,6 +401,7 @@ public sealed class PublicSignalOperationsService
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             ProductLiftWebhookReceiptState? sourceReceipt = _receipts
                 .FirstOrDefault(receipt => string.Equals(receipt.ReceiptId, dispatchReceipt.SourceReceiptId, StringComparison.OrdinalIgnoreCase));
+            SourceHotFilterSummary sourceHotFilter = ResolveSourceHotFilter(dispatchReceipt.SourceReceiptId);
             string sourceDetailBaseHref = $"/feedback/operations/source/{Uri.EscapeDataString(dispatchReceipt.SourceReceiptId)}";
             string threadDetailArtifactBaseHref = $"/api/v1/public/feedback/operations/thread/{Uri.EscapeDataString(dispatchReceipt.ReceiptId)}";
             PublicSignalOperationsDetailPivotViewModel[] savedPivots = BuildDetailPivots(
@@ -461,10 +462,16 @@ public sealed class PublicSignalOperationsService
                 BackLabel: "Back to feedback lane",
                 AggregateArtifactHref: "/feedback/operations",
                 DetailArtifactHref: AppendDetailFilter(threadDetailArtifactBaseHref, normalizedFilter),
-                RelatedHref: AppendDetailFilter(sourceDetailBaseHref, normalizedFilter),
+                RelatedHref: AppendDetailFilter(
+                    sourceDetailBaseHref,
+                    string.Equals(normalizedFilter, "all", StringComparison.Ordinal)
+                        ? sourceHotFilter.FilterKey
+                        : normalizedFilter),
                 RelatedLabel: !string.Equals(normalizedFilter, "all", StringComparison.Ordinal)
                     ? "Open source drilldown with the same filter"
-                    : "Open source receipt drilldown",
+                    : !string.Equals(sourceHotFilter.FilterKey, "all", StringComparison.Ordinal)
+                        ? $"Open {sourceHotFilter.FilterLabel.ToLowerInvariant()}"
+                        : "Open source receipt drilldown",
                 SavedPivots: savedPivots,
                 SourceReceipt: sourceView,
                 RoutingReceipts: routingReceipts,
@@ -1110,6 +1117,10 @@ public sealed class PublicSignalOperationsService
                 receipt.Summary,
                 receipt.ReadyForOutbox,
                 receipt.PublicClaimAllowed,
+                receipt.SourceHotFilterKey,
+                receipt.SourceHotFilterLabel,
+                receipt.SourceHotFilterCount,
+                receipt.SourceHotFilterSummary,
                 receipt.RecordedAtUtc
             }),
             recentDispatchReceipts = LoadRecentDispatchReceiptArtifactRows(),
@@ -1408,33 +1419,12 @@ public sealed class PublicSignalOperationsService
             PublicSignalRoutingReceiptViewModel[] recentRoutingReceipts = _routingReceipts
                 .OrderByDescending(static receipt => receipt.RecordedAtUtc)
                 .Take(6)
-                .Select(static receipt => new PublicSignalRoutingReceiptViewModel(
-                    ReceiptId: receipt.ReceiptId,
-                    SourceReceiptId: receipt.SourceReceiptId,
-                    RouteKind: receipt.RouteKind,
-                    StatusLabel: receipt.StatusLabel,
-                    TargetPath: receipt.TargetPath,
-                    Summary: receipt.Summary,
-                    RecordedAtUtc: receipt.RecordedAtUtc))
+                .Select(BuildRoutingReceiptViewModel)
                 .ToArray();
             PublicSignalCloseoutDeliveryReceiptViewModel[] recentCloseoutReceipts = _closeoutReceipts
                 .OrderByDescending(static receipt => receipt.RecordedAtUtc)
                 .Take(6)
-                .Select(static receipt => new PublicSignalCloseoutDeliveryReceiptViewModel(
-                    ReceiptId: receipt.ReceiptId,
-                    SourceReceiptId: receipt.SourceReceiptId,
-                    StatusLabel: receipt.StatusLabel,
-                    DeliveryState: receipt.DeliveryState,
-                    DeliveryLane: receipt.DeliveryLane,
-                    TemplateId: receipt.TemplateId,
-                    RecipientScopeRef: receipt.RecipientScopeRef,
-                    RecipientScopeCount: receipt.RecipientScopeCount,
-                    ConsentSourceRef: receipt.ConsentSourceRef,
-                    DeliveryReason: receipt.DeliveryReason,
-                    Summary: receipt.Summary,
-                    VoterNotificationAllowed: receipt.VoterNotificationAllowed,
-                    PublicClaimAllowed: receipt.PublicClaimAllowed,
-                    RecordedAtUtc: receipt.RecordedAtUtc))
+                .Select(BuildCloseoutDeliveryReceiptViewModel)
                 .ToArray();
 
             return new WebhookReceiptSnapshot(
@@ -1523,18 +1513,7 @@ public sealed class PublicSignalOperationsService
             PublicSignalJourneyReceiptViewModel[] recentReceipts = _journeyReceipts
                 .OrderByDescending(static receipt => receipt.RecordedAtUtc)
                 .Take(6)
-                .Select(static receipt => new PublicSignalJourneyReceiptViewModel(
-                    ReceiptId: receipt.ReceiptId,
-                    SourceReceiptId: receipt.SourceReceiptId,
-                    EventKey: receipt.EventKey,
-                    StatusLabel: receipt.StatusLabel,
-                    GovernorDecisionRef: receipt.GovernorDecisionRef,
-                    ReleaseProofReceiptId: receipt.ReleaseProofReceiptId,
-                    RecipientCount: receipt.RecipientCount,
-                    SentCount: receipt.SentCount,
-                    Summary: receipt.Summary,
-                    PublicClaimAllowed: receipt.PublicClaimAllowed,
-                    RecordedAtUtc: receipt.RecordedAtUtc))
+                .Select(BuildJourneyReceiptViewModel)
                 .ToArray();
 
             return new JourneyReceiptSnapshot(
@@ -1790,7 +1769,10 @@ public sealed class PublicSignalOperationsService
             return _journeyReceipts
                 .OrderByDescending(static receipt => receipt.RecordedAtUtc)
                 .Take(12)
-                .Select(static receipt => new
+                .Select(receipt =>
+                {
+                    SourceHotFilterSummary hotFilter = ResolveSourceHotFilter(receipt.SourceReceiptId);
+                    return new
                 {
                     receipt.ReceiptId,
                     receipt.SourceReceiptId,
@@ -1802,7 +1784,12 @@ public sealed class PublicSignalOperationsService
                     receipt.SentCount,
                     receipt.Summary,
                     receipt.PublicClaimAllowed,
+                    SourceHotFilterKey = hotFilter.FilterKey,
+                    SourceHotFilterLabel = hotFilter.FilterLabel,
+                    SourceHotFilterCount = hotFilter.Count,
+                    SourceHotFilterSummary = hotFilter.Summary,
                     receipt.RecordedAtUtc
+                };
                 })
                 .Cast<object>()
                 .ToArray();
@@ -2525,7 +2512,10 @@ public sealed class PublicSignalOperationsService
             return _routingReceipts
                 .OrderByDescending(static receipt => receipt.RecordedAtUtc)
                 .Take(12)
-                .Select(static receipt => new
+                .Select(receipt =>
+                {
+                    SourceHotFilterSummary hotFilter = ResolveSourceHotFilter(receipt.SourceReceiptId);
+                    return new
                 {
                     receipt.ReceiptId,
                     receipt.SourceReceiptId,
@@ -2533,7 +2523,12 @@ public sealed class PublicSignalOperationsService
                     receipt.StatusLabel,
                     receipt.TargetPath,
                     receipt.Summary,
+                    SourceHotFilterKey = hotFilter.FilterKey,
+                    SourceHotFilterLabel = hotFilter.FilterLabel,
+                    SourceHotFilterCount = hotFilter.Count,
+                    SourceHotFilterSummary = hotFilter.Summary,
                     receipt.RecordedAtUtc
+                };
                 })
                 .Cast<object>()
                 .ToArray();
@@ -2547,7 +2542,10 @@ public sealed class PublicSignalOperationsService
             return _closeoutReceipts
                 .OrderByDescending(static receipt => receipt.RecordedAtUtc)
                 .Take(12)
-                .Select(static receipt => new
+                .Select(receipt =>
+                {
+                    SourceHotFilterSummary hotFilter = ResolveSourceHotFilter(receipt.SourceReceiptId);
+                    return new
                 {
                     receipt.ReceiptId,
                     receipt.SourceReceiptId,
@@ -2563,7 +2561,12 @@ public sealed class PublicSignalOperationsService
                     receipt.VoterNotificationAllowed,
                     receipt.DeliveryCandidate,
                     receipt.PublicClaimAllowed,
+                    SourceHotFilterKey = hotFilter.FilterKey,
+                    SourceHotFilterLabel = hotFilter.FilterLabel,
+                    SourceHotFilterCount = hotFilter.Count,
+                    SourceHotFilterSummary = hotFilter.Summary,
                     receipt.RecordedAtUtc
+                };
                 })
                 .Cast<object>()
                 .ToArray();

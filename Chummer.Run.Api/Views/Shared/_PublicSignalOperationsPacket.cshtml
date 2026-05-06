@@ -80,6 +80,12 @@
         => AppendDetailFilter($"/feedback/operations/thread/{Uri.EscapeDataString(dispatchReceiptId)}", filterKey);
     string SourceDetailHref(string sourceReceiptId, string filterKey)
         => AppendDetailFilter($"/feedback/operations/source/{Uri.EscapeDataString(sourceReceiptId)}", filterKey);
+    string SourceDetailArtifactHref(string sourceReceiptId, string filterKey)
+        => AppendDetailFilter($"/api/v1/public/feedback/operations/source/{Uri.EscapeDataString(sourceReceiptId)}", filterKey);
+    string SourceDetailActionLabel(string filterLabel, int filterCount, string filterKey)
+        => filterCount > 0 && !string.Equals(filterKey, "all", StringComparison.Ordinal)
+            ? $"Open {filterLabel.ToLowerInvariant()}"
+            : "Open source detail";
 }
 
 <section class="editorial-block">
@@ -435,10 +441,18 @@
                     <span class="tag">@receipt.StatusLabel</span>
                     <h3>@receipt.RouteKind.Replace('_', ' ')</h3>
                     <p>@receipt.Summary</p>
+                    <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
                     <div class="route-choice-card__proof">
                         <span>@receipt.ReceiptId</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
                         <span>@receipt.TargetPath</span>
+                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">
+                            @SourceDetailActionLabel(receipt.SourceHotFilterLabel, receipt.SourceHotFilterCount, receipt.SourceHotFilterKey)
+                        </a>
+                        <a class="button-like button-like--ghost" href="@SourceDetailArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
                     </div>
                 </article>
             }
@@ -469,6 +483,7 @@
                         <span>@receipt.RecipientScopeRef</span>
                         <span>@receipt.ConsentSourceRef</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (receipt.RecipientScopeCount > 0)
                         {
                             <span>@receipt.RecipientScopeCount projected recipient@(receipt.RecipientScopeCount == 1 ? string.Empty : "s")</span>
@@ -489,6 +504,13 @@
                         {
                             <span>No public delivery claim</span>
                         }
+                    </div>
+                    <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">
+                            @SourceDetailActionLabel(receipt.SourceHotFilterLabel, receipt.SourceHotFilterCount, receipt.SourceHotFilterKey)
+                        </a>
+                        <a class="button-like button-like--ghost" href="@SourceDetailArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
                     </div>
                 </article>
             }
@@ -804,12 +826,19 @@
                         <span>@receipt.ReleaseProofReceiptId</span>
                         <span>@receipt.SentCount of @receipt.RecipientCount sent</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (!receipt.PublicClaimAllowed)
                         {
                             <span>No public journey claim</span>
                         }
                     </div>
-                    <a class="editorial-strip__action" href="@SourceDetailHref(receipt.SourceReceiptId, "sent")">Open source detail</a>
+                    <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">
+                            @SourceDetailActionLabel(receipt.SourceHotFilterLabel, receipt.SourceHotFilterCount, receipt.SourceHotFilterKey)
+                        </a>
+                        <a class="button-like button-like--ghost" href="@SourceDetailArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
+                    </div>
                 </article>
             }
         </div>
@@ -842,6 +871,7 @@
                         <span>@receipt.ReleaseProofRoute</span>
                         <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? receipt.ReleaseProofReceiptId : "Release proof pending")</span>
                         <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        <span>@receipt.SourceHotFilterLabel · @receipt.SourceHotFilterCount thread@(receipt.SourceHotFilterCount == 1 ? string.Empty : "s")</span>
                         @if (receipt.ReadyForOutbox)
                         {
                             <span>Ready for Hub outbox</span>
@@ -855,7 +885,13 @@
                             <span>No public send claim</span>
                         }
                     </div>
-                    <a class="editorial-strip__action" href="/feedback/operations/source/@Uri.EscapeDataString(receipt.SourceReceiptId)">Open source detail</a>
+                    <p class="muted-copy">@receipt.SourceHotFilterSummary</p>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">
+                            @SourceDetailActionLabel(receipt.SourceHotFilterLabel, receipt.SourceHotFilterCount, receipt.SourceHotFilterKey)
+                        </a>
+                        <a class="button-like button-like--ghost" href="@SourceDetailArtifactHref(receipt.SourceReceiptId, receipt.SourceHotFilterKey)">Open source artifact</a>
+                    </div>
                 </article>
             }
         </div>

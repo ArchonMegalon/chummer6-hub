@@ -323,6 +323,26 @@
     </div>
 </section>
 
+<section class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
+    <div class="flagship-coverage__lead">
+        <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
+        <h2 class="editorial-title">Keep the whole route in view, not just the current install.</h2>
+        <p class="editorial-copy">This signed-in rail keeps the public shelf, the travel-safe session shell, and the shared flagship quality bar visible together before support or recovery asks you to jump between them.</p>
+    </div>
+    <div class="flagship-coverage__grid">
+        @foreach (var card in Model.FlagshipCoverage.Cards)
+        {
+            <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
+                <span class="tag">@card.Label</span>
+                <h3>@card.CurrentTitle</h3>
+                <p>@card.CurrentBody</p>
+                <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
+                <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
+            </article>
+        }
+    </div>
+</section>
+
 <section class="home-dashboard home-dashboard--focus">
     <div class="home-dashboard__main">
         @if (Model.SignedInStatus is not null)

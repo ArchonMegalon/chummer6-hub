@@ -133,6 +133,23 @@ public sealed record HomePrimaryActionViewModel(
     string Href,
     string Tone);
 
+public sealed record FlagshipCoverageCardViewModel(
+    string Id,
+    string Label,
+    string Summary,
+    string CurrentTitle,
+    string CurrentBody,
+    string TargetTitle,
+    string TargetBody,
+    string Href,
+    string ActionLabel);
+
+public sealed record FlagshipCoverageStripViewModel(
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    IReadOnlyList<FlagshipCoverageCardViewModel> Cards);
+
 public sealed record LandingPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
@@ -150,6 +167,7 @@ public sealed record LandingPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> PreviewItems,
     IReadOnlyList<ResolvedPublicCardViewModel> ComingNext,
     IReadOnlyList<ResolvedPublicCardViewModel> Artifacts,
+    FlagshipCoverageStripViewModel FlagshipCoverage,
     AccountCampaignSummary? CampaignSpine = null);
 
 public sealed record StoryPageViewModel(
@@ -216,6 +234,7 @@ public sealed record DownloadsPageViewModel(
     AssetCatalogViewModel Assets,
     PublicReleaseManifestDto Manifest,
     ReleaseExperienceViewModel ReleaseExperience,
+    FlagshipCoverageStripViewModel FlagshipCoverage,
     IReadOnlyList<ReleaseOptionViewModel>? SignedInWindowsBuilds = null,
     IReadOnlyList<WindowsProofInstallerRecord>? WindowsProofInstallers = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
@@ -981,6 +1000,7 @@ public sealed record HomePageViewModel(
     AccountCampaignSummary CampaignSpine,
     CampaignWorkspaceServerPlaneProjection? LeadWorkspaceServerPlane,
     HomePrimaryActionViewModel PrimaryAction,
+    FlagshipCoverageStripViewModel FlagshipCoverage,
     SignedInTrustStatusPanelViewModel? SignedInStatus,
     IReadOnlyList<ResolvedPublicCardViewModel> NowRail,
     IReadOnlyList<ResolvedPublicCardViewModel> HorizonRail);

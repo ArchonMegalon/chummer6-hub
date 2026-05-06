@@ -15,6 +15,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicRouteCatalogService>();
         services.AddSingleton<PublicActionResolver>();
         services.AddSingleton<PublicLandingService>();
+        services.AddSingleton<PublicFlagshipCoverageService>();
         services.AddSingleton<PublicTrustContentService>();
         services.AddSingleton<PublicPrivacyBoundaryService>();
         services.AddSingleton<PublicSignalProjectionService>();

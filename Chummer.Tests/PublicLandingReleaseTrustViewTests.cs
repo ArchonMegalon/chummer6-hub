@@ -34,6 +34,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("hero-installrail", view, StringComparison.Ordinal);
         Assert.Contains("continuity-band", view, StringComparison.Ordinal);
         Assert.Contains("future-strip", view, StringComparison.Ordinal);
+        Assert.Contains("Model.FlagshipCoverage", view, StringComparison.Ordinal);
+        Assert.Contains("Whole-product frontier", view, StringComparison.Ordinal);
+        Assert.Contains("Hub truth, mobile continuity, and shared flagship polish stay visible together.", view, StringComparison.Ordinal);
         Assert.Contains("Account-aware install handoff", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access", view, StringComparison.Ordinal);
     }
@@ -64,6 +67,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("The same build for everyone", view, StringComparison.Ordinal);
         Assert.Contains("Guest or link this copy", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access stay calm", view, StringComparison.Ordinal);
+        Assert.Contains("The install shelf stays tied to the rest of the product.", view, StringComparison.Ordinal);
+        Assert.Contains("downloads-hub-and-registry", view, StringComparison.Ordinal);
+        Assert.Contains("downloads-mobile-play-shell", view, StringComparison.Ordinal);
+        Assert.Contains("downloads-ui-kit-and-flagship-polish", view, StringComparison.Ordinal);
     }
 
     [Fact]

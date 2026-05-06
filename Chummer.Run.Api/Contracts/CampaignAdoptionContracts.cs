@@ -41,7 +41,7 @@ public sealed record RunnerGoalUpsertRequest(
     [StringLength(256)] string? Summary = null,
     [StringLength(256)] string? Note = null);
 
-public sealed record RunnerGoalProjection(
+public sealed record CampaignAdoptionRunnerGoalProjection(
     string GoalId,
     string WorkspaceId,
     string CampaignId,
@@ -61,7 +61,7 @@ public sealed record ResolutionOutcomeDeltaRequest(
     int Delta,
     [StringLength(256)] string? Summary = null);
 
-public sealed record ResolutionReportApprovalRequest(
+public sealed record CampaignAdoptionResolutionReportApprovalRequest(
     [Required(AllowEmptyStrings = false), StringLength(128)] string DraftPackageId,
     [StringLength(128)] string? RunId = null,
     IReadOnlyList<string>? Outcomes = null,
@@ -77,7 +77,7 @@ public sealed record WorldChangeProjection(
     int Delta,
     string Summary);
 
-public sealed record WorldTickProjection(
+public sealed record CampaignAdoptionWorldTickProjection(
     string WorldTickId,
     string WorkspaceId,
     string CampaignId,
@@ -108,7 +108,7 @@ public sealed record PlayerSafeNewsItemProjection(
     string InitiatedByUserId,
     DateTimeOffset PublishedAtUtc);
 
-public sealed record ResolutionReportApprovalProjection(
+public sealed record CampaignAdoptionResolutionReportProjection(
     string ApprovalId,
     string WorkspaceId,
     string CampaignId,
@@ -130,7 +130,7 @@ public sealed record ResolutionReportApprovalProjection(
 public sealed record CampaignAdoptionWorkspaceStateProjection(
     string WorkspaceId,
     CampaignAdoptionRecordProjection? CampaignAdoption,
-    IReadOnlyList<RunnerGoalProjection> RunnerGoals,
-    IReadOnlyList<ResolutionReportApprovalProjection> ResolutionReports,
-    IReadOnlyList<WorldTickProjection> WorldTicks,
+    IReadOnlyList<CampaignAdoptionRunnerGoalProjection> RunnerGoals,
+    IReadOnlyList<CampaignAdoptionResolutionReportProjection> ResolutionReports,
+    IReadOnlyList<CampaignAdoptionWorldTickProjection> WorldTicks,
     IReadOnlyList<PlayerSafeNewsItemProjection> NewsItems);

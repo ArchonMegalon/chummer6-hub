@@ -299,6 +299,27 @@ internal sealed class PublicReleaseChannelLabelDocument
     public string Label { get; init; } = string.Empty;
 }
 
+internal sealed class PublicProgressPartsDocument
+{
+    public List<PublicProgressPartDocument>? Parts { get; init; }
+}
+
+internal sealed class PublicProgressPartDocument
+{
+    public string Id { get; init; } = string.Empty;
+    public string PublicName { get; init; } = string.Empty;
+    public string ShortPublicName { get; init; } = string.Empty;
+    public string Summary { get; init; } = string.Empty;
+    public List<PublicProgressPartMilestoneDocument>? Milestones { get; init; }
+}
+
+internal sealed class PublicProgressPartMilestoneDocument
+{
+    public string Phase { get; init; } = string.Empty;
+    public string Title { get; init; } = string.Empty;
+    public string Body { get; init; } = string.Empty;
+}
+
 internal sealed class DesktopPlatformAcceptanceDocument
 {
     public string Product { get; init; } = string.Empty;
