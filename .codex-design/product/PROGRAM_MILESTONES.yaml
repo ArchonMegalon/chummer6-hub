@@ -707,7 +707,7 @@ executable_queue:
   milestone: F3
   status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: "Latest recurring follow-up on 2026-05-06T19:39:40Z: the WL-D007 review-template mirror targets again showed no drift, and fresh no-change parity evidence was appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` without reopening completed WL-D007/WL-D010/WL-D011/WL-D012 rows."
+  notes: "Latest recurring follow-up on 2026-05-06T21:21:52Z: the WL-D007 review-template mirror targets again showed no drift, and fresh no-change parity evidence was appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` without reopening completed WL-D007/WL-D010/WL-D011/WL-D012 rows."
 - id: WL-D016
   milestone: F3
   status: done
@@ -732,7 +732,7 @@ executable_queue:
   milestone: F3
   status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: "Closed 2026-03-19; latest requested follow-up on 2026-05-06T19:39:40Z again found no review-template drift across the checked target repos, and the current parity evidence is recorded in `REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
+  notes: "Closed 2026-03-19; latest requested follow-up on 2026-05-06T21:21:52Z again found no review-template drift across the checked target repos, and the current parity evidence is recorded in `REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
 - id: WL-D018
   milestone: F3
   status: done
