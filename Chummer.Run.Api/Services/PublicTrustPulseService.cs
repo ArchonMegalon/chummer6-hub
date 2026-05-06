@@ -15,6 +15,8 @@ public sealed class PublicTrustPulseService
     private readonly WeeklyProductPulseArtifactService _weeklyPulse;
     private readonly IConfiguration _configuration;
     private readonly ILogger<PublicTrustPulseService> _logger;
+    private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
 
     public PublicTrustPulseService(
         WeeklyProductPulseArtifactService weeklyPulse,
@@ -24,6 +26,8 @@ public sealed class PublicTrustPulseService
         _weeklyPulse = weeklyPulse;
         _configuration = configuration;
         _logger = logger;
+        _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
     }
 
     public PublicTrustPulseSnapshot? LoadSnapshot()
@@ -68,10 +72,41 @@ public sealed class PublicTrustPulseService
                 options,
                 static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
                 "hub local release proof");
+            FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+            ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+            string? readinessReason = readiness?.MissingDesktopClientCoverage == true
+                ? readiness.DesktopClientGapSummary
+                : readiness?.Reason;
+            string summary = payload.Summary ?? string.Empty;
+            if (readiness?.MissingDesktopClientCoverage == true && !string.IsNullOrWhiteSpace(readinessReason))
+            {
+                summary = AppendDistinctSentence(
+                    summary,
+                    $"Flagship desktop parity claims stay review-required because {readinessReason!.Trim().TrimEnd('.')}.");
+            }
+            string? launchReadiness = payload.SupportingSignals?.LaunchReadiness;
+            if (readiness?.MissingDesktopClientCoverage == true && !string.IsNullOrWhiteSpace(readinessReason))
+            {
+                launchReadiness = $"Hold parity claims on public routes and support surfaces because {readinessReason!.Trim().TrimEnd('.')}.";
+            }
+            if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
+            {
+                summary = AppendDistinctSentence(
+                    summary,
+                    $"Import-route parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
+                launchReadiness = $"Hold parity claims on public routes, support surfaces, and publication lanes because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.";
+            }
+
+            string? localReleaseProofStatus = adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status;
+            bool parityClaimsReviewRequired = readiness?.MissingDesktopClientCoverage == true || !importRouteGuard.IsCurrent;
+            if (parityClaimsReviewRequired)
+            {
+                localReleaseProofStatus = "review_required";
+            }
 
             return new PublicTrustPulseSnapshot(
                 AsOf: payload.AsOf ?? string.Empty,
-                Summary: payload.Summary ?? string.Empty,
+                Summary: summary,
                 ActiveWave: payload.ActiveWave ?? string.Empty,
                 ActiveWaveStatus: payload.ActiveWaveStatus,
                 ActiveCheckpointId: payload.ActiveCheckpoint?.Id,
@@ -97,7 +132,7 @@ public sealed class PublicTrustPulseService
                 ProgressTrendToAsOf: pulseProgressTrend?.ToAsOf ?? progressTrend?.ToAsOf,
                 ProgressTrendSamples: progressTrendSamples.Count > 0 ? progressTrendSamples : null,
                 LongestPoleLabel: payload.SupportingSignals?.LongestPole,
-                LaunchReadiness: payload.SupportingSignals?.LaunchReadiness,
+                LaunchReadiness: launchReadiness,
                 ProviderRouteDefault: payload.SupportingSignals?.ProviderRouteStewardship?.DefaultStatus,
                 ProviderRouteCanary: payload.SupportingSignals?.ProviderRouteStewardship?.CanaryStatus,
                 ProviderRouteReviewDue: payload.SupportingSignals?.ProviderRouteStewardship?.ReviewDue,
@@ -108,15 +143,34 @@ public sealed class PublicTrustPulseService
                 ClosureHealthPendingHumanResponseCount: payload.SupportingSignals?.ClosureHealth?.PendingHumanResponseCount,
                 ClosureHealthSummary: payload.SupportingSignals?.ClosureHealth?.Summary,
                 NextCheckpointQuestion: payload.NextCheckpointQuestion,
-                LocalReleaseProofStatus: adoptionHealth?.LocalReleaseProofStatus ?? localReleaseProof?.Status,
+                LocalReleaseProofStatus: localReleaseProofStatus,
                 ProvenJourneyCount: adoptionHealth?.ProvenJourneyCount ?? localReleaseProof?.JourneysPassed?.Count,
-                ProvenRouteCount: adoptionHealth?.ProvenRouteCount ?? localReleaseProof?.ProofRoutes?.Count);
+                ProvenRouteCount: adoptionHealth?.ProvenRouteCount ?? localReleaseProof?.ProofRoutes?.Count,
+                FlagshipReadinessStatus: readiness?.Status,
+                FlagshipReadinessReason: readinessReason,
+                MissingDesktopClientCoverage: readiness?.MissingDesktopClientCoverage == true,
+                ParityClaimsReviewRequired: parityClaimsReviewRequired);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Skipping public trust pulse after load failure from synthesized weekly pulse.");
             return null;
         }
+    }
+
+    private static string AppendDistinctSentence(string? existing, string sentence)
+    {
+        if (string.IsNullOrWhiteSpace(existing))
+        {
+            return sentence;
+        }
+
+        if (existing.Contains(sentence, StringComparison.OrdinalIgnoreCase))
+        {
+            return existing;
+        }
+
+        return $"{existing.Trim().TrimEnd('.')} {sentence}";
     }
 
     private TPayload? LoadOptionalArtifact<TPayload>(
@@ -388,6 +442,10 @@ public sealed record PublicTrustPulseSnapshot(
     int? ClosureHealthPendingHumanResponseCount,
     string? ClosureHealthSummary,
     int? ProvenJourneyCount,
-    int? ProvenRouteCount);
+    int? ProvenRouteCount,
+    string? FlagshipReadinessStatus,
+    string? FlagshipReadinessReason,
+    bool MissingDesktopClientCoverage,
+    bool ParityClaimsReviewRequired);
 
 public sealed record ProgressHistoryTrendPoint(string AsOf, int OverallProgressPercent);

@@ -643,6 +643,8 @@ public sealed class PublicLandingDownloadDispatchTests
                 chrome: null!,
                 trustContent: null!,
                 privacyBoundaries: null!,
+                signalProjection: null!,
+                signalOperations: null!,
                 trustPulse: null!,
                 signedInTrustStatus: null!,
                 supportCases: null!,

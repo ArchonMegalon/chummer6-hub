@@ -155,7 +155,6 @@ def verify_queue_authority(missing: list[str], path: Path) -> None:
         if marker not in proof:
             missing.append(f"{path}: {PACKAGE_ID} proof is missing {marker!r}")
 
-
 def verify_successor_registry(missing: list[str], path: Path) -> None:
     if not path.is_file():
         missing.append(f"missing successor registry file: {path}")
@@ -207,7 +206,10 @@ def verify_source_markers(missing: list[str]) -> None:
 def main() -> int:
     missing: list[str] = []
     verify_queue_authority(missing, QUEUE_STAGING_PATH)
+<<<<<<< HEAD
     verify_queue_authority(missing, DESIGN_QUEUE_STAGING_PATH)
+=======
+>>>>>>> 9c25a2b2 (Add campaign federation source-pack orchestration)
     verify_successor_registry(missing, SUCCESSOR_REGISTRY_PATH)
     verify_source_markers(missing)
 

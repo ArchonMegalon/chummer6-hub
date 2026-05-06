@@ -228,6 +228,39 @@
             "run_module" => "Run module",
             _ => HumanizeStatus(kind, "Governed output")
         };
+
+    var leadTravelDevice = leadWorkspaceServerPlane?.TravelMode.Devices.FirstOrDefault();
+    var homeContinuityHeadline = leadWorkspaceServerPlane?.NextSafeAction.Label
+        ?? (releasedOrNotifiedCases.Length > 0
+            ? "A tracked fix or follow-through is waiting"
+            : pendingClaims > 0
+                ? "A linked install still needs return-path follow-through"
+                : claimedInstallations > 0
+                    ? "This account already has a live return rail"
+                    : "Start the first linked install from this account");
+    var homeContinuitySummary = leadWorkspaceServerPlane?.NextSafeAction.Summary
+        ?? releasedOrNotifiedCases.FirstOrDefault()?.NextSafeAction
+        ?? (pendingClaims > 0
+            ? "Finish the claim on the device that already has the build, then use Devices & access only for relink, reclaim, or recovery."
+            : claimedInstallations > 0
+                ? "Downloads, support, and campaign return stay attached to the same account instead of splitting into a browser ritual."
+                : "Use this account to keep install handoff, support follow-through, and campaign return attached from the first successful launch.");
+    var homeRoleSummary = !string.IsNullOrWhiteSpace(leadWorkspaceServerPlane?.Workspace.DeviceRoleSummary)
+        ? leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary
+        : leadTravelDevice is not null
+            ? $"{leadTravelDevice.DeviceRole} · {leadTravelDevice.Platform} / {leadTravelDevice.HeadId} / {leadTravelDevice.Channel}"
+            : claimedInstallations > 0
+                ? $"{claimedInstallations} linked install(s) are already attached to this account."
+                : pendingClaims > 0
+                    ? $"{pendingClaims} pending claim ticket(s) are waiting on their original device."
+                    : "No claimed install or workspace role is attached yet.";
+    var homeWhatChangedSummary = leadWorkspaceServerPlane?.ChangePackets.FirstOrDefault()?.Summary
+        ?? releasedOrNotifiedCases.FirstOrDefault()?.ClosureSummary
+        ?? (recentReceipts.Length > 0
+            ? $"{recentReceipts[0].ArtifactLabel} on {recentReceipts[0].Channel} is still attached to this account."
+            : restoreConflicts > 0
+                ? Model.CampaignSpine.Restore.ConflictSummaries[0]
+                : "Nothing urgent changed. This account is ready for the next install, campaign return, or support follow-up.");
 }
 
 <section class="home-command">
@@ -247,6 +280,48 @@
 <div class="sr-only" aria-hidden="true">
     @Html.AntiForgeryToken()
 </div>
+
+<section class="home-cockpit-strip" aria-label="Signed-in continuity cockpit">
+    <div class="home-cockpit-strip__lead">
+        <p class="eyebrow">Continuity cockpit</p>
+        <h2>@homeContinuityHeadline</h2>
+        <p>@homeContinuitySummary</p>
+        <div class="stacked-actions">
+            @if (primaryActionTargetsSetup && showSetupSection)
+            {
+                <button class="button-like button-like--primary" type="button" data-open-onboarding>@Model.PrimaryAction.Label</button>
+            }
+            else
+            {
+                <a class="button-like button-like--primary" href="@ContextualPreviewHref(Model.PrimaryAction.Href)">@Model.PrimaryAction.Label</a>
+            }
+            <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+            <a class="button-like button-like--ghost" href="/downloads">Open downloads</a>
+        </div>
+    </div>
+    <div class="home-cockpit-strip__panel">
+        <article class="home-cockpit-strip__fact">
+            <span>Install and role</span>
+            <strong>@homeRoleSummary</strong>
+            <p>The same download still works for everyone. Use as guest or link this copy later.</p>
+        </article>
+        <article class="home-cockpit-strip__fact">
+            <span>What changed for me</span>
+            <strong>@homeWhatChangedSummary</strong>
+            <p>The signed-in cockpit answers this first so you know whether to continue, recover, or wait.</p>
+        </article>
+        <article class="home-cockpit-strip__fact">
+            <span>Support and return</span>
+            <strong>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].StageLabel : "Calm return path")</strong>
+            <p>@(releasedOrNotifiedCases.Length > 0 ? releasedOrNotifiedCases[0].ClosureSummary : "No tracked support closure is blocking the next install, campaign, or recovery step right now.")</p>
+        </article>
+        <article class="home-cockpit-strip__fact">
+            <span>Current release</span>
+            <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release to confirm the live access posture.")</strong>
+            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release to confirm the current caution lane.")</p>
+        </article>
+    </div>
+</section>
 
 <section class="home-dashboard home-dashboard--focus">
     <div class="home-dashboard__main">

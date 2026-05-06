@@ -25,7 +25,9 @@ public sealed class PublicCanonFileLoader
             Directory.GetCurrentDirectory(),
             AppContext.BaseDirectory,
             Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")),
-            "/docker/chummercomplete/chummer.run-services"
+            "/docker/chummercomplete/chummer.run-services",
+            "/docker/chummercomplete/chummer-design",
+            "/docker/chummercomplete/chummer-design-m114"
         }
         .Where(static path => !string.IsNullOrWhiteSpace(path))
         .Select(static path => Path.GetFullPath(path!))

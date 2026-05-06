@@ -72,7 +72,8 @@ public sealed class HubPageChromeService
             Authenticated: false,
             SignedInLabel: null,
             FooterCanonicalSource: surface.FooterCanonicalSource,
-            FooterGeneratedNote: surface.FooterGeneratedNote);
+            FooterGeneratedNote: surface.FooterGeneratedNote,
+            PublicSignalNavigation: nav.PublicSignal);
     }
 
     private static string BuildContextualSignInHref(string normalizedCurrentPath, string fallbackHref)
@@ -135,7 +136,8 @@ public sealed class HubPageChromeService
             Authenticated: true,
             SignedInLabel: signedInLabel,
             FooterCanonicalSource: surface.FooterCanonicalSource,
-            FooterGeneratedNote: surface.FooterGeneratedNote);
+            FooterGeneratedNote: surface.FooterGeneratedNote,
+            PublicSignalNavigation: nav.PublicSignal);
     }
 
     private SiteChromeActionViewModel BuildPublicPrimaryCta()

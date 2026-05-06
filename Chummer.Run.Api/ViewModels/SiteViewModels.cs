@@ -29,7 +29,8 @@ public sealed record SiteChromeViewModel(
     bool Authenticated,
     string? SignedInLabel,
     string FooterCanonicalSource,
-    string FooterGeneratedNote);
+    string FooterGeneratedNote,
+    IReadOnlyList<PublicNavigationLink>? PublicSignalNavigation = null);
 
 public sealed class AssetCatalogViewModel
 {
@@ -172,6 +173,8 @@ public sealed record NowPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Inspectable,
     IReadOnlyList<PublicLandingOverlayDto> SignedInPreview,
     PublicReleaseManifestDto Manifest,
+    PublicSignalLoopSnapshotViewModel SignalLoop,
+    PublicSignalProjectionPacketViewModel? SignalProjection = null,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
@@ -183,6 +186,14 @@ public sealed record HorizonsPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Horizons,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record RoadmapPageViewModel(
+    SiteChromeViewModel Chrome,
+    IReadOnlyList<ResolvedPublicCardViewModel> Horizons,
+    IReadOnlyList<ProgramMilestoneSummaryViewModel> Milestones,
+    PublicSignalLoopSnapshotViewModel SignalLoop,
+    PublicSignalProjectionPacketViewModel? SignalProjection = null,
+    PublicTrustPulsePanelViewModel? TrustPulse = null);
 
 public sealed record ShelfPageViewModel(
     SiteChromeViewModel Chrome,
@@ -311,6 +322,7 @@ public sealed record StatusPageViewModel(
     PublicReleaseManifestDto Manifest,
     ReleaseExperienceViewModel ReleaseExperience,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
+    IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
@@ -400,7 +412,10 @@ public sealed record PublicTrustPulsePanelViewModel(
     IReadOnlyList<PublicTrustPulseTrendPointViewModel> TrendSamples,
     IReadOnlyList<PublicTrustPulseRowViewModel> Rows,
     TrustPageActionViewModel PrimaryAction,
-    TrustPageActionViewModel? SecondaryAction = null);
+    TrustPageActionViewModel? SecondaryAction = null,
+    bool MissingDesktopClientCoverage = false,
+    bool ParityClaimsReviewRequired = false,
+    string? RouteGuardSummary = null);
 
 public sealed record PrivacyBoundaryDomainViewModel(
     string Label,
@@ -514,8 +529,370 @@ public sealed record ParticipatePageViewModel(
     AssetCatalogViewModel Assets,
     IReadOnlyList<ResolvedPublicCardViewModel> PublicLane,
     IReadOnlyList<ResolvedPublicCardViewModel> SignedInLane,
+    PublicSignalLoopSnapshotViewModel SignalLoop,
+    PublicSignalProjectionPacketViewModel? SignalProjection = null,
+    PublicSignalOperationsPacketViewModel? SignalOperations = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record PublicSignalLoopSnapshotViewModel(
+    int OpenMilestoneCount,
+    int ClaimedMilestoneCount,
+    int HighDifficultyMilestoneCount,
+    int RoadmapFollowUpCount,
+    int ShippedFollowUpCount,
+    IReadOnlyList<ProgramMilestoneSummaryViewModel> MilestoneFollowUp,
+    IReadOnlyList<ResolvedPublicCardViewModel> RoadmapFollowUp,
+    IReadOnlyList<ResolvedPublicCardViewModel> ShippedFollowUp,
+    string FollowSettingsHref,
+    string FollowSettingsLabel);
+
+public sealed record PublicSignalProjectionPacketViewModel(
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    string Vendor,
+    string Role,
+    string TruthPosture,
+    string PublicPath,
+    string FallbackPath,
+    string PolicyStatus,
+    string CoreRule,
+    IReadOnlyList<string> AuthorityFlow,
+    IReadOnlyList<string> DecisionRoutes,
+    IReadOnlyList<string> CanonicalSources,
+    IReadOnlyList<string> Forbidden,
+    IReadOnlyList<string> CloseoutRequirements,
+    string PublicWarning,
+    IReadOnlyList<string> BoardTargets,
+    string PolicySource,
+    string PipelineSource,
+    string RegistrySource);
+
+public sealed record PublicSignalHostedRouteViewModel(
+    string Label,
+    string PublicPath,
+    string? HostedHref,
+    string StatusLabel,
+    string Summary);
+
+public sealed record PublicSignalDeliveryOutcomeIngressViewModel(
+    string Label,
+    string ProviderKey,
+    string StatusLabel,
+    string Summary,
+    string SecretHeader,
+    IReadOnlyList<string> Routes);
+
+public sealed record PublicSignalCategoryRoutingViewModel(
+    string Label,
+    string OwnerRepo,
+    string FollowUpLane,
+    string Summary,
+    bool SupportMisrouteLikely,
+    bool PrivacySensitive);
+
+public sealed record PublicSignalWebhookReceiptViewModel(
+    string ReceiptId,
+    string ProviderEventId,
+    string EventType,
+    string ActionLabel,
+    string StatusLabel,
+    string BoardLabel,
+    string CategoryLabel,
+    string ItemReference,
+    bool CloseoutCandidate,
+    bool VoterNotificationAllowed,
+    string HotFilterKey,
+    string HotFilterLabel,
+    int HotFilterCount,
+    string HotFilterSummary,
+    DateTimeOffset ReceivedAtUtc,
+    DateTimeOffset? ProviderOccurredAtUtc);
+
+public sealed record PublicSignalRoutingReceiptViewModel(
+    string ReceiptId,
+    string SourceReceiptId,
+    string RouteKind,
+    string StatusLabel,
+    string TargetPath,
+    string Summary,
+    DateTimeOffset RecordedAtUtc);
+
+public sealed record PublicSignalCloseoutDeliveryReceiptViewModel(
+    string ReceiptId,
+    string SourceReceiptId,
+    string StatusLabel,
+    string DeliveryState,
+    string DeliveryLane,
+    string TemplateId,
+    string RecipientScopeRef,
+    int RecipientScopeCount,
+    string ConsentSourceRef,
+    string DeliveryReason,
+    string Summary,
+    bool VoterNotificationAllowed,
+    bool PublicClaimAllowed,
+    DateTimeOffset RecordedAtUtc);
+
+public sealed record PublicSignalCloseoutQueueReceiptViewModel(
+    string ReceiptId,
+    string SourceReceiptId,
+    string StatusLabel,
+    string QueueState,
+    string QueueLane,
+    string DispatchTool,
+    string DispatchAction,
+    string JourneyEventKey,
+    string? GovernorDecisionRef,
+    string ReleaseProofRoute,
+    string? ReleaseProofReceiptId,
+    string QueueReason,
+    string Summary,
+    bool ReadyForOutbox,
+    bool PublicClaimAllowed,
+    DateTimeOffset RecordedAtUtc);
+
+public sealed record PublicSignalCloseoutDispatchReceiptViewModel(
+    string ReceiptId,
+    string SourceReceiptId,
+    string StatusLabel,
+    string DeliveryState,
+    string DeliveryId,
+    string? ProviderMessageId,
+    string TemplateId,
+    string TemplateVersion,
+    string RecipientRef,
+    string AddressHash,
+    string ConsentSourceRef,
+    string SuppressionCheck,
+    string GovernorDecisionRef,
+    string ReleaseProofReceiptId,
+    string IdempotencyKey,
+    string Summary,
+    string? Error,
+    bool PublicClaimAllowed,
+    int RecoveryAttemptCount,
+    string? LastRecoveryStatus,
+    string? LastProviderState,
+    DateTimeOffset? NextAutomaticRetryAtUtc,
+    DateTimeOffset? LastOutcomeAtUtc,
+    DateTimeOffset RequestedAtUtc,
+    DateTimeOffset? AcceptedAtUtc,
+    DateTimeOffset? LastRecoveryAtUtc);
+
+public sealed record PublicSignalJourneyReceiptViewModel(
+    string ReceiptId,
+    string SourceReceiptId,
+    string EventKey,
+    string StatusLabel,
+    string GovernorDecisionRef,
+    string ReleaseProofReceiptId,
+    int RecipientCount,
+    int SentCount,
+    string Summary,
+    bool PublicClaimAllowed,
+    DateTimeOffset RecordedAtUtc);
+
+public sealed record PublicSignalDeliveryOutcomeReceiptViewModel(
+    string ReceiptId,
+    string OutcomeEventId,
+    string Provider,
+    string DispatchReceiptId,
+    string SourceReceiptId,
+    string DeliveryId,
+    string? ProviderMessageId,
+    string RecipientRef,
+    string AddressHash,
+    string IdentityMatchMode,
+    string ProviderState,
+    string StatusLabel,
+    string SuppressionCheck,
+    DateTimeOffset? RetryAtUtc,
+    string Summary,
+    string? Reason,
+    bool PublicClaimAllowed,
+    DateTimeOffset OccurredAtUtc,
+    DateTimeOffset RecordedAtUtc);
+
+public sealed record PublicSignalRecipientThreadViewModel(
+    string RecipientRef,
+    string AddressHash,
+    string SourceReceiptId,
+    string SourceLabel,
+    string CurrentStageLabel,
+    string Summary,
+    string QueueReceiptId,
+    string QueueState,
+    string QueueStatusLabel,
+    DateTimeOffset QueueRecordedAtUtc,
+    string DispatchReceiptId,
+    string DispatchState,
+    string DispatchStatusLabel,
+    DateTimeOffset DispatchRequestedAtUtc,
+    string? OutcomeReceiptId,
+    string? OutcomeStatusLabel,
+    string? OutcomeProvider,
+    string? OutcomeProviderState,
+    string? OutcomeIdentityMatchMode,
+    DateTimeOffset? OutcomeRecordedAtUtc,
+    string? JourneyReceiptId,
+    string? JourneyStatusLabel,
+    string? JourneyEventKey,
+    DateTimeOffset? JourneyRecordedAtUtc,
+    DateTimeOffset LastTouchedAtUtc,
+    bool PublicClaimAllowed);
+
+public sealed record PublicSignalReconcileRunReceiptViewModel(
+    string RunReceiptId,
+    string Status,
+    int CandidateReceiptCount,
+    int ReadyCandidateCount,
+    int ReplayCandidateCount,
+    int DispatchReceiptsCreated,
+    int JourneyReceiptsRecorded,
+    string Summary,
+    DateTimeOffset RecordedAtUtc);
+
+public sealed record PublicSignalOperationsPacketViewModel(
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    string HostedDomainLabel,
+    string HostedProjectionSummary,
+    bool HostedProjectionReady,
+    string WebhookStatusLabel,
+    string WebhookSummary,
+    string VoterCloseoutStatusLabel,
+    string VoterCloseoutSummary,
+    string RecipientProjectionOwner,
+    string FollowSettingsPath,
+    string RecipientProjectionStatusLabel,
+    string RecipientProjectionSummary,
+    string ProjectionSourceRef,
+    int ProjectedRecipientCount,
+    string ConsentStatusLabel,
+    string ConsentSummary,
+    string ConsentSourceRef,
+    string QueueStatusLabel,
+    string QueueSummary,
+    string GovernorStatusLabel,
+    string GovernorSummary,
+    string? GovernorDecisionRef,
+    string ReleaseProofStatusLabel,
+    string ReleaseProofSummary,
+    string ReleaseProofRoute,
+    string? ReleaseProofReceiptId,
+    int ReceiptCount,
+    int CloseoutReceiptCount,
+    DateTimeOffset? LastReceiptAtUtc,
+    int RoutingReceiptCount,
+    int ModerationReceiptCount,
+    int CloseoutDeliveryReceiptCount,
+    int CloseoutDeliveryCandidateCount,
+    int CloseoutQueueReceiptCount,
+    int CloseoutQueueReadyCount,
+    int CloseoutDispatchReceiptCount,
+    int CloseoutDispatchSentCount,
+    int JourneyReceiptCount,
+    int DeliveryOutcomeReceiptCount,
+    int AutomaticRetryPendingCount,
+    DateTimeOffset? LastDeliveryOutcomeAtUtc,
+    int ReplayCandidateCount,
+    int ReconcileRunCount,
+    DateTimeOffset? LastReconcileAtUtc,
+    int DeliveryRecoveryCandidateCount,
+    int SuppressedDispatchCount,
+    int DeliveryRecoveryRunCount,
+    DateTimeOffset? LastDeliveryRecoveryAtUtc,
+    int RetryExpiryCandidateCount,
+    int RetryExpiryRunCount,
+    DateTimeOffset? LastRetryExpiryAtUtc,
+    int CategoryCount,
+    int MisrouteLikelyCount,
+    int PrivacySensitiveCount,
+    IReadOnlyList<PublicSignalHostedRouteViewModel> HostedRoutes,
+    IReadOnlyList<PublicSignalDeliveryOutcomeIngressViewModel> DeliveryOutcomeIngresses,
+    IReadOnlyList<PublicSignalCategoryRoutingViewModel> Categories,
+    IReadOnlyList<PublicSignalWebhookReceiptViewModel> RecentReceipts,
+    IReadOnlyList<PublicSignalRoutingReceiptViewModel> RecentRoutingReceipts,
+    IReadOnlyList<PublicSignalCloseoutDeliveryReceiptViewModel> RecentCloseoutReceipts,
+    IReadOnlyList<PublicSignalCloseoutQueueReceiptViewModel> RecentQueueReceipts,
+    IReadOnlyList<PublicSignalCloseoutDispatchReceiptViewModel> RecentDispatchReceipts,
+    IReadOnlyList<PublicSignalJourneyReceiptViewModel> RecentJourneyReceipts,
+    IReadOnlyList<PublicSignalDeliveryOutcomeReceiptViewModel> RecentDeliveryOutcomes,
+    IReadOnlyList<PublicSignalRecipientThreadViewModel> RecentRecipientThreads,
+    IReadOnlyList<PublicSignalReconcileRunReceiptViewModel> RecentReconcileRuns,
+    IReadOnlyList<PublicSignalReconcileRunReceiptViewModel> RecentRecoveryRuns,
+    IReadOnlyList<PublicSignalReconcileRunReceiptViewModel> RecentRetryExpiryRuns,
+    IReadOnlyList<string> Rules);
+
+public sealed record PublicSignalOperationsDetailViewModel(
+    string DetailKindLabel,
+    string DetailKeyLabel,
+    string DetailKey,
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    string FilterKey,
+    string FilterLabel,
+    bool FilterApplied,
+    string BackHref,
+    string BackLabel,
+    string AggregateArtifactHref,
+    string DetailArtifactHref,
+    string? RelatedHref,
+    string? RelatedLabel,
+    IReadOnlyList<PublicSignalOperationsDetailPivotViewModel> SavedPivots,
+    PublicSignalWebhookReceiptViewModel? SourceReceipt,
+    IReadOnlyList<PublicSignalRoutingReceiptViewModel> RoutingReceipts,
+    IReadOnlyList<PublicSignalCloseoutDeliveryReceiptViewModel> CloseoutReceipts,
+    IReadOnlyList<PublicSignalCloseoutQueueReceiptViewModel> QueueReceipts,
+    IReadOnlyList<PublicSignalRecipientThreadViewModel> RecipientThreads,
+    IReadOnlyList<PublicSignalCloseoutDispatchReceiptViewModel> DispatchReceipts,
+    IReadOnlyList<PublicSignalDeliveryOutcomeReceiptViewModel> DeliveryOutcomes,
+    IReadOnlyList<PublicSignalJourneyReceiptViewModel> JourneyReceipts);
+
+public sealed record PublicSignalOperationsDetailPivotViewModel(
+    string Key,
+    string Label,
+    string Summary,
+    int Count,
+    string Href,
+    string ArtifactHref,
+    bool Current);
+
+public sealed record PublicSignalOperationsDetailPageViewModel(
+    SiteChromeViewModel Chrome,
+    PublicSignalOperationsDetailViewModel Detail);
+
+public sealed record PublicSignalOperationsLookupResultViewModel(
+    string ResultKindLabel,
+    string MatchReason,
+    string KeyLabel,
+    string Key,
+    string Heading,
+    string Summary,
+    string FilterKey,
+    string FilterLabel,
+    string Href,
+    string ArtifactHref,
+    DateTimeOffset LastTouchedAtUtc);
+
+public sealed record PublicSignalOperationsLookupViewModel(
+    string Query,
+    string Scope,
+    string ScopeLabel,
+    bool QueryProvided,
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    int ResultCount,
+    IReadOnlyList<PublicSignalOperationsLookupResultViewModel> Results);
+
+public sealed record PublicSignalOperationsLookupPageViewModel(
+    SiteChromeViewModel Chrome,
+    PublicSignalOperationsLookupViewModel Lookup);
 
 public sealed record FeatureDetailFactViewModel(
     string Label,
@@ -551,8 +928,19 @@ public sealed record PublicCreatorPublicationPageViewModel(
     SiteChromeViewModel Chrome,
     CreatorPublicationProjection Publication,
     string BackHref,
+    string RouteState,
+    PublicRouteReceiptViewModel? RouteReceipt,
+    string? BoundedFailureReason,
+    IReadOnlyList<string> RequiredReceiptRefs,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record PublicRouteReceiptViewModel(
+    string ReceiptId,
+    string PackageId,
+    string MatchedRoute,
+    string MatchMode,
+    string Summary);
 
 public sealed record LeaderboardsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -580,6 +968,26 @@ public sealed record HomePageViewModel(
     SignedInTrustStatusPanelViewModel? SignedInStatus,
     IReadOnlyList<ResolvedPublicCardViewModel> NowRail,
     IReadOnlyList<ResolvedPublicCardViewModel> HorizonRail);
+
+public sealed record ProgramMilestoneSummaryViewModel(
+    string Id,
+    string Title,
+    string WaveLabel,
+    string StatusKey,
+    string StatusLabel,
+    string CasualSummary,
+    string DifficultyLabel,
+    string DifficultySummary,
+    bool Claimed,
+    string ClaimedLabel,
+    string ClaimedSummary,
+    string DependencySummary,
+    IReadOnlyList<ProgramMilestoneDependencyViewModel> Dependencies);
+
+public sealed record ProgramMilestoneDependencyViewModel(
+    string Id,
+    string Title,
+    string StatusLabel);
 
 public sealed record SupportCasePresentationViewModel(
     SupportCaseProjection Case,

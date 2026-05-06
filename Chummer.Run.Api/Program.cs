@@ -45,15 +45,47 @@ builder.Services
     .AddHubCampaignSpineContext()
     .AddHubControlAndSupportContext()
     .AddHubInstallAndOrchestrationAdapters();
+var trustedProxies = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_PROXIES"]);
+var trustedIpNetworks = GetCsvValues(builder.Configuration["CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS"]);
+
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    if (trustedProxies.Length == 0 && trustedIpNetworks.Length == 0)
+    {
+        return;
+    }
+
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
+
+    foreach (var trustedProxy in trustedProxies)
+    {
+        if (IPAddress.TryParse(trustedProxy, out var parsedProxy))
+        {
+            options.KnownProxies.Add(parsedProxy);
+        }
+    }
+
+    foreach (var trustedIpNetwork in trustedIpNetworks)
+    {
+        try
+        {
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(trustedIpNetwork));
+        }
+        catch (FormatException)
+        {
+            // Ignore invalid configured trusted networks.
+        }
+    }
 });
 
 var app = builder.Build();
-app.Services.GetRequiredService<HubGoogleAuthService>().ValidateProductionReadiness();
+var hubGoogleAuth = app.Services.GetRequiredService<HubGoogleAuthService>();
+if (!hubGoogleAuth.IsConfigured())
+{
+    app.Logger.LogWarning("Google OIDC is not configured; Hub will start with Google sign-in surfaces disabled.");
+}
 const string SearchRobotsPolicy = "noindex, nofollow, noarchive, nosnippet, noimageindex";
 
 // Configure the HTTP request pipeline.
@@ -138,4 +170,11 @@ static bool RequiresNoStoreHeaders(PathString path)
 static bool IsLegacyMacReleaseBootstrapArtifactPath(PathString path)
 {
     return path.Equals("/artifacts/mac-codex-release-pipeline/bootstrap.sh", StringComparison.OrdinalIgnoreCase);
+}
+
+static string[] GetCsvValues(string? value)
+{
+    return string.IsNullOrWhiteSpace(value)
+        ? Array.Empty<string>()
+        : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }

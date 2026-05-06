@@ -413,7 +413,7 @@ public sealed class IdentityEmailDeliveryService : IIdentityEmailDeliveryService
         var fromEmail = ResolveFromEmail();
         if (string.IsNullOrWhiteSpace(fromEmail))
         {
-            fromEmail = "god@chummer.run";
+            fromEmail = "concierge@chummer.run";
         }
 
         return new IdentityEmailMessage(
@@ -642,7 +642,7 @@ If you did not request this, you can ignore this email.
             sanitized = Guid.NewGuid().ToString("N");
         }
 
-        return $"email:magic_link:{sanitized[..Math.Min(sanitized.Length, 220)]}";
+        return $"email_magic_link_{sanitized[..Math.Min(sanitized.Length, 220)]}";
     }
 
     private static string? ExtractProviderMessageId(string responseBody)

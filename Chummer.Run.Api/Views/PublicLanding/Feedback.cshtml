@@ -1,0 +1,368 @@
+@model ParticipatePageViewModel
+@{
+    ViewData["Title"] = "Feedback";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-participate";
+    var codexHref = Model.Chrome.Authenticated
+        ? "/participate/codex"
+        : "/auth/google/start?next=%2Fparticipate%2Fcodex";
+    var signalLoop = Model.SignalLoop;
+    var signalProjection = Model.SignalProjection;
+    var signalOperations = Model.SignalOperations;
+    var followSettingsHref = signalLoop.FollowSettingsHref;
+    var followSettingsLabel = signalLoop.FollowSettingsLabel;
+    var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
+    var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
+    var shippedFollowUp = signalLoop.ShippedFollowUp.Take(3).ToArray();
+    var routeChoices = new[]
+    {
+        new
+        {
+            Badge = "Safe public signal",
+            Title = "Feature request, UX friction, or safe public bug",
+            Summary = "Use this route when the issue can stay public and does not need logs, private campaign detail, install recovery, or account repair.",
+            Href = "#feedback-public-lanes",
+            Label = "Review public signal lanes",
+            Proof = new[] { "Public by default", "Votes inform demand", "No private logs" }
+        },
+        new
+        {
+            Badge = "Projected movement",
+            Title = "Follow direction without treating it as shipped truth",
+            Summary = "Roadmap stays the projection rail. It shows the next likely product movement, not a guarantee that a vote or mention already changed delivery truth.",
+            Href = "/roadmap",
+            Label = "Open roadmap projection",
+            Proof = new[] { "Projection only", "Milestone-backed", "No vote authority" }
+        },
+        new
+        {
+            Badge = "Shipped closeout",
+            Title = "Check shipped proof only after evidence exists",
+            Summary = "When you need to know whether something is really available now, switch to the shipped-closeout rail backed by release, route, guide, or artifact proof.",
+            Href = "/changelog",
+            Label = "Open shipped closeout",
+            Proof = new[] { "Evidence first", "User-available", "Release-linked" }
+        },
+        new
+        {
+            Badge = "Private help",
+            Title = "Installs, crashes, account issues, and private table detail leave this lane",
+            Summary = "Use first-party help when the problem needs logs, recovery, support history, or any private account or campaign detail that should not sit on a public board.",
+            Href = "/contact#support-intake",
+            Label = "Need private help instead?",
+            Proof = new[] { "Support-owned", "Tracked return", "Private by default" }
+        }
+    };
+    var signalStages = new[]
+    {
+        new
+        {
+            Badge = "Signal intake",
+            Title = "Post one safe public signal",
+            Summary = "A public feature request, UX pain point, or safe public bug should enter one visible queue instead of scattering across roadmap comments, support tickets, and social replies.",
+            Proof = "Boundary copy comes first so the route stays public-safe.",
+            Href = "#feedback-public-lanes",
+            Label = "Review the public lanes"
+        },
+        new
+        {
+            Badge = "Governed review",
+            Title = "Route and review before promising anything",
+            Summary = "Votes and comments help show demand, but Chummer-owned triage still decides whether the signal becomes research, milestone work, follow-up, or a public decline with reason.",
+            Proof = "Public signal informs demand; it never becomes product truth by itself.",
+            Href = "/roadmap",
+            Label = "See projected movement"
+        },
+        new
+        {
+            Badge = "Shipped closeout",
+            Title = "Close the loop only after the proof exists",
+            Summary = "A signal is not done because code merged. It is done when release, route, guide, or artifact proof shows that users can actually use the result.",
+            Proof = "Closeout lives on the shipped rail, not hidden in a comment thread.",
+            Href = "/changelog",
+            Label = "Open shipped closeout"
+        },
+        new
+        {
+            Badge = "Escalation",
+            Title = "Leave the public board when the problem is private",
+            Summary = "If the issue needs recovery, logs, support follow-through, or account detail, push it onto the first-party help path early instead of keeping it on a public signal lane.",
+            Proof = "Private help stays first-party even while ProductLift mirroring catches up.",
+            Href = "/help",
+            Label = "Open help"
+        }
+    };
+    var operatingRails = new[]
+    {
+        new
+        {
+            Badge = "Stay public",
+            Title = "Leave one searchable signal instead of scattering the same issue",
+            Summary = "Keep feature requests, safe public bugs, and UX friction on one visible rail so demand is legible before roadmap or release language changes.",
+            Href = "#feedback-public-lanes",
+            Label = "Review public lanes"
+        },
+        new
+        {
+            Badge = "Account value",
+            Title = "Create the account only when tracked follow-up becomes useful",
+            Summary = "Roadmap follows, support history, device continuity, and future install-linked return all get calmer once they can come back to one account rail.",
+            Href = followSettingsHref,
+            Label = Model.Chrome.Authenticated ? "Open account settings" : "Create account for follow-up"
+        },
+        new
+        {
+            Badge = "Private boundary",
+            Title = "Move off the board as soon as the issue stops being public",
+            Summary = "Crashes, logs, account repair, install recovery, and private campaign detail belong on first-party help before they leak into public comments.",
+            Href = "/contact#support-intake",
+            Label = "Open private support"
+        }
+    };
+}
+
+<section class="release-footnote route-anchor-target" id="productlift-feedback">
+    <p class="eyebrow">Feedback</p>
+    <h1 class="page-title">Public ideas, votes, and safe public bugs on one first-party signal rail</h1>
+    <p class="page-copy">This is the first-party Fixer Board while ProductLift mirroring catches up. Use it for safe public signal, then move to roadmap for projected movement, shipped closeout for evidence, or help when the issue is private.</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="#feedback-public-lanes">Review public lanes</a>
+        <a class="button-like button-like--secondary" href="/roadmap">Open roadmap projection</a>
+        <a class="button-like button-like--ghost" href="/changelog">Open shipped closeout</a>
+    </div>
+    <p class="muted-copy">Crashes, install failures, account issues, private campaign details, and logs do not belong here.</p>
+</section>
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
+<section class="status-decision-strip" aria-label="Signal loop snapshot">
+    <article class="status-decision-strip__card">
+        <span class="tag">Milestone pressure</span>
+        <h2>@signalLoop.OpenMilestoneCount open slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") currently sit behind the public loop.</h2>
+        <p>@signalLoop.ClaimedMilestoneCount claimed now. @signalLoop.HighDifficultyMilestoneCount high-coordination slice@(signalLoop.HighDifficultyMilestoneCount == 1 ? string.Empty : "s") still need careful governance before public promises move.</p>
+        <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open milestone ledger</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Projected movement</span>
+        <h2>@signalLoop.RoadmapFollowUpCount named horizon@(signalLoop.RoadmapFollowUpCount == 1 ? string.Empty : "s") already carry the current public direction.</h2>
+        <p>Direction is visible now, but it still stays separate from shipped proof and private support follow-through.</p>
+        <a class="button-like button-like--ghost" href="/roadmap#roadmap-horizons">Browse horizon lanes</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Proof-backed closeout</span>
+        <h2>@signalLoop.ShippedFollowUpCount live proof example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show what honest closeout looks like.</h2>
+        <p>Use the shipped rail when you need evidence that a user can actually reach the result today.</p>
+        <a class="button-like button-like--ghost" href="/changelog">Open shipped closeout</a>
+    </article>
+</section>
+
+@if (signalProjection is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
+}
+
+@if (signalOperations is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicSignalOperationsPacket.cshtml", signalOperations)
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Pick the right lane</p>
+        <h2 class="editorial-title">Public signal, projected direction, shipped proof, and private support should not blur together.</h2>
+        <p class="editorial-copy">The route is calmer when each job has one page and one promise. Feedback is where the public signal starts, not where release truth or private support gets faked.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var choice in routeChoices)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@choice.Badge</span>
+                <h3>@choice.Title</h3>
+                <p>@choice.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in choice.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="workflow-band">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Signal loop</p>
+        <h2 class="editorial-title">A public signal should enter one loop and leave with an evidence-backed closeout.</h2>
+        <p class="editorial-copy">This keeps public product learning visible without pretending that public votes become canon, support truth, or release proof.</p>
+    </div>
+    <div class="workflow-grid">
+        @foreach (var stage in signalStages)
+        {
+            <article class="workflow-card">
+                <div class="workflow-card__copy">
+                    <span class="tag">@stage.Badge</span>
+                    <h3>@stage.Title</h3>
+                    <p>@stage.Summary</p>
+                    <p class="workflow-card__proof">@stage.Proof</p>
+                    <a class="inline-link" href="@stage.Href">@stage.Label</a>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="status-decision-strip" aria-label="Public signal operating rules">
+    @foreach (var rail in operatingRails)
+    {
+        <article class="status-decision-strip__card">
+            <span class="tag">@rail.Badge</span>
+            <h2>@rail.Title</h2>
+            <p>@rail.Summary</p>
+            <a class="button-like button-like--ghost" href="@rail.Href">@rail.Label</a>
+        </article>
+    }
+</section>
+
+<section class="editorial-block editorial-block--lanes" id="feedback-public-lanes">
+    <div class="lane-strip-list">
+        <article class="lane-strip">
+            <div class="lane-strip__copy">
+                <span class="tag">Current public lanes</span>
+                <h2>Safe public signal starts here</h2>
+                <p>These first-party lanes stay visible while hosted ProductLift projection is not yet the production default. The route still makes the public loop real instead of bouncing visitors through alias pages.</p>
+                <div class="compact-rail">
+                    @foreach (var card in Model.PublicLane)
+                    {
+                        var sectionId = card.Action.Href.Contains('#', StringComparison.Ordinal)
+                            ? card.Action.Href[(card.Action.Href.LastIndexOf('#') + 1)..]
+                            : card.Card.Id.Replace('_', '-');
+                        <article class="compact-rail__item" id="@sectionId">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            </div>
+        </article>
+
+        <article class="lane-strip">
+            <div class="lane-strip__copy">
+                <span class="tag">Deeper participation</span>
+                <h2>Signed-in Codex and deeper participation stay optional</h2>
+                <p>Public product signal should work without turning this route into a contributor-only or account-gated page. Signed-in participation remains available when you need the deeper lane.</p>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--secondary" href="@codexHref">@(Model.Chrome.Authenticated ? "Authorize Codex access" : "Sign in for Codex access")</a>
+                    <a class="button-like button-like--ghost" href="/participate">Open broader participation</a>
+                </div>
+                @if (Model.SignedInLane.Count > 0)
+                {
+                    <div class="compact-rail">
+                        @foreach (var card in Model.SignedInLane)
+                        {
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>@card.Card.Title</h3>
+                                    <p>@card.Card.Summary</p>
+                                </div>
+                                <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                            </article>
+                        }
+                    </div>
+                }
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Operating loop</p>
+        <h2 class="editorial-title">One public signal should map to actual milestone pressure, projected direction, and proof-backed closeout.</h2>
+        <p class="editorial-copy">This is the first-party operating seam while hosted ProductLift mirroring is still catching up. Public signal stays visible, but the next step is grounded in the same milestone ledger, roadmap projection, and shipped-proof rails that already carry public truth.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Milestone pressure</span>
+            <h3>What active delivery pressure looks like right now</h3>
+            <p>Signals that survive public intake should run into real delivery slices instead of vague roadmap prose or optimistic comment-thread promises.</p>
+            @if (milestoneFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var milestone in milestoneFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>M@milestone.Id · @milestone.Title</h3>
+                                <p>@milestone.CasualSummary</p>
+                            </div>
+                            <span class="tag">@milestone.StatusLabel · @milestone.DifficultyLabel</span>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/roadmap#roadmap-milestones">Open milestone ledger</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Projected direction</span>
+            <h3>What public movement looks like before anything is called shipped</h3>
+            <p>The next public explanation should land on a named horizon with explicit user pain and a truthful next route, not as a promise buried in feedback replies.</p>
+            @if (roadmapFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var card in roadmapFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse horizon lanes</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Proof-backed closeout</span>
+            <h3>What a real closeout example already looks like</h3>
+            <p>Public signal only closes when a release, route, guide, or artifact lets a user actually reach the result. That proof lives here, not in a vote count.</p>
+            @if (shippedFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var card in shippedFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/changelog">Open shipped closeout</a>
+        </article>
+    </div>
+</section>
+
+<section class="release-footnote">
+    <p class="eyebrow">Account-aware follow-up</p>
+    <h2 class="editorial-title">Create the account when you want signal, installs, support, and roadmap follow-up to return to one place.</h2>
+    <p class="editorial-copy">The public board still works without an account. The account becomes useful once you want device continuity, tracked support return, roadmap follows, and future install linking attached to the same calmer shell.</p>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="@followSettingsHref">@followSettingsLabel</a>
+        <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
+        <a class="cta-link cta-link--ghost" href="/help">Open help</a>
+    </div>
+    <p class="muted-copy">Truth stays split on purpose: <a class="inline-link" href="/feedback">public signal</a>, <a class="inline-link" href="/roadmap">projected movement</a>, <a class="inline-link" href="/changelog">shipped closeout</a>, and <a class="inline-link" href="/help">private follow-up</a>.</p>
+</section>

@@ -516,6 +516,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             context.SupportDigests,
             travelMode,
             nextSafeAction);
+        CampaignAdoptionWorkspaceStateProjection? campaignState = _campaignSpine.GetWorkspaceCampaignState(user, workspaceId, installLinking);
 
         return new CampaignWorkspaceServerPlaneProjection(
             Workspace: BuildWorkspaceSummary(context.Workspace, context.Digest, context.Restore),
@@ -540,6 +541,11 @@ public sealed class CampaignWorkspaceServerPlaneService
             TravelMode: travelMode,
             TravelPrefetches: context.Workspace.TravelPrefetches ?? Array.Empty<TravelPrefetchReceiptProjection>(),
             AftermathPackages: context.Workspace.AftermathPackages ?? Array.Empty<AftermathRecapPackageProjection>(),
+            CampaignAdoption: campaignState?.CampaignAdoption,
+            RunnerGoals: campaignState?.RunnerGoals ?? Array.Empty<RunnerGoalProjection>(),
+            ResolutionReports: campaignState?.ResolutionReports ?? Array.Empty<ResolutionReportApprovalProjection>(),
+            WorldTicks: campaignState?.WorldTicks ?? Array.Empty<WorldTickProjection>(),
+            NewsItems: campaignState?.NewsItems ?? Array.Empty<PlayerSafeNewsItemProjection>(),
             FirstPlayableSession: context.Workspace.FirstPlayableSession,
             CampaignMemory: context.Workspace.CampaignMemory,
             NextSessionCarryForward: context.Workspace.NextSessionCarryForward,
@@ -3731,6 +3737,7 @@ public sealed class CampaignWorkspaceServerPlaneService
             || string.Equals(normalizedKind, "next_session_carry_forward", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "after_action_report", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "resolution_report_draft", StringComparison.OrdinalIgnoreCase)
             || ContainsAnyWordToken(normalizedKind, ContinuityWordTokens)
             || (ContainsAnyWordToken(normalizedKind, CarryForwardWordTokens)
                 && ContainsAnyWordToken(normalizedKind, ForwardWordTokens));
@@ -4785,7 +4792,8 @@ public sealed class CampaignWorkspaceServerPlaneService
         if (string.Equals(normalizedKind, "aftermath", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "downtime", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "downtime_brief", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalizedKind, "after_action_report", StringComparison.OrdinalIgnoreCase))
+            || string.Equals(normalizedKind, "after_action_report", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "resolution_report_draft", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -5337,7 +5345,8 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         if (string.Equals(normalizedKind, "event_control", StringComparison.OrdinalIgnoreCase)
             || string.Equals(normalizedKind, "season_control", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(normalizedKind, "replay_timeline", StringComparison.OrdinalIgnoreCase))
+            || string.Equals(normalizedKind, "replay_timeline", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(normalizedKind, "runboard_state", StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -6487,6 +6496,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             "replay_timeline" => "replay_timeline",
             "after_action_report" => "after_action_report",
             "downtime_brief" => "downtime_brief",
+            "runboard_state" => "runboard_state",
+            "resolution_report_draft" => "resolution_report_draft",
             null => throw new InvalidOperationException("aftermath package kind is required."),
             _ => throw new InvalidOperationException($"Unsupported aftermath package kind: {packageKind}")
         };
@@ -6509,6 +6520,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             "replay_timeline" => $"{runTitle} replay timeline",
             "after_action_report" => $"{runTitle} after-action report",
             "downtime_brief" => $"{workspace.CampaignName} downtime brief",
+            "runboard_state" => $"{runTitle} runboard state",
+            "resolution_report_draft" => $"{runTitle} ResolutionReport draft",
             _ => $"{runTitle} session recap"
         };
     }
@@ -6526,6 +6539,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             "replay_timeline" => $"Generated a replay timeline for {subject} so contested turns, continuity, and consequence carry-forward stay reviewable on the same governed package.",
             "after_action_report" => $"Generated an after-action report for {subject} with {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) carried into the shared return lane.",
             "downtime_brief" => $"Generated a downtime brief for {workspace.CampaignName} so the next session return keeps aftermath, carry-forward obligations, and publication-safe continuity in one packet.",
+            "runboard_state" => $"Generated a runboard state packet for {subject} so active-scene return, open objectives, and the GM-facing turn-ledger handoff stay reviewable on the same governed lane.",
+            "resolution_report_draft" => $"Generated a ResolutionReport draft for {subject} so runboard state, contested-turn follow-through, and next-session continuity stay reviewable without the hub owning engine math.",
             _ => $"Generated a session recap package for {subject} with {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) pinned for safe return and creator follow-through."
         };
     }
@@ -6542,6 +6557,10 @@ public sealed class CampaignWorkspaceServerPlaneService
             : run.Scenes.FirstOrDefault(item => string.Equals(item.SceneId, run.ActiveSceneId, StringComparison.OrdinalIgnoreCase))
               ?? run.Scenes.OrderByDescending(static item => item.UpdatedAtUtc).FirstOrDefault();
         int openObjectiveCount = run?.Objectives.Count(item => !string.Equals(item.Status, "closed", StringComparison.OrdinalIgnoreCase) && !string.Equals(item.Status, "done", StringComparison.OrdinalIgnoreCase)) ?? 0;
+        int consequenceCount = workspace.Consequences?.Count ?? 0;
+        string turnLedgerHandoff = activeScene is null
+            ? $"Turn ledger handoff: no active scene is pinned yet, but {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) remain on the shared return lane."
+            : $"Turn ledger handoff: {activeScene.Title} stays pinned at {activeScene.Revision} with {openObjectiveCount} open objective(s) and {consequenceCount} consequence signal(s) carried forward.";
         return new[]
         {
             $"Package kind: {packageKind}.",
@@ -6550,6 +6569,15 @@ public sealed class CampaignWorkspaceServerPlaneService
             activeScene is null ? "Active scene: no pinned scene." : $"Active scene: {activeScene.Title} ({activeScene.Revision}).",
             $"Open objectives: {openObjectiveCount}.",
             $"Continuity: {workspace.LatestContinuity?.Summary ?? workspace.ReturnSummary}.",
+            packageKind == "runboard_state" || packageKind == "resolution_report_draft"
+                ? turnLedgerHandoff
+                : string.Empty,
+            packageKind == "runboard_state"
+                ? $"Runboard state: {workspace.ActiveSceneSummary ?? workspace.ReturnSummary}"
+                : string.Empty,
+            packageKind == "resolution_report_draft"
+                ? "ResolutionReport draft posture: contested-turn follow-through stays draft-scoped on the shared continuity lane until an approved report supersedes it."
+                : string.Empty,
             packageKind == "replay_timeline"
                 ? "Replay posture: governed contested-turn review stays attached to the same campaign return lane."
                 : string.Empty,

@@ -13,6 +13,56 @@ NATIVE_SUPPORT_ROUTE = "/api/v1/install-linking/continuation/support"
 
 
 class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
+    def test_materialized_m102_proof_includes_desktop_client_readiness_snapshot_and_bounded_routes_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+
+        readiness = proof.get("desktop_client_readiness")
+        self.assertIsInstance(readiness, dict)
+        self.assertIn(readiness.get("status"), {"pass", "fail", "unknown"})
+        self.assertEqual(
+            readiness.get("desktop_client_missing"),
+            "desktop_client" in set(readiness.get("missing_coverage_keys", [])),
+        )
+        self.assertTrue(str(readiness.get("reason") or "").strip())
+
+        receipts = {
+            receipt.get("receipt_id"): receipt
+            for receipt in proof["proof_receipts"]
+            if receipt.get("package_id") == "next90-m102-hub-desktop-native-trust"
+        }
+        self.assertIn("desktop_client_readiness:bounded_routes", receipts)
+        self.assertIn("/downloads", receipts["desktop_client_readiness:bounded_routes"]["routes"])
+        self.assertIn("/status", receipts["desktop_client_readiness:bounded_routes"]["routes"])
+        self.assertIn("/artifacts", receipts["desktop_client_readiness:bounded_routes"]["routes"])
+        self.assertIn("/artifacts/publications/{publicationId}", receipts["desktop_client_readiness:bounded_routes"]["routes"])
+        self.assertIn(
+            "desktop_client_readiness:bounded_routes",
+            receipts["desktop_client_readiness:bounded_routes"]["surfaces"],
+        )
+        self.assertIn(
+            "public_proof_shelf:release_bundles",
+            receipts["desktop_client_readiness:bounded_routes"]["surfaces"],
+        )
+
     def test_materialized_m102_proof_includes_native_support_route(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
@@ -232,7 +282,8 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
         package = proof["successor_queue_packages_by_id"]["next90-m117-hub-artifact-shelf-v2"]
         self.assertEqual(117, package["milestone_id"])
         self.assertEqual("117.1", package["work_task_id"])
-        self.assertEqual("in_progress", package["status"])
+        self.assertEqual("complete", package["status"])
+        self.assertEqual("verify_closed_package_only", package["completion_action"])
         self.assertEqual(["artifact_shelf:v2", "artifact_audience_filters"], package["owned_surfaces"])
 
         receipts = {
@@ -254,6 +305,162 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
         self.assertIn("artifact_view:campaign", receipts["artifact_audience_filters"]["surfaces"])
         self.assertIn("artifact_view:creator", receipts["artifact_audience_filters"]["surfaces"])
         self.assertIn("artifact_view:public", receipts["artifact_audience_filters"]["surfaces"])
+        self.assertIn("creator, or public", receipts["artifact_audience_filters"]["summary"])
+
+    def test_materialized_m119_proof_includes_first_session_onboarding_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+
+        package = proof["successor_queue_packages_by_id"]["next90-m119-hub-first-session-onboarding"]
+        self.assertEqual("119.1", package["work_task_id"])
+        self.assertEqual(119, package["milestone_id"])
+        self.assertEqual(1130567614, package["frontier_id"])
+        self.assertEqual("complete", package["status"])
+        self.assertEqual("TO_BE_FILLED_M119_COMMIT", package["landed_commit"])
+        self.assertEqual("verify_closed_package_only", package["completion_action"])
+        self.assertEqual(["first_playable_session:onboarding", "starter_lane:hub"], package["owned_surfaces"])
+        self.assertIn("guided first-playable-session onboarding is complete", package["do_not_reopen_reason"])
+        self.assertIn("python3 scripts/verify_next90_m119_hub_first_session_onboarding.py", package["proof"])
+
+        receipts = {
+            receipt.get("receipt_id"): receipt
+            for receipt in proof["proof_receipts"]
+            if receipt.get("package_id") == "next90-m119-hub-first-session-onboarding"
+        }
+        self.assertIn("first_playable_session:onboarding", receipts)
+        self.assertIn("starter_lane:hub", receipts)
+        self.assertIn("/api/v1/campaign-spine/me/workspaces/starter", receipts["first_playable_session:onboarding"]["routes"])
+        self.assertIn("/home/work", receipts["first_playable_session:onboarding"]["routes"])
+        self.assertIn("campaign_onboarding", receipts["first_playable_session:onboarding"]["surfaces"])
+        self.assertIn("/home/work", receipts["starter_lane:hub"]["routes"])
+        self.assertIn("/account/work", receipts["starter_lane:hub"]["routes"])
+        self.assertIn("/contact", receipts["starter_lane:hub"]["routes"])
+        self.assertIn("starter_build:follow_through", receipts["starter_lane:hub"]["surfaces"])
+
+    def test_materialized_m120_proof_includes_public_launch_health_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+
+        package = proof["successor_queue_packages_by_id"]["next90-m120-hub-public-launch-health"]
+        self.assertEqual("120.1", package["work_task_id"])
+        self.assertEqual(120, package["milestone_id"])
+        self.assertEqual(4442751895, package["frontier_id"])
+        self.assertEqual("complete", package["status"])
+        self.assertEqual("verify_closed_package_only", package["completion_action"])
+        self.assertEqual("TO_BE_FILLED_M120_COMMIT", package["landed_commit"])
+        self.assertIn("public trust and launch-health publication package is complete", package["do_not_reopen_reason"])
+        self.assertEqual(
+            "Publish public trust, status, release, and proof-shelf surfaces from registry and governor truth.",
+            package["title"],
+        )
+        self.assertEqual(["public_trust_surface:v3", "launch_health:public"], package["owned_surfaces"])
+
+        public_trust_surface = proof["publicTrustSurface"]
+        self.assertEqual("/status", public_trust_surface["statusRoute"])
+        self.assertEqual("/api/public/weekly-pulse", public_trust_surface["weeklyPulseRoute"])
+        self.assertEqual("/api/public/progress-poster.svg", public_trust_surface["progressPosterRoute"])
+        self.assertEqual(
+            ["Live", "Preview", "Fallback", "Revoked", "Fixed", "Blocked", "Proof freshness", "Support pulse", "Adoption health"],
+            public_trust_surface["launchHealthLabels"],
+        )
+
+        receipts = {
+            receipt.get("receipt_id"): receipt
+            for receipt in proof["proof_receipts"]
+            if receipt.get("package_id") == "next90-m120-hub-public-launch-health"
+        }
+        self.assertIn("public_trust_surface:v3", receipts)
+        self.assertIn("launch_health:public", receipts)
+
+    def test_materialized_m141_proof_includes_import_route_review_required_receipt(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+
+        package = proof["successor_queue_packages_by_id"][
+            "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the"
+        ]
+        self.assertEqual("141.3", package["work_task_id"])
+        self.assertEqual(141, package["milestone_id"])
+        self.assertEqual(4062147200, package["frontier_id"])
+        self.assertEqual("complete", package["status"])
+        self.assertEqual("verify_closed_package_only", package["completion_action"])
+        self.assertEqual(
+            ["keep_route_support_and_publication_surfaces_from_claimin:hub"],
+            package["owned_surfaces"],
+        )
+        self.assertIn("import-route review-required guard is complete", package["do_not_reopen_reason"])
+
+        receipts = {
+            receipt.get("receipt_id"): receipt
+            for receipt in proof["proof_receipts"]
+            if receipt.get("package_id")
+            == "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the"
+        }
+        self.assertIn("keep_route_support_and_publication_surfaces_from_claimin:hub", receipts)
+        self.assertIn("/downloads", receipts["keep_route_support_and_publication_surfaces_from_claimin:hub"]["routes"])
+        self.assertIn("/status", receipts["keep_route_support_and_publication_surfaces_from_claimin:hub"]["routes"])
+        self.assertIn(
+            "/artifacts/publications/{publicationId}",
+            receipts["keep_route_support_and_publication_surfaces_from_claimin:hub"]["routes"],
+        )
+        self.assertIn(
+            "artifact_shelf:v2",
+            receipts["keep_route_support_and_publication_surfaces_from_claimin:hub"]["surfaces"],
+        )
 
     def test_materialized_m119_proof_includes_first_session_onboarding_receipts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:

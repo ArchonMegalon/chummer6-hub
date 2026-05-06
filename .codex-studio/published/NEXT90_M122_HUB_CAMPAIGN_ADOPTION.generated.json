@@ -1,0 +1,55 @@
+{
+  "contract_name": "chummer6-hub.next90_m122_hub_campaign_adoption",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m122-hub-implement-campaign-adoption-wizard-state-runner-goal-per",
+    "work_task_id": "122.1",
+    "title": "Implement campaign adoption wizard state, runner-goal persistence, ResolutionReport approval, and first WorldTick/news item flow.",
+    "task": "Implement campaign adoption wizard state, runner-goal persistence, ResolutionReport approval, and first WorldTick/news item flow.",
+    "frontier_id": 1630681972,
+    "milestone_id": 122,
+    "wave": "W15",
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "implement_campaign_adoption_wizard_state:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "surfaces_passed": [
+    "implement_campaign_adoption_wizard_state:hub",
+    "runner_goal_persistence:hub",
+    "resolution_report_approval_world_tick_news:hub"
+  ],
+  "missing_markers": {},
+  "required_markers": {
+    "implement_campaign_adoption_wizard_state:hub": [
+      "var adoptionResult = await campaignSpineController.RecordMyCampaignAdoption(",
+      "new CampaignAdoptionWizardRequest(",
+      "Assert(refreshedWorkspaceServerPlanePayload?.CampaignAdoption is not null, \"campaign spine server plane api should project campaign-adoption receipts after adoption.\");",
+      "Assert(string.Equals(refreshedWorkspaceServerPlanePayload?.CampaignAdoption?.Status, \"playable_with_review\", StringComparison.Ordinal), \"campaign spine server plane api should keep the current adoption status on the shared server-plane rail.\");"
+    ],
+    "runner_goal_persistence:hub": [
+      "var runnerGoalResult = await campaignSpineController.UpsertMyRunnerGoal(",
+      "new RunnerGoalUpsertRequest(",
+      "Assert(string.Equals(runnerGoalPayload!.UpdateKind, \"downtime_reward\", StringComparison.Ordinal), \"campaign spine runner-goal api should preserve the normalized update kind.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"runner_goal\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should add runner-goal receipts into the bounded what-changed packet rail.\");"
+    ],
+    "resolution_report_approval_world_tick_news:hub": [
+      "var resolutionApprovalResult = await campaignSpineController.ApproveMyResolutionReport(",
+      "new ResolutionReportApprovalRequest(",
+      "Assert(resolutionApprovalPayload.EvidenceLines.Any(item => item.Contains(\"WorldTick receipt:\", StringComparison.OrdinalIgnoreCase)), \"campaign spine resolution-report approval api should persist the generated WorldTick receipt id.\");",
+      "Assert(resolutionApprovalPayload.EvidenceLines.Any(item => item.Contains(\"Player-safe news item:\", StringComparison.OrdinalIgnoreCase)), \"campaign spine resolution-report approval api should persist the generated news-item receipt id.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"resolution_report_approval\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should add approved ResolutionReport receipts into the bounded what-changed packet rail.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"world_tick\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should add WorldTick receipts into the bounded what-changed packet rail.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"news_item\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should add player-safe news items into the bounded what-changed packet rail.\");"
+    ]
+  },
+  "generated_at": "2026-05-06T05:18:45Z"
+}

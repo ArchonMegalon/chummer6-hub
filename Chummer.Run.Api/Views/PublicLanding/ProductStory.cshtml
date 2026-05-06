@@ -25,7 +25,7 @@
     <div class="story-cinematic__copy">
         <p class="eyebrow">Product</p>
         <h1 class="page-title">One place for builds, explanations, and campaign return.</h1>
-        <p class="page-copy">Chummer helps you build a runner, understand the decisions, and return to a campaign without losing context.</p>
+        <p class="page-copy">Chummer helps you build a runner, understand the decisions, and return to a campaign without losing context, device state, or the thread behind the last ruling.</p>
     </div>
     @if (leadAsset is not null)
     {
@@ -33,6 +33,24 @@
             @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", leadAsset)
         </div>
     }
+</section>
+
+<section class="story-pain-grid">
+    <article class="story-pain-grid__card">
+        <span class="tag">Mystery math is expensive</span>
+        <h2>Rules trust should be visible where the answer lands.</h2>
+        <p>Chummer matters when the table no longer has to choose between speed and inspectability. The answer, the current build, and the explanation trail stay on the same rail.</p>
+    </article>
+    <article class="story-pain-grid__card">
+        <span class="tag">Campaign return should not depend on memory</span>
+        <h2>Continuity needs to survive the next device, gap, and reconnect.</h2>
+        <p>The product is moving toward a real campaign operating system, so return, recovery, and install follow-through stop feeling like separate chores outside the actual game flow.</p>
+    </article>
+    <article class="story-pain-grid__card">
+        <span class="tag">Account value starts small and useful</span>
+        <h2>Create the account when you want calmer continuity.</h2>
+        <p>Linked installs, support history, devices and access, and future follow-up are the immediate value. The binary stays the same for everyone.</p>
+    </article>
 </section>
 
 <section class="role-matrix">
@@ -72,11 +90,6 @@
         Need help instead? <a class="inline-link" href="/help">Open the help hub</a>.
     </p>
 </section>
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
 
 @if (Model.TrustPulse is not null)
 {

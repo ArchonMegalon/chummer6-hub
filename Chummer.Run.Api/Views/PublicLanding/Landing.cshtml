@@ -33,8 +33,22 @@
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
+    var startHereSection = Section("start_here");
+    var trustSection = Section("why_trust_it");
+    var laneSection = Section("choose_your_lane");
     var worksNowSection = Section("whats_real_now");
     var closingSection = Section("closing_cta");
+    var starterWorkflowCards = Model.Workflows.Take(3).ToArray();
+    var trustPillarCards = Model.TrustPillars.Take(3).ToArray();
+    var laneCards = Model.Lanes.Take(3).ToArray();
+    var futurePreviewCards = Model.ComingNext.Take(3).ToArray();
+    var installRailSummary = Model.Chrome.Authenticated
+        ? "Your signed-in route keeps linked installs, device return, and support follow-through on one calmer rail."
+        : "The build stays the same for everyone. The account-aware piece is the install handoff, device continuity, and support history.";
+    var installRailPrimaryLabel = Model.Chrome.Authenticated ? "Open home" : "Create account and install";
+    var installRailPrimaryHref = Model.Chrome.Authenticated ? "/home" : contextualHeroPrimaryHref;
+    var installRailSecondaryLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
+    var installRailSecondaryHref = Model.Chrome.Authenticated ? "/account/access" : "/login?next=/home";
 
     PublicLandingSectionDto Section(string id)
         => sectionsById.TryGetValue(id, out var section)
@@ -62,6 +76,25 @@
         string label,
         string fallback)
         => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
+
+    static string FeatureCardNarrative(PublicFeatureCardDto card)
+        => !string.IsNullOrWhiteSpace(card.Payoff)
+            ? card.Payoff!
+            : !string.IsNullOrWhiteSpace(card.ProofNote)
+                ? card.ProofNote!
+                : card.Summary;
+
+    static string FeatureCardActionLabel(PublicFeatureCardDto card, string fallback)
+        => !string.IsNullOrWhiteSpace(card.ActionLabel)
+            ? card.ActionLabel!
+            : fallback;
+
+    static string ResolvedCardNarrative(ResolvedPublicCardViewModel card)
+        => !string.IsNullOrWhiteSpace(card.Card.Payoff)
+            ? card.Card.Payoff!
+            : !string.IsNullOrWhiteSpace(card.Card.ProofNote)
+                ? card.Card.ProofNote!
+                : card.Card.Summary;
 }
 
 <section class="launch-hero">
@@ -73,6 +106,35 @@
             <div class="launch-hero__actions">
                 <a class="button-like button-like--primary" href="@contextualHeroPrimaryHref">@Model.PrimaryHeroAction.Label</a>
                 <a class="button-like button-like--secondary" href="@Model.SecondaryHeroAction.Href">@Model.SecondaryHeroAction.Label</a>
+            </div>
+            <div class="hero-installrail" aria-label="Recommended install path">
+                <div class="hero-installrail__lead">
+                    <span class="tag tag--amber">Recommended path</span>
+                    <strong>Account-aware install handoff</strong>
+                    <p>@installRailSummary</p>
+                </div>
+                <div class="hero-installrail__facts">
+                    <div class="hero-installrail__fact">
+                        <span>Platform</span>
+                        <strong>@(release.Recommended?.PlatformLabel ?? "Current preview build")</strong>
+                    </div>
+                    <div class="hero-installrail__fact">
+                        <span>Channel</span>
+                        <strong>@release.Display.ChannelLabel</strong>
+                    </div>
+                    <div class="hero-installrail__fact">
+                        <span>Build</span>
+                        <strong>@release.Display.BuildLabel</strong>
+                    </div>
+                    <div class="hero-installrail__fact">
+                        <span>First launch</span>
+                        <strong>Use as guest or link this copy later</strong>
+                    </div>
+                </div>
+                <div class="hero-installrail__actions">
+                    <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
+                    <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
+                </div>
             </div>
             <div class="proof-chip-row" aria-label="Highlights">
                 @foreach (var chip in Model.Surface.SecondaryHighlights)
@@ -184,6 +246,163 @@
     <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open what works today</a>.</p>
 </section>
 
+@if (starterWorkflowCards.Length > 0)
+{
+    <section class="workflow-band">
+        <div class="workflow-band__lead">
+            <p class="eyebrow">@startHereSection.Eyebrow</p>
+            <h2 class="editorial-title">@startHereSection.Title</h2>
+            <p class="editorial-copy">@startHereSection.Intro</p>
+        </div>
+        <div class="workflow-grid">
+            @foreach (var card in starterWorkflowCards)
+            {
+                <article class="workflow-card" id="@card.Card.Id.Replace('_', '-')">
+                    @if (card.Asset is not null)
+                    {
+                        <div class="workflow-card__media">
+                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
+                        </div>
+                    }
+                    <div class="workflow-card__copy">
+                        <span class="tag">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
+                        <h3>@card.Card.Title</h3>
+                        <p>@ResolvedCardNarrative(card)</p>
+                        @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
+                        {
+                            <p class="workflow-card__proof">@card.Card.ProofNote</p>
+                        }
+                        <a class="inline-link" href="@ContextualPreviewHref(card.Action.Href)">@card.Action.Label</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (trustPillarCards.Length > 0)
+{
+    <section class="trust-claims">
+        <div class="trust-claims__lead">
+            <p class="eyebrow">@trustSection.Eyebrow</p>
+            <h2 class="editorial-title">@trustSection.Title</h2>
+            <p class="editorial-copy">@trustSection.Intro</p>
+        </div>
+        <div class="trust-claims__grid">
+            @foreach (var pillar in trustPillarCards)
+            {
+                <article class="trust-claim" id="@pillar.Id.Replace('_', '-')">
+                    <span class="tag">@PublicSurfaceStatus.AudienceLabel(pillar.Audience)</span>
+                    <h3>@pillar.Title</h3>
+                    <p>@FeatureCardNarrative(pillar)</p>
+                    <div class="trust-claim__microproof">
+                        @if (!string.IsNullOrWhiteSpace(pillar.MicroProof))
+                        {
+                            <span>@pillar.MicroProof</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(pillar.ProofNote))
+                        {
+                            <span>@pillar.ProofNote</span>
+                        }
+                        <span>@PublicSurfaceStatus.DisplayLabel(pillar.Badge)</span>
+                    </div>
+                    <a class="inline-link" href="@ContextualPreviewHref(pillar.GuestHref ?? pillar.Href)">@FeatureCardActionLabel(pillar, "Inspect the current proof")</a>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (laneCards.Length > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">@laneSection.Eyebrow</p>
+            <h2 class="editorial-title">@laneSection.Title</h2>
+            <p class="editorial-copy">@laneSection.Intro</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var lane in laneCards)
+            {
+                <article class="route-choice-card" id="@lane.Card.Id.Replace('_', '-')">
+                    <span class="tag">@PublicSurfaceStatus.AudienceLabel(lane.Card.Audience)</span>
+                    <h3>@lane.Card.Title</h3>
+                    <p>@ResolvedCardNarrative(lane)</p>
+                    <div class="route-choice-card__proof">
+                        <span>@PublicSurfaceStatus.DisplayLabel(lane.Card.Badge)</span>
+                        @if (!string.IsNullOrWhiteSpace(lane.Card.ProofNote))
+                        {
+                            <span>@lane.Card.ProofNote</span>
+                        }
+                        <span>@lane.Action.Label</span>
+                    </div>
+                    <a class="editorial-strip__action" href="@ContextualPreviewHref(lane.Action.Href)">@lane.Action.Label</a>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+<section class="continuity-band">
+    <div class="continuity-band__copy">
+        <p class="eyebrow">Why create an account</p>
+        <h2 class="editorial-title">Keep installs, devices, and support on one return path.</h2>
+        <p class="editorial-copy">Account value starts at continuity, not bureaucracy. Chummer keeps the same binary for everyone, then adds claim, relink, recovery, and tracked follow-through only when you want them.</p>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
+            <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
+        </div>
+    </div>
+    <div class="continuity-band__panel">
+        <article class="continuity-band__fact">
+            <span>Binary</span>
+            <strong>The same build for everyone</strong>
+            <p>Account-aware handoff does not turn the installer into a private per-user binary.</p>
+        </article>
+        <article class="continuity-band__fact">
+            <span>First launch</span>
+            <strong>Guest or linked, on the device</strong>
+            <p>Keep the first-run choice inside Chummer: use this copy as guest or link it to your account.</p>
+        </article>
+        <article class="continuity-band__fact">
+            <span>Devices and access</span>
+            <strong>Relink and recovery stay calm</strong>
+            <p>Return to Devices and access when a claimed install needs relink, reclaim, or recovery after the app does the real work.</p>
+        </article>
+        <article class="continuity-band__fact">
+            <span>Support follow-through</span>
+            <strong>Cases stay attached to the install story</strong>
+            <p>Support history, fix notices, and roadmap follow-up stay on the same account rail instead of becoming separate detective work.</p>
+        </article>
+    </div>
+</section>
+
+@if (futurePreviewCards.Length > 0)
+{
+    <section class="future-strip">
+        <div class="future-strip__lead">
+            <p class="eyebrow">Preparing next</p>
+            <h2 class="editorial-title">The next public unlocks already have names, pressure, and seams.</h2>
+            <p class="editorial-copy">Chummer should feel ambitious without bluffing. These lanes stay visible because they explain where the campaign OS is heading and which pain each slice is trying to remove.</p>
+        </div>
+        <div class="future-strip__grid">
+            @foreach (var card in futurePreviewCards)
+            {
+                <article class="future-strip__card" id="@card.Card.Id.Replace('_', '-')">
+                    <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
+                    <h3>@card.Card.Title</h3>
+                    <p>@ResolvedCardNarrative(card)</p>
+                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
+                    {
+                        <p class="future-strip__proof">@card.Card.ProofNote</p>
+                    }
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                </article>
+            }
+        </div>
+    </section>
+}
+
 @if (Model.TrustPulse is not null)
 {
     <section class="release-shelf" aria-label="Current trust and first-session return">
@@ -197,8 +416,6 @@
 
 @if (Model.SignedInStatus is not null)
 {
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-
     <section class="release-shelf" aria-label="First-session return">
         <article class="app-action-card">
             <span class="tag">Return rail</span>

@@ -107,6 +107,24 @@ public sealed class PublicTrustPulseServiceTests
         Assert.Equal(6, snapshot.ProvenRouteCount);
     }
 
+    [Fact]
+    public void LoadSnapshotFailsClosedWhenDesktopClientCoverageIsMissing()
+    {
+        using var fixture = new PublicTrustPulseFixture();
+        fixture.WritePulseWithSynthesizedSignals("chummer.weekly_product_pulse");
+        fixture.WriteFlagshipReadiness(status: "fail", missingCoverageKeys: ["desktop_client"]);
+
+        var snapshot = fixture.CreateService().LoadSnapshot();
+
+        Assert.NotNull(snapshot);
+        Assert.True(snapshot!.MissingDesktopClientCoverage);
+        Assert.Equal("fail", snapshot.FlagshipReadinessStatus);
+        Assert.Equal("review_required", snapshot.LocalReleaseProofStatus);
+        Assert.Contains("desktop_client", snapshot.FlagshipReadinessReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("public routes and support surfaces", snapshot.LaunchReadiness, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("review-required", snapshot.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class PublicTrustPulseFixture : IDisposable
     {
         private readonly string _root;
@@ -131,7 +149,8 @@ public sealed class PublicTrustPulseServiceTests
                     ["CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT"] = _fleetArtifactsRoot,
                     ["CHUMMER_PUBLIC_PROGRESS_REPORT_FILE"] = Path.Combine(_canonRoot, ".codex-design", "product", "PROGRESS_REPORT.generated.json"),
                     ["CHUMMER_PUBLIC_PROGRESS_HISTORY_FILE"] = Path.Combine(_canonRoot, ".codex-design", "product", "PROGRESS_HISTORY.generated.json"),
-                    ["CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE"] = Path.Combine(_canonRoot, ".codex-studio", "published", "HUB_LOCAL_RELEASE_PROOF.generated.json")
+                    ["CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE"] = Path.Combine(_canonRoot, ".codex-studio", "published", "HUB_LOCAL_RELEASE_PROOF.generated.json"),
+                    ["CHUMMER_PUBLIC_FLAGSHIP_READINESS_FILE"] = Path.Combine(_fleetArtifactsRoot, "FLAGSHIP_PRODUCT_READINESS.generated.json")
                 })
                 .Build();
 
@@ -285,6 +304,28 @@ public sealed class PublicTrustPulseServiceTests
                             ["as_of"] = "2026-03-29",
                             ["overall_progress_percent"] = 100
                     }
+                    }
+                }));
+        }
+
+        public void WriteFlagshipReadiness(string status, IReadOnlyList<string> missingCoverageKeys)
+        {
+            Directory.CreateDirectory(_fleetArtifactsRoot);
+            File.WriteAllText(
+                Path.Combine(_fleetArtifactsRoot, "FLAGSHIP_PRODUCT_READINESS.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "fleet.flagship_product_readiness",
+                    ["status"] = status,
+                    ["completion_audit"] = new Dictionary<string, object?>
+                    {
+                        ["reason"] = "Flagship product readiness planes are not green."
+                    },
+                    ["flagship_readiness_audit"] = new Dictionary<string, object?>
+                    {
+                        ["reason"] = "flagship product readiness proof is not green: missing coverage: desktop_client",
+                        ["missing_coverage_keys"] = missingCoverageKeys,
+                        ["scoped_missing_coverage_keys"] = missingCoverageKeys
                     }
                 }));
         }

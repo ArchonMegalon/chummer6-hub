@@ -1,0 +1,241 @@
+@model NowPageViewModel
+@{
+    ViewData["Title"] = "Changelog";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-now";
+    var signalLoop = Model.SignalLoop;
+    var signalProjection = Model.SignalProjection;
+    var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
+    var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
+    var shippedProof = Model.ProofModules.ToArray();
+    var shippedNow = Model.AvailableToday.Take(4).ToArray();
+    var stillCaution = Model.Inspectable.Take(4).ToArray();
+    var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
+
+    string ContextualPreviewHref(string? href)
+    {
+        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
+        if (guestNeedsInstallGate && string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase))
+        {
+            return Model.ReleaseExperience.GuestGatePrimaryHref ?? resolvedHref;
+        }
+
+        return resolvedHref;
+    }
+}
+
+<section class="evidence-header route-anchor-target" id="productlift-shipped-closeout">
+    <div class="page-lead">
+        <p class="eyebrow">Changelog</p>
+        <h1 class="page-title">Shipped closeout with user-available proof</h1>
+        <p class="page-copy">This is the first-party shipped-closeout rail while ProductLift projection catches up. Shipped means a user can actually reach the result through a release, route, guide, or artifact proof trail.</p>
+    </div>
+    <div class="evidence-header__stats">
+        <div>
+            <span class="evidence-header__label">Current build</span>
+            <strong>@Model.ReleaseExperience.Display.BuildLabel</strong>
+        </div>
+        <div>
+            <span class="evidence-header__label">Channel</span>
+            <strong>@Model.ReleaseExperience.Display.ChannelLabel</strong>
+        </div>
+        <div>
+            <span class="evidence-header__label">Published</span>
+            <strong>@Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd")</strong>
+        </div>
+    </div>
+</section>
+
+<section class="status-decision-strip" aria-label="Shipped closeout rules">
+    <article class="status-decision-strip__card">
+        <span class="tag">Evidence first</span>
+        <h2>Shipped only counts when a user-facing proof trail exists.</h2>
+        <p>Release notes, live routes, artifacts, or guides need to carry the change before this rail should treat it as closed out.</p>
+        <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Install path</span>
+        <h2>Closeout still has to land on the current install and recovery rail.</h2>
+        <p>Downloads, update posture, and help stay attached so shipped proof never floats away from the device path that matters.</p>
+        <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag tag--amber">Private follow-up</span>
+        <h2>Support, installs, and account recovery leave the public closeout lane.</h2>
+        <p>When the issue needs logs, private account detail, or tracked support history, switch to first-party help instead of treating this rail like a ticket queue.</p>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
+    </article>
+</section>
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
+@if (signalProjection is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Loop return</p>
+        <h2 class="editorial-title">Closeout is strongest when it feeds back into the same public loop that created the demand.</h2>
+        <p class="editorial-copy">This route is not only a release diary. It is the evidence-backed return path that should clarify what pressure remains active, what movement is next, and where account-aware follow-up stays attached.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Pressure still open</span>
+            <h3>@signalLoop.OpenMilestoneCount open milestone slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") still sit behind the next round of public closeout.</h3>
+            <p>Shipped proof should make the remaining pressure clearer, not pretend the planning queue is empty.</p>
+            @if (milestoneFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var milestone in milestoneFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>M@milestone.Id · @milestone.Title</h3>
+                                <p>@milestone.CasualSummary</p>
+                            </div>
+                            <span class="tag">@milestone.StatusLabel</span>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/roadmap#roadmap-milestones">Open milestone ledger</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Next movement</span>
+            <h3>@signalLoop.RoadmapFollowUpCount named horizon@(signalLoop.RoadmapFollowUpCount == 1 ? string.Empty : "s") already frame what the next public movement is likely to be.</h3>
+            <p>Use the roadmap rail when you need to compare this shipped proof against what is still only direction.</p>
+            @if (roadmapFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var card in roadmapFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse horizon lanes</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Tracked return</span>
+            <h3>Use the account rail once you want the closeout, install path, and future follow-up to keep returning to one place.</h3>
+            <p>That keeps shipped proof, support history, and roadmap follows attached to the same calmer shell instead of scattering them across public reading surfaces.</p>
+            <div class="route-choice-card__proof">
+                <span>Support history</span>
+                <span>Roadmap follows</span>
+                <span>Install continuity</span>
+            </div>
+            <a class="editorial-strip__action" href="@signalLoop.FollowSettingsHref">@signalLoop.FollowSettingsLabel</a>
+        </article>
+    </div>
+</section>
+
+<section class="workflow-band">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Shipped proof</p>
+        <h2 class="editorial-title">The current preview already closes out a few real product claims.</h2>
+        <p class="editorial-copy">These are the capabilities that have enough user-facing proof to belong on the shipped rail instead of staying as roadmap language or internal notes.</p>
+    </div>
+    <div class="workflow-grid">
+        @foreach (var card in shippedProof)
+        {
+            <article class="workflow-card">
+                @if (card.Asset is not null)
+                {
+                    <div class="workflow-card__media">
+                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
+                    </div>
+                }
+                <div class="workflow-card__copy">
+                    <span class="tag">@card.Card.Badge</span>
+                    <h3>@card.Card.Title</h3>
+                    <p>@card.Card.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
+                    {
+                        <p class="workflow-card__proof">@card.Card.ProofNote</p>
+                    }
+                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="release-shelf release-shelf--manual">
+    <div class="home-stream">
+        <div class="home-stream__column">
+            <div class="home-stream__lead">
+                <p class="eyebrow">Closed out now</p>
+                <h2 class="home-stream__title">User-available outcomes</h2>
+                <p class="home-stream__summary">These items already have a live route or release-facing trail and belong on the shipped rail.</p>
+            </div>
+            <div class="app-rail">
+                <article class="app-rail__item">
+                    <span class="tag">Current release</span>
+                    <div class="app-rail__copy">
+                        <h3>Release notes and update posture</h3>
+                        <p>@Model.ReleaseExperience.ReleaseNotesSummary <span>Update path: @Model.ReleaseExperience.UpdatePostureSummary</span></p>
+                    </div>
+                    <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
+                </article>
+                @foreach (var card in shippedNow)
+                {
+                    <article class="app-rail__item" id="@card.Card.Id.Replace('_', '-')">
+                        <span class="tag">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
+                        <div class="app-rail__copy">
+                            <h3>@card.Card.Title</h3>
+                            <p>@card.Card.Summary</p>
+                        </div>
+                        <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                    </article>
+                }
+            </div>
+        </div>
+    </div>
+</section>
+
+@if (stillCaution.Length > 0)
+{
+    <section class="release-shelf release-shelf--manual">
+        <details class="release-accordion">
+            <summary>Still under caution or inspection</summary>
+            <div class="release-accordion__body">
+                <div class="evidence-row-list">
+                    @foreach (var card in stillCaution)
+                    {
+                        <article class="evidence-row" id="@card.Card.Id.Replace('_', '-')">
+                            <div class="evidence-row__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <span class="readiness-tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
+                            <a class="button-like button-like--ghost" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            </div>
+        </details>
+    </section>
+}
+
+<section class="release-footnote">
+    <p class="eyebrow">Next step</p>
+    <h2 class="editorial-title">Use the shipped rail to decide, then move to the right operational route.</h2>
+    <p class="editorial-copy">Install from Downloads, inspect direction on Roadmap, or leave the public rail for Help when the issue is private or recovery-bound.</p>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
+        <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
+        <a class="cta-link cta-link--ghost" href="/help">Open help</a>
+    </div>
+    <p class="muted-copy">Need the broader reality check? <a class="inline-link" href="/now">Open what works today</a>.</p>
+</section>

@@ -142,7 +142,7 @@ services:
     ports:
       - "${CHUMMER_PORTAL_PORT:-8091}:8080"
   chummer-run-cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2024.6.1}"
     container_name: chummer-run-cloudflared
     profiles: ["portal"]
     restart: unless-stopped

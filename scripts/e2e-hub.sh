@@ -90,23 +90,6 @@ resolve_hub_proof_base_url() {
 if [[ "$HUB_SKIP_EDGE_REBUILD" == "1" || "$HUB_SKIP_EDGE_REBUILD" == "true" || "$HUB_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current hub edge containers for playwright e2e"
 else
-  compose_rm_log="$(mktemp)"
-  set +e
-  docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
-  compose_rm_status=${PIPESTATUS[0]}
-  set -e
-  if [[ "$compose_rm_status" -ne 0 ]]; then
-    if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_rm_log"; then
-      echo "skipping hub e2e: docker daemon permission denied in this environment."
-      rm -f "$compose_rm_log"
-      exit 0
-    fi
-
-    rm -f "$compose_rm_log"
-    exit "$compose_rm_status"
-  fi
-  rm -f "$compose_rm_log"
-
   compose_up_log="$(mktemp)"
   set +e
   docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"

@@ -89,6 +89,61 @@ PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-fa
 PUBLIC_RELEASE_PROOF_BASE_URL="${CHUMMER_PUBLIC_RELEASE_PROOF_BASE_URL:-https://chummer.run}"
 DISABLED_ARTIFACT_IDS="${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}}"
 
+detect_auto_disabled_artifact_ids() {
+  local files_root="$1"
+  local manifest_path="$2"
+  python3 - "$files_root" "$manifest_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+files_root = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+
+payload: dict[str, object] = {}
+if manifest_path.is_file():
+    try:
+        loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception:
+        loaded = {}
+    if isinstance(loaded, dict):
+        payload = loaded
+
+rows = payload.get("artifacts")
+if not isinstance(rows, list):
+    rows = payload.get("downloads")
+if not isinstance(rows, list):
+    rows = []
+
+disabled_ids: list[str] = []
+for row in rows:
+    if not isinstance(row, dict):
+        continue
+    artifact_id = str(row.get("artifactId") or row.get("id") or "").strip()
+    if not artifact_id:
+        continue
+    kind = str(row.get("kind") or row.get("flavor") or "").strip().lower()
+    if kind != "portable":
+        continue
+    file_name = str(row.get("fileName") or "").strip()
+    if not file_name:
+        file_name = Path(str(row.get("downloadUrl") or row.get("url") or "").strip()).name
+    if not file_name.endswith(".exe") or file_name.endswith("-installer.exe"):
+        continue
+    sibling_zip = files_root / Path(file_name).with_suffix(".zip").name
+    if sibling_zip.is_file():
+        disabled_ids.append(artifact_id)
+
+seen: set[str] = set()
+for artifact_id in disabled_ids:
+    lowered = artifact_id.lower()
+    if lowered in seen:
+        continue
+    seen.add(lowered)
+    print(artifact_id)
+PY
+}
+
 if [[ ! -d "$RUNSERVICES_SOURCE_FILES_ROOT" ]]; then
   echo "run-services source downloads root missing: $RUNSERVICES_SOURCE_FILES_ROOT" >&2
   exit 1
@@ -127,6 +182,16 @@ mkdir -p "$combined_files_root" "$combined_startup_smoke_root" "$generated_root"
 
 cp "$RUNSERVICES_SOURCE_FILES_ROOT"/chummer-* "$combined_files_root"/
 cp "$PRESENTATION_FILES_ROOT"/chummer-* "$combined_files_root"/
+
+AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH" | paste -sd, -)"
+if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then
+  if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
+    DISABLED_ARTIFACT_IDS="$DISABLED_ARTIFACT_IDS,$AUTO_DISABLED_ARTIFACT_IDS"
+  else
+    DISABLED_ARTIFACT_IDS="$AUTO_DISABLED_ARTIFACT_IDS"
+  fi
+  echo "auto-disabled public artifact ids: $AUTO_DISABLED_ARTIFACT_IDS"
+fi
 
 if [[ -d "$PRESENTATION_STARTUP_SMOKE_ROOT" ]]; then
   find "$PRESENTATION_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \

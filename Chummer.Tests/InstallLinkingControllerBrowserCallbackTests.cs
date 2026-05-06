@@ -282,7 +282,8 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
                 InstallLinking,
                 Releases,
                 supportCases: null!,
-                supportPresentation: new SupportCasePresentationService());
+                supportPresentation: new SupportCasePresentationService(),
+                configuration);
 
             if (authenticated)
             {

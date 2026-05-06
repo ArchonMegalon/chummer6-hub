@@ -2,7 +2,6 @@ product: chummer
 surface: desktop_delivery
 version: 1
 flagship_head: Chummer.Avalonia
-fallback_head: Chummer.Blazor.Desktop
 gold_release_head_policy:
   primary_public_route_must_be_unique: true
   independent_flagship_proof_required_for_all_shipped_heads: true
@@ -16,22 +15,6 @@ head_policies:
       - Avalonia clears the full desktop flagship bar for the platform scope it is promoted on.
     fail_conditions:
       - Avalonia is treated as primary but the public shelf silently routes users to another head without explicit bounded fallback wording.
-  - head: Chummer.Blazor.Desktop
-    role: compatibility_fallback_by_default
-    fallback_allowed_when:
-      - Avalonia is also promoted as the primary head for the same lane.
-      - The shelf, install help, and release evidence label Blazor as compatibility or fallback.
-      - The Blazor lane is support-directed, recovery-directed, or parity backfill rather than the public default.
-    must_independently_meet_flagship_when:
-      - Blazor is the only desktop head visible in the lane.
-      - Blazor is the recommended or default public CTA.
-      - Any public release claim depends on Blazor to represent the desktop wave.
-    pass_conditions:
-      - When fallback, Blazor proves a bounded app-launchable shell and the exact workflow families it promises.
-      - When flagship, Blazor passes the same startup, install, update, crash-recovery, feedback, workflow, and visual-familiarity proof as Avalonia for its promised scope.
-    fail_conditions:
-      - Blazor inherits Avalonia proof without proving its own promised scope.
-      - Blazor is presented as fallback while the shelf or matrix treats it as the primary public route.
 platforms:
   - id: windows
     public_shelf_status: promoted_preview

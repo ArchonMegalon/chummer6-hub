@@ -1,0 +1,398 @@
+@using Chummer.Run.Api.Services
+@model RoadmapPageViewModel
+@{
+    ViewData["Title"] = "Roadmap";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-roadmap";
+
+    var milestones = Model.Milestones.ToArray();
+    var claimedMilestones = milestones.Count(static milestone => milestone.Claimed);
+    var openMilestones = milestones.Length - claimedMilestones;
+    var highDifficultyMilestones = milestones.Count(static milestone => string.Equals(milestone.DifficultyLabel, "High", StringComparison.OrdinalIgnoreCase));
+    var signalLoop = Model.SignalLoop;
+    var signalProjection = Model.SignalProjection;
+    var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
+    var shippedFollowUp = signalLoop.ShippedFollowUp.Take(3).ToArray();
+
+    var preparingHorizons = Model.Horizons
+        .Where(item => PublicSurfaceStatus.IsPreparingNext(item.Card.Badge))
+        .ToArray();
+    var designingHorizons = Model.Horizons
+        .Where(item => PublicSurfaceStatus.IsDesigningInPublic(item.Card.Badge))
+        .ToArray();
+    var researchHorizons = Model.Horizons
+        .Where(item => PublicSurfaceStatus.IsResearchTrack(item.Card.Badge))
+        .ToArray();
+    var otherHorizons = Model.Horizons
+        .Where(item =>
+            !PublicSurfaceStatus.IsPreparingNext(item.Card.Badge)
+            && !PublicSurfaceStatus.IsDesigningInPublic(item.Card.Badge)
+            && !PublicSurfaceStatus.IsResearchTrack(item.Card.Badge))
+        .ToArray();
+    var productliftAlias = Context?.Request?.Query["productlift"].ToString() ?? string.Empty;
+    var fromRoadmapAlias = string.Equals(productliftAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
+    var signalLanes = new[]
+    {
+        new
+        {
+            Badge = "Projected direction",
+            Title = "Roadmap stays visible without claiming shipped truth",
+            Summary = "Use this route to see the next likely product lanes, milestone pressure, and public-facing direction. Use live proof before treating any roadmap note as already real today.",
+            Href = "#roadmap-horizons",
+            Label = "Browse horizon lanes",
+            Proof = new[] { "Projection only", "Milestone-backed", "Not shipped truth" }
+        },
+        new
+        {
+            Badge = "Public signal",
+            Title = "Ideas and votes belong on the Fixer Board",
+            Summary = "Public ideas, votes, UX friction, and safe public bugs should enter the product loop on the feedback lane, not inside roadmap prose or support tickets.",
+            Href = "/feedback",
+            Label = "Open Fixer Board",
+            Proof = new[] { "Votes inform demand", "Safe public bugs", "No private logs" }
+        },
+        new
+        {
+            Badge = "Shipped closeout",
+            Title = "Shipped only counts after evidence exists",
+            Summary = "When you need to know whether something actually shipped, leave roadmap and open the shipped-closeout lane backed by release, guide, route, or artifact proof.",
+            Href = "/changelog",
+            Label = "Open shipped closeout",
+            Proof = new[] { "Evidence first", "Release-linked", "User-available" }
+        },
+        new
+        {
+            Badge = "Private help",
+            Title = "Install, account, or campaign-sensitive issues leave this lane",
+            Summary = "Crashes, install recovery, account access, and private campaign details should move to first-party help instead of sitting on the public roadmap or feedback board.",
+            Href = "/contact#support-intake",
+            Label = "Need private help instead?",
+            Proof = new[] { "Support-owned", "Tracked return", "Private by default" }
+        }
+    };
+}
+
+<section class="roadmap-hero route-anchor-target" id="productlift-roadmap-projection">
+    <div class="roadmap-hero__copy">
+        <p class="eyebrow">Roadmap</p>
+        <h1 class="page-title">Milestones and public direction on one route</h1>
+        <p class="page-copy">Horizons explain what Chummer is trying to unlock. Milestones show the active delivery slices, the rough difficulty, what depends on what, and whether a team has already picked the work up.</p>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="#roadmap-milestones">Open milestone ledger</a>
+            <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse horizon lanes</a>
+            <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+        </div>
+    </div>
+    <aside class="roadmap-hero__aside">
+        <p class="roadmap-hero__kicker">How to read this page</p>
+        <ul class="roadmap-hero__notes">
+            <li>Milestones are internal delivery slices, not public promises.</li>
+            <li>Horizons are the public-facing direction and readiness posture.</li>
+            <li>Use the live proof links before treating roadmap language as already shipped.</li>
+        </ul>
+    </aside>
+</section>
+
+<section class="roadmap-stats" aria-label="Roadmap snapshot">
+    <article class="roadmap-stat">
+        <span class="roadmap-stat__label">Open milestones</span>
+        <strong class="roadmap-stat__value">@milestones.Length</strong>
+        <p class="roadmap-stat__summary">Active and upcoming slices still on the board.</p>
+    </article>
+    <article class="roadmap-stat">
+        <span class="roadmap-stat__label">Claimed now</span>
+        <strong class="roadmap-stat__value">@claimedMilestones</strong>
+        <p class="roadmap-stat__summary">Already active, blocked, or showing started task slices.</p>
+    </article>
+    <article class="roadmap-stat">
+        <span class="roadmap-stat__label">Open to claim</span>
+        <strong class="roadmap-stat__value">@openMilestones</strong>
+        <p class="roadmap-stat__summary">Still not started on the tracked milestone ledger.</p>
+    </article>
+    <article class="roadmap-stat">
+        <span class="roadmap-stat__label">High difficulty</span>
+        <strong class="roadmap-stat__value">@highDifficultyMilestones</strong>
+        <p class="roadmap-stat__summary">Multi-owner, multi-dependency work with broader coordination drag.</p>
+    </article>
+</section>
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
+@if (signalProjection is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
+}
+
+<section class="roadmap-frame route-anchor-target" id="roadmap-signal">
+    <div class="roadmap-frame__lead">
+        <p class="eyebrow">Signal and follow-up</p>
+        <h2 class="editorial-title">Public signal, projected direction, shipped proof, and private help stay on different rails.</h2>
+        <p class="editorial-copy">Roadmap should help you understand direction fast. It should not pretend votes decide priorities, shipped means merely merged, or public signal can replace private support.</p>
+        @if (fromRoadmapAlias)
+        {
+            <div class="route-callout" role="status" aria-live="polite">
+                <h3>You followed the public roadmap alias</h3>
+                <p><code class="mono-receipt">/roadmap</code> is the first-party projection rail for direction and milestone pressure. It is not the shipped-proof rail and it is not the support queue.</p>
+                <div class="route-callout__proof">
+                    <span>Projection only</span>
+                    <span>Votes inform demand</span>
+                    <span>Proof lives elsewhere</span>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="route-choice-grid roadmap-signal-grid">
+        @foreach (var lane in signalLanes)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@lane.Badge</span>
+                <h3>@lane.Title</h3>
+                <p>@lane.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in lane.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@lane.Href">@lane.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Route handoff</p>
+        <h2 class="editorial-title">Roadmap stays honest when it remains connected to public signal and shipped proof at the same time.</h2>
+        <p class="editorial-copy">This route should sit in the middle of the loop: it absorbs visible demand, exposes real milestone pressure, and keeps a direct contrast with evidence-backed closeout before any public promise language tightens.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Active pressure</span>
+            <h3>@signalLoop.OpenMilestoneCount open milestone slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") still define the real planning load.</h3>
+            <p>@signalLoop.ClaimedMilestoneCount already show claimed movement. @signalLoop.HighDifficultyMilestoneCount still need broader coordination before public promise language should narrow.</p>
+            @if (milestoneFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var milestone in milestoneFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>M@milestone.Id · @milestone.Title</h3>
+                                <p>@milestone.CasualSummary</p>
+                            </div>
+                            <span class="tag">@milestone.StatusLabel</span>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="#roadmap-milestones">Open milestone ledger</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Shipped contrast</span>
+            <h3>@signalLoop.ShippedFollowUpCount proof-backed closeout example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already exist on the separate shipped rail.</h3>
+            <p>Keep these examples nearby so roadmap language never drifts into shipped-claim territory before users can reach the result.</p>
+            @if (shippedFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var card in shippedFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/changelog">Open shipped closeout</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Tracked follow-up</span>
+            <h3>Follow the loop from one calmer account rail when you want return paths, not just public reading.</h3>
+            <p>Account-aware follow-up keeps roadmap follows, install continuity, and support history attached to the same shell without turning account creation into the default public ask.</p>
+            <div class="route-choice-card__proof">
+                <span>Roadmap follows</span>
+                <span>Install continuity</span>
+                <span>Support return</span>
+            </div>
+            <a class="editorial-strip__action" href="@signalLoop.FollowSettingsHref">@signalLoop.FollowSettingsLabel</a>
+        </article>
+    </div>
+</section>
+
+<section class="roadmap-frame" id="roadmap-milestones">
+    <div class="roadmap-frame__lead">
+        <p class="eyebrow">Milestone ledger</p>
+        <h2 class="editorial-title">Active and upcoming work slices</h2>
+        <p class="editorial-copy">Each row stays collapsed by default, with a casual summary visible up front. Expand any milestone when you need difficulty, upstream dependencies, or claimed state.</p>
+    </div>
+
+    @if (milestones.Length == 0)
+    {
+        <article class="roadmap-empty">
+            <span class="tag tag--quiet">Temporarily unavailable</span>
+            <h3>Milestone detail is not loaded right now</h3>
+            <p>The roadmap view could not read the milestone registry on this request. The public horizon lanes below still reflect the broader direction.</p>
+        </article>
+    }
+    else
+    {
+        <div class="milestone-stack roadmap-milestone-stack">
+            @foreach (var milestone in milestones)
+            {
+                <details class="milestone-drawer roadmap-milestone">
+                    <summary>
+                        <span class="milestone-drawer__header">
+                            <span class="milestone-drawer__title">
+                                <span class="tag">M@milestone.Id · @milestone.WaveLabel</span>
+                                <span class="milestone-drawer__heading">@milestone.Title</span>
+                                <span class="milestone-drawer__tease">@milestone.CasualSummary</span>
+                            </span>
+                            <span class="milestone-pills" aria-hidden="true">
+                                <span class="milestone-pill milestone-pill--status">@milestone.StatusLabel</span>
+                                <span class="milestone-pill">@milestone.DifficultyLabel</span>
+                                <span class="milestone-pill">@(milestone.Claimed ? "Claimed" : "Open")</span>
+                            </span>
+                        </span>
+                    </summary>
+                    <div class="milestone-body">
+                        <div class="milestone-meta">
+                            <p><strong>Difficulty:</strong> @milestone.DifficultyLabel. @milestone.DifficultySummary</p>
+                            <p><strong>Claimed:</strong> @milestone.ClaimedLabel. @milestone.ClaimedSummary</p>
+                            <p><strong>Dependencies:</strong> @milestone.DependencySummary</p>
+                        </div>
+                        @if (milestone.Dependencies.Count > 0)
+                        {
+                            <ul class="milestone-dependencies">
+                                @foreach (var dependency in milestone.Dependencies)
+                                {
+                                    <li>
+                                        <strong>M@dependency.Id</strong>
+                                        <span>@dependency.Title</span>
+                                        <span class="muted-copy">(@dependency.StatusLabel)</span>
+                                    </li>
+                                }
+                            </ul>
+                        }
+                    </div>
+                </details>
+            }
+        </div>
+    }
+</section>
+
+<section class="roadmap-frame" id="roadmap-horizons">
+    <div class="roadmap-frame__lead">
+        <p class="eyebrow">Direction map</p>
+        <h2 class="editorial-title">Public horizon lanes</h2>
+        <p class="editorial-copy">These are the outward-facing tracks. They explain who the work is for, what pain it is trying to remove, and which live route keeps the promise honest today.</p>
+    </div>
+
+    <div class="roadmap-lanes">
+        @foreach (var lane in new[]
+        {
+            new
+            {
+                Id = "roadmap-preparing",
+                Eyebrow = PublicSurfaceStatus.PreparingNext,
+                Heading = "Closest to the next public step",
+                Intro = "These horizons are nearest to the current preview and the next outward-facing unlock.",
+                Items = preparingHorizons
+            },
+            new
+            {
+                Id = "roadmap-designing",
+                Eyebrow = PublicSurfaceStatus.DesigningInPublic,
+                Heading = "Shaping in public",
+                Intro = "These tracks have a clearer user shape, but they still need more implementation before they belong on the live shelf.",
+                Items = designingHorizons
+            },
+            new
+            {
+                Id = "roadmap-research",
+                Eyebrow = PublicSurfaceStatus.ResearchTrack,
+                Heading = "Early exploration",
+                Intro = "These are worth following early, but they are not near-term preview promises yet.",
+                Items = researchHorizons
+            }
+        })
+        {
+            if (lane.Items.Length == 0)
+            {
+                continue;
+            }
+
+            <section class="roadmap-lane" id="@lane.Id">
+                <header class="roadmap-lane__header">
+                    <div>
+                        <p class="eyebrow">@lane.Eyebrow</p>
+                        <h3>@lane.Heading</h3>
+                    </div>
+                    <span class="roadmap-lane__count">@lane.Items.Length item@(lane.Items.Length == 1 ? string.Empty : "s")</span>
+                </header>
+                <p class="roadmap-lane__intro">@lane.Intro</p>
+                <div class="roadmap-lane__items">
+                    @foreach (var item in lane.Items)
+                    {
+                        <article class="roadmap-horizon-card">
+                            <div class="roadmap-horizon-card__topline">
+                                <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(item.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
+                                <span class="roadmap-horizon-card__audience">@PublicSurfaceStatus.AudienceLabel(item.Card.Audience)</span>
+                            </div>
+                            <h4>@item.Card.Title</h4>
+                            <p>@item.Card.Summary</p>
+                            <div class="roadmap-horizon-card__facts">
+                                @if (!string.IsNullOrWhiteSpace(item.Card.Pain))
+                                {
+                                    <p><strong>User pain:</strong> @item.Card.Pain</p>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(item.Card.Payoff))
+                                {
+                                    <p><strong>Expected unlock:</strong> @item.Card.Payoff</p>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(item.Card.ProofNote))
+                                {
+                                    <p><strong>Closest live route:</strong> @item.Card.ProofNote</p>
+                                }
+                            </div>
+                            <a class="editorial-strip__action" href="@item.Action.Href">@item.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            </section>
+        }
+    </div>
+
+    @if (otherHorizons.Length > 0)
+    {
+        <section class="roadmap-lane roadmap-lane--compact">
+            <header class="roadmap-lane__header">
+                <div>
+                    <p class="eyebrow">Additional tracks</p>
+                    <h3>Other roadmap surfaces</h3>
+                </div>
+                <span class="roadmap-lane__count">@otherHorizons.Length item@(otherHorizons.Length == 1 ? string.Empty : "s")</span>
+            </header>
+            <div class="roadmap-lane__items">
+                @foreach (var item in otherHorizons)
+                {
+                    <article class="roadmap-horizon-card">
+                        <div class="roadmap-horizon-card__topline">
+                            <span class="readiness-tag readiness-tag--horizon @PublicSurfaceStatus.CssTone(item.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(item.Card.Badge)</span>
+                            <span class="roadmap-horizon-card__audience">@PublicSurfaceStatus.AudienceLabel(item.Card.Audience)</span>
+                        </div>
+                        <h4>@item.Card.Title</h4>
+                        <p>@item.Card.Summary</p>
+                        <a class="editorial-strip__action" href="@item.Action.Href">@item.Action.Label</a>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+</section>

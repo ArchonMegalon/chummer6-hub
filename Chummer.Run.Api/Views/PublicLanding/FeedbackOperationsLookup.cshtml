@@ -1,0 +1,98 @@
+@model PublicSignalOperationsLookupPageViewModel
+@{
+    ViewData["Title"] = "Feedback Operations Lookup";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-participate";
+    var lookup = Model.Lookup;
+    var results = lookup.Results.ToArray();
+}
+
+<section class="release-footnote route-anchor-target">
+    <p class="eyebrow">@lookup.Eyebrow</p>
+    <h1 class="page-title">@lookup.Heading</h1>
+    <p class="page-copy">@lookup.Summary</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--ghost" href="/feedback">Back to feedback lane</a>
+        <a class="button-like button-like--ghost" href="/feedback/operations">Open aggregate artifact</a>
+    </div>
+    <p class="muted-copy">Search by source receipt id, dispatch receipt id, recipient ref, address hash, delivery id, provider message id, or item reference.</p>
+</section>
+
+<section class="status-decision-strip" aria-label="Bounded lookup controls">
+    <article class="status-decision-strip__card">
+        <span class="tag">Lookup controls</span>
+        <h2>Search one bounded seam instead of scanning the whole rail.</h2>
+        <form class="auth-form" method="get" action="/feedback/operations/lookup">
+            <label class="field" for="feedbackOperationsLookupQuery">
+                <span>Search query</span>
+                <input id="feedbackOperationsLookupQuery" name="q" type="search" value="@lookup.Query" placeholder="plsend_..., plreceipt_..., usr-..., delivery-1, item-slug" />
+            </label>
+            <label class="field" for="feedbackOperationsLookupScope">
+                <span>Scope</span>
+                <select id="feedbackOperationsLookupScope" name="scope">
+                    <option value="all" selected="@(string.Equals(lookup.Scope, "all", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Sources and threads</option>
+                    <option value="source" selected="@(string.Equals(lookup.Scope, "source", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Source receipts only</option>
+                    <option value="thread" selected="@(string.Equals(lookup.Scope, "thread", StringComparison.OrdinalIgnoreCase) ? "selected" : null)">Recipient threads only</option>
+                </select>
+            </label>
+            <div class="stacked-actions">
+                <button class="button-like button-like--secondary" type="submit">Open bounded lookup</button>
+                <a class="button-like button-like--ghost" href="/api/v1/public/feedback/operations/lookup?q=@Uri.EscapeDataString(lookup.Query)&scope=@Uri.EscapeDataString(lookup.Scope)">Open lookup artifact</a>
+            </div>
+        </form>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Current scope</span>
+        <h2>@lookup.ScopeLabel</h2>
+        <p>@lookup.ResultCount result@(lookup.ResultCount == 1 ? string.Empty : "s") are currently in view.</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Bounded only</span>
+        <h2>Lookup stays inside first-party receipts and hashed identity.</h2>
+        <p>No raw provider payload body, no raw recipient email, and no public claim beyond the stored receipt state.</p>
+    </article>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Lookup results</p>
+        <h2 class="editorial-title">Recent results and exact matches share one public-safe route.</h2>
+        <p class="editorial-copy">When no query is present, this page shows the freshest bounded drilldowns. When a query is present, it narrows the search across source receipts and recipient threads using stored first-party identifiers only.</p>
+    </div>
+    @if (results.Length == 0)
+    {
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">No bounded match</span>
+                <h3>No receipt or thread matched this query</h3>
+                <p>Try a source receipt id, dispatch receipt id, recipient ref, delivery id, provider message id, or item reference from the aggregate feedback operations rail.</p>
+            </article>
+        </div>
+    }
+    else
+    {
+        <div class="route-choice-grid">
+            @foreach (var result in results)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@result.ResultKindLabel</span>
+                    <h3>@result.Heading</h3>
+                    <p>@result.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <span>@result.MatchReason</span>
+                        <span>@result.KeyLabel: @result.Key</span>
+                        @if (!string.Equals(result.FilterKey, "all", StringComparison.Ordinal))
+                        {
+                            <span>Context filter: @result.FilterLabel</span>
+                        }
+                        <span>@result.LastTouchedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@result.Href">Open drilldown</a>
+                        <a class="button-like button-like--ghost" href="@result.ArtifactHref">Open detail artifact</a>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>

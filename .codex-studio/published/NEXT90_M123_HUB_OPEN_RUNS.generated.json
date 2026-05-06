@@ -1,0 +1,45 @@
+{
+  "contract_name": "chummer6-hub.next90_m123_hub_open_runs",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m123-hub-build-openrun-listing-join-request-roster-schedule-meeti",
+    "work_task_id": "123.1",
+    "title": "Build OpenRun listing, join request, roster, schedule, meeting-handoff, and closeout orchestration.",
+    "task": "Build OpenRun listing, join request, roster, schedule, meeting-handoff, and closeout orchestration.",
+    "frontier_id": 8531582567,
+    "milestone_id": 123,
+    "wave": "W16",
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "build_openrun_listing_join_request:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "surfaces_passed": [
+    "build_openrun_listing_join_request:hub",
+    "meeting_handoff_closeout:hub"
+  ],
+  "missing_markers": {},
+  "required_markers": {
+    "build_openrun_listing_join_request:hub": [
+      "var openRunsResult = await campaignSpineController.GetMyOpenRuns(CancellationToken.None);",
+      "new OpenRunJoinRequestRequest(",
+      "var openRunRosterDecisionResult = await campaignSpineController.ReviewMyOpenRunJoinRequest(",
+      "var openRunScheduleResult = await campaignSpineController.ScheduleMyOpenRun("
+    ],
+    "meeting_handoff_closeout:hub": [
+      "var openRunMeetingHandoffResult = await campaignSpineController.PublishMyOpenRunMeetingHandoff(",
+      "new OpenRunMeetingHandoffRequest(",
+      "var openRunCloseoutResult = await campaignSpineController.CloseOutMyOpenRun(",
+      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"open_run\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should add open-run coordination packets into the bounded what-changed rail.\");"
+    ]
+  },
+  "generated_at": "2026-05-05T21:16:55Z"
+}

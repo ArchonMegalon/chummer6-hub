@@ -193,5 +193,6 @@
       "authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1"
     ]
   },
-  "generated_at": "2026-05-05T12:17:09Z"
+  "generated_at": "2026-05-05T12:17:09Z",
+  "generatedAt": "2026-05-05T12:17:09Z"
 }

@@ -17,6 +17,9 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PublicLandingService>();
         services.AddSingleton<PublicTrustContentService>();
         services.AddSingleton<PublicPrivacyBoundaryService>();
+        services.AddSingleton<PublicSignalProjectionService>();
+        services.AddSingleton<PublicSignalOperationsService>();
+        services.AddHostedService<PublicSignalRetryExpiryWorker>();
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
         services.AddSingleton<WeeklyProductPulseArtifactService>();
@@ -59,6 +62,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<CampaignSpineService>();
         services.AddSingleton<CampaignFederationOrchestrationService>();
         services.AddSingleton<CampaignWorkspaceServerPlaneService>();
+        services.AddSingleton<CampaignFederationOrchestrationService>();
         return services;
     }
 

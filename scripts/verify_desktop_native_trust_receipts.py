@@ -20,6 +20,7 @@ LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
 CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "94dd7d42"
 CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 compressed base32/base85 helper proof guard"
+DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -561,6 +562,30 @@ REQUIRED_PROOF_RECEIPTS = {
             "/api/v1/install-linking/continuation/support",
             "/account/support",
             "/contact",
+        ],
+    },
+    "desktop_client_readiness:bounded_routes": {
+        "package_id": "next90-m102-hub-desktop-native-trust",
+        "milestone_id": 102,
+        "frontier_id": FRONTIER_ID,
+        "summary": (
+            "Download, status, publication, continuation, and support routes stay bounded to recovery and support posture "
+            "until the direct desktop_client flagship proof turns green; the public route family must carry the "
+            "current readiness gap instead of claiming parity early."
+        ),
+        "surfaces": [
+            "desktop_client_readiness:bounded_routes",
+            "desktop_native_claim_and_recovery",
+            "support_followthrough:install_truth",
+            "public_proof_shelf:release_bundles",
+        ],
+        "routes": [
+            "/downloads",
+            "/status",
+            "/artifacts",
+            "/artifacts/publications/{publicationId}",
+            "/api/v1/install-linking/continuation",
+            "/api/v1/install-linking/continuation/support",
         ],
     },
 }
@@ -1207,6 +1232,11 @@ def _served_proof_path(repo_root: Path) -> Path:
     return configured if configured.is_absolute() else repo_root / configured
 
 
+def _flagship_readiness_path() -> Path:
+    configured = _configured_path("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH", DEFAULT_FLAGSHIP_READINESS_PATH)
+    return configured if configured.is_absolute() else configured.resolve()
+
+
 def _should_verify_served_proof_matches_published() -> bool:
     published_override = _has_configured_path_override("CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH")
     served_override = _has_configured_path_override("CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH")
@@ -1851,8 +1881,97 @@ def _is_native_install_linking_route(route: str) -> bool:
     return route == NATIVE_INSTALL_LINKING_ROUTE_PREFIX or route.startswith(f"{NATIVE_INSTALL_LINKING_ROUTE_PREFIX}/")
 
 
+def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
+    readiness_path = _flagship_readiness_path()
+    _verify_evidence_path_has_no_forbidden_markers(errors, readiness_path, "flagship readiness proof")
+    if not readiness_path.is_file():
+        errors.append(f"missing flagship readiness proof: {readiness_path}")
+        return None
+
+    try:
+        readiness_payload = json.loads(readiness_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        errors.append(f"flagship readiness proof is not valid json: {exc}")
+        return None
+
+    if not isinstance(readiness_payload, dict):
+        errors.append("flagship readiness proof is not a json object")
+        return None
+
+    coverage_gap_keys = readiness_payload.get("scoped_warning_keys")
+    if not isinstance(coverage_gap_keys, list):
+        coverage_gap_keys = readiness_payload.get("warning_keys")
+    if not isinstance(coverage_gap_keys, list):
+        coverage_gap_keys = readiness_payload.get("scoped_missing_keys")
+    if not isinstance(coverage_gap_keys, list):
+        coverage_gap_keys = readiness_payload.get("missing_keys")
+    readiness_audit = readiness_payload.get("flagship_readiness_audit")
+    if not isinstance(coverage_gap_keys, list) and isinstance(readiness_audit, dict):
+        coverage_gap_keys = readiness_audit.get("scoped_coverage_gap_keys")
+        if not isinstance(coverage_gap_keys, list):
+            coverage_gap_keys = readiness_audit.get("coverage_gap_keys")
+        if not isinstance(coverage_gap_keys, list):
+            coverage_gap_keys = readiness_audit.get("scoped_warning_coverage_keys")
+        if not isinstance(coverage_gap_keys, list):
+            coverage_gap_keys = readiness_audit.get("warning_coverage_keys")
+        if not isinstance(coverage_gap_keys, list):
+            coverage_gap_keys = readiness_audit.get("scoped_missing_coverage_keys")
+        if not isinstance(coverage_gap_keys, list):
+            coverage_gap_keys = readiness_audit.get("missing_coverage_keys")
+    if not isinstance(coverage_gap_keys, list):
+        coverage_gap_keys = []
+
+    completion_audit = readiness_payload.get("completion_audit")
+    normalized_coverage_gap_keys = [
+        str(item).strip()
+        for item in coverage_gap_keys
+        if str(item).strip()
+    ]
+
+    return {
+        "status": str(readiness_payload.get("status") or "").strip() or "unknown",
+        "scoped_status": str(readiness_payload.get("scoped_status") or "").strip() or "unknown",
+        "generated_at": str(readiness_payload.get("generated_at") or "").strip(),
+        "missing_coverage_keys": normalized_coverage_gap_keys,
+        "desktop_client_missing": "desktop_client" in {item.casefold() for item in normalized_coverage_gap_keys},
+        "reason": str(readiness_audit.get("reason") or "").strip()
+        if isinstance(readiness_audit, dict)
+        else "",
+        "completion_audit_status": str(completion_audit.get("status") or "").strip()
+        if isinstance(completion_audit, dict)
+        else "unknown",
+        "completion_audit_reason": str(completion_audit.get("reason") or "").strip()
+        if isinstance(completion_audit, dict)
+        else "",
+        "source_path": str(readiness_path),
+    }
+
+
+def _verify_desktop_client_readiness_block(errors: list[str], proof: dict, label: str) -> None:
+    readiness_snapshot = _load_flagship_readiness_snapshot(errors)
+    block = proof.get("desktop_client_readiness")
+    if not isinstance(block, dict):
+        errors.append(f"{label} missing desktop_client_readiness block")
+        return
+    if readiness_snapshot is None:
+        return
+
+    expected = dict(readiness_snapshot)
+    expected_reason = expected["reason"] or "flagship product readiness proof did not publish a desktop-client reason."
+    if block.get("reason") != expected_reason:
+        errors.append(f"{label} desktop_client_readiness has wrong reason: {block.get('reason')!r}")
+    expected["reason"] = expected_reason
+
+    for key, expected_value in expected.items():
+        if block.get(key) != expected_value:
+            errors.append(
+                f"{label} desktop_client_readiness has wrong {key}: expected {expected_value!r}, got {block.get(key)!r}"
+            )
+
+
 def _verify_m102_proof_payload(errors: list[str], proof: dict, label: str) -> None:
     _verify_json_has_no_forbidden_markers(errors, proof, label)
+    _verify_desktop_client_readiness_block(errors, proof, label)
 
     package_repo = proof.get("package_repo")
     if package_repo != REQUIRED_PROOF_PACKAGE_REPO:

@@ -6,6 +6,49 @@
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
         : "/downloads";
+    var faqRouteChoices = new[]
+    {
+        new
+        {
+            Badge = "Reality check",
+            Title = "Start on what works today when you need shipped truth",
+            Summary = "Use the current-status lane when the real question is whether something is already usable, supported, or still under caution right now.",
+            Href = "/now",
+            Label = "Open what works today",
+            Proof = new[] { "Shipped truth", "Current caution", "Route-level proof" }
+        },
+        new
+        {
+            Badge = "Downloads",
+            Title = "Open the release rail when the answer depends on install posture",
+            Summary = "Package type, account handoff, known issues, and the current support path belong on downloads, not buried inside a long answer.",
+            Href = "/downloads",
+            Label = "Open downloads",
+            Proof = new[] { "One release rail", "Install continuity", "Known issues nearby" }
+        },
+        new
+        {
+            Badge = "Account value",
+            Title = Model.Chrome.Authenticated
+                ? "Account keeps recovery, devices, and support on one calmer path"
+                : "Create an account when you want recovery, linked installs, and tracked support",
+            Summary = Model.Chrome.Authenticated
+                ? "Return to account when the question is about devices, recovery identities, or support follow-through instead of public product posture."
+                : "The binary stays the same. The value is the calmer return path for linked installs, recovery, and tracked support once you want it.",
+            Href = Model.Chrome.Authenticated ? "/account" : "/signup?next=/home",
+            Label = Model.Chrome.Authenticated ? "Open account" : "Create account",
+            Proof = new[] { "Linked installs", "Devices & access", "Tracked follow-up" }
+        },
+        new
+        {
+            Badge = "Private help",
+            Title = "Leave the FAQ as soon as the issue needs logs, recovery, or private detail",
+            Summary = "Install failures, crashes, account issues, and private campaign detail should move to first-party help instead of staying in public copy or a search box.",
+            Href = "/contact#support-intake",
+            Label = "Open support intake",
+            Proof = new[] { "First-party help", "Private by default", "No GitHub required" }
+        }
+    };
 
     string ContextualPreviewHref(string? href)
     {
@@ -67,17 +110,41 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
 @if (Model.TrustPulse is not null)
 {
     @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
 
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Fast answer map</p>
+        <h2 class="editorial-title">Get the answer or leave with the right next route.</h2>
+        <p class="editorial-copy">FAQ should answer the normal objections quickly, then hand you to the correct product lane before the question turns into guesswork or private support.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var choice in faqRouteChoices)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@choice.Badge</span>
+                <h3>@choice.Title</h3>
+                <p>@choice.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in choice.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@ContextualPreviewHref(choice.Href)">@choice.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
 <section class="faq-stack">
     <div class="trust-page-section">
+        <p class="eyebrow">Search the answer deck</p>
+        <h2>Plain answers first, deeper help right behind them</h2>
+        <p>Use the search when you know the topic, or scan the grouped sections below when the question is still broad.</p>
         <label class="field" for="faqFilter">
             <span>Search the FAQ</span>
             <input id="faqFilter" type="search" placeholder="preview, account, install, recovery" data-faq-filter />
@@ -113,5 +180,6 @@
     <p class="editorial-copy">If the FAQ answered part of the question but not enough to move forward, use the first-party support intake and keep the case attached to the product surface.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--secondary" href="/contact#support-intake">Still stuck? Open support</a>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
     </div>
 </section>

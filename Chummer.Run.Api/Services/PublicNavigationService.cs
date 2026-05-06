@@ -7,7 +7,8 @@ public sealed record PublicNavigationLink(
 public sealed record PublicNavigationModel(
     IReadOnlyList<PublicNavigationLink> Primary,
     IReadOnlyList<PublicNavigationLink> Secondary,
-    IReadOnlyList<PublicNavigationLink> Utility);
+    IReadOnlyList<PublicNavigationLink> Utility,
+    IReadOnlyList<PublicNavigationLink> PublicSignal);
 
 public sealed class PublicNavigationService
 {
@@ -27,7 +28,8 @@ public sealed class PublicNavigationService
         return new PublicNavigationModel(
             Primary: BuildLinks(document.PrimaryNav, "primary navigation"),
             Secondary: BuildLinks(document.SecondaryNav, "secondary navigation"),
-            Utility: BuildLinks(document.UtilityNav, "utility navigation"));
+            Utility: BuildLinks(document.UtilityNav, "utility navigation"),
+            PublicSignal: BuildLinks(document.PublicSignalNav, "public signal navigation"));
     }
 
     private IReadOnlyList<PublicNavigationLink> BuildLinks(IReadOnlyList<PublicNavigationLinkDocument>? links, string group)

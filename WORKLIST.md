@@ -45,6 +45,7 @@ Purpose: keep the live hosted-boundary queue readable. Historical re-entry and q
 | WL-243 | done | P2 | Add no-content and empty-state onboarding guidance for hosted workspace entrypoints, especially for new org/creators with no active campaigns. | agent | Completed 2026-04-15: signed-in home and account work/access entrypoints now keep one clear starter/setup action, visible support follow-through, and calmer no-content guidance for empty campaign/operator/creator states; smoke assertions already lock the starter workspace path, support CTA visibility, and customer-facing copy in `tests/RunServicesSmoke/Program.cs`. Verified with `scripts/ai/verify.sh` (pass). |
 
 - Repo-local live queue: none
+- Guided first-playable-session onboarding for the hub-owned starter lane is now closed under Next 90 milestone `119.1`: starter-workspace seeding, first-session proof, build follow-through, campaign-primer follow-through, and install support stay on one bounded signed-in route family, and the closure is fail-closed by `scripts/verify_next90_m119_hub_first_session_onboarding.py`, `tests/test_next90_m119_hub_first_session_onboarding.py`, and the local release-proof receipts.
 - Registry/media ownership, contract canon, orchestration-side adapter authority, hub-side product-consumer planes, and assistant-plane governance are verifier-backed and materially closed.
 - Remaining repo work is future product depth and physical cleanup, not missing hosted-boundary authority proof.
 
