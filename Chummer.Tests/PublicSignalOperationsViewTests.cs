@@ -76,8 +76,12 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("ResolveOutcomeContextFilterKey", partial, StringComparison.Ordinal);
         Assert.Contains("ThreadDetailHref", partial, StringComparison.Ordinal);
         Assert.Contains("SourceDetailHref", partial, StringComparison.Ordinal);
+        Assert.Contains("SourceDetailArtifactHref", partial, StringComparison.Ordinal);
+        Assert.Contains("SourceDetailActionLabel", partial, StringComparison.Ordinal);
         Assert.Contains("receipt.HotFilterLabel", partial, StringComparison.Ordinal);
         Assert.Contains("receipt.HotFilterSummary", partial, StringComparison.Ordinal);
+        Assert.Contains("receipt.SourceHotFilterLabel", partial, StringComparison.Ordinal);
+        Assert.Contains("receipt.SourceHotFilterSummary", partial, StringComparison.Ordinal);
         Assert.Contains("thread.QueueStatusLabel", partial, StringComparison.Ordinal);
         Assert.Contains("thread.DispatchStatusLabel", partial, StringComparison.Ordinal);
         Assert.Contains("thread.OutcomeIdentityMatchMode", partial, StringComparison.Ordinal);
@@ -122,6 +126,10 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("Open source artifact", detailView, StringComparison.Ordinal);
         Assert.Contains("Open thread drilldown", detailView, StringComparison.Ordinal);
         Assert.Contains("Open source drilldown", detailView, StringComparison.Ordinal);
+        Assert.Contains("SourceDetailActionLabel", detailView, StringComparison.Ordinal);
+        Assert.Contains("sourceReceipt.HotFilterLabel", detailView, StringComparison.Ordinal);
+        Assert.Contains("receipt.SourceHotFilterLabel", detailView, StringComparison.Ordinal);
+        Assert.Contains("receipt.SourceHotFilterSummary", detailView, StringComparison.Ordinal);
         Assert.Contains("detail.DetailKindLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("detail.FilterLabel", detailView, StringComparison.Ordinal);
         Assert.Contains("detail.SavedPivots", detailView, StringComparison.Ordinal);
@@ -218,6 +226,8 @@ public sealed class PublicSignalOperationsViewTests
         Assert.Contains("string ArtifactHref", viewModels, StringComparison.Ordinal);
         Assert.Contains("string HotFilterKey", viewModels, StringComparison.Ordinal);
         Assert.Contains("string HotFilterSummary", viewModels, StringComparison.Ordinal);
+        Assert.Contains("string SourceHotFilterKey", viewModels, StringComparison.Ordinal);
+        Assert.Contains("string SourceHotFilterSummary", viewModels, StringComparison.Ordinal);
         Assert.Contains("string FilterLabel", viewModels, StringComparison.Ordinal);
         Assert.Contains("string FilterKey", viewModels, StringComparison.Ordinal);
         Assert.Contains("IReadOnlyList<PublicSignalOperationsDetailPivotViewModel> SavedPivots", viewModels, StringComparison.Ordinal);

@@ -3816,6 +3816,7 @@ td {
   .workflow-grid,
   .trust-claims__grid,
   .route-choice-grid,
+  .flagship-coverage__grid,
   .audience-fit__grid,
   .works-matrix__columns,
   .artifact-gallery__grid,
@@ -4705,7 +4706,8 @@ body.nav-sheet-open {
 .recommended-download__trustrail,
 .status-decision-strip,
 .story-pain-grid,
-.future-strip__grid {
+.future-strip__grid,
+.flagship-coverage__grid {
   display: grid;
   gap: 1rem;
 }
@@ -4719,6 +4721,7 @@ body.nav-sheet-open {
 .status-decision-strip__card,
 .story-pain-grid__card,
 .future-strip__card,
+.flagship-coverage__card,
 .continuity-band__fact {
   padding: 1rem 1.05rem;
   border-radius: 18px;
@@ -4747,6 +4750,7 @@ body.nav-sheet-open {
 .recommended-download__trustfact p,
 .continuity-band__fact p,
 .future-strip__card p,
+.flagship-coverage__card p,
 .story-pain-grid__card p,
 .status-decision-strip__card p {
   margin: 0;
@@ -4754,6 +4758,7 @@ body.nav-sheet-open {
 }
 
 .continuity-band,
+.flagship-coverage,
 .future-strip {
   width: min(var(--site-max), 100%);
   margin: 0 auto;
@@ -4789,6 +4794,44 @@ body.nav-sheet-open {
   gap: 1rem;
   padding: 0 1.5rem;
   margin-top: 1.25rem;
+}
+
+.flagship-coverage {
+  display: grid;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  margin-top: 1.25rem;
+}
+
+.flagship-coverage__lead {
+  padding: 1.4rem 1.55rem;
+  border-radius: 28px;
+  border: 1px solid var(--line-subtle);
+  background:
+    radial-gradient(circle at top right, rgba(57, 198, 255, 0.08), transparent 24%),
+    linear-gradient(180deg, rgba(11, 17, 26, 0.96), rgba(8, 13, 20, 0.98));
+  box-shadow: var(--shadow-soft);
+}
+
+.flagship-coverage__grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.flagship-coverage__card h3 {
+  margin: 0.45rem 0 0.55rem;
+  color: var(--ink-strong);
+  font-family: var(--font-family-display);
+  font-size: 1.1rem;
+  line-height: 1.12;
+}
+
+.flagship-coverage__phase {
+  margin-top: 0.7rem !important;
+  color: var(--ink-soft) !important;
+}
+
+.flagship-coverage__phase strong {
+  color: var(--ink-strong);
 }
 
 .future-strip__lead {
@@ -5139,6 +5182,7 @@ body.nav-sheet-open {
   .hero-installrail__facts,
   .recommended-download__trustrail,
   .continuity-band__panel,
+  .flagship-coverage__grid,
   .future-strip__grid,
   .story-pain-grid,
   .home-cockpit-strip__panel,
@@ -5148,6 +5192,7 @@ body.nav-sheet-open {
   }
 
   .continuity-band,
+  .flagship-coverage,
   .future-strip,
   .home-cockpit-strip,
   .account-rail-snapshot,

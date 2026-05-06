@@ -163,6 +163,9 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("Desktop And Install", packet.RecentReceipts[0].CategoryLabel);
         Assert.Equal("faster-install-recovery", packet.RecentReceipts[0].ItemReference);
         Assert.Equal("/help#install-update", packet.RecentRoutingReceipts[0].TargetPath);
+        Assert.Equal("all", packet.RecentRoutingReceipts[0].SourceHotFilterKey);
+        Assert.Equal("All threads", packet.RecentRoutingReceipts[0].SourceHotFilterLabel);
+        Assert.Equal(0, packet.RecentRoutingReceipts[0].SourceHotFilterCount);
         Assert.Equal("Recipient projection pending", packet.RecentCloseoutReceipts[0].StatusLabel);
         Assert.Equal("deferred", packet.RecentCloseoutReceipts[0].DeliveryState);
         Assert.Equal("productlift_voter_shipped", packet.RecentCloseoutReceipts[0].TemplateId);
@@ -171,6 +174,9 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("hub_preferences:follow_horizons", packet.RecentCloseoutReceipts[0].ConsentSourceRef);
         Assert.Contains("recipient projection", packet.RecentCloseoutReceipts[0].DeliveryReason, StringComparison.OrdinalIgnoreCase);
         Assert.False(packet.RecentCloseoutReceipts[0].PublicClaimAllowed);
+        Assert.Equal("all", packet.RecentCloseoutReceipts[0].SourceHotFilterKey);
+        Assert.Equal("All threads", packet.RecentCloseoutReceipts[0].SourceHotFilterLabel);
+        Assert.Equal(0, packet.RecentCloseoutReceipts[0].SourceHotFilterCount);
         Assert.Equal("Recipient projection pending", packet.RecentQueueReceipts[0].StatusLabel);
         Assert.Equal("blocked", packet.RecentQueueReceipts[0].QueueState);
         Assert.Equal("connector.dispatch", packet.RecentQueueReceipts[0].DispatchTool);
@@ -179,6 +185,9 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("/changelog", packet.RecentQueueReceipts[0].ReleaseProofRoute);
         Assert.Contains("recipient projection", packet.RecentQueueReceipts[0].QueueReason, StringComparison.OrdinalIgnoreCase);
         Assert.False(packet.RecentQueueReceipts[0].PublicClaimAllowed);
+        Assert.Equal("all", packet.RecentQueueReceipts[0].SourceHotFilterKey);
+        Assert.Equal("All threads", packet.RecentQueueReceipts[0].SourceHotFilterLabel);
+        Assert.Equal(0, packet.RecentQueueReceipts[0].SourceHotFilterCount);
         Assert.Equal("Recipient projection pending", packet.RecipientProjectionStatusLabel);
         Assert.Equal(0, packet.ProjectedRecipientCount);
         Assert.Equal("Queue blocked", packet.QueueStatusLabel);
@@ -188,6 +197,8 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Contains("\"recentRoutingReceipts\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"recentCloseoutReceipts\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"recentQueueReceipts\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"sourceHotFilterKey\": \"all\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"sourceHotFilterLabel\": \"All threads\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"deliveryState\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"templateId\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"recipientScopeRef\"", artifactJson, StringComparison.Ordinal);
@@ -308,6 +319,7 @@ public sealed class PublicSignalOperationsServiceTests
 
         service.RecordWebhook(payload);
         PublicSignalOperationsPacketViewModel packet = service.BuildPacket();
+        string artifactJson = service.LoadArtifactJson();
 
         Assert.Equal("Recipient projection configured", packet.RecipientProjectionStatusLabel);
         Assert.Equal("Consent basis configured", packet.ConsentStatusLabel);
@@ -361,6 +373,92 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Contains(fixture.Requests, request => string.Equals(request.Url, "https://ea.test/v1/tools/execute", StringComparison.Ordinal));
         Assert.Contains(fixture.Requests, request => string.Equals(request.Url, "https://emailit.test/emails", StringComparison.Ordinal));
         Assert.Contains(fixture.Requests, request => string.Equals(request.Url, "https://ea.test/v1/delivery/outbox/delivery-1/sent", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SourceLinkedAggregateCardsBiasToTheHottestSourcePivot()
+    {
+        using var fixture = new PublicSignalOperationsFixture(new Dictionary<string, string?>
+        {
+            ["CHUMMER_PRODUCTLIFT_WEBHOOK_SECRET"] = "secret",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EMAILIT_API_KEY"] = "emailit-api-key",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_RECIPIENT_PROJECTION_ENABLED"] = "true",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_CONSENT_BASIS"] = "hub_transactional_follow",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_API_TOKEN"] = "ea-token",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_PRINCIPAL_ID"] = "principal-001",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_BINDING_ID"] = "binding-001",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_GOVERNOR_APPROVED"] = "true",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_GOVERNOR_DECISION_REF"] = "gov-2026-05-06-productlift-closeout",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EA_BASE_URL"] = "https://ea.test",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_EMAILIT_BASE_URL"] = "https://emailit.test",
+            ["CHUMMER_PRODUCTLIFT_CLOSEOUT_PUBLIC_BASE_URL"] = "https://chummer.run"
+        }, enableHttpCapture: true);
+        fixture.WriteSupportFiles();
+        fixture.WriteReleaseProofFile("/changelog");
+        fixture.SeedVerifiedFollowRecipient();
+        PublicSignalOperationsService service = fixture.CreateService();
+        JsonElement payload = JsonDocument.Parse(
+            """
+            {
+              "id": "evt_004b",
+              "type": "idea.status_changed",
+              "data": {
+                "board": {
+                  "name": "Desktop Preview"
+                },
+                "category": {
+                  "slug": "desktop_and_install"
+                },
+                "item": {
+                  "slug": "desktop-proof-handoff",
+                  "status": {
+                    "name": "shipped"
+                  },
+                  "voter_notification_allowed": true
+                }
+              }
+            }
+            """).RootElement.Clone();
+        JsonElement callbackPayload = JsonDocument.Parse(
+            """
+            {
+              "type": "email.delivered",
+              "data": {
+                "id": "emailit-pivot-sent",
+                "delivery_id": "delivery-1",
+                "to": "runner@example.com",
+                "created_at": "2026-05-06T13:25:00Z"
+              }
+            }
+            """).RootElement.Clone();
+
+        service.RecordWebhook(payload);
+        service.RecordDeliveryOutcome("emailit", callbackPayload);
+        PublicSignalOperationsPacketViewModel packet = service.BuildPacket();
+        string artifactJson = service.LoadArtifactJson();
+
+        Assert.Single(packet.RecentRoutingReceipts);
+        Assert.Single(packet.RecentCloseoutReceipts);
+        Assert.Single(packet.RecentQueueReceipts);
+        Assert.Single(packet.RecentJourneyReceipts);
+
+        Assert.Equal("sent", packet.RecentRoutingReceipts[0].SourceHotFilterKey);
+        Assert.Equal("Sent threads", packet.RecentRoutingReceipts[0].SourceHotFilterLabel);
+        Assert.Equal(1, packet.RecentRoutingReceipts[0].SourceHotFilterCount);
+
+        Assert.Equal("sent", packet.RecentCloseoutReceipts[0].SourceHotFilterKey);
+        Assert.Equal("Sent threads", packet.RecentCloseoutReceipts[0].SourceHotFilterLabel);
+        Assert.Equal(1, packet.RecentCloseoutReceipts[0].SourceHotFilterCount);
+
+        Assert.Equal("sent", packet.RecentQueueReceipts[0].SourceHotFilterKey);
+        Assert.Equal("Sent threads", packet.RecentQueueReceipts[0].SourceHotFilterLabel);
+        Assert.Equal(1, packet.RecentQueueReceipts[0].SourceHotFilterCount);
+
+        Assert.Equal("sent", packet.RecentJourneyReceipts[0].SourceHotFilterKey);
+        Assert.Equal("Sent threads", packet.RecentJourneyReceipts[0].SourceHotFilterLabel);
+        Assert.Equal(1, packet.RecentJourneyReceipts[0].SourceHotFilterCount);
+        Assert.Contains("\"sourceHotFilterKey\": \"sent\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"sourceHotFilterLabel\": \"Sent threads\"", artifactJson, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -946,6 +1044,8 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("Recipient thread drilldown", threadDetail!.DetailKindLabel);
         Assert.Equal(packet.RecentDispatchReceipts[0].ReceiptId, threadDetail.DetailKey);
         Assert.Equal("all", threadDetail.FilterKey);
+        Assert.Contains("?filter=sent", threadDetail.RelatedHref, StringComparison.Ordinal);
+        Assert.Equal("Open sent threads", threadDetail.RelatedLabel);
         Assert.Single(threadDetail.RecipientThreads);
         Assert.Single(threadDetail.DispatchReceipts);
         Assert.Single(threadDetail.DeliveryOutcomes);
@@ -955,6 +1055,7 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("sent", filteredThreadDetail!.FilterKey);
         Assert.True(filteredThreadDetail.FilterApplied);
         Assert.Contains("?filter=sent", filteredThreadDetail.RelatedHref, StringComparison.Ordinal);
+        Assert.Equal("Open source drilldown with the same filter", filteredThreadDetail.RelatedLabel);
         Assert.Contains("?filter=sent", filteredThreadDetail.SavedPivots.Single(static pivot => string.Equals(pivot.Key, "sent", StringComparison.Ordinal)).ArtifactHref, StringComparison.Ordinal);
         Assert.NotNull(sourceDetailJson);
         Assert.NotNull(threadDetailJson);

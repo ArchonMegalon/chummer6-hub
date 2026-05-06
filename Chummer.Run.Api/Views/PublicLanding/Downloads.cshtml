@@ -214,6 +214,26 @@ else
         </section>
     }
 
+    <section class="flagship-coverage flagship-coverage--downloads">
+        <div class="flagship-coverage__lead">
+            <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
+            <h2 class="editorial-title">The install shelf stays tied to the rest of the product.</h2>
+            <p class="editorial-copy">@Model.FlagshipCoverage.Intro</p>
+        </div>
+        <div class="flagship-coverage__grid">
+            @foreach (var card in Model.FlagshipCoverage.Cards)
+            {
+                <article class="flagship-coverage__card" id="downloads-@card.Id.Replace('_', '-')">
+                    <span class="tag">@card.Label</span>
+                    <h3>@card.Summary</h3>
+                    <p class="flagship-coverage__phase"><strong>Now:</strong> @card.CurrentBody</p>
+                    <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
+                    <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
+                </article>
+            }
+        </div>
+    </section>
+
     @if (hasAdvancedPanels)
     {
         <section class="release-shelf release-shelf--manual" id="advanced-downloads">

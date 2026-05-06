@@ -628,6 +628,7 @@ public sealed class PublicLandingDownloadDispatchTests
             PersonalizedInstallScripts = new PersonalizedInstallScriptService(InstallLinkingStore, Configuration);
             Controller = new PublicLandingController(
                 landing: null!,
+                flagshipCoverage: null!,
                 releases: ManifestService,
                 campaignOsProof: null!,
                 releaseSelection: ReleaseSelection,

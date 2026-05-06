@@ -31,7 +31,6 @@ public sealed class CampaignMovementServiceTests
             SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
             AccountService accounts = new(store);
             GroupService groups = new(store, accounts);
-            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
             CampaignSpineService campaignSpine = new(
                 store,
                 new WorkspaceLifecyclePolicyService(configuration),

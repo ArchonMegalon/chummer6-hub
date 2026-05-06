@@ -29,6 +29,7 @@ public sealed class PublicLandingController : Controller
     private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
 
     private readonly PublicLandingService _landing;
+    private readonly PublicFlagshipCoverageService _flagshipCoverage;
     private readonly PublicReleaseManifestService _releases;
     private readonly CampaignOsLocalProofService _campaignOsProof;
     private readonly ReleaseSelectionService _releaseSelection;
@@ -63,6 +64,7 @@ public sealed class PublicLandingController : Controller
 
     public PublicLandingController(
         PublicLandingService landing,
+        PublicFlagshipCoverageService flagshipCoverage,
         PublicReleaseManifestService releases,
         CampaignOsLocalProofService campaignOsProof,
         ReleaseSelectionService releaseSelection,
@@ -93,6 +95,7 @@ public sealed class PublicLandingController : Controller
         ILogger<PublicLandingController> logger)
     {
         _landing = landing;
+        _flagshipCoverage = flagshipCoverage;
         _releases = releases;
         _campaignOsProof = campaignOsProof;
         _releaseSelection = releaseSelection;
@@ -167,6 +170,7 @@ public sealed class PublicLandingController : Controller
             PreviewItems: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/"),
             ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
             Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"),
+            FlagshipCoverage: _flagshipCoverage.LoadStrip(),
             CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken));
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }
@@ -251,6 +255,7 @@ public sealed class PublicLandingController : Controller
             Assets: new AssetCatalogViewModel(surface.Assets),
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
+            FlagshipCoverage: _flagshipCoverage.LoadStrip(),
             SignedInWindowsBuilds: signedInWindowsBuilds,
             WindowsProofInstallers: windowsProofInstallers,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
@@ -1927,6 +1932,7 @@ public sealed class PublicLandingController : Controller
                 CampaignSpine: campaignSpine,
                 LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
                 PrimaryAction: BuildHomePrimaryAction(experience, campaignSpine, installLinking, releaseExperience),
+                FlagshipCoverage: _flagshipCoverage.LoadStrip(),
                 SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
                 NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
                 HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));

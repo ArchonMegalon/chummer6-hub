@@ -246,6 +246,28 @@
     <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open what works today</a>.</p>
 </section>
 
+<section class="flagship-coverage">
+    <div class="flagship-coverage__lead">
+        <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
+        <h2 class="editorial-title">@Model.FlagshipCoverage.Heading</h2>
+        <p class="editorial-copy">@Model.FlagshipCoverage.Intro</p>
+    </div>
+    <div class="flagship-coverage__grid">
+        @foreach (var card in Model.FlagshipCoverage.Cards)
+        {
+            <article class="flagship-coverage__card" id="@card.Id.Replace('_', '-')">
+                <span class="tag">@card.Label</span>
+                <h3>@card.Summary</h3>
+                <p class="flagship-coverage__phase"><strong>Now:</strong> @card.CurrentTitle</p>
+                <p>@card.CurrentBody</p>
+                <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetTitle</p>
+                <p>@card.TargetBody</p>
+                <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
+            </article>
+        }
+    </div>
+</section>
+
 @if (starterWorkflowCards.Length > 0)
 {
     <section class="workflow-band">

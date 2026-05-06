@@ -813,6 +813,59 @@ public sealed class CampaignSpineService
         return GetWorkspace(user, workspaceId, installLinking)?.CampaignAdoptionLoop;
     }
 
+    public CampaignAdoptionWorkspaceStateProjection? GetWorkspaceCampaignState(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking = null)
+    {
+        ArgumentNullException.ThrowIfNull(user);
+        ArgumentException.ThrowIfNullOrWhiteSpace(workspaceId);
+
+        CampaignWorkspaceProjection workspace = GetWorkspace(user, workspaceId, installLinking)
+            ?? throw new KeyNotFoundException($"Unknown workspace: {workspaceId}");
+
+        lock (_store.Gate)
+        {
+            CampaignAdoptionProjection? adoption = _store.CampaignAdoptions
+                .Where(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+            RunnerGoalProjection[] runnerGoals = _store.RunnerGoals
+                .Where(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            ResolutionReportApprovalProjection[] approvals = _store.ResolutionReportApprovals
+                .Where(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            WorldTickProjection[] worldTicks = _store.WorldTicks
+                .Where(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+            PlayerSafeNewsProjection[] newsItems = _store.PlayerSafeNews
+                .Where(item => string.Equals(item.WorkspaceId, workspace.WorkspaceId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.UpdatedAtUtc)
+                .ToArray();
+
+            if (adoption is null
+                && runnerGoals.Length == 0
+                && approvals.Length == 0
+                && worldTicks.Length == 0
+                && newsItems.Length == 0)
+            {
+                return null;
+            }
+
+            return new CampaignAdoptionWorkspaceStateProjection(
+                WorkspaceId: workspace.WorkspaceId,
+                CampaignAdoption: adoption is null ? null : BuildCampaignAdoptionRecordProjection(workspace, adoption),
+                RunnerGoals: runnerGoals.Select(BuildCampaignAdoptionRunnerGoalProjection).ToArray(),
+                ResolutionReports: approvals.Select(approval => BuildCampaignAdoptionResolutionReportProjection(workspace, approval, worldTicks)).ToArray(),
+                WorldTicks: worldTicks.Select(worldTick => BuildCampaignAdoptionWorldTickProjection(workspace, worldTick)).ToArray(),
+                NewsItems: newsItems.Select(newsItem => BuildPlayerSafeNewsItemProjection(workspace, newsItem)).ToArray());
+        }
+    }
+
     public GovernedPrepLaunchProjection RecordPrepLaunch(
         HubUserDto user,
         CampaignWorkspaceProjection workspace,
@@ -5992,6 +6045,146 @@ public sealed class CampaignSpineService
 
         return value.Trim().Replace('_', ' ');
     }
+
+    private static CampaignAdoptionRecordProjection BuildCampaignAdoptionRecordProjection(
+        CampaignWorkspaceProjection workspace,
+        CampaignAdoptionProjection adoption)
+    {
+        string status = adoption.SafeToPlay
+            ? "playable_with_review"
+            : adoption.ExplicitUnknowns.Count == 0
+                ? "review_required"
+                : "history_gaps_open";
+
+        return new CampaignAdoptionRecordProjection(
+            AdoptionId: adoption.AdoptionId,
+            WorkspaceId: adoption.WorkspaceId,
+            CampaignId: adoption.CampaignId,
+            CampaignName: workspace.CampaignName,
+            Status: status,
+            SafeToPlay: adoption.SafeToPlay,
+            ConfidencePercent: adoption.ConfidencePercent,
+            Known: new CampaignAdoptionKnownCountsProjection(
+                Runners: adoption.RunnerCount,
+                ActiveJobs: adoption.ActiveJobCount,
+                Contacts: adoption.ContactCount,
+                HouseRules: adoption.HouseRuleCount),
+            UnknownHistoryMarkers: adoption.ExplicitUnknowns,
+            RecommendedNextActions: adoption.RecommendedNextActions,
+            Summary: adoption.Summary,
+            NextBestCleanupAction: adoption.NextSafeAction,
+            EvidenceLines: adoption.EvidenceLines,
+            InitiatedByUserId: adoption.UpdatedByUserId,
+            AdoptedAtUtc: adoption.UpdatedAtUtc);
+    }
+
+    private static CampaignAdoptionRunnerGoalProjection BuildCampaignAdoptionRunnerGoalProjection(RunnerGoalProjection goal)
+        => new(
+            GoalId: goal.GoalId,
+            WorkspaceId: goal.WorkspaceId,
+            CampaignId: goal.CampaignId,
+            DossierId: goal.DossierId,
+            RunnerHandle: goal.RunnerHandle,
+            GoalTitle: goal.Label,
+            Status: goal.ApprovalStatus,
+            UpdateKind: goal.TargetKind,
+            Summary: $"{goal.Label} targets {goal.TargetKind} / {goal.TargetReference}. {goal.NextSafeAction}",
+            EvidenceLines: goal.EvidenceLines,
+            InitiatedByUserId: goal.UpdatedByUserId,
+            UpdatedAtUtc: goal.UpdatedAtUtc);
+
+    private static WorldChangeProjection BuildCampaignAdoptionWorldChangeProjection(
+        string kind,
+        string subject,
+        int delta,
+        string summary)
+        => new(
+            Kind: kind,
+            Subject: subject,
+            Delta: delta,
+            Summary: summary);
+
+    private static CampaignAdoptionWorldTickProjection BuildCampaignAdoptionWorldTickProjection(
+        CampaignWorkspaceProjection workspace,
+        WorldTickProjection worldTick)
+        => new(
+            WorldTickId: worldTick.WorldTickId,
+            WorkspaceId: worldTick.WorkspaceId,
+            CampaignId: worldTick.CampaignId,
+            CampaignName: workspace.CampaignName,
+            WorldRef: workspace.CampaignId,
+            TickRef: worldTick.RunId,
+            Summary: worldTick.Summary,
+            CauseRefs: FinalizeLines([worldTick.RunId, worldTick.RunTitle]),
+            Changes:
+            [
+                BuildCampaignAdoptionWorldChangeProjection(
+                    kind: "world_tick",
+                    subject: worldTick.RunTitle,
+                    delta: 0,
+                    summary: worldTick.ConsequenceSummary)
+            ],
+            HeatDelta: 0,
+            GmApproved: true,
+            SpoilerPolicy: "player_safe_preview_only",
+            EvidenceLines: worldTick.EvidenceLines,
+            InitiatedByUserId: worldTick.UpdatedByUserId,
+            CreatedAtUtc: worldTick.UpdatedAtUtc);
+
+    private static CampaignAdoptionResolutionReportProjection BuildCampaignAdoptionResolutionReportProjection(
+        CampaignWorkspaceProjection workspace,
+        ResolutionReportApprovalProjection approval,
+        IReadOnlyList<WorldTickProjection> worldTicks)
+    {
+        WorldTickProjection? matchingWorldTick = worldTicks
+            .FirstOrDefault(item => string.Equals(item.WorldTickId, approval.WorldTickId, StringComparison.OrdinalIgnoreCase));
+
+        WorldChangeProjection[] deltas = matchingWorldTick is null
+            ? Array.Empty<WorldChangeProjection>()
+            : [
+                BuildCampaignAdoptionWorldChangeProjection(
+                    kind: "world_tick",
+                    subject: matchingWorldTick.RunTitle,
+                    delta: 0,
+                    summary: matchingWorldTick.ConsequenceSummary)
+            ];
+
+        return new CampaignAdoptionResolutionReportProjection(
+            ApprovalId: approval.ApprovalId,
+            WorkspaceId: approval.WorkspaceId,
+            CampaignId: approval.CampaignId,
+            CampaignName: workspace.CampaignName,
+            DraftPackageId: approval.ApprovalId,
+            RunId: approval.RunId,
+            RunTitle: approval.RunTitle,
+            Status: "approved",
+            Outcomes: FinalizeLines([approval.Summary]),
+            Deltas: deltas,
+            HeatDelta: 0,
+            Summary: approval.Summary,
+            EvidenceLines: approval.EvidenceLines,
+            WorldTickId: approval.WorldTickId,
+            NewsItemId: approval.NewsId,
+            InitiatedByUserId: approval.UpdatedByUserId,
+            ApprovedAtUtc: approval.UpdatedAtUtc);
+    }
+
+    private static PlayerSafeNewsItemProjection BuildPlayerSafeNewsItemProjection(
+        CampaignWorkspaceProjection workspace,
+        PlayerSafeNewsProjection newsItem)
+        => new(
+            NewsItemId: newsItem.NewsId,
+            WorkspaceId: newsItem.WorkspaceId,
+            CampaignId: newsItem.CampaignId,
+            CampaignName: workspace.CampaignName,
+            Visibility: "player_safe_preview_only",
+            Headline: newsItem.Title,
+            Summary: newsItem.Summary,
+            SourceRefs: FinalizeLines([newsItem.Source, newsItem.Url, newsItem.WorldTickId]),
+            SpoilerLevel: newsItem.SpoilerPolicy,
+            EvidenceLines: newsItem.EvidenceLines,
+            InitiatedByUserId: newsItem.UpdatedByUserId,
+            PublishedAtUtc: newsItem.UpdatedAtUtc);
 
     private static CampaignAdoptionLoopProjection? BuildCampaignAdoptionLoopProjection(
         string workspaceId,
