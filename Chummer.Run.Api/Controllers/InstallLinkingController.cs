@@ -55,6 +55,9 @@ public sealed class InstallLinkingController : ControllerBase
     private readonly PublicReleaseManifestService _releases;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
+    private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
+    private readonly LocalReleaseProofArtifactService _localReleaseProof;
 
     public InstallLinkingController(
         HubIdentityClient identity,
@@ -62,7 +65,8 @@ public sealed class InstallLinkingController : ControllerBase
         InstallLinkingService installLinking,
         PublicReleaseManifestService releases,
         SupportCaseService supportCases,
-        SupportCasePresentationService supportPresentation)
+        SupportCasePresentationService supportPresentation,
+        IConfiguration configuration)
     {
         _identity = identity;
         _accounts = accounts;
@@ -70,6 +74,9 @@ public sealed class InstallLinkingController : ControllerBase
         _releases = releases;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
+        _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
+        _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
     }
 
     [HttpGet("me")]
@@ -247,6 +254,9 @@ public sealed class InstallLinkingController : ControllerBase
             updateAvailable);
         DesktopInstallSupportContinuationCase? leadSupportCase = supportCases.FirstOrDefault(static item => item.ReporterActionNeeded)
             ?? supportCases.FirstOrDefault();
+        NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
+            NativeContinuationHref,
+            "No current local release-proof receipt is attached to the native claimed-install continuation route.");
         string supportHref = DesktopInstallRail.BuildAccountSupportHref(
             installationId: installation.InstallationId,
             applicationVersion: installation.Version,
@@ -269,6 +279,9 @@ public sealed class InstallLinkingController : ControllerBase
             CurrentReleaseVersion: manifest.Version,
             CurrentReleaseChannel: manifest.Channel,
             CurrentArtifactId: releaseArtifact?.Id,
+            RouteState: nativeRouteProof.State,
+            RouteReceipt: nativeRouteProof.RouteReceipt,
+            BoundedFailureReason: nativeRouteProof.BoundedFailureReason,
             FallbackPosture: continuation?.FallbackPosture
                 ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
             UpdateAvailable: updateAvailable,
@@ -314,6 +327,9 @@ public sealed class InstallLinkingController : ControllerBase
             : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
         DownloadReceiptDto? receipt = ResolveLatestReceipt(installSummary, installation, releaseArtifact);
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
+        NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
+            NativeSupportHref,
+            "No current local release-proof receipt is attached to the native claimed-install support route.");
 
         SupportCaseProjection created;
         try
@@ -351,6 +367,9 @@ public sealed class InstallLinkingController : ControllerBase
             CurrentReleaseVersion: manifest.Version,
             CurrentReleaseChannel: manifest.Channel,
             CurrentArtifactId: releaseArtifact?.Id,
+            RouteState: nativeRouteProof.State,
+            RouteReceipt: nativeRouteProof.RouteReceipt,
+            BoundedFailureReason: nativeRouteProof.BoundedFailureReason,
             FallbackPosture: continuation?.FallbackPosture
                 ?? "Release artifact truth is unavailable for this claimed install. Stay on the current install rail and use support recovery with this install identity attached.",
             UpdateAvailable: updateAvailable,
@@ -384,6 +403,9 @@ public sealed class InstallLinkingController : ControllerBase
             : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
         DownloadReceiptDto? receipt = ResolveLatestReceipt(installSummary, installation, releaseArtifact);
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
+        NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
+            NativeUpdateHref,
+            "No current local release-proof receipt is attached to the native claimed-install update planner route.");
 
         string supportHref = DesktopInstallRail.BuildAccountSupportHref(
             installationId: installation.InstallationId,
@@ -406,6 +428,9 @@ public sealed class InstallLinkingController : ControllerBase
             CurrentReleaseVersion: manifest.Version,
             CurrentReleaseChannel: manifest.Channel,
             CurrentArtifactId: releaseArtifact?.Id,
+            RouteState: nativeRouteProof.State,
+            RouteReceipt: nativeRouteProof.RouteReceipt,
+            BoundedFailureReason: nativeRouteProof.BoundedFailureReason,
             UpdateAvailable: updateAvailable,
             UpdatePlan: BuildNativeUpdatePlan(installation, manifest, releaseArtifact, receipt, updateAvailable),
             UpdateAction: updateAvailable
@@ -445,6 +470,9 @@ public sealed class InstallLinkingController : ControllerBase
             : DesktopInstallRail.BuildContinuationReceipt(releaseArtifact, manifest, recoveryMode: false);
         DownloadReceiptDto? receipt = ResolveLatestReceipt(installSummary, installation, releaseArtifact);
         bool updateAvailable = IsUpdateAvailable(installation, manifest, releaseArtifact);
+        NativeRouteProofStatus nativeRouteProof = BuildNativeRouteProofStatus(
+            NativeRollbackHref,
+            "No current local release-proof receipt is attached to the native claimed-install rollback planner route.");
 
         string supportHref = DesktopInstallRail.BuildAccountSupportHref(
             installationId: installation.InstallationId,
@@ -467,6 +495,9 @@ public sealed class InstallLinkingController : ControllerBase
             CurrentReleaseVersion: manifest.Version,
             CurrentReleaseChannel: manifest.Channel,
             CurrentArtifactId: releaseArtifact?.Id,
+            RouteState: nativeRouteProof.State,
+            RouteReceipt: nativeRouteProof.RouteReceipt,
+            BoundedFailureReason: nativeRouteProof.BoundedFailureReason,
             UpdateAvailable: updateAvailable,
             RollbackPlan: BuildNativeRollbackPlan(installation, receipt),
             RollbackAction: continuation?.RollbackAction
@@ -1724,8 +1755,70 @@ public sealed class InstallLinkingController : ControllerBase
             values.Select(static item =>
                 $"{Uri.EscapeDataString(item.Key)}={Uri.EscapeDataString(item.Value ?? string.Empty)}"));
 
+    private NativeRouteProofStatus BuildNativeRouteProofStatus(string route, string boundedFailureReason)
+    {
+        LocalReleaseProofLookupResult routeLookup = FindLocalReleaseProofReceipt(route);
+        if (!string.IsNullOrWhiteSpace(routeLookup.CurrentnessFailureReason))
+        {
+            return new NativeRouteProofStatus(
+                State: "bounded_failure",
+                RouteReceipt: null,
+                BoundedFailureReason: $"Parity claims stay review-required because {routeLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')}.");
+        }
+
+        LocalProofReceiptMatch? routeReceipt = routeLookup.ReceiptMatch;
+        if (routeReceipt is null)
+        {
+            return new NativeRouteProofStatus(
+                State: "bounded_failure",
+                RouteReceipt: null,
+                BoundedFailureReason: boundedFailureReason);
+        }
+
+        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        if (readiness?.MissingDesktopClientCoverage == true)
+        {
+            string reviewRequiredReason = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
+            return new NativeRouteProofStatus(
+                State: "bounded_failure",
+                RouteReceipt: BuildRouteReceiptPayload(routeReceipt),
+                BoundedFailureReason: $"Current direct route receipt is attached, but parity claims stay review-required because {reviewRequiredReason}.");
+        }
+
+        ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+        if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
+        {
+            return new NativeRouteProofStatus(
+                State: "bounded_failure",
+                RouteReceipt: BuildRouteReceiptPayload(routeReceipt),
+                BoundedFailureReason: $"Current direct route receipt is attached, but parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
+        }
+
+        return new NativeRouteProofStatus(
+            State: "pass",
+            RouteReceipt: BuildRouteReceiptPayload(routeReceipt),
+            BoundedFailureReason: null);
+    }
+
+    private static NativeRouteReceiptDto? BuildRouteReceiptPayload(LocalProofReceiptMatch? routeReceipt)
+        => routeReceipt is null
+            ? null
+            : new NativeRouteReceiptDto(
+                ReceiptId: routeReceipt.ReceiptId,
+                PackageId: routeReceipt.PackageId,
+                MatchedRoute: routeReceipt.MatchedRoute,
+                MatchMode: routeReceipt.MatchMode,
+                Summary: routeReceipt.Summary);
+
+    private LocalReleaseProofLookupResult FindLocalReleaseProofReceipt(params string?[] routeCandidates)
+        => _localReleaseProof.FindReceipt(routeCandidates);
+
+    private static string? NormalizeOptionalValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
     private static string NormalizeResponseValue(string? value)
         => string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
+
 }
 
 public sealed record DesktopInstallNativeContinuationRequest(
@@ -1745,6 +1838,9 @@ public sealed record DesktopInstallNativeContinuationResponse(
     string CurrentReleaseVersion,
     string CurrentReleaseChannel,
     string? CurrentArtifactId,
+    string RouteState,
+    NativeRouteReceiptDto? RouteReceipt,
+    string? BoundedFailureReason,
     string FallbackPosture,
     bool UpdateAvailable,
     string NextSafeAction,
@@ -1791,6 +1887,9 @@ public sealed record DesktopInstallNativeSupportResponse(
     string CurrentReleaseVersion,
     string CurrentReleaseChannel,
     string? CurrentArtifactId,
+    string RouteState,
+    NativeRouteReceiptDto? RouteReceipt,
+    string? BoundedFailureReason,
     string FallbackPosture,
     bool UpdateAvailable,
     string UpdateAction,
@@ -1809,6 +1908,9 @@ public sealed record DesktopInstallNativeUpdateResponse(
     string CurrentReleaseVersion,
     string CurrentReleaseChannel,
     string? CurrentArtifactId,
+    string RouteState,
+    NativeRouteReceiptDto? RouteReceipt,
+    string? BoundedFailureReason,
     bool UpdateAvailable,
     string UpdatePlan,
     string UpdateAction,
@@ -1833,6 +1935,9 @@ public sealed record DesktopInstallNativeRollbackResponse(
     string CurrentReleaseVersion,
     string CurrentReleaseChannel,
     string? CurrentArtifactId,
+    string RouteState,
+    NativeRouteReceiptDto? RouteReceipt,
+    string? BoundedFailureReason,
     bool UpdateAvailable,
     string RollbackPlan,
     string RollbackAction,
@@ -1877,3 +1982,15 @@ public sealed record DesktopInstallSupportContinuationCase(
     string NativeRollbackHref,
     string NativeRecoveryHref,
     string RecoveryAction);
+
+public sealed record NativeRouteReceiptDto(
+    string ReceiptId,
+    string PackageId,
+    string MatchedRoute,
+    string MatchMode,
+    string Summary);
+
+public sealed record NativeRouteProofStatus(
+    string State,
+    NativeRouteReceiptDto? RouteReceipt,
+    string? BoundedFailureReason);

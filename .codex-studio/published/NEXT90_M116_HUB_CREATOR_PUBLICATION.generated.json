@@ -1,0 +1,43 @@
+{
+  "generatedAt": "2026-05-05T11:45:00Z",
+  "status": "pass",
+  "contract_name": "chummer6-hub.next90_m116_hub_creator_publication",
+  "evidence": {
+    "packageId": "next90-m116-hub-creator-publication",
+    "workTaskId": "116.1",
+    "frontierId": 3131897979,
+    "milestoneId": 116,
+    "wave": "W13",
+    "repo": "chummer6-hub",
+    "task": "Build creator publication discovery and moderation orchestration",
+    "title": "Build creator publication discovery and moderation orchestration",
+    "status": "complete",
+    "completionAction": "verify_closed_package_only",
+    "doNotReopenReason": "M116 chummer6-hub creator publication discovery and moderation orchestration is complete; future shards must verify approved-manifest authority discovery, correction, moderation, public artifact shelf contracts, and registry-facing proof evidence from this package instead of reopening this slice.",
+    "allowedPaths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "ownedSurfaces": [
+      "creator_publication:discovery",
+      "creator_publication:moderation"
+    ],
+    "proofFiles": [
+      "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+      "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/AccountsController.cs",
+      "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
+      "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
+      "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/Accounts/Account.cshtml",
+      "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
+      "/docker/chummercomplete/chummer.run-services/tests/RunServicesSmoke/Program.cs",
+      "/docker/chummercomplete/chummer.run-services/scripts/verify_next90_m116_hub_creator_publication.py",
+      "/docker/chummercomplete/chummer.run-services/tests/test_next90_m116_hub_creator_publication.py"
+    ],
+    "proofCommands": {
+      "verifyScript": "python3 scripts/verify_next90_m116_hub_creator_publication.py",
+      "targetedTests": "python3 -m unittest tests/test_next90_m116_hub_creator_publication.py",
+      "aggregateVerify": "bash scripts/ai/verify.sh"
+    }
+  }
+}

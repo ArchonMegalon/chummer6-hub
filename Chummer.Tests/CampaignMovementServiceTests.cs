@@ -28,6 +28,7 @@ public sealed class CampaignMovementServiceTests
                 .Build();
 
             CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);
             AccountService accounts = new(store);
             GroupService groups = new(store, accounts);
             SupportStore supportStore = new(configuration, NullLogger<SupportStore>.Instance);

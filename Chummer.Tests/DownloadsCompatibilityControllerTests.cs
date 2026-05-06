@@ -567,6 +567,7 @@ public sealed class DownloadsCompatibilityControllerTests
                 InstallLinking,
                 InstallBootstrapTickets,
                 identityClient,
+                Configuration,
                 NullLogger<DownloadsCompatibilityController>.Instance);
         }
 

@@ -1,0 +1,46 @@
+{
+  "contract_name": "chummer6-hub.next90_m121_hub_runboard_resolution",
+  "status": "passed",
+  "proof_kind": "source_backed_local_smoke_contract",
+  "package_proof": {
+    "package_id": "next90-m121-hub-persist-session-turn-ledger-handoff-runboard-state-and-r",
+    "work_task_id": "121.5",
+    "title": "Persist session turn-ledger handoff, runboard state, and ResolutionReport draft continuity without owning engine math.",
+    "task": "Persist session turn-ledger handoff, runboard state, and ResolutionReport draft continuity without owning engine math.",
+    "frontier_id": 7165194744,
+    "milestone_id": 121,
+    "wave": "W15",
+    "repo": "chummer6-hub",
+    "status": "not_started",
+    "allowed_paths": [
+      "Chummer.Run.Api",
+      "scripts",
+      "tests"
+    ],
+    "owned_surfaces": [
+      "persist_session_turn_ledger_handoff:hub"
+    ]
+  },
+  "source_file": "tests/RunServicesSmoke/Program.cs",
+  "surfaces_passed": [
+    "persist_session_turn_ledger_handoff:hub",
+    "resolution_report_draft_continuity"
+  ],
+  "required_markers": {
+    "persist_session_turn_ledger_handoff:hub": [
+      "PackageKind: \"runboard_state\",",
+      "Assert(runboardStatePayload.EvidenceLines.Any(item => item.Contains(\"Turn ledger handoff:\", StringComparison.OrdinalIgnoreCase)), \"campaign spine runboard state api should persist turn-ledger handoff evidence lines.\");",
+      "Assert(runboardStatePayload.EvidenceLines.Any(item => item.Contains(\"Runboard state:\", StringComparison.OrdinalIgnoreCase)), \"campaign spine runboard state api should persist runboard-state evidence lines.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, runboardStatePayload.PackageId, StringComparison.Ordinal)) == true, \"campaign spine server plane api should project runboard state packets after generation.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"runboard_state\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should name runboard packets explicitly on the bounded what-changed rail.\");"
+    ],
+    "resolution_report_draft_continuity": [
+      "PackageKind: \"resolution_report_draft\",",
+      "Assert(resolutionReportDraftPayload.EvidenceLines.Any(item => item.Contains(\"Turn ledger handoff:\", StringComparison.OrdinalIgnoreCase)), \"campaign spine ResolutionReport draft api should persist turn-ledger handoff evidence lines.\");",
+      "Assert(resolutionReportDraftPayload.EvidenceLines.Any(item => item.Contains(\"ResolutionReport draft posture:\", StringComparison.OrdinalIgnoreCase)), \"campaign spine ResolutionReport draft api should persist draft-posture evidence lines.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.AftermathPackages.Any(item => string.Equals(item.PackageId, resolutionReportDraftPayload.PackageId, StringComparison.Ordinal)) == true, \"campaign spine server plane api should project ResolutionReport draft packets after generation.\");",
+      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"resolution_report\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should name ResolutionReport drafts explicitly on the bounded what-changed rail.\");"
+    ]
+  },
+  "generated_at": "2026-05-05T16:23:58Z"
+}

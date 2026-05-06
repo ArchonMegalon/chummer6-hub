@@ -3,11 +3,16 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-trust-page";
+    var helpPage = string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase);
+    var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
     var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
         : "/downloads";
+    var policyFacts = new List<(string Tag, string Heading, string Summary, string Href)>();
+    var helpRouteChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
+    var contactRouteChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
 
     string ContextualPreviewHref(string? href)
     {
@@ -37,6 +42,83 @@
         "product-question" => new TrustPageActionViewModel("Open support intake", "/contact#support-intake", "ghost"),
         _ => null
     };
+
+    if (policyPage && Model.SummaryPoints is { Count: > 0 })
+    {
+        for (var index = 0; index < Model.SummaryPoints.Count; index++)
+        {
+            var sourceSection = index < Model.Sections.Count ? Model.Sections[index] : null;
+            policyFacts.Add((
+                Tag: sourceSection?.Eyebrow ?? "Policy",
+                Heading: sourceSection?.Heading ?? "Current boundary",
+                Summary: Model.SummaryPoints[index],
+                Href: sourceSection is null ? "#" : $"#{sourceSection.Id}"));
+        }
+    }
+
+    if (helpPage)
+    {
+        foreach (var pageSection in Model.Sections)
+        {
+            var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated);
+            var fallbackAction = HelpFallbackActionFor(pageSection.Id, Model.Chrome.Authenticated);
+            var routeAction = quickAction ?? fallbackAction ?? new TrustPageActionViewModel("Open details", $"#{pageSection.Id}", "ghost");
+            helpRouteChoices.Add((
+                Badge: pageSection.Eyebrow,
+                Title: pageSection.Heading,
+                Summary: pageSection.Body,
+                Href: ContextualPreviewHref(routeAction.Href),
+                Label: routeAction.Label,
+                Proof: (pageSection.Bullets ?? Array.Empty<string>()).Take(3).ToArray()));
+        }
+    }
+
+    if (contactPage && Model.SupportIntake is not null)
+    {
+        string installHref = ContextualPreviewHref(Model.SupportIntake.InstallAccessHref);
+        string installSummary = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary)
+            ? "Devices and access stays the calm relink, reclaim, and recovery rail after the installer or app does the real work."
+            : Model.SupportIntake.InstallRailSummary!;
+        string installTitle = Model.SupportIntake.RecoveryModeOnly
+            ? "Install recovery stays on the same device rail"
+            : "Install continuity stays attached to the affected copy";
+        string installRouteLabel = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
+            ? Model.SupportIntake.InstallAccessLabel
+            : Model.SupportIntake.InstallRailLabel!;
+        contactRouteChoices.Add((
+            Badge: "Public signal",
+            Title: "Safe public feedback should start on Fixer Board",
+            Summary: "Feature requests, safe public bugs, and confusing public copy belong on the public signal lane. Install failures, account issues, logs, and private campaign detail do not.",
+            Href: "/feedback",
+            Label: "Open Fixer Board",
+            Proof: new[] { "Public by default", "Votes inform demand", "No private logs" }));
+        contactRouteChoices.Add((
+            Badge: "Private support",
+            Title: "Use the support form when the issue needs private or account-linked follow-up",
+            Summary: "First-party support is the normal path for crashes, install recovery, broken behavior, and anything that needs logs, support history, or a quieter follow-up loop.",
+            Href: "#support-intake",
+            Label: "Open support intake",
+            Proof: new[] { "Support-owned", "Tracked return", "Private by default" }));
+        contactRouteChoices.Add((
+            Badge: "Tracked return",
+            Title: "Create an account when you want support history in one place",
+            Summary: "Guest submissions are allowed, but account-backed follow-up keeps the case, recovery state, and later replies attached to the same Chummer return path.",
+            Href: ContextualPreviewHref(Model.SupportIntake.AccountSupportHref),
+            Label: Model.SupportIntake.AccountSupportLabel,
+            Proof: new[] { "Guest allowed", "History in Account", "No GitHub required" }));
+        contactRouteChoices.Add((
+            Badge: "Install continuity",
+            Title: installTitle,
+            Summary: installSummary,
+            Href: installHref,
+            Label: installRouteLabel,
+            Proof: new[]
+            {
+                Model.SupportIntake.RecoveryModeOnly ? "Recovery mode only" : "Normal install rail",
+                "Devices & access stays calm",
+                "Browser handoff, not claim ritual"
+            }));
+    }
 }
 
 <section class="trust-page-hero">
@@ -90,28 +172,69 @@
     @await Html.PartialAsync("~/Views/Shared/_PrivacyBoundaryPanel.cshtml", Model.PrivacyBoundary)
 }
 
-@if (policyPage && Model.SummaryPoints is { Count: > 0 })
+@if (policyFacts.Count > 0)
 {
-    <section class="trust-rail-section">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">What changed in this version</p>
-            <h2 class="editorial-title">Read the current policy delta before you dive into the full document</h2>
+    <section class="continuity-band trust-doc-band">
+        <div class="continuity-band__copy">
+            <p class="eyebrow">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Boundary summary" : "Rule summary"))</p>
+            <h2 class="editorial-title">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Read the trust boundary first, then the full policy." : "Read the rule boundary first, then the full terms."))</h2>
+            <p class="editorial-copy">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
+                ? "Start with the short version: the binary stays the same for everyone, account truth is bounded, and telemetry or diagnostics stay explicit about what they capture."
+                : "Start with the short version: this is honest early access, support starts with Chummer, and the normal download path stays clearer than the edge-case fallback."))</p>
         </div>
-        <div class="trust-rail-list">
-            @foreach (var point in Model.SummaryPoints)
+        <div class="continuity-band__panel">
+            @foreach (var fact in policyFacts)
             {
-                <article class="trust-rail">
-                    <span class="tag">Policy</span>
-                    <p>@point</p>
+                <article class="continuity-band__fact">
+                    <span>@fact.Tag</span>
+                    <strong>@fact.Heading</strong>
+                    <p>@fact.Summary</p>
+                    @if (!string.Equals(fact.Href, "#", StringComparison.Ordinal))
+                    {
+                        <a class="inline-link" href="@fact.Href">Open section</a>
+                    }
                 </article>
             }
         </div>
     </section>
 }
 
-@if (string.Equals(Model.PageId, "help", StringComparison.OrdinalIgnoreCase))
+@if (helpPage)
 {
-    <section class="trust-page-sections">
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Help route map</p>
+            <h2 class="editorial-title">Choose the next safe help path.</h2>
+            <p class="editorial-copy">Downloads, recovery, product questions, and private support are separate jobs. Start on the right rail so the fix path stays short and the follow-through stays attached.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var choice in helpRouteChoices)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@choice.Badge</span>
+                    <h3>@choice.Title</h3>
+                    <p>@choice.Summary</p>
+                    @if (choice.Proof.Length > 0)
+                    {
+                        <div class="route-choice-card__proof">
+                            @foreach (var item in choice.Proof)
+                            {
+                                <span>@item</span>
+                            }
+                        </div>
+                    }
+                    <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                </article>
+            }
+        </div>
+    </section>
+
+    <section class="workflow-band">
+        <div class="workflow-band__lead">
+            <p class="eyebrow">Route detail</p>
+            <h2 class="editorial-title">First-party help keeps the next step concrete.</h2>
+            <p class="editorial-copy">Each lane answers one question quickly: where to get the right build, how to recover access, when to open a private case, and when a plain answer should be enough.</p>
+        </div>
         <div class="workflow-grid">
             @foreach (var pageSection in Model.Sections)
             {
@@ -145,7 +268,7 @@
         </div>
     </section>
 }
-else
+else if (!contactPage)
 {
     <section class="trust-page-layout">
         <aside class="account-nav account-nav--trust" aria-label="Page sections">
@@ -178,6 +301,34 @@ else
 
 @if (Model.SupportIntake is not null)
 {
+    if (contactPage)
+    {
+        <section class="editorial-block">
+            <div class="editorial-block__lead">
+                <p class="eyebrow">Support routing</p>
+                <h2 class="editorial-title">Public signal, private support, tracked return, and install recovery stay separate.</h2>
+                <p class="editorial-copy">This route exists to start the right first-party case. Use the public board for safe signal, then move here as soon as the problem needs logs, recovery, account help, or any private campaign detail.</p>
+            </div>
+            <div class="route-choice-grid">
+                @foreach (var choice in contactRouteChoices)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@choice.Badge</span>
+                        <h3>@choice.Title</h3>
+                        <p>@choice.Summary</p>
+                        <div class="route-choice-card__proof">
+                            @foreach (var item in choice.Proof)
+                            {
+                                <span>@item</span>
+                            }
+                        </div>
+                        <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
     <section class="trust-page-sections" id="support-intake">
         <article class="trust-page-section trust-page-section--form">
             <p class="eyebrow">Support intake</p>
@@ -188,6 +339,23 @@ else
             {
                 <p class="status-copy status-copy--success">@Model.SupportIntake.SubmissionNotice</p>
             }
+
+            <div class="editorial-block__lead trust-page-section__lead">
+                <p class="eyebrow">Case-type guide</p>
+                <h3>Choose the lane that fits the issue before you attach logs</h3>
+                <p class="muted-copy">Safe public feedback should start on Fixer Board. Choose this form only when the issue needs private or account-linked follow-up.</p>
+            </div>
+            <div class="compact-rail">
+                @foreach (var option in Model.SupportIntake.Options)
+                {
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>@option.Label</h3>
+                            <p>@option.Description</p>
+                        </div>
+                    </article>
+                }
+            </div>
 
             <form class="settings-form" method="post" action="@Model.SupportIntake.ActionHref" enctype="multipart/form-data">
                 @Html.AntiForgeryToken()
@@ -279,18 +447,6 @@ else
                     </article>
                 </div>
             }
-
-            <div class="compact-rail">
-                @foreach (var option in Model.SupportIntake.Options)
-                {
-                    <article class="compact-rail__item">
-                        <div class="compact-rail__copy">
-                            <h3>@option.Label</h3>
-                            <p>@option.Description</p>
-                        </div>
-                    </article>
-                }
-            </div>
         </article>
     </section>
 }

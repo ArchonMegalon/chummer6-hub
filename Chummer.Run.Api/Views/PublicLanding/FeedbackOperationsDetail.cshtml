@@ -1,0 +1,433 @@
+@model PublicSignalOperationsDetailPageViewModel
+@{
+    ViewData["Title"] = Model.Detail.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-participate";
+    var detail = Model.Detail;
+    var routingReceipts = detail.RoutingReceipts.ToArray();
+    var closeoutReceipts = detail.CloseoutReceipts.ToArray();
+    var queueReceipts = detail.QueueReceipts.ToArray();
+    var recipientThreads = detail.RecipientThreads.ToArray();
+    var dispatchReceipts = detail.DispatchReceipts.ToArray();
+    var deliveryOutcomes = detail.DeliveryOutcomes.ToArray();
+    var journeyReceipts = detail.JourneyReceipts.ToArray();
+    var savedPivots = detail.SavedPivots.ToArray();
+    var sourceReceipt = detail.SourceReceipt;
+    var totalThreadCount = savedPivots.FirstOrDefault(static pivot => string.Equals(pivot.Key, "all", StringComparison.Ordinal))?.Count ?? recipientThreads.Length;
+    string AppendCurrentFilter(string baseHref)
+        => detail.FilterApplied
+            ? $"{baseHref}?filter={Uri.EscapeDataString(detail.FilterKey)}"
+            : baseHref;
+    string SourceDetailHref(string sourceReceiptId)
+        => AppendCurrentFilter($"/feedback/operations/source/{Uri.EscapeDataString(sourceReceiptId)}");
+    string SourceArtifactHref(string sourceReceiptId)
+        => AppendCurrentFilter($"/api/v1/public/feedback/operations/source/{Uri.EscapeDataString(sourceReceiptId)}");
+    string ThreadDetailHref(string dispatchReceiptId)
+        => AppendCurrentFilter($"/feedback/operations/thread/{Uri.EscapeDataString(dispatchReceiptId)}");
+    string ThreadArtifactHref(string dispatchReceiptId)
+        => AppendCurrentFilter($"/api/v1/public/feedback/operations/thread/{Uri.EscapeDataString(dispatchReceiptId)}");
+}
+
+<section class="release-footnote route-anchor-target">
+    <p class="eyebrow">@detail.Eyebrow</p>
+    <h1 class="page-title">@detail.Heading</h1>
+    <p class="page-copy">@detail.Summary</p>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@detail.BackHref">@detail.BackLabel</a>
+        <a class="button-like button-like--secondary" href="@detail.DetailArtifactHref">Open detail artifact</a>
+        <a class="button-like button-like--ghost" href="@detail.AggregateArtifactHref">Open aggregate artifact</a>
+        <a class="button-like button-like--ghost" href="/feedback/operations/lookup?q=@Uri.EscapeDataString(detail.DetailKey)">Search another bounded drilldown</a>
+        @if (!string.IsNullOrWhiteSpace(detail.RelatedHref) && !string.IsNullOrWhiteSpace(detail.RelatedLabel))
+        {
+            <a class="button-like button-like--ghost" href="@detail.RelatedHref">@detail.RelatedLabel</a>
+        }
+    </div>
+    <p class="muted-copy">@detail.DetailKindLabel · @detail.DetailKeyLabel: @detail.DetailKey</p>
+</section>
+
+@if (savedPivots.Length > 0)
+{
+    <section class="status-decision-strip" aria-label="Saved pivots">
+        @foreach (var pivot in savedPivots)
+        {
+            <article class="status-decision-strip__card">
+                <span class="tag">@(pivot.Current ? "Current pivot" : "Saved pivot")</span>
+                <h2>@pivot.Label · @pivot.Count thread@(pivot.Count == 1 ? string.Empty : "s")</h2>
+                <p>@pivot.Summary</p>
+                <div class="stacked-actions">
+                    <a class="button-like @(pivot.Current ? "button-like--primary" : "button-like--secondary")" href="@pivot.Href">
+                        @(pivot.Current ? "Viewing this pivot" : "Open this pivot")
+                    </a>
+                    <a class="button-like button-like--ghost" href="@pivot.ArtifactHref">Open pivot artifact</a>
+                </div>
+            </article>
+        }
+    </section>
+}
+
+<section class="status-decision-strip" aria-label="Drilldown summary">
+    <article class="status-decision-strip__card">
+        <span class="tag">Receipt spine</span>
+        <h2>@recipientThreads.Length recipient thread@(recipientThreads.Length == 1 ? string.Empty : "s") currently sit under this drilldown.</h2>
+        <p>@dispatchReceipts.Length dispatch receipt@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length provider callback@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length journey receipt@(journeyReceipts.Length == 1 ? string.Empty : "s") are now joined here.</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Queue posture</span>
+        <h2>@queueReceipts.Length bounded queue candidate@(queueReceipts.Length == 1 ? string.Empty : "s") are attached to this drilldown.</h2>
+        <p>@closeoutReceipts.Length closeout follow-up receipt@(closeoutReceipts.Length == 1 ? string.Empty : "s") and @routingReceipts.Length routing receipt@(routingReceipts.Length == 1 ? string.Empty : "s") keep the source and support boundary visible.</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Public-safe detail</span>
+        <h2>Raw provider payloads still stay out of first-party storage.</h2>
+        <p>This page only uses bounded receipt metadata, hashed recipient identity, and first-party closeout state.</p>
+    </article>
+</section>
+
+@if (detail.FilterApplied)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Current filter</p>
+            <h2 class="editorial-title">@detail.FilterLabel are currently isolated on this drilldown.</h2>
+            <p class="editorial-copy">The thread, dispatch, callback, and journey sections below are narrowed from @totalThreadCount total recipient thread@(totalThreadCount == 1 ? string.Empty : "s") to the bounded pivot you selected.</p>
+        </div>
+    </section>
+}
+
+@if (sourceReceipt is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Source receipt</p>
+            <h2 class="editorial-title">The originating ProductLift receipt stays visible as the root of this drilldown.</h2>
+            <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, dispatch, callback, and journey state.</p>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">@sourceReceipt.StatusLabel</span>
+                <h3>@sourceReceipt.CategoryLabel · @sourceReceipt.ItemReference</h3>
+                <p>@sourceReceipt.ActionLabel</p>
+                <div class="route-choice-card__proof">
+                    <span>@sourceReceipt.ReceiptId</span>
+                    <span>@sourceReceipt.BoardLabel</span>
+                    <span>@sourceReceipt.EventType</span>
+                    <span>@sourceReceipt.ProviderEventId</span>
+                    <span>@sourceReceipt.ReceivedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                    @if (sourceReceipt.ProviderOccurredAtUtc is { } providerOccurredAtUtc)
+                    {
+                        <span>@providerOccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                    }
+                    @if (sourceReceipt.CloseoutCandidate)
+                    {
+                        <span>Closeout candidate</span>
+                    }
+                    else
+                    {
+                        <span>No closeout candidate</span>
+                    }
+                    @if (sourceReceipt.VoterNotificationAllowed)
+                    {
+                        <span>Voter follow-up allowed</span>
+                    }
+                    else
+                    {
+                        <span>Voter follow-up blocked</span>
+                    }
+                </div>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--secondary" href="@SourceDetailHref(sourceReceipt.ReceiptId)">Open source drilldown</a>
+                    <a class="button-like button-like--ghost" href="@SourceArtifactHref(sourceReceipt.ReceiptId)">Open source artifact</a>
+                </div>
+            </article>
+        </div>
+    </section>
+}
+
+@if (routingReceipts.Length > 0 || closeoutReceipts.Length > 0 || queueReceipts.Length > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Receipt spine</p>
+            <h2 class="editorial-title">Routing, closeout posture, and queue readiness stay inspectable before any provider callback lands.</h2>
+            <p class="editorial-copy">This keeps the support boundary, voter-follow-up posture, and outbox readiness explicit on the same route as the later delivery timeline.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var receipt in routingReceipts)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.StatusLabel</span>
+                    <h3>@receipt.RouteKind</h3>
+                    <p>@receipt.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <span>@receipt.ReceiptId</span>
+                        <span>@receipt.TargetPath</span>
+                        <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId)">Open source drilldown</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId)">Open source artifact</a>
+                    </div>
+                </article>
+            }
+            @foreach (var receipt in closeoutReceipts)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.StatusLabel</span>
+                    <h3>@receipt.TemplateId · @receipt.DeliveryState</h3>
+                    <p>@receipt.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <span>@receipt.ReceiptId</span>
+                        <span>@receipt.RecipientScopeRef</span>
+                        <span>@receipt.RecipientScopeCount projected recipient@(receipt.RecipientScopeCount == 1 ? string.Empty : "s")</span>
+                        <span>@receipt.ConsentSourceRef</span>
+                        <span>@receipt.DeliveryReason</span>
+                        <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        @if (!receipt.PublicClaimAllowed)
+                        {
+                            <span>No public delivery claim</span>
+                        }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId)">Open source drilldown</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId)">Open source artifact</a>
+                    </div>
+                </article>
+            }
+            @foreach (var receipt in queueReceipts)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.StatusLabel</span>
+                    <h3>@receipt.QueueLane</h3>
+                    <p>@receipt.Summary</p>
+                    <p class="muted-copy">@receipt.QueueReason</p>
+                    <div class="route-choice-card__proof">
+                        <span>@receipt.ReceiptId</span>
+                        <span>@receipt.QueueState</span>
+                        <span>@receipt.DispatchTool</span>
+                        <span>@receipt.DispatchAction</span>
+                        <span>@receipt.JourneyEventKey</span>
+                        <span>@receipt.ReleaseProofRoute</span>
+                        <span>@(!string.IsNullOrWhiteSpace(receipt.ReleaseProofReceiptId) ? receipt.ReleaseProofReceiptId : "Release proof pending")</span>
+                        <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        @if (receipt.ReadyForOutbox)
+                        {
+                            <span>Ready for Hub outbox</span>
+                        }
+                        else
+                        {
+                            <span>Outbox blocked</span>
+                        }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId)">Open source drilldown</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId)">Open source artifact</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (detail.FilterApplied && recipientThreads.Length == 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Filtered result</p>
+            <h2 class="editorial-title">No @detail.FilterLabel.ToLowerInvariant() remain under this bounded drilldown.</h2>
+            <p class="editorial-copy">Use the saved pivots above to reopen the full source receipt or jump straight to another bounded state without leaving this route.</p>
+        </div>
+    </section>
+}
+
+@if (recipientThreads.Length > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Recipient threads</p>
+            <h2 class="editorial-title">The dispatch spine, latest callback, and journey proof now sit on one bounded recipient timeline.</h2>
+            <p class="editorial-copy">This is the compact operator view for one or more recipient threads that belong to the selected source or dispatch spine.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var thread in recipientThreads)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@thread.CurrentStageLabel</span>
+                    <h3>@thread.RecipientRef</h3>
+                    <p>@thread.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <span>@thread.SourceLabel</span>
+                        <span>@thread.AddressHash</span>
+                        <span>@thread.QueueStatusLabel</span>
+                        <span>@thread.DispatchStatusLabel</span>
+                        @if (!string.IsNullOrWhiteSpace(thread.OutcomeStatusLabel))
+                        {
+                            <span>@thread.OutcomeStatusLabel</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(thread.JourneyStatusLabel))
+                        {
+                            <span>@thread.JourneyStatusLabel</span>
+                        }
+                        <span>@thread.DispatchReceiptId</span>
+                        <span>@thread.LastTouchedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        @if (!thread.PublicClaimAllowed)
+                        {
+                            <span>No public thread claim</span>
+                        }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(thread.DispatchReceiptId)">Open thread drilldown</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(thread.DispatchReceiptId)">Open thread artifact</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (dispatchReceipts.Length > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Dispatch receipts</p>
+            <h2 class="editorial-title">Every first-party outbound attempt stays visible as a bounded dispatch receipt.</h2>
+            <p class="editorial-copy">This keeps send posture, suppression state, retry timing, and provider identity aligned to one dispatch spine.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var receipt in dispatchReceipts)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.StatusLabel</span>
+                    <h3>@receipt.TemplateId · @receipt.DeliveryState</h3>
+                    <p>@receipt.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(receipt.Error))
+                    {
+                        <p class="muted-copy">@receipt.Error</p>
+                    }
+                    <div class="route-choice-card__proof">
+                        <span>@receipt.ReceiptId</span>
+                        <span>@receipt.DeliveryId</span>
+                        <span>@receipt.RecipientRef</span>
+                        <span>@receipt.AddressHash</span>
+                        <span>@receipt.TemplateVersion</span>
+                        <span>@receipt.ConsentSourceRef</span>
+                        <span>@receipt.SuppressionCheck</span>
+                        <span>@receipt.GovernorDecisionRef</span>
+                        <span>@receipt.ReleaseProofReceiptId</span>
+                        <span>@receipt.RequestedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        @if (receipt.AcceptedAtUtc is { } acceptedAtUtc)
+                        {
+                            <span>@acceptedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(receipt.ProviderMessageId))
+                        {
+                            <span>@receipt.ProviderMessageId</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(receipt.LastProviderState))
+                        {
+                            <span>@receipt.LastProviderState</span>
+                        }
+                        @if (receipt.NextAutomaticRetryAtUtc is { } nextAutomaticRetryAtUtc)
+                        {
+                            <span>@nextAutomaticRetryAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        }
+                        @if (!receipt.PublicClaimAllowed)
+                        {
+                            <span>No public send claim</span>
+                        }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.ReceiptId)">Open thread drilldown</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.ReceiptId)">Open thread artifact</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (deliveryOutcomes.Length > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Provider callbacks</p>
+            <h2 class="editorial-title">Provider callback receipts stay bounded but fully attributable to this drilldown spine.</h2>
+            <p class="editorial-copy">Identity match mode, hashed recipient proof, and provider state stay visible without storing raw payload bodies.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var receipt in deliveryOutcomes)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.StatusLabel</span>
+                    <h3>@receipt.Provider · @receipt.ProviderState</h3>
+                    <p>@receipt.Summary</p>
+                    @if (!string.IsNullOrWhiteSpace(receipt.Reason))
+                    {
+                        <p class="muted-copy">@receipt.Reason</p>
+                    }
+                    <div class="route-choice-card__proof">
+                        <span>@receipt.ReceiptId</span>
+                        <span>@receipt.DispatchReceiptId</span>
+                        <span>@receipt.RecipientRef</span>
+                        <span>@receipt.AddressHash</span>
+                        <span>@receipt.IdentityMatchMode</span>
+                        <span>@receipt.SuppressionCheck</span>
+                        <span>@receipt.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        @if (!string.IsNullOrWhiteSpace(receipt.ProviderMessageId))
+                        {
+                            <span>@receipt.ProviderMessageId</span>
+                        }
+                        @if (receipt.RetryAtUtc is { } retryAtUtc)
+                        {
+                            <span>@retryAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        }
+                        @if (!receipt.PublicClaimAllowed)
+                        {
+                            <span>No public outcome claim</span>
+                        }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@ThreadDetailHref(receipt.DispatchReceiptId)">Open thread drilldown</a>
+                        <a class="button-like button-like--ghost" href="@ThreadArtifactHref(receipt.DispatchReceiptId)">Open thread artifact</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (journeyReceipts.Length > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Journey writeback</p>
+            <h2 class="editorial-title">Journey proof only lands after the first-party closeout timeline actually completes.</h2>
+            <p class="editorial-copy">These rows show the bounded voter-notified evidence tied to the same governor decision and release proof used by the dispatch spine.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var receipt in journeyReceipts)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.StatusLabel</span>
+                    <h3>@receipt.EventKey</h3>
+                    <p>@receipt.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <span>@receipt.ReceiptId</span>
+                        <span>@receipt.GovernorDecisionRef</span>
+                        <span>@receipt.ReleaseProofReceiptId</span>
+                        <span>@receipt.SentCount of @receipt.RecipientCount sent</span>
+                        <span>@receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")</span>
+                        @if (!receipt.PublicClaimAllowed)
+                        {
+                            <span>No public journey claim</span>
+                        }
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--secondary" href="@SourceDetailHref(receipt.SourceReceiptId)">Open source drilldown</a>
+                        <a class="button-like button-like--ghost" href="@SourceArtifactHref(receipt.SourceReceiptId)">Open source artifact</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}

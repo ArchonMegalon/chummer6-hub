@@ -3,6 +3,9 @@
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-artifacts";
+    var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
+        || Model.TrustPulse?.ParityClaimsReviewRequired == true;
     var liveItems = Model.Items.Where(card => PublicSurfaceStatus.IsAvailableToday(card.Card.Badge)).ToArray();
     var previewItems = Model.Items.Except(liveItems).ToArray();
     var selectedSignedInArtifactView = Model.SignedInArtifactView;
@@ -19,6 +22,60 @@
         .OrderByDescending(publication => CreatorPublicationTrustRank(publication.TrustBand))
         .ThenBy(publication => publication.Title, StringComparer.OrdinalIgnoreCase)
         .ToArray();
+    var artifactShelfPrimaryHref = rankedPublicCreatorPublications.Length > 0
+        ? "#public-proof-shelf"
+        : liveItems.Length > 0
+            ? "#current-proof-surfaces"
+            : previewItems.Length > 0
+                ? "#preview-artifacts"
+                : "#artifact-route-map";
+    var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-proof-shelf" : "/signup?next=%2Fartifacts";
+    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Signed-in continuity shelf" : "Create account for signed-in continuity";
+    var routeChoices = new[]
+    {
+        new
+        {
+            Badge = "Proof shelf",
+            Title = "Inspect live proof, dossiers, and publication lineage here",
+            Summary = "Use this route when the job is to inspect outputs, provenance, trust posture, or route-linked proof without confusing that with the install decision.",
+            Href = artifactShelfPrimaryHref,
+            Label = "Inspect proof gallery",
+            Proof = new[] { "Inspectable outputs", "Route-linked proof", "Provenance first" }
+        },
+        new
+        {
+            Badge = "Downloads",
+            Title = "Go back to downloads when you actually want the build",
+            Summary = "The release rail still owns the recommended install path, account-aware handoff, known issues, and support fallback. This page should not compete with that decision.",
+            Href = "/downloads",
+            Label = "Open downloads",
+            Proof = new[] { "Install rail stays primary", "Same file for everyone", "Support nearby" }
+        },
+        new
+        {
+            Badge = "Signed-in continuity",
+            Title = Model.Chrome.Authenticated
+                ? "Personal, campaign, creator, and public returns stay on one signed-in shelf"
+                : "Sign in when you want the private continuity shelf as well as public proof",
+            Summary = Model.Chrome.Authenticated
+                ? "The signed-in shelf keeps account-side aftermath, replay, publication, and continuity artifacts visible without splitting them into separate stories."
+                : "Public proof works without an account. Sign in only when you want private continuity, linked returns, and campaign or creator-owned artifact follow-through.",
+            Href = signedInContinuityHref,
+            Label = signedInContinuityLabel,
+            Proof = Model.Chrome.Authenticated
+                ? new[] { "Personal and campaign views", "Creator follow-through", "Same return rail" }
+                : new[] { "Public first", "Account adds continuity", "No auth wall for proof" }
+        },
+        new
+        {
+            Badge = "Help",
+            Title = "Leave the proof shelf when the problem becomes support or recovery",
+            Summary = "Install failures, account recovery, and private campaign issues belong on first-party help. Proof should support that route, not replace it.",
+            Href = "/help",
+            Label = "Open help",
+            Proof = new[] { "Support-owned", "Private help", "No route confusion" }
+        }
+    };
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -76,8 +133,8 @@
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string ArtifactViewHref(string view)
         => string.Equals(view, "all", StringComparison.Ordinal)
-            ? "/artifacts#linked-artifacts"
-            : $"/artifacts?view={Uri.EscapeDataString(view)}#linked-artifacts";
+            ? "/artifacts#signed-in-proof-shelf"
+            : $"/artifacts?view={Uri.EscapeDataString(view)}#signed-in-proof-shelf";
     static string ArtifactViewTitle(string view) => view switch
     {
         "personal" => "Personal view",
@@ -94,338 +151,396 @@
         "public" => "Inspect only the published shared-publication lane so discoverable creator packets, trust posture, and publication detail stay on the same public rail while you are signed in.",
         _ => "When you are signed in, the artifact shelf keeps your live aftermath, replay, and linked creator-publication record together instead of splitting them into separate artifact stories."
     };
+
+    string PublicationAvailabilityLabel(bool discoverable)
+        => publicationRouteReviewRequired && discoverable
+            ? "Review-required route"
+            : discoverable
+                ? "Ready now"
+                : "Limited release";
+
+    var governedDiscoveryTitle = publicationRouteReviewRequired
+        ? "Shared publications on the review-required lane"
+        : "Published shared publications";
+    var governedDiscoveryCopy = publicationRouteReviewRequired
+        ? "These campaign, primer, dossier, recap, replay, and run-module outputs stay discoverable on the governed account path, but public parity claims remain review-required until current direct parity proof receipts are green."
+        : "These campaign, primer, dossier, recap, replay, and run-module outputs are live because they made it through review, publication, lineage, and moderation on one consistent account path.";
 }
 
-<section class="section-band">
-    <div class="page-lead">
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
-    </div>
-    <div class="stacked-actions">
-        @if (liveItems.Length > 0)
-        {
-            <a class="button-like button-like--ghost" href="#live-artifacts">Available today</a>
-        }
-        @if (previewItems.Length > 0)
-        {
-            <a class="button-like button-like--ghost" href="#preview-artifacts">@PublicSurfaceStatus.PreviewInProgress</a>
-        }
-    </div>
-    @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
-    @if (Model.SignedInStatus is not null)
-    {
-        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-    }
-    @if (Model.TrustPulse is not null)
-    {
-        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-    }
-    @if (Model.Chrome.Authenticated && (signedInRecapShelf.Length > 0 || signedInCreatorPublications.Length > 0))
-    {
-        var selectedArtifactViewTitle = ArtifactViewTitle(selectedSignedInArtifactView);
-        <div class="editorial-block__lead" id="linked-artifacts">
-            <p class="eyebrow">Signed-in artifact views</p>
-            <h2 class="editorial-title">@selectedArtifactViewTitle</h2>
-            <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
-        </div>
-        <div class="stacked-actions">
-            @foreach (var view in new[] { "all", "personal", "campaign", "creator", "public" })
+        <p class="page-copy">Dossiers, recaps, and release proof belong on a shelf you can inspect, not in a vague gallery. Use this route for proof and provenance, then go back to downloads when you actually want the build.</p>
+        <div class="trust-claim__microproof">
+            <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public proof card(s)</span>
+            <span>@previewItems.Length opening next</span>
+            @if (publicationRouteReviewRequired)
             {
-                var selected = string.Equals(selectedSignedInArtifactView, view, StringComparison.Ordinal);
-                <a class="button-like @(selected ? "button-like--primary" : "button-like--ghost")" href="@ArtifactViewHref(view)">@ArtifactViewTitle(view)</a>
+                <span>Review-required publication route</span>
+            }
+            @if (Model.Chrome.Authenticated)
+            {
+                <span>@(signedInRecapShelf.Length + signedInCreatorPublications.Length) signed-in return card(s)</span>
             }
         </div>
-        <div class="shelf-stack">
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@artifactShelfPrimaryHref">Inspect proof gallery</a>
+        <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
+        <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+    </div>
+</section>
+
+<section class="editorial-block" id="artifact-route-map">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Route map</p>
+        <h2 class="editorial-title">Pick proof, downloads, signed-in continuity, or help without mixing their jobs.</h2>
+        <p class="editorial-copy">The proof shelf should make outputs and provenance tangible. It should not become the install rail, a support queue, or a disguised account wall.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var choice in routeChoices)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@choice.Badge</span>
+                <h3>@choice.Title</h3>
+                <p>@choice.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in choice.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
+@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
+
+@if (rankedPublicCreatorPublications.Length > 0)
+{
+    <section class="artifact-gallery" id="public-proof-shelf">
+        <div class="artifact-gallery__lead">
+            <p class="eyebrow">Public publication shelf</p>
+            <h2 class="editorial-title">@governedDiscoveryTitle</h2>
+            <p class="editorial-copy">@governedDiscoveryCopy</p>
+            @if (publicationRouteReviewRequired)
+            {
+                <article class="route-callout">
+                    <span class="tag">Review-required route</span>
+                    <h3>Public parity claims stay review-required until direct proof receipts close the gap.</h3>
+                    <p>These publications remain discoverable, but the route stays explicit about the review boundary until current direct parity-proof closure is green.</p>
+                    <div class="route-callout__proof">
+                        <span>Discoverable now</span>
+                        <span>Parity still reviewed</span>
+                        <span>No fake closure</span>
+                    </div>
+                </article>
+            }
+        </div>
+        <div class="artifact-gallery__grid">
+            @foreach (var publication in rankedPublicCreatorPublications)
+            {
+                <article class="artifact-card">
+                    <div class="artifact-card__copy">
+                        <span class="tag">Shared publication</span>
+                        <h3>@publication.Title</h3>
+                        <p>@publication.Summary</p>
+                        <div class="trust-claim__microproof">
+                            <span>@HumanizeStatus(publication.PublicationStatus, "Published")</span>
+                            <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
+                            <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
+                        </div>
+                        <p><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
+                        <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
+                        @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
+                        {
+                            <p><strong>Trust:</strong> @publication.TrustSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
+                        {
+                            <p><strong>Compare by:</strong> @publication.ComparisonSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
+                        {
+                            <p><strong>Lineage:</strong> @publication.LineageSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
+                        {
+                            <p><strong>Moderation:</strong> @publication.ModerationSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
+                        {
+                            <p><strong>Return:</strong> @publication.CampaignReturnSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
+                        {
+                            <p><strong>Next:</strong> @publication.NextSafeAction</p>
+                        }
+                        <a class="editorial-strip__action" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public publication</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (Model.Chrome.Authenticated && (signedInRecapShelf.Length > 0 || signedInCreatorPublications.Length > 0))
+{
+    <section class="continuity-band" id="signed-in-proof-shelf">
+        <div class="continuity-band__copy">
+            <p class="eyebrow">Signed-in continuity shelf</p>
+            <h2 class="editorial-title">@ArtifactViewTitle(selectedSignedInArtifactView)</h2>
+            <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
+            <div class="stacked-actions">
+                @foreach (var view in new[] { "all", "personal", "campaign", "creator", "public" })
+                {
+                    var selected = string.Equals(selectedSignedInArtifactView, view, StringComparison.Ordinal);
+                    <a class="button-like @(selected ? "button-like--primary" : "button-like--ghost")" href="@ArtifactViewHref(view)">@ArtifactViewTitle(view)</a>
+                }
+            </div>
+        </div>
+        <div class="continuity-band__panel">
+            <article class="continuity-band__fact">
+                <span>Visible recap cards</span>
+                <strong>@signedInRecapShelf.Length</strong>
+                <p>Aftermath, replay, and return artifacts that stay on this signed-in shelf.</p>
+            </article>
+            <article class="continuity-band__fact">
+                <span>Visible creator cards</span>
+                <strong>@signedInCreatorPublications.Length</strong>
+                <p>Creator-linked lineage, availability, and publication follow-through on the same rail.</p>
+            </article>
+            <article class="continuity-band__fact">
+                <span>Selected view</span>
+                <strong>@ArtifactViewTitle(selectedSignedInArtifactView)</strong>
+                <p>Switch views without losing the shared continuity story underneath them.</p>
+            </article>
+            <article class="continuity-band__fact">
+                <span>Boundary</span>
+                <strong>@(publicationRouteReviewRequired ? "Public parity still reviewed" : "Public parity ready now")</strong>
+                <p>Signed-in continuity can stay productive even while the public publication route is still review-required.</p>
+            </article>
+        </div>
+    </section>
+
+    <section class="artifact-gallery">
+        <div class="artifact-gallery__grid">
             @foreach (var item in signedInRecapShelf)
             {
                 var linkedPublication = !string.IsNullOrWhiteSpace(item.CreatorPublicationId)
                     ? signedInCreatorPublications.FirstOrDefault(publication => string.Equals(publication.PublicationId, item.CreatorPublicationId, StringComparison.OrdinalIgnoreCase))
                     : null;
-                <article class="shelf-item">
-                    <span class="tag">Signed-in return shelf</span>
-                    <h2>@item.Label</h2>
-                    <p>@item.Summary</p>
-                    <div class="trust-claim__microproof">
-                        <span>@PublicSurfaceStatus.AudienceLabel(item.Audience)</span>
-                        @if (!string.IsNullOrWhiteSpace(item.PublicationState))
+                <article class="artifact-card">
+                    <div class="artifact-card__copy">
+                        <span class="tag">Signed-in return shelf</span>
+                        <h3>@item.Label</h3>
+                        <p>@item.Summary</p>
+                        <div class="trust-claim__microproof">
+                            <span>@PublicSurfaceStatus.AudienceLabel(item.Audience)</span>
+                            @if (!string.IsNullOrWhiteSpace(item.PublicationState))
+                            {
+                                <span>@HumanizeStatus(item.PublicationState, "Ready")</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(item.TrustBand))
+                            {
+                                <span>@HumanizeStatus(item.TrustBand, "Draft")</span>
+                                <span>@PublicationAvailabilityLabel(item.Discoverable)</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
                         {
-                            <span>@HumanizeStatus(item.PublicationState, "Ready")</span>
+                            <p><strong>Ownership:</strong> @item.OwnershipSummary</p>
                         }
-                        @if (!string.IsNullOrWhiteSpace(item.TrustBand))
+                        @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
                         {
-                            <span>@HumanizeStatus(item.TrustBand, "Draft")</span>
-                            <span>@(item.Discoverable ? "Ready now" : "Limited release")</span>
+                            <p><strong>Provenance:</strong> @item.ProvenanceSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
+                        {
+                            <p><strong>Audit:</strong> @item.AuditSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
+                        {
+                            <p><strong>Publication:</strong> @item.PublicationSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(linkedPublication?.TrustSummary))
+                        {
+                            <p><strong>Trust:</strong> @linkedPublication.TrustSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
+                        {
+                            <p><strong>Lineage:</strong> @linkedPublication.LineageSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
+                        {
+                            <p><strong>Return:</strong> @linkedPublication.CampaignReturnSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
+                        {
+                            <p><strong>Next:</strong> @item.NextSafeAction</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
+                        {
+                            <a class="quiet-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
+                        {
+                            <a class="editorial-strip__action" href="@CreatorPublicationHref(linkedPublication, item.CreatorPublicationId)">@CreatorPublicationLinkLabel(linkedPublication)</a>
                         }
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(item.OwnershipSummary))
-                    {
-                        <p class="muted-copy"><strong>Ownership:</strong> @item.OwnershipSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(item.ProvenanceSummary))
-                    {
-                        <p class="muted-copy"><strong>Provenance:</strong> @item.ProvenanceSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(item.AuditSummary))
-                    {
-                        <p class="muted-copy"><strong>Audit:</strong> @item.AuditSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(item.PublicationSummary))
-                    {
-                        <p class="muted-copy"><strong>Publication:</strong> @item.PublicationSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.Visibility))
-                    {
-                        <p class="muted-copy"><strong>Visibility:</strong> @HumanizeStatus(linkedPublication.Visibility, "Shared")</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.DiscoverySummary))
-                    {
-                        <p class="muted-copy"><strong>Discovery:</strong> @linkedPublication.DiscoverySummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.TrustSummary))
-                    {
-                        <p class="muted-copy"><strong>Trust:</strong> @linkedPublication.TrustSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.ComparisonSummary))
-                    {
-                        <p class="muted-copy"><strong>Compare by:</strong> @linkedPublication.ComparisonSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.LineageSummary))
-                    {
-                        <p class="muted-copy"><strong>Lineage:</strong> @linkedPublication.LineageSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.CampaignReturnSummary))
-                    {
-                        <p class="muted-copy"><strong>Return:</strong> @linkedPublication.CampaignReturnSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.SupportClosureSummary))
-                    {
-                        <p class="muted-copy"><strong>Support:</strong> @linkedPublication.SupportClosureSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.ModerationSummary))
-                    {
-                        <p class="muted-copy"><strong>Moderation:</strong> @linkedPublication.ModerationSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(item.NextSafeAction))
-                    {
-                        <p class="muted-copy"><strong>Next:</strong> @item.NextSafeAction</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(linkedPublication?.BuildHandoffId))
-                    {
-                        <a class="inline-link" href="@BuildHandoffDetailHref(linkedPublication.BuildHandoffId)">Open build path for @linkedPublication.Title</a>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(item.CreatorPublicationId))
-                    {
-                        <a class="inline-link" href="@CreatorPublicationHref(linkedPublication, item.CreatorPublicationId)">@CreatorPublicationLinkLabel(linkedPublication)</a>
-                    }
                 </article>
             }
             @foreach (var publication in signedInCreatorPublications)
             {
-                <article class="shelf-item">
-                    <span class="tag">Shared publication</span>
-                    <h2>@publication.Title</h2>
-                    <p>@publication.Summary</p>
-                    <div class="trust-claim__microproof">
-                        <span>@HumanizeStatus(publication.Visibility, "Shared")</span>
-                        <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
-                        <span>@(publication.Discoverable ? "Ready now" : "Limited release")</span>
-                    </div>
-                    <p class="muted-copy"><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
-                    <p class="muted-copy"><strong>Discovery:</strong> @publication.DiscoverySummary</p>
-                    @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
-                    {
-                        <p class="muted-copy"><strong>Trust:</strong> @publication.TrustSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
-                    {
-                        <p class="muted-copy"><strong>Compare by:</strong> @publication.ComparisonSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
-                    {
-                        <p class="muted-copy"><strong>Lineage:</strong> @publication.LineageSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
-                    {
-                        <p class="muted-copy"><strong>Return:</strong> @publication.CampaignReturnSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
-                    {
-                        <p class="muted-copy"><strong>Support:</strong> @publication.SupportClosureSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
-                    {
-                        <p class="muted-copy"><strong>Moderation:</strong> @publication.ModerationSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
-                    {
-                        <p class="muted-copy"><strong>Next:</strong> @publication.NextSafeAction</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
-                    {
-                        <a class="inline-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
-                    }
-                    <a class="inline-link" href="@CreatorPublicationHref(publication, publication.PublicationId)">@CreatorPublicationLinkLabel(publication)</a>
-                </article>
-            }
-        </div>
-        @if (signedInRecapShelf.Length == 0 && signedInCreatorPublications.Length == 0)
-        {
-            <p class="muted-copy">No signed-in artifacts are mirrored into the @selectedArtifactViewTitle.ToLowerInvariant() yet.</p>
-        }
-    }
-    @if (publicCreatorPublications.Length > 0)
-    {
-        <div class="editorial-block__lead" id="governed-creator-discovery">
-            <p class="eyebrow">Governed publication discovery</p>
-            <h2 class="editorial-title">Published shared publications</h2>
-            <p class="editorial-copy">These campaign, primer, dossier, recap, replay, and run-module outputs are live because they made it through review, publication, lineage, and moderation on one consistent account path.</p>
-        </div>
-        <section class="trust-rail-section" id="creator-packet-comparison">
-            <div class="editorial-block__lead">
-                <p class="eyebrow">Compare at a glance</p>
-                <h2 class="editorial-title">How live publications differ</h2>
-                <p class="editorial-copy">Compare provenance, trust ranking, lineage, moderation, and return notes here before you open every detail page one by one.</p>
-            </div>
-            <div class="trust-rail-list">
-                @foreach (var publication in rankedPublicCreatorPublications)
-                {
-                    <article class="trust-rail">
-                        <span class="tag">@HumanizeStatus(publication.TrustBand, "Draft")</span>
-                        <p><strong>@publication.Title</strong></p>
-                        <p>Provenance: @publication.ProvenanceSummary</p>
+                <article class="artifact-card">
+                    <div class="artifact-card__copy">
+                        <span class="tag">Creator-linked publication</span>
+                        <h3>@publication.Title</h3>
+                        <p>@publication.Summary</p>
+                        <div class="trust-claim__microproof">
+                            <span>@HumanizeStatus(publication.Visibility, "Shared")</span>
+                            <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
+                            <span>@PublicationAvailabilityLabel(publication.Discoverable)</span>
+                        </div>
+                        <p><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
+                        <p><strong>Discovery:</strong> @publication.DiscoverySummary</p>
                         @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
                         {
-                            <p>Trust: @publication.TrustSummary</p>
+                            <p><strong>Trust:</strong> @publication.TrustSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
                         {
-                            <p>Compare by: @publication.ComparisonSummary</p>
+                            <p><strong>Compare by:</strong> @publication.ComparisonSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
                         {
-                            <p>Lineage: @publication.LineageSummary</p>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
-                        {
-                            <p>Moderation: @publication.ModerationSummary</p>
+                            <p><strong>Lineage:</strong> @publication.LineageSummary</p>
                         }
                         @if (!string.IsNullOrWhiteSpace(publication.CampaignReturnSummary))
                         {
-                            <p>Return: @publication.CampaignReturnSummary</p>
+                            <p><strong>Return:</strong> @publication.CampaignReturnSummary</p>
                         }
-                        <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public publication</a>
-                    </article>
-                }
-            </div>
-        </section>
-        <div class="shelf-stack">
-            @foreach (var publication in rankedPublicCreatorPublications)
-            {
-                <article class="shelf-item">
-                    <span class="tag">Shared publication</span>
-                    <h2>@publication.Title</h2>
-                    <p>@publication.Summary</p>
-                    <div class="trust-claim__microproof">
-                        <span>@HumanizeStatus(publication.PublicationStatus, "Published")</span>
-                        <span>@HumanizeStatus(publication.TrustBand, "Draft")</span>
-                        <span>@(publication.Discoverable ? "Ready now" : "Limited release")</span>
+                        @if (!string.IsNullOrWhiteSpace(publication.SupportClosureSummary))
+                        {
+                            <p><strong>Support:</strong> @publication.SupportClosureSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
+                        {
+                            <p><strong>Moderation:</strong> @publication.ModerationSummary</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
+                        {
+                            <p><strong>Next:</strong> @publication.NextSafeAction</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(publication.BuildHandoffId))
+                        {
+                            <a class="quiet-link" href="@BuildHandoffDetailHref(publication.BuildHandoffId)">Open build path for @publication.Title</a>
+                        }
+                        <a class="editorial-strip__action" href="@CreatorPublicationHref(publication, publication.PublicationId)">@CreatorPublicationLinkLabel(publication)</a>
                     </div>
-                    <p class="muted-copy"><strong>Provenance:</strong> @publication.ProvenanceSummary</p>
-                    <p class="muted-copy"><strong>Discovery:</strong> @publication.DiscoverySummary</p>
-                    @if (!string.IsNullOrWhiteSpace(publication.TrustSummary))
-                    {
-                        <p class="muted-copy"><strong>Trust:</strong> @publication.TrustSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.ComparisonSummary))
-                    {
-                        <p class="muted-copy"><strong>Compare by:</strong> @publication.ComparisonSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.LineageSummary))
-                    {
-                        <p class="muted-copy"><strong>Lineage:</strong> @publication.LineageSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.ModerationSummary))
-                    {
-                        <p class="muted-copy"><strong>Moderation:</strong> @publication.ModerationSummary</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(publication.NextSafeAction))
-                    {
-                        <p class="muted-copy"><strong>Next:</strong> @publication.NextSafeAction</p>
-                    }
-                    <a class="inline-link" href="@PublicCreatorPublicationHref(publication.PublicationId)">Open public publication</a>
                 </article>
             }
         </div>
-    }
-    @if (liveItems.Length > 0)
-    {
-        <div class="editorial-block__lead" id="live-artifacts">
+    </section>
+}
+
+@if (liveItems.Length > 0)
+{
+    <section class="artifact-gallery" id="current-proof-surfaces">
+        <div class="artifact-gallery__lead">
             <p class="eyebrow">@PublicSurfaceStatus.AvailableToday</p>
-            <h2 class="editorial-title">Current usable surfaces</h2>
-            <p class="editorial-copy">These are the artifacts you can use or inspect against the current preview today.</p>
+            <h2 class="editorial-title">Current usable proof surfaces</h2>
+            <p class="editorial-copy">These are the proof surfaces you can use or inspect today. They support the install decision; they do not replace the release rail.</p>
         </div>
-        <div class="shelf-stack">
+        <div class="artifact-gallery__grid">
             @foreach (var card in liveItems)
             {
-                <article class="shelf-item">
+                <article class="artifact-card">
                     @if (card.Asset is not null)
                     {
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
+                        <div class="artifact-card__media">
+                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
+                        </div>
                     }
-                    <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                    <h2>@card.Card.Title</h2>
-                    <p>@card.Card.Summary</p>
-                    <div class="trust-claim__microproof">
-                        <span>@PublicSurfaceStatus.AudienceLabel(card.Card.Audience)</span>
-                        <span>@card.Action.Label</span>
+                    <div class="artifact-card__copy">
+                        <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
+                        <h3>@card.Card.Title</h3>
+                        <p>@card.Card.Summary</p>
+                        <div class="trust-claim__microproof">
+                            <span>@PublicSurfaceStatus.AudienceLabel(card.Card.Audience)</span>
+                            <span>@card.Action.Label</span>
+                            @if (!string.IsNullOrWhiteSpace(card.Card.MicroProof))
+                            {
+                                <span>@card.Card.MicroProof</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
+                        {
+                            <p><strong>What this shows:</strong> @card.Card.Payoff</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
+                        {
+                            <p><strong>Proof:</strong> @card.Card.ProofNote</p>
+                        }
+                        <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
-                    {
-                        <p class="muted-copy"><strong>What this shows:</strong> @card.Card.Payoff</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote) || !string.IsNullOrWhiteSpace(card.Card.Payoff))
-                    {
-                        <p class="muted-copy">@(card.Card.ProofNote ?? card.Card.Payoff)</p>
-                    }
-                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
                 </article>
             }
         </div>
-    }
-    @if (previewItems.Length > 0)
-    {
-        <div class="editorial-block__lead" id="preview-artifacts">
+    </section>
+}
+
+@if (previewItems.Length > 0)
+{
+    <section class="editorial-block" id="preview-artifacts">
+        <div class="editorial-block__lead">
             <p class="eyebrow">@PublicSurfaceStatus.PreviewInProgress</p>
-            <h2 class="editorial-title">Preview surfaces still opening</h2>
-            <p class="editorial-copy">These stay visible so you can compare future-facing artifact work against what is already usable today.</p>
+            <h2 class="editorial-title">Opening next on the shelf</h2>
+            <p class="editorial-copy">These future-facing proof surfaces stay visible so you can compare what is opening next against what is already usable today, without pretending they are live yet.</p>
         </div>
-        <div class="shelf-stack">
+        <div class="compact-rail">
             @foreach (var card in previewItems)
             {
-                <article class="shelf-item">
-                    @if (card.Asset is not null)
-                    {
-                        @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", card.Asset)
-                    }
-                    <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                    <h2>@card.Card.Title</h2>
-                    <p>@card.Card.Summary</p>
-                    <div class="trust-claim__microproof">
-                        <span>@PublicSurfaceStatus.AudienceLabel(card.Card.Audience)</span>
-                        <span>@card.Action.Label</span>
+                <article class="compact-rail__item">
+                    <div class="compact-rail__copy">
+                        <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
+                        <h3>@card.Card.Title</h3>
+                        <p>@card.Card.Summary</p>
+                        @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
+                        {
+                            <p><strong>Expected unlock:</strong> @card.Card.Payoff</p>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
+                        {
+                            <p><strong>Current seam:</strong> @card.Card.ProofNote</p>
+                        }
                     </div>
-                    @if (!string.IsNullOrWhiteSpace(card.Card.Payoff))
-                    {
-                        <p class="muted-copy"><strong>Expected unlock:</strong> @card.Card.Payoff</p>
-                    }
-                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote) || !string.IsNullOrWhiteSpace(card.Card.Payoff))
-                    {
-                        <p class="muted-copy">@(card.Card.ProofNote ?? card.Card.Payoff)</p>
-                    }
-                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
+                    <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
                 </article>
             }
         </div>
-    }
-</section>
+    </section>
+}
+
+@if (rankedPublicCreatorPublications.Length == 0 && liveItems.Length == 0 && previewItems.Length == 0)
+{
+    <section class="editorial-block">
+        <article class="route-callout">
+            <span class="tag">Temporarily thin shelf</span>
+            <h3>The proof shelf is not populated on this request.</h3>
+            <p>Use downloads for the live build, what works today for current route truth, or help if you expected a specific artifact to be visible here already.</p>
+            <div class="route-callout__actions">
+                <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
+                <a class="inline-link" href="/now">Open what works today</a>
+            </div>
+        </article>
+    </section>
+}

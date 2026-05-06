@@ -71,12 +71,33 @@ public sealed class CampaignFederationOrchestrationService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        string[] requiredReceiptRefs = batch.RequiredReceiptRefs
+            .Concat(sourcePacks
+                .Select(item => item.RouteReceipt?.ReceiptId)
+                .Where(static item => !string.IsNullOrWhiteSpace(item))
+                .Select(static item => item!))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        bool allSourcePacksPublished = sourcePacks.All(static item => string.Equals(item.RouteState, "published", StringComparison.OrdinalIgnoreCase));
+        string routeState = allSourcePacksPublished ? "queued" : "bounded_failure";
+        string? boundedFailureReason = allSourcePacksPublished
+            ? null
+            : "One or more governed source packs are not published on the outward-facing shelf yet, so this exchange batch stays bounded until visible source receipts are live.";
+        string nextSafeAction = allSourcePacksPublished
+            ? "Current public source-pack receipts are attached; follow the queued publication batch until the requested outward-facing outputs publish their own receipts."
+            : "Publish or re-review the bounded source packs first, then relaunch this exchange batch after the outward-facing shelf exposes current source receipts.";
 
         return new CampaignFederationBatchProjection(
             WorkspaceId: workspace.WorkspaceId,
             CampaignId: workspace.CampaignId,
             CampaignName: workspace.CampaignName,
             SelectionSummary: selectionSummary,
+            RouteState: routeState,
+            RouteReceipt: null,
+            BoundedFailureReason: boundedFailureReason,
+            NextSafeAction: nextSafeAction,
+            RequiredReceiptRefs: requiredReceiptRefs,
             Watchouts: watchouts,
             SourcePacks: sourcePacks,
             Batch: batch);
@@ -190,6 +211,23 @@ public sealed class CampaignFederationOrchestrationService
                     ? $"replay:{candidate.EntryId}"
                     : $"recap:{candidate.EntryId}"
         ];
+        string routeState = string.Equals(moderationState, "published", StringComparison.OrdinalIgnoreCase)
+            ? "published"
+            : "bounded_failure";
+        CampaignFederationRouteReceiptProjection? routeReceipt = string.Equals(routeState, "published", StringComparison.OrdinalIgnoreCase)
+            ? new CampaignFederationRouteReceiptProjection(
+                ReceiptId: $"public-shelf:{publicShelfRef}",
+                PackageId: $"creator-publication:{candidate.PublicationId}",
+                MatchedRoute: publicShelfRef,
+                MatchMode: "publication_status",
+                Summary: $"{candidate.Label} is live on the outward-facing governed publication shelf.")
+            : null;
+        string? boundedFailureReason = routeReceipt is null
+            ? $"{candidate.Label} stays {moderationState.Replace('_', ' ')} until outward-facing publication review promotes a live shelf receipt."
+            : null;
+        string nextSafeAction = routeReceipt is null
+            ? $"Keep {candidate.Label} on the governed review lane until {publicShelfRef} carries a current published receipt."
+            : $"Current governed publication receipt is attached at {publicShelfRef}; use that shelf route as the outward-facing source of truth.";
 
         return new CampaignFederationSourcePackProjection(
             SourcePackId: sourcePackId,
@@ -201,6 +239,10 @@ public sealed class CampaignFederationOrchestrationService
             Summary: candidate.Summary,
             PublicationKind: candidate.Kind,
             PublicationStatus: moderationState,
+            RouteState: routeState,
+            RouteReceipt: routeReceipt,
+            BoundedFailureReason: boundedFailureReason,
+            NextSafeAction: nextSafeAction,
             PublicShelfRef: publicShelfRef,
             ArtifactId: candidate.ArtifactId,
             DossierId: candidate.DossierId,

@@ -276,6 +276,8 @@
             "print_pdf_export" => "Print/PDF export",
             "replay_timeline" => "Replay timeline",
             "session_recap" => "Session recap",
+            "runboard_state" => "Runboard state",
+            "resolution_report_draft" => "ResolutionReport draft",
             "run_module" => "Run module",
             _ => HumanizeStatus(kind, "Governed output")
         };
@@ -453,6 +455,28 @@
 
         return "No resume action needed right now.";
     }
+
+    var accountRailHeadline = showAccessSection
+        ? "Devices and access remain the calm recovery rail"
+        : showSupportSection
+            ? "Support and install follow-through stay on this account rail"
+            : installRailHeading;
+    var accountRailSummary = showAccessSection
+        ? "Relink, reclaim, recovery, and active grant review stay here after the installer or app does the real work. Do not turn this into a browser-first claim ritual."
+        : showSupportSection
+            ? "Tracked support stays attached to the affected install so release truth, closure, and recovery never split across separate surfaces."
+            : installRailSummary;
+    var accountRailInstallSummary = leadInstallation is not null
+        ? $"{InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)} · {PlatformSummary(leadInstallation.Platform, leadInstallation.Arch)} · {InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)}"
+        : pendingClaims > 0
+            ? $"{pendingClaims} pending claim ticket(s) are still waiting on their original device."
+            : "No linked install is attached yet. Open Downloads while signed in to start with the same binary and a better handoff.";
+    var accountRailRecoverySummary = leadPendingClaim is not null
+        ? $"{leadPendingClaim.ArtifactLabel} is already staged. Use the pending code only if that copy explicitly opens in recovery mode."
+        : "Recovery codes stay fallback only. The default path remains installer or in-app linking on the affected device.";
+    var accountRailSupportSummary = openSupportCases > 0
+        ? $"{openSupportCases} active support case(s) stay attached to this account rail."
+        : "No active support case is blocking the next install or return path right now.";
 }
 
 <section class="account-stage">
@@ -486,6 +510,41 @@
             </article>
         </div>
     }
+
+    <section class="account-rail-snapshot" aria-label="Account continuity rail">
+        <div class="account-rail-snapshot__lead">
+            <p class="eyebrow">Account rail</p>
+            <h2>@accountRailHeadline</h2>
+            <p>@accountRailSummary</p>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
+                <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+                <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
+            </div>
+        </div>
+        <div class="account-rail-snapshot__panel">
+            <article class="account-rail-snapshot__fact">
+                <span>Primary sign-in</span>
+                <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
+                <p>@(emailLink is null ? "Add an email recovery path if you want a calmer return route later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
+            </article>
+            <article class="account-rail-snapshot__fact">
+                <span>Linked install rail</span>
+                <strong>@accountRailInstallSummary</strong>
+                <p>The artifact stays the same for everyone; the account-aware piece is the handoff, claim, and support continuity.</p>
+            </article>
+            <article class="account-rail-snapshot__fact">
+                <span>Support and release</span>
+                <strong>@accountRailSupportSummary</strong>
+                <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution lane.")</p>
+            </article>
+            <article class="account-rail-snapshot__fact">
+                <span>Recovery fallback</span>
+                <strong>@accountRailRecoverySummary</strong>
+                <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
+            </article>
+        </div>
+    </section>
 
     <div class="account-shell">
         <aside class="account-nav" aria-label="Account sections">
@@ -2462,6 +2521,8 @@
                                                 <option value="replay_timeline">Replay timeline</option>
                                                 <option value="after_action_report">After-action report</option>
                                                 <option value="downtime_brief">Downtime brief</option>
+                                                <option value="runboard_state">Runboard state</option>
+                                                <option value="resolution_report_draft">ResolutionReport draft</option>
                                             </select>
                                         </div>
                                         <div class="field">
@@ -4370,6 +4431,10 @@
         return `${scopeLabel} after-action report`;
       case "downtime_brief":
         return `${scopeLabel} downtime brief`;
+      case "runboard_state":
+        return `${scopeLabel} runboard state`;
+      case "resolution_report_draft":
+        return `${scopeLabel} ResolutionReport draft`;
       default:
         return `${scopeLabel} session recap`;
     }
@@ -4384,6 +4449,10 @@
         return `${scopeLabel} keeps after-action review and consequence follow-through on the shared return lane.`;
       case "downtime_brief":
         return `${scopeLabel} keeps downtime obligations and next-session readiness grounded on the shared return lane.`;
+      case "runboard_state":
+        return `${scopeLabel} keeps the GM runboard and turn-ledger handoff reviewable on the same governed lane.`;
+      case "resolution_report_draft":
+        return `${scopeLabel} keeps the ResolutionReport draft continuous without turning hub into the engine-math owner.`;
       default:
         return `${scopeLabel} keeps recap and next-session return on the same governed packet.`;
     }

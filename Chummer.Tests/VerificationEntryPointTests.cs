@@ -458,7 +458,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("ReleaseUploadTicketService", controller, StringComparison.Ordinal);
         Assert.Contains("self-contained bootstrap command", controller, StringComparison.Ordinal);
         Assert.Contains("ResolveReleaseUploadCommandAuth", controller, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET=", controller, StringComparison.Ordinal);
+        Assert.Contains("ReleaseUploadTicketEnvironmentVariable", controller, StringComparison.Ordinal);
+        Assert.Contains("\"export \" + releaseUploadAuthEnvironmentVariable + \"=\"", controller, StringComparison.Ordinal);
         Assert.Contains("Release upload authorization was attached", controller, StringComparison.Ordinal);
         Assert.Contains("ReleaseUploadPageViewModel", viewModel, StringComparison.Ordinal);
         Assert.Contains("Signed-in release upload", view, StringComparison.Ordinal);
@@ -499,7 +500,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("to_lower_ascii()", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("${release_proof_status,,}", bootstrap, StringComparison.Ordinal);
         Assert.DoesNotContain("${ui_gate_status,,}", bootstrap, StringComparison.Ordinal);
-        Assert.Contains("bootstrap template not found", wrapper, StringComparison.Ordinal);
+        Assert.Contains("no release-upload auth was supplied", wrapper, StringComparison.Ordinal);
+        Assert.Contains("cannot mint a signed-in release ticket by itself", wrapper, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload", wrapper, StringComparison.Ordinal);
         Assert.Contains("downloads/release-upload/bootstrap.sh", wrapper, StringComparison.Ordinal);
         Assert.Contains("copy the generated Command block", wrapper, StringComparison.Ordinal);
@@ -525,10 +527,10 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("run-mac-release-bootstrap.sh", publicReadme, StringComparison.Ordinal);
         Assert.Contains("Copy the generated `Command` block", publicReadme, StringComparison.Ordinal);
         Assert.Contains("a raw public script has no upload credential", publicReadme, StringComparison.Ordinal);
-        Assert.Contains("latest pushed `main` branch", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("pins the repo refs to expected commits", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_MAC_RELEASE_PACKAGING_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("defaults temporary packaging work to `$work_root/tmp`", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", publicReadme, StringComparison.Ordinal);
         Assert.Contains("delete the local temporary release artifacts again", publicReadme, StringComparison.Ordinal);
@@ -3375,6 +3377,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("MIG-091", backlog, StringComparison.Ordinal);
         Assert.Contains("Response.OnStarting", middleware, StringComparison.Ordinal);
         Assert.Contains("IDENTITY_ENABLE_HTTPS_REDIRECTION", identityProgram, StringComparison.Ordinal);
+        Assert.Contains("HasHttpsListenerConfiguration", identityProgram, StringComparison.Ordinal);
+        Assert.Contains("HTTPS_PORTS", identityProgram, StringComparison.Ordinal);
+        Assert.Contains("Skipping HTTPS redirection", identityProgram, StringComparison.Ordinal);
     }
 
     [Fact]

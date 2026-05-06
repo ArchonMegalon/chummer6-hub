@@ -4002,6 +4002,105 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 result.stderr,
             )
 
+    def test_verifier_fail_closes_missing_desktop_client_readiness_block(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, materialize.returncode, msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}")
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            proof.pop("desktop_client_readiness", None)
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("missing desktop_client_readiness block", result.stderr)
+
+    def test_verifier_fail_closes_desktop_client_readiness_drift_from_flagship_proof(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            readiness_path = Path(temp_root) / "FLAGSHIP_PRODUCT_READINESS.generated.json"
+            materialize = subprocess.run(
+                [
+                    "python3",
+                    str(PROOF_SCRIPT),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(0, materialize.returncode, msg=f"stdout:\n{materialize.stdout}\nstderr:\n{materialize.stderr}")
+
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+            readiness = {
+                "contract_name": "fleet.flagship_product_readiness",
+                "generated_at": "2026-05-05T21:31:06Z",
+                "status": "fail",
+                "scoped_status": "fail",
+                "missing_keys": ["desktop_client"],
+                "scoped_missing_keys": ["desktop_client"],
+                "completion_audit": {
+                    "status": "fail",
+                    "reason": "desktop client proof is still blocked",
+                },
+                "flagship_readiness_audit": {
+                    "reason": "desktop client proof is still blocked",
+                },
+            }
+            readiness_path.write_text(json.dumps(readiness, indent=2) + "\n", encoding="utf-8")
+
+            proof["desktop_client_readiness"]["reason"] = "drifted reason"
+            proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
+
+            result = subprocess.run(
+                ["python3", str(VERIFY_SCRIPT)],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                env={
+                    **dict(os.environ),
+                    "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH": str(readiness_path),
+                },
+            )
+
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("desktop_client_readiness has wrong reason", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

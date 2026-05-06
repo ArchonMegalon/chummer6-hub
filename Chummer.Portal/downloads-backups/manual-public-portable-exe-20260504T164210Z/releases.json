@@ -1,0 +1,432 @@
+{
+  "generated_at": "2026-05-04T16:17:03Z",
+  "generatedAt": "2026-05-04T16:17:03Z",
+  "contract_name": "Chummer.Hub.Registry.Contracts",
+  "contractName": "Chummer.Hub.Registry.Contracts",
+  "version": "run-20260504-155233",
+  "channel": "preview",
+  "publishedAt": "2026-05-04T16:17:03Z",
+  "downloads": [
+    {
+      "id": "avalonia-win-x64-installer",
+      "platform": "Avalonia Desktop Windows X64 Installer",
+      "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+      "sha256": "602938d9471ebfdb62fcb50a48b3894091c3249a49d69067fb4f04cd7b291456",
+      "sizeBytes": 237460127,
+      "format": "exe",
+      "flavor": "installer",
+      "kind": "installer",
+      "head": "avalonia",
+      "platformId": "windows-x64",
+      "arch": "x64",
+      "fileName": "chummer-avalonia-win-x64-installer.exe",
+      "installAccessClass": "account_required"
+    },
+    {
+      "id": "avalonia-win-x64-archive",
+      "platform": "Avalonia Desktop Windows X64 Portable",
+      "url": "/downloads/files/chummer-avalonia-win-x64.zip",
+      "sha256": "b72fca95de87e8fa820255acc29a9a0aa069459f639aa768da3c59ff336fe879",
+      "sizeBytes": 45058572,
+      "format": "zip",
+      "flavor": "archive",
+      "kind": "archive",
+      "head": "avalonia",
+      "platformId": "windows-x64",
+      "arch": "x64",
+      "fileName": "chummer-avalonia-win-x64.zip",
+      "installAccessClass": "open_public"
+    }
+  ],
+  "source": "registry",
+  "status": "published",
+  "message": "The open-public Windows portable archive is live on the shelf, but supportability stays review_required until fresh Windows installer startup-smoke proof is captured for this release.",
+  "rolloutState": "coverage_incomplete",
+  "rolloutReason": "Current shelf is published, but the refreshed Windows installer has not yet passed a fresh startup-smoke proof lane on this host; treat the shelf as review-required until that proof is captured.",
+  "supportabilityState": "review_required",
+  "supportabilitySummary": "The open-public Windows portable archive is live on the shelf, but supportability stays review_required until fresh Windows installer startup-smoke proof is captured for this release.",
+  "knownIssueSummary": "Fresh Windows installer startup-smoke proof is still pending for this release; prefer the open-public portable archive until the installer proof lane is refreshed.",
+  "fixAvailabilitySummary": "Send fixed notices only after the refreshed Windows installer can be downloaded with matching startup-smoke proof for this shelf.",
+  "releaseProof": {
+    "status": "review_required",
+    "generatedAt": "2026-05-04T16:17:03Z",
+    "baseUrl": "https://chummer.run",
+    "journeysPassed": [
+      "install_claim_restore_continue",
+      "build_explain_publish",
+      "campaign_session_recover_recap",
+      "report_cluster_release_notify",
+      "organize_community_and_close_loop"
+    ],
+    "proofRoutes": [
+      "/downloads/install/avalonia-linux-x64-installer",
+      "/home/access",
+      "/home/work",
+      "/account/access",
+      "/account/work",
+      "/account/support",
+      "/contact",
+      "/downloads",
+      "/downloads/install/avalonia-osx-arm64-installer",
+      "/downloads/install/avalonia-win-x64-installer"
+    ],
+    "uiLocalizationReleaseGate": {
+      "status": "pass",
+      "generatedAt": "2026-05-02T14:05:06Z",
+      "defaultKeyCount": 386,
+      "explicitFallbackRuntime": "pass",
+      "signoffSmokeRunnerStatus": "pass",
+      "shippingLocales": [
+        "en-us",
+        "de-de",
+        "fr-fr",
+        "ja-jp",
+        "pt-br",
+        "zh-cn"
+      ],
+      "localeSummary": [
+        {
+          "locale": "en-us",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 386,
+          "minimumOverrideCount": 386,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "de-de",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 386,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "fr-fr",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 386,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "ja-jp",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 386,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "pt-br",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 386,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        },
+        {
+          "locale": "zh-cn",
+          "untranslatedKeyCount": 0,
+          "overrideCount": 386,
+          "minimumOverrideCount": 40,
+          "missingReleaseSeedKeys": [],
+          "legacyXmlPresent": true,
+          "legacyDataXmlPresent": true
+        }
+      ],
+      "acceptanceGates": [
+        "pseudo_localization",
+        "missing_key_fail_fast",
+        "top_surface_overflow_checks",
+        "locale_smoke_first_launch",
+        "locale_smoke_settings",
+        "locale_smoke_explain",
+        "locale_smoke_updater",
+        "locale_smoke_support",
+        "non_english_generated_artifact_smoke"
+      ],
+      "domainCoverage": {
+        "app_chrome": "pass",
+        "data_rules_names": "pass",
+        "explain_receipts": "pass",
+        "generated_artifacts": "pass",
+        "install_update_support": "pass"
+      },
+      "localeDomainCoverage": {
+        "de-de": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "en-us": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "fr-fr": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "ja-jp": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "pt-br": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        },
+        "zh-cn": {
+          "app_chrome": "pass",
+          "data_rules_names": "pass",
+          "explain_receipts": "pass",
+          "generated_artifacts": "pass",
+          "install_update_support": "pass"
+        }
+      },
+      "blockingFindings": [],
+      "blockingFindingsCount": 0,
+      "translationBacklogFindings": [],
+      "translationBacklogFindingsCount": 0
+    },
+    "reason": "Fresh Windows installer startup-smoke proof is pending on this host for the current shelf refresh."
+  },
+  "desktopTupleCoverage": {
+    "requiredDesktopPlatforms": [
+      "windows"
+    ],
+    "requiredDesktopHeads": [
+      "avalonia"
+    ],
+    "promotedInstallerTuples": [],
+    "promotedPlatformHeads": {
+      "windows": [
+        "avalonia"
+      ]
+    },
+    "requiredDesktopPlatformHeadRidTuples": [
+      "avalonia:win-x64:windows"
+    ],
+    "promotedPlatformHeadRidTuples": [],
+    "missingRequiredPlatforms": [],
+    "missingRequiredHeads": [],
+    "missingRequiredPlatformHeadPairs": [],
+    "missingRequiredPlatformHeadRidTuples": [
+      "avalonia:win-x64:windows"
+    ],
+    "externalProofRequests": [],
+    "desktopRouteTruth": [
+      {
+        "tupleId": "avalonia:windows:win-x64",
+        "head": "avalonia",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "artifactId": "avalonia-win-x64-installer",
+        "routeRole": "primary",
+        "routeRoleReasonCode": "primary_flagship_head",
+        "routeRoleReason": "Avalonia Desktop route avalonia:windows:win-x64 is the flagship desktop route for windows/win-x64 and must carry independent startup-smoke proof before promotion.",
+        "promotionState": "proof_required",
+        "promotionReasonCode": "missing_artifact_or_startup_smoke_proof",
+        "promotionReason": "Primary-route Avalonia Desktop tuple avalonia:windows:win-x64 for windows/win-x64 is live on the shelf with refreshed artifact bytes, but fresh Windows startup-smoke proof is still pending for this release.",
+        "parityPosture": "flagship_primary",
+        "updateEligibility": "blocked_missing_proof",
+        "updateEligibilityReason": "Use the open-public portable archive while fresh Windows installer startup-smoke proof is pending.",
+        "rollbackState": "manual_recovery_required",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:windows:win-x64 is not promoted for windows/win-x64 because matching artifact bytes and fresh startup-smoke proof are still required; primary route avalonia:windows:win-x64 therefore requires manual recovery.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for avalonia:windows:win-x64.",
+        "installPosture": "proof_capture_required",
+        "installPostureReason": "The refreshed Windows installer is present on the shelf, but fresh startup-smoke proof is still required before installer promotion.",
+        "publicInstallRoute": "/downloads/install/avalonia-win-x64-installer"
+      },
+      {
+        "tupleId": "blazor-desktop:windows:win-x64",
+        "head": "blazor-desktop",
+        "platform": "windows",
+        "rid": "win-x64",
+        "arch": "x64",
+        "artifactId": "",
+        "routeRole": "fallback",
+        "routeRoleReasonCode": "fallback_recovery_head",
+        "routeRoleReason": "Blazor Desktop route blazor-desktop:windows:win-x64 is retained as an explicit fallback route for windows/win-x64; it cannot satisfy the primary-route promise.",
+        "promotionState": "proof_required",
+        "promotionReasonCode": "missing_artifact_or_startup_smoke_proof",
+        "promotionReason": "Fallback Blazor Desktop tuple blazor-desktop:windows:win-x64 for windows/win-x64 is retained for recovery/manual routing on windows/win-x64 but is not promoted until matching artifact bytes and fresh startup-smoke proof are present.",
+        "parityPosture": "explicit_fallback",
+        "updateEligibility": "blocked_missing_proof",
+        "updateEligibilityReason": "Fallback route blazor-desktop:windows:win-x64 is not update-eligible until promoted.",
+        "rollbackState": "fallback_not_promoted",
+        "rollbackReasonCode": "fallback_missing_artifact_or_startup_smoke_proof",
+        "rollbackReason": "Fallback route blazor-desktop:windows:win-x64 needs artifact and startup-smoke proof before rollback use.",
+        "revokeState": "not_revoked",
+        "revokeSource": "none",
+        "revokeReasonCode": "no_registry_revoke_marker",
+        "revokeReason": "No registry revoke marker is active for blazor-desktop:windows:win-x64.",
+        "installPosture": "proof_capture_required",
+        "installPostureReason": "Do not present blazor-desktop:windows:win-x64 as installable until the missing tuple proof is captured.",
+        "publicInstallRoute": "/downloads/install/blazor-desktop-win-x64-installer"
+      }
+    ],
+    "complete": false
+  },
+  "installAwareArtifactRegistry": [
+    {
+      "registryId": "concierge:preview:run-20260504-155233:avalonia-win-x64-installer",
+      "artifactId": "avalonia-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260504-155233",
+      "tupleId": "avalonia:windows:win-x64",
+      "head": "avalonia",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "installedBuildSelector": "preview/run-20260504-155233/avalonia/windows/x64",
+      "currentForInstalledBuild": true,
+      "channelRationale": "Published preview channel keeps primary-route avalonia:windows:win-x64 current for installed build selector preview/run-20260504-155233/avalonia/windows/x64.",
+      "correctnessReason": "Offer avalonia-win-x64-installer to installed build selector preview/run-20260504-155233/avalonia/windows/x64 because tuple avalonia:windows:win-x64 is currently promoted for this channel.",
+      "recoveryProofRefs": [
+        "/downloads/install/avalonia-win-x64-installer",
+        "startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
+        "desktopTupleCoverage.desktopRouteTruth[avalonia:windows:win-x64]"
+      ],
+      "conciergeAssetRefs": {
+        "releaseExplainerPacket": "concierge/release/preview/run-20260504-155233/avalonia-win-x64-installer",
+        "supportClosurePacket": "concierge/support/preview/run-20260504-155233/avalonia-win-x64-installer",
+        "publicTrustWrapper": "/downloads/install/avalonia-win-x64-installer"
+      }
+    },
+    {
+      "registryId": "concierge:preview:run-20260504-155233:blazor-desktop-win-x64-installer",
+      "artifactId": "blazor-desktop-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260504-155233",
+      "tupleId": "blazor-desktop:windows:win-x64",
+      "head": "blazor-desktop",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "installedBuildSelector": "preview/run-20260504-155233/blazor-desktop/windows/x64",
+      "currentForInstalledBuild": false,
+      "channelRationale": "Published preview channel keeps fallback-route blazor-desktop:windows:win-x64 blocked for installed build selector preview/run-20260504-155233/blazor-desktop/windows/x64 until installer and startup-smoke proof are present.",
+      "correctnessReason": "Do not offer blazor-desktop-win-x64-installer to installed build selector preview/run-20260504-155233/blazor-desktop/windows/x64 because tuple blazor-desktop:windows:win-x64 is not currently promoted for this channel.",
+      "recoveryProofRefs": [
+        "/downloads/install/blazor-desktop-win-x64-installer",
+        "startup-smoke/startup-smoke-blazor-desktop-win-x64.receipt.json",
+        "desktopTupleCoverage.desktopRouteTruth[blazor-desktop:windows:win-x64]"
+      ],
+      "conciergeAssetRefs": {
+        "releaseExplainerPacket": "concierge/release/preview/run-20260504-155233/blazor-desktop-win-x64-installer",
+        "supportClosurePacket": "concierge/support/preview/run-20260504-155233/blazor-desktop-win-x64-installer",
+        "publicTrustWrapper": "/downloads/install/blazor-desktop-win-x64-installer"
+      }
+    }
+  ],
+  "artifactIdentityRegistry": [
+    {
+      "registryId": "artifact-identity:preview:run-20260504-155233:avalonia:windows:win-x64",
+      "artifactFamilyId": "artifact-family:avalonia:windows:win-x64",
+      "artifactId": "avalonia-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260504-155233",
+      "tupleId": "avalonia:windows:win-x64",
+      "head": "avalonia",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "previewRef": "registry-preview:avalonia-win-x64-installer:avalonia:windows:win-x64",
+      "captionRef": "registry-caption:preview:run-20260504-155233:avalonia:windows:win-x64",
+      "publicationBindingId": "binding:preview:run-20260504-155233:avalonia:windows:win-x64",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260504-155233:avalonia-win-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260504-155233:avalonia-win-x64-installer",
+      "publicInstallRoute": "/downloads/install/avalonia-win-x64-installer"
+    },
+    {
+      "registryId": "artifact-identity:preview:run-20260504-155233:blazor-desktop:windows:win-x64",
+      "artifactFamilyId": "artifact-family:blazor-desktop:windows:win-x64",
+      "artifactId": "blazor-desktop-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260504-155233",
+      "tupleId": "blazor-desktop:windows:win-x64",
+      "head": "blazor-desktop",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "previewRef": "registry-preview:blazor-desktop-win-x64-installer:blazor-desktop:windows:win-x64",
+      "captionRef": "registry-caption:preview:run-20260504-155233:blazor-desktop:windows:win-x64",
+      "publicationBindingId": "binding:preview:run-20260504-155233:blazor-desktop:windows:win-x64",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260504-155233:blazor-desktop-win-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260504-155233:blazor-desktop-win-x64-installer",
+      "publicInstallRoute": "/downloads/install/blazor-desktop-win-x64-installer"
+    }
+  ],
+  "artifactPublicationBindings": [
+    {
+      "bindingId": "binding:preview:run-20260504-155233:avalonia:windows:win-x64",
+      "artifactFamilyId": "artifact-family:avalonia:windows:win-x64",
+      "artifactId": "avalonia-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260504-155233",
+      "tupleId": "avalonia:windows:win-x64",
+      "head": "avalonia",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "publicationScope": "signed-in-and-public",
+      "publicationState": "published",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260504-155233:avalonia-win-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260504-155233:avalonia-win-x64-installer",
+      "previewRef": "registry-preview:avalonia-win-x64-installer:avalonia:windows:win-x64",
+      "captionRef": "registry-caption:preview:run-20260504-155233:avalonia:windows:win-x64",
+      "publicInstallRoute": "/downloads/install/avalonia-win-x64-installer",
+      "rationale": "preview keeps primary tuple avalonia:windows:win-x64 published so signed-in and public shelves cite the same governed preview, caption, and install refs."
+    },
+    {
+      "bindingId": "binding:preview:run-20260504-155233:blazor-desktop:windows:win-x64",
+      "artifactFamilyId": "artifact-family:blazor-desktop:windows:win-x64",
+      "artifactId": "blazor-desktop-win-x64-installer",
+      "channelId": "preview",
+      "releaseVersion": "run-20260504-155233",
+      "tupleId": "blazor-desktop:windows:win-x64",
+      "head": "blazor-desktop",
+      "platform": "windows",
+      "rid": "win-x64",
+      "arch": "x64",
+      "kind": "installer",
+      "publicationScope": "signed-in-and-public",
+      "publicationState": "preview",
+      "signedInShelfRef": "shelf:signed-in:preview:run-20260504-155233:blazor-desktop-win-x64-installer",
+      "publicShelfRef": "shelf:public:preview:run-20260504-155233:blazor-desktop-win-x64-installer",
+      "previewRef": "registry-preview:blazor-desktop-win-x64-installer:blazor-desktop:windows:win-x64",
+      "captionRef": "registry-caption:preview:run-20260504-155233:blazor-desktop:windows:win-x64",
+      "publicInstallRoute": "/downloads/install/blazor-desktop-win-x64-installer",
+      "rationale": "preview keeps tuple blazor-desktop:windows:win-x64 in preview so shelf refs stay governed before wider publication."
+    }
+  ]
+}

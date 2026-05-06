@@ -62,6 +62,13 @@ It also includes Build and Explain companion siblings:
 * blocker companion captions and text fallbacks
 * receipt-anchor labels and inspectable sibling actions
 
+It also includes rule-environment grounded-media siblings:
+
+* activation-receipt labels
+* diff-receipt labels
+* rule-environment badges
+* localized text fallbacks for campaign-drift, restore, import, and support follow-through companions
+
 ### Companion runtime text
 
 First-party companion barks, action chips, evidence-drawer labels, voice opt-in copy, and rare scene fallback text that render inside desktop or mobile runtime surfaces.
@@ -90,6 +97,7 @@ Phase 1 runtime language behavior is intentionally boring:
 * companion text, chips, evidence drawers, and voice-mode affordances must resolve in the chosen locale
 * campaign cold-open and mission-briefing launch labels, captions, preview cards, and sibling packet copy must resolve through one deterministic locale chain
 * Build and Explain companion launch labels, captions, preview cards, and inspectable sibling actions must resolve through one deterministic locale chain
+* artifact shelf labels, captions, packet siblings, retention badges, and inspectable sibling actions must resolve through one deterministic locale chain
 * if EA compile output, a companion locale pack, or a media attachment is unavailable, runtime falls back to the first-party local template for that locale and then to `en-US`
 * denied or unavailable microphone access keeps the same localized text-first path instead of hiding actions or surfacing ad hoc English prompts
 
@@ -104,6 +112,10 @@ It may not widen spoiler scope, change audience class, or silently mix translate
 
 For Build and Explain companions, locale fallback also may not drop receipt-anchor labels, paraphrase away blocker severity, or replace inspectable packet references with freer narration.
 It also may not swap packet revision ids, approval-state labels, or rule-environment badges for locale-specific marketing copy that makes the artifact look more final than the underlying receipt truth.
+
+For rule-environment grounded-media companions, locale fallback also may not paraphrase away activation or diff receipt identity, collapse active-versus-compared environment posture, or replace the required text-first recovery action with freer presenter phrasing.
+
+For artifact shelves, locale fallback also may not hide audience posture, retention posture, inspectable sibling actions, or source packet identity behind smoother localized marketing copy.
 
 If a locale or string is unavailable, the product must fall back deterministically to `en-US` instead of rendering ad hoc partial state.
 

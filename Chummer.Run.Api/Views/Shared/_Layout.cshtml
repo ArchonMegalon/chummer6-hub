@@ -12,6 +12,7 @@
     var supportLinks = chrome.SecondaryNavigation.Where(link =>
         link.Href is "/help" or "/faq" or "/privacy" or "/terms" or "/contact").ToArray();
     var productLinks = chrome.SecondaryNavigation.Except(supportLinks).ToArray();
+    var publicSignalLinks = chrome.PublicSignalNavigation?.ToArray() ?? Array.Empty<PublicNavigationLink>();
     Func<string?, string> normalizeHeaderActionPath = href =>
     {
         if (string.IsNullOrWhiteSpace(href))
@@ -33,6 +34,38 @@
 
         return candidate.Trim().TrimEnd('/');
     };
+    var normalizedCurrentPath = normalizeHeaderActionPath(chrome.CurrentPath);
+    Func<string?, bool> isContextualRouteCurrent = href =>
+    {
+        var candidate = normalizeHeaderActionPath(href);
+        return candidate switch
+        {
+            "/what-is-chummer" => string.Equals(normalizedCurrentPath, "/what-is-chummer", StringComparison.OrdinalIgnoreCase),
+            "/downloads" => normalizedCurrentPath is "/downloads" || normalizedCurrentPath.StartsWith("/downloads/", StringComparison.OrdinalIgnoreCase),
+            "/now" => string.Equals(normalizedCurrentPath, "/now", StringComparison.OrdinalIgnoreCase),
+            "/horizons" => normalizedCurrentPath is "/horizons" or "/roadmap" || normalizedCurrentPath.StartsWith("/roadmap/", StringComparison.OrdinalIgnoreCase),
+            "/artifacts" => normalizedCurrentPath is "/artifacts" || normalizedCurrentPath.StartsWith("/artifacts/", StringComparison.OrdinalIgnoreCase),
+            "/participate" => normalizedCurrentPath is "/participate" || normalizedCurrentPath.StartsWith("/participate/", StringComparison.OrdinalIgnoreCase),
+            "/status" => string.Equals(normalizedCurrentPath, "/status", StringComparison.OrdinalIgnoreCase),
+            "/help" => string.Equals(normalizedCurrentPath, "/help", StringComparison.OrdinalIgnoreCase),
+            "/faq" => string.Equals(normalizedCurrentPath, "/faq", StringComparison.OrdinalIgnoreCase),
+            "/privacy" => string.Equals(normalizedCurrentPath, "/privacy", StringComparison.OrdinalIgnoreCase),
+            "/terms" => string.Equals(normalizedCurrentPath, "/terms", StringComparison.OrdinalIgnoreCase),
+            "/contact" => normalizedCurrentPath is "/contact" || normalizedCurrentPath.StartsWith("/contact/", StringComparison.OrdinalIgnoreCase),
+            _ => string.Equals(normalizedCurrentPath, candidate, StringComparison.OrdinalIgnoreCase)
+        };
+    };
+    Func<string?, bool> isPublicSignalCurrent = href =>
+    {
+        var candidate = normalizeHeaderActionPath(href);
+        return candidate switch
+        {
+            "/feedback" => normalizedCurrentPath is "/feedback",
+            "/roadmap" => normalizedCurrentPath is "/roadmap" or "/horizons" || normalizedCurrentPath.StartsWith("/roadmap/", StringComparison.OrdinalIgnoreCase),
+            "/changelog" => normalizedCurrentPath is "/changelog",
+            _ => isContextualRouteCurrent(candidate)
+        };
+    };
 
     Func<string?, bool> isBuildAction = href =>
     {
@@ -43,7 +76,7 @@
     var nonBuildHeaderActions = chrome.HeaderActions.Where(action => !isBuildAction(action.Href)).ToArray();
     var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || chrome.CurrentPath.StartsWith("/downloads/release-upload/", StringComparison.OrdinalIgnoreCase);
-    var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "artifacts" or "downloads" or "participate" or "help" or "faq" or "privacy" or "terms" or "contact"
+    var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "artifacts" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
     var compactProductLinks = productLinks
@@ -52,6 +85,43 @@
     var footerProductLinks = compactFooter && compactProductLinks.Length > 0
         ? compactProductLinks
         : productLinks;
+    (string Eyebrow, string Label, string Href)? bottomQuickAction = null;
+    if (!authSurface && !chrome.Authenticated && chrome.PublicPrimaryCta is not null)
+    {
+        bottomQuickAction = ("Preview access", chrome.PublicPrimaryCta.Label, chrome.PublicPrimaryCta.Href);
+
+        if (routeKey is "participate")
+        {
+            bottomQuickAction = ("Public signal", "Open Fixer Board", "/feedback");
+        }
+        else if (routeKey is "feedback")
+        {
+            bottomQuickAction = ("Projected movement", "Open roadmap", "/roadmap");
+        }
+        else if (routeKey is "horizons" or "roadmap" or "status" or "what-is-chummer" || routeKey.StartsWith("roadmap-", StringComparison.Ordinal))
+        {
+            bottomQuickAction = ("Reality check", "Open what works today", "/now");
+        }
+        else if (routeKey is "help" or "faq" or "contact")
+        {
+            bottomQuickAction = ("Need help", "Open support", "/contact#support-intake");
+        }
+        else if (routeKey is "privacy" or "terms")
+        {
+            bottomQuickAction = ("Need context", "Open help", "/help");
+        }
+    }
+    var requestHost = Context?.Request?.Host.Host?.Trim().TrimEnd('.').ToLowerInvariant() ?? string.Empty;
+    var clickRankSiteId = requestHost is "chummer.run" or "www.chummer.run"
+        ? (System.Environment.GetEnvironmentVariable("CLICKRANK_AI_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
+        : string.Empty;
+    var clickRankEligible = !authSurface
+        && !chrome.Authenticated
+        && !string.IsNullOrWhiteSpace(clickRankSiteId)
+        && (
+            routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
+            || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
+            || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
 }
 <!doctype html>
 <html lang="en" data-theme="hub-front-door">
@@ -65,6 +135,41 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+    @if (clickRankEligible)
+    {
+        <script>
+            (function () {
+                var doNotTrack = window.doNotTrack === "1"
+                    || navigator.doNotTrack === "1"
+                    || navigator.msDoNotTrack === "1"
+                    || navigator.globalPrivacyControl === true;
+                if (doNotTrack || document.querySelector("script[data-clickrank-ai='seo']")) {
+                    return;
+                }
+
+                var loadClickRank = function () {
+                    if (document.querySelector("script[data-clickrank-ai='seo']")) {
+                        return;
+                    }
+
+                    var clickRankAi = document.createElement("script");
+                    clickRankAi.src = "https://js.clickrank.ai/seo/@clickRankSiteId/script";
+                    clickRankAi.async = true;
+                    clickRankAi.defer = true;
+                    clickRankAi.dataset.clickrankAi = "seo";
+                    clickRankAi.referrerPolicy = "strict-origin-when-cross-origin";
+                    document.head.appendChild(clickRankAi);
+                };
+
+                if ("requestIdleCallback" in window) {
+                    window.requestIdleCallback(loadClickRank, { timeout: 1500 });
+                    return;
+                }
+
+                window.setTimeout(loadClickRank, 250);
+            })();
+        </script>
+    }
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="@bodyClass">
@@ -107,7 +212,7 @@
                 <nav class="site-nav" aria-label="Primary navigation">
                     @foreach (var link in chrome.PrimaryNavigation)
                     {
-                        var current = string.Equals(chrome.CurrentPath, link.Href, StringComparison.OrdinalIgnoreCase);
+                        var current = isContextualRouteCurrent(link.Href);
                         if (current)
                         {
                             <span class="site-nav__current">@link.Label</span>
@@ -118,6 +223,14 @@
                         }
                     }
                 </nav>
+                <button
+                    class="site-nav__toggle button-like button-like--ghost"
+                    type="button"
+                    data-nav-toggle
+                    aria-expanded="false"
+                    aria-controls="site-nav-sheet">
+                    Menu
+                </button>
                 <div class="site-actions">
                     @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
                     {
@@ -157,6 +270,103 @@
                     }
                 </div>
             </div>
+            <div class="site-nav-sheet" id="site-nav-sheet" data-nav-sheet hidden inert aria-hidden="true">
+                <div class="site-nav-sheet__panel">
+                    <div class="site-nav-sheet__section">
+                        <p class="site-nav-sheet__heading">Navigate</p>
+                        <nav aria-label="Compact navigation">
+                            @foreach (var link in chrome.PrimaryNavigation)
+                            {
+                                var current = isContextualRouteCurrent(link.Href);
+                                if (current)
+                                {
+                                    <span class="site-nav__current">@link.Label</span>
+                                }
+                                else
+                                {
+                                    <a href="@link.Href">@link.Label</a>
+                                }
+                            }
+                        </nav>
+                    </div>
+                    <div class="site-nav-sheet__section">
+                        <p class="site-nav-sheet__heading">Actions</p>
+                        <div class="site-nav-sheet__actions">
+                            @foreach (var action in nonBuildHeaderActions)
+                            {
+                                if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <form method="post" action="/logout" class="action-form">
+                                        @Html.AntiForgeryToken()
+                                        <button class="action-pill action-pill--@action.Tone" type="submit">@action.Label</button>
+                                    </form>
+                                }
+                                else if (action.Current)
+                                {
+                                    <span class="action-pill action-pill--current">@action.Label</span>
+                                }
+                                else
+                                {
+                                    var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
+                                        ? "site-actions__link"
+                                        : $"action-pill action-pill--{action.Tone}";
+                                    <a class="@actionClass" href="@action.Href">@action.Label</a>
+                                }
+                            }
+                            @if (buildAction is not null)
+                            {
+                                if (buildAction.Current)
+                                {
+                                    <span class="action-pill action-pill--current">@buildAction.Label</span>
+                                }
+                                else
+                                {
+                                    <a class="action-pill action-pill--secondary" href="@buildAction.Href">@buildAction.Label</a>
+                                }
+                            }
+                        </div>
+                    </div>
+                    <div class="site-nav-sheet__section">
+                        @if (publicSignalLinks.Length > 0)
+                        {
+                            <p class="site-nav-sheet__heading">Public loop</p>
+                            <nav aria-label="Compact public signal navigation">
+                                @foreach (var link in publicSignalLinks)
+                                {
+                                    if (isPublicSignalCurrent(link.Href))
+                                    {
+                                        <span class="site-nav__current">@link.Label</span>
+                                    }
+                                    else
+                                    {
+                                        <a href="@link.Href">@link.Label</a>
+                                    }
+                                }
+                            </nav>
+                        }
+                     </div>
+                    <div class="site-nav-sheet__section">
+                        <p class="site-nav-sheet__heading">Help and legal</p>
+                        <nav aria-label="Compact support navigation">
+                            @foreach (var link in supportLinks)
+                            {
+                                if (isContextualRouteCurrent(link.Href))
+                                {
+                                    <span class="site-nav__current">@link.Label</span>
+                                }
+                                else
+                                {
+                                    <a href="@link.Href">@link.Label</a>
+                                }
+                            }
+                            @foreach (var link in chrome.UtilityNavigation)
+                            {
+                                <a href="@link.Href">@link.Label</a>
+                            }
+                        </nav>
+                    </div>
+                </div>
+            </div>
         </header>
     }
 
@@ -178,12 +388,41 @@
                         <div class="site-footer__links">
                             @foreach (var link in footerProductLinks)
                             {
-                                <a href="@link.Href">@link.Label</a>
+                                if (isContextualRouteCurrent(link.Href))
+                                {
+                                    <span class="site-footer__current">@link.Label</span>
+                                }
+                                else
+                                {
+                                    <a href="@link.Href">@link.Label</a>
+                                }
                             }
                         </div>
                     </div>
                     @if (compactFooter)
                     {
+                        if (publicSignalLinks.Length > 0)
+                        {
+                            <details class="site-footer__disclosure">
+                                <summary>Public loop</summary>
+                                <div class="site-footer__link-group">
+                                    <p class="site-footer__heading">Public loop</p>
+                                    <div class="site-footer__links">
+                                        @foreach (var link in publicSignalLinks)
+                                        {
+                                            if (isPublicSignalCurrent(link.Href))
+                                            {
+                                                <span class="site-footer__current">@link.Label</span>
+                                            }
+                                            else
+                                            {
+                                                <a href="@link.Href">@link.Label</a>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </details>
+                        }
                         <details class="site-footer__disclosure">
                             <summary>Help and legal</summary>
                             <div class="site-footer__link-group">
@@ -191,20 +430,63 @@
                                 <div class="site-footer__links">
                                     @foreach (var link in supportLinks)
                                     {
-                                        <a href="@link.Href">@link.Label</a>
+                                        if (isContextualRouteCurrent(link.Href))
+                                        {
+                                            <span class="site-footer__current">@link.Label</span>
+                                        }
+                                        else
+                                        {
+                                            <a href="@link.Href">@link.Label</a>
+                                        }
                                     }
                                 </div>
+                            </div>
+                        </details>
+                        <details class="site-footer__disclosure">
+                            <summary>Truth boundary</summary>
+                            <div class="site-footer__link-group site-footer__link-group--provenance">
+                                <p class="site-footer__heading">Canon source</p>
+                                <p class="site-footer__provenance">@chrome.FooterCanonicalSource</p>
+                                <p class="site-footer__heading">Projection</p>
+                                <p class="site-footer__provenance">@chrome.FooterGeneratedNote</p>
+                                <p class="site-footer__provenance">First-party truth stays on <a class="quiet-link" href="/now">what works today</a> and <a class="quiet-link" href="/status">status</a>.</p>
                             </div>
                         </details>
                     }
                     else
                     {
+                        if (publicSignalLinks.Length > 0)
+                        {
+                            <div class="site-footer__link-group">
+                                <p class="site-footer__heading">Public loop</p>
+                                <div class="site-footer__links">
+                                    @foreach (var link in publicSignalLinks)
+                                    {
+                                        if (isPublicSignalCurrent(link.Href))
+                                        {
+                                            <span class="site-footer__current">@link.Label</span>
+                                        }
+                                        else
+                                        {
+                                            <a href="@link.Href">@link.Label</a>
+                                        }
+                                    }
+                                </div>
+                            </div>
+                        }
                         <div class="site-footer__link-group">
                             <p class="site-footer__heading">Help and legal</p>
                             <div class="site-footer__links">
                                 @foreach (var link in supportLinks)
                                 {
-                                    <a href="@link.Href">@link.Label</a>
+                                    if (isContextualRouteCurrent(link.Href))
+                                    {
+                                        <span class="site-footer__current">@link.Label</span>
+                                    }
+                                    else
+                                    {
+                                        <a href="@link.Href">@link.Label</a>
+                                    }
                                 }
                             </div>
                         </div>
@@ -233,6 +515,11 @@
                         {
                             <p>Preview product. Honest status.</p>
                         }
+                        <p class="site-footer__meta-label">Canon source</p>
+                        <p class="site-footer__provenance">@chrome.FooterCanonicalSource</p>
+                        <p class="site-footer__meta-label">Projection</p>
+                        <p class="site-footer__provenance">@chrome.FooterGeneratedNote</p>
+                        <p class="site-footer__provenance">First-party truth stays on <a class="quiet-link" href="/now">what works today</a> and <a class="quiet-link" href="/status">status</a>.</p>
                         <p><a class="quiet-link" href="/help">Need help?</a></p>
                         <p><a class="quiet-link" href="/contact">Contact Chummer</a></p>
                     </div>
@@ -240,14 +527,21 @@
             </div>
         </footer>
 
-        @if (!chrome.Authenticated && chrome.PublicPrimaryCta is not null)
+        @if (bottomQuickAction is not null)
         {
-            <div class="site-bottom-cta" aria-label="Quick action">
+            <div class="site-bottom-cta" aria-label="Quick action" data-bottom-cta data-bottom-cta-key="@routeKey">
                 <div class="site-bottom-cta__copy">
-                    <span class="site-bottom-cta__label">Preview access</span>
-                    <strong>@chrome.PublicPrimaryCta.Label</strong>
+                    <span class="site-bottom-cta__label">@bottomQuickAction.Value.Eyebrow</span>
+                    <strong>@bottomQuickAction.Value.Label</strong>
                 </div>
-                <a class="button-like button-like--primary" href="@chrome.PublicPrimaryCta.Href">@chrome.PublicPrimaryCta.Label</a>
+                <a class="button-like button-like--primary" href="@bottomQuickAction.Value.Href">@bottomQuickAction.Value.Label</a>
+                <button
+                    class="site-bottom-cta__dismiss"
+                    type="button"
+                    data-bottom-cta-dismiss
+                    aria-label="Dismiss quick action">
+                    Dismiss
+                </button>
             </div>
         }
     }

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -17,7 +18,35 @@ WORK_TASK_ID = "116.1"
 WORK_TASK_TITLE = "Build creator publication discovery, moderation, and submission orchestration from approved artifact manifests."
 ALLOWED_PATHS = ["Chummer.Run.Api", "scripts", "tests"]
 OWNED_SURFACES = ["creator_publication:discovery", "creator_publication:moderation"]
-EXPECTED_STATUS = "in_progress"
+EXPECTED_STATUS = "complete"
+EXPECTED_WAVE = "W13"
+PACKAGE_COMPLETION_ACTION = "verify_closed_package_only"
+PACKAGE_DO_NOT_REOPEN_REASON = (
+    "M116 chummer6-hub creator publication discovery and moderation orchestration is complete; future shards must "
+    "verify approved-manifest authority discovery, correction, moderation, public artifact shelf contracts, and registry-facing "
+    "proof evidence from this package instead of reopening this slice."
+)
+REQUIRED_PROOF = [
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/AccountsController.cs",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/Accounts/Account.cshtml",
+    "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
+    "/docker/chummercomplete/chummer.run-services/tests/RunServicesSmoke/Program.cs",
+    "/docker/chummercomplete/chummer.run-services/scripts/verify_next90_m116_hub_creator_publication.py",
+    "/docker/chummercomplete/chummer.run-services/tests/test_next90_m116_hub_creator_publication.py",
+    "/docker/chummercomplete/chummer.run-services/.codex-studio/published/NEXT90_M116_HUB_CREATOR_PUBLICATION.generated.json",
+    "python3 scripts/verify_next90_m116_hub_creator_publication.py",
+    "python3 -m unittest tests/test_next90_m116_hub_creator_publication.py",
+    "bash scripts/ai/verify.sh",
+]
+GENERATED_PROOF_REQUIRED_FILES = [
+    required_file
+    for required_file in REQUIRED_PROOF
+    if required_file.startswith("/docker/chummercomplete/chummer.run-services/")
+    and "/.codex-studio/published/" not in required_file
+]
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_NEXT90_M116_HUB_CREATOR_PUBLICATION_ROOT", DEFAULT_ROOT))
@@ -39,8 +68,55 @@ SUCCESSOR_REGISTRY_PATH = Path(
         "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml",
     )
 )
+LOCAL_MIRROR_SUCCESSOR_REGISTRY_PATH = Path(
+    os.environ.get(
+        "CHUMMER_NEXT90_M116_HUB_CREATOR_PUBLICATION_LOCAL_MIRROR_SUCCESSOR_REGISTRY",
+        str(ROOT / ".codex-design/product/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml"),
+    )
+)
+GENERATED_PROOF_PATH = Path(
+    os.environ.get(
+        "CHUMMER_NEXT90_M116_HUB_CREATOR_PUBLICATION_GENERATED_PROOF",
+        str(ROOT / ".codex-studio/published/NEXT90_M116_HUB_CREATOR_PUBLICATION.generated.json"),
+    )
+)
+GENERATED_PROOF_CONTRACT = "chummer6-hub.next90_m116_hub_creator_publication"
+GENERATED_PROOF_EVIDENCE = {
+    "packageId": PACKAGE_ID,
+    "workTaskId": WORK_TASK_ID,
+    "frontierId": FRONTIER_ID,
+    "milestoneId": MILESTONE_ID,
+    "wave": EXPECTED_WAVE,
+    "repo": "chummer6-hub",
+    "task": TITLE,
+    "title": TITLE,
+    "status": EXPECTED_STATUS,
+    "completionAction": PACKAGE_COMPLETION_ACTION,
+    "doNotReopenReason": PACKAGE_DO_NOT_REOPEN_REASON,
+    "allowedPaths": ALLOWED_PATHS,
+    "ownedSurfaces": OWNED_SURFACES,
+}
+GENERATED_PROOF_COMMANDS = {
+    "verifyScript": "python3 scripts/verify_next90_m116_hub_creator_publication.py",
+    "targetedTests": "python3 -m unittest tests/test_next90_m116_hub_creator_publication.py",
+    "aggregateVerify": "bash scripts/ai/verify.sh",
+}
+REGISTRY_EVIDENCE_MARKERS = [
+    "PublicLandingController.cs and /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs now keep governed public discovery and detail routes restricted to approved-manifest-backed creator publications while preserving sibling packet navigation and the public artifact shelf contracts.",
+    "AccountsController.cs, /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Views/Accounts/Account.cshtml, and /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs now keep submission, rejection, correction resubmission, approval, and publication on one approved-manifest moderation lane and fail closed without approved audit authority.",
+    "tests/RunServicesSmoke/Program.cs proves correction-pass resubmission notes, fail-closed public detail routes for rejected packets, and governed public shelf/detail contracts on discoverable creator publications.",
+    "scripts/verify_next90_m116_hub_creator_publication.py, /docker/chummercomplete/chummer.run-services/tests/test_next90_m116_hub_creator_publication.py, and /docker/chummercomplete/chummer.run-services/.codex-studio/published/NEXT90_M116_HUB_CREATOR_PUBLICATION.generated.json keep the closed-package queue, registry, generated-proof, and source-marker receipt executable inside the repo.",
+    "python3 scripts/verify_next90_m116_hub_creator_publication.py exits 0, python3 -m unittest tests/test_next90_m116_hub_creator_publication.py exits 0, and bash scripts/ai/verify.sh keeps the dedicated M116 verifier in the shared verify lane.",
+]
 
 SOURCE_MARKERS: dict[str, list[str]] = {
+    "Chummer.Run.Api/Controllers/PublicLandingController.cs": [
+        'contractName = "chummer.run.public_artifact_shelf.v2"',
+        "publicCreatorPublications = publicCreatorPublications.Select(publication =>",
+        'contractName = "chummer.run.public_artifact_shelf.publication.v1"',
+        'IReadOnlyList<CreatorPublicationProjection> siblings = _publicCreatorDiscovery.ListDiscoverable(limit: 12)',
+        'publication = BuildArtifactShelfCreatorPublicationPayload(',
+    ],
     "Chummer.Run.Api/Controllers/AccountsController.cs": [
         '[HttpPost("/account/work/publications/{publicationId}/submit")]',
         '[HttpPost("/account/work/publications/{publicationId}/approve")]',
@@ -94,6 +170,15 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'Assert(string.Equals(rejectedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Rejected, StringComparison.Ordinal), "rejected dossier publications should surface the requested-changes review posture on the account detail route.");',
         'var resubmitDossierPublicationResult = await accountController.SubmitCreatorPublication(dossierPublicationId, "Correction pass refreshed the dossier packet provenance and return summary for governed moderation.", CancellationToken.None);',
         'Assert(string.Equals(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.Ordinal), "resubmitted dossier publications should re-enter the registry moderation queue after a correction pass.");',
+        'Assert(rejectedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.LatestModerationNotes?.Contains("clearer correction pass", StringComparison.OrdinalIgnoreCase) == true, "rejected dossier publications should retain the requested correction note on the account detail route.");',
+        'Assert(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.LatestModerationNotes?.Contains("Correction pass refreshed", StringComparison.OrdinalIgnoreCase) == true, "resubmitted dossier publications should stamp the correction-pass resubmission note onto the governed moderation lane.");',
+        'Assert(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Manifest authority: approved-shared-publication-manifest;", StringComparison.Ordinal) == true, "resubmitted dossier publications should keep approved manifest authority attached after the correction pass re-enters review.");',
+        'Assert(await controller.CreatorPublicationDetailPage(dossierPublicationId, CancellationToken.None) is NotFoundResult, "guest creator-publication detail should fail closed while a dossier packet is still rejected on the governed moderation lane.");',
+        'Assert(await controller.CreatorPublicationDetailApi(dossierPublicationId, locale: "en-us", CancellationToken.None) is NotFoundResult, "creator publication detail api should fail closed while a dossier packet is still rejected on the governed moderation lane.");',
+        'Assert(string.Equals(guestArtifactShelfApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.v2", StringComparison.Ordinal), "artifact shelf api should expose the governed public artifact shelf contract.");',
+        'Assert(guestArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").EnumerateArray().Any(item => item.GetProperty("siblingPackets").GetArrayLength() > 0), "artifact shelf api should keep sibling packet links visible on public creator publications.");',
+        'Assert(string.Equals(publicCreatorDetailApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.publication.v1", StringComparison.Ordinal), "creator publication detail api should expose the governed publication detail contract.");',
+        'Assert(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("siblingPackets").GetArrayLength() > 0, "creator publication detail api should keep sibling packet routes visible.");',
     ],
     "scripts/ai/verify.sh": [
         "python3 scripts/verify_next90_m116_hub_creator_publication.py",
@@ -102,6 +187,9 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     "tests/test_next90_m116_hub_creator_publication.py": [
         "class Next90M116HubCreatorPublicationTests(unittest.TestCase):",
         'self.assertIn("Resubmit corrected packet", result.stderr)',
+        'self.assertIn("correction-pass resubmission note", result.stderr)',
+        'self.assertIn("public artifact shelf contract", result.stderr)',
+        'self.assertIn("governed publication detail contract", result.stderr)',
     ],
 }
 
@@ -111,76 +199,138 @@ def load_yaml(path: Path) -> object:
         return yaml.safe_load(handle)
 
 
-def verify_queue_authority(missing: list[str], path: Path) -> None:
+def load_json(path: Path) -> object:
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def load_queue_row(missing: list[str], path: Path) -> dict[str, object] | None:
     if not path.is_file():
         missing.append(f"missing queue staging file: {path}")
-        return
+        return None
 
     payload = load_yaml(path) or {}
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list):
         missing.append(f"{path}: items is missing")
-        return
+        return None
 
     matches = [item for item in items if isinstance(item, dict) and item.get("package_id") == PACKAGE_ID]
     if len(matches) != 1:
         missing.append(f"{path}: expected exactly one {PACKAGE_ID} row, found {len(matches)}")
-        return
+        return None
 
-    item = matches[0]
+    return matches[0]
+
+
+def verify_queue_authority(missing: list[str], path: Path) -> dict[str, object] | None:
+    item = load_queue_row(missing, path)
+    if item is None:
+        return None
+
     expected_fields = {
         "title": TITLE,
         "task": TASK,
         "repo": "chummer6-hub",
         "milestone_id": MILESTONE_ID,
         "work_task_id": 116.1,
+        "frontier_id": FRONTIER_ID,
         "status": EXPECTED_STATUS,
+        "wave": EXPECTED_WAVE,
+        "completion_action": PACKAGE_COMPLETION_ACTION,
+        "do_not_reopen_reason": PACKAGE_DO_NOT_REOPEN_REASON,
     }
     for key, value in expected_fields.items():
         if item.get(key) != value:
             missing.append(f"{path}: {PACKAGE_ID} {key} must be {value!r}")
 
-    if "frontier_id" in item and item.get("frontier_id") != FRONTIER_ID:
-        missing.append(f"{path}: {PACKAGE_ID} frontier_id must be {FRONTIER_ID!r} when present")
     if item.get("allowed_paths") != ALLOWED_PATHS:
-        missing.append(f"{path}: allowed_paths must be {ALLOWED_PATHS!r}")
+        missing.append(f"{path}: {PACKAGE_ID} allowed_paths must be {ALLOWED_PATHS!r}")
     if item.get("owned_surfaces") != OWNED_SURFACES:
-        missing.append(f"{path}: owned_surfaces must be {OWNED_SURFACES!r}")
+        missing.append(f"{path}: {PACKAGE_ID} owned_surfaces must be {OWNED_SURFACES!r}")
+
+    proof = item.get("proof")
+    if not isinstance(proof, list) or not proof:
+        missing.append(f"{path}: {PACKAGE_ID} must define a non-empty proof list")
+    else:
+        if proof != REQUIRED_PROOF:
+            missing.append(f"{path}: {PACKAGE_ID} proof must match the closed-package receipt exactly")
+
+    return item
 
 
-def verify_successor_registry(missing: list[str], path: Path) -> None:
+def verify_queue_parity(
+    missing: list[str],
+    queue_row: dict[str, object] | None,
+    design_queue_row: dict[str, object] | None,
+) -> None:
+    if queue_row is None or design_queue_row is None:
+        return
+
+    if queue_row != design_queue_row:
+        missing.append("fleet and design queue rows for next90-m116-hub-creator-publication must match exactly")
+
+
+def verify_successor_registry(missing: list[str], path: Path) -> dict[str, object] | None:
     if not path.is_file():
         missing.append(f"missing successor registry file: {path}")
-        return
+        return None
 
     payload = load_yaml(path) or {}
     milestones = payload.get("milestones") if isinstance(payload, dict) else None
     if not isinstance(milestones, list):
         missing.append(f"{path}: milestones is missing")
-        return
+        return None
 
     milestone = next((item for item in milestones if isinstance(item, dict) and item.get("id") == MILESTONE_ID), None)
     if milestone is None:
         missing.append(f"{path}: milestone {MILESTONE_ID} is missing")
-        return
+        return None
 
     if milestone.get("title") != "Creator publication discovery, lineage, moderation, and trust ranking":
         missing.append(f"{path}: milestone {MILESTONE_ID} title drifted")
+    if milestone.get("status") != EXPECTED_STATUS:
+        missing.append(f"{path}: milestone {MILESTONE_ID} status must be {EXPECTED_STATUS!r}")
 
     work_tasks = milestone.get("work_tasks")
     if not isinstance(work_tasks, list):
         missing.append(f"{path}: milestone {MILESTONE_ID} work_tasks is missing")
-        return
+        return None
 
     task = next((item for item in work_tasks if isinstance(item, dict) and str(item.get("id")) == WORK_TASK_ID), None)
     if task is None:
         missing.append(f"{path}: work task {WORK_TASK_ID} is missing")
-        return
+        return None
 
     if task.get("owner") != "chummer6-hub":
         missing.append(f"{path}: work task {WORK_TASK_ID} owner drifted")
     if task.get("title") != WORK_TASK_TITLE:
         missing.append(f"{path}: work task {WORK_TASK_ID} title drifted")
+    if task.get("status") != EXPECTED_STATUS:
+        missing.append(f"{path}: work task {WORK_TASK_ID} status must be {EXPECTED_STATUS!r}")
+
+    evidence = task.get("evidence")
+    if not isinstance(evidence, list):
+        missing.append(f"{path}: work task {WORK_TASK_ID} evidence must be a list")
+    else:
+        evidence_text = "\n".join(str(item) for item in evidence)
+        for marker in REGISTRY_EVIDENCE_MARKERS:
+            if marker not in evidence_text:
+                missing.append(f"{path}: work task {WORK_TASK_ID} evidence missing marker {marker!r}")
+
+    return task
+
+
+def verify_successor_registry_parity(
+    missing: list[str],
+    canonical_task: dict[str, object] | None,
+    mirror_task: dict[str, object] | None,
+) -> None:
+    if canonical_task is None or mirror_task is None:
+        return
+
+    if canonical_task != mirror_task:
+        missing.append("canonical and repo-local successor registry work task 116.1 must match exactly")
 
 
 def verify_source_markers(missing: list[str]) -> None:
@@ -196,11 +346,55 @@ def verify_source_markers(missing: list[str]) -> None:
                 missing.append(f"{path}: missing marker {marker!r}")
 
 
+def verify_generated_proof(missing: list[str], path: Path) -> None:
+    if not path.is_file():
+        missing.append(f"missing generated proof: {path}")
+        return
+
+    payload = load_json(path)
+    if not isinstance(payload, dict):
+        missing.append(f"{path}: payload must be a JSON object")
+        return
+
+    if payload.get("status") != "pass":
+        missing.append(f"{path}: status must be 'pass'")
+    if payload.get("contract_name") != GENERATED_PROOF_CONTRACT:
+        missing.append(f"{path}: contract_name must be {GENERATED_PROOF_CONTRACT!r}")
+
+    evidence = payload.get("evidence")
+    if not isinstance(evidence, dict):
+        missing.append(f"{path}: evidence must be a JSON object")
+        return
+
+    for key, value in GENERATED_PROOF_EVIDENCE.items():
+        if evidence.get(key) != value:
+            missing.append(f"{path}: evidence.{key} must be {value!r}")
+
+    proof_files = evidence.get("proofFiles")
+    if not isinstance(proof_files, list):
+        missing.append(f"{path}: evidence.proofFiles must be a list")
+    elif proof_files != GENERATED_PROOF_REQUIRED_FILES:
+        missing.append(f"{path}: evidence.proofFiles must match the closed-package receipt exactly")
+
+    proof_commands = evidence.get("proofCommands")
+    if not isinstance(proof_commands, dict):
+        missing.append(f"{path}: evidence.proofCommands must be a JSON object")
+        return
+
+    for key, value in GENERATED_PROOF_COMMANDS.items():
+        if proof_commands.get(key) != value:
+            missing.append(f"{path}: evidence.proofCommands.{key} must be {value!r}")
+
+
 def main() -> int:
     missing: list[str] = []
-    verify_queue_authority(missing, QUEUE_STAGING_PATH)
-    verify_queue_authority(missing, DESIGN_QUEUE_STAGING_PATH)
-    verify_successor_registry(missing, SUCCESSOR_REGISTRY_PATH)
+    queue_row = verify_queue_authority(missing, QUEUE_STAGING_PATH)
+    design_queue_row = verify_queue_authority(missing, DESIGN_QUEUE_STAGING_PATH)
+    verify_queue_parity(missing, queue_row, design_queue_row)
+    registry_task = verify_successor_registry(missing, SUCCESSOR_REGISTRY_PATH)
+    local_mirror_registry_task = verify_successor_registry(missing, LOCAL_MIRROR_SUCCESSOR_REGISTRY_PATH)
+    verify_successor_registry_parity(missing, registry_task, local_mirror_registry_task)
+    verify_generated_proof(missing, GENERATED_PROOF_PATH)
     verify_source_markers(missing)
 
     if missing:

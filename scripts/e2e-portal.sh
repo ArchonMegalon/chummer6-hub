@@ -7,6 +7,7 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHUMMER_API_KEY="${CHUMMER_API_KEY:-}"
 PORTAL_PLAYWRIGHT_TIMEOUT_SECONDS="${CHUMMER_PORTAL_E2E_TIMEOUT_SECONDS:-240}"
 PORTAL_EDGE_COMPOSE_FILE="${CHUMMER_PORTAL_EDGE_COMPOSE_FILE:-$ROOT_DIR/docker-compose.public-edge.yml}"
+PORTAL_EDGE_PROJECT_NAME="${CHUMMER_PORTAL_EDGE_PROJECT_NAME:-${CHUMMER_HUB_EDGE_PROJECT_NAME:-${COMPOSE_PROJECT_NAME:-chummer6-hub}}}"
 PORTAL_BASE_URL="${CHUMMER_PORTAL_BASE_URL:-http://127.0.0.1:${CHUMMER_PUBLIC_EDGE_PORT:-8091}}"
 PORTAL_PUBLIC_HOST="${CHUMMER_PORTAL_PUBLIC_HOST:-chummer.run}"
 PORTAL_FORWARDED_PROTO="${CHUMMER_PORTAL_FORWARDED_PROTO:-https}"
@@ -60,26 +61,9 @@ fi
 if [[ "$PORTAL_SKIP_EDGE_REBUILD" == "1" || "$PORTAL_SKIP_EDGE_REBUILD" == "true" || "$PORTAL_SKIP_EDGE_REBUILD" == "TRUE" ]]; then
   echo "reusing current public-edge containers for portal playwright e2e"
 else
-  compose_rm_log="$(mktemp)"
-  set +e
-  docker compose -f "$PORTAL_EDGE_COMPOSE_FILE" rm -fsv chummer-run-identity chummer-portal 2>&1 | tee "$compose_rm_log"
-  compose_rm_status=${PIPESTATUS[0]}
-  set -e
-  if [[ "$compose_rm_status" -ne 0 ]]; then
-    if [[ "$PLAYWRIGHT_SOFT_FAIL" == "1" ]] && is_docker_permission_error_text "$compose_rm_log"; then
-      echo "skipping portal e2e: docker daemon permission denied in this environment."
-      rm -f "$compose_rm_log"
-      exit 0
-    fi
-
-    rm -f "$compose_rm_log"
-    exit "$compose_rm_status"
-  fi
-  rm -f "$compose_rm_log"
-
   compose_up_log="$(mktemp)"
   set +e
-  docker compose -f "$PORTAL_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
+  docker compose -p "$PORTAL_EDGE_PROJECT_NAME" -f "$PORTAL_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal 2>&1 | tee "$compose_up_log"
   compose_up_status=${PIPESTATUS[0]}
   set -e
   if [[ "$compose_up_status" -ne 0 ]]; then

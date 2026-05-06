@@ -24,6 +24,40 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestFailsClosedWhenDesktopClientCoverageIsMissing()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifest(includeProof: false);
+        fixture.WriteLocalProof("passed", "http://127.0.0.1:8091");
+        fixture.WriteFlagshipReadiness(status: "fail", missingCoverageKeys: ["desktop_client"]);
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("review_required", manifest.SupportabilityState);
+        Assert.Equal("desktop_proof_review_required", manifest.RolloutState);
+        Assert.Contains("desktop_client", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("parity-sensitive routes", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("support lane", manifest.FixAvailabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("passed", manifest.ProofStatus);
+    }
+
+    [Fact]
+    public void LoadManifestFailsClosedWhenDesktopClientCoverageIsOnlyWarningScoped()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifest(includeProof: false);
+        fixture.WriteLocalProof("passed", "http://127.0.0.1:8091");
+        fixture.WriteFlagshipReadiness(status: "fail", warningCoverageKeys: ["desktop_client"]);
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("review_required", manifest.SupportabilityState);
+        Assert.Equal("desktop_proof_review_required", manifest.RolloutState);
+        Assert.Contains("desktop_client", manifest.SupportabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("review-required lane", manifest.KnownIssueSummary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LoadManifestDoesNotOverrideRegistryProof()
     {
         using var fixture = new PublicReleaseManifestFixture();
@@ -510,7 +544,15 @@ public sealed class PublicReleaseManifestServiceTests
 
         JsonElement coverage = Assert.IsType<JsonElement>(manifest.DesktopTupleCoverage);
         Assert.False(coverage.GetProperty("complete").GetBoolean());
-        Assert.Contains("windows", coverage.GetProperty("missingRequiredPlatforms").EnumerateArray().Select(static value => value.GetString()));
+        bool missingWindowsPlatform = coverage.GetProperty("missingRequiredPlatforms")
+            .EnumerateArray()
+            .Select(static value => value.GetString())
+            .Contains("windows", StringComparer.OrdinalIgnoreCase);
+        bool missingWindowsTuple = coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
+            .EnumerateArray()
+            .Select(static value => value.GetString())
+            .Any(static value => value is not null && value.Contains("windows", StringComparison.OrdinalIgnoreCase));
+        Assert.True(missingWindowsPlatform || missingWindowsTuple);
     }
 
     private sealed class PublicReleaseManifestFixture : IDisposable
@@ -536,7 +578,8 @@ public sealed class PublicReleaseManifestServiceTests
             Dictionary<string, string?> settings = new()
             {
                 ["CHUMMER_DOWNLOADS_SOURCE_ROOT"] = _downloadsRoot,
-                ["CHUMMER_PUBLIC_CANON_ROOT"] = _canonRoot
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = _canonRoot,
+                ["CHUMMER_PUBLIC_FLAGSHIP_READINESS_FILE"] = Path.Combine(_root, "fleet", ".codex-studio", "published", "FLAGSHIP_PRODUCT_READINESS.generated.json")
             };
             if (includeRuntimeUrl)
             {
@@ -660,6 +703,36 @@ public sealed class PublicReleaseManifestServiceTests
                     ["generated_at"] = "2026-03-28T21:03:08Z",
                     ["journeys_passed"] = new[] { "install_claim_restore_continue", "build_explain_publish" },
                     ["proof_routes"] = new[] { "/downloads/install/avalonia-linux-x64-installer", "/account/support" }
+                }));
+        }
+
+        public void WriteFlagshipReadiness(
+            string status,
+            IReadOnlyList<string>? missingCoverageKeys = null,
+            IReadOnlyList<string>? warningCoverageKeys = null)
+        {
+            string readinessDir = Path.Combine(_root, "fleet", ".codex-studio", "published");
+            Directory.CreateDirectory(readinessDir);
+            missingCoverageKeys ??= Array.Empty<string>();
+            warningCoverageKeys ??= Array.Empty<string>();
+            File.WriteAllText(
+                Path.Combine(readinessDir, "FLAGSHIP_PRODUCT_READINESS.generated.json"),
+                JsonSerializer.Serialize(new Dictionary<string, object?>
+                {
+                    ["contract_name"] = "fleet.flagship_product_readiness",
+                    ["status"] = status,
+                    ["completion_audit"] = new Dictionary<string, object?>
+                    {
+                        ["reason"] = "Flagship product readiness planes are not green."
+                    },
+                    ["flagship_readiness_audit"] = new Dictionary<string, object?>
+                    {
+                        ["reason"] = "flagship product readiness proof is not green: missing coverage: desktop_client",
+                        ["warning_coverage_keys"] = warningCoverageKeys,
+                        ["scoped_warning_coverage_keys"] = warningCoverageKeys,
+                        ["missing_coverage_keys"] = missingCoverageKeys,
+                        ["scoped_missing_coverage_keys"] = missingCoverageKeys
+                    }
                 }));
         }
 

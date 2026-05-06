@@ -2,6 +2,13 @@ using Chummer.Run.Api.Services;
 
 namespace Chummer.Run.Api.Contracts;
 
+public sealed record CampaignFederationRouteReceiptProjection(
+    string ReceiptId,
+    string PackageId,
+    string MatchedRoute,
+    string MatchMode,
+    string Summary);
+
 public sealed record CampaignFederationBatchRequest(
     IReadOnlyList<string>? SourceIds = null,
     IReadOnlyList<string>? RequestedFormats = null,
@@ -18,6 +25,10 @@ public sealed record CampaignFederationSourcePackProjection(
     string Summary,
     string PublicationKind,
     string PublicationStatus,
+    string RouteState,
+    CampaignFederationRouteReceiptProjection? RouteReceipt,
+    string? BoundedFailureReason,
+    string NextSafeAction,
     string PublicShelfRef,
     string? ArtifactId,
     string? DossierId,
@@ -28,6 +39,11 @@ public sealed record CampaignFederationBatchProjection(
     string CampaignId,
     string CampaignName,
     string SelectionSummary,
+    string RouteState,
+    CampaignFederationRouteReceiptProjection? RouteReceipt,
+    string? BoundedFailureReason,
+    string NextSafeAction,
+    IReadOnlyList<string> RequiredReceiptRefs,
     IReadOnlyList<string> Watchouts,
     IReadOnlyList<CampaignFederationSourcePackProjection> SourcePacks,
     ArtifactFactoryJobBatchLaunchResult Batch);

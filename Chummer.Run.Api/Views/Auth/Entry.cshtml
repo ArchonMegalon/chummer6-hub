@@ -14,11 +14,25 @@
 
 <section class="auth-entry">
     <div class="auth-entry__story auth-entry__story--visual">
-        <p class="eyebrow">Explainable Shadowrun</p>
+        <p class="eyebrow">Campaign OS preview</p>
         <h1 class="hero-brand">CHUMMER</h1>
         <h2 class="hero-headline">@Model.Heading</h2>
         <p class="auth-entry__copy">@Model.SupportLine</p>
-        <p class="auth-entry__trust">One account keeps downloads, device linking, and support follow-up together.</p>
+        <div class="auth-value-strip" aria-label="Immediate account value">
+            <article class="auth-value-strip__fact">
+                <span>Linked installs</span>
+                <strong>Keep the handoff attached to this return path.</strong>
+            </article>
+            <article class="auth-value-strip__fact">
+                <span>Devices and access</span>
+                <strong>Relink, reclaim, and recover from one calmer rail.</strong>
+            </article>
+            <article class="auth-value-strip__fact">
+                <span>Support follow-through</span>
+                <strong>Tracked help stays attached to the same account story.</strong>
+            </article>
+        </div>
+        <p class="auth-entry__trust">The binary stays the same for everyone. The account adds continuity, device return, and support follow-through when you want it.</p>
     </div>
 
     <div class="auth-entry__panel auth-panel auth-panel--entry">
@@ -39,14 +53,14 @@
         {
             <div class="auth-panel__intro">
                 <h3>Email first</h3>
-                <p>Create the account first, then shape the profile in setup. Email keeps the first step simple; Google stays available if you prefer the faster return path later.</p>
+                <p>Create the account first, then shape the profile in setup. Email keeps the first step simple; Google stays available if you want the faster return path later.</p>
             </div>
             <div class="auth-benefits">
                 <span class="tag">What you get right away</span>
                 <ul>
-                    <li>A Chummer account that can link downloads and install receipts.</li>
-                    <li>A place to follow roadmap updates and raise beta interest.</li>
-                    <li>A calmer return path when you come back for the next preview.</li>
+                    <li>An account that can link downloads, install receipts, and future device return.</li>
+                    <li>A place to keep support history, roadmap follows, and preview interest on one rail.</li>
+                    <li>A calmer return path the next time this install, your account, or your support story needs attention.</li>
                 </ul>
             </div>
             <p class="muted-copy">After verification you land in @nextTarget.</p>
@@ -75,14 +89,14 @@
         {
             <div class="auth-panel__intro">
                 <h3>Fastest way back in</h3>
-                <p>Sign in to reopen your downloads, account settings, roadmap follows, and any participation state already attached to your account.</p>
+                <p>Sign in to reopen your downloads, devices and access, support history, roadmap follows, and any optional participation state already attached to your account.</p>
             </div>
             <div class="auth-benefits">
                 <span class="tag">What opens after sign-in</span>
                 <ul>
-                    <li>Your signed-in home and account surfaces.</li>
-                    <li>Account-linked download receipts and claim tickets.</li>
-                    <li>Any beta interest, update follows, or optional participation history already on the account.</li>
+                    <li>Your signed-in home and account rails for continuity, recovery, and next safe action.</li>
+                    <li>Account-linked download receipts, claim tickets, and device follow-through.</li>
+                    <li>Any beta interest, update follows, support history, or optional participation state already on the account.</li>
                 </ul>
             </div>
             <p class="muted-copy">After verification you return to @nextTarget.</p>
@@ -108,6 +122,6 @@
                 <p class="muted-copy">@Model.GoogleUnavailableReason</p>
             }
         }
-        <p class="privacy-note">The account keeps preview access, updates, devices, and support history together.</p>
+        <p class="privacy-note">The account keeps preview access, updates, linked installs, devices and access, and support history together.</p>
     </div>
 </section>

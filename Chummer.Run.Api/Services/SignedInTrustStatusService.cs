@@ -58,7 +58,7 @@ public sealed class SignedInTrustStatusService
                     : $"{ResolveInstallationDisplayLabel(latestInstallation)} · {latestInstallation.Version} on {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}"),
             new(
                 "Who can get it now",
-                BuildTrustPulseAccessSummary(releaseExperience)),
+                BuildTrustPulseAccessSummary(manifest, releaseExperience, pulse)),
             new(
                 "Recommended for this install",
                 BuildSignedInInstallRecommendationSummary(manifest, releaseExperience, latestInstallation, followThrough)),
@@ -144,10 +144,15 @@ public sealed class SignedInTrustStatusService
 
         string installationLabel = ResolveInstallationDisplayLabel(latestInstallation);
         var recommendedAction = BuildRecommendedInstallAction(releaseExperience, tone: "secondary");
+        bool reviewRequired = (pulse?.ParityClaimsReviewRequired ?? false)
+            || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase);
+        string summary = reviewRequired
+            ? $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery stay on the same claimed install rail, but parity-sensitive follow-through remains review-required until current desktop proof receipts are green."
+            : $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.";
         return new SignedInTrustStatusPanelViewModel(
             Eyebrow: "Signed-in trust status",
             Heading: $"{installationLabel} is attached",
-            Summary: $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.",
+            Summary: summary,
             Rows: rows,
             PrimaryAction: new TrustPageActionViewModel("Open Devices and access", "/account/access", "primary"),
             SecondaryAction: recommendedAction);
@@ -521,11 +526,22 @@ public sealed class SignedInTrustStatusService
             ? null
             : value.Trim().ToLowerInvariant();
 
-    private static string BuildTrustPulseAccessSummary(ReleaseExperienceViewModel releaseExperience)
+    private static string BuildTrustPulseAccessSummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        PublicTrustPulseSnapshot? pulse)
     {
         if (releaseExperience.Recommended is null)
         {
             return "No release handoff is published yet.";
+        }
+
+        if ((pulse?.ParityClaimsReviewRequired ?? false)
+            || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
+        {
+            return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
+                ? "Signed-in handoff stays preferred while desktop proof receipts are still review-required."
+                : "Guest and signed-in handoffs are both visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
@@ -570,6 +586,15 @@ public sealed class SignedInTrustStatusService
             segments.Add(historySnapshotCount < 6
                 ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
                 : $"{historySnapshotCount} weekly snapshots are on record for the current public trust posture.");
+        }
+
+        if (pulse.MissingDesktopClientCoverage && !string.IsNullOrWhiteSpace(pulse.FlagshipReadinessReason))
+        {
+            segments.Add($"Flagship desktop proof still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
+        }
+        else if (pulse.ParityClaimsReviewRequired && !string.IsNullOrWhiteSpace(pulse.LaunchReadiness))
+        {
+            segments.Add(pulse.LaunchReadiness!.Trim().TrimEnd('.') + ".");
         }
 
         return segments.Count == 0

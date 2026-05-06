@@ -1,0 +1,162 @@
+@model PublicSignalProjectionPacketViewModel
+@{
+    string FormatProjectionLabel(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        string normalized = value.Trim();
+        int slash = normalized.LastIndexOf('/');
+        if (slash >= 0 && slash < normalized.Length - 1)
+        {
+            normalized = normalized[(slash + 1)..];
+        }
+
+        normalized = normalized
+            .Replace(".md", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace(".yaml", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace(".yml", string.Empty, StringComparison.OrdinalIgnoreCase)
+            .Replace('_', ' ')
+            .Replace('-', ' ');
+
+        return System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(normalized.ToLowerInvariant());
+    }
+
+    var authorityFlow = Model.AuthorityFlow.Take(4).ToArray();
+    var decisionRoutes = Model.DecisionRoutes.Take(4).ToArray();
+    var forbidden = Model.Forbidden.Take(4).ToArray();
+    var canonicalSources = Model.CanonicalSources
+        .Select(FormatProjectionLabel)
+        .Where(static item => !string.IsNullOrWhiteSpace(item))
+        .Take(4)
+        .ToArray();
+    var boardTargets = Model.BoardTargets.Take(6).ToArray();
+    var sourceReceipts = new[]
+    {
+        FormatProjectionLabel(Model.PolicySource),
+        FormatProjectionLabel(Model.PipelineSource),
+        FormatProjectionLabel(Model.RegistrySource)
+    }
+    .Where(static item => !string.IsNullOrWhiteSpace(item))
+    .Distinct(StringComparer.Ordinal)
+    .ToArray();
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h2 class="editorial-title">@Model.Heading</h2>
+        <p class="editorial-copy">@Model.Summary</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">@Model.Vendor</span>
+            <h3>Public route and first-party fallback stay paired.</h3>
+            <p>@Model.PolicyStatus</p>
+            <div class="route-choice-card__proof">
+                <span>Role: @Model.Role</span>
+                <span>Public route: @Model.PublicPath</span>
+                <span>First-party fallback: @Model.FallbackPath</span>
+                <span>@Model.TruthPosture</span>
+            </div>
+            <a class="editorial-strip__action" href="@Model.FallbackPath">Open first-party fallback</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Core rule</span>
+            <h3>@Model.CoreRule</h3>
+            <p>Hosted projection can collect visible demand, but it stays downstream of Chummer-owned review, canon, implementation, and proof.</p>
+            @if (authorityFlow.Length > 0)
+            {
+                <div class="compact-rail">
+                    @for (var i = 0; i < authorityFlow.Length; i++)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>Stage @(i + 1)</h3>
+                                <p>@authorityFlow[i]</p>
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Boundary conditions</span>
+            <h3>Decision routes and forbidden claims stay explicit.</h3>
+            <p>Public signal can move into named review lanes, but it must not turn into support truth, release truth, or canon by itself.</p>
+            @if (decisionRoutes.Length > 0)
+            {
+                <div class="route-choice-card__proof">
+                    @foreach (var route in decisionRoutes)
+                    {
+                        <span>@route</span>
+                    }
+                </div>
+            }
+            @if (forbidden.Length > 0)
+            {
+                <div class="compact-rail">
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>Forbidden on this rail</h3>
+                            <p>@string.Join(" / ", forbidden)</p>
+                        </div>
+                    </article>
+                </div>
+            }
+            <div class="compact-rail">
+                <article class="compact-rail__item">
+                    <div class="compact-rail__copy">
+                        <h3>Required public warning</h3>
+                        <p>@Model.PublicWarning</p>
+                    </div>
+                </article>
+            </div>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Source receipts</span>
+            <h3>Canonical sources and closeout gates still sit upstream of the hosted surface.</h3>
+            <p>These Chummer-owned receipts keep the projection honest even while the hosted board handles visibility and voter follow-up.</p>
+            @if (sourceReceipts.Length > 0)
+            {
+                <div class="route-choice-card__proof">
+                    @foreach (var receipt in sourceReceipts)
+                    {
+                        <span>@receipt</span>
+                    }
+                </div>
+            }
+            <div class="compact-rail">
+                @if (canonicalSources.Length > 0)
+                {
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>Canonical sources</h3>
+                            <p>@string.Join(" / ", canonicalSources)</p>
+                        </div>
+                    </article>
+                }
+                @if (boardTargets.Length > 0)
+                {
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>First board set</h3>
+                            <p>@string.Join(" / ", boardTargets)</p>
+                        </div>
+                    </article>
+                }
+                @if (Model.CloseoutRequirements.Count > 0)
+                {
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>Shipped closeout gate</h3>
+                            <p>@string.Join(" / ", Model.CloseoutRequirements)</p>
+                        </div>
+                    </article>
+                }
+            </div>
+        </article>
+    </div>
+</section>

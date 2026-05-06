@@ -8308,16 +8308,26 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             handoff.Outputs,
             output =>
             {
-                Assert.Equal("ready", output.PublicationState);
-                Assert.Equal("governed", output.TrustBand);
+                Assert.Equal("bounded_failure", output.PublicationState);
+                Assert.Equal("receipt_required", output.TrustBand);
+                Assert.False(output.Discoverable);
+                Assert.False(string.IsNullOrWhiteSpace(output.ArtifactId));
+                Assert.Contains("receipt:", output.ArtifactId!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.PublicationSummary);
-                Assert.Contains(output.Kind.Replace('_', '-'), output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("visible output receipt", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("rule diff", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("source hints sources:sr6-core|house-rules:reputation_house_rules", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.AuditSummary);
                 Assert.Contains($"lane:{output.Kind}", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("required-output-receipt:", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("rule-environment:sr6-preview->sr6-mainline", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("source-hints:sources:sr6-core|house-rules:reputation_house_rules", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.NotNull(output.NextSafeAction);
+                Assert.Contains("bounded-failure posture", output.NextSafeAction!, StringComparison.OrdinalIgnoreCase);
+                Assert.NotNull(output.CompatibilitySummary);
+                Assert.Contains("outward-facing output remains bounded", output.CompatibilitySummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.NotNull(output.LineageSummary);
+                Assert.Contains("stays bounded until visible receipt", output.LineageSummary!, StringComparison.OrdinalIgnoreCase);
             });
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(handoff.RuleEnvironmentDiff);
@@ -8335,8 +8345,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.NotNull(handoff.PlannerCoverageLines);
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Crew-fit:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Output lane coverage:", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("foundry-exchange=ready", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("print-pdf-export=ready", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("foundry-exchange=bounded-failure", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("print-pdf-export=bounded-failure", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("crew-fit", handoff.CrewFitSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("conditional state rail", handoff.ConditionalStateSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(handoff.ConditionalStateLines);
@@ -8355,13 +8365,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Advancement lane:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Crew-fit lane:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("sheet/print/export/viewer and adjacent exchange parity lanes", handoff.ExchangeParitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("0 of 5", handoff.ExchangeParitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(handoff.ExchangeParityLines);
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Sheet viewer:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Print PDF export:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("JSON exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Foundry exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Character template export:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("visible output receipt", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("dossier/exchange/replay/recap/module portability lanes", handoff.PortabilityPillarSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("0 of 6", handoff.PortabilityPillarSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(handoff.PortabilityPillarLines);
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Dossier exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("JSON exchange:", StringComparison.OrdinalIgnoreCase));
@@ -8369,6 +8382,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Replay timeline:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Session recap:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Run module:", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("visible output receipt", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

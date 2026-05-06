@@ -6,35 +6,333 @@
     var codexHref = Model.Chrome.Authenticated
         ? "/participate/codex"
         : "/auth/google/start?next=%2Fparticipate%2Fcodex";
+    var signalLoop = Model.SignalLoop;
+    var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
+    var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
+    var shippedFollowUp = signalLoop.ShippedFollowUp.Take(3).ToArray();
+    var productliftAlias = Context?.Request?.Query["productlift"].ToString() ?? string.Empty;
+    var fromFeedbackAlias = string.Equals(productliftAlias, "feedback", StringComparison.OrdinalIgnoreCase);
+    var fixerRoutes = new[]
+    {
+        new
+        {
+            Id = "productlift-feedback-lane",
+            Eyebrow = "Field Reports",
+            Title = "Public ideas and safe bug reports",
+            Summary = "Use the public signal rail for feature requests, safe public bugs, and help-copy gaps. Keep crashes, install failures, account issues, and private campaign details on first-party help routes instead.",
+            Href = "/feedback",
+            Label = "Open public feedback",
+            Proof = new[] { "Public posts", "No private logs", "Category routing" }
+        },
+        new
+        {
+            Id = "productlift-roadmap-lane",
+            Eyebrow = "Roadmap Projection",
+            Title = "Public direction stays visible without becoming source truth",
+            Summary = "Roadmap cards are projections from Chummer-owned design and milestone truth. Votes help show demand, but they do not grant implementation priority by themselves.",
+            Href = "/roadmap",
+            Label = "Open roadmap projection",
+            Proof = new[] { "Governor-reviewed", "First-party fallback", "No vote authority" }
+        },
+        new
+        {
+            Id = "productlift-changelog-lane",
+            Eyebrow = "Shipped Closeout",
+            Title = "Shipped means user-available, not only merged",
+            Summary = "Patch notes and voter closeout should only move after release, guide, Hub route, or artifact proof exists. The public changelog must stay attached to what works today.",
+            Href = "/changelog",
+            Label = "Open shipped updates",
+            Proof = new[] { "Closeout evidence", "User availability", "Release-linked" }
+        }
+    };
+    var signalStages = new[]
+    {
+        new
+        {
+            Badge = "Signal intake",
+            Title = "Post one safe public signal",
+            Summary = "Users can suggest work, vote on shared pain, or flag confusing copy without opening a private case first.",
+            Proof = "Public idea receipt, category, and boundary copy come first.",
+            Href = "/feedback",
+            Label = "Start with public feedback"
+        },
+        new
+        {
+            Badge = "Governed review",
+            Title = "Route and review before promising anything",
+            Summary = "EA and Product Governor triage decide whether the signal becomes follow-up, research, milestone work, or a public decline with reason.",
+            Proof = "Votes inform demand; they do not decide roadmap truth.",
+            Href = "/roadmap",
+            Label = "See public direction"
+        },
+        new
+        {
+            Badge = "Availability proof",
+            Title = "Prove real user availability",
+            Summary = "A planned or shipped public claim needs Chummer-owned evidence, not only enthusiasm or merged code.",
+            Proof = "Release, guide, Hub route, or artifact proof must exist.",
+            Href = "/now",
+            Label = "Open what works today"
+        },
+        new
+        {
+            Badge = "Closeout",
+            Title = "Notify and document after the proof exists",
+            Summary = "Only then should the public changelog, voter notices, and help copy close the loop back to the original request.",
+            Proof = "First-party help and status routes stay live even if ProductLift is down.",
+            Href = "/help",
+            Label = "Open help hub"
+        }
+    };
+    var routeChoices = new[]
+    {
+        new
+        {
+            Badge = "Safe public signal",
+            Title = "Suggestion, UX pain, or safe public bug",
+            Summary = "Start on the public Fixer Board when the issue can stay public and does not need logs, secrets, or account recovery.",
+            Href = "/feedback",
+            Label = "Open Fixer Board",
+            Proof = new[] { "Public by default", "Category routing", "Shared demand" }
+        },
+        new
+        {
+            Badge = "Follow movement",
+            Title = "Want to know whether an idea is moving",
+            Summary = "Use the roadmap projection when you need public direction and readiness posture, not a promise that votes alone decide priority.",
+            Href = "/roadmap",
+            Label = "Open roadmap projection",
+            Proof = new[] { "Direction only", "Milestone-backed", "No vote authority" }
+        },
+        new
+        {
+            Badge = "Need shipped proof",
+            Title = "Need to know whether something is real today",
+            Summary = "Use shipped closeout when you need release truth, guide proof, or user-available evidence instead of merged-code optimism.",
+            Href = "/changelog",
+            Label = "Open shipped updates",
+            Proof = new[] { "Release-linked", "Guide-backed", "Available now" }
+        },
+        new
+        {
+            Badge = "Private help",
+            Title = "Crash, install, account, or campaign-sensitive issue",
+            Summary = "Leave the public lane when the issue needs logs, recovery, support status, or private table details that should never sit on ProductLift.",
+            Href = "/contact#support-intake",
+            Label = "Open support intake",
+            Proof = new[] { "Private case", "Tracked return", "Support-owned" }
+        }
+    };
 }
 
 <section class="release-footnote">
     <p class="eyebrow">Participate</p>
-    <h1 class="page-title">Choose how to participate</h1>
-    <p class="page-copy">Report a problem in public, or sign in and explicitly let Chummer use your OpenAI account in ChatGPT for temporary Codex access.</p>
+    <h1 class="page-title">Fixer Board keeps the public product loop visible</h1>
+    <p class="page-copy">Use the public feedback rail when you want to suggest future work, vote on public demand, or follow shipped closeout. Use the signed-in path only when you want tracked beta follow-up or temporary Codex access with your OpenAI account in ChatGPT.</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@codexHref">@(Model.Chrome.Authenticated ? "Authorize Codex access" : "Sign in to authorize Codex")</a>
-        <a class="button-like button-like--secondary" href="/contact">Report a problem</a>
+        <a class="button-like button-like--primary" href="/feedback">Open Fixer Board</a>
+        <a class="button-like button-like--secondary" href="@codexHref">@(Model.Chrome.Authenticated ? "Authorize Codex access" : "Sign in to authorize Codex")</a>
+        <a class="button-like button-like--ghost" href="/help">Open help instead</a>
     </div>
-    <p class="muted-copy">Authorization is optional, revocable, and does not count as contribution credit by itself.</p>
+    <p class="muted-copy">Hosted ProductLift mirroring stays public-only. For crashes, install problems, account issues, private campaign details, or logs, use Chummer Help and support instead.</p>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
 @if (Model.TrustPulse is not null)
 {
     @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
 
+<section class="status-decision-strip" aria-label="Participation loop snapshot">
+    <article class="status-decision-strip__card">
+        <span class="tag">Live pressure</span>
+        <h2>@signalLoop.OpenMilestoneCount open milestone slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") keep the public loop grounded in real delivery pressure.</h2>
+        <p>@signalLoop.ClaimedMilestoneCount already show claimed movement. Public participation stays more credible when it points at live work instead of generic enthusiasm.</p>
+        <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open milestone ledger</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Named direction</span>
+        <h2>@signalLoop.RoadmapFollowUpCount current horizon@(signalLoop.RoadmapFollowUpCount == 1 ? string.Empty : "s") already absorb public demand without pretending to be shipped.</h2>
+        <p>These are the outward-facing tracks that can explain why the product is moving before the work crosses onto the live shelf.</p>
+        <a class="button-like button-like--ghost" href="/roadmap#roadmap-horizons">Browse horizon lanes</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Closeout exists</span>
+        <h2>@signalLoop.ShippedFollowUpCount proof-backed closeout example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show the loop can finish honestly.</h2>
+        <p>The public board is not just intake. It already has a separate shipped rail where evidence-backed outcomes can land.</p>
+        <a class="button-like button-like--ghost" href="/changelog">Open shipped closeout</a>
+    </article>
+</section>
+
+<section class="trust-claims route-anchor-target" id="productlift-feedback">
+    <div class="trust-claims__lead">
+        <p class="eyebrow">Fixer Board</p>
+        <h2 class="editorial-title">Public signal, roadmap projection, and shipped closeout stay visible without becoming source truth.</h2>
+        <p class="editorial-copy">This page keeps the broader participation story visible while hosted ProductLift mirroring catches up. The dedicated signal, roadmap, and shipped rails stay honest about what they can promise today and keep clean paths back to help, status, and release evidence.</p>
+        @if (fromFeedbackAlias)
+        {
+            <div class="route-callout" role="status" aria-live="polite">
+                <h3>You followed a legacy feedback handoff</h3>
+                <p>The current public signal rail lives on <code class="mono-receipt">/feedback</code>. This page keeps the broader participation and signed-in lanes visible without turning them into the default intake.</p>
+                <div class="route-callout__proof">
+                    <span>Public by default</span>
+                    <span>No private logs</span>
+                    <span>Support stays first-party</span>
+                </div>
+                <div class="route-callout__actions">
+                    <a class="inline-link" href="/feedback">Open Fixer Board</a>
+                    <a class="inline-link" href="/contact#support-intake">Need private help instead?</a>
+                    <a class="inline-link" href="/status">Open status</a>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="trust-claims__grid">
+        @foreach (var route in fixerRoutes)
+        {
+            <article class="trust-claim" id="@route.Id">
+                <span class="tag">@route.Eyebrow</span>
+                <h3>@route.Title</h3>
+                <p>@route.Summary</p>
+                <div class="trust-claim__microproof">
+                    @foreach (var item in route.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="inline-link" href="@route.Href">@route.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Pick the right lane</p>
+        <h2 class="editorial-title">Use the public route only when the work can stay public.</h2>
+        <p class="editorial-copy">This cut reduces misrouted ProductLift posts and keeps support, release truth, and roadmap interpretation on the calmer first-party routes that can actually carry them.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var choice in routeChoices)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@choice.Badge</span>
+                <h3>@choice.Title</h3>
+                <p>@choice.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in choice.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="workflow-band">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Public loop</p>
+        <h2 class="editorial-title">Keep the ProductLift loop visible, but keep authority inside Chummer-owned truth.</h2>
+        <p class="editorial-copy">The public path should feel alive and understandable: one place to post signal, one place to follow movement, and one honest closeout path when the feature is actually available.</p>
+    </div>
+    <div class="workflow-grid">
+        @foreach (var stage in signalStages)
+        {
+            <article class="workflow-card">
+                <div class="workflow-card__copy">
+                    <span class="tag">@stage.Badge</span>
+                    <h3>@stage.Title</h3>
+                    <p>@stage.Summary</p>
+                    <p class="workflow-card__proof">@stage.Proof</p>
+                    <a class="inline-link" href="@stage.Href">@stage.Label</a>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Loop in motion</p>
+        <h2 class="editorial-title">Participation is easier to trust when the public loop points at live milestones, named horizons, and proof-backed closeout.</h2>
+        <p class="editorial-copy">This keeps participation grounded in the same first-party routes that already carry product truth instead of reading like a detached community shell.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Active pressure</span>
+            <h3>Milestones already under load</h3>
+            <p>These are the current delivery slices the public loop is most likely to touch next.</p>
+            @if (milestoneFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var milestone in milestoneFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>M@milestone.Id · @milestone.Title</h3>
+                                <p>@milestone.CasualSummary</p>
+                            </div>
+                            <span class="tag">@milestone.StatusLabel</span>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/roadmap#roadmap-milestones">Open milestone ledger</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Named direction</span>
+            <h3>Horizons already carrying public movement</h3>
+            <p>These are the named outward-facing tracks that can absorb public demand without pretending the work is already shipped.</p>
+            @if (roadmapFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var card in roadmapFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse horizon lanes</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Real closeout</span>
+            <h3>Proof that the loop can actually close</h3>
+            <p>These shipped examples keep participation honest by showing what evidence-backed closeout already looks like on the public surface.</p>
+            @if (shippedFollowUp.Length > 0)
+            {
+                <div class="compact-rail">
+                    @foreach (var card in shippedFollowUp)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>@card.Card.Title</h3>
+                                <p>@card.Card.Summary</p>
+                            </div>
+                            <a class="editorial-strip__action" href="@card.Action.Href">@card.Action.Label</a>
+                        </article>
+                    }
+                </div>
+            }
+            <a class="editorial-strip__action" href="/changelog">Open shipped closeout</a>
+        </article>
+    </div>
+</section>
+
 <section class="editorial-block editorial-block--lanes">
     <div class="lane-strip-list">
         <article class="lane-strip">
             <div class="lane-strip__copy">
-                <span class="tag">Public</span>
-                <h2>Public feedback</h2>
-                <p>Report a problem, missing feature, or broken installer without creating an account first.</p>
+                <span class="tag">Public signal rail</span>
+                <h2>Public Fixer Board</h2>
+                <p>Use this lane when you want to suggest future work, vote on safe public issues, or point at confusing public copy without creating an account first.</p>
+                <p>For crashes, install failures, account issues, private logs, or private campaign details, leave this lane and use Chummer Help or support instead.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.PublicLane)
                     {
@@ -57,7 +355,7 @@
             <div class="lane-strip__copy">
                 <span class="tag tag--amber">Account required</span>
                 <h2>Signed-in participation</h2>
-                <p>Use the signed-in path when you want tracked beta follow-up or want to grant temporary Codex access with your OpenAI account in ChatGPT.</p>
+                <p>Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your OpenAI account in ChatGPT.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)
                     {
@@ -76,4 +374,15 @@
             </div>
         </article>
     </div>
+</section>
+
+<section class="release-footnote">
+    <p class="eyebrow">Current route posture</p>
+    <h2 class="editorial-title">Broader participation stays separate from the dedicated public-signal loop.</h2>
+    <p class="editorial-copy">The current Chummer-owned loop is explicit now: public signal lives on <code class="mono-receipt">/feedback</code>, projected movement lives on <code class="mono-receipt">/roadmap</code>, and shipped closeout lives on <code class="mono-receipt">/changelog</code>. This page stays focused on broader participation and optional signed-in lanes even while hosted mirroring remains incomplete.</p>
+    <p class="muted-copy">
+        Need public signal? <a class="inline-link" href="/feedback">Open Fixer Board</a>.
+        Need current release truth? <a class="inline-link" href="/changelog">Open shipped closeout</a>.
+        Need public direction? <a class="inline-link" href="/roadmap">Open roadmap</a>.
+    </p>
 </section>

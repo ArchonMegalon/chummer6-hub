@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Chummer Blazor
+Exec=/usr/bin/chummer6-blazor-desktop
+Icon=/opt/chummer6/blazor-desktop-linux-x64/chummer-icon.png
+Terminal=false
+Categories=Game;
+StartupNotify=true

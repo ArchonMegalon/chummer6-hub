@@ -3,18 +3,25 @@ using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace Chummer.Run.Api.Controllers;
 
 [ApiController]
 public sealed class DownloadsCompatibilityController : ControllerBase
 {
+    private const string DefaultLocalReleaseProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
+    private const string LocalReleaseProofFileKey = "CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE";
+
     private readonly PublicReleaseManifestService _releases;
     private readonly WindowsProofInstallerService _windowsProofInstallers;
     private readonly ReleaseSelectionService _releaseSelection;
     private readonly InstallLinkingService _installLinking;
     private readonly InstallBootstrapTicketService _installBootstrapTickets;
     private readonly HubIdentityClient _identity;
+    private readonly IConfiguration _configuration;
+    private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
     private readonly ILogger<DownloadsCompatibilityController> _logger;
 
     public DownloadsCompatibilityController(
@@ -24,6 +31,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         InstallLinkingService installLinking,
         InstallBootstrapTicketService installBootstrapTickets,
         HubIdentityClient identity,
+        IConfiguration configuration,
         ILogger<DownloadsCompatibilityController> logger)
     {
         _releases = releases;
@@ -32,6 +40,9 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         _installLinking = installLinking;
         _installBootstrapTickets = installBootstrapTickets;
         _identity = identity;
+        _configuration = configuration;
+        _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
         _logger = logger;
     }
 
@@ -106,6 +117,12 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         }
 
         ApplyProofInstallerHeaders(Response.Headers);
+        ApplyRouteProofHeaders(
+            Response.Headers,
+            "No current local release-proof receipt is attached to the Windows proof-installer output route.",
+            "/downloads/proof/windows/{fileName}",
+            "/downloads/install/{artifactId}/proof",
+            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
         return PhysicalFile(
             installer.FilePath,
             "application/octet-stream",
@@ -124,6 +141,12 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         }
 
         ApplyProofInstallerHeaders(Response.Headers);
+        ApplyRouteProofHeaders(
+            Response.Headers,
+            "No current local release-proof receipt is attached to the Windows proof-installer artifact route.",
+            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}/proof",
+            "/downloads/install/{artifactId}/proof",
+            $"/downloads/install/{Uri.EscapeDataString(installer.ArtifactId)}");
         return PhysicalFile(
             installer.FilePath,
             "application/octet-stream",
@@ -168,6 +191,12 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         var dispatch = _installLinking.IssueDownload(manifest, artifact, null, null);
         Response.Headers["X-Chummer-Download-Receipt-Id"] = dispatch.Receipt.ReceiptId;
+        ApplyRouteProofHeaders(
+            Response.Headers,
+            "No current local release-proof receipt is attached to the compatibility download route.",
+            $"/downloads/get/{Uri.EscapeDataString(artifact.Id)}",
+            "/downloads/get/{artifactId}",
+            $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}");
 
         return PhysicalFile(
             filePath,
@@ -239,6 +268,12 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return Redirect(BuildInstallLoginHref(Uri.EscapeDataString(artifact.Id)));
         }
 
+        ApplyRouteProofHeaders(
+            Response.Headers,
+            "No current local release-proof receipt is attached to the artifact download output route.",
+            $"/downloads/file/{Uri.EscapeDataString(artifact.Id)}",
+            "/downloads/file/{artifactId}",
+            $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}");
         return PhysicalFile(
             filePath,
             "application/octet-stream",
@@ -307,8 +342,155 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return Redirect(BuildInstallLoginHref(encodedArtifactId));
         }
 
+        ApplyRouteProofHeaders(
+            Response.Headers,
+            "No current local release-proof receipt is attached to the public file-output route.",
+            "/downloads/files/{**path}",
+            $"/downloads/install/{encodedArtifactId}");
         return PhysicalFile(filePath, "application/octet-stream", enableRangeProcessing: true);
     }
+
+    private void ApplyRouteProofHeaders(
+        IHeaderDictionary headers,
+        string missingReceiptReason,
+        params string?[] routeCandidates)
+    {
+        RouteReceiptMatch? routeReceipt = FindLocalReleaseProofReceipt(routeCandidates);
+        RouteProofStatus routeProof = ResolveRouteProofStatus(routeReceipt, missingReceiptReason);
+
+        headers["X-Chummer-Route-State"] = routeProof.State;
+        if (!string.IsNullOrWhiteSpace(routeProof.BoundedFailureReason))
+        {
+            headers["X-Chummer-Route-Bounded-Failure-Reason"] = routeProof.BoundedFailureReason;
+        }
+
+        if (routeReceipt is null)
+        {
+            return;
+        }
+
+        headers["X-Chummer-Route-Receipt-Id"] = routeReceipt.ReceiptId;
+        headers["X-Chummer-Route-Receipt-Package-Id"] = routeReceipt.PackageId;
+        headers["X-Chummer-Route-Receipt-Route"] = routeReceipt.MatchedRoute;
+        headers["X-Chummer-Route-Receipt-Match-Mode"] = routeReceipt.MatchMode;
+    }
+
+    private RouteProofStatus ResolveRouteProofStatus(RouteReceiptMatch? routeReceipt, string missingReceiptReason)
+    {
+        if (routeReceipt is null)
+        {
+            return new RouteProofStatus("bounded_failure", missingReceiptReason);
+        }
+
+        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        if (readiness?.MissingDesktopClientCoverage == true)
+        {
+            string reviewRequiredReason = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
+            return new RouteProofStatus(
+                "bounded_failure",
+                $"Current direct route receipt is attached, but parity claims stay review-required because {reviewRequiredReason}.");
+        }
+
+        ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+        if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
+        {
+            return new RouteProofStatus(
+                "bounded_failure",
+                $"Current direct route receipt is attached, but parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
+        }
+
+        return new RouteProofStatus("pass", null);
+    }
+
+    private RouteReceiptMatch? FindLocalReleaseProofReceipt(params string?[] routeCandidates)
+    {
+        string? proofPath = ResolveLocalReleaseProofPath();
+        if (string.IsNullOrWhiteSpace(proofPath) || !System.IO.File.Exists(proofPath))
+        {
+            return null;
+        }
+
+        try
+        {
+            using JsonDocument proof = JsonDocument.Parse(System.IO.File.ReadAllText(proofPath));
+            if (!proof.RootElement.TryGetProperty("proof_receipts", out JsonElement receipts) || receipts.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            foreach (JsonElement receipt in receipts.EnumerateArray())
+            {
+                if (!receipt.TryGetProperty("routes", out JsonElement routes) || routes.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (JsonElement route in routes.EnumerateArray())
+                {
+                    string? publishedRoute = NormalizeOptionalRoute(route.GetString());
+                    if (publishedRoute is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (string? routeCandidate in routeCandidates)
+                    {
+                        string? normalizedCandidate = NormalizeOptionalRoute(routeCandidate);
+                        if (normalizedCandidate is null)
+                        {
+                            continue;
+                        }
+
+                        if (string.Equals(publishedRoute, normalizedCandidate, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return new RouteReceiptMatch(
+                                ReceiptId: NormalizeOptionalRoute(receipt.GetProperty("receipt_id").GetString()) ?? "unknown",
+                                PackageId: NormalizeOptionalRoute(receipt.GetProperty("package_id").GetString()) ?? "unknown",
+                                MatchedRoute: publishedRoute,
+                                MatchMode: "exact");
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipping local release-proof receipt lookup after JSON load failure.");
+        }
+
+        return null;
+    }
+
+    private string? ResolveLocalReleaseProofPath()
+    {
+        string? configuredPath = NormalizeOptionalRoute(_configuration[LocalReleaseProofFileKey]);
+        if (configuredPath is not null)
+        {
+            return configuredPath;
+        }
+
+        string relativePath = DefaultLocalReleaseProofRelativePath.Replace('/', Path.DirectorySeparatorChar);
+        return new[]
+            {
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath)),
+                Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", relativePath))
+            }
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(System.IO.File.Exists);
+    }
+
+    private sealed record RouteReceiptMatch(
+        string ReceiptId,
+        string PackageId,
+        string MatchedRoute,
+        string MatchMode);
+
+    private sealed record RouteProofStatus(
+        string State,
+        string? BoundedFailureReason);
 
     private static string BuildInstallLoginHref(string encodedArtifactId)
         => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{encodedArtifactId}")}";
@@ -380,4 +562,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return null;
         }
     }
+
+    private static string? NormalizeOptionalRoute(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

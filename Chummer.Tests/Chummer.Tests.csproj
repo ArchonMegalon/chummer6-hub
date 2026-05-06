@@ -33,6 +33,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Chummer.Run.Api\Chummer.Run.Api.csproj" />
     <ProjectReference Include="..\Chummer.Run.AI\Chummer.Run.AI.csproj" />
+    <ProjectReference Include="..\Chummer.Run.Identity\Chummer.Run.Identity.csproj" />
     <ProjectReference Include="..\Chummer.Campaign.Contracts\Chummer.Campaign.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Control.Contracts\Chummer.Control.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />

@@ -156,6 +156,9 @@
   const header = document.querySelector("[data-site-header]");
   const navToggle = document.querySelector("[data-nav-toggle]");
   const navSheet = document.querySelector("[data-nav-sheet]");
+  const bottomCta = document.querySelector("[data-bottom-cta]");
+  const bottomCtaDismiss = document.querySelector("[data-bottom-cta-dismiss]");
+  const bottomCtaStorageKey = "chummer.bottom_cta.dismissed_routes";
 
   const syncHeader = () => {
     if (!header) return;
@@ -166,13 +169,92 @@
   window.addEventListener("scroll", syncHeader, { passive: true });
 
   if (navToggle && navSheet) {
+    const closeNavSheet = () => {
+      navToggle.setAttribute("aria-expanded", "false");
+      navSheet.hidden = true;
+      navSheet.setAttribute("aria-hidden", "true");
+      navSheet.toggleAttribute("inert", true);
+      document.body.classList.remove("nav-sheet-open");
+    };
+
+    const openNavSheet = () => {
+      navToggle.setAttribute("aria-expanded", "true");
+      navSheet.hidden = false;
+      navSheet.setAttribute("aria-hidden", "false");
+      navSheet.toggleAttribute("inert", false);
+      document.body.classList.add("nav-sheet-open");
+    };
+
     navToggle.addEventListener("click", () => {
       const expanded = navToggle.getAttribute("aria-expanded") === "true";
-      navToggle.setAttribute("aria-expanded", expanded ? "false" : "true");
-      navSheet.hidden = expanded;
-      navSheet.toggleAttribute("inert", expanded);
-      navSheet.setAttribute("aria-hidden", expanded ? "true" : "false");
+      if (expanded) {
+        closeNavSheet();
+        return;
+      }
+
+      openNavSheet();
     });
+
+    navSheet.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", closeNavSheet);
+    });
+
+    navSheet.querySelectorAll("form").forEach((form) => {
+      form.addEventListener("submit", closeNavSheet);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true") {
+        closeNavSheet();
+        navToggle.focus();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > 980 && navToggle.getAttribute("aria-expanded") === "true") {
+        closeNavSheet();
+      }
+    });
+  }
+
+  if (bottomCta) {
+    const routeKey = bottomCta.getAttribute("data-bottom-cta-key") || "";
+    const readDismissedRoutes = () => {
+      try {
+        const raw = window.sessionStorage.getItem(bottomCtaStorageKey);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const writeDismissedRoutes = (routes) => {
+      try {
+        window.sessionStorage.setItem(bottomCtaStorageKey, JSON.stringify(routes));
+      } catch {
+        // Ignore storage failures and keep the CTA interactive.
+      }
+    };
+
+    const hideBottomCta = (persist) => {
+      bottomCta.hidden = true;
+      if (!persist || !routeKey) return;
+      const dismissedRoutes = readDismissedRoutes();
+      if (!dismissedRoutes.includes(routeKey)) {
+        dismissedRoutes.push(routeKey);
+        writeDismissedRoutes(dismissedRoutes);
+      }
+    };
+
+    if (routeKey && readDismissedRoutes().includes(routeKey)) {
+      hideBottomCta(false);
+    }
+
+    if (bottomCtaDismiss) {
+      bottomCtaDismiss.addEventListener("click", () => hideBottomCta(true));
+    }
   }
 
   document.querySelectorAll("[data-copy-source]").forEach((button) => {

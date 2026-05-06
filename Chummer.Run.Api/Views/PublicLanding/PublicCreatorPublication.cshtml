@@ -2,6 +2,8 @@
 @{
     ViewData["Title"] = Model.Publication.Title;
     ViewData["Chrome"] = Model.Chrome;
+    var publicationRouteReviewRequired = Model.TrustPulse?.MissingDesktopClientCoverage == true
+        || Model.TrustPulse?.ParityClaimsReviewRequired == true;
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
     {
@@ -28,6 +30,29 @@
             _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '))
         };
     }
+
+    string PublicationAvailabilityLabel(bool discoverable)
+        => publicationRouteReviewRequired && discoverable
+            ? "Review-required route"
+            : discoverable
+                ? "Ready now"
+                : "Limited release";
+
+    var publicationPostureTitle = publicationRouteReviewRequired
+        ? "Why this publication stays on the review-required lane"
+        : "Why this publication is live";
+    var publicationPostureCopy = publicationRouteReviewRequired
+        ? "This page keeps discovery, trust, comparison, lineage, moderation, and the next step together while current direct parity proof receipts still hold public parity claims on the review-required lane."
+        : "This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.";
+    var routeStateLabel = HumanizeStatus(Model.RouteState, "Bounded failure");
+    var routeReceiptSummary = Model.RouteReceipt?.Summary
+        ?? Model.BoundedFailureReason
+        ?? "No visible receipt is attached to this outward-facing publication route yet.";
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
 
 <section class="story-cinematic">
@@ -38,8 +63,13 @@
         <div class="trust-claim__microproof">
             <span>@HumanizeStatus(Model.Publication.PublicationStatus, "Published")</span>
             <span>@HumanizeStatus(Model.Publication.TrustBand, "Draft")</span>
-            <span>@(Model.Publication.Discoverable ? "Ready now" : "Limited release")</span>
+            <span>@PublicationAvailabilityLabel(Model.Publication.Discoverable)</span>
+            <span>Route: @routeStateLabel</span>
         </div>
+        @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
+        {
+            <p class="muted-copy">@Model.TrustPulse.RouteGuardSummary</p>
+        }
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>
             <a class="button-like button-like--ghost" href="/artifacts">Open artifacts shelf</a>
@@ -50,8 +80,8 @@
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">Shared publication</p>
-        <h2 class="editorial-title">Why this publication is live</h2>
-        <p class="editorial-copy">This page keeps discovery, trust, comparison, lineage, moderation, and the next step together instead of scattering them across separate routes.</p>
+        <h2 class="editorial-title">@publicationPostureTitle</h2>
+        <p class="editorial-copy">@publicationPostureCopy</p>
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">
@@ -69,6 +99,22 @@
         <article class="trust-rail">
             <span class="tag">Discovery</span>
             <p>@Model.Publication.DiscoverySummary</p>
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Route receipt</span>
+            <p>@routeReceiptSummary</p>
+            @if (Model.RouteReceipt is not null)
+            {
+                <p class="muted-copy">Receipt @Model.RouteReceipt.ReceiptId via @Model.RouteReceipt.MatchedRoute (@HumanizeStatus(Model.RouteReceipt.MatchMode, "Route match")).</p>
+            }
+            else
+            {
+                <p class="muted-copy">This public route stays bounded until a current outward-facing receipt is attached.</p>
+            }
+        </article>
+        <article class="trust-rail">
+            <span class="tag">Required receipts</span>
+            <p>@string.Join(", ", Model.RequiredReceiptRefs)</p>
         </article>
         @if (!string.IsNullOrWhiteSpace(Model.Publication.ComparisonSummary))
         {

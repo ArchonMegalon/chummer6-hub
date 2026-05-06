@@ -9,7 +9,6 @@ from pathlib import Path
 
 import yaml
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m115_hub_dossier_federation.py"
 SOURCE_FILES = [
@@ -66,7 +65,6 @@ class Next90M115HubDossierFederationTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("status must be 'complete'", result.stderr)
-
     def test_verifier_fails_when_controller_drops_federation_route(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m115-controller-") as temp_dir:
             temp_root = Path(temp_dir)

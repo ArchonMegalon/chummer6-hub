@@ -35,6 +35,8 @@ public sealed class PublicReleaseManifestService
     };
     private readonly IConfiguration _configuration;
     private readonly HttpClient? _httpClient;
+    private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
 
     public PublicReleaseManifestService(IConfiguration configuration)
         : this(configuration, httpClient: null)
@@ -45,6 +47,8 @@ public sealed class PublicReleaseManifestService
     {
         _configuration = configuration;
         _httpClient = httpClient;
+        _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
     }
 
     public PublicReleaseManifestDto LoadManifest()
@@ -61,18 +65,18 @@ public sealed class PublicReleaseManifestService
         if (File.Exists(registryManifestPath))
         {
             var canonicalManifest = LoadRegistryReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(registryManifestPath)), "registry");
-            return ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest)));
+            return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(ChoosePreferredRegistryManifest(runtimeManifest, canonicalManifest)))));
         }
 
         if (runtimeManifest is not null)
         {
-            return ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(runtimeManifest));
+            return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(runtimeManifest))));
         }
 
         var manifestPath = Path.Combine(root, "releases.json");
         if (!File.Exists(manifestPath))
         {
-            return ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
+            return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(new PublicReleaseManifestDto(
                 Version: "unpublished",
                 Channel: "preview",
                 PublishedAt: DateTimeOffset.UtcNow,
@@ -81,10 +85,10 @@ public sealed class PublicReleaseManifestService
                 Status: "unpublished",
                 Message: "No published desktop builds are available yet.",
                 HasFallbackSource: false,
-                GeneratedAt: DateTimeOffset.UtcNow)));
+                GeneratedAt: DateTimeOffset.UtcNow)))));
         }
 
-        return ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(manifestPath)))));
+        return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(manifestPath)))))));
     }
 
     public bool HasArtifactSuppressions()
@@ -189,6 +193,22 @@ public sealed class PublicReleaseManifestService
 
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string AppendDistinctSentence(string? existing, string sentence)
+    {
+        if (string.IsNullOrWhiteSpace(existing))
+        {
+            return sentence;
+        }
+
+        if (existing.Contains(sentence, StringComparison.OrdinalIgnoreCase))
+        {
+            return existing;
+        }
+
+        return $"{existing.Trim().TrimEnd('.')} {sentence}";
+    }
+
     public string? ResolveDownloadFilePath(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -639,6 +659,60 @@ public sealed class PublicReleaseManifestService
             SupportabilitySummary = supportabilitySummary,
             KnownIssueSummary = knownIssueSummary,
             FixAvailabilitySummary = fixAvailabilitySummary
+        });
+    }
+
+    private PublicReleaseManifestDto ApplyFlagshipReadinessGuard(PublicReleaseManifestDto manifest)
+    {
+        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        if (readiness is null || !readiness.MissingDesktopClientCoverage)
+        {
+            return EnsureContractName(manifest);
+        }
+
+        string gapSummary = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
+        return EnsureContractName(manifest with
+        {
+            RolloutState = string.Equals(NormalizeOptional(manifest.Status), "published", StringComparison.OrdinalIgnoreCase)
+                ? "desktop_proof_review_required"
+                : manifest.RolloutState,
+            RolloutReason = AppendDistinctSentence(
+                manifest.RolloutReason,
+                $"Current shelf stays install-capable, but parity claims remain blocked because {gapSummary}."),
+            SupportabilityState = "review_required",
+            SupportabilitySummary = AppendDistinctSentence(
+                manifest.SupportabilitySummary,
+                $"Treat the current shelf as review-required because {gapSummary}."),
+            KnownIssueSummary = AppendDistinctSentence(
+                manifest.KnownIssueSummary,
+                "Desktop flagship proof receipts are not current yet, so parity-sensitive routes stay on the review-required lane."),
+            FixAvailabilitySummary = AppendDistinctSentence(
+                manifest.FixAvailabilitySummary,
+                "Use the linked-install recovery and first-party support lane until current desktop proof receipts are green again.")
+        });
+    }
+
+    private PublicReleaseManifestDto ApplyImportRouteParityGuard(PublicReleaseManifestDto manifest)
+    {
+        ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+        if (importRouteGuard.IsCurrent || string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
+        {
+            return EnsureContractName(manifest);
+        }
+
+        string gapSummary = importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.');
+        return EnsureContractName(manifest with
+        {
+            SupportabilityState = "review_required",
+            SupportabilitySummary = AppendDistinctSentence(
+                manifest.SupportabilitySummary,
+                $"Treat the current shelf as review-required because {gapSummary}."),
+            KnownIssueSummary = AppendDistinctSentence(
+                manifest.KnownIssueSummary,
+                "Translator, XML amendment, Hero Lab, and adjacent import parity receipts are not current yet, so parity-sensitive routes stay on the review-required lane."),
+            FixAvailabilitySummary = AppendDistinctSentence(
+                manifest.FixAvailabilitySummary,
+                "Use the linked-install recovery and first-party support lane until current translator/XML/Hero Lab/import-route proof receipts are published.")
         });
     }
 

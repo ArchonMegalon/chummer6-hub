@@ -44,7 +44,12 @@ public sealed class PublicLandingController : Controller
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
     private readonly PublicPrivacyBoundaryService _privacyBoundaries;
+    private readonly PublicSignalProjectionService _signalProjection;
+    private readonly PublicSignalOperationsService _signalOperations;
     private readonly PublicTrustPulseService _trustPulse;
+    private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly LocalReleaseProofArtifactService _localReleaseProof;
+    private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
@@ -73,6 +78,8 @@ public sealed class PublicLandingController : Controller
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
         PublicPrivacyBoundaryService privacyBoundaries,
+        PublicSignalProjectionService signalProjection,
+        PublicSignalOperationsService signalOperations,
         PublicTrustPulseService trustPulse,
         SignedInTrustStatusService signedInTrustStatus,
         SupportCaseService supportCases,
@@ -101,7 +108,12 @@ public sealed class PublicLandingController : Controller
         _chrome = chrome;
         _trustContent = trustContent;
         _privacyBoundaries = privacyBoundaries;
+        _signalProjection = signalProjection;
+        _signalOperations = signalOperations;
         _trustPulse = trustPulse;
+        _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
+        _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
         _signedInTrustStatus = signedInTrustStatus;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
@@ -185,25 +197,11 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> NowPage(CancellationToken cancellationToken)
     {
-        var surface = _landing.LoadSurface();
-        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
-        var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
-        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
-        var model = new NowPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("What Is Real Now", "Readiness labels and direct evidence for what you can use today.", "/now", cancellationToken),
-            Surface: surface,
-            Assets: assetCatalog,
-            ReleaseExperience: releaseExperience,
-            ProofModules: ResolveCards(_landing.CardsForBucket(surface, "start_here").Take(3).ToArray(), assetCatalog, authenticated: false, "/now"),
-            AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/now"),
-            Inspectable: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, "/now"),
-            SignedInPreview: surface.RegisteredOverlays,
-            Manifest: manifest,
-            CampaignOsProof: _campaignOsProof.LoadProof(),
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+        var model = await BuildNowPageModel(
+            title: "What Is Real Now",
+            description: "Readiness labels and direct evidence for what you can use today.",
+            currentPath: "/now",
+            cancellationToken);
         return View("~/Views/PublicLanding/Now.cshtml", model);
     }
 
@@ -929,14 +927,31 @@ public sealed class PublicLandingController : Controller
             artifact,
             manifest,
             recoveryMode: true);
+        LocalReleaseProofLookupResult routeLookup = FindLocalReleaseProofReceipt(
+            $"/downloads/install/{Uri.EscapeDataString(artifactId)}/continue.json",
+            "/downloads/install/{artifactId}/continue.json");
+        RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
+            routeLookup,
+            passingState: "pass",
+            missingReceiptReason: "No current local release-proof receipt is attached to this install recovery exchange route for the requested artifact.");
 
         Response.Headers["Cache-Control"] = "private, no-store";
         return Ok(new
         {
             artifactId = artifact.Id,
+            downloadReceiptId = dispatch.Receipt.ReceiptId,
+            claimTicketId = dispatch.ClaimTicket.TicketId,
             claimCode = dispatch.ClaimTicket.ClaimCode,
             expiresAtUtc = dispatch.ClaimTicket.ExpiresAtUtc,
-            status = "pass",
+            status = routeClaim.State,
+            routeReceipt = BuildRouteReceiptPayload(routeLookup.ReceiptMatch),
+            boundedFailureReason = routeClaim.BoundedFailureReason,
+            requiredReceiptRefs = new[]
+            {
+                $"download:{dispatch.Receipt.ReceiptId}",
+                $"claim-ticket:{dispatch.ClaimTicket.TicketId}",
+                "desktop_native_claim_and_recovery"
+            },
             nextSafeAction = continuation.NextSafeAction,
             recoveryModeOnly = guidedBootstrapDownload,
             applicationVersion = continuation.ApplicationVersion,
@@ -960,37 +975,317 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> ParticipatePage(CancellationToken cancellationToken)
     {
-        var surface = _landing.LoadSurface();
-        var cards = _landing.CardsForBucket(surface, "participate");
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Participate", "Public product signal stays visible here, while signed-in Codex access remains an optional account-linked lane.", "/participate", cancellationToken);
-        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
-        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
-        var model = new ParticipatePageViewModel(
-            Chrome: chrome,
-            Surface: surface,
-            Assets: new AssetCatalogViewModel(surface.Assets),
-            PublicLane: ResolveCards(cards.Where(card => !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: false, "/participate"),
-            SignedInLane: ResolveCards(cards.Where(card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal)).ToArray(), new AssetCatalogViewModel(surface.Assets), authenticated: chrome.Authenticated, "/participate"),
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+        var model = await BuildParticipatePageModel(
+            title: "Participate",
+            description: "Public product signal stays visible here, while signed-in Codex access remains an optional account-linked lane.",
+            currentPath: "/participate",
+            cancellationToken);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
 
     [HttpGet("/feedback")]
-    public IActionResult FeedbackPage()
-        => Redirect("/participate?productlift=feedback#productlift-feedback");
+    [Produces("text/html")]
+    public async Task<IActionResult> FeedbackPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildParticipatePageModel(
+            title: "Feedback",
+            description: "Public ideas, votes, safe bug reports, and shipped follow-up stay on a dedicated first-party signal rail.",
+            currentPath: "/feedback",
+            cancellationToken);
+        return View("~/Views/PublicLanding/Feedback.cshtml", model);
+    }
 
     [HttpGet("/help/feedback")]
     public IActionResult FeedbackHelpPage()
         => Redirect("/feedback");
 
+    [HttpPost("/feedback/providers/productlift/webhook")]
+    [HttpPost("/api/v1/public/feedback/providers/productlift/webhook")]
+    [ProducesResponseType<PublicSignalWebhookAckResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<PublicSignalWebhookAckResponse> ReceiveProductLiftWebhook([FromBody] JsonElement payload)
+    {
+        string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_WEBHOOK_SECRET"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift webhook adapter is not configured.");
+        }
+
+        string suppliedSecret = Request.Headers[PublicSignalOperationsService.WebhookSecretHeader].ToString();
+        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift webhook secret mismatch.");
+        }
+
+        try
+        {
+            return Ok(_signalOperations.RecordWebhook(payload));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("/feedback/operations")]
+    [HttpGet("/api/v1/public/feedback/operations")]
+    [Produces("application/json")]
+    public ContentResult FeedbackOperationsArtifact()
+        => Content(_signalOperations.LoadArtifactJson(), "application/json");
+
+    [HttpGet("/feedback/operations/lookup")]
+    [Produces("text/html")]
+    public async Task<IActionResult> FeedbackOperationsLookupPage([FromQuery] string? q, [FromQuery] string? scope, CancellationToken cancellationToken)
+        => View(
+            "~/Views/PublicLanding/FeedbackOperationsLookup.cshtml",
+            new PublicSignalOperationsLookupPageViewModel(
+                Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                    "Feedback Operations Lookup",
+                    "Bounded operator search across ProductLift source receipts and closeout thread drilldowns.",
+                    "/feedback/operations/lookup",
+                    cancellationToken),
+                Lookup: _signalOperations.BuildLookup(q, scope)));
+
+    [HttpGet("/api/v1/public/feedback/operations/lookup")]
+    [Produces("application/json")]
+    public ContentResult FeedbackOperationsLookupArtifact([FromQuery] string? q, [FromQuery] string? scope)
+        => Content(_signalOperations.LoadLookupJson(q, scope), "application/json");
+
+    [HttpGet("/feedback/operations/source/{sourceReceiptId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> FeedbackOperationsSourceDetailPage(string sourceReceiptId, [FromQuery] string? filter, CancellationToken cancellationToken)
+    {
+        PublicSignalOperationsDetailViewModel? detail = _signalOperations.BuildSourceReceiptDetail(sourceReceiptId, filter);
+        if (detail is null)
+        {
+            return NotFound();
+        }
+
+        return View(
+            "~/Views/PublicLanding/FeedbackOperationsDetail.cshtml",
+            new PublicSignalOperationsDetailPageViewModel(
+                Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                    "Feedback Operations Source Detail",
+                    "Bounded ProductLift source receipt drilldown across queue, dispatch, callback, and journey state.",
+                    string.Equals(detail.FilterKey, "all", StringComparison.Ordinal)
+                        ? $"/feedback/operations/source/{sourceReceiptId}"
+                        : $"/feedback/operations/source/{sourceReceiptId}?filter={Uri.EscapeDataString(detail.FilterKey)}",
+                    cancellationToken),
+                Detail: detail));
+    }
+
+    [HttpGet("/api/v1/public/feedback/operations/source/{sourceReceiptId}")]
+    [Produces("application/json")]
+    public IActionResult FeedbackOperationsSourceDetailArtifact(string sourceReceiptId, [FromQuery] string? filter)
+    {
+        string? json = _signalOperations.LoadSourceReceiptDetailJson(sourceReceiptId, filter);
+        return json is null
+            ? NotFound()
+            : Content(json, "application/json");
+    }
+
+    [HttpGet("/feedback/operations/thread/{dispatchReceiptId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> FeedbackOperationsThreadDetailPage(string dispatchReceiptId, [FromQuery] string? filter, CancellationToken cancellationToken)
+    {
+        PublicSignalOperationsDetailViewModel? detail = _signalOperations.BuildRecipientThreadDetail(dispatchReceiptId, filter);
+        if (detail is null)
+        {
+            return NotFound();
+        }
+
+        return View(
+            "~/Views/PublicLanding/FeedbackOperationsDetail.cshtml",
+            new PublicSignalOperationsDetailPageViewModel(
+                Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                    "Feedback Operations Thread Detail",
+                    "Bounded ProductLift closeout thread drilldown for one dispatch spine.",
+                    string.Equals(detail.FilterKey, "all", StringComparison.Ordinal)
+                        ? $"/feedback/operations/thread/{dispatchReceiptId}"
+                        : $"/feedback/operations/thread/{dispatchReceiptId}?filter={Uri.EscapeDataString(detail.FilterKey)}",
+                    cancellationToken),
+                Detail: detail));
+    }
+
+    [HttpGet("/api/v1/public/feedback/operations/thread/{dispatchReceiptId}")]
+    [Produces("application/json")]
+    public IActionResult FeedbackOperationsThreadDetailArtifact(string dispatchReceiptId, [FromQuery] string? filter)
+    {
+        string? json = _signalOperations.LoadRecipientThreadDetailJson(dispatchReceiptId, filter);
+        return json is null
+            ? NotFound()
+            : Content(json, "application/json");
+    }
+
+    [HttpPost("/feedback/operations/reconcile")]
+    [HttpPost("/api/v1/public/feedback/operations/reconcile")]
+    [ProducesResponseType<PublicSignalOperationsReconcileResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<PublicSignalOperationsReconcileResponse> ReconcileFeedbackOperations()
+    {
+        string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_OPERATIONS_SECRET"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift operations replay is not configured.");
+        }
+
+        string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
+        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
+        }
+
+        return Ok(_signalOperations.ReconcilePendingCloseouts());
+    }
+
+    [HttpPost("/feedback/operations/recover")]
+    [HttpPost("/api/v1/public/feedback/operations/recover")]
+    [ProducesResponseType<PublicSignalOperationsRecoveryResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<PublicSignalOperationsRecoveryResponse> RecoverFeedbackOperations()
+    {
+        string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_OPERATIONS_SECRET"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "productlift operations recovery is not configured.");
+        }
+
+        string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
+        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
+        }
+
+        return Ok(_signalOperations.RecoverDispatchOutcomes());
+    }
+
+    [HttpPost("/feedback/providers/emailit/webhook")]
+    [HttpPost("/api/v1/public/feedback/providers/emailit/webhook")]
+    [ProducesResponseType<PublicSignalDeliveryOutcomeAckResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<PublicSignalDeliveryOutcomeAckResponse> ReceiveEmailitDeliveryOutcome([FromBody] JsonElement payload)
+    {
+        string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_EMAILIT_WEBHOOK_SECRET"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "emailit delivery callback adapter is not configured.");
+        }
+
+        string suppliedSecret = Request.Headers[PublicSignalOperationsService.EmailitWebhookSecretHeader].ToString();
+        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "emailit webhook secret mismatch.");
+        }
+
+        try
+        {
+            return Ok(_signalOperations.RecordDeliveryOutcome("emailit", payload));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("/feedback/providers/ea/delivery/webhook")]
+    [HttpPost("/api/v1/public/feedback/providers/ea/delivery/webhook")]
+    [ProducesResponseType<PublicSignalDeliveryOutcomeAckResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<PublicSignalDeliveryOutcomeAckResponse> ReceiveEaDeliveryOutcome([FromBody] JsonElement payload)
+    {
+        string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_EA_DELIVERY_WEBHOOK_SECRET"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "ea delivery callback adapter is not configured.");
+        }
+
+        string suppliedSecret = Request.Headers[PublicSignalOperationsService.EaDeliveryWebhookSecretHeader].ToString();
+        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "ea delivery webhook secret mismatch.");
+        }
+
+        try
+        {
+            return Ok(_signalOperations.RecordDeliveryOutcome("ea", payload));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("/feedback/providers/delivery/outcome")]
+    [HttpPost("/api/v1/public/feedback/providers/delivery/outcome")]
+    [ProducesResponseType<PublicSignalDeliveryOutcomeAckResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+    public ActionResult<PublicSignalDeliveryOutcomeAckResponse> ReceiveDeliveryOutcome([FromBody] JsonElement payload)
+    {
+        string? configuredSecret = _configuration["CHUMMER_PRODUCTLIFT_OPERATIONS_SECRET"]?.Trim();
+        if (string.IsNullOrWhiteSpace(configuredSecret))
+        {
+            return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "delivery outcome adapter is not configured.");
+        }
+
+        string suppliedSecret = Request.Headers[PublicSignalOperationsService.OperationsSecretHeader].ToString();
+        if (!string.Equals(suppliedSecret, configuredSecret, StringComparison.Ordinal))
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: "productlift operations secret mismatch.");
+        }
+
+        try
+        {
+            return Ok(_signalOperations.RecordDeliveryOutcome(payload));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     [HttpGet("/roadmap")]
-    public IActionResult RoadmapPage()
-        => Redirect("/horizons?productlift=roadmap#productlift-roadmap-projection");
+    [Produces("text/html")]
+    public async Task<IActionResult> RoadmapPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/roadmap";
+        var surface = _landing.LoadSurface();
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var signalLoop = BuildPublicSignalLoopSnapshot(surface, assetCatalog, authenticated, currentPath);
+        var signalProjection = BuildOptionalSignalProjectionPacket(currentPath);
+        var model = new RoadmapPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Roadmap", "Milestone-backed public direction, readiness posture, and the next honest routes.", currentPath, cancellationToken),
+            Horizons: ResolveCards(_landing.CardsForBucket(surface, "coming_next"), assetCatalog, authenticated: false, currentPath),
+            Milestones: BuildRoadmapMilestones(),
+            SignalLoop: signalLoop,
+            SignalProjection: signalProjection,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience));
+        return View("~/Views/PublicLanding/Roadmap.cshtml", model);
+    }
 
     [HttpGet("/changelog")]
-    public IActionResult ChangelogPage()
-        => Redirect("/now?productlift=changelog#productlift-shipped-closeout");
+    [Produces("text/html")]
+    public async Task<IActionResult> ChangelogPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildNowPageModel(
+            title: "Changelog",
+            description: "Shipped closeout, user-available proof, and current caution stay on one calmer first-party rail.",
+            currentPath: "/changelog",
+            cancellationToken);
+        return View("~/Views/PublicLanding/Changelog.cshtml", model);
+    }
 
     [HttpGet("/status")]
     [Produces("text/html")]
@@ -999,12 +1294,14 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var pulse = _trustPulse.LoadSnapshot();
         var model = new StatusPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Weekly pulse, release posture, and the current longest pole on one calmer route.", "/status", cancellationToken),
             Manifest: manifest,
             ReleaseExperience: releaseExperience,
             CampaignOsProof: _campaignOsProof.LoadProof(),
-            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience, pulse),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Status.cshtml", model);
     }
@@ -1021,7 +1318,12 @@ public sealed class PublicLandingController : Controller
         var signedInArtifactView = NormalizeSignedInArtifactView(Request.Query["view"].ToString());
         IReadOnlyList<RecapShelfEntry> signedInRecapShelf = Array.Empty<RecapShelfEntry>();
         IReadOnlyList<CreatorPublicationProjection> signedInCreatorPublications = Array.Empty<CreatorPublicationProjection>();
-        IReadOnlyList<CreatorPublicationProjection> publicCreatorPublications = _publicCreatorDiscovery.ListDiscoverable();
+        IReadOnlyList<CreatorPublicationProjection> publicCreatorPublications = FilterGuestArtifactShelfPublications(
+            _publicCreatorDiscovery.ListDiscoverable(),
+            signedInArtifactView);
+        IReadOnlyList<ResolvedPublicCardViewModel> guestCards = FilterGuestArtifactShelfCards(
+            ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/artifacts"),
+            signedInArtifactView);
         var subject = await TryGetOptionalPublicSurfaceSubjectAsync("/artifacts", cancellationToken);
         if (subject is not null)
         {
@@ -1046,7 +1348,7 @@ public sealed class PublicLandingController : Controller
             Eyebrow: "Artifacts",
             Heading: "Proof gallery",
             Intro: "Browse the packs, briefs, and proof surfaces that make the preview feel tangible.",
-            Items: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/artifacts"),
+            Items: guestCards,
             PublicCreatorPublications: publicCreatorPublications,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
@@ -1054,6 +1356,107 @@ public sealed class PublicLandingController : Controller
             SignedInCreatorPublications: signedInCreatorPublications,
             SignedInArtifactView: signedInArtifactView);
         return View("~/Views/PublicLanding/Shelf.cshtml", model);
+    }
+
+    [HttpGet("artifacts/shelf")]
+    [HttpGet("/api/v1/public/artifacts/shelf")]
+    [HttpGet("/api/public/artifacts/shelf")]
+    [Produces("application/json")]
+    public async Task<IActionResult> ArtifactShelfApi([FromQuery] string? view, [FromQuery] string? locale, CancellationToken cancellationToken)
+    {
+        var surface = _landing.LoadSurface();
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
+        var signedInArtifactView = NormalizeSignedInArtifactView(view ?? Request.Query["view"].ToString());
+        IReadOnlyList<RecapShelfEntry> signedInRecapShelf = Array.Empty<RecapShelfEntry>();
+        IReadOnlyList<CreatorPublicationProjection> signedInCreatorPublications = Array.Empty<CreatorPublicationProjection>();
+        IReadOnlyList<CreatorPublicationProjection> publicCreatorPublications = _publicCreatorDiscovery.ListDiscoverable();
+        IReadOnlyList<RecapShelfEntry> mergedSignedInArtifactShelf = Array.Empty<RecapShelfEntry>();
+        var subject = await TryGetOptionalPublicSurfaceSubjectAsync("/artifacts", cancellationToken);
+        if (subject is not null)
+        {
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
+            mergedSignedInArtifactShelf = MergeSignedInArtifactShelfEntries(
+                BuildSignedInArtifactShelfEntries(user, campaignSpine, installLinking),
+                BuildSignedInPersonalArtifactShelfEntries(campaignSpine));
+            signedInRecapShelf = FilterSignedInArtifactShelfEntries(
+                mergedSignedInArtifactShelf,
+                signedInArtifactView);
+            signedInCreatorPublications = FilterSignedInCreatorPublications(
+                campaignSpine.CreatorPublications
+                    .OrderByDescending(static item => item.UpdatedAtUtc)
+                    .ToArray(),
+                signedInArtifactView);
+        }
+
+        string resolvedLocale = ResolveArtifactShelfLocale(locale, Request.Headers.AcceptLanguage.ToString());
+        PrivacyBoundaryPanelViewModel retention = _privacyBoundaries.BuildPanel("privacy");
+        IReadOnlyList<ResolvedPublicCardViewModel> guestCards = ResolveCards(
+            _landing.CardsForBucket(surface, "featured_artifacts"),
+            assetCatalog,
+            authenticated: subject is not null,
+            "/artifacts");
+        IReadOnlyList<ResolvedPublicCardViewModel> filteredGuestCards = FilterGuestArtifactShelfCards(guestCards, signedInArtifactView);
+        IReadOnlyList<CreatorPublicationProjection> filteredPublicCreatorPublications = FilterGuestArtifactShelfPublications(publicCreatorPublications, signedInArtifactView);
+        IReadOnlyDictionary<string, int> viewCounts = BuildArtifactShelfViewCounts(
+            mergedSignedInArtifactShelf,
+            signedInCreatorPublications,
+            guestCards,
+            publicCreatorPublications,
+            subject is not null);
+
+        return Ok(new
+        {
+            contractName = "chummer.run.public_artifact_shelf.v2",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            locale = resolvedLocale,
+            signedIn = subject is not null,
+            requestedView = signedInArtifactView,
+            availableViews = new[]
+            {
+                BuildArtifactShelfViewPayload("all", viewCounts),
+                BuildArtifactShelfViewPayload("personal", viewCounts),
+                BuildArtifactShelfViewPayload("campaign", viewCounts),
+                BuildArtifactShelfViewPayload("creator", viewCounts),
+                BuildArtifactShelfViewPayload("public", viewCounts)
+            },
+            retention = BuildArtifactShelfRetentionPayload(retention),
+            guestShelf = new
+            {
+                caption = GuestArtifactViewSummaryForApi(signedInArtifactView),
+                cards = filteredGuestCards.Select(card => BuildArtifactShelfCardPayload(
+                    card,
+                    resolvedLocale,
+                    BuildArtifactShelfRetentionSummary(retention, "claim_install_linkage"))),
+                publicCreatorPublications = filteredPublicCreatorPublications.Select(publication =>
+                    BuildArtifactShelfCreatorPublicationPayload(
+                        publication,
+                        filteredPublicCreatorPublications,
+                        resolvedLocale,
+                        BuildArtifactShelfRetentionSummary(retention, publication.Discoverable ? "survey_follow_up" : "claim_install_linkage"),
+                        publicOnly: true))
+            },
+            signedInShelf = subject is null
+                ? null
+                : new
+                {
+                    caption = ArtifactViewSummaryForApi(signedInArtifactView),
+                    recapItems = signedInRecapShelf.Select(item =>
+                        BuildArtifactShelfRecapPayload(
+                            item,
+                            signedInCreatorPublications,
+                            resolvedLocale,
+                            BuildArtifactShelfRetentionSummary(retention, "claim_install_linkage"))),
+                    creatorPublications = signedInCreatorPublications.Select(publication =>
+                        BuildArtifactShelfCreatorPublicationPayload(
+                            publication,
+                            signedInCreatorPublications,
+                            resolvedLocale,
+                            BuildArtifactShelfRetentionSummary(retention, publication.Discoverable ? "survey_follow_up" : "claim_install_linkage"),
+                            publicOnly: string.Equals(signedInArtifactView, "public", StringComparison.Ordinal)))
+                }
+        });
     }
 
     [HttpGet("/artifacts/release-bundles/{releaseArtifactId}")]
@@ -1084,13 +1487,80 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        LocalReleaseProofLookupResult routeLookup = FindLocalReleaseProofReceipt(
+            "/artifacts/publications/{publicationId}",
+            "/api/v1/public/artifacts/publications/{publicationId}",
+            "/api/public/artifacts/publications/{publicationId}");
+        RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
+            routeLookup,
+            passingState: "published",
+            missingReceiptReason: "No current local release-proof receipt is attached to the public creator-publication detail route.");
         var model = new PublicCreatorPublicationPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(publication.Title, publication.Summary, currentPath, cancellationToken),
             Publication: publication,
             BackHref: "/artifacts#governed-creator-discovery",
+            RouteState: routeClaim.State,
+            RouteReceipt: BuildRouteReceiptPayload(routeLookup.ReceiptMatch),
+            BoundedFailureReason: routeClaim.BoundedFailureReason,
+            RequiredReceiptRefs: new[]
+            {
+                "artifact_shelf:v2",
+                "public-shelf:/artifacts/publications/{publicationId}"
+            },
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/PublicCreatorPublication.cshtml", model);
+    }
+
+    [HttpGet("artifacts/publications/{publicationId}")]
+    [HttpGet("/api/v1/public/artifacts/publications/{publicationId}")]
+    [HttpGet("/api/public/artifacts/publications/{publicationId}")]
+    [Produces("application/json")]
+    public async Task<IActionResult> CreatorPublicationDetailApi([FromRoute] string publicationId, [FromQuery] string? locale, CancellationToken cancellationToken)
+    {
+        CreatorPublicationProjection? publication = _publicCreatorDiscovery.GetDiscoverable(publicationId);
+        if (publication is null)
+        {
+            return NotFound();
+        }
+
+        string resolvedLocale = ResolveArtifactShelfLocale(locale, Request.Headers.AcceptLanguage.ToString());
+        PrivacyBoundaryPanelViewModel retention = _privacyBoundaries.BuildPanel("privacy");
+        IReadOnlyList<CreatorPublicationProjection> siblings = _publicCreatorDiscovery.ListDiscoverable(limit: 12)
+            .Where(item => !string.Equals(item.PublicationId, publicationId, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var subject = await TryGetOptionalPublicSurfaceSubjectAsync($"/artifacts/publications/{publicationId}", cancellationToken);
+        LocalReleaseProofLookupResult routeLookup = FindLocalReleaseProofReceipt(
+            "/artifacts/publications/{publicationId}",
+            "/api/v1/public/artifacts/publications/{publicationId}",
+            "/api/public/artifacts/publications/{publicationId}");
+        RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
+            routeLookup,
+            passingState: "published",
+            missingReceiptReason: "No current local release-proof receipt is attached to the public creator-publication detail route.");
+
+        return Ok(new
+        {
+            contractName = "chummer.run.public_artifact_shelf.publication.v1",
+            generatedAtUtc = DateTimeOffset.UtcNow,
+            locale = resolvedLocale,
+            signedIn = subject is not null,
+            routeState = routeClaim.State,
+            routeReceipt = BuildRouteReceiptPayload(routeLookup.ReceiptMatch),
+            boundedFailureReason = routeClaim.BoundedFailureReason,
+            requiredReceiptRefs = new[]
+            {
+                "artifact_shelf:v2",
+                "public-shelf:/artifacts/publications/{publicationId}"
+            },
+            retention = BuildArtifactShelfRetentionPayload(retention),
+            publication = BuildArtifactShelfCreatorPublicationPayload(
+                publication,
+                siblings.Prepend(publication).ToArray(),
+                resolvedLocale,
+                BuildArtifactShelfRetentionSummary(retention, publication.Discoverable ? "survey_follow_up" : "claim_install_linkage"),
+                publicOnly: true)
+        });
     }
 
     private IActionResult BuildReleaseArtifactBundleProof(string releaseArtifactId, string? requestedFormat)
@@ -1121,17 +1591,30 @@ public sealed class PublicLandingController : Controller
                 static format => format,
                 format => $"{bundleRef}/{Uri.EscapeDataString(format)}",
                 StringComparer.OrdinalIgnoreCase);
+        LocalReleaseProofLookupResult routeLookup = FindLocalReleaseProofReceipt(
+            normalizedFormat is null ? bundleRef : outputRefs[normalizedFormat],
+            bundleRef,
+            installRef);
+        RouteClaimStatus routeClaim = ResolvePublicRouteClaimStatus(
+            routeLookup,
+            passingState: "published",
+            missingReceiptReason: "No current local release-proof receipt is attached to this release-bundle route or format.");
 
         return Ok(new
         {
             contractName = "chummer.run.public_proof_shelf.release_bundle.v1",
             releaseArtifactId = artifactId,
-            state = "published",
+            state = routeClaim.State,
             publicProofShelfRef = normalizedFormat is null ? bundleRef : outputRefs[normalizedFormat],
             releaseBundleRef = bundleRef,
             canonicalInstallRef = installRef,
             requestedFormat = normalizedFormat,
             outputRefs,
+            routeReceipt = BuildRouteReceiptPayload(routeLookup.ReceiptMatch),
+            boundedFailureReason = routeClaim.BoundedFailureReason,
+            nextSafeAction = routeClaim.Blocked
+                ? $"Stay on {installRef} or the governed support lane until a current proof receipt is published for {bundleRef}."
+                : "Current release-bundle proof is attached to this public route.",
             requiredReceiptRefs = new[]
             {
                 $"release:{artifactId}",
@@ -1310,9 +1793,9 @@ public sealed class PublicLandingController : Controller
                 : "Chummer accepted the report and linked it to the signed-in account path so the next routed update stays visible.",
             CaseId: caseId,
             StatusLabel: trackedCase?.Status ?? SupportCaseStatuses.New,
-            ResponseExpectation: authenticated
-                ? "Tracked support updates should appear inside Account > Support when the case moves through triage or a release reaches reporter-ready state."
-                : "Guest reports should include a reply email. Clear preview reports usually get an answer within two working days.",
+            ResponseExpectation: BuildSupportResponseExpectation(
+                authenticated,
+                BuildPublicTrustPulsePanel(manifest, releaseExperience)),
             Highlights: highlights,
             Actions: actions,
             Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>(),
@@ -1353,6 +1836,7 @@ public sealed class PublicLandingController : Controller
             Platform: platform,
             Arch: arch,
             Source: SupportCaseSourceKinds.PublicWeb);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
 
         try
         {
@@ -1378,6 +1862,7 @@ public sealed class PublicLandingController : Controller
                 SupportIntake = BuildSupportIntakeModel(
                     authenticated: chrome.Authenticated,
                     submissionNotice: ex.Message,
+                    manifest,
                     installDefaults,
                     new SupportIntakeOverrides(
                         Kind: kind,
@@ -1423,28 +1908,28 @@ public sealed class PublicLandingController : Controller
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
             var campaignSpine = _campaignSpine.GetAccountSummary(user, installLinking);
-        var leadWorkspaceServerPlane = campaignSpine.Workspaces.Count == 0
-            ? null
-            : _workspaceServerPlane.GetWorkspaceServerPlane(user, campaignSpine.Workspaces[0].WorkspaceId, installLinking);
-        var model = new HomePageViewModel(
-            Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
-            CurrentSection: selectedSection,
-            Sections: BuildHomeSections(selectedSection),
-            Surface: surface,
-            Assets: assetCatalog,
-            ReleaseExperience: releaseExperience,
-            User: user,
-            Links: links,
-            Experience: experience,
-            InstallLinking: installLinking,
-            SupportCases: supportCases,
-            SupportCaseSummaries: supportCaseSummaries,
-            CampaignSpine: campaignSpine,
-            LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
-            PrimaryAction: BuildHomePrimaryAction(experience, campaignSpine, installLinking, releaseExperience),
-            SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
-            NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
-            HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));
+            var leadWorkspaceServerPlane = campaignSpine.Workspaces.Count == 0
+                ? null
+                : _workspaceServerPlane.GetWorkspaceServerPlane(user, campaignSpine.Workspaces[0].WorkspaceId, installLinking);
+            var model = new HomePageViewModel(
+                Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
+                CurrentSection: selectedSection,
+                Sections: BuildHomeSections(selectedSection),
+                Surface: surface,
+                Assets: assetCatalog,
+                ReleaseExperience: releaseExperience,
+                User: user,
+                Links: links,
+                Experience: experience,
+                InstallLinking: installLinking,
+                SupportCases: supportCases,
+                SupportCaseSummaries: supportCaseSummaries,
+                CampaignSpine: campaignSpine,
+                LeadWorkspaceServerPlane: leadWorkspaceServerPlane,
+                PrimaryAction: BuildHomePrimaryAction(experience, campaignSpine, installLinking, releaseExperience),
+                SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
+                NowRail: ResolveCards(_landing.CardsForBucket(surface, "whats_real_now").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath),
+                HorizonRail: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: true, currentPath));
             return View("~/Views/PublicLanding/Home.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -1729,6 +2214,392 @@ public sealed class PublicLandingController : Controller
             .Any(token => string.Equals(token, needle, StringComparison.OrdinalIgnoreCase));
     }
 
+    private static string ResolveArtifactShelfLocale(string? requestedLocale, string? acceptLanguage)
+    {
+        string? direct = NormalizeArtifactShelfLocaleToken(requestedLocale);
+        if (!string.IsNullOrWhiteSpace(direct))
+        {
+            return direct;
+        }
+
+        if (!string.IsNullOrWhiteSpace(acceptLanguage))
+        {
+            string[] candidates = acceptLanguage
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            foreach (string candidate in candidates)
+            {
+                string language = candidate.Split(';', 2, StringSplitOptions.TrimEntries)[0];
+                string? normalized = NormalizeArtifactShelfLocaleToken(language);
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    return normalized;
+                }
+            }
+        }
+
+        return "en-US";
+    }
+
+    private static string? NormalizeArtifactShelfLocaleToken(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string trimmed = value.Trim().Replace('_', '-');
+        string[] parts = trimmed.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length == 0 || parts.Length > 3)
+        {
+            return null;
+        }
+
+        string language = parts[0].ToLowerInvariant();
+        if (language.Length < 2 || language.Length > 8 || !language.All(char.IsLetter))
+        {
+            return null;
+        }
+
+        if (parts.Length == 1)
+        {
+            return language;
+        }
+
+        string region = parts[1].ToUpperInvariant();
+        if (region.Length is < 2 or > 8 || !region.All(char.IsLetterOrDigit))
+        {
+            return null;
+        }
+
+        return parts.Length == 2
+            ? $"{language}-{region}"
+            : $"{language}-{region}-{parts[2].ToUpperInvariant()}";
+    }
+
+    private static string ArtifactViewSummaryForApi(string view) => view switch
+    {
+        "personal" => "Personal shelf view keeps account-side runner artifacts and continuity on the governed personal rail.",
+        "campaign" => "Campaign shelf view keeps shared continuity, replay, and aftermath artifacts on the governed campaign rail.",
+        "creator" => "Creator shelf view keeps creator-linked lineage, publication posture, and sibling packets together.",
+        "public" => "Public shelf view keeps discoverable published creator packets and their public detail routes on one shared rail.",
+        _ => "All shelf views keep personal, campaign, creator, and public artifact posture inspectable from one route."
+    };
+
+    private static string GuestArtifactViewSummaryForApi(string view) => view switch
+    {
+        "creator" => "Guest creator shelf view keeps discoverable creator packets, sibling packets, and publication posture together on the public rail.",
+        "public" => "Guest public shelf view keeps proof cards, preview posture, and published creator packets on one inspectable route.",
+        "personal" => "Personal shelf view requires a signed-in account before private return artifacts can render.",
+        "campaign" => "Campaign shelf view requires a signed-in account before shared continuity artifacts can render.",
+        _ => "Public proof, preview posture, and governed publication discovery stay on one inspectable artifact rail."
+    };
+
+    private static IReadOnlyList<ResolvedPublicCardViewModel> FilterGuestArtifactShelfCards(
+        IReadOnlyList<ResolvedPublicCardViewModel> items,
+        string artifactView)
+        => artifactView switch
+        {
+            "personal" or "campaign" or "creator" => Array.Empty<ResolvedPublicCardViewModel>(),
+            _ => items
+        };
+
+    private static IReadOnlyList<CreatorPublicationProjection> FilterGuestArtifactShelfPublications(
+        IReadOnlyList<CreatorPublicationProjection> items,
+        string artifactView)
+        => artifactView switch
+        {
+            "personal" or "campaign" => Array.Empty<CreatorPublicationProjection>(),
+            _ => items
+        };
+
+    private static IReadOnlyDictionary<string, int> BuildArtifactShelfViewCounts(
+        IReadOnlyList<RecapShelfEntry> signedInArtifactShelf,
+        IReadOnlyList<CreatorPublicationProjection> creatorPublications,
+        IReadOnlyList<ResolvedPublicCardViewModel> guestCards,
+        IReadOnlyList<CreatorPublicationProjection> publicCreatorPublications,
+        bool signedIn)
+    {
+        if (!signedIn)
+        {
+            int guestVisibleCount = guestCards.Count + publicCreatorPublications.Count;
+            return new Dictionary<string, int>(StringComparer.Ordinal)
+            {
+                ["all"] = guestVisibleCount,
+                ["personal"] = 0,
+                ["campaign"] = 0,
+                ["creator"] = publicCreatorPublications.Count,
+                ["public"] = guestVisibleCount
+            };
+        }
+
+        int guestAllCount = FilterGuestArtifactShelfCards(guestCards, "all").Count
+            + FilterGuestArtifactShelfPublications(publicCreatorPublications, "all").Count;
+        int guestCreatorCount = FilterGuestArtifactShelfPublications(publicCreatorPublications, "creator").Count;
+        int guestPublicCount = FilterGuestArtifactShelfCards(guestCards, "public").Count
+            + FilterGuestArtifactShelfPublications(publicCreatorPublications, "public").Count;
+        int allCount = signedInArtifactShelf.Count + creatorPublications.Count + guestAllCount;
+        int personalCount = FilterSignedInArtifactShelfEntries(signedInArtifactShelf, "personal").Count;
+        int campaignCount = FilterSignedInArtifactShelfEntries(signedInArtifactShelf, "campaign").Count;
+        int creatorCount = FilterSignedInArtifactShelfEntries(signedInArtifactShelf, "creator").Count
+            + creatorPublications.Count
+            + guestCreatorCount;
+        int publicCount = FilterSignedInCreatorPublications(creatorPublications, "public").Count + guestPublicCount;
+        return new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["all"] = allCount,
+            ["personal"] = personalCount,
+            ["campaign"] = campaignCount,
+            ["creator"] = creatorCount,
+            ["public"] = publicCount
+        };
+    }
+
+    private static object BuildArtifactShelfViewPayload(string view, IReadOnlyDictionary<string, int> viewCounts)
+        => new
+        {
+            view,
+            title = view switch
+            {
+                "personal" => "Personal view",
+                "campaign" => "Campaign view",
+                "creator" => "Creator view",
+                "public" => "Public view",
+                _ => "All views"
+            },
+            summary = ArtifactViewSummaryForApi(view),
+            itemCount = viewCounts.TryGetValue(view, out int count) ? count : 0
+        };
+
+    private static object BuildArtifactShelfRetentionPayload(PrivacyBoundaryPanelViewModel retention)
+        => new
+        {
+            heading = retention.Heading,
+            summary = retention.Summary,
+            domains = retention.Domains.Select(domain => new
+            {
+                id = NormalizeRetentionDomainId(domain.Label),
+                domain.Label,
+                domain.Owner,
+                domain.RetentionSummary,
+                domain.RedactionSummary
+            })
+        };
+
+    private static string BuildArtifactShelfRetentionSummary(PrivacyBoundaryPanelViewModel retention, string domainId)
+    {
+        PrivacyBoundaryDomainViewModel? domain = retention.Domains.FirstOrDefault(item =>
+            string.Equals(NormalizeRetentionDomainId(item.Label), domainId, StringComparison.Ordinal));
+        return domain?.RetentionSummary ?? retention.Summary;
+    }
+
+    private static string NormalizeRetentionDomainId(string label)
+        => label.Trim().ToLowerInvariant().Replace(" ", "_");
+
+    private static object BuildArtifactShelfCardPayload(
+        ResolvedPublicCardViewModel card,
+        string locale,
+        string retentionSummary)
+        => new
+        {
+            id = card.Card.Id,
+            title = card.Card.Title,
+            summary = card.Card.Summary,
+            caption = string.IsNullOrWhiteSpace(card.Asset?.Caption) ? card.Card.Title : card.Asset.Caption,
+            audience = SplitAudience(card.Card.Audience),
+            audienceLabel = PublicSurfaceStatus.AudienceLabel(card.Card.Audience),
+            locale,
+            retentionSummary,
+            previewState = PublicSurfaceStatus.IsAvailableToday(card.Card.Badge) ? "available_today" : "preview_in_progress",
+            publicationState = BuildArtifactCardPublicationState(card.Card),
+            proof = string.IsNullOrWhiteSpace(card.Card.ProofNote) ? card.Card.Payoff : card.Card.ProofNote,
+            detailHref = card.Action.Href,
+            detailLabel = card.Action.Label,
+            siblingPackets = Array.Empty<object>()
+        };
+
+    private static object BuildArtifactShelfRecapPayload(
+        RecapShelfEntry item,
+        IReadOnlyList<CreatorPublicationProjection> creatorPublications,
+        string locale,
+        string retentionSummary)
+    {
+        CreatorPublicationProjection? linkedPublication = string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+            ? null
+            : creatorPublications.FirstOrDefault(publication =>
+                string.Equals(publication.PublicationId, item.CreatorPublicationId, StringComparison.OrdinalIgnoreCase));
+        return new
+        {
+            id = item.EntryId,
+            kind = item.Kind,
+            title = item.Label,
+            item.Summary,
+            caption = BuildArtifactRecapCaption(item),
+            artifactId = item.ArtifactId,
+            audience = SplitAudience(item.Audience),
+            audienceLabel = PublicSurfaceStatus.AudienceLabel(item.Audience),
+            locale,
+            retentionSummary,
+            previewState = BuildArtifactPreviewState(item.PublicationState, item.Discoverable),
+            proof = BuildArtifactProofSummary(item.ProvenanceSummary, item.AuditSummary, item.PublicationSummary),
+            publicationState = item.PublicationState,
+            trustBand = item.TrustBand,
+            discoverable = item.Discoverable,
+            creatorPublicationId = item.CreatorPublicationId,
+            publicationHref = string.IsNullOrWhiteSpace(item.CreatorPublicationId)
+                ? null
+                : CreatorPublicationHrefForApi(linkedPublication, item.CreatorPublicationId!),
+            siblingPackets = BuildCreatorSiblingPackets(linkedPublication, creatorPublications),
+            ownershipSummary = item.OwnershipSummary,
+            provenanceSummary = item.ProvenanceSummary,
+            auditSummary = item.AuditSummary,
+            publicationSummary = item.PublicationSummary,
+            lineageSummary = item.LineageSummary,
+            nextSafeAction = item.NextSafeAction,
+            updatedAtUtc = item.UpdatedAtUtc
+        };
+    }
+
+    private static object BuildArtifactShelfCreatorPublicationPayload(
+        CreatorPublicationProjection publication,
+        IReadOnlyList<CreatorPublicationProjection> publications,
+        string locale,
+        string retentionSummary,
+        bool publicOnly)
+    {
+        string[] audience = publicOnly
+            ? ["public"]
+            : ["creator", publication.Discoverable ? "public" : "signed_in"];
+        return new
+        {
+            id = publication.PublicationId,
+            kind = publication.Kind,
+            title = publication.Title,
+            publication.Summary,
+            caption = BuildCreatorPublicationCaption(publication, publicOnly),
+            audience,
+            audienceLabel = PublicSurfaceStatus.AudienceLabel(string.Join(",", audience)),
+            locale,
+            retentionSummary,
+            previewState = BuildArtifactPreviewState(publication.PublicationStatus, publication.Discoverable),
+            proof = BuildArtifactProofSummary(publication.ProvenanceSummary, publication.TrustSummary, publication.ModerationSummary),
+            publicationState = publication.PublicationStatus,
+            visibility = publication.Visibility,
+            trustBand = publication.TrustBand,
+            discoverable = publication.Discoverable,
+            detailHref = $"/artifacts/publications/{Uri.EscapeDataString(publication.PublicationId)}",
+            siblingPackets = BuildCreatorSiblingPackets(publication, publications),
+            provenanceSummary = publication.ProvenanceSummary,
+            discoverySummary = publication.DiscoverySummary,
+            comparisonSummary = publication.ComparisonSummary,
+            lineageSummary = publication.LineageSummary,
+            moderationSummary = publication.ModerationSummary,
+            campaignReturnSummary = publication.CampaignReturnSummary,
+            supportClosureSummary = publication.SupportClosureSummary,
+            nextSafeAction = publication.NextSafeAction,
+            updatedAtUtc = publication.UpdatedAtUtc
+        };
+    }
+
+    private static string BuildArtifactRecapCaption(RecapShelfEntry item)
+        => item.Kind.Trim().ToLowerInvariant() switch
+        {
+            "dossier_projection" => "Signed-in personal dossier packet",
+            var kind when kind.Contains("replay", StringComparison.Ordinal) => "Signed-in replay packet",
+            var kind when kind.Contains("downtime", StringComparison.Ordinal) => "Signed-in downtime packet",
+            var kind when kind.Contains("aftermath", StringComparison.Ordinal) => "Signed-in aftermath packet",
+            _ => "Signed-in return shelf packet"
+        };
+
+    private static string BuildCreatorPublicationCaption(CreatorPublicationProjection publication, bool publicOnly)
+        => publicOnly
+            ? "Published shared-publication packet"
+            : string.Equals(publication.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
+                ? "Creator packet already widened onto the public rail"
+                : "Creator packet still moving through governed publication"
+        ;
+
+    private static string BuildArtifactCardPublicationState(PublicFeatureCardDto card)
+        => PublicSurfaceStatus.IsAvailableToday(card.Badge) ? "published" : "preview";
+
+    private static string BuildArtifactPreviewState(string? publicationState, bool discoverable)
+    {
+        string normalized = publicationState?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (normalized is "published" or "ready" or "personal_ready")
+        {
+            return discoverable || normalized == "published" ? "live" : "signed_in_ready";
+        }
+
+        return normalized switch
+        {
+            "approved" => "approved_preview",
+            "review" or "pending_review" => "under_review",
+            "draft" => "draft_preview",
+            _ => discoverable ? "live" : "preview_in_progress"
+        };
+    }
+
+    private static string[] BuildArtifactProofSummary(params string?[] segments)
+        => segments
+            .Where(static item => !string.IsNullOrWhiteSpace(item))
+            .Select(static item => item!.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+    private static string[] SplitAudience(string? audience)
+        => string.IsNullOrWhiteSpace(audience)
+            ? Array.Empty<string>()
+            : audience
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+    private static string CreatorPublicationHrefForApi(CreatorPublicationProjection? publication, string publicationId)
+        => publication is { Discoverable: true }
+            && string.Equals(publication.PublicationStatus, HubPublicationStates.Published, StringComparison.OrdinalIgnoreCase)
+                ? $"/artifacts/publications/{Uri.EscapeDataString(publicationId)}"
+                : $"/account/work/publications/{Uri.EscapeDataString(publicationId)}";
+
+    private static object[] BuildCreatorSiblingPackets(
+        CreatorPublicationProjection? publication,
+        IReadOnlyList<CreatorPublicationProjection> publications)
+    {
+        if (publication is null)
+        {
+            return Array.Empty<object>();
+        }
+
+        return publications
+            .Where(item =>
+                !string.Equals(item.PublicationId, publication.PublicationId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.CampaignId, publication.CampaignId, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(item => RankPublicationSibling(item, publication))
+            .ThenBy(static item => item.Title, StringComparer.OrdinalIgnoreCase)
+            .Take(3)
+            .Select(item => (object)new
+            {
+                id = item.PublicationId,
+                kind = item.Kind,
+                title = item.Title,
+                discoverable = item.Discoverable,
+                publicationState = item.PublicationStatus,
+                detailHref = CreatorPublicationHrefForApi(item, item.PublicationId),
+                detailLabel = string.Equals(
+                    CreatorPublicationHrefForApi(item, item.PublicationId),
+                    $"/artifacts/publications/{Uri.EscapeDataString(item.PublicationId)}",
+                    StringComparison.Ordinal)
+                    ? "Open public publication"
+                    : "Open publication status"
+            })
+            .ToArray();
+    }
+
+    private static int RankPublicationSibling(CreatorPublicationProjection candidate, CreatorPublicationProjection reference)
+    {
+        int sameKindBonus = string.Equals(candidate.Kind, reference.Kind, StringComparison.OrdinalIgnoreCase) ? 2 : 0;
+        int discoverableBonus = candidate.Discoverable ? 1 : 0;
+        return sameKindBonus + discoverableBonus;
+    }
+
     private static string NormalizeHomeSection(string? section)
         => string.IsNullOrWhiteSpace(section)
             ? "overview"
@@ -1813,6 +2684,7 @@ public sealed class PublicLandingController : Controller
             SupportIntake = BuildSupportIntakeModel(
                 authenticated: chrome.Authenticated,
                 submissionNotice: null,
+                manifest,
                 installDefaults,
                 overrides)
         };
@@ -1820,9 +2692,10 @@ public sealed class PublicLandingController : Controller
 
     private PublicTrustPulsePanelViewModel? BuildPublicTrustPulsePanel(
         PublicReleaseManifestDto manifest,
-        ReleaseExperienceViewModel releaseExperience)
+        ReleaseExperienceViewModel releaseExperience,
+        PublicTrustPulseSnapshot? pulse = null)
     {
-        var pulse = _trustPulse.LoadSnapshot();
+        pulse ??= _trustPulse.LoadSnapshot();
         if (pulse is null)
         {
             return null;
@@ -1859,6 +2732,11 @@ public sealed class PublicLandingController : Controller
             microProof.Add($"{historySnapshotCount} measured snapshot(s)");
         }
 
+        if (pulse.MissingDesktopClientCoverage)
+        {
+            microProof.Add("Desktop proof gap: desktop_client");
+        }
+
         if (pulse.ClosureHealthWaitingCount is int closureWaitingCount
             && pulse.ClosureHealthPendingHumanResponseCount is int pendingHumanResponseCount)
         {
@@ -1867,8 +2745,8 @@ public sealed class PublicLandingController : Controller
 
         var rows = new List<PublicTrustPulseRowViewModel>
         {
-            new("Recommended now", BuildTrustPulseRecommendedSummary(manifest, releaseExperience)),
-            new("Who can get it now", BuildTrustPulseAccessSummary(releaseExperience)),
+            new("Recommended now", BuildTrustPulseRecommendedSummary(manifest, releaseExperience, pulse)),
+            new("Who can get it now", BuildTrustPulseAccessSummary(manifest, releaseExperience, pulse)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new("Launch readiness", BuildTrustPulseLaunchReadinessSummary(pulse)),
             new("Provider-route stewardship", BuildProviderRouteStewardshipSummary(pulse)),
@@ -1901,7 +2779,10 @@ public sealed class PublicLandingController : Controller
                 string.IsNullOrWhiteSpace(releaseExperience.GuestGatePrimaryHref)
                     ? "/downloads"
                     : releaseExperience.GuestGatePrimaryHref,
-                "ghost"));
+                "ghost"),
+            MissingDesktopClientCoverage: pulse.MissingDesktopClientCoverage,
+            ParityClaimsReviewRequired: pulse.ParityClaimsReviewRequired,
+            RouteGuardSummary: BuildTrustPulseLaunchReadinessSummary(pulse));
     }
 
     private async Task<SignedInTrustStatusPanelViewModel?> BuildSignedInTrustStatusPanelAsync(
@@ -1930,6 +2811,158 @@ public sealed class PublicLandingController : Controller
         var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
         return _campaignSpine.GetAccountSummary(user, installLinking);
+    }
+
+    private async Task<ParticipatePageViewModel> BuildParticipatePageModel(
+        string title,
+        string description,
+        string currentPath,
+        CancellationToken cancellationToken)
+    {
+        var surface = _landing.LoadSurface();
+        var cards = _landing.CardsForBucket(surface, "participate");
+        var assets = new AssetCatalogViewModel(surface.Assets);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync(title, description, currentPath, cancellationToken);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        var signalLoop = BuildPublicSignalLoopSnapshot(surface, assets, chrome.Authenticated, currentPath);
+        var signalProjection = BuildOptionalSignalProjectionPacket(currentPath);
+        var signalOperations = string.Equals(currentPath, "/feedback", StringComparison.OrdinalIgnoreCase)
+            ? BuildOptionalSignalOperationsPacket()
+            : null;
+
+        return new ParticipatePageViewModel(
+            Chrome: chrome,
+            Surface: surface,
+            Assets: assets,
+            PublicLane: ResolveCards(
+                cards.Where(card =>
+                        !string.Equals(card.Id, "participate_booster", StringComparison.Ordinal)
+                        && !string.Equals(card.Id, "participate_beta", StringComparison.Ordinal))
+                    .ToArray(),
+                assets,
+                authenticated: false,
+                currentPath),
+            SignedInLane: ResolveCards(
+                cards.Where(card =>
+                        string.Equals(card.Id, "participate_booster", StringComparison.Ordinal)
+                        || string.Equals(card.Id, "participate_beta", StringComparison.Ordinal))
+                    .ToArray(),
+                assets,
+                authenticated: chrome.Authenticated,
+                currentPath),
+            SignalLoop: signalLoop,
+            SignalProjection: signalProjection,
+            SignalOperations: signalOperations,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private async Task<NowPageViewModel> BuildNowPageModel(
+        string title,
+        string description,
+        string currentPath,
+        CancellationToken cancellationToken)
+    {
+        var surface = _landing.LoadSurface();
+        var assetCatalog = new AssetCatalogViewModel(surface.Assets);
+        var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var signalLoop = BuildPublicSignalLoopSnapshot(surface, assetCatalog, authenticated, currentPath);
+        var signalProjection = BuildOptionalSignalProjectionPacket(currentPath);
+
+        return new NowPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(title, description, currentPath, cancellationToken),
+            Surface: surface,
+            Assets: assetCatalog,
+            ReleaseExperience: releaseExperience,
+            ProofModules: ResolveCards(_landing.CardsForBucket(surface, "start_here").Take(3).ToArray(), assetCatalog, authenticated: false, currentPath),
+            AvailableToday: ResolveCards(nowCards.Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, currentPath),
+            Inspectable: ResolveCards(nowCards.Where(static card => !PublicSurfaceStatus.IsAvailableToday(card.Badge)).ToArray(), assetCatalog, authenticated: false, currentPath),
+            SignedInPreview: surface.RegisteredOverlays,
+            Manifest: manifest,
+            SignalLoop: signalLoop,
+            SignalProjection: signalProjection,
+            CampaignOsProof: _campaignOsProof.LoadProof(),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private PublicSignalLoopSnapshotViewModel BuildPublicSignalLoopSnapshot(
+        PublicLandingSurfaceDto surface,
+        AssetCatalogViewModel assets,
+        bool authenticated,
+        string currentPath)
+    {
+        var milestones = BuildRoadmapMilestones();
+        var milestoneFollowUp = milestones.Take(3).ToArray();
+        var roadmapCards = _landing.CardsForBucket(surface, "coming_next");
+        var roadmapFollowUp = ResolveCards(
+            roadmapCards.Take(3).ToArray(),
+            assets,
+            authenticated: false,
+            currentPath);
+        var shippedCards = _landing.CardsForBucket(surface, "whats_real_now")
+            .Where(static card => PublicSurfaceStatus.IsAvailableToday(card.Badge))
+            .ToArray();
+        var shippedFollowUp = ResolveCards(
+            shippedCards.Take(3).ToArray(),
+            assets,
+            authenticated: false,
+            currentPath);
+
+        return new PublicSignalLoopSnapshotViewModel(
+            OpenMilestoneCount: milestones.Count,
+            ClaimedMilestoneCount: milestones.Count(static milestone => milestone.Claimed),
+            HighDifficultyMilestoneCount: milestones.Count(static milestone => string.Equals(milestone.DifficultyLabel, "High", StringComparison.OrdinalIgnoreCase)),
+            RoadmapFollowUpCount: roadmapCards.Count,
+            ShippedFollowUpCount: shippedCards.Length,
+            MilestoneFollowUp: milestoneFollowUp,
+            RoadmapFollowUp: roadmapFollowUp,
+            ShippedFollowUp: shippedFollowUp,
+            FollowSettingsHref: authenticated ? "/account/settings" : "/signup?next=%2Faccount%2Fsettings",
+            FollowSettingsLabel: authenticated ? "Open account settings" : "Create account for follow-up");
+    }
+
+    private PublicSignalProjectionPacketViewModel? BuildOptionalSignalProjectionPacket(string currentPath)
+    {
+        try
+        {
+            return _signalProjection.BuildPacket(currentPath);
+        }
+        catch (Exception ex) when (ex is DirectoryNotFoundException or FileNotFoundException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Public signal projection packet could not load for {Path}.", currentPath);
+            return null;
+        }
+    }
+
+    private PublicSignalOperationsPacketViewModel? BuildOptionalSignalOperationsPacket()
+    {
+        try
+        {
+            return _signalOperations.BuildPacket();
+        }
+        catch (Exception ex) when (ex is DirectoryNotFoundException or FileNotFoundException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Public signal operations packet could not load.");
+            return null;
+        }
+    }
+
+    private IReadOnlyList<ProgramMilestoneSummaryViewModel> BuildRoadmapMilestones()
+    {
+        try
+        {
+            return new ProgramMilestoneDigestService(new PublicCanonFileLoader(_configuration)).BuildOpenMilestones();
+        }
+        catch (Exception ex) when (ex is DirectoryNotFoundException or FileNotFoundException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Roadmap page could not load milestone digest.");
+            return Array.Empty<ProgramMilestoneSummaryViewModel>();
+        }
     }
 
     private SupportIntakeOverrides ResolveSupportIntakeOverridesFromQuery()
@@ -2032,6 +3065,7 @@ public sealed class PublicLandingController : Controller
     private static SupportIntakeViewModel BuildSupportIntakeModel(
         bool authenticated,
         string? submissionNotice,
+        PublicReleaseManifestDto manifest,
         SupportIntakeDefaults installDefaults,
         SupportIntakeOverrides overrides)
     {
@@ -2050,9 +3084,7 @@ public sealed class PublicLandingController : Controller
             AccountSupportLabel: authenticated ? "Open tracked support" : "Create account for tracked support",
             InstallAccessHref: installRail.ReturnHref ?? "/account/access",
             InstallAccessLabel: installRail.ReturnLabel ?? "Open Devices and access",
-            ResponseExpectation: authenticated
-                ? "Tracked cases stay visible in Account. When the report is actionable, the next routed update should show up there without sending you into side channels."
-                : "Guest cases should include a reply email. We usually answer preview support within two working days when the report includes a clear reproduction path.",
+            ResponseExpectation: BuildSupportResponseExpectation(authenticated, manifest.SupportabilityState, manifest.SupportabilitySummary),
             SubmissionNotice: submissionNotice,
             AttachmentHelp: "Add screenshots, logs, or a small diagnostic bundle when they make the bug or install problem easier to route.",
             Options:
@@ -2081,6 +3113,36 @@ public sealed class PublicLandingController : Controller
                     installDefaults.ContextHint,
                     overrides.ContextHint
                 }.Where(static item => !string.IsNullOrWhiteSpace(item))));
+    }
+
+    private static string BuildSupportResponseExpectation(
+        bool authenticated,
+        PublicTrustPulsePanelViewModel? pulse)
+        => BuildSupportResponseExpectation(
+            authenticated,
+            pulse?.ParityClaimsReviewRequired == true ? "review_required" : null,
+            pulse?.RouteGuardSummary);
+
+    private static string BuildSupportResponseExpectation(
+        bool authenticated,
+        string? supportabilityState,
+        string? routeGuardSummary)
+    {
+        string baseline = authenticated
+            ? "Tracked cases stay visible in Account. When the report is actionable, the next routed update should show up there without sending you into side channels."
+            : "Guest cases should include a reply email. We usually answer preview support within two working days when the report includes a clear reproduction path.";
+
+        if (!string.Equals(supportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
+        {
+            return baseline;
+        }
+
+        if (string.IsNullOrWhiteSpace(routeGuardSummary))
+        {
+            return $"{baseline} Public parity claims stay review-required until the current desktop proof receipts are green again.";
+        }
+
+        return $"{baseline} {routeGuardSummary}";
     }
 
     private async Task<SupportIntakeDefaults> ResolveSupportIntakeDefaultsAsync(CancellationToken cancellationToken)
@@ -2166,6 +3228,27 @@ public sealed class PublicLandingController : Controller
         return HumanizeToken(channel, "Current preview");
     }
 
+    private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        PublicTrustPulseSnapshot? pulse)
+    {
+        return
+        [
+            new("Live", BuildLiveLaunchSummary(manifest)),
+            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience)),
+            new("Fallback", BuildFallbackLaunchSummary(manifest)),
+            new("Revoked", BuildRevokedLaunchSummary(manifest)),
+            new("Fixed", BuildFixedLaunchSummary(manifest)),
+            new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
+            new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),
+            new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
+            new("Adoption health", pulse is null
+                ? BuildReleaseProofSummary(manifest)
+                : BuildTrustPulseAdoptionSummary(pulse))
+        ];
+    }
+
     private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
     {
         string proof = HumanizeToken(manifest.ProofStatus, "Unknown");
@@ -2181,6 +3264,175 @@ public sealed class PublicLandingController : Controller
 
         return proof;
     }
+
+    private static string BuildLiveLaunchSummary(PublicReleaseManifestDto manifest)
+    {
+        int openPublicCount = manifest.Downloads.Count(static artifact =>
+            !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
+        string shelfSummary = openPublicCount switch
+        {
+            <= 0 => "No open-public artifacts are live on the shelf right now.",
+            1 => "1 open-public artifact is live on the shelf right now.",
+            _ => $"{openPublicCount} open-public artifacts are live on the shelf right now."
+        };
+
+        JsonElement primaryRoute = EnumerateDesktopRouteTruth(manifest)
+            .FirstOrDefault(static route => string.Equals(TryGetJsonString(route, "routeRole"), "primary", StringComparison.OrdinalIgnoreCase));
+
+        string? primaryReason = primaryRoute.ValueKind == JsonValueKind.Object
+            ? FirstNonEmpty(
+                TryGetJsonString(primaryRoute, "installPostureReason"),
+                TryGetJsonString(primaryRoute, "promotionReason"),
+                TryGetJsonString(primaryRoute, "updateEligibilityReason"))
+            : null;
+
+        return string.IsNullOrWhiteSpace(primaryReason)
+            ? shelfSummary
+            : $"{shelfSummary} {primaryReason}";
+    }
+
+    private static string BuildPreviewLaunchSummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience)
+        => $"{HumanizeToken(manifest.RolloutState, "Current preview")} on {releaseExperience.Display.ChannelLabel} {manifest.Version}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+
+    private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
+    {
+        var fallbackRoutes = EnumerateDesktopRouteTruth(manifest)
+            .Where(static route => string.Equals(TryGetJsonString(route, "routeRole"), "fallback", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (fallbackRoutes.Length == 0)
+        {
+            return "No explicit fallback route is mirrored for the current shelf.";
+        }
+
+        string? reason = FirstNonEmpty(
+            TryGetJsonString(fallbackRoutes[0], "rollbackReason"),
+            TryGetJsonString(fallbackRoutes[0], "promotionReason"),
+            TryGetJsonString(fallbackRoutes[0], "updateEligibilityReason"));
+        return string.IsNullOrWhiteSpace(reason)
+            ? $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current shelf."
+            : $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current shelf. {reason}";
+    }
+
+    private static string BuildRevokedLaunchSummary(PublicReleaseManifestDto manifest)
+    {
+        var routeRows = EnumerateDesktopRouteTruth(manifest);
+        var revokedRoutes = routeRows
+            .Where(static route => string.Equals(TryGetJsonString(route, "revokeState"), "revoked", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (revokedRoutes.Length == 0)
+        {
+            return routeRows.Count == 0
+                ? "No desktop route revoke truth is mirrored for the current shelf."
+                : $"No registry revoke markers are active across {routeRows.Count} tracked desktop route(s).";
+        }
+
+        string? reason = FirstNonEmpty(
+            TryGetJsonString(revokedRoutes[0], "revokeReason"),
+            TryGetJsonString(revokedRoutes[0], "installPostureReason"));
+        return string.IsNullOrWhiteSpace(reason)
+            ? $"{revokedRoutes.Length} desktop route(s) are currently revoked."
+            : $"{revokedRoutes.Length} desktop route(s) are currently revoked. {reason}";
+    }
+
+    private static string BuildFixedLaunchSummary(PublicReleaseManifestDto manifest)
+        => !string.IsNullOrWhiteSpace(manifest.FixAvailabilitySummary)
+            ? manifest.FixAvailabilitySummary!
+            : !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
+                ? manifest.SupportabilitySummary!
+                : "No fixed-release follow-through note is published for the current shelf.";
+
+    private static string BuildBlockedLaunchSummary(
+        PublicReleaseManifestDto manifest,
+        PublicTrustPulseSnapshot? pulse)
+    {
+        int blockedRouteCount = EnumerateDesktopRouteTruth(manifest).Count(static route =>
+            IsBlockedStatus(TryGetJsonString(route, "updateEligibility"))
+            || IsBlockedStatus(TryGetJsonString(route, "promotionState"))
+            || IsBlockedStatus(TryGetJsonString(route, "installPosture")));
+        int blockedJourneyCount = pulse?.BlockedJourneyCount ?? 0;
+        if (blockedRouteCount == 0 && blockedJourneyCount == 0)
+        {
+            return "No blocked public route or journey is mirrored right now.";
+        }
+
+        var segments = new List<string>(2);
+        if (blockedRouteCount > 0)
+        {
+            segments.Add($"{blockedRouteCount} desktop route(s) are blocked or still proof-gated");
+        }
+
+        if (blockedJourneyCount > 0)
+        {
+            segments.Add($"{blockedJourneyCount} golden journey(s) remain blocked");
+        }
+
+        return string.Join("; ", segments) + ".";
+    }
+
+    private static string BuildProofFreshnessSummary(
+        PublicReleaseManifestDto manifest,
+        PublicTrustPulseSnapshot? pulse)
+    {
+        string manifestStamp = manifest.GeneratedAt is DateTimeOffset generatedAt
+            ? $"Manifest {generatedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC"
+            : $"Manifest published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC";
+        string proofStamp = manifest.ProofGeneratedAt is DateTimeOffset proofGeneratedAt
+            ? $"release proof {proofGeneratedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC ({HumanizeToken(manifest.ProofStatus, "unknown")})"
+            : $"release proof {HumanizeToken(manifest.ProofStatus, "not mirrored").ToLowerInvariant()}";
+        string pulseStamp = string.IsNullOrWhiteSpace(pulse?.AsOf)
+            ? "weekly pulse not mirrored"
+            : $"weekly pulse as of {pulse.AsOf}";
+        return $"{manifestStamp}; {proofStamp}; {pulseStamp}.";
+    }
+
+    private static string BuildSupportPulseSummary(
+        PublicReleaseManifestDto manifest,
+        PublicTrustPulseSnapshot? pulse)
+        => pulse is not null
+            ? BuildTrustPulseClosureHealthSummary(pulse)
+            : !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
+                ? manifest.SupportabilitySummary!
+                : "Support closure posture is not mirrored yet.";
+
+    private static bool IsBlockedStatus(string? value)
+    {
+        string normalized = value?.Trim() ?? string.Empty;
+        return normalized.StartsWith("blocked", StringComparison.OrdinalIgnoreCase)
+               || normalized.EndsWith("_required", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(normalized, "proof_required", StringComparison.OrdinalIgnoreCase)
+               || string.Equals(normalized, "fallback_not_promoted", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static List<JsonElement> EnumerateDesktopRouteTruth(PublicReleaseManifestDto manifest)
+    {
+        var rows = new List<JsonElement>();
+        if (manifest.DesktopTupleCoverage is not JsonElement coverage
+            || coverage.ValueKind != JsonValueKind.Object
+            || !coverage.TryGetProperty("desktopRouteTruth", out JsonElement routeTruth)
+            || routeTruth.ValueKind != JsonValueKind.Array)
+        {
+            return rows;
+        }
+
+        foreach (JsonElement route in routeTruth.EnumerateArray())
+        {
+            rows.Add(route.Clone());
+        }
+
+        return rows;
+    }
+
+    private static string? TryGetJsonString(JsonElement element, string propertyName)
+        => element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out JsonElement value)
+            && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
+    private static string? FirstNonEmpty(params string?[] values)
+        => values.FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
 
     private static string BuildSignedInInstallRecommendationSummary(
         PublicReleaseManifestDto manifest,
@@ -2501,7 +3753,8 @@ public sealed class PublicLandingController : Controller
 
     private static string BuildTrustPulseRecommendedSummary(
         PublicReleaseManifestDto manifest,
-        ReleaseExperienceViewModel releaseExperience)
+        ReleaseExperienceViewModel releaseExperience,
+        PublicTrustPulseSnapshot pulse)
     {
         if (manifest.Downloads.Count == 0 || releaseExperience.Recommended is null)
         {
@@ -2510,17 +3763,34 @@ public sealed class PublicLandingController : Controller
                 : manifest.Message;
         }
 
+        if (pulse.MissingDesktopClientCoverage || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
+        {
+            return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
+                ? "Signed-in handoff remains the safest route while desktop proof receipts stay review-required."
+                : "The current shelf is still installable, but keep parity-sensitive installs on the review-required lane until current desktop proof receipts are green.";
+        }
+
         string accessSummary = releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
             ? "Signed-in handoff is the recommended path so the install can stay linked."
             : "Guest-readable handoff is live on the current shelf, and Signed-in handoff keeps the install linked once you want account-aware follow-through.";
         return $"{releaseExperience.Recommended.Title} on {releaseExperience.Display.ChannelLabel}. {accessSummary}";
     }
 
-    private static string BuildTrustPulseAccessSummary(ReleaseExperienceViewModel releaseExperience)
+    private static string BuildTrustPulseAccessSummary(
+        PublicReleaseManifestDto manifest,
+        ReleaseExperienceViewModel releaseExperience,
+        PublicTrustPulseSnapshot pulse)
     {
         if (releaseExperience.Recommended is null)
         {
             return "No release handoff is published yet.";
+        }
+
+        if (pulse.MissingDesktopClientCoverage || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
+        {
+            return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
+                ? "Signed-in handoff stays preferred while desktop proof receipts are still review-required."
+                : "Guest and signed-in handoffs are both visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
@@ -2549,6 +3819,11 @@ public sealed class PublicLandingController : Controller
     private static string BuildTrustPulseCautionSummary(PublicTrustPulseSnapshot pulse)
     {
         List<string> segments = [];
+
+        if (pulse.MissingDesktopClientCoverage && !string.IsNullOrWhiteSpace(pulse.FlagshipReadinessReason))
+        {
+            segments.Add($"Desktop flagship proof still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
+        }
 
         if (!string.IsNullOrWhiteSpace(pulse.LongestPoleLabel))
         {
@@ -2579,6 +3854,11 @@ public sealed class PublicLandingController : Controller
 
     private static string BuildTrustPulseLaunchReadinessSummary(PublicTrustPulseSnapshot pulse)
     {
+        if (pulse.MissingDesktopClientCoverage && !string.IsNullOrWhiteSpace(pulse.FlagshipReadinessReason))
+        {
+            return $"Hold parity claims on public routes and support surfaces because {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.";
+        }
+
         if (!string.IsNullOrWhiteSpace(pulse.LaunchReadiness))
         {
             return pulse.LaunchReadiness!;
@@ -2653,6 +3933,11 @@ public sealed class PublicLandingController : Controller
             segments.Add(historySnapshotCount < 6
                 ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."
                 : $"{historySnapshotCount} weekly snapshots are on record for the current public trust posture.");
+        }
+
+        if (pulse.MissingDesktopClientCoverage && !string.IsNullOrWhiteSpace(pulse.FlagshipReadinessReason))
+        {
+            segments.Add($"Flagship desktop proof still needs closure: {pulse.FlagshipReadinessReason!.Trim().TrimEnd('.')}.");
         }
 
         return segments.Count == 0
@@ -2765,6 +4050,64 @@ public sealed class PublicLandingController : Controller
         => string.IsNullOrWhiteSpace(value)
             ? fallback
             : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+
+    private static PublicRouteReceiptViewModel? BuildRouteReceiptPayload(LocalProofReceiptMatch? routeReceipt)
+        => routeReceipt is null
+            ? null
+            : new PublicRouteReceiptViewModel(
+                routeReceipt.ReceiptId,
+                routeReceipt.PackageId,
+                routeReceipt.MatchedRoute,
+                routeReceipt.MatchMode,
+                routeReceipt.Summary);
+
+    private RouteClaimStatus ResolvePublicRouteClaimStatus(
+        LocalReleaseProofLookupResult routeLookup,
+        string passingState,
+        string missingReceiptReason)
+    {
+        if (!string.IsNullOrWhiteSpace(routeLookup.CurrentnessFailureReason))
+        {
+            return new RouteClaimStatus(
+                "bounded_failure",
+                $"Parity claims stay review-required because {routeLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')}.");
+        }
+
+        LocalProofReceiptMatch? routeReceipt = routeLookup.ReceiptMatch;
+        if (routeReceipt is null)
+        {
+            return new RouteClaimStatus("bounded_failure", missingReceiptReason);
+        }
+
+        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        if (readiness?.MissingDesktopClientCoverage == true)
+        {
+            string reviewRequiredReason = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
+            return new RouteClaimStatus(
+                "bounded_failure",
+                $"Current direct route receipt is attached, but parity claims stay review-required because {reviewRequiredReason}.");
+        }
+
+        ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+        if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
+        {
+            return new RouteClaimStatus(
+                "bounded_failure",
+                $"Current direct route receipt is attached, but parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
+        }
+
+        return new RouteClaimStatus(passingState, null);
+    }
+
+    private LocalReleaseProofLookupResult FindLocalReleaseProofReceipt(params string?[] routeCandidates)
+        => _localReleaseProof.FindReceipt(routeCandidates);
+
+    private sealed record RouteClaimStatus(
+        string State,
+        string? BoundedFailureReason)
+    {
+        public bool Blocked => string.Equals(State, "bounded_failure", StringComparison.OrdinalIgnoreCase);
+    }
 
     private sealed record SupportIntakeDefaults(
         string? Platform,

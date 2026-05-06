@@ -3,6 +3,8 @@
     ViewData["Title"] = "What Works Today";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-now";
+    var productliftAlias = Context?.Request?.Query["productlift"].ToString() ?? string.Empty;
+    var fromChangelogAlias = string.Equals(productliftAlias, "changelog", StringComparison.OrdinalIgnoreCase);
     static string NormalizeRoute(string href)
     {
         var trimmed = (href ?? string.Empty).Trim();
@@ -46,11 +48,29 @@
     }
 }
 
-<section class="evidence-header">
+<section class="evidence-header route-anchor-target" id="productlift-shipped-closeout">
     <div class="page-lead">
         <p class="eyebrow">What works today</p>
         <h1 class="page-title">What works today and what still needs caution</h1>
         <p class="page-copy">Use this page to decide whether to install now, wait, or read one more detail first.</p>
+        @if (fromChangelogAlias)
+        {
+            <div class="route-callout" role="status" aria-live="polite">
+                <h3>You followed a legacy shipped handoff</h3>
+                <p>The dedicated shipped-closeout rail now lives on <code class="mono-receipt">/changelog</code>. This page stays the broader reality check for what works today, what still needs caution, and whether a device should move now.</p>
+                <div class="route-callout__proof">
+                    <span>User-available</span>
+                    <span>Release-linked</span>
+                    <span>Broader install reality</span>
+                </div>
+                <div class="route-callout__actions">
+                    <a class="inline-link" href="/changelog">Open shipped closeout</a>
+                    <a class="inline-link" href="/feedback">Open Fixer Board</a>
+                    <a class="inline-link" href="/horizons">Open horizons</a>
+                    <a class="inline-link" href="/help">Open help</a>
+                </div>
+            </div>
+        }
     </div>
     <div class="evidence-header__stats">
         <div>
@@ -66,6 +86,27 @@
             <strong>@Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd")</strong>
         </div>
     </div>
+</section>
+
+<section class="status-decision-strip" aria-label="Install decision lanes">
+    <article class="status-decision-strip__card">
+        <span class="tag">Install now</span>
+        <h2>The current preview is real enough to start from the public shelf.</h2>
+        <p>Use Downloads when you want the recommended build, current package posture, and the calmest first-run path for this device.</p>
+        <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Inspect first</span>
+        <h2>Proof should answer the normal trust questions quickly.</h2>
+        <p>Read the core proof cards below when you need one concrete result, one visible trail, and one current caution before you commit a device.</p>
+        <a class="button-like button-like--ghost" href="#productlift-shipped-closeout">Stay on this page</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag tag--amber">Need caution</span>
+        <h2>Known issues, install help, and support stay close to the release rail.</h2>
+        <p>Wait, route around, or ask for help from the same first-party surfaces instead of reverse-engineering the repo or the public signal lane.</p>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
+    </article>
 </section>
 
 <section class="evidence-wall">
