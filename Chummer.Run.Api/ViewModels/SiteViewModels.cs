@@ -617,6 +617,10 @@ public sealed record PublicSignalRoutingReceiptViewModel(
     string StatusLabel,
     string TargetPath,
     string Summary,
+    string SourceHotFilterKey,
+    string SourceHotFilterLabel,
+    int SourceHotFilterCount,
+    string SourceHotFilterSummary,
     DateTimeOffset RecordedAtUtc);
 
 public sealed record PublicSignalCloseoutDeliveryReceiptViewModel(
@@ -633,6 +637,10 @@ public sealed record PublicSignalCloseoutDeliveryReceiptViewModel(
     string Summary,
     bool VoterNotificationAllowed,
     bool PublicClaimAllowed,
+    string SourceHotFilterKey,
+    string SourceHotFilterLabel,
+    int SourceHotFilterCount,
+    string SourceHotFilterSummary,
     DateTimeOffset RecordedAtUtc);
 
 public sealed record PublicSignalCloseoutQueueReceiptViewModel(
@@ -651,6 +659,10 @@ public sealed record PublicSignalCloseoutQueueReceiptViewModel(
     string Summary,
     bool ReadyForOutbox,
     bool PublicClaimAllowed,
+    string SourceHotFilterKey,
+    string SourceHotFilterLabel,
+    int SourceHotFilterCount,
+    string SourceHotFilterSummary,
     DateTimeOffset RecordedAtUtc);
 
 public sealed record PublicSignalCloseoutDispatchReceiptViewModel(
@@ -692,6 +704,10 @@ public sealed record PublicSignalJourneyReceiptViewModel(
     int SentCount,
     string Summary,
     bool PublicClaimAllowed,
+    string SourceHotFilterKey,
+    string SourceHotFilterLabel,
+    int SourceHotFilterCount,
+    string SourceHotFilterSummary,
     DateTimeOffset RecordedAtUtc);
 
 public sealed record PublicSignalDeliveryOutcomeReceiptViewModel(

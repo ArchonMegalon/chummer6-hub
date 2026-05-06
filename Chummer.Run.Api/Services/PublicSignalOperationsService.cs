@@ -2127,9 +2127,22 @@ public sealed class PublicSignalOperationsService
     }
 
     private SourceHotFilterSummary ResolveSourceHotFilter(ProductLiftWebhookReceiptState sourceReceipt)
+        => ResolveSourceHotFilter(sourceReceipt.ReceiptId);
+
+    private SourceHotFilterSummary ResolveSourceHotFilter(string sourceReceiptId)
     {
+        string? normalizedSourceReceiptId = NormalizeOptional(sourceReceiptId);
+        if (normalizedSourceReceiptId is null)
+        {
+            return new SourceHotFilterSummary(
+                FilterKey: "all",
+                FilterLabel: ResolveDetailFilterLabel("all"),
+                Count: 0,
+                Summary: "No bounded recipient threads exist under this source receipt yet.");
+        }
+
         ProductLiftCloseoutDispatchReceiptState[] dispatchStates = _dispatchReceipts
-            .Where(receipt => string.Equals(receipt.SourceReceiptId, sourceReceipt.ReceiptId, StringComparison.OrdinalIgnoreCase))
+            .Where(receipt => string.Equals(receipt.SourceReceiptId, normalizedSourceReceiptId, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         if (dispatchStates.Length == 0)
         {
@@ -2141,7 +2154,7 @@ public sealed class PublicSignalOperationsService
         }
 
         HashSet<string> dispatchReceiptIdsWithOutcomes = _deliveryOutcomeReceipts
-            .Where(receipt => string.Equals(receipt.SourceReceiptId, sourceReceipt.ReceiptId, StringComparison.OrdinalIgnoreCase))
+            .Where(receipt => string.Equals(receipt.SourceReceiptId, normalizedSourceReceiptId, StringComparison.OrdinalIgnoreCase))
             .Select(static receipt => receipt.DispatchReceiptId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -2366,18 +2379,27 @@ public sealed class PublicSignalOperationsService
             ProviderOccurredAtUtc: receipt.ProviderOccurredAtUtc);
     }
 
-    private static PublicSignalRoutingReceiptViewModel BuildRoutingReceiptViewModel(ProductLiftRoutingReceiptState receipt)
-        => new(
+    private PublicSignalRoutingReceiptViewModel BuildRoutingReceiptViewModel(ProductLiftRoutingReceiptState receipt)
+    {
+        SourceHotFilterSummary hotFilter = ResolveSourceHotFilter(receipt.SourceReceiptId);
+        return new(
             ReceiptId: receipt.ReceiptId,
             SourceReceiptId: receipt.SourceReceiptId,
             RouteKind: receipt.RouteKind,
             StatusLabel: receipt.StatusLabel,
             TargetPath: receipt.TargetPath,
             Summary: receipt.Summary,
+            SourceHotFilterKey: hotFilter.FilterKey,
+            SourceHotFilterLabel: hotFilter.FilterLabel,
+            SourceHotFilterCount: hotFilter.Count,
+            SourceHotFilterSummary: hotFilter.Summary,
             RecordedAtUtc: receipt.RecordedAtUtc);
+    }
 
-    private static PublicSignalCloseoutDeliveryReceiptViewModel BuildCloseoutDeliveryReceiptViewModel(ProductLiftCloseoutDeliveryReceiptState receipt)
-        => new(
+    private PublicSignalCloseoutDeliveryReceiptViewModel BuildCloseoutDeliveryReceiptViewModel(ProductLiftCloseoutDeliveryReceiptState receipt)
+    {
+        SourceHotFilterSummary hotFilter = ResolveSourceHotFilter(receipt.SourceReceiptId);
+        return new(
             ReceiptId: receipt.ReceiptId,
             SourceReceiptId: receipt.SourceReceiptId,
             StatusLabel: receipt.StatusLabel,
@@ -2391,7 +2413,12 @@ public sealed class PublicSignalOperationsService
             Summary: receipt.Summary,
             VoterNotificationAllowed: receipt.VoterNotificationAllowed,
             PublicClaimAllowed: receipt.PublicClaimAllowed,
+            SourceHotFilterKey: hotFilter.FilterKey,
+            SourceHotFilterLabel: hotFilter.FilterLabel,
+            SourceHotFilterCount: hotFilter.Count,
+            SourceHotFilterSummary: hotFilter.Summary,
             RecordedAtUtc: receipt.RecordedAtUtc);
+    }
 
     private static PublicSignalCloseoutDispatchReceiptViewModel BuildDispatchReceiptViewModel(ProductLiftCloseoutDispatchReceiptState receipt)
         => new(
@@ -2422,8 +2449,10 @@ public sealed class PublicSignalOperationsService
             AcceptedAtUtc: receipt.AcceptedAtUtc,
             LastRecoveryAtUtc: receipt.LastRecoveryAtUtc);
 
-    private static PublicSignalJourneyReceiptViewModel BuildJourneyReceiptViewModel(ProductLiftJourneyReceiptState receipt)
-        => new(
+    private PublicSignalJourneyReceiptViewModel BuildJourneyReceiptViewModel(ProductLiftJourneyReceiptState receipt)
+    {
+        SourceHotFilterSummary hotFilter = ResolveSourceHotFilter(receipt.SourceReceiptId);
+        return new(
             ReceiptId: receipt.ReceiptId,
             SourceReceiptId: receipt.SourceReceiptId,
             EventKey: receipt.EventKey,
@@ -2434,7 +2463,12 @@ public sealed class PublicSignalOperationsService
             SentCount: receipt.SentCount,
             Summary: receipt.Summary,
             PublicClaimAllowed: receipt.PublicClaimAllowed,
+            SourceHotFilterKey: hotFilter.FilterKey,
+            SourceHotFilterLabel: hotFilter.FilterLabel,
+            SourceHotFilterCount: hotFilter.Count,
+            SourceHotFilterSummary: hotFilter.Summary,
             RecordedAtUtc: receipt.RecordedAtUtc);
+    }
 
     private static PublicSignalDeliveryOutcomeReceiptViewModel BuildDeliveryOutcomeReceiptViewModel(ProductLiftDeliveryOutcomeReceiptState receipt)
         => new(
@@ -3058,6 +3092,7 @@ public sealed class PublicSignalOperationsService
         OperationsCanonDocument canonDocument,
         CloseoutRuntimeReadiness readiness)
     {
+        SourceHotFilterSummary hotFilter = ResolveSourceHotFilter(sourceReceipt);
         bool deliveryAdapterConfigured = HasCloseoutDeliveryAdapterConfigured();
         bool readyForOutbox = canonDocument.CloseoutFamilyReady
             && sourceReceipt.VoterNotificationAllowed
@@ -3097,6 +3132,10 @@ public sealed class PublicSignalOperationsService
             Summary: BuildCloseoutQueueSummary(sourceReceipt, readiness, readyForOutbox),
             ReadyForOutbox: readyForOutbox,
             PublicClaimAllowed: false,
+            SourceHotFilterKey: hotFilter.FilterKey,
+            SourceHotFilterLabel: hotFilter.FilterLabel,
+            SourceHotFilterCount: hotFilter.Count,
+            SourceHotFilterSummary: hotFilter.Summary,
             RecordedAtUtc: sourceReceipt.ReceivedAtUtc);
     }
 
