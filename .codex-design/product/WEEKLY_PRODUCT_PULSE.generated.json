@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-05-07T15:19:25Z",
+  "generated_at": "2026-05-07T19:22:25Z",
   "as_of": "2026-05-07",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
@@ -98,10 +98,10 @@
     {
       "decision_id": "2026-05-07-focus-next-12-biggest-wins",
       "action": "focus_shift",
-      "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 99% overall progress in 'Public-fit polish', history depth has reached 23 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
+      "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 99% overall progress in 'Public-fit polish', history depth has reached 24 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
       "cited_signals": [
         "overall_progress_percent=99",
-        "history_snapshot_count=23",
+        "history_snapshot_count=24",
         "oldest_blocker_days=0",
         "phase_label=Public-fit polish",
         "longest_pole=Core Engine",
@@ -192,10 +192,10 @@
       {
         "decision_id": "2026-05-07-focus-next-12-biggest-wins",
         "action": "focus_shift",
-        "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 99% overall progress in 'Public-fit polish', history depth has reached 23 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
+        "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 99% overall progress in 'Public-fit polish', history depth has reached 24 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
         "cited_signals": [
           "overall_progress_percent=99",
-          "history_snapshot_count=23",
+          "history_snapshot_count=24",
           "oldest_blocker_days=0",
           "phase_label=Public-fit polish",
           "longest_pole=Core Engine",
@@ -227,7 +227,7 @@
     "current_recommended_wave": "Next 12 Biggest Wins",
     "overall_progress_percent": 99,
     "phase_label": "Public-fit polish",
-    "history_snapshot_count": 23,
+    "history_snapshot_count": 24,
     "longest_pole": "Core Engine",
     "launch_readiness": "Launch posture is still waiting on provider-route evidence.",
     "provider_route_stewardship": {
@@ -281,22 +281,18 @@
       "local_release_proof_status": "passed",
       "proven_journey_count": 5,
       "proven_route_count": 10,
-      "history_snapshot_count": 23,
-      "summary": "Current local edge proof passed. 5 journey proofs and 10 trust routes are on record. 23 weekly snapshots are on record for the current public trust posture."
+      "history_snapshot_count": 24,
+      "summary": "Current local edge proof passed. 5 journey proofs and 10 trust routes are on record. 24 weekly snapshots are on record for the current public trust posture."
     },
     "progress_trend": {
       "state": "steady",
       "direction": "flat",
       "delta_percent": 0,
-      "from_as_of": "2026-05-05",
-      "to_as_of": "2026-05-06",
-      "summary": "Flat trend 0% from 2026-05-05 to 2026-05-06. Trend window: 2026-04-16 100% -> 2026-04-23 100% -> 2026-04-25 100% -> 2026-04-26 100% -> 2026-05-01 99% -> 2026-05-02 99% -> 2026-05-05 99% -> 2026-05-06 99%.",
+      "from_as_of": "2026-05-06",
+      "to_as_of": "2026-05-07",
+      "summary": "Flat trend 0% from 2026-05-06 to 2026-05-07. Trend window: 2026-04-23 100% -> 2026-04-25 100% -> 2026-04-26 100% -> 2026-05-01 99% -> 2026-05-02 99% -> 2026-05-05 99% -> 2026-05-06 99% -> 2026-05-07 99%.",
       "sample_count": 8,
       "samples": [
-        {
-          "as_of": "2026-04-16",
-          "overall_progress_percent": 100
-        },
         {
           "as_of": "2026-04-23",
           "overall_progress_percent": 100
@@ -323,6 +319,10 @@
         },
         {
           "as_of": "2026-05-06",
+          "overall_progress_percent": 99
+        },
+        {
+          "as_of": "2026-05-07",
           "overall_progress_percent": 99
         }
       ]
