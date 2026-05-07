@@ -11,20 +11,36 @@
 
 ## Current hosted routes
 
+Front-door and proof rails:
+
 - `/`
 - `/what-is-chummer`
 - `/now`
-- `/horizons`
 - `/downloads`
+- `/status`
+- `/progress`
+- `/artifacts`
+
+Direction, signal, and shipped-closeout rails:
+
+- `/horizons` for the deeper readiness shelf
+- `/roadmap` for milestone-backed public direction
+- `/feedback` for safe public signal and votes
+- `/changelog` for shipped closeout
+- `/participate`
+- `/participate/karma-forge`
+- `/participate/karma-forge/submitted/{submissionId}`
+- `/feedback/operations`
+- `/feedback/operations/lookup`
+
+Help, policy, and signed-in overlays:
+
 - `/help`
 - `/faq`
 - `/privacy`
 - `/terms`
 - `/contact`
-- `/progress`
-- `/participate`
-- `/status`
-- `/artifacts`
+- `/contact/submitted/{caseId}`
 - `/login`
 - `/signup`
 - `/logout`
@@ -33,6 +49,8 @@
 
 `/participate/codex` remains the deeper preview booster flow behind the friendlier participate entry page.
 Guest access to `/home`, `/account`, and `/participate/codex` should fall back to `/login?next=...` rather than asking users to paste bearer tokens into product pages.
+`/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness shelf, while roadmap stays the public milestone and direction rail.
+`/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped proof do not collapse into one vague route family.
 
 ## Source of truth
 
@@ -58,7 +76,10 @@ Public visitors get:
 - product story
 - proof shelf
 - progress report
+- shipped closeout
 - horizons
+- roadmap projection
+- public feedback
 - downloads
 - participate entry
 - public status
