@@ -70,6 +70,9 @@ internal sealed class PublicLandingRouteDocument
     public bool MustExist { get; init; } = true;
     public bool PlaceholderAllowed { get; init; }
     public string? PlaceholderRequirements { get; init; }
+    public string? VerificationMode { get; init; }
+    public string? VerificationFile { get; init; }
+    public string? VerificationPattern { get; init; }
 }
 
 internal sealed class PublicLandingSectionDocument
