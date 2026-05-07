@@ -5,6 +5,8 @@ namespace Chummer.Run.Api.Services;
 
 public sealed class PublicCanonFileLoader
 {
+    private const string DesignProductPrefix = "products/chummer/";
+    private const string MirrorProductPrefix = ".codex-design/product/";
     private readonly IConfiguration _configuration;
     private static readonly IDeserializer Deserializer = new DeserializerBuilder()
         .WithNamingConvention(UnderscoredNamingConvention.Instance)
@@ -35,19 +37,37 @@ public sealed class PublicCanonFileLoader
 
         foreach (var candidate in candidates)
         {
-            if (File.Exists(Path.Combine(candidate, requiredRelativePath)))
+            foreach (string relativePathCandidate in ExpandRelativePathCandidates(requiredRelativePath))
             {
-                return candidate;
+                string fullPath = Path.Combine(candidate, relativePathCandidate.Replace('/', Path.DirectorySeparatorChar));
+                if (File.Exists(fullPath))
+                {
+                    return candidate;
+                }
             }
         }
 
         throw new DirectoryNotFoundException($"Unable to resolve a repo root that contains '{requiredRelativePath}'.");
     }
 
+    public string ResolveRequiredPath(string relativePath)
+    {
+        string repoRoot = ResolveRepoRoot(relativePath);
+        foreach (string relativePathCandidate in ExpandRelativePathCandidates(relativePath))
+        {
+            string fullPath = Path.Combine(repoRoot, relativePathCandidate.Replace('/', Path.DirectorySeparatorChar));
+            if (File.Exists(fullPath))
+            {
+                return fullPath;
+            }
+        }
+
+        throw new FileNotFoundException($"required canon file not found: {relativePath}");
+    }
+
     public T LoadRequiredYaml<T>(string relativePath)
     {
-        var repoRoot = ResolveRepoRoot(relativePath);
-        var path = Path.Combine(repoRoot, relativePath);
+        string path = ResolveRequiredPath(relativePath);
         if (!File.Exists(path))
         {
             throw new FileNotFoundException($"required canon file not found: {path}");
@@ -67,13 +87,23 @@ public sealed class PublicCanonFileLoader
 
     public string LoadRequiredText(string relativePath)
     {
-        var repoRoot = ResolveRepoRoot(relativePath);
-        var path = Path.Combine(repoRoot, relativePath);
+        string path = ResolveRequiredPath(relativePath);
         if (!File.Exists(path))
         {
             throw new FileNotFoundException($"required canon file not found: {path}");
         }
 
         return File.ReadAllText(path);
+    }
+
+    private static IEnumerable<string> ExpandRelativePathCandidates(string relativePath)
+    {
+        string normalized = relativePath.Replace('\\', '/');
+        yield return normalized;
+
+        if (normalized.StartsWith(DesignProductPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            yield return MirrorProductPrefix + normalized[DesignProductPrefix.Length..];
+        }
     }
 }

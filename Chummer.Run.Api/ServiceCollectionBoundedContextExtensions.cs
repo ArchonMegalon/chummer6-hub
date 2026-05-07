@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Registry.Services;
 
@@ -23,6 +24,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHostedService<PublicSignalRetryExpiryWorker>();
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
+        services.AddSingleton<KarmaForgeStore>();
+        services.AddSingleton<KarmaForgeDiscoveryService>();
         services.AddSingleton<WeeklyProductPulseArtifactService>();
         services.AddSingleton<PublicProgressService>();
         services.AddSingleton<PublicTrustPulseService>();

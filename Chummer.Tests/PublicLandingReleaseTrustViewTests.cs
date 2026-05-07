@@ -208,6 +208,23 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void KarmaForgeControllerAndServicesWireThePublicIntakeAndReceiptRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string servicesPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string services = File.ReadAllText(servicesPath);
+
+        Assert.Contains("KarmaForgeDiscoveryService", services, StringComparison.Ordinal);
+        Assert.Contains("KarmaForgeStore", services, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/karma-forge\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"/participate/karma-forge\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("KarmaForgeSubmitted.cshtml", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FeatureDetailViewUsesTheSharedRouteChoiceShellAndExitRailInsteadOfStoppingAtHeroAndFamilyPartial()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml");

@@ -3,6 +3,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.DataProtection;
@@ -640,6 +641,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 installLinking: InstallLinking,
                 campaignSpine: null!,
                 workspaceServerPlane: null!,
+                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance)),
                 publicCreatorDiscovery: null!,
                 chrome: null!,
                 trustContent: null!,

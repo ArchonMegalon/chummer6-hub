@@ -1,10 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.Extensions.Configuration;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Campaign.Contracts;
@@ -41,6 +43,7 @@ public sealed class PublicLandingController : Controller
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
+    private readonly KarmaForgeDiscoveryService _karmaForge;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
@@ -76,6 +79,7 @@ public sealed class PublicLandingController : Controller
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
+        KarmaForgeDiscoveryService karmaForge,
         PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
@@ -107,6 +111,7 @@ public sealed class PublicLandingController : Controller
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
+        _karmaForge = karmaForge;
         _publicCreatorDiscovery = publicCreatorDiscovery;
         _chrome = chrome;
         _trustContent = trustContent;
@@ -986,6 +991,61 @@ public sealed class PublicLandingController : Controller
             currentPath: "/participate",
             cancellationToken);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
+    }
+
+    [HttpGet("/participate/karma-forge")]
+    [Produces("text/html")]
+    public async Task<IActionResult> KarmaForgePage([FromQuery] string? track, CancellationToken cancellationToken)
+    {
+        var request = new KarmaForgeSubmissionRequest();
+        if (!string.IsNullOrWhiteSpace(track))
+        {
+            request.TrackKey = track;
+        }
+
+        var model = await BuildKarmaForgePageModel(
+            request,
+            submissionNotice: null,
+            validationErrors: Array.Empty<string>(),
+            cancellationToken);
+        return View("~/Views/PublicLanding/KarmaForge.cshtml", model);
+    }
+
+    [HttpPost("/participate/karma-forge")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public async Task<IActionResult> SubmitKarmaForgePage([FromForm] KarmaForgeSubmissionRequest request, CancellationToken cancellationToken)
+    {
+        request ??= new KarmaForgeSubmissionRequest();
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/participate/karma-forge", cancellationToken);
+        IReadOnlyList<string> validationErrors = ValidateKarmaForgeSubmission(request, subject is not null);
+        if (validationErrors.Count > 0)
+        {
+            var invalidModel = await BuildKarmaForgePageModel(
+                request,
+                "The packet is still local to this form until the required fields and consent are complete.",
+                validationErrors,
+                cancellationToken,
+                subject);
+            return View("~/Views/PublicLanding/KarmaForge.cshtml", invalidModel);
+        }
+
+        KarmaForgeSubmissionProjection submission = _karmaForge.Submit(request, subject?.SubjectId, subject?.DisplayName);
+        return Redirect($"/participate/karma-forge/submitted/{Uri.EscapeDataString(submission.SubmissionId)}");
+    }
+
+    [HttpGet("/participate/karma-forge/submitted/{submissionId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> KarmaForgeSubmittedPage([FromRoute] string submissionId, CancellationToken cancellationToken)
+    {
+        KarmaForgeSubmissionProjection? submission = _karmaForge.FindById(submissionId);
+        if (submission is null)
+        {
+            return NotFound();
+        }
+
+        var model = await BuildKarmaForgeSubmittedPageModel(submission, cancellationToken);
+        return View("~/Views/PublicLanding/KarmaForgeSubmitted.cshtml", model);
     }
 
     [HttpGet("/feedback")]
@@ -2864,6 +2924,77 @@ public sealed class PublicLandingController : Controller
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }
 
+    private async Task<KarmaForgeIntakePageViewModel> BuildKarmaForgePageModel(
+        KarmaForgeSubmissionRequest request,
+        string? submissionNotice,
+        IReadOnlyList<string> validationErrors,
+        CancellationToken cancellationToken,
+        AuthenticatedHubSubject? subject = null)
+    {
+        request ??= new KarmaForgeSubmissionRequest();
+        subject ??= await TryGetOptionalPublicSurfaceSubjectAsync("/participate/karma-forge", cancellationToken);
+
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync(
+            "KARMA FORGE",
+            "Chummer-owned intake for house-rule, campaign, and trust-friction discovery packets.",
+            "/participate/karma-forge",
+            cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        KarmaForgeTrackDefinition selectedTrack = _karmaForge.ResolveTrack(request.TrackKey);
+
+        return new KarmaForgeIntakePageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Governed discovery intake",
+            Heading: "KARMA FORGE",
+            Intro: "Turn one table pain into named Chummer-owned packets before it drifts into generic feedback, unsupported roadmap claims, or implementation guesswork.",
+            CanonicalLane: _karmaForge.CanonicalLane,
+            EntryLane: _karmaForge.EntryLane,
+            Dashboard: _karmaForge.GetDashboardSummary(),
+            DiscoverySteps: _karmaForge.GetDiscoverySteps(),
+            Form: new KarmaForgeIntakeFormViewModel(
+                ActionHref: "/participate/karma-forge",
+                Authenticated: chrome.Authenticated,
+                SubmissionNotice: submissionNotice,
+                ValidationErrors: validationErrors,
+                TrackOptions: _karmaForge.ListTracks().Select(static track => new KarmaForgeOptionDefinition(track.Key, track.Title, track.Family)).ToArray(),
+                RoleOptions: _karmaForge.ListRoleOptions(),
+                TableTypeOptions: _karmaForge.ListTableTypeOptions(),
+                RuleCategoryOptions: _karmaForge.ListRuleCategoryOptions(),
+                SeverityOptions: _karmaForge.ListSeverityOptions(),
+                DefaultTrackKey: request.TrackKey,
+                DefaultRespondentRole: request.RespondentRole,
+                DefaultEdition: request.Edition,
+                DefaultTableType: request.TableType,
+                DefaultRuleCategory: request.RuleCategory,
+                DefaultSeverity: request.Severity,
+                DefaultFeedbackPrompt: request.FeedbackPrompt,
+                DefaultUserWordsSummary: request.UserWordsSummary,
+                DefaultCurrentWorkaround: request.CurrentWorkaround,
+                DefaultInterpretedNeedSummary: request.InterpretedNeedSummary,
+                DefaultImpactNotes: request.ImpactNotes,
+                DefaultShareabilityNotes: request.ShareabilityNotes,
+                DefaultReplyEmail: string.IsNullOrWhiteSpace(request.ReplyEmail) ? subject?.Email ?? string.Empty : request.ReplyEmail,
+                DefaultFollowUpAllowed: request.FollowUpAllowed,
+                DefaultQuoteAllowed: request.QuoteAllowed,
+                DefaultConsentAccepted: request.ConsentAccepted),
+            SelectedTrack: selectedTrack,
+            CandidateDecisions: _karmaForge.GetCandidateDecisionMeanings()
+                .Select(static item => new KarmaForgeCandidateDecisionViewModel(item.Key, item.Value))
+                .ToArray(),
+            CanonicalOutputs: _karmaForge.GetCanonicalOutputs(),
+            RecentSubmissions: _karmaForge.ListRecentForSubject(subject?.SubjectId)
+                .Select(static item => new KarmaForgeRecentSubmissionViewModel(
+                    item.SubmissionId,
+                    item.Packet.Title,
+                    item.SubmittedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'"),
+                    HumanizeToken(item.Candidate.CandidateDecision, "Decision pending"),
+                    HumanizeToken(item.QueueStatus, "Queued")))
+                .ToArray(),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
     private async Task<NowPageViewModel> BuildNowPageModel(
         string title,
         string description,
@@ -2892,6 +3023,65 @@ public sealed class PublicLandingController : Controller
             SignalLoop: signalLoop,
             SignalProjection: signalProjection,
             CampaignOsProof: _campaignOsProof.LoadProof(),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private async Task<KarmaForgeSubmittedPageViewModel> BuildKarmaForgeSubmittedPageModel(
+        KarmaForgeSubmissionProjection submission,
+        CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync(
+            "KARMA FORGE packet receipt",
+            "The normalized packet, decision path, and follow-through questions for one KARMA FORGE submission.",
+            $"/participate/karma-forge/submitted/{submission.SubmissionId}",
+            cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        JsonSerializerOptions jsonOptions = new() { WriteIndented = true };
+
+        List<TrustPageActionViewModel> actions =
+        [
+            new("Open KARMA FORGE", "/participate/karma-forge", "primary"),
+            new("Read the horizon brief", "/roadmap/karma-forge", "secondary"),
+            new("Open support intake", "/contact#support-intake", "ghost")
+        ];
+
+        string affectedDomains = submission.Packet.AffectedDomains.Count == 0
+            ? "No domain tags were inferred yet."
+            : $"Affected domains: {string.Join(", ", submission.Packet.AffectedDomains.Select(domain => HumanizeToken(domain, domain)))}.";
+        string rolloutScope = submission.ImpactHypothesis.RolloutScope.Count == 0
+            ? "Scope still needs an explicit portability call."
+            : $"Rollout scope: {string.Join(", ", submission.ImpactHypothesis.RolloutScope.Select(scope => HumanizeToken(scope, scope)))}.";
+
+        return new KarmaForgeSubmittedPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Normalized packet receipt",
+            Heading: "KARMA FORGE submission captured",
+            Intro: "The intake is now visible as Chummer-owned packet truth, with the next questions and the likely governor route still explicit.",
+            SubmissionId: submission.SubmissionId,
+            TrackTitle: submission.Candidate.TrackTitle,
+            QueueStatus: HumanizeToken(submission.QueueStatus, "Queued"),
+            Actions: actions,
+            PacketTitle: submission.Packet.Title,
+            QueueSummary: submission.QueueSummary,
+            CandidateDecision: HumanizeToken(submission.Candidate.CandidateDecision, "Decision pending"),
+            CandidateDecisionMeaning: submission.Candidate.CandidateDecisionMeaning,
+            ReporterNextAction: submission.ReporterNextAction,
+            ConsentSummary: submission.ConsentSummary,
+            Highlights:
+            [
+                $"{HumanizeToken(submission.Packet.Source.RuleCategory, "Rule category")} · {HumanizeToken(submission.Packet.Source.Severity, "Severity")}",
+                $"Blocker score {submission.Packet.PrioritySignals.BlockerScore}/5 · shareability {submission.Packet.PrioritySignals.ShareabilityScore}/5 · {HumanizeToken(submission.Packet.PrioritySignals.FrequencySignal, "Frequency signal")}",
+                $"{affectedDomains} {rolloutScope}"
+            ],
+            FollowUpAllowed: submission.FollowUpAllowed,
+            NextQuestions: submission.NextQuestions,
+            NextSteps: submission.Packet.NextSteps,
+            QuoteAllowed: submission.QuoteAllowed,
+            PacketJson: JsonSerializer.Serialize(submission.Packet, jsonOptions),
+            CandidateJson: JsonSerializer.Serialize(submission.Candidate, jsonOptions),
+            ImpactHypothesisJson: JsonSerializer.Serialize(submission.ImpactHypothesis, jsonOptions),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }
@@ -3037,6 +3227,38 @@ public sealed class PublicLandingController : Controller
 
     private static string? NormalizeSupportPrefill(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static IReadOnlyList<string> ValidateKarmaForgeSubmission(KarmaForgeSubmissionRequest request, bool authenticated)
+    {
+        List<string> errors = [];
+        if (string.IsNullOrWhiteSpace(request.UserWordsSummary))
+        {
+            errors.Add("User words are required before Chummer can normalize the packet.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CurrentWorkaround))
+        {
+            errors.Add("Current workaround is required so the packet records how the table is coping today.");
+        }
+
+        if (!request.ConsentAccepted)
+        {
+            errors.Add("Consent must be accepted before the intake can become Chummer-owned packet truth.");
+        }
+
+        if (!authenticated && request.FollowUpAllowed && string.IsNullOrWhiteSpace(request.ReplyEmail))
+        {
+            errors.Add("Guest submissions that allow follow-up need a reply email.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ReplyEmail)
+            && !new EmailAddressAttribute().IsValid(request.ReplyEmail))
+        {
+            errors.Add("Reply email must be a valid email address when it is provided.");
+        }
+
+        return errors;
+    }
 
     private DesktopInstallRailContext ResolveSupportIntakeRailFromQuery()
     {

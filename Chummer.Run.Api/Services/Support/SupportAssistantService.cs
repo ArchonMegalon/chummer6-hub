@@ -422,8 +422,7 @@ public sealed class SupportAssistantService
     {
         try
         {
-            string repoRoot = _canon.ResolveRepoRoot(relativePath);
-            string fullPath = Path.Combine(repoRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            string fullPath = _canon.ResolveRequiredPath(relativePath);
             if (!File.Exists(fullPath))
             {
                 return null;
