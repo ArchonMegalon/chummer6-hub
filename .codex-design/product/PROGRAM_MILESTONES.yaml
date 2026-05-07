@@ -707,7 +707,7 @@ executable_queue:
   milestone: F3
   status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: "Latest recurring follow-up on 2026-05-07T10:57:22Z: checksum parity matched across all seven WL-D007 review-template mirror targets, and refreshed no-change parity evidence was appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` without reopening completed WL-D007/WL-D010/WL-D011/WL-D012 rows."
+  notes: "Latest recurring follow-up on 2026-05-07T14:47:29Z: checksum parity matched across all seven WL-D007 review-template mirror targets, and refreshed no-change parity evidence was appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` without reopening completed WL-D007/WL-D010/WL-D011/WL-D012 rows."
 - id: WL-D016
   milestone: F3
   status: done
@@ -732,7 +732,7 @@ executable_queue:
   milestone: F3
   status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: "Closed 2026-03-19; latest requested follow-up on 2026-05-07T10:57:22Z reconfirmed checksum parity across all seven review-template targets, and the current no-change evidence is recorded in `REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
+  notes: "Closed 2026-03-19; latest requested follow-up on 2026-05-07T14:47:29Z reconfirmed checksum parity across all seven review-template targets, and the current no-change evidence is recorded in `REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
 - id: WL-D018
   milestone: F3
   status: done
