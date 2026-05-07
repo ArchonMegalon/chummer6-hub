@@ -138,9 +138,9 @@ Component families:
 
 - Global nav: `Product`, `Downloads`, `What works today`, `Roadmap`, `Artifacts`, `Participate`
 - Hero eyebrow: `Explainable Shadowrun`
-- Hero headline: `Shadowrun rules truth, with clear explanations.`
-- Hero subheadline: `Build characters, inspect rulings, and keep sessions moving with explainable math, durable state, and a clearer view of what works today.`
-- Hero CTA pair: `Create account to install` / `See what works today`
+- Hero headline: `Build a runner, explain every ruling, and recover the campaign.`
+- Hero subheadline: `Start with the current preview, inspect the modifier trail, and keep the next session moving with explainable math, durable state, and visible recovery paths.`
+- Hero CTA pair: `Open downloads` / `See what works today`
 - Proof section headline: `One concrete result, one visible trail, one current build`
 - What's-live-now strip: `What is real today, what is preview, what is next`
 - Downloads summary: `Start with the one recommended build for this device, then use status and help without leaving the same truth rail.`

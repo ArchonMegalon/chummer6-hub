@@ -60,7 +60,7 @@
         {
             Badge = "Governed review",
             Title = "Route and review before promising anything",
-            Summary = "EA and Product Governor triage decide whether the signal becomes follow-up, research, milestone work, or a public decline with reason.",
+            Summary = "First-party triage decides whether the signal becomes follow-up, research, milestone work, or a public decline with reason.",
             Proof = "Votes inform demand; they do not decide roadmap truth.",
             Href = "/roadmap",
             Label = "See public direction"
@@ -79,7 +79,7 @@
             Badge = "Closeout",
             Title = "Notify and document after the proof exists",
             Summary = "Only then should the public changelog, voter notices, and help copy close the loop back to the original request.",
-            Proof = "First-party help and status routes stay live even if ProductLift is down.",
+            Proof = "First-party help and status routes stay live even if hosted mirroring is down.",
             Href = "/help",
             Label = "Open help hub"
         }
@@ -117,7 +117,7 @@
         {
             Badge = "Private help",
             Title = "Crash, install, account, or campaign-sensitive issue",
-            Summary = "Leave the public lane when the issue needs logs, recovery, support status, or private table details that should never sit on ProductLift.",
+            Summary = "Leave the public lane when the issue needs logs, recovery, support status, or private table details that should never sit on the public board.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
             Proof = new[] { "Private case", "Tracked return", "Support-owned" }
@@ -128,13 +128,13 @@
 <section class="release-footnote">
     <p class="eyebrow">Participate</p>
     <h1 class="page-title">Fixer Board keeps the public product loop visible</h1>
-    <p class="page-copy">Use the public feedback rail when you want to suggest future work, vote on public demand, or follow shipped closeout. Use the signed-in path only when you want tracked beta follow-up or temporary Codex access with your OpenAI account in ChatGPT.</p>
+    <p class="page-copy">Use the public feedback rail when you want to suggest future work, vote on public demand, or follow shipped closeout. Use the signed-in path only when you want tracked beta follow-up or temporary Codex access with your existing signed-in chat account.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/feedback">Open Fixer Board</a>
         <a class="button-like button-like--secondary" href="@codexHref">@(Model.Chrome.Authenticated ? "Authorize Codex access" : "Sign in to authorize Codex")</a>
         <a class="button-like button-like--ghost" href="/help">Open help instead</a>
     </div>
-    <p class="muted-copy">Hosted ProductLift mirroring stays public-only. For crashes, install problems, account issues, private campaign details, or logs, use Chummer Help and support instead.</p>
+    <p class="muted-copy">Hosted signal mirroring stays public-only. For crashes, install problems, account issues, private campaign details, or logs, use Chummer Help and support instead.</p>
 </section>
 
 @if (Model.TrustPulse is not null)
@@ -167,7 +167,7 @@
     <div class="trust-claims__lead">
         <p class="eyebrow">Fixer Board</p>
         <h2 class="editorial-title">Public signal, roadmap projection, and shipped closeout stay visible without becoming source truth.</h2>
-        <p class="editorial-copy">This page keeps the broader participation story visible while hosted ProductLift mirroring catches up. The dedicated signal, roadmap, and shipped rails stay honest about what they can promise today and keep clean paths back to help, status, and release evidence.</p>
+        <p class="editorial-copy">This page keeps the broader participation story visible while hosted public-signal mirroring catches up. The dedicated signal, roadmap, and shipped rails stay honest about what they can promise today and keep clean paths back to help, status, and release evidence.</p>
         @if (fromFeedbackAlias)
         {
             <div class="route-callout" role="status" aria-live="polite">
@@ -209,7 +209,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Pick the right lane</p>
         <h2 class="editorial-title">Use the public route only when the work can stay public.</h2>
-        <p class="editorial-copy">This cut reduces misrouted ProductLift posts and keeps support, release truth, and roadmap interpretation on the calmer first-party routes that can actually carry them.</p>
+        <p class="editorial-copy">This cut reduces misrouted public-board posts and keeps support, release truth, and roadmap interpretation on the calmer first-party routes that can actually carry them.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -233,7 +233,7 @@
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Public loop</p>
-        <h2 class="editorial-title">Keep the ProductLift loop visible, but keep authority inside Chummer-owned truth.</h2>
+        <h2 class="editorial-title">Keep the public loop visible, but keep authority inside Chummer-owned truth.</h2>
         <p class="editorial-copy">The public path should feel alive and understandable: one place to post signal, one place to follow movement, and one honest closeout path when the feature is actually available.</p>
     </div>
     <div class="workflow-grid">
@@ -355,7 +355,7 @@
             <div class="lane-strip__copy">
                 <span class="tag tag--amber">Account required</span>
                 <h2>Signed-in participation</h2>
-                <p>Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your OpenAI account in ChatGPT.</p>
+                <p>Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your existing signed-in chat account.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)
                     {

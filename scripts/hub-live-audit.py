@@ -11878,8 +11878,11 @@ def main() -> int:
     routes = [
         AuditRoute(
             "/",
-            "Create account to install",
+            "Build a runner, explain every ruling, and recover the campaign.",
             required_texts=(
+                "Open downloads",
+                "Create account and install",
+                "Account-aware install handoff",
                 "Final pool 9",
                 "Who can get it now",
                 "Release proof",
@@ -11935,7 +11938,7 @@ def main() -> int:
                 "Open support intake",
                 "/contact#support-intake",
                 "/auth/google/start?next=%2Fparticipate%2Fcodex",
-                "Hosted ProductLift mirroring stays public-only."),
+                "Hosted signal mirroring stays public-only."),
             expects_header_count=1),
         AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"), expects_header_count=1),
         AuditRoute(

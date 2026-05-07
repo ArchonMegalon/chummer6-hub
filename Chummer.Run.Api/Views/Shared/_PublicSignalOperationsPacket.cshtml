@@ -97,7 +97,7 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Hosted route promotion</span>
-            <h3>@(Model.HostedProjectionReady ? "Hosted ProductLift public routes are ready for a bounded domain split." : "Hosted ProductLift public routes are still pending on this instance.")</h3>
+            <h3>@(Model.HostedProjectionReady ? "Hosted public-signal routes are ready for a bounded domain split." : "Hosted public-signal routes are still pending on this instance.")</h3>
             <p>@Model.HostedProjectionSummary</p>
             <div class="route-choice-card__proof">
                 <span>@Model.HostedDomainLabel</span>
@@ -202,7 +202,7 @@
                             }
                             else
                             {
-                                @:No bounded ProductLift webhook receipts have been materialized on this instance yet.
+                                @:No bounded public-signal webhook receipts have been materialized on this instance yet.
                             }
                         </p>
                     </div>
@@ -210,13 +210,13 @@
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
                         <h3>@Model.CloseoutDeliveryCandidateCount delivery candidate@(Model.CloseoutDeliveryCandidateCount == 1 ? string.Empty : "s")</h3>
-                        <p>@Model.CloseoutDeliveryReceiptCount first-party closeout receipt@(Model.CloseoutDeliveryReceiptCount == 1 ? string.Empty : "s") now track whether shipped ProductLift items can move toward Chummer-owned follow-up instead of stopping at the vendor state.</p>
+                        <p>@Model.CloseoutDeliveryReceiptCount first-party closeout receipt@(Model.CloseoutDeliveryReceiptCount == 1 ? string.Empty : "s") now track whether shipped public-signal items can move toward Chummer-owned follow-up instead of stopping at the hosted board state.</p>
                     </div>
                 </article>
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
                         <h3>@Model.CloseoutQueueReadyCount outbox candidate@(Model.CloseoutQueueReadyCount == 1 ? string.Empty : "s") ready</h3>
-                        <p>@Model.CloseoutQueueReceiptCount bounded outbox queue receipt@(Model.CloseoutQueueReceiptCount == 1 ? string.Empty : "s") now show whether shipped ProductLift items can materialize a Hub-owned outbox candidate before any send or journey closeout is claimed.</p>
+                        <p>@Model.CloseoutQueueReceiptCount bounded outbox queue receipt@(Model.CloseoutQueueReceiptCount == 1 ? string.Empty : "s") now show whether shipped public-signal items can materialize a Hub-owned outbox candidate before any send or journey closeout is claimed.</p>
                     </div>
                 </article>
                 <article class="compact-rail__item">
@@ -228,7 +228,7 @@
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
                         <h3>@Model.JourneyReceiptCount journey receipt@(Model.JourneyReceiptCount == 1 ? string.Empty : "s")</h3>
-                        <p>Bounded @("voter_notified") evidence now lands only after the first-party closeout send path finishes instead of being implied by ProductLift vendor state.</p>
+                        <p>Bounded @("voter_notified") evidence now lands only after the first-party closeout send path finishes instead of being implied by hosted mirror state.</p>
                     </div>
                 </article>
                 <article class="compact-rail__item">
@@ -328,8 +328,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Provider-auth ingress</p>
-            <h2 class="editorial-title">Emailit and EA callbacks now declare their own authenticity rails instead of hiding behind one generic operations secret.</h2>
-            <p class="editorial-copy">This keeps ProductLift closeout delivery truth honest: provider callbacks should prove themselves on provider-specific ingress before they can influence first-party retry, suppression, or shipped-notification state.</p>
+            <h2 class="editorial-title">Ingress callbacks now declare their own authenticity rails instead of hiding behind one generic operations secret.</h2>
+            <p class="editorial-copy">This keeps closeout delivery truth honest: callbacks should prove themselves on ingress-specific rails before they can influence first-party retry, suppression, or shipped-notification state.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var ingress in deliveryOutcomeIngresses)
@@ -388,7 +388,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Provider receipts</p>
-            <h2 class="editorial-title">Hosted ProductLift callbacks now land as bounded first-party receipts instead of vanishing into route-level copy.</h2>
+            <h2 class="editorial-title">Hosted public-board callbacks now land as bounded first-party receipts instead of vanishing into route-level copy.</h2>
             <p class="editorial-copy">These rows show only public-board metadata, closeout posture, timestamps, and durable receipt ids. Raw user prose and provider payload bodies stay out of the stored first-party loop.</p>
         </div>
         <div class="route-choice-grid">
@@ -465,7 +465,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Closeout follow-up</p>
-            <h2 class="editorial-title">Shipped ProductLift items now create bounded first-party closeout delivery receipts instead of relying on vendor state alone.</h2>
+            <h2 class="editorial-title">Shipped public-board items now create bounded first-party closeout delivery receipts instead of relying on hosted-board state alone.</h2>
             <p class="editorial-copy">These receipts do not claim that mail already went out. They show whether Chummer has enough canon and adapter posture to move toward first-party voter follow-up once release proof is real.</p>
         </div>
         <div class="route-choice-grid">
@@ -678,7 +678,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Replay and backfill</p>
-            <h2 class="editorial-title">Ready ProductLift closeout receipts can now be replayed through a bounded first-party reconcile lane when governor or proof gates arrive late.</h2>
+            <h2 class="editorial-title">Ready closeout receipts can now be replayed through a bounded first-party reconcile lane when governor or proof gates arrive late.</h2>
             <p class="editorial-copy">Replay stays narrow: it reuses the audience captured on the original closeout receipt, records a bounded run receipt, and does not broaden notification scope from later public-board state.</p>
         </div>
         <div class="route-choice-grid">
@@ -736,7 +736,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Outbound delivery</p>
-            <h2 class="editorial-title">Ready ProductLift closeout candidates now become first-party queued or sent delivery receipts instead of staying theoretical.</h2>
+            <h2 class="editorial-title">Ready closeout candidates now become first-party queued or sent delivery receipts instead of staying theoretical.</h2>
             <p class="editorial-copy">These rows keep raw email out of stored state. Hub stores recipient refs, address hashes, template ids, idempotency keys, and provider-safe delivery posture only.</p>
         </div>
         <div class="route-choice-grid">
@@ -810,8 +810,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Journey writeback</p>
-            <h2 class="editorial-title">The ProductLift closeout rail now writes bounded voter-notified journey evidence only after the first-party send path completes.</h2>
-            <p class="editorial-copy">This stays on the Hub side of the boundary: ProductLift says something shipped, but Chummer records the notification event only after governor truth, release proof, and the first-party outbound lane line up.</p>
+            <h2 class="editorial-title">The public closeout rail now writes bounded voter-notified journey evidence only after the first-party send path completes.</h2>
+            <p class="editorial-copy">This stays on the Hub side of the boundary: the hosted board can say something shipped, but Chummer records the notification event only after governor truth, release proof, and the first-party outbound lane line up.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in recentJourneyReceipts)
@@ -850,8 +850,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Outbox candidates</p>
-            <h2 class="editorial-title">Shipped ProductLift items now materialize bounded Hub outbox candidate receipts from governor truth and current changelog proof.</h2>
-            <p class="editorial-copy">These rows still do not claim a send or a voter_notified journey receipt. They show whether Chummer can hand a shipped ProductLift closeout into the Hub-owned outbox contract without letting provider state become notification truth.</p>
+            <h2 class="editorial-title">Shipped public-board items now materialize bounded Hub outbox candidate receipts from governor truth and current changelog proof.</h2>
+            <p class="editorial-copy">These rows still do not claim a send or a voter_notified journey receipt. They show whether Chummer can hand a shipped public-board closeout into the Hub-owned outbox contract without letting hosted-board state become notification truth.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in recentQueueReceipts)

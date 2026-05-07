@@ -326,7 +326,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Public Fixer Board');
     await expectVisible(page, 'text=Signed-in participation');
     await expectBodyText(page, 'Use the public feedback rail when you want to suggest future work, vote on public demand, or follow shipped closeout.', '/participate');
-    await expectBodyText(page, 'Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your OpenAI account in ChatGPT.', '/participate');
+    await expectBodyText(page, 'Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your existing signed-in chat account.', '/participate');
     assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/contact#support-intake"]', '/participate support intake'), '/contact#support-intake');
     assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/login?next=/participate/codex"]', '/participate guided contribution guest handoff'), '/login?next=/participate/codex');
     assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/signup?next=/account/settings"]', '/participate beta signup handoff'), '/signup?next=/account/settings');

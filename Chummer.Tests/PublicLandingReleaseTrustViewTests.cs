@@ -38,6 +38,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
         Assert.Contains("@Model.FlagshipCoverage.Heading", view, StringComparison.Ordinal);
         Assert.Contains("Account-aware install handoff", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"@guestReadableHeroPrimaryHref\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("href=\"@contextualHeroPrimaryHref\"", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access", view, StringComparison.Ordinal);
     }
 
@@ -100,7 +102,7 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void ParticipatePagePromotesCodexAuthorizationThroughOpenAiAccountFlow()
+    public void ParticipatePageKeepsPublicCodexInvitationGenericWhileDeepAuthFlowNamesProvider()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
         string consoleViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "CodexParticipation", "Console.cshtml");
@@ -112,7 +114,8 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Authorize Codex access", view, StringComparison.Ordinal);
         Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
-        Assert.Contains("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
+        Assert.Contains("existing signed-in chat account", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
         Assert.Contains("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.Contains("authorize with your OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
     }
