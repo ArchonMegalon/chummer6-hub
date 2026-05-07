@@ -38,4 +38,22 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/feedback", ai, StringComparison.Ordinal);
         Assert.Contains("/contact", ai, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void SurfaceDocsTrackCodexFallbackTruthAndTheManifestRouteVerifier()
+    {
+        string docPath = RepoPaths.FromRoot("docs", "PUBLIC_LANDING_SURFACE.md");
+        string runbookPath = RepoPaths.FromRoot("docs", "SELF_HOSTED_DOWNLOADS_RUNBOOK.md");
+        string manifestPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_LANDING_MANIFEST.yaml");
+
+        string doc = File.ReadAllText(docPath);
+        string runbook = File.ReadAllText(runbookPath);
+        string manifest = File.ReadAllText(manifestPath);
+
+        Assert.Contains("/auth/google/start?next=...", doc, StringComparison.Ordinal);
+        Assert.Contains("/auth/google/start?next=/participate/codex", manifest, StringComparison.Ordinal);
+        Assert.Contains("verify_public_routes_from_manifest.py", runbook, StringComparison.Ordinal);
+        Assert.Contains(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml", runbook, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PUBLIC_ROUTE_PROOF.generated.json", runbook, StringComparison.Ordinal);
+    }
 }

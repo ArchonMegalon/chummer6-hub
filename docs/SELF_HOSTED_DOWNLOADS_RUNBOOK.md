@@ -108,6 +108,11 @@ Required post-publish checks:
 4. `https://chummer.run/downloads/install/avalonia-win-x64-installer/proof`
 5. `https://chummer.run/downloads/proof/windows/chummer-avalonia-win-x64-installer.exe`
 
+Manifest-driven public route proof:
+1. `python3 scripts/verify_public_routes_from_manifest.py --base-url https://chummer.run --manifest .codex-design/product/PUBLIC_LANDING_MANIFEST.yaml --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`
+2. Local reverse-proxy variant: `python3 scripts/verify_public_routes_from_manifest.py --base-url http://127.0.0.1:8091 --public-host chummer.run --forwarded-proto https --manifest .codex-design/product/PUBLIC_LANDING_MANIFEST.yaml --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json`
+3. The verifier checks public routes directly, checks anonymous fallbacks for registered routes without following the redirect, and emits a machine-readable JSON proof packet for publish or audit closeout.
+
 ## Strict Test Gate Commands (host-side)
 
 Use these when you want hard failures instead of soft-skips.

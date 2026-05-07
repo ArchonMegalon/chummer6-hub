@@ -48,7 +48,8 @@ Help, policy, and signed-in overlays:
 - `/account`
 
 `/participate/codex` remains the deeper preview booster flow behind the friendlier participate entry page.
-Guest access to `/home`, `/account`, and `/participate/codex` should fall back to `/login?next=...` rather than asking users to paste bearer tokens into product pages.
+Guest access to `/home` and `/account` should fall back to `/login?next=...` rather than asking users to paste bearer tokens into product pages.
+Guest access to `/participate/codex` should fall back to `/auth/google/start?next=...` because the guided contribution console begins on the signed-in authorization rail.
 `/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness shelf, while roadmap stays the public milestone and direction rail.
 `/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped proof do not collapse into one vague route family.
 
