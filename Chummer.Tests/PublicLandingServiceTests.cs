@@ -32,22 +32,22 @@ public sealed class PublicLandingServiceTests
     }
 
     [Fact]
-    public void LoadSurface_IncludesShadowcastersAndBlackLedgerRoadmapRoutes()
+    public void LoadSurface_IncludesCurrentRoadmapAndArtifactBridgeRoutes()
     {
         var surface = BuildService().LoadSurface();
 
         Assert.Contains(surface.PublicRoutes, static route =>
-            string.Equals(route.Path, "/roadmap/shadowcasters-network", StringComparison.Ordinal));
-        Assert.Contains(surface.PublicRoutes, static route =>
             string.Equals(route.Path, "/roadmap/black-ledger", StringComparison.Ordinal));
+        Assert.Contains(surface.PublicRoutes, static route =>
+            string.Equals(route.Path, "/roadmap/community-hub", StringComparison.Ordinal));
 
-        var shadowcasters = Assert.Single(surface.FeatureCards, static card =>
-            string.Equals(card.Id, "horizon_shadowcasters_network", StringComparison.Ordinal));
+        var communityHub = Assert.Single(surface.FeatureCards, static card =>
+            string.Equals(card.Id, "horizon_community_hub", StringComparison.Ordinal));
         var blackLedger = Assert.Single(surface.FeatureCards, static card =>
             string.Equals(card.Id, "horizon_black_ledger", StringComparison.Ordinal));
 
-        Assert.Equal("/roadmap/shadowcasters-network", shadowcasters.DetailRoute);
-        Assert.Equal("/roadmap/black-ledger", shadowcasters.DetailPrimaryHref);
+        Assert.Equal("/roadmap/community-hub", communityHub.DetailRoute);
+        Assert.Equal("/roadmap/black-ledger", communityHub.DetailPrimaryHref);
         Assert.Equal("/roadmap/black-ledger", blackLedger.DetailRoute);
         Assert.Equal("/artifacts/replay-after-action", blackLedger.DetailPrimaryHref);
     }
@@ -66,7 +66,17 @@ public sealed class PublicLandingServiceTests
         var document = loader.LoadRequiredYaml<PublicLandingManifestDocument>(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml");
 
         Assert.Contains("posted files", document.ProductProofScopeLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("flagship", document.ProductFlagshipBoundaryLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("finished-product claims", document.ProductFlagshipBoundaryLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/contact/submitted/{caseId}", StringComparison.Ordinal)
+            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
+            && string.Equals(route.VerificationFile, "Chummer.Run.Api/Controllers/PublicLandingController.cs", StringComparison.Ordinal)
+            && string.Equals(route.VerificationPattern, "[HttpGet(\"/contact/submitted/{caseId}\")]", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/participate/karma-forge/submitted/{submissionId}", StringComparison.Ordinal)
+            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
+            && string.Equals(route.VerificationFile, "Chummer.Run.Api/Controllers/PublicLandingController.cs", StringComparison.Ordinal)
+            && string.Equals(route.VerificationPattern, "[HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")]", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -87,7 +97,7 @@ public sealed class PublicLandingServiceTests
 
             Assert.Equal("chummer.run", surface.Surface);
             Assert.Contains(surface.FeatureCards, static card =>
-                string.Equals(card.Id, "horizon_shadowcasters_network", StringComparison.Ordinal));
+                string.Equals(card.Id, "horizon_black_ledger", StringComparison.Ordinal));
         }
         finally
         {
