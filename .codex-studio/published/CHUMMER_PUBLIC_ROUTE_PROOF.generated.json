@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.public_route_proof",
-  "generated_at_utc": "2026-05-07T19:25:07.404760Z",
+  "generated_at_utc": "2026-05-07T20:12:08.495545Z",
   "base_url": "https://chummer.run",
   "public_host": null,
   "forwarded_proto": null,
@@ -252,11 +252,11 @@
       "guest_fallback": "/contact/submitted/{caseId}",
       "mode": "controller_contract",
       "success": true,
-      "status_code": null,
-      "final_url": null,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact/submitted/sample-case-id",
       "redirect_location": null,
-      "expectation": "controller contract contains [HttpGet(\"/contact/submitted/{caseId}\")]",
-      "detail": "found [HttpGet(\"/contact/submitted/{caseId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs"
+      "expectation": "controller contract contains [HttpGet(\"/contact/submitted/{caseId}\")] and resolves /contact/submitted/sample-case-id",
+      "detail": "expected [HttpGet(\"/contact/submitted/{caseId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /contact/submitted/sample-case-id to resolve one of [200, 302, 303, 307, 308, 400, 404, 405], got 200"
     },
     {
       "path": "/participate",
@@ -342,11 +342,11 @@
       "guest_fallback": "/participate/karma-forge/submitted/{submissionId}",
       "mode": "controller_contract",
       "success": true,
-      "status_code": null,
-      "final_url": null,
+      "status_code": 404,
+      "final_url": "https://chummer.run/participate/karma-forge/submitted/sample-submission-id",
       "redirect_location": null,
-      "expectation": "controller contract contains [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")]",
-      "detail": "found [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs"
+      "expectation": "controller contract contains [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] and resolves /participate/karma-forge/submitted/sample-submission-id",
+      "detail": "expected [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /participate/karma-forge/submitted/sample-submission-id to resolve one of [200, 302, 303, 307, 308, 400, 404, 405], got 404"
     },
     {
       "path": "/artifacts",
@@ -779,7 +779,7 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/auth/google/start",
-      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=-XxkSEkAb_AaOVtyiwovDyV_Cag_IpNb&nonce=3X6Ga_2cByqD84RheTySiYwEPQt6kN9s&code_challenge=enXPdS_naD2jfOCzmy8OPYf4wW6sSGHscbk_XrjBCoQ&code_challenge_method=S256&prompt=select_account",
+      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=NocVJt9VTrKE--ou8Ra0osbjQfzHyYmT&nonce=6LkRWuBhRYeRsv83QCPxcbaCEzOF1ipz&code_challenge=gSfujpoGZXdL3yq4BpwNlzzynsqoycZaZsVekNyG6G4&code_challenge_method=S256&prompt=select_account",
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302"
     },
