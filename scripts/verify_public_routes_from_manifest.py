@@ -21,7 +21,6 @@ DEFAULT_MANIFEST = REPO_ROOT / ".codex-design" / "product" / "PUBLIC_LANDING_MAN
 DEFAULT_OUTPUT = REPO_ROOT / ".codex-studio" / "published" / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 AUTH_OPERATION_OK_STATUSES = {200, 302, 303, 307, 308, 400, 405}
-CONTROLLER_CONTRACT_OK_STATUSES = {200, 302, 303, 307, 308, 400, 404, 405}
 PLACEHOLDER_SAMPLE_LOOKUP = {
     "case": "sample-case-id",
     "caseid": "sample-case-id",
