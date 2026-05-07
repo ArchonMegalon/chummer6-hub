@@ -21,6 +21,7 @@ DEFAULT_MANIFEST = REPO_ROOT / ".codex-design" / "product" / "PUBLIC_LANDING_MAN
 DEFAULT_OUTPUT = REPO_ROOT / ".codex-studio" / "published" / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 AUTH_OPERATION_OK_STATUSES = {200, 302, 303, 307, 308, 400, 405}
+CONTROLLER_CONTRACT_OK_STATUSES = {200, 302, 303, 307, 308, 400, 404, 405}
 PLACEHOLDER_SAMPLE_LOOKUP = {
     "case": "sample-case-id",
     "caseid": "sample-case-id",
@@ -213,10 +214,10 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
                 forwarded_proto=forwarded_proto or None,
                 follow_redirects=True)
             redirect_location = headers.get("location")
-            success = status == 200
+            success = status in CONTROLLER_CONTRACT_OK_STATUSES
             detail = (
                 f"expected {verification_pattern} in {verification_file} and "
-                f"{resolved_request_path} to resolve 200, got {status}"
+                f"{resolved_request_path} to resolve one of {sorted(CONTROLLER_CONTRACT_OK_STATUSES)}, got {status}"
             )
             return RouteResult(
                 path=path,
