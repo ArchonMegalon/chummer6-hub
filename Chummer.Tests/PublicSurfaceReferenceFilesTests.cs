@@ -1,0 +1,41 @@
+using Xunit;
+
+namespace Chummer.Tests;
+
+public sealed class PublicSurfaceReferenceFilesTests
+{
+    [Fact]
+    public void PublicLandingSurfaceDocTracksTheCurrentPublicRouteFamilies()
+    {
+        string docPath = RepoPaths.FromRoot("docs", "PUBLIC_LANDING_SURFACE.md");
+        string doc = File.ReadAllText(docPath);
+
+        Assert.Contains("/roadmap", doc, StringComparison.Ordinal);
+        Assert.Contains("/feedback", doc, StringComparison.Ordinal);
+        Assert.Contains("/changelog", doc, StringComparison.Ordinal);
+        Assert.Contains("/participate/karma-forge", doc, StringComparison.Ordinal);
+        Assert.Contains("/feedback/operations", doc, StringComparison.Ordinal);
+        Assert.Contains("milestone-backed public direction", doc, StringComparison.Ordinal);
+        Assert.Contains("public signal, projected movement, and shipped proof", doc, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MachineReadableGuideFilesExistForTheCurrentPublicRouteSplit()
+    {
+        string llmsPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "llms.txt");
+        string aiPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "ai.txt");
+
+        string llms = File.ReadAllText(llmsPath);
+        string ai = File.ReadAllText(aiPath);
+
+        Assert.Contains("/downloads", llms, StringComparison.Ordinal);
+        Assert.Contains("/roadmap", llms, StringComparison.Ordinal);
+        Assert.Contains("/feedback", llms, StringComparison.Ordinal);
+        Assert.Contains("/changelog", llms, StringComparison.Ordinal);
+        Assert.Contains("/participate/karma-forge", llms, StringComparison.Ordinal);
+        Assert.Contains("/llms.txt", ai, StringComparison.Ordinal);
+        Assert.Contains("/roadmap", ai, StringComparison.Ordinal);
+        Assert.Contains("/feedback", ai, StringComparison.Ordinal);
+        Assert.Contains("/contact", ai, StringComparison.Ordinal);
+    }
+}

@@ -1,0 +1,14 @@
+Chummer AI reference
+
+Full route guide: /llms.txt
+
+Fast split
+- Live proof now: /now, /downloads, /status, /changelog
+- Future direction: /roadmap, /horizons
+- Public signal: /feedback, /participate/karma-forge
+- Private help: /help, /contact
+- Signed-in follow-through: /home, /account
+
+Guardrails
+- Do not infer shipped truth from /roadmap or /horizons alone.
+- Use /feedback for safe public requests and /contact for private support.
