@@ -138,6 +138,17 @@ else
                         {
                             <a class="button-like button-like--ghost" href="#windows-verification-rail">Open Windows verification rail</a>
                         }
+                        <details class="release-accordion">
+                            <summary>Release notes, known issues, and requirements</summary>
+                            <div class="release-accordion__body">
+                                <p class="muted-copy">This platform is not on the current public shelf, but the release notes, known issues, and install help still stay attached to the same release rail.</p>
+                                <div class="stacked-actions">
+                                    <a class="button-like button-like--ghost" href="/now">Open current release</a>
+                                    <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
+                                    <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                                </div>
+                            </div>
+                        </details>
                     }
                     else if (guestGateRequired)
                     {
@@ -233,6 +244,16 @@ else
             }
         </div>
     </section>
+
+    @if (Model.SignedInStatus is not null)
+    {
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    }
+
+    @if (Model.TrustPulse is not null)
+    {
+        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+    }
 
     @if (hasAdvancedPanels)
     {

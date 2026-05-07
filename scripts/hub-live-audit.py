@@ -217,6 +217,7 @@ def require_snippet(body: str, snippet: str, path: str) -> None:
 
 
 def require_support_progress_mail(payload: dict[str, object], stage_id: str) -> dict[str, object]:
+    fallback_item: dict[str, object] | None = None
     for item in payload.get("timeline") or []:
         if not isinstance(item, dict):
             continue
@@ -225,10 +226,12 @@ def require_support_progress_mail(payload: dict[str, object], stage_id: str) -> 
             continue
         if str(metadata.get("email_stage_id") or "") != stage_id:
             continue
-        if str(metadata.get("email_state") or "") != "sent":
-            raise AssertionError(f"support progress mail '{stage_id}' did not record a sent receipt")
-        return item
+        if str(metadata.get("email_state") or "") == "sent":
+            return item
+        fallback_item = item
 
+    if fallback_item is not None:
+        raise AssertionError(f"support progress mail '{stage_id}' did not record a sent receipt")
     raise AssertionError(f"support progress mail '{stage_id}' is missing from the support-case timeline")
 
 
@@ -543,10 +546,10 @@ def verify_signed_in_work_audit(
     if status != 200:
         raise AssertionError(f"/participate/codex returned {status}, expected 200")
     require_snippet(body, "Help Chummer show its work.", "/participate/codex")
-    require_snippet(body, "I want to participate", "/participate/codex")
+    require_snippet(body, "Authorize Codex access", "/participate/codex")
     require_snippet(body, "One decision, one code, one clean handoff", "/participate/codex")
     require_snippet(body, "Generate fresh code", "/participate/codex")
-    require_snippet(body, "Open a fresh contribution lane", "/participate/codex")
+    require_snippet(body, "Authorize a fresh Codex lane", "/participate/codex")
     require_snippet(body, "Technical details and controls", "/participate/codex")
 
     status, body, _, _ = fetch(
@@ -616,7 +619,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Welcome back", "/home")
     require_snippet(body, "Use the current preview", "/home")
     require_snippet(body, "Keep this copy connected", "/home")
-    require_snippet(body, "Open current release", "/home")
+    require_snippet(body, "Open what works today", "/home")
 
     status, body, _, _ = fetch(
         base_url,
@@ -666,7 +669,7 @@ def verify_signed_in_work_audit(
         "Transfer governed roster state",
         "Launch governed prep packet",
         "Stage travel prefetch",
-        "Generate aftermath recap package",
+        "Generate aftermath or replay package",
         "GM prep library and travel mode",
     ):
         require_snippet(body, snippet, workspace_path)
@@ -11893,21 +11896,21 @@ def main() -> int:
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
-            "One product for rules truth, living dossiers, and session return.",
+            "One place for builds, explanations, and campaign return.",
             required_texts=(
                 "The short answer",
-                "A Shadowrun companion with one front door",
-                "Between build truth and table continuity",
-                "Proof, release, and help stay attached",
-                "Players, GMs, and creators on one rules truth",
+                "A Shadowrun desktop and campaign companion",
+                "Between character creation and the next session",
+                "Explanation, release, and help stay attached",
+                "Players, GMs, and returning groups",
                 "Open what works today",
                 "Open downloads",
                 "Open the help hub"),
             expects_header_count=1),
         AuditRoute(
             "/now",
-            "Current preview, visible proof, and known limits",
-            required_texts=("What you can verify now", "Build, explain, and run with visible evidence", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point", "Status guide"),
+            "What works today and what still needs caution",
+            required_texts=("What you can try now", "Build, explain, and run with visible evidence", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point", "Status guide"),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
@@ -11916,24 +11919,23 @@ def main() -> int:
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
-        AuditRoute("/artifacts", "Current proof surfaces", required_texts=("Available today", "Preview in progress", "Status guide", "These are the artifacts you can use or inspect against the current preview today."), expects_header_count=1),
-        AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "Use and verify this proof", "What this live artifact shows, who it helps, and what to check next", "Start from the live surface", "Open current release", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Anyone evaluating the preview", "Why this horizon matters now", "Current pain, expected unlock, and the live proof you should compare first", "Compare with current proof", "Need a decision instead?", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/shadowcasters-network", "SHADOWCASTERS NETWORK", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "See the world-state foundation", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/black-ledger", "BLACK LEDGER", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "See the related artifact preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/artifacts", "Proof gallery", required_texts=("Available today", "Preview in progress", "Status guide", "Inspect proof gallery"), expects_header_count=1),
+        AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "What this live artifact does, who it helps, and where to go next", "Start from the live surface", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/ghostwire", "GHOSTWIRE", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/black-ledger", "BLACK LEDGER", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute(
             "/participate",
-            "Choose how to participate",
+            "Fixer Board keeps the public product loop visible",
             required_texts=(
-                "Public feedback",
-                "Signed-in participation",
-                "Report a problem without an account, then stop there unless you want tracked follow-up.",
-                "Use the signed-in path when you want a tracked suggestion, beta follow-up, or a bounded contribution flow.",
+                "Public ideas and safe bug reports",
+                "Public direction stays visible without becoming source truth",
+                "Open Fixer Board",
+                "Open shipped updates",
+                "Open support intake",
                 "/contact#support-intake",
-                "/login?next=/participate/codex",
-                "/signup?next=/account/settings",
-                "Open guided contribution",
-                "Join beta waitlist"),
+                "/auth/google/start?next=%2Fparticipate%2Fcodex",
+                "Hosted ProductLift mirroring stays public-only."),
             expects_header_count=1),
         AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"), expects_header_count=1),
         AuditRoute(
@@ -11952,7 +11954,6 @@ def main() -> int:
             "What Chummer stores, and what it does not",
             required_texts=(
                 "Support, survey, and assistant data stay on a bounded clock",
-                "What changed in this version",
                 "Weekly trust pulse",
                 "Open downloads",
                 "Open help"),
@@ -11961,7 +11962,7 @@ def main() -> int:
             "/terms",
             "Preview terms in plain language",
             required_texts=(
-                "What changed in this version",
+                "Weekly trust pulse",
                 "Open downloads",
                 "Open help",
                 "Sign in"),

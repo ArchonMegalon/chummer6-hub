@@ -48,12 +48,85 @@
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
         ?? "No visible receipt is attached to this outward-facing publication route yet.";
+    var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-proof-shelf" : "/signup?next=%2Fartifacts";
+    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in continuity shelf" : "Create account for signed-in continuity";
+    var signedInShelfSummary = Model.Chrome.Authenticated
+        ? "Use the signed-in artifact shelf when you want personal, campaign, creator, and public returns to stay on one calmer continuation rail."
+        : "Public discovery works without an account. Sign in only when you want private continuity, campaign return, and creator follow-through on the same shelf.";
+    var routeChoices = new[]
+    {
+        new
+        {
+            Badge = "Proof discovery",
+            Title = "Stay on the artifact shelf when the job is proof, provenance, or comparison",
+            Summary = "This publication detail route belongs to the proof family. Use the shelf and discovery routes when you want to inspect related outputs instead of jumping straight to the install rail.",
+            Href = Model.BackHref,
+            Label = "Back to publication discovery",
+            Proof = new[] { "Proof first", "Publication lineage", "Comparison nearby" }
+        },
+        new
+        {
+            Badge = "Downloads",
+            Title = "Leave this route when the next job is installing the product",
+            Summary = "The publication route should never compete with the recommended build, platform posture, or install help. Downloads still owns that decision.",
+            Href = "/downloads",
+            Label = "Open downloads",
+            Proof = new[] { "Install rail stays primary", "Known issues nearby", "No fake build path" }
+        },
+        new
+        {
+            Badge = "Signed-in continuity",
+            Title = Model.Chrome.Authenticated
+                ? "Signed-in continuity keeps public and private artifact returns together"
+                : "Create the account only when you want the signed-in continuity shelf too",
+            Summary = signedInShelfSummary,
+            Href = signedInShelfHref,
+            Label = signedInShelfLabel,
+            Proof = Model.Chrome.Authenticated
+                ? new[] { "Personal and campaign returns", "Creator follow-through", "Same artifact rail" }
+                : new[] { "Public first", "Account adds continuity", "No auth wall for proof" }
+        },
+        new
+        {
+            Badge = "Help",
+            Title = "Use first-party help as soon as the issue becomes support or recovery",
+            Summary = "If the problem needs logs, account recovery, install repair, or private campaign detail, leave the publication route and move to help or support immediately.",
+            Href = "/help",
+            Label = "Open help",
+            Proof = new[] { "Support-owned", "Private help", "No route confusion" }
+        }
+    };
 }
 
 @if (Model.TrustPulse is not null)
 {
     @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Route map</p>
+        <h2 class="editorial-title">Choose discovery, downloads, signed-in continuity, or help on purpose.</h2>
+        <p class="editorial-copy">A publication detail page should make trust and provenance tangible. It should not pretend to be the install rail, a support queue, or a disguised account wall.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var choice in routeChoices)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@choice.Badge</span>
+                <h3>@choice.Title</h3>
+                <p>@choice.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in choice.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+            </article>
+        }
+    </div>
+</section>
 
 <section class="story-cinematic">
     <div class="story-cinematic__copy">
@@ -159,4 +232,16 @@
             </article>
         }
     </div>
+</section>
+
+<section class="release-footnote">
+    <p class="eyebrow">Next step</p>
+    <h2 class="editorial-title">Use this route to inspect the publication, then move to the rail that owns the next job.</h2>
+    <p class="editorial-copy">Stay on the proof shelf for related artifacts, open Downloads when you actually want the build, or leave for Help when the issue becomes private, recovery-bound, or support-owned.</p>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to publication discovery</a>
+        <a class="cta-link cta-link--secondary" href="/artifacts">Open artifacts shelf</a>
+        <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
+    </div>
+    <p class="muted-copy">Need private follow-through instead? <a class="inline-link" href="/contact#support-intake">Open support intake</a>.</p>
 </section>

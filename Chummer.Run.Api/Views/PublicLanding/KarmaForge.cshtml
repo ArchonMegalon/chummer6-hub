@@ -4,6 +4,68 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge";
     bool hasErrors = Model.Form.ValidationErrors.Count > 0;
+    var historyHref = Model.Form.Authenticated
+        ? "#recent-packets"
+        : "/signup?next=%2Fparticipate%2Fkarma-forge";
+    var historyLabel = Model.Form.Authenticated
+        ? "Open signed-in packet history"
+        : "Create account for packet history";
+    var historyTitle = Model.Form.Authenticated
+        ? "Stay on the signed-in packet rail when you need recent KARMA FORGE continuity"
+        : "Create the account only when you want packet history and follow-through on one rail";
+    var historySummary = Model.Form.Authenticated
+        ? "Signed-in history keeps recent packets, queue posture, and follow-through attached to the same discovery lane instead of burying them in generic feedback history."
+        : "The public intake works without an account. Sign in only when you want your packet history, queue posture, and follow-through to stay visible on the same lane.";
+    var routeChoices = new[]
+    {
+        new
+        {
+            Badge = "Intake",
+            Title = "Stay on this route when the job is turning table pain into a Chummer-owned packet",
+            Summary = "The intake route owns normalization, consent, and the first named packet output. It should not be replaced by generic support copy or vague future-signal chatter.",
+            Href = "#karma-forge-intake",
+            Label = "Start the intake",
+            Proof = new[] { "Chummer-owned packets", "Consent explicit", "One intake lane" }
+        },
+        new
+        {
+            Badge = "Roadmap family",
+            Title = "Open the horizon brief only when you need the larger product case",
+            Summary = "The intake route keeps the discovery job concrete. Move to the horizon brief when you need the broader why, planned shape, or longer strategic frame behind KARMA FORGE.",
+            Href = "/roadmap/karma-forge",
+            Label = "Read the horizon brief",
+            Proof = new[] { "Broader rationale", "Planned product frame", "Still first-party" }
+        },
+        new
+        {
+            Badge = "Public signal",
+            Title = "Return to participate when the question is broader public discovery, not this intake packet",
+            Summary = "Participate still owns the wider public signal loop. This page should stay the governed intake for specific house-rule and campaign demand packets.",
+            Href = "/participate",
+            Label = "Back to participate",
+            Proof = new[] { "Broader signal loop", "Public discovery", "No mixed jobs" }
+        },
+        new
+        {
+            Badge = "Continuity",
+            Title = historyTitle,
+            Summary = historySummary,
+            Href = historyHref,
+            Label = historyLabel,
+            Proof = Model.Form.Authenticated
+                ? new[] { "Recent packets", "Queue posture", "Same discovery rail" }
+                : new[] { "Public first", "Account adds history", "No auth wall for intake" }
+        },
+        new
+        {
+            Badge = "Support",
+            Title = "Leave KARMA FORGE for normal support as soon as the issue is no longer discovery work",
+            Summary = "If the problem is install repair, account recovery, or a normal bug/support case, stop using this discovery route and move to first-party support instead.",
+            Href = "/contact#support-intake",
+            Label = "Open support intake",
+            Proof = new[] { "Support-owned", "Normal issue lane", "Discovery stays bounded" }
+        }
+    };
 }
 
 <section class="trust-page-hero">
@@ -33,6 +95,31 @@
     @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
 
+<section class="editorial-block" id="karma-forge-route-map">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Route map</p>
+        <h2 class="editorial-title">Keep discovery intake, roadmap context, packet continuity, and support on their own rails.</h2>
+        <p class="editorial-copy">KARMA FORGE should stay a governed intake lane for table pain and house-rule demand. It should not quietly turn into generic support, the entire public signal loop, or a disguised roadmap page.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var choice in routeChoices)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@choice.Badge</span>
+                <h3>@choice.Title</h3>
+                <p>@choice.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in choice.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">Loop state</p>
@@ -56,6 +143,17 @@
             <span class="tag">Core gap</span>
             <p>@Model.Dashboard.CoreRulesetGapCount packet(s) already look closer to core-ruleset review than KARMA FORGE packaging work.</p>
         </article>
+    </div>
+</section>
+
+<section class="release-footnote">
+    <p class="eyebrow">Next step</p>
+    <h2 class="editorial-title">Use KARMA FORGE to capture one discovery packet, then move to the rail that owns the next job.</h2>
+    <p class="editorial-copy">Stay on the intake when the work is packet capture, open the horizon brief for broader roadmap context, and leave for support the moment the issue stops being governed discovery work.</p>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="#karma-forge-intake">Start the intake</a>
+        <a class="cta-link cta-link--secondary" href="/roadmap/karma-forge">Read the horizon brief</a>
+        <a class="cta-link cta-link--ghost" href="/contact#support-intake">Open support intake</a>
     </div>
 </section>
 

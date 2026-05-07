@@ -150,6 +150,16 @@
 
 @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
 
+@if (Model.SignedInStatus is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+}
+
+@if (Model.TrustPulse is not null)
+{
+    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+}
+
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">What you can try now</p>

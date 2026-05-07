@@ -3510,10 +3510,10 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", faqView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", storyView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", participateView, StringComparison.Ordinal);
-        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("_SignedInTrustStatusPanel.cshtml", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", downloadDispatchView, StringComparison.Ordinal);
         Assert.Contains("_SignedInTrustStatusPanel.cshtml", homeView, StringComparison.Ordinal);
-        Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", nowView, StringComparison.Ordinal);
+        Assert.Contains("_SignedInTrustStatusPanel.cshtml", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", supportSubmittedView, StringComparison.Ordinal);
         Assert.DoesNotContain("_SignedInTrustStatusPanel.cshtml", publicCreatorPublicationView, StringComparison.Ordinal);
     }
@@ -3617,7 +3617,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("AutomationResumabilitySummary", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent governed prep launches", accountView, StringComparison.Ordinal);
         Assert.Contains("Recent travel prefetch receipts", accountView, StringComparison.Ordinal);
-        Assert.Contains("Recent aftermath and replay packages", accountView, StringComparison.Ordinal);
+        Assert.Contains("Recent aftermath recap packages and replay outputs", accountView, StringComparison.Ordinal);
     }
 
     [Fact]

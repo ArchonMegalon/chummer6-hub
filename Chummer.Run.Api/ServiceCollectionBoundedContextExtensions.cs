@@ -98,6 +98,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<ArtifactFactoryOrchestrationService>();
         services.AddSingleton<FleetReceiptVerifier>();
         services.AddSingleton<HubEmailLinkVerificationService>();
+        services.AddSingleton<HubIdentitySubjectCache>();
         services.AddHttpClient<FleetBridgeService>();
         services.AddHttpClient<HubIdentityClient>();
         services.AddHttpClient<HubBrowserAuthService>();

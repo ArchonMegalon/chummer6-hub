@@ -5,6 +5,49 @@
     ViewData["SurfaceClass"] = "surface-horizons";
     var productliftAlias = Context?.Request?.Query["productlift"].ToString() ?? string.Empty;
     var fromRoadmapAlias = string.Equals(productliftAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
+    var totalHorizons = Model.Horizons.Count;
+    var preparingCount = Model.Horizons.Count(card => string.Equals(card.Card.Badge, "Preparing", StringComparison.OrdinalIgnoreCase));
+    var designingCount = Model.Horizons.Count(card => string.Equals(card.Card.Badge, "Designing", StringComparison.OrdinalIgnoreCase));
+    var researchCount = Model.Horizons.Count(card => string.Equals(card.Card.Badge, "Research", StringComparison.OrdinalIgnoreCase));
+    var routeChoices = new[]
+    {
+        new
+        {
+            Badge = "Live proof first",
+            Title = "Compare with live proof instead of treating a horizon as already shipped",
+            Summary = "Use what works today when you need the current capability, current caution, or one inspectable trail before you read further into future lanes.",
+            Href = "/now",
+            Label = "Open what works today",
+            Proof = new[] { "Current proof", "Caution explicit", "No future bluff" }
+        },
+        new
+        {
+            Badge = "Milestone pressure",
+            Title = "The milestone roadmap lives on a separate rail",
+            Summary = "Roadmap stays the public direction and milestone-pressure route. Horizons stay deeper and more editorial so research or design tracks do not read like the active claim ledger.",
+            Href = "/roadmap",
+            Label = "Open roadmap",
+            Proof = new[] { "Milestone-backed", "Direction only", "Not shipped truth" }
+        },
+        new
+        {
+            Badge = "Public signal",
+            Title = "Use the public loop when a future lane matches real user pain",
+            Summary = "Feedback is where feature demand, UX friction, and safe public bugs should enter the product loop before they become roadmap or shipped-closeout language.",
+            Href = "/feedback",
+            Label = "Open Fixer Board",
+            Proof = new[] { "Votes inform demand", "Public by default", "No private logs" }
+        },
+        new
+        {
+            Badge = "Install and help",
+            Title = "Leave horizons when the next job is install, support, or recovery",
+            Summary = "The future shelf should not compete with downloads or support. Install from the release rail, and use first-party help as soon as the issue becomes private or recovery-bound.",
+            Href = "/downloads",
+            Label = "Open downloads",
+            Proof = new[] { "Install rail stays primary", "Support is separate", "No route confusion" }
+        }
+    };
     var groups = new[]
     {
         new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current preview and the next release-adjacent work." },
@@ -14,33 +57,41 @@
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
 
-<section class="horizons-intro route-anchor-target" id="productlift-roadmap-projection">
-    <p class="eyebrow">Coming next</p>
-    <h1 class="page-title">What Chummer is building toward</h1>
-    <p class="page-copy">Each horizon carries a clearer readiness label, the user pain it addresses, and one truthful next step inside the product before the deeper brief.</p>
-    <div class="stacked-actions">
-        <a class="button-like button-like--ghost" href="#preparing">Preparing next</a>
-        <a class="button-like button-like--ghost" href="#designing">Designing in public</a>
-        <a class="button-like button-like--ghost" href="#research">Research track</a>
-    </div>
-    @if (fromRoadmapAlias)
-    {
-        <div class="route-callout" role="status" aria-live="polite">
-            <h3>You followed a legacy roadmap handoff</h3>
-            <p>The milestone-backed public roadmap now lives on <code class="mono-receipt">/roadmap</code>. This page stays the deeper horizon shelf for readiness posture, user pain, and the next honest comparison point.</p>
-            <div class="route-callout__proof">
-                <span>Milestone-backed</span>
-                <span>Direction only</span>
-                <span>Deeper horizon detail</span>
-            </div>
-            <div class="route-callout__actions">
-                <a class="inline-link" href="/roadmap">Open roadmap</a>
-                <a class="inline-link" href="/feedback">Open Fixer Board</a>
-                <a class="inline-link" href="/now">Open what works today</a>
-                <a class="inline-link" href="/help">Open help</a>
-            </div>
+<section class="trust-page-hero route-anchor-target" id="productlift-roadmap-projection">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">Coming next</p>
+        <h1 class="page-title">What Chummer is building toward</h1>
+        <p class="page-copy">Each horizon carries a clearer readiness label, the user pain it addresses, and one truthful next step inside the product before the deeper brief.</p>
+        <div class="trust-claim__microproof">
+            <span>@totalHorizons named horizon@(totalHorizons == 1 ? string.Empty : "s")</span>
+            <span>@preparingCount preparing next</span>
+            <span>@designingCount designing in public</span>
+            <span>@researchCount research track</span>
         </div>
-    }
+        @if (fromRoadmapAlias)
+        {
+            <div class="route-callout" role="status" aria-live="polite">
+                <h3>You followed a legacy roadmap handoff</h3>
+                <p>The milestone-backed public roadmap now lives on <code class="mono-receipt">/roadmap</code>. This page stays the deeper horizon shelf for readiness posture, user pain, and the next honest comparison point.</p>
+                <div class="route-callout__proof">
+                    <span>Milestone-backed</span>
+                    <span>Direction only</span>
+                    <span>Deeper horizon detail</span>
+                </div>
+                <div class="route-callout__actions">
+                    <a class="inline-link" href="/roadmap">Open roadmap</a>
+                    <a class="inline-link" href="/feedback">Open Fixer Board</a>
+                    <a class="inline-link" href="/now">Open what works today</a>
+                    <a class="inline-link" href="/help">Open help</a>
+                </div>
+            </div>
+        }
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="#preparing">Preparing next</a>
+        <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
+        <a class="button-like button-like--ghost" href="/now">Open what works today</a>
+    </div>
 </section>
 
 @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
@@ -48,6 +99,52 @@
 {
     @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
 }
+
+<section class="status-decision-strip" aria-label="Horizon posture snapshot">
+    <article class="status-decision-strip__card">
+        <span class="tag">Preparing next</span>
+        <h2>@preparingCount horizon@(preparingCount == 1 ? string.Empty : "s") sit closest to the current preview.</h2>
+        <p>These are the lanes that should compare directly against current proof and the active release rail before any broader flagship claim tightens.</p>
+        <a class="button-like button-like--ghost" href="#preparing">Open preparing next</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Designing in public</span>
+        <h2>@designingCount horizon@(designingCount == 1 ? string.Empty : "s") have clearer product shape but still need more delivery truth.</h2>
+        <p>Use these when you need the named user pain, likely unlock, and live comparison point without mistaking them for the milestone ledger.</p>
+        <a class="button-like button-like--ghost" href="#designing">Open design tracks</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag tag--amber">Research track</span>
+        <h2>@researchCount horizon@(researchCount == 1 ? string.Empty : "s") are worth following early without reading them as current-preview promises.</h2>
+        <p>Research remains visible because it explains direction, not because it already belongs on the live shelf or install path.</p>
+        <a class="button-like button-like--ghost" href="#research">Open research tracks</a>
+    </article>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Route map</p>
+        <h2 class="editorial-title">Pick horizons, roadmap, live proof, or help on purpose.</h2>
+        <p class="editorial-copy">The future shelf should explain why a lane matters and how far away it is. It should not replace current proof, the milestone roadmap, or the install and support rails.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var choice in routeChoices)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@choice.Badge</span>
+                <h3>@choice.Title</h3>
+                <p>@choice.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in choice.Proof)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+            </article>
+        }
+    </div>
+</section>
 
 @foreach (var group in groups)
 {
@@ -115,6 +212,18 @@
         </div>
     </section>
 }
+
+<section class="release-footnote">
+    <p class="eyebrow">Next step</p>
+    <h2 class="editorial-title">Use horizons to understand the future, then move to the route that owns the present-tense job.</h2>
+    <p class="editorial-copy">Compare with live proof on What works today, inspect active delivery pressure on Roadmap, install from Downloads, or leave the public future shelf for Help when the issue is private or recovery-bound.</p>
+    <div class="stacked-actions">
+        <a class="cta-link cta-link--primary" href="/now">Open what works today</a>
+        <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
+        <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
+    </div>
+    <p class="muted-copy">Need to influence direction? <a class="inline-link" href="/feedback">Open Fixer Board</a>.</p>
+</section>
 
 @{
     var remaining = Model.Horizons.Where(card => !rendered.Contains(card.Card.Id)).ToArray();

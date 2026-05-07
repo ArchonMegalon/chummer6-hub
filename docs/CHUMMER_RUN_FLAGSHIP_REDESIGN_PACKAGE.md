@@ -2,6 +2,7 @@
 
 Date: 2026-05-06
 Scope: `chummer.run` public route family, account-aware front door, ProductLift fallback posture, and the first implementation slice in `chummer.run-services`
+Status: the major route-family redesign slices are already landed in this repo; use this package as the shipped baseline and follow-through guide, not as a greenfield restart brief.
 
 ## 1. Audit Summary
 
@@ -27,6 +28,17 @@ What is still weak:
 - The route family does not yet feel like one flagship product system.
 - GM, player, and creator fit are present in canon, but underused on the front door.
 - The visual hierarchy is still "proof shelf first, flagship operating surface second".
+
+## 1A. Current Shipped Baseline (2026-05-07)
+
+This package started as the 2026-05-06 audit, and several of the weaker spots listed above have already been tightened. Do not restart this work from a blank redesign prompt. The repo already ships most of the route-family work described below:
+
+- `Chummer.Run.Api/Views/PublicLanding/Landing.cshtml` already projects canon `start_here`, `why_trust_it`, `choose_your_lane`, continuity, and flagship-coverage sections onto the live landing route.
+- `Chummer.Run.Api/Views/PublicLanding/Downloads.cshtml`, `Now.cshtml`, `Participate.cshtml`, `Roadmap.cshtml`, `Shelf.cshtml`, `ProductStory.cshtml`, and `TrustPage.cshtml` already share the stronger flagship shell language, route-choice cards, proof rails, and first-party truth boundaries.
+- `Chummer.Run.Api/Views/PublicLanding/Home.cshtml`, `Chummer.Run.Api/Views/Accounts/Account.cshtml`, `Chummer.Run.Api/Views/Auth/Entry.cshtml`, and `Chummer.Run.Api/Views/Shared/_Layout.cshtml` already carry the signed-in continuation, auth-value, shared navigation, and mobile CTA work.
+- `Chummer.Tests/PublicLandingReleaseTrustViewTests.cs` and related route/view tests already fail closed on the core route-family expectations, so new work should extend those guardrails instead of bypassing them.
+
+Use that shipped baseline. The remaining work is not "redesign chummer.run again". It is incremental flagship compression: keep route-family coherence tight, improve thinner sibling routes without breaking canon truth, and prefer extending the current component families over inventing a second visual system.
 
 ## 2. Non-Negotiable Product Truth
 
@@ -305,6 +317,13 @@ Priority order:
 3. sharpen `/downloads` and `/now` visual cadence without weakening trust posture
 4. improve `/roadmap` detail density and `/artifacts` gallery polish
 5. only then promote ProductLift-hosted projection
+
+Current follow-through priority on 2026-05-07:
+
+1. Treat the route-family redesign above as materially shipped across the main public routes; do not reopen it as a blank audit.
+2. Tighten thinner sibling routes such as `/status`, minor trust/legal rails, and signed-in detail density only when they visibly lag the stronger landing/downloads/help/participate/roadmap/artifact shell.
+3. Keep canon projection and fail-closed view tests current whenever route-family components, copy boundaries, or install/support truth move.
+4. Revisit larger visual structure only if a concrete route has drifted away from the shipped component family or the mirrored canon changed.
 
 Reusable components:
 

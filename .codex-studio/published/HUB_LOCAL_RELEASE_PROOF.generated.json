@@ -479,7 +479,7 @@
       "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
     }
   },
-  "base_url": "http://127.0.0.1:8091",
+  "base_url": "https://chummer.run",
   "compose_file": "docker-compose.public-edge.yml",
   "playwright_timeout_seconds": 300,
   "edge_rebuild_skipped": true,
@@ -961,6 +961,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-05T12:17:09Z",
-  "generatedAt": "2026-05-05T12:17:09Z"
+  "generated_at": "2026-05-07T11:32:53Z",
+  "generatedAt": "2026-05-07T11:32:53Z"
 }
