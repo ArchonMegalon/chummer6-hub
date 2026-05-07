@@ -77,7 +77,9 @@ public sealed class PublicSurfaceReferenceFilesTests
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeedbackOperationsDetail.cshtml"),
-            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicSignalOperationsPacket.cshtml")
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicSignalOperationsPacket.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForge.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForgeSubmitted.cshtml"),
         };
 
         string combined = string.Join("\n", publicFiles.Select(static path => File.ReadAllText(path)));
@@ -85,6 +87,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.DoesNotContain("ProductLift", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Emailit", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Icanpreneur", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Lunacal", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Product Governor", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", combined, StringComparison.Ordinal);
     }

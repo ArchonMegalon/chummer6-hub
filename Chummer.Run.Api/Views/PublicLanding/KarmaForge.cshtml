@@ -124,16 +124,16 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Loop state</p>
         <h2 class="editorial-title">The full product loop is visible before any rules work starts.</h2>
-        <p class="editorial-copy">Hub owns the intake and receipts. Icanpreneur-style questions sharpen the demand. EA clustering and Product Governor decisions happen after Chummer-owned packets exist.</p>
+        <p class="editorial-copy">Hub owns the intake and receipts. Structured follow-through prompts sharpen the demand. Review clustering and governance decisions happen after Chummer-owned packets exist.</p>
     </div>
     <div class="trust-rail-list">
         <article class="trust-rail">
             <span class="tag">Queue</span>
-            <p>@Model.Dashboard.GovernorQueueCount packet(s) already normalized for Product Governor review.</p>
+            <p>@Model.Dashboard.GovernorQueueCount packet(s) already normalized for review queue handling.</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Follow-up</span>
-            <p>@Model.Dashboard.FollowUpCandidateCount packet(s) are strong enough for a likely Icanpreneur or Lunacal follow-up.</p>
+            <p>@Model.Dashboard.FollowUpCandidateCount packet(s) are strong enough for a likely follow-up by product operators.</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Shareable</span>
@@ -202,7 +202,7 @@
             <form class="settings-form" method="post" action="@Model.Form.ActionHref">
                 @Html.AntiForgeryToken()
                 <div class="field">
-                    <label for="trackKey">Icanpreneur track</label>
+                    <label for="trackKey">Follow-up track</label>
                     <select id="trackKey" name="TrackKey" required>
                         @foreach (var option in Model.Form.TrackOptions)
                         {
@@ -315,7 +315,7 @@
         </article>
 
         <article class="trust-page-section" id="track-questions">
-            <p class="eyebrow">Icanpreneur prompts</p>
+            <p class="eyebrow">Follow-up prompts</p>
             <h2>@Model.SelectedTrack.Title</h2>
             <p>These are the next questions Chummer will use to sharpen the need without letting interview tooling become truth or package ownership.</p>
             <ul class="trust-page-section__list">
@@ -327,7 +327,7 @@
         </article>
 
         <article class="trust-page-section" id="candidate-decisions">
-            <p class="eyebrow">Product Governor routes</p>
+            <p class="eyebrow">Priority routes</p>
             <h2>Every packet still has to land on a named decision.</h2>
             <p>Discovery does not skip directly to implementation. It has to become a reject, document lane, governed candidate, or core-ruleset review with reasons.</p>
             <p class="muted-copy">The normalized output is explicit: HouseRuleDemandPacket, KarmaForgeCandidate, and RuleEnvironmentImpactHypothesis stay visible before any governor routing or follow-up.</p>

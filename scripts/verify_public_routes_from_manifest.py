@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import re
 import sys
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -20,6 +21,15 @@ DEFAULT_MANIFEST = REPO_ROOT / ".codex-design" / "product" / "PUBLIC_LANDING_MAN
 DEFAULT_OUTPUT = REPO_ROOT / ".codex-studio" / "published" / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 AUTH_OPERATION_OK_STATUSES = {200, 302, 303, 307, 308, 400, 405}
+CONTROLLER_CONTRACT_OK_STATUSES = {200, 302, 303, 307, 308, 400, 404, 405}
+PLACEHOLDER_SAMPLE_LOOKUP = {
+    "case": "sample-case-id",
+    "caseid": "sample-case-id",
+    "case_id": "sample-case-id",
+    "submission": "sample-submission-id",
+    "submissionid": "sample-submission-id",
+    "submission_id": "sample-submission-id",
+}
 ROUTE_LIST_KEYS = ("public_routes", "auth_routes", "registered_routes")
 
 
@@ -80,6 +90,18 @@ def normalize_target(target: str | None) -> tuple[str, tuple[tuple[str, str], ..
     return path, query_items, fragment
 
 
+def _normalize_placeholder_token(token: str) -> str:
+    return "".join(ch for ch in token.lower() if ch.isalnum())
+
+
+def resolve_route_path_placeholders(route_path: str) -> str:
+    def replace_token(match: re.Match[str]) -> str:
+        token = _normalize_placeholder_token(match.group(1))
+        return PLACEHOLDER_SAMPLE_LOOKUP.get(token, f"sample-{token}")
+
+    return re.sub(r"\{([^{}]+)\}", replace_token, route_path)
+
+
 def read_manifest(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     if not isinstance(payload, dict):
@@ -119,6 +141,7 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
     must_exist = bool(route.get("must_exist"))
     guest_fallback = str(route.get("guest_fallback") or "") or None
     request_path = str(route.get("verification_path") or path)
+    resolved_request_path = resolve_route_path_placeholders(request_path)
     verification_mode = str(route.get("verification_mode") or "").strip()
 
     if verification_mode:
@@ -167,19 +190,61 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
                 expectation=expectation,
                 detail=f"could not read {verification_file}: {exc}")
 
-        success = verification_pattern in source
-        detail = f"expected {verification_pattern} in {verification_file}" if not success else f"found {verification_pattern} in {verification_file}"
-        return RouteResult(
-            path=path,
-            audience=audience,
-            purpose=purpose,
-            requires_auth=requires_auth,
-            must_exist=must_exist,
-            guest_fallback=guest_fallback,
-            mode=verification_mode,
-            success=success,
-            expectation=expectation,
-            detail=detail)
+        if not verification_pattern in source:
+            return RouteResult(
+                path=path,
+                audience=audience,
+                purpose=purpose,
+                requires_auth=requires_auth,
+                must_exist=must_exist,
+                guest_fallback=guest_fallback,
+                mode=verification_mode,
+                success=False,
+                status_code=None,
+                final_url=None,
+                expectation=expectation,
+                detail=f"expected {verification_pattern} in {verification_file}")
+
+        expectation = f"{expectation} and resolves {resolved_request_path}"
+        try:
+            status, _, headers, final_url = fetch(
+                base_url,
+                resolved_request_path,
+                public_host=public_host or None,
+                forwarded_proto=forwarded_proto or None,
+                follow_redirects=True)
+            redirect_location = headers.get("location")
+            success = status == 200
+            detail = (
+                f"expected {verification_pattern} in {verification_file} and "
+                f"{resolved_request_path} to resolve 200, got {status}"
+            )
+            return RouteResult(
+                path=path,
+                audience=audience,
+                purpose=purpose,
+                requires_auth=requires_auth,
+                must_exist=must_exist,
+                guest_fallback=guest_fallback,
+                mode=verification_mode,
+                success=success,
+                status_code=status,
+                final_url=final_url,
+                redirect_location=redirect_location,
+                expectation=expectation,
+                detail=detail)
+        except Exception as exc:
+            return RouteResult(
+                path=path,
+                audience=audience,
+                purpose=purpose,
+                requires_auth=requires_auth,
+                must_exist=must_exist,
+                guest_fallback=guest_fallback,
+                mode=verification_mode,
+                success=False,
+                expectation=expectation,
+                detail=f"could not resolve {resolved_request_path}: {exc}")
 
     if requires_auth:
         mode = "registered_fallback"
@@ -187,10 +252,10 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
         try:
             status, _, headers, final_url = fetch(
                 base_url,
-                request_path,
-                public_host=public_host or None,
-                forwarded_proto=forwarded_proto or None,
-                follow_redirects=False)
+            resolved_request_path,
+            public_host=public_host or None,
+            forwarded_proto=forwarded_proto or None,
+            follow_redirects=False)
             redirect_location = headers.get("location")
             success = status in REDIRECT_STATUSES and normalize_target(redirect_location) == normalize_target(guest_fallback)
             detail = (
@@ -229,10 +294,10 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
         try:
             status, _, headers, final_url = fetch(
                 base_url,
-                request_path,
-                public_host=public_host or None,
-                forwarded_proto=forwarded_proto or None,
-                follow_redirects=False)
+            resolved_request_path,
+            public_host=public_host or None,
+            forwarded_proto=forwarded_proto or None,
+            follow_redirects=False)
             redirect_location = headers.get("location")
             success = status in AUTH_OPERATION_OK_STATUSES
             detail = f"expected auth-operation status in {sorted(AUTH_OPERATION_OK_STATUSES)}, got {status}"
@@ -268,7 +333,7 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
     try:
         status, _, headers, final_url = fetch(
             base_url,
-            request_path,
+            resolved_request_path,
             public_host=public_host or None,
             forwarded_proto=forwarded_proto or None,
             follow_redirects=True)
