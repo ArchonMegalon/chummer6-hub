@@ -47,13 +47,45 @@ public sealed class PublicSurfaceReferenceFilesTests
         string manifestPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_LANDING_MANIFEST.yaml");
 
         string doc = File.ReadAllText(docPath);
-        string runbook = File.ReadAllText(runbookPath);
         string manifest = File.ReadAllText(manifestPath);
+        string runbook = File.ReadAllText(runbookPath);
 
         Assert.Contains("/auth/google/start?next=...", doc, StringComparison.Ordinal);
         Assert.Contains("/auth/google/start?next=/participate/codex", manifest, StringComparison.Ordinal);
+        Assert.Contains("/progress", manifest, StringComparison.Ordinal);
+        Assert.Contains("/feedback/operations", manifest, StringComparison.Ordinal);
+        Assert.Contains("/feedback/operations/lookup", manifest, StringComparison.Ordinal);
+        Assert.Contains("/contact/submitted/{caseId}", manifest, StringComparison.Ordinal);
+        Assert.Contains("/participate/karma-forge/submitted/{submissionId}", manifest, StringComparison.Ordinal);
+        Assert.Contains("verification_mode: controller_contract", manifest, StringComparison.Ordinal);
         Assert.Contains("verify_public_routes_from_manifest.py", runbook, StringComparison.Ordinal);
         Assert.Contains(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml", runbook, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_PUBLIC_ROUTE_PROOF.generated.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("https://chummer.run", runbook, StringComparison.Ordinal);
+        Assert.Contains("https://chummer6.run", runbook, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_PUBLIC_ROUTE_PROOF_CHUMMER6_ALIAS.generated.json", runbook, StringComparison.Ordinal);
+        Assert.Contains("stay unpublished", runbook, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SelectedPublicSurfaceCopyAvoidsProviderAndLtdNames()
+    {
+        string[] publicFiles =
+        {
+            RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FEATURE_REGISTRY.yaml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeedbackOperationsDetail.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicSignalOperationsPacket.cshtml")
+        };
+
+        string combined = string.Join("\n", publicFiles.Select(static path => File.ReadAllText(path)));
+
+        Assert.DoesNotContain("ProductLift", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Emailit", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Icanpreneur", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Product Governor", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenAI account in ChatGPT", combined, StringComparison.Ordinal);
     }
 }

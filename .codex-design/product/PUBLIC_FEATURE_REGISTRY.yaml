@@ -11,7 +11,7 @@ cards:
     audience: public
     image_family: solo_operator
     asset_slot: capability_build_runner
-    action_label: Create account to install
+    action_label: Open downloads
     proof_note: "Proof: a real preview build exists now, not just a story about one."
     pain: Clean dossiers, visible tradeoffs, and no hidden modifier stack.
     payoff: Deterministic totals stay readable before you ever take the character to the table.
@@ -502,7 +502,7 @@ cards:
     audience: public
     image_family: archive_stair
     action_label: Open feedback board
-    proof_note: "Projection only: ProductLift collects demand, while Chummer-owned design, support, release, and closeout evidence remain authoritative."
+    proof_note: "Projection only: the hosted public signal mirror collects demand, while Chummer-owned design, support, release, and closeout evidence remain authoritative."
   - id: productlift_roadmap
     bucket: supporting_reads
     title: Public roadmap projection
@@ -522,7 +522,7 @@ cards:
     audience: public
     image_family: dossier_desk
     action_label: View changelog
-    proof_note: "Closeout proof is Chummer-owned before ProductLift notifies voters."
+    proof_note: "Closeout proof is Chummer-owned before public follow-up notifies interested users."
   - id: participate_feedback
     bucket: participate
     title: Report a problem
@@ -535,7 +535,7 @@ cards:
   - id: participate_future
     bucket: participate
     title: Start KARMA FORGE discovery
-    summary: Turn house-rule pain into governed discovery packets with Icanpreneur prompts, clear change notes, and Product Governor routing.
+    summary: Turn house-rule pain into governed discovery packets with guided prompts, clear change notes, and governed routing.
     href: /participate/karma-forge
     badge: Public
     audience: public

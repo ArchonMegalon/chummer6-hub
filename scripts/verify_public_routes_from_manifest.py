@@ -104,6 +104,13 @@ def read_manifest(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     return payload, normalized
 
 
+def resolve_repo_path(path_value: str) -> Path:
+    candidate = Path(path_value)
+    if candidate.is_absolute():
+        return candidate
+    return REPO_ROOT / candidate
+
+
 def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: str | None, forwarded_proto: str | None) -> RouteResult:
     path = str(route.get("path") or "")
     audience = str(route.get("audience") or "")
@@ -111,6 +118,68 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
     requires_auth = bool(route.get("requires_auth"))
     must_exist = bool(route.get("must_exist"))
     guest_fallback = str(route.get("guest_fallback") or "") or None
+    request_path = str(route.get("verification_path") or path)
+    verification_mode = str(route.get("verification_mode") or "").strip()
+
+    if verification_mode:
+        if verification_mode != "controller_contract":
+            return RouteResult(
+                path=path,
+                audience=audience,
+                purpose=purpose,
+                requires_auth=requires_auth,
+                must_exist=must_exist,
+                guest_fallback=guest_fallback,
+                mode=verification_mode,
+                success=False,
+                expectation="recognized verification_mode",
+                detail=f"unsupported verification_mode {verification_mode!r}")
+
+        verification_file_value = str(route.get("verification_file") or "").strip()
+        verification_pattern = str(route.get("verification_pattern") or "")
+        expectation = f"controller contract contains {verification_pattern}"
+        if not verification_file_value or not verification_pattern:
+            return RouteResult(
+                path=path,
+                audience=audience,
+                purpose=purpose,
+                requires_auth=requires_auth,
+                must_exist=must_exist,
+                guest_fallback=guest_fallback,
+                mode=verification_mode,
+                success=False,
+                expectation=expectation,
+                detail="controller_contract verification requires verification_file and verification_pattern")
+
+        verification_file = resolve_repo_path(verification_file_value)
+        try:
+            source = verification_file.read_text(encoding="utf-8")
+        except Exception as exc:
+            return RouteResult(
+                path=path,
+                audience=audience,
+                purpose=purpose,
+                requires_auth=requires_auth,
+                must_exist=must_exist,
+                guest_fallback=guest_fallback,
+                mode=verification_mode,
+                success=False,
+                expectation=expectation,
+                detail=f"could not read {verification_file}: {exc}")
+
+        success = verification_pattern in source
+        detail = f"expected {verification_pattern} in {verification_file}" if not success else f"found {verification_pattern} in {verification_file}"
+        return RouteResult(
+            path=path,
+            audience=audience,
+            purpose=purpose,
+            requires_auth=requires_auth,
+            must_exist=must_exist,
+            guest_fallback=guest_fallback,
+            mode=verification_mode,
+            success=success,
+            expectation=expectation,
+            detail=detail)
 
     if requires_auth:
         mode = "registered_fallback"
@@ -118,7 +187,7 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
         try:
             status, _, headers, final_url = fetch(
                 base_url,
-                path,
+                request_path,
                 public_host=public_host or None,
                 forwarded_proto=forwarded_proto or None,
                 follow_redirects=False)
@@ -160,7 +229,7 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
         try:
             status, _, headers, final_url = fetch(
                 base_url,
-                path,
+                request_path,
                 public_host=public_host or None,
                 forwarded_proto=forwarded_proto or None,
                 follow_redirects=False)
@@ -199,7 +268,7 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
     try:
         status, _, headers, final_url = fetch(
             base_url,
-            path,
+            request_path,
             public_host=public_host or None,
             forwarded_proto=forwarded_proto or None,
             follow_redirects=True)
@@ -247,6 +316,7 @@ def build_report(manifest: dict[str, Any], manifest_path: Path, args: argparse.N
     registered = [route for route in routes if route.requires_auth]
     auth_operations = [route for route in routes if route.mode == "auth_operation"]
     public = [route for route in routes if route.mode == "public_route"]
+    controller_contracts = [route for route in routes if route.mode == "controller_contract"]
 
     return {
         "contract_name": "chummer.public_route_proof",
@@ -264,6 +334,7 @@ def build_report(manifest: dict[str, Any], manifest_path: Path, args: argparse.N
             "public_route_count": len(public),
             "auth_operation_count": len(auth_operations),
             "registered_route_count": len(registered),
+            "controller_contract_count": len(controller_contracts),
             "failed_paths": [route.path for route in failed],
         },
         "routes": [asdict(route) for route in routes],

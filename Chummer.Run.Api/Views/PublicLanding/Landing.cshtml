@@ -26,10 +26,10 @@
     var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
     var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
-    var contextualHeroPrimaryHref = guestNeedsInstallGate
-        ? release.GuestGatePrimaryHref
-        : Model.PrimaryHeroAction.Href;
-    var contextualProductPrimaryAction = Model.PrimaryHeroAction;
+    var guestReadableHeroPrimaryHref = Model.PrimaryHeroAction.Href;
+    var accountAwareInstallPrimaryHref = guestNeedsInstallGate
+        ? release.GuestGatePrimaryHref ?? guestReadableHeroPrimaryHref
+        : guestReadableHeroPrimaryHref;
     var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
@@ -46,7 +46,7 @@
         ? "Your signed-in route keeps linked installs, device return, and support follow-through on one calmer rail."
         : "The build stays the same for everyone. The account-aware piece is the install handoff, device continuity, and support history.";
     var installRailPrimaryLabel = Model.Chrome.Authenticated ? "Open home" : "Create account and install";
-    var installRailPrimaryHref = Model.Chrome.Authenticated ? "/home" : contextualHeroPrimaryHref;
+    var installRailPrimaryHref = Model.Chrome.Authenticated ? "/home" : accountAwareInstallPrimaryHref;
     var installRailSecondaryLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
     var installRailSecondaryHref = Model.Chrome.Authenticated ? "/account/access" : "/login?next=/home";
 
@@ -57,18 +57,7 @@
 
     string ContextualPreviewHref(string? href)
     {
-        var resolvedHref = href ?? string.Empty;
-        if (!guestNeedsInstallGate)
-        {
-            return resolvedHref;
-        }
-
-        var trimmed = resolvedHref.Trim();
-        var queryIndex = trimmed.IndexOf('?');
-        var route = queryIndex >= 0 ? trimmed[..queryIndex] : trimmed;
-        return string.Equals(route, "/downloads", StringComparison.OrdinalIgnoreCase)
-            ? (release.GuestGatePrimaryHref ?? resolvedHref)
-            : resolvedHref;
+        return href ?? string.Empty;
     }
 
     static string TrustRowValue(
@@ -104,7 +93,7 @@
             <h1 class="launch-hero__title">@Model.Surface.Headline</h1>
             <p class="launch-hero__support">@Model.Surface.Subhead</p>
             <div class="launch-hero__actions">
-                <a class="button-like button-like--primary" href="@contextualHeroPrimaryHref">@Model.PrimaryHeroAction.Label</a>
+                <a class="button-like button-like--primary" href="@guestReadableHeroPrimaryHref">@Model.PrimaryHeroAction.Label</a>
                 <a class="button-like button-like--secondary" href="@Model.SecondaryHeroAction.Href">@Model.SecondaryHeroAction.Label</a>
             </div>
             <div class="hero-installrail" aria-label="Recommended install path">
@@ -191,7 +180,7 @@
             </div>
         }
         <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@contextualProductPrimaryAction.Href">@contextualProductPrimaryAction.Label</a>
+            <a class="button-like button-like--primary" href="@Model.PrimaryHeroAction.Href">@Model.PrimaryHeroAction.Label</a>
         </div>
         <p class="muted-copy">Need the broader shelf? <a class="inline-link" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>.</p>
     </div>

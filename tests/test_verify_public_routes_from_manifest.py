@@ -185,6 +185,76 @@ class VerifyPublicRoutesFromManifestTests(unittest.TestCase):
         self.assertEqual(report["summary"]["failed_paths"], ["/private"])
         self.assertIn("expected anonymous redirect", report["routes"][0]["detail"])
 
+    def test_verifier_supports_controller_contract_routes_for_parameterized_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            temp_root = Path(tmp_dir)
+            manifest_path = temp_root / "PUBLIC_LANDING_MANIFEST.yaml"
+            report_path = temp_root / "route-proof.json"
+            controller_path = temp_root / "PublicLandingController.cs"
+            controller_path.write_text(
+                '[HttpGet("/contact/submitted/{caseId}")]\n'
+                '[HttpGet("/participate/karma-forge/submitted/{submissionId}")]\n',
+                encoding="utf-8",
+            )
+            manifest_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "surface": "chummer.run",
+                        "version": 1,
+                        "public_routes": [
+                            {
+                                "path": "/contact/submitted/{caseId}",
+                                "audience": "public",
+                                "purpose": "support_submission_receipt",
+                                "requires_auth": False,
+                                "guest_fallback": "/contact/submitted/{caseId}",
+                                "must_exist": True,
+                                "verification_mode": "controller_contract",
+                                "verification_file": str(controller_path),
+                                "verification_pattern": '[HttpGet("/contact/submitted/{caseId}")]',
+                            },
+                            {
+                                "path": "/participate/karma-forge/submitted/{submissionId}",
+                                "audience": "public",
+                                "purpose": "governed_future_signal_receipt",
+                                "requires_auth": False,
+                                "guest_fallback": "/participate/karma-forge/submitted/{submissionId}",
+                                "must_exist": True,
+                                "verification_mode": "controller_contract",
+                                "verification_file": str(controller_path),
+                                "verification_pattern": '[HttpGet("/participate/karma-forge/submitted/{submissionId}")]',
+                            },
+                        ],
+                    },
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+            completed = subprocess.run(
+                [
+                    "python3",
+                    str(SCRIPT),
+                    "--base-url",
+                    self.base_url,
+                    "--manifest",
+                    str(manifest_path),
+                    "--output",
+                    str(report_path),
+                ],
+                cwd=REPO_ROOT,
+                capture_output=True,
+                text=True,
+            )
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(report["summary"]["failed_count"], 0)
+        self.assertEqual(report["summary"]["controller_contract_count"], 2)
+        self.assertEqual(
+            [route["mode"] for route in report["routes"]],
+            ["controller_contract", "controller_contract"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

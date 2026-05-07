@@ -3519,7 +3519,7 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
-    public void LandingPageContextualizesGuestPreviewInstallLinks()
+    public void LandingPageKeepsGuestDownloadsSeparateFromTheAccountAwareInstallRail()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "ReleaseSelectionService.cs");
@@ -3535,8 +3535,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("release.Recommended.ActionLabel", service, StringComparison.Ordinal);
         Assert.Contains("release.Recommended.DispatchHref", service, StringComparison.Ordinal);
         Assert.Contains("guestNeedsInstallGate", landingView, StringComparison.Ordinal);
-        Assert.Contains("contextualHeroPrimaryHref", landingView, StringComparison.Ordinal);
-        Assert.Contains("contextualProductPrimaryAction", landingView, StringComparison.Ordinal);
+        Assert.Contains("guestReadableHeroPrimaryHref", landingView, StringComparison.Ordinal);
+        Assert.Contains("accountAwareInstallPrimaryHref", landingView, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref", landingView, StringComparison.Ordinal);
         Assert.Contains("release.GuestGatePrimaryHref", landingView, StringComparison.Ordinal);
     }
@@ -3638,12 +3638,13 @@ public sealed class VerificationEntryPointTests
     }
 
     [Fact]
-    public void HubLiveAuditDownloadsRouteUsesCurrentInstallCtaText()
+    public void HubLiveAuditTracksCurrentLandingAndDownloadsCtaText()
     {
         string auditPath = RepoPaths.FromRoot("scripts", "hub-live-audit.py");
         string audit = File.ReadAllText(auditPath);
 
         Assert.Contains("\"/downloads\"", audit, StringComparison.Ordinal);
+        Assert.Contains("\"Open downloads\"", audit, StringComparison.Ordinal);
         Assert.Contains("\"Create account to install\"", audit, StringComparison.Ordinal);
         Assert.DoesNotContain("\"Get preview build\"", audit, StringComparison.Ordinal);
     }
@@ -3668,12 +3669,13 @@ public sealed class VerificationEntryPointTests
 
         Assert.Contains("`Create account to install`", downloadsPolicy, StringComparison.Ordinal);
         Assert.DoesNotContain("`Get preview build`", downloadsPolicy, StringComparison.Ordinal);
-        Assert.Contains("`Create account to install`", landingPolicy, StringComparison.Ordinal);
+        Assert.Contains("`Open downloads`", landingPolicy, StringComparison.Ordinal);
         Assert.DoesNotContain("`Get preview build`", landingPolicy, StringComparison.Ordinal);
-        Assert.Contains("product_proof_primary_label: Create account to install", landingManifest, StringComparison.Ordinal);
-        Assert.Contains("Create account to install the current preview", landingManifest, StringComparison.Ordinal);
-        Assert.DoesNotContain("product_proof_primary_label: Install the current preview", landingManifest, StringComparison.Ordinal);
-        Assert.Contains("action_label: Create account to install", canonicalFeatureRegistry, StringComparison.Ordinal);
+        Assert.Contains("headline: Build a runner, explain every ruling, and recover the campaign.", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("product_proof_primary_label: Open downloads", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("Open downloads for the current preview", landingManifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("product_proof_primary_label: Create account to install", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("action_label: Open downloads", canonicalFeatureRegistry, StringComparison.Ordinal);
         Assert.DoesNotContain("action_label: Install the current preview", canonicalFeatureRegistry, StringComparison.Ordinal);
         Assert.Equal(landingManifest, mirroredLandingManifest);
         Assert.Equal(canonicalFeatureRegistry, mirroredFeatureRegistry);

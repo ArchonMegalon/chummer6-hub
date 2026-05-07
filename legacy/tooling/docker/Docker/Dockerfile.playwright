@@ -9,4 +9,5 @@ RUN npm init -y \
 COPY scripts/e2e-ui-playwright.cjs /work/scripts/e2e-ui-playwright.cjs
 COPY scripts/e2e-portal.cjs /work/scripts/e2e-portal.cjs
 COPY scripts/e2e-hub-playwright.cjs /work/scripts/e2e-hub-playwright.cjs
+COPY scripts/check-public-mobile-nav.cjs /work/scripts/check-public-mobile-nav.cjs
 COPY Chummer.Tests/TestFiles/BLUE.chum5 /work/testdata/BLUE.chum5
