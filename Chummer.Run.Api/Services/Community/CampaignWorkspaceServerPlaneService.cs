@@ -6,6 +6,7 @@ using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.Search;
+using System.Collections.Concurrent;
 using ApiWorkspaceRestoreConflictReceiptProjection = Chummer.Run.Api.Contracts.WorkspaceRestoreConflictReceiptProjection;
 
 namespace Chummer.Run.Api.Services.Community;
@@ -435,6 +436,17 @@ public sealed class CampaignWorkspaceServerPlaneService
         IReadOnlyList<SupportCaseDigestViewModel> SupportDigests,
         DateTimeOffset GeneratedAtUtc);
 
+    private sealed record SearchablePrepPacket(
+        GovernedPrepPacketSummary Packet,
+        string Searchable,
+        string NormalizedSearchable);
+
+    private sealed record CachedWorkspacePrepLibrary(
+        WorkspaceContext? Context,
+        CampaignPrepLibrarySummary PrepLibrary,
+        IReadOnlyList<SearchablePrepPacket> SearchablePackets,
+        DateTimeOffset CachedAtUtc);
+
     private enum RestoreReceiptStatusScope
     {
         Restore,
@@ -462,6 +474,9 @@ public sealed class CampaignWorkspaceServerPlaneService
         '\n',
         '\t'
     ];
+
+    private static readonly ConcurrentDictionary<string, CachedWorkspacePrepLibrary> PrepLibraryCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly TimeSpan PrepLibraryCacheTtl = TimeSpan.FromMinutes(2);
 
     private readonly CampaignSpineService _campaignSpine;
     private readonly SupportCaseService _supportCases;
@@ -1911,17 +1926,18 @@ public sealed class CampaignWorkspaceServerPlaneService
     {
         ArgumentNullException.ThrowIfNull(user);
 
-        WorkspaceContext? context = ResolveWorkspaceContext(user, workspaceId, installLinking);
+        WorkspaceContext? context;
+        CachedWorkspacePrepLibrary cachedPrepLibrary = ResolveCachedWorkspacePrepLibrary(user, workspaceId, installLinking, out context);
         if (context is null)
         {
             return null;
         }
 
-        CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
         string? normalizedQuery = NormalizeOptional(queryText);
         IReadOnlyList<string> queryTokens = BuildPrepLibraryQueryTokens(normalizedQuery);
-        IReadOnlyList<GovernedPrepPacketSummary> packets = prepLibrary.Packets
-            .Where(packet => MatchesPrepLibraryQuery(packet, queryTokens))
+        IReadOnlyList<GovernedPrepPacketSummary> packets = cachedPrepLibrary.SearchablePackets
+            .Where(packet => MatchesCachedPrepLibraryQuery(packet, queryTokens))
+            .Select(static packet => packet.Packet)
             .ToArray();
 
         return new CampaignPrepLibrarySearchResponse(
@@ -1952,7 +1968,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
         RunProjection? targetRun = ResolvePrepLaunchRun(context.Workspace, context.LeadRun, request.TargetRunId);
         SceneProjection? targetScene = ResolvePrepLaunchScene(targetRun, request.TargetSceneId);
-        return _campaignSpine.RecordPrepLaunch(
+        GovernedPrepLaunchProjection launch = _campaignSpine.RecordPrepLaunch(
             user,
             context.Workspace,
             packet.PacketId,
@@ -1962,6 +1978,8 @@ public sealed class CampaignWorkspaceServerPlaneService
             targetRun,
             targetScene,
             request.Note);
+        InvalidateCachedWorkspacePrepLibrary(user, workspaceId);
+        return launch;
     }
 
     public TravelPrefetchReceiptProjection? StageTravelPrefetch(
@@ -1983,7 +2001,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
         IReadOnlyList<string> inventoryLines = BuildTravelPrefetchInventoryLines(context.Workspace, context.Restore, prepLibrary, device);
         string prefetchSummary = BuildTravelPrefetchSummary(context.Workspace, device, prepLibrary);
-        return _campaignSpine.RecordTravelPrefetch(
+        TravelPrefetchReceiptProjection receipt = _campaignSpine.RecordTravelPrefetch(
             user,
             context.Workspace,
             device,
@@ -1994,6 +2012,8 @@ public sealed class CampaignWorkspaceServerPlaneService
                 "Install-local caches, secrets, and runtime state stay local even when travel packets are staged for bounded offline use."
             ]).ToArray(),
             request.Note);
+        InvalidateCachedWorkspacePrepLibrary(user, workspaceId);
+        return receipt;
     }
 
     public AftermathRecapPackageProjection? GenerateAftermathRecapPackage(
@@ -2016,7 +2036,7 @@ public sealed class CampaignWorkspaceServerPlaneService
         string title = BuildAftermathPackageTitle(context.Workspace, targetRun, packageKind, request.Title);
         string summary = BuildAftermathPackageSummary(context.Workspace, targetRun, packageKind);
         IReadOnlyList<string> evidenceLines = BuildAftermathPackageEvidenceLines(context.Workspace, context.Restore, targetRun, packageKind, request.Note);
-        return _campaignSpine.RecordAftermathRecapPackage(
+        AftermathRecapPackageProjection package = _campaignSpine.RecordAftermathRecapPackage(
             user,
             context.Workspace,
             targetRun,
@@ -2024,6 +2044,81 @@ public sealed class CampaignWorkspaceServerPlaneService
             title,
             summary,
             evidenceLines);
+        InvalidateCachedWorkspacePrepLibrary(user, workspaceId);
+        return package;
+    }
+
+    private CachedWorkspacePrepLibrary ResolveCachedWorkspacePrepLibrary(
+        HubUserDto user,
+        string workspaceId,
+        InstallLinkingSummaryDto? installLinking,
+        out WorkspaceContext? context)
+    {
+        string? normalizedWorkspaceId = NormalizeOptional(workspaceId);
+        if (normalizedWorkspaceId is null)
+        {
+            context = null;
+            return CreateEmptyCachedWorkspacePrepLibrary();
+        }
+
+        string cacheKey = BuildWorkspacePrepLibraryCacheKey(user, normalizedWorkspaceId);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (PrepLibraryCache.TryGetValue(cacheKey, out CachedWorkspacePrepLibrary? cached)
+            && now - cached.CachedAtUtc <= PrepLibraryCacheTtl)
+        {
+            PrepLibraryCache[cacheKey] = cached with { CachedAtUtc = now };
+            context = cached.Context;
+            return cached;
+        }
+
+        if (cached is not null)
+        {
+            PrepLibraryCache.TryRemove(cacheKey, out _);
+        }
+
+        context = ResolveWorkspaceContext(user, normalizedWorkspaceId, installLinking);
+        if (context is null)
+        {
+            return CreateEmptyCachedWorkspacePrepLibrary();
+        }
+
+        CampaignPrepLibrarySummary prepLibrary = BuildPrepLibrary(context.Workspace, context.Restore, context.LeadRun);
+        SearchablePrepPacket[] searchablePackets = prepLibrary.Packets
+            .Select(BuildSearchablePrepPacket)
+            .ToArray();
+        CachedWorkspacePrepLibrary resolved = new(context, prepLibrary, searchablePackets, now);
+        PrepLibraryCache[cacheKey] = resolved;
+        return resolved;
+    }
+
+    private static CachedWorkspacePrepLibrary CreateEmptyCachedWorkspacePrepLibrary()
+        => new(
+            Context: null,
+            PrepLibrary: new CampaignPrepLibrarySummary(
+                Summary: string.Empty,
+                BindingSummary: string.Empty,
+                SearchSummary: string.Empty,
+                ReusablePacketCount: 0,
+                SearchablePacketCount: 0,
+                Packets: Array.Empty<GovernedPrepPacketSummary>()),
+            SearchablePackets: Array.Empty<SearchablePrepPacket>(),
+            CachedAtUtc: DateTimeOffset.MinValue);
+
+    private static string BuildWorkspacePrepLibraryCacheKey(HubUserDto user, string workspaceId)
+        => string.Join('|',
+            NormalizeOptional(user.UserId) ?? string.Empty,
+            NormalizeOptional(user.SubjectId) ?? string.Empty,
+            workspaceId);
+
+    private static void InvalidateCachedWorkspacePrepLibrary(HubUserDto user, string workspaceId)
+    {
+        string? normalizedWorkspaceId = NormalizeOptional(workspaceId);
+        if (normalizedWorkspaceId is null)
+        {
+            return;
+        }
+
+        PrepLibraryCache.TryRemove(BuildWorkspacePrepLibraryCacheKey(user, normalizedWorkspaceId), out _);
     }
 
     private WorkspaceContext? ResolveWorkspaceContext(
@@ -3873,13 +3968,13 @@ public sealed class CampaignWorkspaceServerPlaneService
                 : $"Reusable across {workspace.CampaignName} and currently anchored to {leadRun.Title} for long-lived return continuity.",
             Reusable: true,
             SearchTerms: BuildSearchTerms(
-                workspace.CampaignName,
                 "campaign",
                 "memory",
                 "archive",
                 "history",
                 "timeline",
                 "ledger",
+                workspace.CampaignName,
                 campaignMemory?.Label,
                 campaignMemory?.Summary,
                 campaignMemory?.ReturnSummary,
@@ -4535,9 +4630,12 @@ public sealed class CampaignWorkspaceServerPlaneService
             SearchTerms: BuildSearchTerms(
                 workspace.CampaignName,
                 "roster",
-                "movement",
                 "crew",
+                "move",
+                "handoff",
+                "movement",
                 "assignment",
+                "transfer",
                 transfers.Select(static item => item.RunnerHandle),
                 transfers.Select(static item => item.SourceCampaignName),
                 transfers.Select(static item => item.TargetCampaignName),
@@ -5616,12 +5714,12 @@ public sealed class CampaignWorkspaceServerPlaneService
                 : $"Travel staging actions stay attached to {leadRun.Title} and the same account-audit campaign backbone.",
             Reusable: true,
             SearchTerms: BuildSearchTerms(
-                workspace.CampaignName,
                 "travel",
                 "prefetch",
                 "offline",
                 "safehouse",
                 "device",
+                workspace.CampaignName,
                 receipts.Select(static item => item.InstallationId),
                 receipts.Select(static item => item.DeviceRole),
                 receipts.Select(static item => item.Platform),
@@ -5735,9 +5833,15 @@ public sealed class CampaignWorkspaceServerPlaneService
                 : $"Reusable across {restore.ClaimedDevices.Count} claimed device(s) without moving install-local secrets into the roaming restore packet.",
             Reusable: true,
             SearchTerms: BuildSearchTerms(
-                workspace.CampaignName,
                 "safehouse",
                 "travel",
+                "prefetch",
+                "offline",
+                "cache",
+                "stale",
+                "staged",
+                "recap",
+                workspace.CampaignName,
                 restore.ClaimedDevices.Select(static item => item.DeviceRole),
                 restore.ClaimedDevices.Select(static item => item.Platform),
                 restore.ClaimedDevices.Select(static item => item.HeadId),
@@ -6364,19 +6468,13 @@ public sealed class CampaignWorkspaceServerPlaneService
     private static void RewritePrepLibraryQueryAliases(HashSet<string> tokens)
         => PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
 
-    private static bool MatchesPrepLibraryQuery(
-        GovernedPrepPacketSummary packet,
-        IReadOnlyList<string> queryTokens)
+    private static SearchablePrepPacket BuildSearchablePrepPacket(GovernedPrepPacketSummary packet)
     {
-        if (queryTokens.Count == 0)
-        {
-            return true;
-        }
-
         string searchable = string.Join(
             " ",
             new[]
             {
+                "prep library packet session return loop",
                 packet.Title,
                 packet.Summary,
                 packet.BindingSummary
@@ -6385,11 +6483,30 @@ public sealed class CampaignWorkspaceServerPlaneService
             .Concat(packet.EvidenceLines)
             .Where(static text => !string.IsNullOrWhiteSpace(text)))
             .ToLowerInvariant();
-        string normalizedSearchable = NormalizeSearchToken(searchable).ToLowerInvariant();
+
+        return new SearchablePrepPacket(
+            Packet: packet,
+            Searchable: searchable,
+            NormalizedSearchable: NormalizeSearchToken(searchable).ToLowerInvariant());
+    }
+
+    private static bool MatchesPrepLibraryQuery(
+        GovernedPrepPacketSummary packet,
+        IReadOnlyList<string> queryTokens)
+        => MatchesCachedPrepLibraryQuery(BuildSearchablePrepPacket(packet), queryTokens);
+
+    private static bool MatchesCachedPrepLibraryQuery(
+        SearchablePrepPacket packet,
+        IReadOnlyList<string> queryTokens)
+    {
+        if (queryTokens.Count == 0)
+        {
+            return true;
+        }
 
         return queryTokens.All(token =>
-            searchable.Contains(token, StringComparison.OrdinalIgnoreCase)
-            || normalizedSearchable.Contains(token, StringComparison.OrdinalIgnoreCase));
+            packet.Searchable.Contains(token, StringComparison.OrdinalIgnoreCase)
+            || packet.NormalizedSearchable.Contains(token, StringComparison.OrdinalIgnoreCase));
     }
 
     private static GovernedPrepPacketSummary ResolvePrepPacket(

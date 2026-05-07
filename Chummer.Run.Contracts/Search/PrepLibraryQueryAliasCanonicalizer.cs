@@ -1209,22 +1209,32 @@ public static class PrepLibraryQueryAliasCanonicalizer
             tokens.Add("handoff");
         }
 
+        if (tokens.Contains("crewhandoff"))
+        {
+            tokens.Remove("crewhandoff");
+            tokens.Add("crew");
+            tokens.Add("handoff");
+        }
+
         if (tokens.Contains("crewhandoffs"))
         {
             tokens.Remove("crewhandoffs");
-            tokens.Add("crewhandoff");
+            tokens.Add("crew");
+            tokens.Add("handoff");
         }
 
         if (tokens.Contains("crewhandover"))
         {
             tokens.Remove("crewhandover");
-            tokens.Add("crewhandoff");
+            tokens.Add("crew");
+            tokens.Add("handoff");
         }
 
         if (tokens.Contains("crewhandovers"))
         {
             tokens.Remove("crewhandovers");
-            tokens.Add("crewhandoff");
+            tokens.Add("crew");
+            tokens.Add("handoff");
         }
 
         if (tokens.Contains("roster") && tokens.Contains("moves"))
@@ -1683,6 +1693,30 @@ public static class PrepLibraryQueryAliasCanonicalizer
         {
             tokens.Remove("oppositioncontrol");
             tokens.Remove("oppositioncontrols");
+            tokens.Add("opposition");
+        }
+
+        if (tokens.Contains("encounter")
+            || tokens.Contains("encounters")
+            || tokens.Contains("enemy")
+            || tokens.Contains("enemies")
+            || tokens.Contains("hostile")
+            || tokens.Contains("hostiles")
+            || tokens.Contains("adversary")
+            || tokens.Contains("adversaries")
+            || tokens.Contains("threat")
+            || tokens.Contains("threats"))
+        {
+            tokens.Remove("encounter");
+            tokens.Remove("encounters");
+            tokens.Remove("enemy");
+            tokens.Remove("enemies");
+            tokens.Remove("hostile");
+            tokens.Remove("hostiles");
+            tokens.Remove("adversary");
+            tokens.Remove("adversaries");
+            tokens.Remove("threat");
+            tokens.Remove("threats");
             tokens.Add("opposition");
         }
 

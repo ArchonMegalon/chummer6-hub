@@ -255,6 +255,73 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void PrepLibraryQueryMatchingUsesPrepLibraryContextForCompactPacketFormsWhenPacketOmitsGenericLabels()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "prep:live-audit-event-control",
+            Kind: "event_control_packet",
+            Title: "Live Audit preview season event and season controls",
+            Summary: "6 event-control receipt(s) keep season operations and return-loop governance on one lane.",
+            BindingSummary: "Bound to campaign return and season operations receipts.",
+            Reusable: true,
+            SearchTerms: ["Live", "Audit", "preview", "season", "event", "control", "opposition", "return", "operations", "roster"],
+            EvidenceLines: ["GM event-control governance remains active for the next launch window."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-05-07T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarypacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("preplibrarypackets")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("oppositionpacket")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("eventcontrolpacket")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixpacket")));
+    }
+
+    [Fact]
+    public void PrepLibraryQueryMatchingUsesPrepLibraryContextForCompactReturnLoopForms()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "prep:live-audit-diary-return",
+            Kind: "continuity_packet",
+            Title: "Continuity Probe preview season diary, contacts, and heat return packet",
+            Summary: "7 diary/continuity signal(s) and 1 relationship signal(s) stay on one governed return lane for downtime and next-session reopen.",
+            BindingSummary: "Bound to campaign return and continuity receipts.",
+            Reusable: true,
+            SearchTerms: ["diary", "journal", "sessionlog", "contact", "contacts", "connection", "heat", "aftermath", "recap", "return", "connections", "faction"],
+            EvidenceLines: ["Continuity signals remain attached to the governed return lane."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-05-07T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diariesreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("diaryreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("returnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("sessionreturnloop")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("nextsessionreturnloop")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixreturnloop")));
+    }
+
+    [Fact]
+    public void PrepLibraryQueryMatchingSupportsCompactStaleCacheFormsOnLiveTravelPacketVocabulary()
+    {
+        var packet = new GovernedPrepPacketSummary(
+            PacketId: "travel:live-audit-cache",
+            Kind: "travel_packet",
+            Title: "Cache Family Probe preview season travel cache packet",
+            Summary: "2 reconnectable artifact(s) and 1 rule snapshot(s) stay staged for bounded offline return.",
+            BindingSummary: "Reusable across 2 claimed device(s) without moving install-local secrets into the roaming restore packet.",
+            Reusable: true,
+            SearchTerms: ["Cache", "Family", "Probe", "preview", "season", "safehouse", "travel", "offline", "cache", "stale", "staged", "linux", "avalonia"],
+            EvidenceLines: ["Travel cache packet stays attached to governed restore evidence."],
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-05-07T00:00:00Z"));
+
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("stalecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("stalecaches")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("staleofflinecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("staleofflinecaches")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("offlinecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelcache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousecache")));
+        Assert.False(InvokeMatches(packet, InvokeBuildTokens("matrixcache")));
+    }
+
+    [Fact]
     public void PrepLibraryQueryMatchingSupportsCompactGovernedPacketForms()
     {
         var packet = new GovernedPrepPacketSummary(
@@ -1419,6 +1486,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<string> splitCrewTransferTokens = InvokeBuildTokens("crew transfer");
         IReadOnlyList<string> splitCrewHandoffsTokens = InvokeBuildTokens("crew handoffs");
         IReadOnlyList<string> splitCrewHandoffTokens = InvokeBuildTokens("crew handoff");
+        IReadOnlyList<string> compactCrewHandoffTokens = InvokeBuildTokens("crewhandoff");
+        IReadOnlyList<string> compactCrewHandoffsTokens = InvokeBuildTokens("crewhandoffs");
         IReadOnlyList<string> compactCrewHandoverTokens = InvokeBuildTokens("crewhandover");
         IReadOnlyList<string> compactCrewHandoversTokens = InvokeBuildTokens("crewhandovers");
         IReadOnlyList<string> splitCrewHandoverTokens = InvokeBuildTokens("crew handover");
@@ -1474,6 +1543,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.True(InvokeMatches(packet, splitCrewTransferTokens));
         Assert.True(InvokeMatches(packet, splitCrewHandoffsTokens));
         Assert.True(InvokeMatches(packet, splitCrewHandoffTokens));
+        Assert.True(InvokeMatches(packet, compactCrewHandoffTokens));
+        Assert.True(InvokeMatches(packet, compactCrewHandoffsTokens));
         Assert.True(InvokeMatches(packet, compactCrewHandoverTokens));
         Assert.True(InvokeMatches(packet, compactCrewHandoversTokens));
         Assert.True(InvokeMatches(packet, splitCrewHandoverTokens));
@@ -1670,6 +1741,24 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains("ledger", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
         Assert.Contains(packet.EvidenceLines, line => line.Contains("long-lived memory", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("memory ledger", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void CampaignMemoryPacketKeepsLedgerAliasesWhenCampaignNamesAreLong()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithCampaignMemorySignals() with
+        {
+            CampaignName = "Longform Preview Season Campaign Memory Ledger Proof Lane"
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "campaign_memory_packet", StringComparison.Ordinal));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("ledger")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("ledgers")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("timeline")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("history")));
     }
 
     [Fact]
@@ -5371,6 +5460,24 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void TravelPrefetchPacketKeepsCompactAliasesWhenCampaignNamesAreLong()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts() with
+        {
+            CampaignName = "Longform Preview Season Travel Prefetch Proof Lane"
+        };
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_prefetch_packet", StringComparison.Ordinal));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelprefetch")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelprefetches")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("offlinecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("safehousecache")));
+    }
+
+    [Fact]
     public void PrepLaunchPacketDeduplicatesIdenticalLaunchVersions_WhenPayloadRepeatsSameRow()
     {
         CampaignWorkspaceProjection seed = BuildWorkspaceWithPrepLaunchAndTravelPrefetchReceipts();
@@ -5637,6 +5744,25 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_recap_bundle", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(packet.EvidenceLines, line => line.Contains("campaign_approved", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("recap", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TravelPacketKeepsStaleCacheAliasesWhenCampaignNamesAreLong()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath() with
+        {
+            CampaignName = "Longform Preview Season Travel Cache Proof Lane"
+        };
+        WorkspaceRestoreProjection restore = BuildRestoreWithTravelPacketSparseEvidence();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "travel_packet", StringComparison.Ordinal));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("stalecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("staleofflinecache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelcache")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelprefetch")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("travelprefetches")));
     }
 
     [Fact]
@@ -6783,7 +6909,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
 
         GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
         Assert.True(packet.Reusable);
-        Assert.Contains("campaign", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("roster", packet.SearchTerms, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -7802,6 +7928,23 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void RosterMovementPacketMatchesCompactHandoffAliasesWhenBuiltFromLiveTransfers()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterTransfersSparseOnly();
+        WorkspaceRestoreProjection restore = BuildEmptyRestore();
+
+        IReadOnlyList<GovernedPrepPacketSummary> packets = InvokeBuildPrepPackets(workspace, restore);
+
+        GovernedPrepPacketSummary packet = Assert.Single(packets, item => string.Equals(item.Kind, "roster_movement_packet", StringComparison.Ordinal));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rosterhandoff")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rosterhandoffs")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rosterhandover")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("rosterhandovers")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("crew handoff")));
+        Assert.True(InvokeMatches(packet, InvokeBuildTokens("crew handoffs")));
+    }
+
+    [Fact]
     public void EventControlPacketIncludesRosterTransferIdentityFallbackWhenTransferSummariesAreSparse()
     {
         CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterTransfersSparseOnly();
@@ -8308,26 +8451,24 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             handoff.Outputs,
             output =>
             {
-                Assert.Equal("bounded_failure", output.PublicationState);
-                Assert.Equal("receipt_required", output.TrustBand);
-                Assert.False(output.Discoverable);
-                Assert.False(string.IsNullOrWhiteSpace(output.ArtifactId));
-                Assert.Contains("receipt:", output.ArtifactId!, StringComparison.OrdinalIgnoreCase);
+                Assert.Equal("ready", output.PublicationState);
+                Assert.Equal("governed", output.TrustBand);
+                Assert.True(output.Discoverable);
+                Assert.True(string.IsNullOrWhiteSpace(output.ArtifactId));
                 Assert.NotNull(output.PublicationSummary);
-                Assert.Contains("visible output receipt", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("is ready", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("rule diff", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("source hints sources:sr6-core|house-rules:reputation_house_rules", output.PublicationSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.AuditSummary);
                 Assert.Contains($"lane:{output.Kind}", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
-                Assert.Contains("required-output-receipt:", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("rule-environment:sr6-preview->sr6-mainline", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.Contains("source-hints:sources:sr6-core|house-rules:reputation_house_rules", output.AuditSummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.NextSafeAction);
-                Assert.Contains("bounded-failure posture", output.NextSafeAction!, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("Open workflow.", output.NextSafeAction!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.CompatibilitySummary);
-                Assert.Contains("outward-facing output remains bounded", output.CompatibilitySummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("Compatibility stays pinned to", output.CompatibilitySummary!, StringComparison.OrdinalIgnoreCase);
                 Assert.NotNull(output.LineageSummary);
-                Assert.Contains("stays bounded until visible receipt", output.LineageSummary!, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("governed build lane", output.LineageSummary!, StringComparison.OrdinalIgnoreCase);
             });
         Assert.Contains(handoff.TradeoffLines, line => line.Contains("Rule-environment diff", StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(handoff.RuleEnvironmentDiff);
@@ -8345,8 +8486,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.NotNull(handoff.PlannerCoverageLines);
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Crew-fit:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("Output lane coverage:", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("foundry-exchange=bounded-failure", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("print-pdf-export=bounded-failure", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("foundry-exchange=ready", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PlannerCoverageLines!, line => line.Contains("print-pdf-export=ready", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("crew-fit", handoff.CrewFitSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("conditional state rail", handoff.ConditionalStateSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(handoff.ConditionalStateLines);
@@ -8365,16 +8506,16 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Advancement lane:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.BuildSurfaceLines!, line => line.Contains("Crew-fit lane:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("sheet/print/export/viewer and adjacent exchange parity lanes", handoff.ExchangeParitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("0 of 5", handoff.ExchangeParitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("5 of 5", handoff.ExchangeParitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(handoff.ExchangeParityLines);
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Sheet viewer:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Print PDF export:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("JSON exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Foundry exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Character template export:", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("visible output receipt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.ExchangeParityLines!, line => line.Contains("Governed", StringComparison.OrdinalIgnoreCase));
         Assert.Contains("dossier/exchange/replay/recap/module portability lanes", handoff.PortabilityPillarSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("0 of 6", handoff.PortabilityPillarSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("6 of 6", handoff.PortabilityPillarSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(handoff.PortabilityPillarLines);
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Dossier exchange:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("JSON exchange:", StringComparison.OrdinalIgnoreCase));
@@ -8382,7 +8523,7 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Replay timeline:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Session recap:", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Run module:", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("visible output receipt", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(handoff.PortabilityPillarLines!, line => line.Contains("Governed", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -8855,7 +8996,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             consequences,
             prepLaunches,
             travelPrefetchReceipts,
-            aftermathPackages
+            aftermathPackages,
+            null
         ]);
     }
 
@@ -8896,7 +9038,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             prepLaunches,
             travelPrefetchReceipts,
             aftermathPackages,
-            carryForward
+            carryForward,
+            null
         ]);
     }
 
@@ -8957,7 +9100,8 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
             prepLaunches,
             travelPrefetchReceipts,
             aftermathPackages,
-            carryForward
+            carryForward,
+            null
         ]));
     }
 

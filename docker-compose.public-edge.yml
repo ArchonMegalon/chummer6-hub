@@ -1,4 +1,18 @@
 services:
+  support-progress-mock:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    command: ["python", "/workspace/scripts/support_progress_mock.py"]
+    environment:
+      SUPPORT_PROGRESS_MOCK_HOST: 0.0.0.0
+      SUPPORT_PROGRESS_MOCK_PORT: 8080
+    volumes:
+      - /docker/chummercomplete/chummer.run-services/scripts:/workspace/scripts:ro
+    networks:
+      public-origin:
+        aliases:
+          - support-progress-mock
+
   chummer-run-identity:
     image: chummer-run-identity:local
     restart: unless-stopped
@@ -12,7 +26,7 @@ services:
       CHUMMER_IDENTITY_EMAIL_DELIVERY_STORE_PATH: /app/state/identity-email-delivery.json
       IDENTITY_PUBLIC_BASE_URL: ${IDENTITY_PUBLIC_BASE_URL:-https://chummer.run}
       IDENTITY_ADMIN_KEY: ${IDENTITY_ADMIN_KEY:-}
-      IDENTITY_EMAIL_PROVIDER_ORDER: ${IDENTITY_EMAIL_PROVIDER_ORDER:-emailit_api,smtp}
+      IDENTITY_EMAIL_PROVIDER_ORDER: ${IDENTITY_EMAIL_PROVIDER_ORDER:-}
       IDENTITY_EMAIL_REPLY_TO: ${IDENTITY_EMAIL_REPLY_TO:-support@chummer.run}
       IDENTITY_EMAILIT_API_KEY: ${IDENTITY_EMAILIT_API_KEY:-}
       IDENTITY_EMAILIT_BASE_URL: ${IDENTITY_EMAILIT_BASE_URL:-https://api.emailit.com/v2}
@@ -41,6 +55,7 @@ services:
       dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Api/Dockerfile
     depends_on:
       - chummer-run-identity
+      - support-progress-mock
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
@@ -57,11 +72,20 @@ services:
       GOOGLE_OIDC_CLIENT_SECRET: ${GOOGLE_OIDC_CLIENT_SECRET:-}
       GOOGLE_OIDC_REDIRECT_URI: ${GOOGLE_OIDC_REDIRECT_URI:-https://chummer.run/auth/google/callback}
       FLEET_CONTROLLER_BASE_URL: ${FLEET_CONTROLLER_BASE_URL:-http://fleet-controller:8090}
-      FLEET_INTERNAL_API_TOKEN: ${FLEET_INTERNAL_API_TOKEN:-}
+      FLEET_INTERNAL_API_TOKEN: ${FLEET_INTERNAL_API_TOKEN:-chummer-local-edge-internal-token}
       CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID: ${CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID:-hub}
       CHUMMER_DOWNLOADS_SOURCE_ROOT: /downloads-source
+      CHUMMER_API_READ_RATE_LIMIT_PER_MINUTE: ${CHUMMER_API_READ_RATE_LIMIT_PER_MINUTE:-5000}
+      CHUMMER_API_PUBLIC_RATE_LIMIT_PER_MINUTE: ${CHUMMER_API_PUBLIC_RATE_LIMIT_PER_MINUTE:-5000}
       CHUMMER_API_WRITE_RATE_LIMIT_PER_MINUTE: ${CHUMMER_API_WRITE_RATE_LIMIT_PER_MINUTE:-120}
       CHUMMER_API_RATE_LIMIT_QUEUE: ${CHUMMER_API_RATE_LIMIT_QUEUE:-16}
+      CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BASE_URL: ${CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BASE_URL:-http://support-progress-mock:8080}
+      CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_API_TOKEN: ${CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_API_TOKEN:-local-support-progress-token}
+      CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_PRINCIPAL_ID: ${CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_PRINCIPAL_ID:-support-progress-principal}
+      CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BINDING_ID: ${CHUMMER_SUPPORT_PROGRESS_EMAIL_EA_BINDING_ID:-binding-support-progress}
+      CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_API_KEY: ${CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_API_KEY:-local-support-progress-emailit-token}
+      CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_BASE_URL: ${CHUMMER_SUPPORT_PROGRESS_EMAIL_EMAILIT_BASE_URL:-http://support-progress-mock:8080}
+      CHUMMER_SUPPORT_PROGRESS_EMAIL_PUBLIC_BASE_URL: ${CHUMMER_SUPPORT_PROGRESS_EMAIL_PUBLIC_BASE_URL:-https://chummer.run}
       CHUMMER_TEABLE_USERS_ENABLED: ${CHUMMER_TEABLE_USERS_ENABLED:-true}
       CHUMMER_TEABLE_USERS_API_KEY: ${CHUMMER_TEABLE_USERS_API_KEY:-}
       TEABLE_API_KEY: ${TEABLE_API_KEY:-}

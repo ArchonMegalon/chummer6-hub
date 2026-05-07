@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Collections.Concurrent;
 
 namespace Chummer.Run.Api.Services;
 
@@ -24,26 +25,93 @@ public sealed class HubRequestAuthException : Exception
     public int StatusCode { get; }
 }
 
+public sealed class HubIdentitySubjectCache
+{
+    private sealed record CachedAuthenticatedHubSubject(
+        AuthenticatedHubSubject Subject,
+        DateTimeOffset ExpiresAtUtc);
+
+    private readonly ConcurrentDictionary<string, CachedAuthenticatedHubSubject> _entries = new(StringComparer.Ordinal);
+
+    public bool TryGet(string cacheScope, string accessToken, out AuthenticatedHubSubject? subject)
+    {
+        string cacheKey = BuildCacheKey(cacheScope, accessToken);
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        if (_entries.TryGetValue(cacheKey, out CachedAuthenticatedHubSubject? cached)
+            && cached.ExpiresAtUtc >= now)
+        {
+            subject = cached.Subject;
+            return true;
+        }
+
+        if (cached is not null)
+        {
+            _entries.TryRemove(cacheKey, out _);
+        }
+
+        subject = null;
+        return false;
+    }
+
+    public void Set(string cacheScope, string accessToken, AuthenticatedHubSubject subject, TimeSpan ttl)
+    {
+        if (ttl <= TimeSpan.Zero)
+        {
+            return;
+        }
+
+        _entries[BuildCacheKey(cacheScope, accessToken)] = new CachedAuthenticatedHubSubject(subject, DateTimeOffset.UtcNow.Add(ttl));
+    }
+
+    private static string BuildCacheKey(string cacheScope, string accessToken)
+        => string.Concat(cacheScope, "|", accessToken);
+}
+
 public sealed class HubIdentityClient
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _configuration;
     private readonly ILogger<HubIdentityClient> _logger;
+    private readonly HubIdentitySubjectCache _subjectCache;
     private const string IdentityUnavailableMessage = "Identity is unavailable right now. Try again later.";
 
-    public HubIdentityClient(HttpClient httpClient, IConfiguration configuration, ILogger<HubIdentityClient>? logger = null)
+    public HubIdentityClient(
+        HttpClient httpClient,
+        IConfiguration configuration,
+        ILogger<HubIdentityClient>? logger = null,
+        HubIdentitySubjectCache? subjectCache = null)
     {
         _httpClient = httpClient;
         _configuration = configuration;
         _logger = logger ?? NullLogger<HubIdentityClient>.Instance;
+        _subjectCache = subjectCache ?? new HubIdentitySubjectCache();
     }
 
     private string BaseUrl =>
         (_configuration["IDENTITY_SERVICE_BASE_URL"] ?? "http://chummer-run-identity:8080").TrimEnd('/');
 
+    private TimeSpan SubjectCacheTtl
+    {
+        get
+        {
+            if (int.TryParse(_configuration["CHUMMER_IDENTITY_SUBJECT_CACHE_SECONDS"], out int seconds))
+            {
+                seconds = Math.Clamp(seconds, 0, 300);
+                return TimeSpan.FromSeconds(seconds);
+            }
+
+            return TimeSpan.FromSeconds(30);
+        }
+    }
+
     public async Task<AuthenticatedHubSubject> RequireSubjectAsync(HttpRequest request, CancellationToken cancellationToken)
     {
         var accessToken = ExtractBearerToken(request);
+        if (_subjectCache.TryGet(BaseUrl, accessToken, out AuthenticatedHubSubject? cachedSubject))
+        {
+            return cachedSubject;
+        }
+
         var introspection = await IntrospectAsync(accessToken, cancellationToken);
         if (!introspection.Active || string.IsNullOrWhiteSpace(introspection.SubjectId))
         {
@@ -51,12 +119,14 @@ public sealed class HubIdentityClient
         }
 
         var profile = await TryGetSubjectAsync(introspection.SubjectId!, cancellationToken);
-        return new AuthenticatedHubSubject(
+        AuthenticatedHubSubject subject = new(
             introspection.SubjectId!,
             profile?.DisplayName,
             profile?.Email,
             introspection.Roles ?? Array.Empty<string>(),
             accessToken);
+        _subjectCache.Set(BaseUrl, accessToken, subject, SubjectCacheTtl);
+        return subject;
     }
 
     public async Task<AuthenticatedHubSubject> RequireMatchingSubjectAsync(

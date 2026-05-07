@@ -8,7 +8,7 @@ const baseUrl = (process.env.CHUMMER_HUB_PLAYWRIGHT_BASE_URL || 'http://127.0.0.
 const publicHost = (process.env.CHUMMER_HUB_PLAYWRIGHT_PUBLIC_HOST || '').trim();
 const forwardedProto = (process.env.CHUMMER_HUB_PLAYWRIGHT_FORWARDED_PROTO || '').trim();
 const isLocalReverseProxyMode = baseUrl.startsWith('http://') && forwardedProto.toLowerCase() === 'https';
-const signupNext = '/downloads/install/avalonia-linux-x64-installer';
+let signupNext = '/downloads/install/avalonia-linux-x64-installer';
 const bannedCopy = /\b(Read the linked detail|Read more|Learn more)\b/i;
 
 async function expectVisible(page, selector, message) {
@@ -120,6 +120,18 @@ async function assertCreatorPublicationDetail(page, pageErrors, path, label) {
   });
 }
 
+async function assertPublicArtifactDetail(page, pageErrors, path, label) {
+  await gotoAndAssert(page, pageErrors, path, async () => {
+    const currentPath = new URL(page.url()).pathname;
+    assert(/^\/artifacts\//.test(currentPath), `${label} should open a public artifact detail route.`);
+    await expectBodyText(page, 'Current preview build', label);
+    await expectBodyText(page, 'Available today. The installer shelf, release channel, and integrity trail are live right now.', label);
+    await expectBodyText(page, 'Proof: the current preview has a real installer shelf, explicit release posture, and a first-party download path.', label);
+    await expectBodyText(page, 'Open downloads', label);
+    await assertNoBannedCopy(page, label);
+  });
+}
+
 async function expandDetailsBySummary(page, summaryText, label) {
   const summary = page.locator('summary').filter({ hasText: summaryText }).first();
   if (await summary.count() === 0) {
@@ -153,6 +165,24 @@ async function readOptionalHref(page, selector) {
   return locator.getAttribute('href');
 }
 
+function resolveInstallNextFromHref(href, label) {
+  assert.equal(Boolean(href), true, `${label} should expose a non-empty href.`);
+
+  if (href.startsWith('/signup?next=')) {
+    const current = new URL(`http://local${href}`);
+    const next = current.searchParams.get('next') || '';
+    assert.equal(next.startsWith('/downloads/install/'), true, `${label} should gate a downloads install route, got ${href}.`);
+    return next;
+  }
+
+  if (href.startsWith('/downloads/install/')) {
+    return href;
+  }
+
+  assert.equal(href === '/downloads', true, `${label} should point to /downloads or a gated install route, got ${href}.`);
+  return signupNext;
+}
+
 async function readDefinitionValue(page, label, path) {
   const term = page.locator('dt').filter({ hasText: label }).first();
   if (await term.count() === 0) {
@@ -184,6 +214,18 @@ function assertLoginRedirect(page, expectedNext, label) {
   const current = new URL(page.url());
   assert.equal(current.pathname, '/login', `${label} should redirect to /login.`);
   assert.equal(current.searchParams.get('next'), expectedNext, `${label} should preserve next.`);
+}
+
+function assertGoogleOauthRedirect(page, label) {
+  const current = new URL(page.url());
+  assert.equal(current.hostname, 'accounts.google.com', `${label} should hand off to Google OAuth.`);
+  assert.equal(current.pathname, '/v3/signin/identifier', `${label} should land on the Google sign-in identifier step.`);
+  assert.equal(
+    current.searchParams.get('redirect_uri'),
+    'https://chummer.run/auth/google/callback',
+    `${label} should keep the Chummer Google callback.`
+  );
+  assert(current.searchParams.has('state'), `${label} should preserve OAuth state.`);
 }
 
 async function gotoAndAssert(page, pageErrors, path, checks) {
@@ -234,7 +276,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   let homeSeasonBoardPath;
   let homeInviteRailPath;
   let homeSponsorRailPath;
-  let publicCreatorPublicationPath;
+  let publicArtifactDetailPath;
   let accountPublicationBuildHandoffPath;
   let runDetailPath;
   let rulesDetailPath;
@@ -264,24 +306,27 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/what-is-chummer', async () => {
-    await expectVisible(page, 'text=One product for rules truth, living dossiers, and session return.');
+    await expectVisible(page, 'text=One place for builds, explanations, and campaign return.');
     await expectVisible(page, 'text=The short answer');
-    await expectVisible(page, 'text=A Shadowrun companion with one front door');
-    await expectVisible(page, 'text=Between build truth and table continuity');
-    await expectVisible(page, 'text=Proof, release, and help stay attached');
-    await expectVisible(page, 'text=Players, GMs, and creators on one rules truth');
+    await expectVisible(page, 'text=A Shadowrun desktop and campaign companion');
+    await expectVisible(page, 'text=Between character creation and the next session');
+    await expectVisible(page, 'text=Explanation, release, and help stay attached');
+    await expectVisible(page, 'text=Players, GMs, and returning groups');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/what-is-chummer now link'), '/now');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/downloads"]', '/what-is-chummer downloads link'), '/downloads');
+    signupNext = resolveInstallNextFromHref(
+      await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/what-is-chummer downloads link'),
+      '/what-is-chummer downloads link'
+    );
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/help"]', '/what-is-chummer help link'), '/help');
     await assertNoBannedCopy(page, '/what-is-chummer');
   });
 
   await gotoAndAssert(page, pageErrors, '/participate', async () => {
-    await expectVisible(page, 'text=Choose how to participate');
-    await expectVisible(page, 'text=Public feedback');
+    await expectVisible(page, 'text=Fixer Board keeps the public product loop visible');
+    await expectVisible(page, 'text=Public Fixer Board');
     await expectVisible(page, 'text=Signed-in participation');
-    await expectBodyText(page, 'Report a problem without an account, then stop there unless you want tracked follow-up.', '/participate');
-    await expectBodyText(page, 'Use the signed-in path when you want a tracked suggestion, beta follow-up, or a bounded contribution flow.', '/participate');
+    await expectBodyText(page, 'Use the public feedback rail when you want to suggest future work, vote on public demand, or follow shipped closeout.', '/participate');
+    await expectBodyText(page, 'Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your OpenAI account in ChatGPT.', '/participate');
     assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/contact#support-intake"]', '/participate support intake'), '/contact#support-intake');
     assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/login?next=/participate/codex"]', '/participate guided contribution guest handoff'), '/login?next=/participate/codex');
     assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/signup?next=/account/settings"]', '/participate beta signup handoff'), '/signup?next=/account/settings');
@@ -293,7 +338,13 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'input[data-faq-filter]');
     await expectVisible(page, 'text=Search the FAQ');
     await expectVisible(page, 'text=Still stuck? Open support');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/downloads"]', '/faq downloads link'), '/downloads');
+    assert.equal(
+      resolveInstallNextFromHref(
+        await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/faq downloads link'),
+        '/faq downloads link'
+      ),
+      signupNext
+    );
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/faq support link'), '/contact#support-intake');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/faq now link'), '/now');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/contact#support-intake"]', '/faq footer support link'), '/contact#support-intake');
@@ -303,9 +354,15 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/privacy', async () => {
     await expectVisible(page, 'text=What Chummer stores, and what it does not');
     await expectVisible(page, 'text=Support, survey, and assistant data stay on a bounded clock');
-    await expectVisible(page, 'text=What changed in this version');
+    await expectVisible(page, 'text=Your account keeps sign-in, preferences, and support together');
     await expectVisible(page, 'text=Weekly trust pulse');
-    assert.equal(await readFirstHref(page, 'a.button-like[href="/downloads"]', '/privacy downloads link'), '/downloads');
+    assert.equal(
+      resolveInstallNextFromHref(
+        await readFirstHref(page, 'a.button-like:has-text("Open downloads")', '/privacy downloads link'),
+        '/privacy downloads link'
+      ),
+      signupNext
+    );
     assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/privacy help link'), '/help');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/contact#support-intake"]', '/privacy support link'), '/contact#support-intake');
     await assertNoBannedCopy(page, '/privacy');
@@ -313,11 +370,17 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/terms', async () => {
     await expectVisible(page, 'text=Preview terms in plain language');
-    await expectVisible(page, 'text=What changed in this version');
+    await expectVisible(page, 'text=These are the plain rules for the current preview: early access, honest labels, real downloads, and straightforward support.');
     await expectVisible(page, 'text=Create account to install');
-    await expectVisible(page, 'text=Main platform downloads');
-    await expectVisible(page, 'text=Chummer for Windows');
-    assert.equal(await readFirstHref(page, 'a.button-like[href="/downloads"]', '/terms downloads link'), '/downloads');
+    await expectVisible(page, 'text=Current downloads when available');
+    await expectVisible(page, 'text=Expect real pages, current downloads, visible proof, and explicit preview labels when support, compatibility, or breadth are still moving.');
+    assert.equal(
+      resolveInstallNextFromHref(
+        await readFirstHref(page, 'a.button-like:has-text("Open downloads")', '/terms downloads link'),
+        '/terms downloads link'
+      ),
+      signupNext
+    );
     assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/terms help link'), '/help');
     await assertNoBannedCopy(page, '/terms');
   });
@@ -326,7 +389,13 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=Get help without guessing');
     await expectVisible(page, 'text=Fallback:');
     await expectVisible(page, 'text=Support, survey, and assistant data stay on a bounded clock');
-    assert.equal(await readFirstHref(page, 'a.inline-link[href="/downloads"]', '/help downloads link'), '/downloads');
+    assert.equal(
+      resolveInstallNextFromHref(
+        await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/help downloads link'),
+        '/help downloads link'
+      ),
+      signupNext
+    );
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/faq"]', '/help faq link'), '/faq');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/help support link'), '/contact#support-intake');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/help now link'), '/now');
@@ -341,8 +410,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   assertLoginRedirect(page, '/account/support', 'Signed-out /account/support');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /account/support redirect');
 
-  await page.goto(`${baseUrl}/participate/codex`, { waitUntil: 'domcontentloaded' });
-  assertLoginRedirect(page, '/participate/codex', 'Signed-out /participate/codex');
+  const codexRedirectResponse = await page.context().request.get(`${baseUrl}/participate/codex`, {
+    failOnStatusCode: false,
+    maxRedirects: 0
+  });
+  assert.equal(codexRedirectResponse.status(), 302, 'Signed-out /participate/codex should issue a redirect.');
+  const codexRedirect = new URL(codexRedirectResponse.headers().location, baseUrl);
+  assert.equal(codexRedirect.pathname, '/auth/google/start', 'Signed-out /participate/codex should redirect into the Google auth start route.');
+  assert.equal(codexRedirect.searchParams.get('next'), '/participate/codex', 'Signed-out /participate/codex should preserve next.');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /participate/codex redirect');
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
@@ -389,7 +464,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, 'Public support confirmation');
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
-    await expectVisible(page, 'text=What you can verify now');
+    await expectVisible(page, 'text=What you can try now');
     await expectVisible(page, 'text=Build, explain, and run with visible evidence');
     await expectVisible(page, 'text=Status guide');
     await assertNoBannedCopy(page, 'Now');
@@ -406,19 +481,18 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/artifacts', async () => {
-    await expectVisible(page, 'text=Current proof surfaces');
-    await expectVisible(page, 'text=Preview in progress');
+    await expectVisible(page, 'text=Proof gallery');
+    await expectVisible(page, 'text=Review-required publication route');
     await expectVisible(page, 'text=Status guide');
-    await expectVisible(page, 'text=Governed publication discovery');
-    await expectVisible(page, 'text=Published shared publications');
-    await expectVisible(page, 'text=Compare at a glance');
-    await expectVisible(page, 'text=How live publications differ');
-    await expectVisible(page, 'text=Open public publication');
-    publicCreatorPublicationPath = await readFirstHref(page, 'a[href*="/artifacts/publications/"]', '/artifacts');
+    await expectVisible(page, 'text=Inspect live proof, dossiers, and publication lineage here');
+    await expectVisible(page, 'text=Current usable proof surfaces');
+    await expectVisible(page, 'text=Opening next on the shelf');
+    publicArtifactDetailPath = await readFirstHref(page, 'a[href="/artifacts/current-preview-build"]', '/artifacts');
     await assertNoBannedCopy(page, 'Artifacts');
   });
-  await assertCreatorPublicationDetail(page, pageErrors, publicCreatorPublicationPath, '/artifacts -> public publication');
+  await assertPublicArtifactDetail(page, pageErrors, publicArtifactDetailPath, '/artifacts -> public artifact detail');
 
+  console.log('hub-playwright: opening signup handoff');
   await page.goto(`${baseUrl}/signup?next=${encodeURIComponent(signupNext)}`, { waitUntil: 'domcontentloaded' });
   await expectVisible(page, 'input[name="email"]');
   await page.fill('input[name="email"]', uniqueEmail);
@@ -432,25 +506,29 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoBannedCopy(page, 'Signup confirmation');
   await assertNoPageErrors(page, pageErrors, 'Signup confirmation');
 
+  console.log('hub-playwright: following verification callback');
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
     page.getByRole('link', { name: /Open the verification link for Downloads/i }).click()
   ]);
   if (isLocalReverseProxyMode) {
-    assertLoginRedirect(page, signupNext, 'Local reverse-proxied signup callback');
-    await expectVisible(page, 'text=Sign in');
+    console.log('hub-playwright: landed on local reverse-proxy auth handoff');
+    assertGoogleOauthRedirect(page, 'Local reverse-proxied signup callback');
     await assertNoPageErrors(page, pageErrors, 'Local reverse-proxied signup callback');
     await browser.close();
+    console.log('hub-playwright: completed local reverse-proxy flow');
     return;
   }
 
-  assert(page.url().includes('/downloads/install/avalonia-linux-x64-installer'), 'Signup callback should land on the signed-in handoff route.');
+  assert(page.url().includes(signupNext), 'Signup callback should land on the signed-in handoff route.');
   await expectVisible(page, 'text=Claim code');
   await assertNoPageErrors(page, pageErrors, 'Download handoff');
 
+  const installSlug = signupNext.split('/').pop();
+  assert.equal(Boolean(installSlug), true, `Unable to derive install slug from ${signupNext}.`);
   const downloadRequest = page.waitForResponse((response) => {
     const url = response.url();
-    return url.includes('/downloads/file/avalonia-linux-x64-installer') && response.status() === 200;
+    return url.includes(`/downloads/file/${installSlug}`) && response.status() === 200;
   });
   await page.getByRole('link', { name: /Start download again/i }).click();
   const downloadResponse = await downloadRequest;
@@ -744,7 +822,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await expectBodyText(page, 'Move governed roster state', '/account/work/workspaces detail');
   await expectBodyText(page, 'Launch governed prep packet', '/account/work/workspaces detail');
   await expectBodyText(page, 'Stage travel prefetch', '/account/work/workspaces detail');
-  await expectBodyText(page, 'Generate aftermath recap package', '/account/work/workspaces detail');
+  await expectBodyText(page, 'Generate aftermath or replay package', '/account/work/workspaces detail');
   await expectBodyText(page, 'Rule and continuity health', '/account/work/workspaces detail');
   await expectBodyText(page, 'GM prep library and travel mode', '/account/work/workspaces detail');
   await expectBodyText(page, 'Safehouse / travel mode', '/account/work/workspaces detail');

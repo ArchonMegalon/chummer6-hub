@@ -952,4 +952,36 @@ public sealed class PrepLibraryQueryAliasCanonicalizerTests
         Assert.DoesNotContain("opforces", tokens);
         Assert.DoesNotContain("opfors", tokens);
     }
+
+    [Fact]
+    public void RewriteAliases_CollapsesPlainOppositionSynonymsIntoOppositionTokens()
+    {
+        HashSet<string> tokens = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "encounter",
+            "encounters",
+            "enemy",
+            "enemies",
+            "hostile",
+            "hostiles",
+            "adversary",
+            "adversaries",
+            "threat",
+            "threats"
+        };
+
+        PrepLibraryQueryAliasCanonicalizer.RewriteAliases(tokens);
+
+        Assert.Contains("opposition", tokens);
+        Assert.DoesNotContain("encounter", tokens);
+        Assert.DoesNotContain("encounters", tokens);
+        Assert.DoesNotContain("enemy", tokens);
+        Assert.DoesNotContain("enemies", tokens);
+        Assert.DoesNotContain("hostile", tokens);
+        Assert.DoesNotContain("hostiles", tokens);
+        Assert.DoesNotContain("adversary", tokens);
+        Assert.DoesNotContain("adversaries", tokens);
+        Assert.DoesNotContain("threat", tokens);
+        Assert.DoesNotContain("threats", tokens);
+    }
 }

@@ -1,10 +1,16 @@
 using Chummer.Run.Api.ViewModels;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace Chummer.Run.Api.Services;
 
 public sealed class PublicFlagshipCoverageService
 {
     private const string ProgressPartsRelativePath = ".codex-design/product/PUBLIC_PROGRESS_PARTS.yaml";
+    private static readonly IDeserializer Deserializer = new DeserializerBuilder()
+        .WithNamingConvention(UnderscoredNamingConvention.Instance)
+        .IgnoreUnmatchedProperties()
+        .Build();
 
     private static readonly IReadOnlyList<(string PartId, string CardId, string Href, string ActionLabel)> CoverageOrder =
     [
@@ -22,7 +28,17 @@ public sealed class PublicFlagshipCoverageService
 
     public FlagshipCoverageStripViewModel LoadStrip()
     {
-        var document = _canon.LoadRequiredYaml<PublicProgressPartsDocument>(ProgressPartsRelativePath);
+        PublicProgressPartsDocument document;
+        try
+        {
+            document = Deserializer.Deserialize<PublicProgressPartsDocument>(_canon.LoadRequiredText(ProgressPartsRelativePath))
+                ?? throw new InvalidOperationException($"canon file '{ProgressPartsRelativePath}' could not be deserialized.");
+        }
+        catch (YamlDotNet.Core.YamlException ex)
+        {
+            throw new InvalidOperationException($"canon file '{ProgressPartsRelativePath}' is invalid: {ex.Message}", ex);
+        }
+
         var parts = (document.Parts ?? [])
             .ToDictionary(static part => part.Id, StringComparer.OrdinalIgnoreCase);
 
