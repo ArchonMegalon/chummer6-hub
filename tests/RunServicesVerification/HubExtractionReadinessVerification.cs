@@ -18,6 +18,7 @@ internal static class HubExtractionReadinessVerification
         VerifyFeedbackAndOperatorConsumerRule();
         VerifyCommunityPlaneDurabilityAndConvergence();
         VerifyDesignMirrorReadiness();
+        VerifyClosedQueuePromptsStayClosed();
         VerifyAcceptanceDocument();
         VerifyLegacyRootBoundaryMoves();
         VerifyMilestoneMapping();
@@ -864,6 +865,9 @@ internal static class HubExtractionReadinessVerification
         VerifyMirrorFile(
             Path.Combine(RepoRoot, ".codex-design", "review", "REVIEW_CONTEXT.md"),
             "Review guidelines");
+        VerifyCanonicalProductMirror("WEEKLY_PRODUCT_PULSE.generated.json");
+        VerifyCanonicalProductMirror("NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml");
+        VerifyCanonicalProductMirror("NEXT_90_DAY_QUEUE_STAGING.generated.yaml");
     }
 
     private static void VerifyAcceptanceDocument()
@@ -1097,6 +1101,20 @@ internal static class HubExtractionReadinessVerification
         AssertSectionContainsCandidate(p3Section, "P3", 2369, "project.queue_exhausted_with_uncovered_scope");
     }
 
+    private static void VerifyClosedQueuePromptsStayClosed()
+    {
+        var queuePath = Path.Combine(RepoRoot, ".codex-studio", "published", "QUEUE.generated.yaml");
+        VerificationAssert.True(File.Exists(queuePath), "Published queue mirror must exist for stale prompt closure checks.");
+
+        var queueText = File.ReadAllText(queuePath);
+        VerificationAssert.True(
+            !queueText.Contains("Close recurring `hub` design-mirror drift audit slice by fail-closing exact parity for the flagged local mirror bundle.", StringComparison.Ordinal),
+            "Published queue must not reopen the closed hub design-mirror drift audit slice.");
+        VerificationAssert.True(
+            !queueText.Contains("Finish milestone coverage modeling for hub so ETA and completion truth are no longer partial.", StringComparison.Ordinal),
+            "Published queue must not reopen the closed hub milestone-coverage reconciliation slice.");
+    }
+
     private static void VerifyExecutableQueueMapping(string milestoneText)
     {
         AssertExecutableQueueItem(
@@ -1237,6 +1255,18 @@ internal static class HubExtractionReadinessVerification
         VerificationAssert.True(
             text.Contains(requiredToken, StringComparison.Ordinal),
             $"Design mirror file '{path}' must retain token '{requiredToken}'.");
+    }
+
+    private static void VerifyCanonicalProductMirror(string relativePath)
+    {
+        var sourcePath = Path.Combine(RepoRoot, "..", "chummer-design", "products", "chummer", relativePath);
+        var mirrorPath = Path.Combine(RepoRoot, ".codex-design", "product", relativePath);
+
+        VerificationAssert.True(File.Exists(sourcePath), $"Canonical design source '{sourcePath}' must exist.");
+        VerificationAssert.True(File.Exists(mirrorPath), $"Mirrored design file '{mirrorPath}' must exist.");
+        VerificationAssert.True(
+            string.Equals(File.ReadAllText(sourcePath), File.ReadAllText(mirrorPath), StringComparison.Ordinal),
+            $"Mirrored design file '{mirrorPath}' must exactly match canonical source '{sourcePath}'.");
     }
 
     private static string ResolveRepoRoot()
