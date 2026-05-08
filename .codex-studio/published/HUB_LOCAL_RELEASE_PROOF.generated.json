@@ -2,6 +2,37 @@
   "contract_name": "chummer6-hub.local_release_proof",
   "package_repo": "chummer6-hub",
   "status": "passed",
+  "desktop_client_readiness": {
+    "status": "pass",
+    "scoped_status": "pass",
+    "generated_at": "2026-05-08T14:17:34Z",
+    "missing_coverage_keys": [],
+    "desktop_client_missing": false,
+    "reason": "Flagship product readiness proof is green.",
+    "completion_audit_status": "pass",
+    "completion_audit_reason": "Flagship product readiness proof is green.",
+    "source_path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
+  },
+  "publicTrustSurface": {
+    "summary": "This governor-visible trust surface bundle keeps status, current release, downloads, proof shelf, and public pulse routes aligned on the same outward-facing release truth.",
+    "statusRoute": "/status",
+    "currentReleaseRoute": "/now",
+    "downloadsRoute": "/downloads",
+    "proofShelfRoute": "/artifacts",
+    "weeklyPulseRoute": "/api/public/weekly-pulse",
+    "progressPosterRoute": "/api/public/progress-poster.svg",
+    "launchHealthLabels": [
+      "Live",
+      "Preview",
+      "Fallback",
+      "Revoked",
+      "Fixed",
+      "Blocked",
+      "Proof freshness",
+      "Support pulse",
+      "Adoption health"
+    ]
+  },
   "successor_queue_package": {
     "package_id": "next90-m105-hub-workspace-continuity",
     "milestone_id": 105,
@@ -72,6 +103,25 @@
         "public_proof_shelf:release_bundles"
       ],
       "exit_criterion": "Release, fix, support, and publication explainers can ship as approved video, audio, preview, and packet bundles from the same underlying release and support truth."
+    },
+    {
+      "package_id": "next90-m143-hub-bind-exchange-and-outward-facing-output-routes-to-visible-receipt-or-bou",
+      "milestone_id": 143,
+      "frontier_id": 4032374688,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M143 chummer6-hub outward-facing route receipts are complete; future shards must verify this receipt, registry row, queue row, and design-queue row instead of reopening the exchange and outward-facing output route contract.",
+      "title": "Bind exchange and outward-facing output routes to visible receipt or bounded-failure posture instead of silent optimistic claims.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "bind_exchange_and_outward_facing_output_routes_to_visibl:hub"
+      ],
+      "exit_criterion": "Install recovery, release-bundle proof, creator-publication detail, and federation exchange routes surface a current receipt or bounded review posture instead of silent parity claims."
     },
     {
       "package_id": "next90-m108-hub-campaign-briefing-bundles",
@@ -214,14 +264,32 @@
       "milestone_id": 117,
       "frontier_id": 4041187890,
       "repo": "chummer6-hub",
-      "status": "in_progress",
+      "status": "complete",
       "wave": "W13",
       "task": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state.",
       "title": "Build artifact shelf APIs and audience filters",
+      "landed_commit": "TO_BE_FILLED_M117_COMMIT",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M117 chummer6-hub artifact shelf APIs and audience filters are complete; future shards must verify the artifact-shelf release-proof receipts, canonical registry row, Fleet queue row, and design queue row instead of reopening the signed-in and public artifact shelf slice.",
       "allowed_paths": [
         "Chummer.Run.Api",
         "scripts",
         "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m117_hub_artifact_shelf_v2.py",
+        "python3 scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
+        "python3 -m unittest tests/test_next90_m117_hub_artifact_shelf_v2.py",
+        "bash scripts/ai/run_services_smoke.sh"
       ],
       "owned_surfaces": [
         "artifact_shelf:v2",
@@ -230,25 +298,145 @@
       "exit_criterion": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state."
     },
     {
-      "package_id": "next90-m119-hub-first-session-onboarding",
-      "work_task_id": "119.1",
-      "milestone_id": 119,
-      "frontier_id": 1130567614,
+      "package_id": "next90-m118-hub-organizer-ops",
+      "work_task_id": "118.1",
+      "milestone_id": 118,
+      "frontier_id": 3207603971,
       "repo": "chummer6-hub",
-      "status": "in_progress",
-      "wave": "W14",
-      "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
-      "title": "Orchestrate guided first-playable-session onboarding",
+      "status": "complete",
+      "wave": "W13",
+      "task": "Add roles, rosters, events, permissions, artifact publication, and support escalation contracts for community-scale operations.",
+      "title": "Land organizer, league, convention, and season contracts",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M118 chummer6-hub organizer, league, convention, and season contracts are complete; future shards must verify the organizer operations release-proof receipts, canonical registry row, Fleet queue row, and design queue row instead of reopening this governed community-operations slice.",
       "allowed_paths": [
         "Chummer.Run.Api",
         "scripts",
         "tests"
       ],
       "owned_surfaces": [
+        "organizer_ops",
+        "league_convention_season_ops"
+      ],
+      "exit_criterion": "Add roles, rosters, events, permissions, artifact publication, and support escalation contracts for community-scale operations."
+    },
+    {
+      "package_id": "next90-m119-hub-first-session-onboarding",
+      "work_task_id": "119.1",
+      "milestone_id": 119,
+      "frontier_id": 1130567614,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "wave": "W14",
+      "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+      "title": "Orchestrate guided first-playable-session onboarding",
+      "landed_commit": "TO_BE_FILLED_M119_COMMIT",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M119 chummer6-hub guided first-playable-session onboarding is complete; future shards must verify the starter-lane proof receipts, local release proof package, canonical registry row, Fleet queue row, and design queue row instead of reopening the install-to-first-session onboarding slice.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m119_hub_first_session_onboarding.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m119_hub_first_session_onboarding.py",
+        "python3 scripts/verify_next90_m119_hub_first_session_onboarding.py",
+        "python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py",
+        "bash scripts/ai/run_services_smoke.sh"
+      ],
+      "owned_surfaces": [
         "first_playable_session:onboarding",
         "starter_lane:hub"
       ],
       "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
+    },
+    {
+      "package_id": "next90-m120-hub-public-launch-health",
+      "work_task_id": "120.1",
+      "milestone_id": 120,
+      "frontier_id": 4442751895,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "landed_commit": "TO_BE_FILLED_M120_COMMIT",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M120 chummer6-hub public trust and launch-health publication package is complete; future shards must verify the launch-health contract, canonical registry row, queue parity, and local+served proof before reopening this package.",
+      "wave": "W14",
+      "task": "Compile live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health into public status surfaces.",
+      "title": "Publish public trust, status, release, and proof-shelf surfaces from registry and governor truth.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m120_hub_public_launch_health.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m120_hub_public_launch_health.py",
+        "python3 scripts/verify_next90_m120_hub_public_launch_health.py",
+        "python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py",
+        "bash scripts/ai/verify.sh"
+      ],
+      "owned_surfaces": [
+        "public_trust_surface:v3",
+        "launch_health:public"
+      ],
+      "exit_criterion": "Compile live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health into public status surfaces."
+    },
+    {
+      "package_id": "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the",
+      "work_task_id": "141.3",
+      "milestone_id": 141,
+      "frontier_id": 4062147200,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M141 chummer6-hub import-route review-required guard is complete; future shards must verify the route/support/publication proof receipt, canonical registry row, queue mirrors, and local+served Hub proof instead of reopening this slice.",
+      "wave": "W22P",
+      "task": "Keep route, support, and publication surfaces from claiming parity for these routes unless the direct proof receipts are current.",
+      "title": "Keep route, support, and publication surfaces from claiming parity for these routes unless the direct proof receipts are current.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicTrustPulseService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/DownloadsCompatibilityController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_hub_local_release_proof_native_support_route.py",
+        "/docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "python3 scripts/verify_next90_m141_hub_import_route_review_required.py",
+        "python3 -m unittest tests/test_next90_m141_hub_import_route_review_required.py",
+        "python3 -m unittest tests/test_hub_local_release_proof_native_support_route.py",
+        "bash scripts/ai/verify.sh"
+      ],
+      "owned_surfaces": [
+        "keep_route_support_and_publication_surfaces_from_claimin:hub"
+      ],
+      "exit_criterion": "Keep route, support, and publication surfaces from claiming parity for these routes unless the direct proof receipts are current."
     }
   ],
   "successor_queue_packages_by_id": {
@@ -300,6 +488,25 @@
         "public_proof_shelf:release_bundles"
       ],
       "exit_criterion": "Release, fix, support, and publication explainers can ship as approved video, audio, preview, and packet bundles from the same underlying release and support truth."
+    },
+    "next90-m143-hub-bind-exchange-and-outward-facing-output-routes-to-visible-receipt-or-bou": {
+      "package_id": "next90-m143-hub-bind-exchange-and-outward-facing-output-routes-to-visible-receipt-or-bou",
+      "milestone_id": 143,
+      "frontier_id": 4032374688,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M143 chummer6-hub outward-facing route receipts are complete; future shards must verify this receipt, registry row, queue row, and design-queue row instead of reopening the exchange and outward-facing output route contract.",
+      "title": "Bind exchange and outward-facing output routes to visible receipt or bounded-failure posture instead of silent optimistic claims.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "owned_surfaces": [
+        "bind_exchange_and_outward_facing_output_routes_to_visibl:hub"
+      ],
+      "exit_criterion": "Install recovery, release-bundle proof, creator-publication detail, and federation exchange routes surface a current receipt or bounded review posture instead of silent parity claims."
     },
     "next90-m108-hub-campaign-briefing-bundles": {
       "package_id": "next90-m108-hub-campaign-briefing-bundles",
@@ -442,14 +649,32 @@
       "milestone_id": 117,
       "frontier_id": 4041187890,
       "repo": "chummer6-hub",
-      "status": "in_progress",
+      "status": "complete",
       "wave": "W13",
       "task": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state.",
       "title": "Build artifact shelf APIs and audience filters",
+      "landed_commit": "TO_BE_FILLED_M117_COMMIT",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M117 chummer6-hub artifact shelf APIs and audience filters are complete; future shards must verify the artifact-shelf release-proof receipts, canonical registry row, Fleet queue row, and design queue row instead of reopening the signed-in and public artifact shelf slice.",
       "allowed_paths": [
         "Chummer.Run.Api",
         "scripts",
         "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/PublicCreatorPublicationDiscoveryService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m117_hub_artifact_shelf_v2.py",
+        "python3 scripts/verify_next90_m117_hub_artifact_shelf_v2.py",
+        "python3 -m unittest tests/test_next90_m117_hub_artifact_shelf_v2.py",
+        "bash scripts/ai/run_services_smoke.sh"
       ],
       "owned_surfaces": [
         "artifact_shelf:v2",
@@ -457,31 +682,151 @@
       ],
       "exit_criterion": "Serve personal, campaign, creator, and public artifact shelves with proof, preview, captions, sibling packets, audience, locale, retention, and publication state."
     },
-    "next90-m119-hub-first-session-onboarding": {
-      "package_id": "next90-m119-hub-first-session-onboarding",
-      "work_task_id": "119.1",
-      "milestone_id": 119,
-      "frontier_id": 1130567614,
+    "next90-m118-hub-organizer-ops": {
+      "package_id": "next90-m118-hub-organizer-ops",
+      "work_task_id": "118.1",
+      "milestone_id": 118,
+      "frontier_id": 3207603971,
       "repo": "chummer6-hub",
-      "status": "in_progress",
-      "wave": "W14",
-      "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
-      "title": "Orchestrate guided first-playable-session onboarding",
+      "status": "complete",
+      "wave": "W13",
+      "task": "Add roles, rosters, events, permissions, artifact publication, and support escalation contracts for community-scale operations.",
+      "title": "Land organizer, league, convention, and season contracts",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M118 chummer6-hub organizer, league, convention, and season contracts are complete; future shards must verify the organizer operations release-proof receipts, canonical registry row, Fleet queue row, and design queue row instead of reopening this governed community-operations slice.",
       "allowed_paths": [
         "Chummer.Run.Api",
         "scripts",
         "tests"
       ],
       "owned_surfaces": [
+        "organizer_ops",
+        "league_convention_season_ops"
+      ],
+      "exit_criterion": "Add roles, rosters, events, permissions, artifact publication, and support escalation contracts for community-scale operations."
+    },
+    "next90-m119-hub-first-session-onboarding": {
+      "package_id": "next90-m119-hub-first-session-onboarding",
+      "work_task_id": "119.1",
+      "milestone_id": 119,
+      "frontier_id": 1130567614,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "wave": "W14",
+      "task": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane.",
+      "title": "Orchestrate guided first-playable-session onboarding",
+      "landed_commit": "TO_BE_FILLED_M119_COMMIT",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M119 chummer6-hub guided first-playable-session onboarding is complete; future shards must verify the starter-lane proof receipts, local release proof package, canonical registry row, Fleet queue row, and design queue row instead of reopening the install-to-first-session onboarding slice.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m119_hub_first_session_onboarding.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m119_hub_first_session_onboarding.py",
+        "python3 scripts/verify_next90_m119_hub_first_session_onboarding.py",
+        "python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py",
+        "bash scripts/ai/run_services_smoke.sh"
+      ],
+      "owned_surfaces": [
         "first_playable_session:onboarding",
         "starter_lane:hub"
       ],
       "exit_criterion": "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
+    },
+    "next90-m120-hub-public-launch-health": {
+      "package_id": "next90-m120-hub-public-launch-health",
+      "work_task_id": "120.1",
+      "milestone_id": 120,
+      "frontier_id": 4442751895,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "landed_commit": "TO_BE_FILLED_M120_COMMIT",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M120 chummer6-hub public trust and launch-health publication package is complete; future shards must verify the launch-health contract, canonical registry row, queue parity, and local+served proof before reopening this package.",
+      "wave": "W14",
+      "task": "Compile live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health into public status surfaces.",
+      "title": "Publish public trust, status, release, and proof-shelf surfaces from registry and governor truth.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m120_hub_public_launch_health.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m120_hub_public_launch_health.py",
+        "python3 scripts/verify_next90_m120_hub_public_launch_health.py",
+        "python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py",
+        "bash scripts/ai/verify.sh"
+      ],
+      "owned_surfaces": [
+        "public_trust_surface:v3",
+        "launch_health:public"
+      ],
+      "exit_criterion": "Compile live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health into public status surfaces."
+    },
+    "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the": {
+      "package_id": "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the",
+      "work_task_id": "141.3",
+      "milestone_id": 141,
+      "frontier_id": 4062147200,
+      "repo": "chummer6-hub",
+      "status": "complete",
+      "completion_action": "verify_closed_package_only",
+      "do_not_reopen_reason": "M141 chummer6-hub import-route review-required guard is complete; future shards must verify the route/support/publication proof receipt, canonical registry row, queue mirrors, and local+served Hub proof instead of reopening this slice.",
+      "wave": "W22P",
+      "task": "Keep route, support, and publication surfaces from claiming parity for these routes unless the direct proof receipts are current.",
+      "title": "Keep route, support, and publication surfaces from claiming parity for these routes unless the direct proof receipts are current.",
+      "allowed_paths": [
+        "Chummer.Run.Api",
+        "scripts",
+        "tests"
+      ],
+      "proof": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicTrustPulseService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/SignedInTrustStatusService.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/DownloadsCompatibilityController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml",
+        "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_next90_m141_hub_import_route_review_required.py",
+        "/docker/chummercomplete/chummer6-hub/tests/test_hub_local_release_proof_native_support_route.py",
+        "/docker/chummercomplete/chummer6-hub/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
+        "python3 scripts/verify_next90_m141_hub_import_route_review_required.py",
+        "python3 -m unittest tests/test_next90_m141_hub_import_route_review_required.py",
+        "python3 -m unittest tests/test_hub_local_release_proof_native_support_route.py",
+        "bash scripts/ai/verify.sh"
+      ],
+      "owned_surfaces": [
+        "keep_route_support_and_publication_surfaces_from_claimin:hub"
+      ],
+      "exit_criterion": "Keep route, support, and publication surfaces from claiming parity for these routes unless the direct proof receipts are current."
     }
   },
   "base_url": "https://chummer.run",
-  "compose_file": "docker-compose.public-edge.yml",
-  "playwright_timeout_seconds": 300,
+  "compose_file": "docker-compose.yml",
+  "playwright_timeout_seconds": 120,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
@@ -546,6 +891,32 @@
         "support_followthrough:install_truth",
         "support_case_install_readiness",
         "desktop_update_rollback_recovery"
+      ]
+    },
+    {
+      "receipt_id": "desktop_client_readiness:bounded_routes",
+      "package_id": "next90-m102-hub-desktop-native-trust",
+      "milestone_id": 102,
+      "frontier_id": 2897065929,
+      "frontier_ids": [
+        2897065929,
+        2594403904
+      ],
+      "active_flagship_frontier_id": 2594403904,
+      "summary": "Download, status, publication, continuation, and support routes stay bounded to recovery and support posture until the direct desktop_client flagship proof turns green; the public route family must carry the current readiness gap instead of claiming parity early.",
+      "routes": [
+        "/downloads",
+        "/status",
+        "/artifacts",
+        "/artifacts/publications/{publicationId}",
+        "/api/v1/install-linking/continuation",
+        "/api/v1/install-linking/continuation/support"
+      ],
+      "surfaces": [
+        "desktop_client_readiness:bounded_routes",
+        "desktop_native_claim_and_recovery",
+        "support_followthrough:install_truth",
+        "public_proof_shelf:release_bundles"
       ]
     },
     {
@@ -892,7 +1263,7 @@
       "package_id": "next90-m117-hub-artifact-shelf-v2",
       "milestone_id": 117,
       "frontier_id": 4041187890,
-      "summary": "Signed-in artifact shelf filters now fail closed to all, personal, campaign, or creator while workspace and campaign projections stamp recap entries with audience and publication posture before the public shelf renders them.",
+      "summary": "Signed-in artifact shelf filters now fail closed to all, personal, campaign, creator, or public while workspace and campaign projections stamp recap entries with audience and publication posture before the public shelf renders them.",
       "routes": [
         "/artifacts",
         "/home/work",
@@ -911,6 +1282,103 @@
         "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignWorkspaceServerPlaneService.cs and CampaignSpineService.cs stamp creator-linked recap entries with campaign, personal, and creator audience plus publication state before the shelf view filters them.",
         "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CreatorPublicationRegistryBridge.cs requires approved manifest-backed audit authority before creator-publication moderation and publication can widen onto the public shelf.",
         "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m117_hub_artifact_shelf_v2.py fail-closes queue, registry, and source-proof drift if artifact shelf audience filtering or signed-in view controls regress."
+      ]
+    },
+    {
+      "receipt_id": "organizer_ops",
+      "package_id": "next90-m118-hub-organizer-ops",
+      "milestone_id": 118,
+      "frontier_id": 3207603971,
+      "summary": "Hub now keeps governed organizer operations, roles, roster movement, and signed-in account rail follow-through on one bounded organizer dashboard instead of scattering them across ad hoc operator screens.",
+      "routes": [
+        "/api/v1/campaign-spine/me/organizer-ops",
+        "/home/work",
+        "/account/work"
+      ],
+      "surfaces": [
+        "organizer_ops",
+        "organizer_roles",
+        "organizer_permissions",
+        "organizer_roster_contracts"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs now serves the organizer operations dashboard from the shared campaign-spine route instead of a detached operator-only endpoint.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs now composes organizer roles, permissions, and roster movement from one governed campaign/community projection.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves organizer role assignments, permissions, and governed roster movement survive the shared organizer operations contract and signed-in rails."
+      ]
+    },
+    {
+      "receipt_id": "league_convention_season_ops",
+      "package_id": "next90-m118-hub-organizer-ops",
+      "milestone_id": 118,
+      "frontier_id": 3207603971,
+      "summary": "The same governed operations lane now keeps season lanes, artifact publication posture, and support escalation visible together so organizer workflows stay auditable instead of fragmenting across separate admin-only dashboards.",
+      "routes": [
+        "/api/v1/campaign-spine/me/organizer-ops",
+        "/home/work",
+        "/account/work"
+      ],
+      "surfaces": [
+        "league_convention_season_ops",
+        "season_event_lanes",
+        "artifact_publication:organizer",
+        "support_escalation:organizer"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs now keeps season lanes, artifact publication posture, and tracked support escalation on the same organizer dashboard instead of splitting them into separate operator notes.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml and /docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml surface organizer artifact-publication and support-escalation posture on the shared operator rails.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves governed season lanes, artifact publication receipts, and tracked support escalation survive the organizer contract across the same governed operations lane."
+      ]
+    },
+    {
+      "receipt_id": "public_trust_surface:v3",
+      "package_id": "next90-m120-hub-public-launch-health",
+      "milestone_id": 120,
+      "frontier_id": 4442751895,
+      "summary": "Public trust now keeps status, current release, downloads, proof shelf, weekly pulse, and the hosted progress poster on one governor-backed public route family instead of splitting launch posture across unrelated pages.",
+      "routes": [
+        "/status",
+        "/now",
+        "/downloads",
+        "/artifacts",
+        "/api/public/weekly-pulse",
+        "/api/public/progress-poster.svg"
+      ],
+      "surfaces": [
+        "public_trust_surface:v3",
+        "weekly_trust_pulse",
+        "proof_shelf_projection",
+        "status_release_guidance"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs binds the shared trust pulse and launch-health model onto the hosted status, release, downloads, and proof-shelf surfaces.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicProgressController.cs serves the hosted weekly pulse and progress-poster routes from the same public-trust surface contract.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml renders the public launch-health card and trust-surface projection instead of leaving governor-backed public posture implicit.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs proves the status page surfaces the trust pulse, proof shelf guidance, and hosted public launch-health packet on one route family."
+      ]
+    },
+    {
+      "receipt_id": "launch_health:public",
+      "package_id": "next90-m120-hub-public-launch-health",
+      "milestone_id": 120,
+      "frontier_id": 4442751895,
+      "summary": "Public launch health now compiles live, preview, fallback, revoked, fixed, blocked, proof freshness, support pulse, and adoption health from mirrored release and weekly governor truth instead of leaving the public status lane to infer them.",
+      "routes": [
+        "/status",
+        "/api/public/weekly-pulse",
+        "/api/public/progress-poster.svg"
+      ],
+      "surfaces": [
+        "launch_health:public",
+        "launch_health_rows",
+        "support_pulse:public",
+        "adoption_health:public"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs builds explicit launch-health rows from the public release and governor truth.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/ViewModels/SiteViewModels.cs keeps launch-health rows as an explicit status-page projection instead of free-form copy.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Status.cshtml renders Model.LaunchHealthRows on the public status lane.",
+        "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs fail-closes the status route if the public launch-health rows stop surfacing the mirrored release and weekly governor truth."
       ]
     },
     {
@@ -959,8 +1427,73 @@
         "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml keeps the selected first-session drawer, legal-runner and return proof, and install-support follow-through on the shared account work route.",
         "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes the starter lane as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet."
       ]
+    },
+    {
+      "receipt_id": "keep_route_support_and_publication_surfaces_from_claimin:hub",
+      "package_id": "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the",
+      "milestone_id": 141,
+      "frontier_id": 4062147200,
+      "summary": "Route, support, and publication surfaces now keep parity claims review-required until the direct translator, XML amendment, Hero Lab, and adjacent import-route receipts are current, so downloads, status, support, and publication detail routes stay honest about the remaining review-required lane.",
+      "routes": [
+        "/downloads",
+        "/status",
+        "/contact",
+        "/account/support",
+        "/artifacts",
+        "/artifacts/publications/{publicationId}",
+        "/api/v1/public/artifacts/publications/{publicationId}"
+      ],
+      "surfaces": [
+        "keep_route_support_and_publication_surfaces_from_claimin:hub",
+        "public_trust_surface:v3",
+        "support_followthrough:install_truth",
+        "artifact_shelf:v2"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/ImportRouteParityProofGuardService.cs requires current local release-proof receipts before translator, XML amendment, Hero Lab, and adjacent import routes can clear the review-required lane.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/PublicReleaseManifestService.cs, PublicTrustPulseService.cs, and SignedInTrustStatusService.cs carry the review-required parity guard onto public release, support, and signed-in trust surfaces.",
+        "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs, DownloadsCompatibilityController.cs, CampaignSpineController.cs apply the same review-required lane to downloads, status, support, and publication routes.",
+        "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m141_hub_import_route_review_required.py and tests/test_next90_m141_hub_import_route_review_required.py fail-close queue, registry, and Hub proof drift when route/support/publication surfaces claim parity without the direct import-route receipts."
+      ]
+    },
+    {
+      "receipt_id": "bind_exchange_and_outward_facing_output_routes_to_visibl:hub",
+      "package_id": "next90-m143-hub-bind-exchange-and-outward-facing-output-routes-to-visible-receipt-or-bou",
+      "milestone_id": 143,
+      "frontier_id": 4032374688,
+      "summary": "Install recovery exchange, release-bundle proof, creator-publication detail, and campaign federation routes now surface a visible receipt or a bounded-failure posture instead of silent optimistic claims, so output readiness stays inspectable on every outward-facing lane.",
+      "routes": [
+        "/downloads/install/{artifactId}/claim.json",
+        "/downloads/install/{artifactId}/continue.json",
+        "/api/v1/install-linking/continuation",
+        "/api/v1/install-linking/continuation/support",
+        "/api/v1/install-linking/continuation/update",
+        "/api/v1/install-linking/continuation/rollback",
+        "/artifacts/release-bundles/{releaseArtifactId}",
+        "/artifacts/release-bundles/{releaseArtifactId}/{format}",
+        "/artifacts/publications/{publicationId}",
+        "/api/v1/public/artifacts/publications/{publicationId}",
+        "/api/public/artifacts/publications/{publicationId}",
+        "/api/v1/campaign-spine/me/workspaces/{workspaceId}/federation-batches"
+      ],
+      "surfaces": [
+        "bind_exchange_and_outward_facing_output_routes_to_visibl:hub",
+        "desktop_native_claim_and_recovery",
+        "support_followthrough:install_truth",
+        "public_proof_shelf:release_bundles",
+        "creator_publication_detail",
+        "campaign_federation_exchange"
+      ],
+      "evidence": [
+        "PublicLandingController.cs binds install recovery exchange, release-bundle proof, and creator-publication detail routes to route receipts or bounded review posture.",
+        "InstallLinkingController.cs keeps native claimed-install continuation, support, update, and rollback routes on the same route-receipt or bounded-review contract.",
+        "CampaignFederationOrchestrationService.cs keeps federation batches bounded until every outward-facing source pack carries a live publication-shelf receipt.",
+        "Views/PublicLanding/PublicCreatorPublication.cshtml surfaces the creator-publication route receipt or bounded review posture directly on the public detail page.",
+        "RunServicesSmoke/Program.cs proves native continuation, release-bundle proof, creator-publication detail, and campaign federation routes expose route receipts or bounded review posture instead of silent claims.",
+        "verify_next90_m143_hub_exchange_output_receipts.py and tests/test_next90_m143_hub_exchange_output_receipts.py fail closed when exchange/output route proof, queue truth, or release-proof receipts drift."
+      ]
     }
   ],
-  "generated_at": "2026-05-07T11:32:53Z",
-  "generatedAt": "2026-05-07T11:32:53Z"
+  "generated_at": "2026-05-08T14:24:35Z",
+  "generatedAt": "2026-05-08T14:24:35Z"
 }

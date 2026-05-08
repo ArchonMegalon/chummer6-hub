@@ -98,6 +98,7 @@
     "initiation_add",
     "master_index",
     "matrix_program_add",
+    "new_character",
     "new_window",
     "print_character",
     "print_multiple",

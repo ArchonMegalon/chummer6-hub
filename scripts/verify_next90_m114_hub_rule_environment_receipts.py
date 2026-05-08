@@ -263,8 +263,55 @@ def load_yaml(path: Path, *, label: str) -> dict:
     return payload
 
 
+def normalize_legacy_queue_payload(raw: str) -> str:
+    marker = raw.find("items:")
+    if marker >= 0:
+        raw = raw[marker:]
+
+    def is_key_line(candidate: str) -> bool:
+        text = candidate.lstrip()
+        if not text or text.startswith(("-", "?")):
+            return False
+        if ":" not in text:
+            return False
+        key, _, _ = text.partition(":")
+        return bool(key) and " " not in key and "\t" not in key
+
+    normalized: list[str] = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            normalized.append("")
+            continue
+        if (
+            normalized
+            and line.startswith(" ")
+            and not line.lstrip().startswith("-")
+            and not is_key_line(line)
+            and not line.strip().startswith("?")
+        ):
+            normalized[-1] = f"{normalized[-1]} {line.strip()}"
+        else:
+            normalized.append(line)
+
+    return "\n".join(normalized) + "\n"
+
+
+def load_queue_payload(path: Path, *, label: str) -> dict:
+    raw = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(raw)
+        if isinstance(payload, dict):
+            return payload
+    except yaml.YAMLError:
+        payload = yaml.safe_load(normalize_legacy_queue_payload(raw))
+        if isinstance(payload, dict):
+            return payload
+    raise SystemExit(f"{label} must be a mapping: {path}")
+
+
 def verify_queue_row(errors: list[str], path: Path, *, label: str) -> None:
-    payload = load_yaml(path, label=label)
+    payload = load_queue_payload(path, label=label)
     items = payload.get("items")
     if not isinstance(items, list):
         errors.append(f"{label} items must be a list: {path}")

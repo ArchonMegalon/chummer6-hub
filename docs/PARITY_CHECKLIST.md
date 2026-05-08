@@ -19,7 +19,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | --- | ---: | ---: | ---: | ---: |
 | Tabs | 17 | 17 | 0 | 2 |
 | Workspace Actions | 47 | 47 | 0 | 2 |
-| Desktop Controls | 29 | 29 | 0 | 41 |
+| Desktop Controls | 29 | 29 | 0 | 42 |
 
 ## Tabs Coverage
 
@@ -154,6 +154,7 @@ Generated automatically from the parity oracle and current contracts catalogs.
 | `initiation_add` | present_in_dialog_factory_acknowledged |
 | `master_index` | present_in_dialog_factory_acknowledged |
 | `matrix_program_add` | present_in_dialog_factory_acknowledged |
+| `new_character` | present_in_dialog_factory_acknowledged |
 | `new_window` | present_in_dialog_factory_acknowledged |
 | `print_character` | present_in_dialog_factory_acknowledged |
 | `print_multiple` | present_in_dialog_factory_acknowledged |

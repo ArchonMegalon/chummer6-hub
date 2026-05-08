@@ -4,6 +4,7 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -18,6 +19,9 @@ public sealed class CampaignSpineController : ControllerBase
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly CampaignFederationOrchestrationService _campaignFederation;
+    private readonly FlagshipReadinessArtifactService _flagshipReadiness;
+    private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
+    private readonly LocalReleaseProofArtifactService _localReleaseProof;
 
     public CampaignSpineController(
         HubIdentityClient identity,
@@ -25,7 +29,8 @@ public sealed class CampaignSpineController : ControllerBase
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
-        CampaignFederationOrchestrationService campaignFederation)
+        CampaignFederationOrchestrationService campaignFederation,
+        IConfiguration configuration)
     {
         _identity = identity;
         _accounts = accounts;
@@ -33,6 +38,9 @@ public sealed class CampaignSpineController : ControllerBase
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
         _campaignFederation = campaignFederation;
+        _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
+        _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
+        _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
     }
 
     [HttpGet("me")]
@@ -953,7 +961,24 @@ public sealed class CampaignSpineController : ControllerBase
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var batch = _campaignFederation.LaunchWorkspaceFederationBatch(user, workspaceId, request, installLinking);
-            return batch is null ? NotFound() : Ok(batch);
+            if (batch is null)
+            {
+                return NotFound();
+            }
+
+            LocalReleaseProofLookupResult routeLookup = FindLocalReleaseProofReceipt($"/api/v1/campaign-spine/me/workspaces/{workspaceId}/federation-batches");
+            RouteClaimStatus routeClaim = ResolveCampaignFederationRouteClaimStatus(
+                routeLookup,
+                "No current local release-proof receipt is attached to this campaign federation exchange route.");
+
+            return Ok(batch with
+            {
+                RouteState = routeClaim.State,
+                RouteReceipt = routeClaim.RouteReceipt,
+                BoundedFailureReason = routeClaim.State == "pass"
+                    ? batch.BoundedFailureReason
+                    : routeClaim.BoundedFailureReason,
+            });
         }
         catch (CommunityAccessDeniedException ex)
         {
@@ -1091,6 +1116,7 @@ public sealed class CampaignSpineController : ControllerBase
     {
         try
         {
+            ApplyImportRouteParityHeaders("/api/v1/campaign-spine/me/publications/{publicationId}");
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
@@ -1102,4 +1128,79 @@ public sealed class CampaignSpineController : ControllerBase
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
     }
+
+    private void ApplyImportRouteParityHeaders(string route)
+    {
+        ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+        Response.Headers["X-Chummer-Parity-Claims"] = importRouteGuard.IsCurrent ? "pass" : "review_required";
+        Response.Headers["X-Chummer-Parity-Claims-Route"] = route;
+        if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
+        {
+            Response.Headers["X-Chummer-Parity-Claims-Reason"] = importRouteGuard.ReviewRequiredReason!;
+        }
+    }
+
+    private RouteClaimStatus ResolveCampaignFederationRouteClaimStatus(
+        LocalReleaseProofLookupResult routeLookup,
+        string boundedFailureReason)
+    {
+        if (!string.IsNullOrWhiteSpace(routeLookup.CurrentnessFailureReason))
+        {
+            return new RouteClaimStatus(
+                "bounded_failure",
+                null,
+                $"Parity claims stay review-required because {routeLookup.CurrentnessFailureReason!.Trim().TrimEnd('.')}.");
+        }
+
+        LocalProofReceiptMatch? routeReceipt = routeLookup.ReceiptMatch;
+        if (routeReceipt is null)
+        {
+            return new RouteClaimStatus(
+                "bounded_failure",
+                null,
+                boundedFailureReason);
+        }
+
+        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        if (readiness?.MissingDesktopClientCoverage == true)
+        {
+            string reviewRequiredReason = readiness.DesktopClientGapSummary.Trim().TrimEnd('.');
+            return new RouteClaimStatus(
+                "bounded_failure",
+                BuildRouteReceiptPayload(routeReceipt),
+                $"Current direct route receipt is attached, but parity claims stay review-required because {reviewRequiredReason}.");
+        }
+
+        ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+        if (!importRouteGuard.IsCurrent && !string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
+        {
+            return new RouteClaimStatus(
+                "bounded_failure",
+                BuildRouteReceiptPayload(routeReceipt),
+                $"Current direct route receipt is attached, but parity claims stay review-required because {importRouteGuard.ReviewRequiredReason!.Trim().TrimEnd('.')}.");
+        }
+
+        return new RouteClaimStatus(
+            "pass",
+            BuildRouteReceiptPayload(routeReceipt),
+            null);
+    }
+
+    private static CampaignFederationRouteReceiptProjection? BuildRouteReceiptPayload(LocalProofReceiptMatch? routeReceipt)
+        => routeReceipt is null
+            ? null
+            : new CampaignFederationRouteReceiptProjection(
+                routeReceipt.ReceiptId,
+                routeReceipt.PackageId,
+                routeReceipt.MatchedRoute,
+                routeReceipt.MatchMode,
+                routeReceipt.Summary);
+
+    private LocalReleaseProofLookupResult FindLocalReleaseProofReceipt(params string?[] routeCandidates)
+        => _localReleaseProof.FindReceipt(routeCandidates);
+
+    private sealed record RouteClaimStatus(
+        string State,
+        CampaignFederationRouteReceiptProjection? RouteReceipt,
+        string? BoundedFailureReason);
 }

@@ -68,6 +68,62 @@ FORBIDDEN_PROOF_MARKERS = [
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.environ.get("CHUMMER_CAMPAIGN_CONSEQUENCE_TRUTH_ROOT", DEFAULT_ROOT))
+
+
+def normalize_legacy_queue_payload(raw: str) -> str:
+    """Normalize legacy malformed queue YAML so strict parsing can proceed."""
+
+    marker = raw.find("items:")
+    if marker >= 0:
+        raw = raw[marker:]
+
+    def is_key_line(candidate: str) -> bool:
+        text = candidate.lstrip()
+        if not text or text.startswith(("-", "?")):
+            return False
+        if ":" not in text:
+            return False
+        key, _, _ = text.partition(":")
+        return bool(key) and " " not in key and "\t" not in key
+
+    normalized: list[str] = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            normalized.append("")
+            continue
+        if (
+            normalized
+            and line.startswith(" ")
+            and not line.lstrip().startswith("-")
+            and not is_key_line(line)
+            and not line.strip().startswith("?")
+        ):
+            normalized[-1] = f"{normalized[-1]} {line.strip()}"
+        else:
+            normalized.append(line)
+
+    return "\n".join(normalized) + "\n"
+
+
+def load_queue_payload(path: Path) -> dict:
+    raw = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(raw) or {}
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(payload, list):
+            return {"items": payload}
+    except yaml.YAMLError:
+        payload = yaml.safe_load(normalize_legacy_queue_payload(raw)) or {}
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(payload, list):
+            return {"items": payload}
+        raise
+    return {}
+
+
 QUEUE_STAGING_PATH = Path(
     os.environ.get(
         "CHUMMER_CAMPAIGN_CONSEQUENCE_TRUTH_QUEUE_STAGING",
@@ -325,7 +381,7 @@ def verify_queue_authority(missing: list[str], path: Path, label: str) -> dict[s
     if not path.is_file():
         missing.append(f"{label} is missing: {path}")
         return None
-    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    payload = load_queue_payload(path)
     items = payload.get("items")
     if not isinstance(items, list):
         missing.append(f"{label} items must be a list: {path}")

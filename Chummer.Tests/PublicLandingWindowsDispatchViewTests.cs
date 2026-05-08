@@ -42,8 +42,8 @@ public sealed class PublicLandingWindowsDispatchViewTests
         Assert.Contains("Main platform downloads", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Signed-in Windows builds", downloadsView, StringComparison.Ordinal);
         Assert.Contains("Open signed-in Windows build", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Windows verification and support rail", downloadsView, StringComparison.Ordinal);
-        Assert.Contains("Open Windows verification rail", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Windows verification and support path", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Open Windows verification page", downloadsView, StringComparison.Ordinal);
     }
 
     private static int CountOccurrences(string text, string needle)

@@ -10,7 +10,7 @@ public sealed class FaqFlagshipViewTests
         string faqViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml");
         string faqView = File.ReadAllText(faqViewPath);
 
-        Assert.Contains("Get the answer or leave with the right next route.", faqView, StringComparison.Ordinal);
+        Assert.Contains("Get the answer or leave with the right next page.", faqView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", faqView, StringComparison.Ordinal);
         Assert.Contains("Reality check", faqView, StringComparison.Ordinal);
         Assert.Contains("Private help", faqView, StringComparison.Ordinal);

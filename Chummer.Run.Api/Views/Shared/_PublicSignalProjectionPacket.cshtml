@@ -53,11 +53,11 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@Model.Vendor</span>
-            <h3>Public route and first-party fallback stay paired.</h3>
+            <h3>Public page and first-party fallback stay paired.</h3>
             <p>@Model.PolicyStatus</p>
             <div class="route-choice-card__proof">
                 <span>Role: @Model.Role</span>
-                <span>Public route: @Model.PublicPath</span>
+                <span>Public page: @Model.PublicPath</span>
                 <span>First-party fallback: @Model.FallbackPath</span>
                 <span>@Model.TruthPosture</span>
             </div>
@@ -84,8 +84,8 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Boundary conditions</span>
-            <h3>Decision routes and forbidden claims stay explicit.</h3>
-            <p>Public signal can move into named review lanes, but it must not turn into support truth, release truth, or canon by itself.</p>
+            <h3>Decision paths and forbidden claims stay explicit.</h3>
+            <p>Public signal can move into named review tracks, but it must not turn into support truth, release truth, or canon by itself.</p>
             @if (decisionRoutes.Length > 0)
             {
                 <div class="route-choice-card__proof">
@@ -100,7 +100,7 @@
                 <div class="compact-rail">
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Forbidden on this rail</h3>
+                            <h3>Forbidden on this page</h3>
                             <p>@string.Join(" / ", forbidden)</p>
                         </div>
                     </article>

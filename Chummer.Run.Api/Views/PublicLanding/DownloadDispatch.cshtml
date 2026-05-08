@@ -14,7 +14,7 @@
         {
             Badge = "Current handoff",
             Title = "Stay on this install handoff while this device finishes its claim-aware setup",
-            Summary = "This route exists for one signed-in device continuation. Keep using it when the job is finishing the guided setup assistant, the installer download, or the linked claim handoff for this copy.",
+            Summary = "This page exists for one signed-in device continuation. Keep using it when the job is finishing the guided setup assistant, the installer download, or the linked claim handoff for this copy.",
             Href = "#signed-in-download",
             Label = "Stay on this handoff",
             Proof = new[] { Model.PlatformLabel, Model.Display.BuildLabel, "One device continuation" }
@@ -23,16 +23,16 @@
         {
             Badge = "Downloads",
             Title = "Return to downloads when the job is choosing a platform or installer shape",
-            Summary = "The main downloads rail still owns platform comparison, known issues, and the calmer entry point for a fresh device. This page should not become a general installer catalog.",
+            Summary = "The main downloads page still owns platform comparison, known issues, and the calmer entry point for a fresh device. This page should not become a general installer catalog.",
             Href = "/downloads",
             Label = "Back to downloads",
-            Proof = new[] { "Platform shelf", "Known issues nearby", "General install rail" }
+            Proof = new[] { "Platform shelf", "Known issues nearby", "General install path" }
         },
         new
         {
             Badge = "Devices and access",
             Title = "Open Devices and access only when this copy needs relink or reclaim help",
-            Summary = "Use the account-owned device rail when the install needs relinking, reclaim, or continuity cleanup. Do not use this handoff page as a substitute account center.",
+            Summary = "Use the account-owned device page when the install needs relinking, reclaim, or continuity cleanup. Do not use this handoff page as a substitute account center.",
             Href = Model.AccountHref,
             Label = Model.AccountLabel,
             Proof = new[] { "Claimed install history", "Relink and reclaim", "Account-owned continuity" }
@@ -41,7 +41,7 @@
         {
             Badge = "Reality check",
             Title = "Open what works today when the question is current proof, not this device handoff",
-            Summary = "The install handoff is for one device. Use the live proof rail when you need the broader release posture, user-visible cautions, or current confidence before continuing.",
+            Summary = "The install handoff is for one device. Use the live proof page when you need the broader release posture, user-visible cautions, or current confidence before continuing.",
             Href = "/now",
             Label = "Open what works today",
             Proof = new[] { "Current proof shelf", "User-visible caution", "No mixed jobs" }
@@ -50,12 +50,13 @@
         {
             Badge = "Recovery",
             Title = "Leave the handoff for tracked support or help as soon as the problem becomes recovery-bound",
-            Summary = "If setup breaks, logs are needed, or private follow-up starts, move to the support/help rail immediately instead of treating this page like a troubleshooting maze.",
+            Summary = "If setup breaks, logs are needed, or private follow-up starts, move to the support/help page immediately instead of treating this page like a troubleshooting maze.",
             Href = Model.SupportHref,
             Label = Model.SupportLabel,
             Proof = new[] { "Tracked follow-up", "Install context preserved", "Private help" }
         }
     };
+    @* Support follow-through stays on the same install rail while this handoff resolves linked install truth. *@
 }
 
 <section class="release-stage">
@@ -108,9 +109,9 @@
 
 <section class="editorial-block" id="dispatch-route-map">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Route map</p>
-        <h2 class="editorial-title">Keep install handoff, platform choice, release proof, and recovery on separate rails.</h2>
-        <p class="editorial-copy">This page should finish one signed-in device handoff. It should not replace the general downloads shelf, the account-owned device rail, or first-party support.</p>
+        <p class="eyebrow">Where to go next</p>
+        <h2 class="editorial-title">Keep install handoff, platform choice, release proof, and recovery on separate pages.</h2>
+        <p class="editorial-copy">This page should finish one signed-in device handoff. It should not replace the general downloads shelf, the account-owned device page, or first-party support.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -143,7 +144,7 @@
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="@Model.SecondaryDownloadHref" id="startSignedInDownloadButton">@Model.SecondaryDownloadLabel</a>
                 </div>
-                <p class="muted-copy">Use this raw installer fallback only when support asks for it. The guided setup assistant below remains the linked-install default when this route is active.</p>
+                <p class="muted-copy">Use this raw installer fallback only when support asks for it. The guided setup assistant below remains the linked-install default when this page is active.</p>
                 <details class="release-disclosure">
                     <summary>Guided setup assistant</summary>
                     <div class="release-disclosure__body">
@@ -242,8 +243,8 @@
                         ? "The published packages stay the same for every user. The account-aware part is the short-lived setup assistant and the short-lived install claims it carries, not a personalized app binary."
                         : "The installer bytes stay the same for every user. If account linking is needed, enter the support or recovery code inside setup instead of copying one from this page.")</p>
                     <p class="muted-copy">Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.</p>
-                    <p class="muted-copy">Support follow-through stays on the same install rail, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.</p>
-                    <p class="muted-copy">Status, known issues, and install help stay on one release rail so recovery never depends on stale page copy.</p>
+                    <p class="muted-copy">Support follow-through stays on the same install page, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.</p>
+                    <p class="muted-copy">Status, known issues, and install help stay on one release page so recovery never depends on stale page copy.</p>
                 </div>
             </details>
         </div>
@@ -252,7 +253,7 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use this route to finish one install handoff, then move to the rail that owns the next job.</h2>
+    <h2 class="editorial-title">Use this page to finish one install handoff, then move to the page that owns the next job.</h2>
     <p class="editorial-copy">Return to Downloads for platform choice, open Devices and access for relink or reclaim work, and leave for tracked support as soon as the device needs recovery help instead of another install click.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="/downloads">Back to downloads</a>

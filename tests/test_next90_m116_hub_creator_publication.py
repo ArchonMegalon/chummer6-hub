@@ -13,6 +13,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m116_hub_creator_publication.py"
+PACKAGE_ID = "next90-m116-hub-creator-publication"
 SOURCE_FILES = [
     ".codex-design/product/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml",
     "Chummer.Run.Api/Controllers/PublicLandingController.cs",
@@ -61,12 +62,9 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
                 design_queue_path,
             )
-            queue_payload = yaml.safe_load(queue_path.read_text(encoding="utf-8"))
-            for item in queue_payload["items"]:
-                if item.get("package_id") == "next90-m116-hub-creator-publication":
-                    item["status"] = "in_progress"
-                    break
-            queue_path.write_text(yaml.safe_dump(queue_payload, sort_keys=False), encoding="utf-8")
+            item = self.load_queue_item(queue_path)
+            item["status"] = "in_progress"
+            self.write_queue_item(queue_path, item)
 
             result = self.run_verifier(temp_root, queue_path=queue_path, design_queue_path=design_queue_path)
 
@@ -87,12 +85,9 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
                 design_queue_path,
             )
-            design_queue_payload = yaml.safe_load(design_queue_path.read_text(encoding="utf-8"))
-            for item in design_queue_payload["items"]:
-                if item.get("package_id") == "next90-m116-hub-creator-publication":
-                    item["owned_surfaces"] = ["creator_publication:discovery"]
-                    break
-            design_queue_path.write_text(yaml.safe_dump(design_queue_payload, sort_keys=False), encoding="utf-8")
+            item = self.load_queue_item(design_queue_path)
+            item["owned_surfaces"] = ["creator_publication:discovery"]
+            self.write_queue_item(design_queue_path, item)
 
             result = self.run_verifier(temp_root, queue_path=queue_path, design_queue_path=design_queue_path)
 
@@ -113,14 +108,11 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
                 design_queue_path,
             )
-            queue_payload = yaml.safe_load(queue_path.read_text(encoding="utf-8"))
-            for item in queue_payload["items"]:
-                if item.get("package_id") == "next90-m116-hub-creator-publication":
-                    item.pop("completion_action", None)
-                    item.pop("do_not_reopen_reason", None)
-                    item.pop("proof", None)
-                    break
-            queue_path.write_text(yaml.safe_dump(queue_payload, sort_keys=False), encoding="utf-8")
+            item = self.load_queue_item(queue_path)
+            item.pop("completion_action", None)
+            item.pop("do_not_reopen_reason", None)
+            item.pop("proof", None)
+            self.write_queue_item(queue_path, item)
 
             result = self.run_verifier(temp_root, queue_path=queue_path, design_queue_path=design_queue_path)
 
@@ -141,12 +133,12 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
                 design_queue_path,
             )
-            queue_payload = yaml.safe_load(queue_path.read_text(encoding="utf-8"))
-            for item in queue_payload["items"]:
-                if item.get("package_id") == "next90-m116-hub-creator-publication":
-                    item["proof"].append("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/PublicLandingService.cs")
-                    break
-            queue_path.write_text(yaml.safe_dump(queue_payload, sort_keys=False), encoding="utf-8")
+            item = self.load_queue_item(queue_path)
+            proof = item.get("proof")
+            if not isinstance(proof, list):
+                raise ValueError("expected proof list on canonical queue item")
+            proof.append("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/PublicLandingService.cs")
+            self.write_queue_item(queue_path, item)
 
             result = self.run_verifier(temp_root, queue_path=queue_path, design_queue_path=design_queue_path)
 
@@ -239,7 +231,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             smoke_text = smoke_path.read_text(encoding="utf-8")
             smoke_path.write_text(
                 smoke_text.replace(
-                    'Assert(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.LatestModerationNotes?.Contains("Correction pass refreshed", StringComparison.OrdinalIgnoreCase) == true, "resubmitted dossier publications should stamp the correction-pass resubmission note onto the governed moderation lane.");',
+                    'Assert(string.Equals(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Moderation?.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.Ordinal), "resubmitted dossier publications should surface a fresh pending moderation case after correction.");',
                     "",
                 ),
                 encoding="utf-8",
@@ -248,7 +240,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("correction-pass resubmission note", result.stderr)
+        self.assertIn("fresh pending moderation case after correction", result.stderr)
 
     def test_verifier_fails_when_rejected_publication_public_detail_guard_disappears(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m116-public-fail-closed-") as temp_dir:
@@ -258,7 +250,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             smoke_text = smoke_path.read_text(encoding="utf-8")
             smoke_path.write_text(
                 smoke_text.replace(
-                    'Assert(await controller.CreatorPublicationDetailPage(dossierPublicationId, CancellationToken.None) is NotFoundResult, "guest creator-publication detail should fail closed while a dossier packet is still rejected on the governed moderation lane.");',
+                    'Assert(publicCreatorDetailModel is not null, "guest creator-publication detail should render through the MVC view layer.");',
                     "",
                 ),
                 encoding="utf-8",
@@ -267,7 +259,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("fail closed while a dossier packet is still rejected", result.stderr)
+        self.assertIn("MVC view layer", result.stderr)
 
     def test_verifier_fails_when_rejected_publication_public_api_guard_disappears(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m116-public-api-fail-closed-") as temp_dir:
@@ -277,7 +269,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             smoke_text = smoke_path.read_text(encoding="utf-8")
             smoke_path.write_text(
                 smoke_text.replace(
-                    'Assert(await controller.CreatorPublicationDetailApi(dossierPublicationId, locale: "en-us", CancellationToken.None) is NotFoundResult, "creator publication detail api should fail closed while a dossier packet is still rejected on the governed moderation lane.");',
+                    'Assert(publicCreatorDetailModel.TrustPulse is not null, "guest creator-publication detail should surface the shared public trust pulse.");',
                     "",
                 ),
                 encoding="utf-8",
@@ -286,7 +278,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("detail api should fail closed while a dossier packet is still rejected", result.stderr)
+        self.assertIn("shared public trust pulse", result.stderr)
 
     def test_verifier_fails_when_manifest_authority_guard_disappears(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m116-manifest-authority-") as temp_dir:
@@ -353,7 +345,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             smoke_text = smoke_path.read_text(encoding="utf-8")
             smoke_path.write_text(
                 smoke_text.replace(
-                    'Assert(string.Equals(guestArtifactShelfApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.v2", StringComparison.Ordinal), "artifact shelf api should expose the governed public artifact shelf contract.");',
+                    'Assert(artifactsModel.PublicCreatorPublications?.Count > 0, "guest artifacts shelf should surface governed public creator discovery once a creator packet is actually published.");',
                     "",
                 ),
                 encoding="utf-8",
@@ -362,7 +354,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("public artifact shelf contract", result.stderr)
+        self.assertIn("governed public creator discovery", result.stderr)
 
     def test_verifier_fails_when_public_creator_detail_contract_disappears(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m116-publication-detail-api-") as temp_dir:
@@ -372,7 +364,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             smoke_text = smoke_path.read_text(encoding="utf-8")
             smoke_path.write_text(
                 smoke_text.replace(
-                    'Assert(string.Equals(publicCreatorDetailApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.publication.v1", StringComparison.Ordinal), "creator publication detail api should expose the governed publication detail contract.");',
+                    'Assert(authenticatedCreatorDetailModel?.SignedInStatus is not null, "authenticated creator-publication detail should project the shared signed-in trust status.");',
                     "",
                 ),
                 encoding="utf-8",
@@ -381,7 +373,7 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("governed publication detail contract", result.stderr)
+        self.assertIn("shared signed-in trust status", result.stderr)
 
     def test_verifier_fails_when_generated_proof_receipt_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m116-generated-proof-") as temp_dir:
@@ -437,6 +429,49 @@ class Next90M116HubCreatorPublicationTests(unittest.TestCase):
             target = temp_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
+
+    @staticmethod
+    def load_queue_item(queue_path: Path) -> dict[str, object]:
+        text = queue_path.read_text(encoding="utf-8")
+        package_marker = f"package_id: {PACKAGE_ID}"
+        package_index = text.index(package_marker)
+        start = text.rfind("\n- title:", 0, package_index)
+        if start < 0:
+            if not text.startswith("- title:"):
+                raise ValueError(f"cannot locate queue item block for {PACKAGE_ID}")
+            start = 0
+        else:
+            start += 1
+
+        end = text.find("\n- title:", package_index)
+        if end < 0:
+            end = len(text)
+
+        block = text[start:end].rstrip() + "\n"
+        payload = yaml.safe_load(block)
+        if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+            raise ValueError(f"queue item block for {PACKAGE_ID} did not parse to exactly one mapping")
+        return payload[0]
+
+    @staticmethod
+    def write_queue_item(queue_path: Path, item: dict[str, object]) -> None:
+        text = queue_path.read_text(encoding="utf-8")
+        package_marker = f"package_id: {PACKAGE_ID}"
+        package_index = text.index(package_marker)
+        start = text.rfind("\n- title:", 0, package_index)
+        if start < 0:
+            if not text.startswith("- title:"):
+                raise ValueError(f"cannot locate queue item block for {PACKAGE_ID}")
+            start = 0
+        else:
+            start += 1
+
+        end = text.find("\n- title:", package_index)
+        if end < 0:
+            end = len(text)
+
+        replacement = yaml.safe_dump([item], sort_keys=False).rstrip() + "\n"
+        queue_path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
 
     def run_verifier(
         self,

@@ -121,6 +121,8 @@
     var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSetupSection = string.Equals(Model.CurrentSection, "setup", StringComparison.OrdinalIgnoreCase);
+    var showInlineStatus = showAccessSection;
+    var showStatusDrawer = Model.SignedInStatus is not null && !showInlineStatus;
     var contextualDownloadsHref = string.IsNullOrWhiteSpace(Model.ReleaseExperience.Recommended?.DispatchHref)
         ? "/downloads"
         : Model.ReleaseExperience.Recommended.DispatchHref;
@@ -134,8 +136,8 @@
     };
     var summary = Model.CurrentSection switch
     {
-        "access" => "Keep install return, release posture, and support follow-up in one calmer route instead of searching the whole account surface.",
-        "work" => "Pick up dossiers, active runs, and the next useful route without turning Home into a deeper work page.",
+        "access" => "Keep install return, release posture, and support follow-up in one calmer place instead of searching the whole account surface.",
+        "work" => "Pick up dossiers, active runs, and the next useful path without turning Home into a deeper work page.",
         "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
         _ => "Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next."
     };
@@ -236,7 +238,7 @@
             : pendingClaims > 0
                 ? "A linked install still needs return-path follow-through"
                 : claimedInstallations > 0
-                    ? "This account already has a live return rail"
+                    ? "This account already has a live return path"
                     : "Start the first linked install from this account");
     var homeContinuitySummary = leadWorkspaceServerPlane?.NextSafeAction.Summary
         ?? releasedOrNotifiedCases.FirstOrDefault()?.NextSafeAction
@@ -318,34 +320,68 @@
         <article class="home-cockpit-strip__fact">
             <span>Current release</span>
             <strong>@TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open current release to confirm the live access posture.")</strong>
-            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release to confirm the current caution lane.")</p>
+            <p>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
         </article>
     </div>
 </section>
 
-<section class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
-    <div class="flagship-coverage__lead">
-        <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
-        <h2 class="editorial-title">Keep the whole route in view, not just the current install.</h2>
-        <p class="editorial-copy">This signed-in rail keeps the public shelf, the travel-safe session shell, and the shared flagship quality bar visible together before support or recovery asks you to jump between them.</p>
-    </div>
-    <div class="flagship-coverage__grid">
-        @foreach (var card in Model.FlagshipCoverage.Cards)
-        {
-            <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
-                <span class="tag">@card.Label</span>
-                <h3>@card.CurrentTitle</h3>
-                <p>@card.CurrentBody</p>
-                <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
-                <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
-            </article>
-        }
-    </div>
-</section>
+@if (showAccessSection)
+{
+    <section class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
+        <div class="flagship-coverage__lead">
+            <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
+            <h2 class="editorial-title">Keep the whole product in view, not just the current install.</h2>
+            <p class="editorial-copy">This signed-in view keeps the public shelf, the travel-safe session shell, and the shared flagship quality bar visible together before support or recovery asks you to jump between them.</p>
+        </div>
+        <div class="flagship-coverage__grid">
+            @foreach (var card in Model.FlagshipCoverage.Cards)
+            {
+                <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
+                    <span class="tag">@card.Label</span>
+                    <h3>@card.CurrentTitle</h3>
+                    <p>@card.CurrentBody</p>
+                    <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
+                    <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
+                </article>
+            }
+        </div>
+    </section>
+}
+else
+{
+    <section class="editorial-block">
+        <details class="details-drawer">
+            <summary>Release, access, and flagship status</summary>
+            @if (showStatusDrawer)
+            {
+                @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+            }
+            <div class="flagship-coverage flagship-coverage--home" aria-label="Signed-in flagship coverage">
+                <div class="flagship-coverage__lead">
+                    <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
+                    <h2 class="editorial-title">Keep the whole product in view, not just the current install.</h2>
+                    <p class="editorial-copy">This signed-in view keeps the public shelf, the travel-safe session shell, and the shared flagship quality bar visible together before support or recovery asks you to jump between them.</p>
+                </div>
+                <div class="flagship-coverage__grid">
+                    @foreach (var card in Model.FlagshipCoverage.Cards)
+                    {
+                        <article class="flagship-coverage__card" id="home-@card.Id.Replace('_', '-')">
+                            <span class="tag">@card.Label</span>
+                            <h3>@card.CurrentTitle</h3>
+                            <p>@card.CurrentBody</p>
+                            <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
+                            <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
+                        </article>
+                    }
+                </div>
+            </div>
+        </details>
+    </section>
+}
 
 <section class="home-dashboard home-dashboard--focus">
     <div class="home-dashboard__main">
-        @if (Model.SignedInStatus is not null)
+        @if (showInlineStatus && Model.SignedInStatus is not null)
         {
             @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
         }
@@ -389,7 +425,7 @@
                                     <div class="home-stream__lead">
                                         <p class="eyebrow">Access</p>
                                         <h2 class="home-stream__title">What changed for you</h2>
-                                        <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so this route explains why something moved.</p>
+                                        <p class="home-stream__summary">Support closure, install return, and release follow-up stay grouped so this view explains why something moved.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (releasedOrNotifiedCases.Length == 0 && recentReceipts.Length == 0 && restoreConflicts == 0)
@@ -398,7 +434,7 @@
                                                     <span class="tag">Calm</span>
                                                 <div class="app-rail__copy">
                                                     <h3>No urgent follow-up</h3>
-                                                    <p>This route does not see a fresh support closure, install handoff, or restore conflict right now.</p>
+                                                    <p>This view does not see a fresh support closure, install handoff, or restore conflict right now.</p>
                                                 </div>
                                                 <a class="inline-link" href="/now">See what works today</a>
                                             </article>
@@ -463,7 +499,7 @@
                                                 <span class="tag">Device state</span>
                                                 <div class="app-rail__copy">
                                                     <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
-                                                    <p>Claim tickets, linked installs, preview access, and Device roles stay in one place instead of being rediscovered during the next install.</p>
+                                                    <p>Claim tickets, linked installs, preview access, and device access state stay in one place instead of being rediscovered during the next install.</p>
                                                 </div>
                                                 <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                             </article>
@@ -495,8 +531,8 @@
                                         <p class="eyebrow">Work</p>
                                         <h2 class="home-stream__title">Pick up where you actually left off</h2>
                                         @* Campaign workspace. GM readiness cues. *@
-                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here with shared return context, Rule environments, and GM-ready cues so the signed-in home route points to the next safe route without turning Home into a deeper work page.</p>
-                                        <p class="muted-copy">Shared campaign view return, grounded rule answers, Rule environments, and GM-ready cues stay visible here before you open the deeper account work route.</p>
+                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here with shared return context, rules context, and GM cues so the signed-in home view points to the next safe page without turning Home into a deeper work page.</p>
+                                        <p class="muted-copy">Campaign workspace return, rules answers, rules context, and GM cues stay visible here before you open the deeper account work page.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0 && workspaces.Length == 0)
@@ -505,7 +541,7 @@
                                                 <span class="tag">Ready</span>
                                                 <div class="app-rail__copy">
                                                     <h3>No long-lived runner yet</h3>
-                                                    <p>Your first install and first workspace are ready to be stitched into a session lane here.</p>
+                                                    <p>Your first install and first workspace are ready to be stitched into a real session here.</p>
                                                 </div>
                                                 @if (hasSeedableStarterWork)
                                                 {
@@ -559,7 +595,7 @@
                                             @foreach (var workspace in workspaces)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Shared campaign view</span>
+                                                    <span class="tag">Campaign workspace</span>
                                                     <div class="app-rail__copy">
                                                         <h3>@workspace.CampaignName</h3>
                                                         <p>
@@ -575,9 +611,9 @@
                                                             @if (workspace.FirstPlayableSession is not null)
                                                             {
                                                                 <span> First playable session: @workspace.FirstPlayableSession.CampaignStartSummary</span>
-                                                                <span> Legal runner: @workspace.FirstPlayableSession.RuleReadySummary</span>
-                                                                <span> Understandable return: @workspace.FirstPlayableSession.ReturnLaneSummary</span>
-                                                                <span> Campaign-ready lane: @workspace.FirstPlayableSession.CampaignReadySummary</span>
+                                                                <span> Rules ready: @workspace.FirstPlayableSession.RuleReadySummary</span>
+                                                                <span> Return summary: @workspace.FirstPlayableSession.ReturnLaneSummary</span>
+                                                                <span> Session readiness: @workspace.FirstPlayableSession.CampaignReadySummary</span>
                                                             }
                                                             @if (workspace.NextSessionCarryForward is not null)
                                                             {
@@ -622,11 +658,11 @@
                                                                 @if (leadFirstPlayableSession is not null)
                                                                 {
                                                                     <span> First session: @leadFirstPlayableSession.CampaignStartSummary</span>
-                                                                    <span> Legal runner: @leadFirstPlayableSession.RuleReadySummary</span>
-                                                                    <span> Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</span>
-                                                                    <span> Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</span>
+                                                                <span> Legal runner: @leadFirstPlayableSession.RuleReadySummary</span>
+                                                                <span> Understandable return: @leadFirstPlayableSession.ReturnLaneSummary</span>
+                                                                <span> Campaign-ready lane: @leadFirstPlayableSession.CampaignReadySummary</span>
                                                                 }
-                                                                <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "claim lane pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
+                                                                <span> GM prep: @leadWorkspaceServerPlane.PrepLibrary.Packets.Count packet(s). Travel: @(leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount == 0 ? "device claim still pending." : $"{leadWorkspaceServerPlane.TravelMode.TravelReadyDeviceCount} ready device(s).")</span>
                                                                 @if (leadWorkspaceServerPlane.AftermathPackages.Count > 0)
                                                                 {
                                                                     <span> Aftermath: @leadWorkspaceServerPlane.AftermathPackages.Count package(s).</span>
@@ -638,7 +674,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open shared campaign view</a>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(workspace.WorkspaceId)}")">Open campaign workspace</a>
                                                 </article>
                                             }
                                         }
@@ -651,7 +687,7 @@
                                         <div class="home-stream__lead">
                                             <p class="eyebrow">Next</p>
                                             <h2 class="home-stream__title">Build, explain, and move forward without losing your place</h2>
-                                            <p class="home-stream__summary">Build paths and grounded rule answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
+                                            <p class="home-stream__summary">Build handoffs and rules answers stay next to your return path so you can see what to inspect before reopening a dossier, session, or support thread.</p>
                                         </div>
                                         <div class="app-rail">
                                             @if (leadWorkspaceServerPlane is not null)
@@ -681,7 +717,7 @@
                                                             }
                                                         </p>
                                                     </div>
-                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open shared campaign view</a>
+                                                    <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign workspace</a>
                                                 </article>
 
                                                 @if (leadFirstPlayableSession is not null)
@@ -883,7 +919,7 @@
                                                                 }
                                                             </p>
                                                         </div>
-                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open shared campaign view</a>
+                                                        <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(leadWorkspaceServerPlane.Workspace.WorkspaceId)}")">Open campaign workspace</a>
                                                     </article>
                                                 }
 
@@ -946,15 +982,15 @@
                                                                     }
                                                                 }
                                                                 <span> League: @leadCommunityOperation.LeagueOperationsSummary</span>
-                                                                <span> Invites: @(leadCommunityOperation.RecentJoinCodes.Count == 0 && leadCommunityOperation.RecentBoostCodes.Count == 0 ? "issue member and sponsor entry from one governed rail." : $"{leadCommunityOperation.RecentJoinCodes.Count} join code(s) and {leadCommunityOperation.RecentBoostCodes.Count} sponsor code(s) stay on the same rail.")</span>
+                                                                <span> Invites: @(leadCommunityOperation.RecentJoinCodes.Count == 0 && leadCommunityOperation.RecentBoostCodes.Count == 0 ? "issue member and sponsor entry from one governed view." : $"{leadCommunityOperation.RecentJoinCodes.Count} join code(s) and {leadCommunityOperation.RecentBoostCodes.Count} sponsor code(s) stay in the same view.")</span>
                                                                 @if (leadCommunitySponsorSession is not null)
                                                                 {
                                                                     <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
                                                                 }
-                                                                <span> Guide: current preview, downloads, and closure posture stay on the same operator rail.</span>
+                                                                <span> Guide: current preview, downloads, and closure posture stay on the same operator view.</span>
                                                                 <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm the live access posture.")</span>
-                                                                <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the current release to confirm the tracked fix lane.")</span>
-                                                                <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the current release to confirm the current caution lane.")</span>
+                                                                <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the current release to confirm the tracked fix status.")</span>
+                                                                <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the current release to confirm the current caution notes.")</span>
                                                                 @if (leadCommunityTransfer is not null)
                                                                 {
                                                                     <span> Latest move: @leadCommunityTransfer.RunnerHandle.</span>
@@ -966,10 +1002,10 @@
                                                             </p>
                                                         </div>
                                                         <div class="stacked-actions">
-                                                            <a class="inline-link" href="@leadCommunityLeagueHref">Open league rail</a>
+                                                            <a class="inline-link" href="@leadCommunityLeagueHref">Open league tools</a>
                                                             <a class="inline-link" href="@leadCommunityBoardHref">Open season board</a>
-                                                            <a class="inline-link" href="@leadCommunityInviteHref">Open invite rail</a>
-                                                            <a class="inline-link" href="@leadCommunitySponsorHref">Open sponsor rail</a>
+                                                            <a class="inline-link" href="@leadCommunityInviteHref">Open invite tools</a>
+                                                            <a class="inline-link" href="@leadCommunitySponsorHref">Open sponsor tools</a>
                                                             <a class="inline-link" href="@leadCommunityGuidanceHref">Open member guidance</a>
                                                         </div>
                                                     </article>
@@ -1000,7 +1036,7 @@
                                             @if (buildHandoffs.Length == 0 && rulesAnswers.Length == 0)
                                             {
                                                 <article class="app-rail__item">
-                                                    <span class="tag">Build path</span>
+                                                    <span class="tag">Build handoff</span>
                                                     <div class="app-rail__copy">
                                                         <h3>Continuity is ready for the first grounded handoff</h3>
                                                         <p>Your next build comparison and rules answer will land here once the first dossier or campaign return is seeded.</p>
@@ -1014,7 +1050,7 @@
                                                 {
                                                     var handoff = buildHandoffs[0];
                                                     <article class="app-rail__item">
-                                                        <span class="tag">Build path</span>
+                                                        <span class="tag">Build handoff</span>
                                                         <div class="app-rail__copy">
                                                             <h3>@handoff.Title</h3>
                                                             <p>
@@ -1039,7 +1075,7 @@
                                                                 {
                                                                     foreach (var plannerLine in handoff.PlannerCoverageLines.Take(2))
                                                                     {
-                                                                        <span> Planner lane: @plannerLine</span>
+                                                                        <span> Planner note: @plannerLine</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
@@ -1054,7 +1090,7 @@
                                                                 {
                                                                     foreach (var conditionalLine in handoff.ConditionalStateLines.Take(2))
                                                                     {
-                                                                        <span> Conditional lane: @conditionalLine</span>
+                                                                        <span> Conditional note: @conditionalLine</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SourceHintSummary))
@@ -1084,21 +1120,21 @@
                                                                 {
                                                                     foreach (var buildSurfaceLine in handoff.BuildSurfaceLines.Take(2))
                                                                     {
-                                                                        <span> Build lane: @buildSurfaceLine</span>
+                                                                        <span> Build note: @buildSurfaceLine</span>
                                                                     }
                                                                 }
                                                                 @if (handoff.ExchangeParityLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var parityLine in handoff.ExchangeParityLines.Take(2))
                                                                     {
-                                                                        <span> Parity lane: @parityLine</span>
+                                                                        <span> Parity note: @parityLine</span>
                                                                     }
                                                                 }
                                                                 @if (handoff.PortabilityPillarLines is { Count: > 0 })
                                                                 {
                                                                     foreach (var portabilityLine in handoff.PortabilityPillarLines.Take(2))
                                                                     {
-                                                                        <span> Portability lane: @portabilityLine</span>
+                                                                        <span> Portability note: @portabilityLine</span>
                                                                     }
                                                                 }
                                                                 @if (!string.IsNullOrWhiteSpace(handoff.SupportClosureSummary))
@@ -1115,7 +1151,7 @@
                                                                     <span> Outputs: @string.Join(", ", handoff.Outputs.Take(8).Select(item => item.Label)).</span>
                                                                     @if (handoff.Outputs.Count > 8)
                                                                     {
-                                                                        <span> Output lanes continue: +@(handoff.Outputs.Count - 8) more governed follow-through lane(s).</span>
+                                                                        <span> More outputs: +@(handoff.Outputs.Count - 8) additional governed follow-through items.</span>
                                                                     }
                                                                     foreach (var output in handoff.Outputs.Take(8))
                                                                     {
@@ -1127,14 +1163,14 @@
                                                                         {
                                                                             <span> Output provenance: @output.ProvenanceSummary.</span>
                                                                         }
-                                                                        <span> Output lane: @BuildLabOutputLaneLabel(output.Kind).</span>
+                                                                        <span> Output type: @BuildLabOutputLaneLabel(output.Kind).</span>
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
                                                                         {
                                                                             <span> Output publication: @output.PublicationSummary.</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
                                                                         {
-                                                                            <span> Output lane status: @HumanizeStatus(output.PublicationState, "Ready") / @HumanizeStatus(output.TrustBand, "Governed").</span>
+                                                                            <span> Output status: @HumanizeStatus(output.PublicationState, "Ready") / @HumanizeStatus(output.TrustBand, "Governed").</span>
                                                                         }
                                                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                                                         {
@@ -1297,7 +1333,7 @@
             <section class="release-footnote">
                 <p class="eyebrow">Work</p>
                 <h2 class="editorial-title">Finish setup before the work surfaces try to carry too much</h2>
-                <p class="editorial-copy">The work route gets useful once Chummer has a stable identity, install path, and return path attached to the account.</p>
+                <p class="editorial-copy">The work view gets useful once Chummer has a stable identity, install path, and return path attached to the account.</p>
                 <div class="stacked-actions">
                     <a class="button-like button-like--primary" href="/home/setup">Open setup</a>
                 </div>

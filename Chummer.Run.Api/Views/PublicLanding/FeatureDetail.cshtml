@@ -39,22 +39,22 @@
     {
         "roadmap" => "Take the bounded next step without pretending the whole horizon is already shipped",
         "live-proof" => "Take the direct next action when this artifact already proved itself",
-        "preview-concept" => "Follow the one truthful next action instead of treating preview copy like a release rail",
-        _ => "Take the direct next route once this detail answered the question"
+        "preview-concept" => "Follow the one truthful next action instead of treating preview copy like a live release",
+        _ => "Take the direct next page once this detail answered the question"
     };
     var primaryRouteSummary = Model.Family switch
     {
-        "roadmap" => $"{Model.PrimaryAction.Label} is the current next route for this horizon. Use it when the detail answered the question and you know which bounded action comes next.",
-        "live-proof" => $"{Model.PrimaryAction.Label} stays available because this route is proving one user-visible artifact, not hiding the next action behind vague card copy.",
-        "preview-concept" => $"{Model.PrimaryAction.Label} is the honest next move from this preview concept. It keeps the route explicit about what is real now versus what is still opening next.",
-        _ => $"{Model.PrimaryAction.Label} is the explicit next route for this feature detail once the bounded question is resolved."
+        "roadmap" => $"{Model.PrimaryAction.Label} is the current next page for this horizon. Use it when the detail answered the question and you know which bounded action comes next.",
+        "live-proof" => $"{Model.PrimaryAction.Label} stays available because this page is proving one user-visible artifact, not hiding the next action behind vague card copy.",
+        "preview-concept" => $"{Model.PrimaryAction.Label} is the honest next move from this preview concept. It keeps the next step explicit about what is real now versus what is still opening next.",
+        _ => $"{Model.PrimaryAction.Label} is the explicit next page for this feature detail once the bounded question is resolved."
     };
     var primaryRouteProof = Model.Family switch
     {
-        "roadmap" => new[] { "Bounded action", "No fake ship claim", "Next route explicit" },
+        "roadmap" => new[] { "Bounded action", "No fake ship claim", "Next step explicit" },
         "live-proof" => new[] { "User-visible proof", "Direct continuation", "No vague gallery loop" },
-        "preview-concept" => new[] { "Preview stays honest", "Next move explicit", "No fake release rail" },
-        _ => new[] { "Bounded detail", "Single next route", "Route stays honest" }
+        "preview-concept" => new[] { "Preview stays honest", "Next move explicit", "No fake release claim" },
+        _ => new[] { "Bounded detail", "Single next page", "Next step stays honest" }
     };
 
     var compareRoute = Model.Family switch
@@ -63,25 +63,25 @@
             Href: "/now",
             Label: "Open what works today",
             Title: "Compare with live proof instead of treating a horizon as already shipped",
-            Summary: "Roadmap detail keeps direction honest, but the live proof rail still owns current user-available truth.",
+            Summary: "Roadmap detail keeps direction honest, but the live proof page still owns current user-available truth.",
             Proof: new[] { "Current proof shelf", "No fake ship claim", "Install truth stays separate" }),
         "live-proof" => (
             Href: "/downloads",
             Label: "Open downloads",
-            Title: "Use the release rail when the question becomes install or update posture",
+            Title: "Use downloads when the question becomes install or update posture",
             Summary: "This detail proves one artifact or flow. Downloads still owns build choice, platform posture, and known issues.",
-            Proof: new[] { "Install rail", "Known issues nearby", "One calmer device path" }),
+            Proof: new[] { "Install path", "Known issues nearby", "One calmer device path" }),
         "preview-concept" => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Compare with the live proof rail before treating a preview as already available",
-            Summary: "Preview concepts stay explicit about what is still opening next. The live proof rail still answers what a user can start from today.",
+            Title: "Compare with the live proof page before treating a preview as already available",
+            Summary: "Preview concepts stay explicit about what is still opening next. The live proof page still answers what a user can start from today.",
             Proof: new[] { "Preview stays honest", "Current proof nearby", "No fake availability" }),
         _ => (
             Href: "/now",
             Label: "Open what works today",
-            Title: "Check the live proof rail when current availability matters more than the feature brief",
-            Summary: "The feature detail answers one bounded question. The live proof rail still owns current release truth.",
+            Title: "Check the live proof page when current availability matters more than the feature brief",
+            Summary: "The feature detail answers one bounded question. The live proof page still owns current release truth.",
             Proof: new[] { "Current proof", "Availability first", "No mixed jobs" })
     };
 
@@ -104,24 +104,24 @@
                 Href: "/artifacts",
                 Label: "Open artifacts shelf",
                 Title: "Go back to the proof shelf when you need comparison instead of one isolated card",
-                Summary: "The artifacts shelf keeps adjacent proof, provenance, and comparison on one rail instead of turning this detail route into a dead end.",
+                Summary: "The artifacts shelf keeps adjacent proof, provenance, and comparison together instead of turning this detail page into a dead end.",
                 Proof: new[] { "Proof shelf", "Comparison nearby", "Same trust family" }),
             "preview-concept" => (
                 Href: "/artifacts",
                 Label: "Open artifacts shelf",
-                Title: "Use the proof shelf when you want adjacent preview and live artifacts on one rail",
+                Title: "Use the proof shelf when you want adjacent preview and live artifacts together",
                 Summary: "Preview concepts become easier to read when the shelf keeps neighboring proof and availability context nearby.",
                 Proof: new[] { "Preview and live together", "Proof shelf", "Comparison nearby" }),
             _ => (
                 Href: "/roadmap",
                 Label: "Open roadmap",
-                Title: "Move to the larger route family only when the single feature card is not enough",
-                Summary: "This detail route stays bounded on purpose. Open the broader route family when you need surrounding context.",
+                Title: "Move to the larger page family only when the single feature card is not enough",
+                Summary: "This detail page stays bounded on purpose. Open the broader page family when you need surrounding context.",
                 Proof: new[] { "Broader context", "Still first-party", "Bounded detail stays bounded" })
         };
 
-    AddRouteChoice("Best next route", primaryRouteTitle, primaryRouteSummary, Model.PrimaryAction.Href, Model.PrimaryAction.Label, primaryRouteProof);
-    AddRouteChoice(compareRoute.Title.Contains("install or update posture", StringComparison.Ordinal) ? "Install rail" : "Reality check", compareRoute.Title, compareRoute.Summary, compareRoute.Href, compareRoute.Label, compareRoute.Proof);
+    AddRouteChoice("Best next page", primaryRouteTitle, primaryRouteSummary, Model.PrimaryAction.Href, Model.PrimaryAction.Label, primaryRouteProof);
+    AddRouteChoice(compareRoute.Title.Contains("install or update posture", StringComparison.Ordinal) ? "Install path" : "Reality check", compareRoute.Title, compareRoute.Summary, compareRoute.Href, compareRoute.Label, compareRoute.Proof);
     AddRouteChoice("Deeper context", deeperRoute.Title, deeperRoute.Summary, deeperRoute.Href, deeperRoute.Label, deeperRoute.Proof);
     AddRouteChoice(
         "Help",
@@ -131,7 +131,7 @@
         "Open help",
         "Support-owned",
         "Private follow-up",
-        "No route confusion");
+        "No page confusion");
 }
 
 <section class="story-cinematic">
@@ -159,16 +159,11 @@
     }
 </section>
 
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="editorial-block" id="feature-route-map">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Route map</p>
-        <h2 class="editorial-title">Keep feature detail, proof, installs, and help on their own rails.</h2>
-        <p class="editorial-copy">This page should answer the bounded question behind one feature card. It should not pretend to be the whole roadmap, the install rail, or private support.</p>
+        <p class="eyebrow">Where to go next</p>
+        <h2 class="editorial-title">Keep feature detail, proof, installs, and help on their own pages.</h2>
+        <p class="editorial-copy">This page should answer the bounded question behind one feature card. It should not pretend to be the whole roadmap, the install page, or private support.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -223,7 +218,7 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use the feature detail to answer one question, then move to the rail that owns the next job.</h2>
+    <h2 class="editorial-title">Use the feature detail to answer one question, then move to the page that owns the next job.</h2>
     <p class="editorial-copy">Take the explicit next action when the card is clear, compare against live proof when availability matters, and leave for help as soon as the issue becomes private, recovery-bound, or support-owned.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>

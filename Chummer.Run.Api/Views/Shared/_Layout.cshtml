@@ -85,32 +85,19 @@
     var footerProductLinks = compactFooter && compactProductLinks.Length > 0
         ? compactProductLinks
         : productLinks;
-    (string Eyebrow, string Label, string Href)? bottomQuickAction = null;
-    if (!authSurface && !chrome.Authenticated && chrome.PublicPrimaryCta is not null)
-    {
-        bottomQuickAction = ("Preview access", chrome.PublicPrimaryCta.Label, chrome.PublicPrimaryCta.Href);
-
-        if (routeKey is "participate")
-        {
-            bottomQuickAction = ("Public signal", "Open Fixer Board", "/feedback");
-        }
-        else if (routeKey is "feedback")
-        {
-            bottomQuickAction = ("Projected movement", "Open roadmap", "/roadmap");
-        }
-        else if (routeKey is "horizons" or "roadmap" or "status" or "what-is-chummer" || routeKey.StartsWith("roadmap-", StringComparison.Ordinal))
-        {
-            bottomQuickAction = ("Reality check", "Open what works today", "/now");
-        }
-        else if (routeKey is "help" or "faq" or "contact")
-        {
-            bottomQuickAction = ("Need help", "Open support", "/contact#support-intake");
-        }
-        else if (routeKey is "privacy" or "terms")
-        {
-            bottomQuickAction = ("Need context", "Open help", "/help");
-        }
-    }
+    var compactDrawerLinks = chrome.PrimaryNavigation
+        .Concat(publicSignalLinks)
+        .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
+        .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
+        .ToArray();
+    var footerLinks = footerProductLinks
+        .Concat(publicSignalLinks)
+        .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
+        .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)
+        .Select(group => group.First())
+        .ToArray();
+    var utilityLink = chrome.UtilityNavigation.FirstOrDefault();
     var requestHost = Context?.Request?.Host.Host?.Trim().TrimEnd('.').ToLowerInvariant() ?? string.Empty;
     var clickRankSiteId = requestHost is "chummer.run" or "www.chummer.run"
         ? (System.Environment.GetEnvironmentVariable("CLICKRANK_AI_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
@@ -273,11 +260,13 @@
             <div class="site-nav-sheet" id="site-nav-sheet" data-nav-sheet hidden inert aria-hidden="true">
                 <div class="site-nav-sheet__panel">
                     <div class="site-nav-sheet__section">
-                        <p class="site-nav-sheet__heading">Navigate</p>
+                        <p class="site-nav-sheet__heading">Browse</p>
                         <nav aria-label="Compact navigation">
-                            @foreach (var link in chrome.PrimaryNavigation)
+                            @foreach (var link in compactDrawerLinks)
                             {
-                                var current = isContextualRouteCurrent(link.Href);
+                                var current = publicSignalLinks.Contains(link)
+                                    ? isPublicSignalCurrent(link.Href)
+                                    : isContextualRouteCurrent(link.Href);
                                 if (current)
                                 {
                                     <span class="site-nav__current">@link.Label</span>
@@ -289,82 +278,46 @@
                             }
                         </nav>
                     </div>
-                    <div class="site-nav-sheet__section">
-                        <p class="site-nav-sheet__heading">Actions</p>
-                        <div class="site-nav-sheet__actions">
-                            @foreach (var action in nonBuildHeaderActions)
-                            {
-                                if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
+                    @if (chrome.Authenticated || nonBuildHeaderActions.Length > 0 || buildAction is not null)
+                    {
+                        <div class="site-nav-sheet__section">
+                            <p class="site-nav-sheet__heading">Account</p>
+                            <div class="site-nav-sheet__actions">
+                                @foreach (var action in nonBuildHeaderActions)
                                 {
-                                    <form method="post" action="/logout" class="action-form">
-                                        @Html.AntiForgeryToken()
-                                        <button class="action-pill action-pill--@action.Tone" type="submit">@action.Label</button>
-                                    </form>
-                                }
-                                else if (action.Current)
-                                {
-                                    <span class="action-pill action-pill--current">@action.Label</span>
-                                }
-                                else
-                                {
-                                    var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
-                                        ? "site-actions__link"
-                                        : $"action-pill action-pill--{action.Tone}";
-                                    <a class="@actionClass" href="@action.Href">@action.Label</a>
-                                }
-                            }
-                            @if (buildAction is not null)
-                            {
-                                if (buildAction.Current)
-                                {
-                                    <span class="action-pill action-pill--current">@buildAction.Label</span>
-                                }
-                                else
-                                {
-                                    <a class="action-pill action-pill--secondary" href="@buildAction.Href">@buildAction.Label</a>
-                                }
-                            }
-                        </div>
-                    </div>
-                    <div class="site-nav-sheet__section">
-                        @if (publicSignalLinks.Length > 0)
-                        {
-                            <p class="site-nav-sheet__heading">Public loop</p>
-                            <nav aria-label="Compact public signal navigation">
-                                @foreach (var link in publicSignalLinks)
-                                {
-                                    if (isPublicSignalCurrent(link.Href))
+                                    if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
                                     {
-                                        <span class="site-nav__current">@link.Label</span>
+                                        <form method="post" action="/logout" class="action-form">
+                                            @Html.AntiForgeryToken()
+                                            <button class="action-pill action-pill--@action.Tone" type="submit">@action.Label</button>
+                                        </form>
+                                    }
+                                    else if (action.Current)
+                                    {
+                                        <span class="action-pill action-pill--current">@action.Label</span>
                                     }
                                     else
                                     {
-                                        <a href="@link.Href">@link.Label</a>
+                                        var actionClass = string.Equals(action.Tone, "link", StringComparison.OrdinalIgnoreCase)
+                                            ? "site-actions__link"
+                                            : $"action-pill action-pill--{action.Tone}";
+                                        <a class="@actionClass" href="@action.Href">@action.Label</a>
                                     }
                                 }
-                            </nav>
-                        }
-                     </div>
-                    <div class="site-nav-sheet__section">
-                        <p class="site-nav-sheet__heading">Help and legal</p>
-                        <nav aria-label="Compact support navigation">
-                            @foreach (var link in supportLinks)
-                            {
-                                if (isContextualRouteCurrent(link.Href))
+                                @if (buildAction is not null)
                                 {
-                                    <span class="site-nav__current">@link.Label</span>
+                                    if (buildAction.Current)
+                                    {
+                                        <span class="action-pill action-pill--current">@buildAction.Label</span>
+                                    }
+                                    else
+                                    {
+                                        <a class="action-pill action-pill--secondary" href="@buildAction.Href">@buildAction.Label</a>
+                                    }
                                 }
-                                else
-                                {
-                                    <a href="@link.Href">@link.Label</a>
-                                }
-                            }
-                            @foreach (var link in chrome.UtilityNavigation)
-                            {
-                                <a href="@link.Href">@link.Label</a>
-                            }
-                        </nav>
-                    </div>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </header>
@@ -380,15 +333,18 @@
             <div class="site-footer__inner">
                 <div class="site-footer__brand">
                     <a class="site-footer__wordmark" href="/">CHUMMER</a>
-                    <p class="site-footer__copy">Shadowrun character and campaign companion in preview.</p>
+                    <p class="site-footer__copy">Shadowrun character and campaign companion with clear install, help, and proof pages.</p>
                 </div>
                 <nav class="site-footer__nav" aria-label="Footer navigation">
                     <div class="site-footer__link-group">
-                        <p class="site-footer__heading">Product</p>
+                        <p class="site-footer__heading">Explore</p>
                         <div class="site-footer__links">
-                            @foreach (var link in footerProductLinks)
+                            @foreach (var link in footerLinks)
                             {
-                                if (isContextualRouteCurrent(link.Href))
+                                var current = publicSignalLinks.Contains(link)
+                                    ? isPublicSignalCurrent(link.Href)
+                                    : isContextualRouteCurrent(link.Href);
+                                if (current)
                                 {
                                     <span class="site-footer__current">@link.Label</span>
                                 }
@@ -399,151 +355,24 @@
                             }
                         </div>
                     </div>
-                    @if (compactFooter)
+                </nav>
+                <div class="site-footer__meta">
+                    @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
                     {
-                        if (publicSignalLinks.Length > 0)
-                        {
-                            <details class="site-footer__disclosure">
-                                <summary>Public loop</summary>
-                                <div class="site-footer__link-group">
-                                    <p class="site-footer__heading">Public loop</p>
-                                    <div class="site-footer__links">
-                                        @foreach (var link in publicSignalLinks)
-                                        {
-                                            if (isPublicSignalCurrent(link.Href))
-                                            {
-                                                <span class="site-footer__current">@link.Label</span>
-                                            }
-                                            else
-                                            {
-                                                <a href="@link.Href">@link.Label</a>
-                                            }
-                                        }
-                                    </div>
-                                </div>
-                            </details>
-                        }
-                        <details class="site-footer__disclosure">
-                            <summary>Help and legal</summary>
-                            <div class="site-footer__link-group">
-                                <p class="site-footer__heading">Help and legal</p>
-                                <div class="site-footer__links">
-                                    @foreach (var link in supportLinks)
-                                    {
-                                        if (isContextualRouteCurrent(link.Href))
-                                        {
-                                            <span class="site-footer__current">@link.Label</span>
-                                        }
-                                        else
-                                        {
-                                            <a href="@link.Href">@link.Label</a>
-                                        }
-                                    }
-                                </div>
-                            </div>
-                        </details>
-                        <details class="site-footer__disclosure">
-                            <summary>Truth boundary</summary>
-                            <div class="site-footer__link-group site-footer__link-group--provenance">
-                                <p class="site-footer__heading">Canon source</p>
-                                <p class="site-footer__provenance">@chrome.FooterCanonicalSource</p>
-                                <p class="site-footer__heading">Projection</p>
-                                <p class="site-footer__provenance">@chrome.FooterGeneratedNote</p>
-                                <p class="site-footer__provenance">First-party truth stays on <a class="quiet-link" href="/now">what works today</a> and <a class="quiet-link" href="/status">status</a>.</p>
-                            </div>
-                        </details>
+                        <p>Signed in as @chrome.SignedInLabel.</p>
                     }
                     else
                     {
-                        if (publicSignalLinks.Length > 0)
-                        {
-                            <div class="site-footer__link-group">
-                                <p class="site-footer__heading">Public loop</p>
-                                <div class="site-footer__links">
-                                    @foreach (var link in publicSignalLinks)
-                                    {
-                                        if (isPublicSignalCurrent(link.Href))
-                                        {
-                                            <span class="site-footer__current">@link.Label</span>
-                                        }
-                                        else
-                                        {
-                                            <a href="@link.Href">@link.Label</a>
-                                        }
-                                    }
-                                </div>
-                            </div>
-                        }
-                        <div class="site-footer__link-group">
-                            <p class="site-footer__heading">Help and legal</p>
-                            <div class="site-footer__links">
-                                @foreach (var link in supportLinks)
-                                {
-                                    if (isContextualRouteCurrent(link.Href))
-                                    {
-                                        <span class="site-footer__current">@link.Label</span>
-                                    }
-                                    else
-                                    {
-                                        <a href="@link.Href">@link.Label</a>
-                                    }
-                                }
-                            </div>
-                        </div>
-                        @if (chrome.UtilityNavigation.Count > 0)
-                        {
-                            <div class="site-footer__link-group site-footer__link-group--utility">
-                                <p class="site-footer__heading">Utility</p>
-                                <div class="site-footer__links site-footer__links--utility">
-                                    @foreach (var link in chrome.UtilityNavigation)
-                                    {
-                                        <a href="@link.Href">@link.Label</a>
-                                    }
-                                </div>
-                            </div>
-                        }
+                        <p>Preview product. Honest install and support guidance.</p>
                     }
-                </nav>
-                @if (!compactFooter)
-                {
-                    <div class="site-footer__meta">
-                        @if (chrome.Authenticated && !string.IsNullOrWhiteSpace(chrome.SignedInLabel))
-                        {
-                            <p>Signed in as @chrome.SignedInLabel</p>
-                        }
-                        else
-                        {
-                            <p>Preview product. Honest status.</p>
-                        }
-                        <p class="site-footer__meta-label">Canon source</p>
-                        <p class="site-footer__provenance">@chrome.FooterCanonicalSource</p>
-                        <p class="site-footer__meta-label">Projection</p>
-                        <p class="site-footer__provenance">@chrome.FooterGeneratedNote</p>
-                        <p class="site-footer__provenance">First-party truth stays on <a class="quiet-link" href="/now">what works today</a> and <a class="quiet-link" href="/status">status</a>.</p>
-                        <p><a class="quiet-link" href="/help">Need help?</a></p>
-                        <p><a class="quiet-link" href="/contact">Contact Chummer</a></p>
-                    </div>
-                }
+                    <p class="site-footer__provenance">Use <a class="quiet-link" href="/now">what works today</a> for customer-facing proof and <a class="quiet-link" href="/status">status</a> for current cautions.</p>
+                    @if (utilityLink is not null)
+                    {
+                        <p><a class="quiet-link" href="@utilityLink.Href">@utilityLink.Label</a> is the external source fallback.</p>
+                    }
+                </div>
             </div>
         </footer>
-
-        @if (bottomQuickAction is not null)
-        {
-            <div class="site-bottom-cta" aria-label="Quick action" data-bottom-cta data-bottom-cta-key="@routeKey">
-                <div class="site-bottom-cta__copy">
-                    <span class="site-bottom-cta__label">@bottomQuickAction.Value.Eyebrow</span>
-                    <strong>@bottomQuickAction.Value.Label</strong>
-                </div>
-                <a class="button-like button-like--primary" href="@bottomQuickAction.Value.Href">@bottomQuickAction.Value.Label</a>
-                <button
-                    class="site-bottom-cta__dismiss"
-                    type="button"
-                    data-bottom-cta-dismiss
-                    aria-label="Dismiss quick action">
-                    Dismiss
-                </button>
-            </div>
-        }
     }
 
     <script src="~/js/site.js" asp-append-version="true"></script>

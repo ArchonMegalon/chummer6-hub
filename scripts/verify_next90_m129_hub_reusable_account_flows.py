@@ -91,15 +91,53 @@ def read_text(relative_path: str) -> str:
 
 
 def load_yaml(path: Path) -> object:
-    with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
+    text = path.read_text(encoding="utf-8")
+    return yaml.safe_load(text)
+
+
+def load_queue_staging_yaml(path: Path) -> object:
+    text = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(text)
+    except yaml.YAMLError:
+        payload = None
+    else:
+        if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+            return payload
+
+    package_marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(package_marker)
+    if package_index < 0:
+        raise ValueError(f"queue staging is missing package_id {PACKAGE_ID}")
+
+    start = text.rfind("\n- title:", 0, package_index)
+    if start < 0:
+        if not text.startswith("- title:"):
+            raise ValueError(f"queue staging is missing the item block for {PACKAGE_ID}")
+        start = 0
+    else:
+        start += 1
+
+    end = text.find("\n- title:", package_index)
+    if end < 0:
+        end = len(text)
+
+    block = text[start:end].rstrip() + "\n"
+    payload = yaml.safe_load(block)
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise ValueError(f"queue staging package block for {PACKAGE_ID} must parse to exactly one item")
+    return {"items": payload}
 
 
 def verify_queue(path: Path, missing: list[str]) -> None:
     if not path.is_file():
         missing.append(f"missing queue staging file: {path}")
         return
-    payload = load_yaml(path) or {}
+    try:
+        payload = load_queue_staging_yaml(path) or {}
+    except (ValueError, yaml.YAMLError) as exc:
+        missing.append(f"{path}: unable to load queue staging for {PACKAGE_ID}: {exc}")
+        return
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list):
         missing.append(f"{path}: items is missing")

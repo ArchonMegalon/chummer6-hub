@@ -356,11 +356,18 @@ public sealed class SupportConciergePacketService
            && !value.StartsWith("unknown-", StringComparison.OrdinalIgnoreCase);
 
     private static bool HasConcreteInstalledReceiptId(string? receiptId)
-        => HasConcreteInstalledValue(receiptId)
-           && !string.Equals(receiptId.Trim(), "pending", StringComparison.OrdinalIgnoreCase)
-           && !string.Equals(receiptId.Trim(), "none", StringComparison.OrdinalIgnoreCase)
-           && !string.Equals(receiptId.Trim(), "n/a", StringComparison.OrdinalIgnoreCase)
-           && !receiptId.Trim().StartsWith("missing-", StringComparison.OrdinalIgnoreCase);
+    {
+        if (!HasConcreteInstalledValue(receiptId))
+        {
+            return false;
+        }
+
+        string normalized = receiptId!.Trim();
+        return !string.Equals(normalized, "pending", StringComparison.OrdinalIgnoreCase)
+               && !string.Equals(normalized, "none", StringComparison.OrdinalIgnoreCase)
+               && !string.Equals(normalized, "n/a", StringComparison.OrdinalIgnoreCase)
+               && !normalized.StartsWith("missing-", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static InstalledToReleaseDelta BuildInstalledToReleaseDelta(
         InstallAwareBuildTruth installedTruth,

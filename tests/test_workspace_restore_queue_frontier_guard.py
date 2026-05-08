@@ -17,217 +17,196 @@ DO_NOT_REOPEN_REASON = (
 )
 
 
-def _remove_package_frontier_id(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
+def _package_block_range(text: str) -> tuple[int, int]:
+    lines = text.splitlines(keepends=True)
+    package_line_index = next(
+        (index for index, line in enumerate(lines) if line.lstrip() == f"package_id: {PACKAGE_ID}\n"),
+        None,
+    )
+    if package_line_index is None:
         raise AssertionError(f"missing package row for {PACKAGE_ID}")
 
-    next_package_index = text.find("\n  - title:", package_index + len(package_marker))
-    if next_package_index == -1:
-        next_package_index = len(text)
+    package_start_index = package_line_index
+    package_indent: int | None = None
+    for index in range(package_line_index, -1, -1):
+        stripped = lines[index].lstrip()
+        indent = len(lines[index]) - len(stripped)
+        if stripped.startswith("- title:"):
+            package_start_index = index
+            package_indent = indent
+            break
 
-    before = text[:package_index]
-    package_block = text[package_index:next_package_index]
-    after = text[next_package_index:]
-    return before + package_block.replace("    frontier_id: 4623636482\n", "", 1) + after
+    if package_indent is None:
+        raise AssertionError(f"missing title row for {PACKAGE_ID}")
+
+    package_end_index = len(lines)
+    for index in range(package_start_index + 1, len(lines)):
+        stripped = lines[index].lstrip()
+        if not stripped.startswith("- title:"):
+            continue
+        indent = len(lines[index]) - len(stripped)
+        if indent == package_indent:
+            package_end_index = index
+            break
+
+    start = sum(len(line) for line in lines[:package_start_index])
+    end = sum(len(line) for line in lines[:package_end_index])
+    return start, end
+
+
+def _canonicalize_package_block(package_block: str) -> str:
+    lines = package_block.splitlines()
+    suffix = "\n" if package_block.endswith("\n") else ""
+    normalized_lines: list[str] = []
+    for line in lines:
+        if not line:
+            normalized_lines.append(line)
+            continue
+        stripped = line.lstrip()
+        if stripped.startswith("- title:"):
+            normalized_lines.append(f"  {stripped}")
+            continue
+        if line.startswith("  - "):
+            normalized_lines.append(f"      {stripped}")
+            continue
+        if line.startswith("    "):
+            normalized_lines.append(f"  {line}")
+            continue
+        if line.startswith("  "):
+            normalized_lines.append(f"  {line}")
+            continue
+        normalized_lines.append(line)
+    return "\n".join(normalized_lines) + suffix
+
+
+def _transform_package_block(text: str, transform) -> str:
+    start, end = _package_block_range(text)
+    package_block = _canonicalize_package_block(text[start:end])
+    return text[:start] + transform(package_block) + text[end:]
+
+
+def _remove_package_frontier_id(text: str) -> str:
+    return _transform_package_block(text, lambda block: block.replace("    frontier_id: 4623636482\n", "", 1))
 
 
 def _append_mixed_case_forbidden_proof_marker(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - Mixed-case Active-Run Helper output is not valid package proof.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - Mixed-case Active-Run Helper output is not valid package proof.\n",
+            1,
+        ),
     )
 
 
 def _append_active_run_handoff_path(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - /var/lib/codex-fleet/chummer_design_supervisor/shard-5/ACTIVE_RUN_HANDOFF.generated.md\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - /var/lib/codex-fleet/chummer_design_supervisor/shard-5/ACTIVE_RUN_HANDOFF.generated.md\n",
+            1,
+        ),
     )
 
 
 def _append_active_run_handoff_transcript_fields(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - Shard Runtime Handoff Recent stderr tail says Prompt path: /tmp/prompt and Selected model: gpt-5.4.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - Shard Runtime Handoff Recent stderr tail says Prompt path: /tmp/prompt and Selected model: gpt-5.4.\n",
+            1,
+        ),
     )
 
 
 def _append_supervisor_status_helper_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - Supervisor status helper says the successor-wave telemetry eta is green.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - Supervisor status helper says the successor-wave telemetry eta is green.\n",
+            1,
+        ),
     )
 
 
 def _append_successor_telemetry_summary_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - copied worker summary: remaining milestones 20, remaining queue items 41, critical path 101 -> 102 -> 105.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - copied worker summary: remaining milestones 20, remaining queue items 41, critical path 101 -> 102 -> 105.\n",
+            1,
+        ),
     )
 
 
 def _append_task_local_telemetry_field_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - copied worker telemetry fields active_runs_count, eta_human, queue_item, slice_summary, and remaining_not_started_milestones are not package evidence.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - copied worker telemetry fields active_runs_count, eta_human, queue_item, slice_summary, and remaining_not_started_milestones are not package evidence.\n",
+            1,
+        ),
     )
 
 
 def _append_task_local_telemetry_field_name_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - status_query_supported: false is task-local telemetry, not M105 package proof.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - status_query_supported: false is task-local telemetry, not M105 package proof.\n",
+            1,
+        ),
     )
 
 
 def _append_successor_frontier_detail_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - Successor frontier detail says polling disabled and status query unsupported.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - Successor frontier detail says polling disabled and status query unsupported.\n",
+            1,
+        ),
     )
 
 
 def _append_successor_prompt_control_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - Assigned successor queue package and successor frontier ids were copied from execution rules inside this run.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - Assigned successor queue package and successor frontier ids were copied from execution rules inside this run.\n",
+            1,
+        ),
     )
 
 
 def _append_successor_steering_focus_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - Current steering focus profile focus top_flagship_grade, owner focus chummer6-hub, text focus recovery, eta: 5.6d-2w.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - Current steering focus profile focus top_flagship_grade, owner focus chummer6-hub, text focus recovery, eta: 5.6d-2w.\n",
+            1,
+        ),
     )
 
 
 def _append_execution_discipline_telemetry_proof(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    proof_index = text.find("    proof:\n", package_index)
-    if proof_index == -1:
-        raise AssertionError(f"missing proof row for {PACKAGE_ID}")
-
-    insert_at = proof_index + len("    proof:\n")
-    return (
-        text[:insert_at]
-        + "      - Execution discipline says operator/OODA loop owns telemetry, which is run-control context rather than repo-local proof.\n"
-        + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    proof:\n",
+            "    proof:\n      - Execution discipline says operator/OODA loop owns telemetry, which is run-control context rather than repo-local proof.\n",
+            1,
+        ),
     )
 
 
@@ -250,91 +229,60 @@ def _append_registry_task_local_telemetry_proof(text: str) -> str:
 
 
 def _duplicate_package_row(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    start = text.rfind("\n  - title:", 0, package_index)
-    if start == -1:
-        raise AssertionError(f"missing package title row for {PACKAGE_ID}")
-    start += 1
-
-    end = text.find("\n  - title:", package_index + len(package_marker))
-    if end == -1:
-        end = len(text)
-
-    package_block = text[start:end]
+    start, end = _package_block_range(text)
+    package_block = _canonicalize_package_block(text[start:end])
     return text[:end] + "\n" + package_block + text[end:]
 
 
 def _append_extra_allowed_path(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    marker = "    allowed_paths:\n      - Chummer.Run.Api\n      - scripts\n      - tests\n"
-    path_index = text.find(marker, package_index)
-    if path_index == -1:
-        raise AssertionError("missing canonical allowed_paths block")
-
-    return text[:path_index] + marker + "      - docs\n" + text[path_index + len(marker):]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    allowed_paths:\n      - Chummer.Run.Api\n      - scripts\n      - tests\n",
+            "    allowed_paths:\n      - Chummer.Run.Api\n      - scripts\n      - tests\n      - docs\n",
+            1,
+        ),
+    )
 
 
 def _append_extra_owned_surface(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    marker = (
-        "    owned_surfaces:\n"
-        "      - workspace_restore:provenance\n"
-        "      - entitlement_sync:conflict_receipts\n"
+    return _transform_package_block(
+        text,
+        lambda block: block.replace(
+            "    owned_surfaces:\n      - workspace_restore:provenance\n      - entitlement_sync:conflict_receipts\n",
+            "    owned_surfaces:\n      - workspace_restore:provenance\n      - entitlement_sync:conflict_receipts\n      - workspace_restore:unowned_surface\n",
+            1,
+        ),
     )
-    surface_index = text.find(marker, package_index)
-    if surface_index == -1:
-        raise AssertionError("missing canonical owned_surfaces block")
-
-    return text[:surface_index] + marker + "      - workspace_restore:unowned_surface\n" + text[surface_index + len(marker):]
 
 
 def _append_conflicting_queue_status(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    status_marker = "    status: complete\n"
-    status_index = text.find(status_marker, package_index)
-    if status_index == -1:
-        raise AssertionError("missing canonical completed status")
-
-    insert_at = status_index + len(status_marker)
-    return text[:insert_at] + "    status: in_progress\n" + text[insert_at:]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace("    status: complete\n", "    status: complete\n    status: in_progress\n", 1),
+    )
 
 
 def _remove_queue_completion_action(text: str) -> str:
-    package_marker = f"    package_id: {PACKAGE_ID}\n"
-    package_index = text.find(package_marker)
-    if package_index == -1:
-        raise AssertionError(f"missing package row for {PACKAGE_ID}")
-
-    marker = "    completion_action: verify_closed_package_only\n"
-    action_index = text.find(marker, package_index)
-    if action_index == -1:
-        raise AssertionError("missing queue completion action")
-
-    return text[:action_index] + text[action_index + len(marker):]
+    return _transform_package_block(
+        text,
+        lambda block: block.replace("    completion_action: verify_closed_package_only\n", "", 1),
+    )
 
 
 def _replace_queue_do_not_reopen_reason(text: str) -> str:
-    marker = f"    do_not_reopen_reason: {DO_NOT_REOPEN_REASON}\n"
-    if marker not in text:
+    def replace_reason(block: str) -> str:
+        lines = block.splitlines(keepends=True)
+        for index, line in enumerate(lines):
+            if not line.startswith("    do_not_reopen_reason:"):
+                continue
+            end = index + 1
+            while end < len(lines) and lines[end].startswith("      "):
+                end += 1
+            return "".join(lines[:index] + ["    do_not_reopen_reason: copied closed-package reason\n"] + lines[end:])
         raise AssertionError("missing queue do-not-reopen reason")
 
-    return text.replace(marker, "    do_not_reopen_reason: copied closed-package reason\n", 1)
+    return _transform_package_block(text, replace_reason)
 
 
 def _append_conflicting_registry_status(text: str) -> str:
@@ -745,9 +693,9 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
             )
             queue_path.write_text(
                 source_queue_path.read_text(encoding="utf-8").replace(
-                    "      - python3 scripts/verify_workspace_restore_receipts.py\n",
-                    "      - run_ooda_design_supervisor_until_quiet.py output from an active worker run\n"
-                    "      - python3 scripts/verify_workspace_restore_receipts.py\n",
+                    "  - python3 scripts/verify_workspace_restore_receipts.py\n",
+                    "  - run_ooda_design_supervisor_until_quiet.py output from an active worker run\n"
+                    "  - python3 scripts/verify_workspace_restore_receipts.py\n",
                     1,
                 ),
                 encoding="utf-8",
@@ -993,9 +941,9 @@ class WorkspaceRestoreQueueFrontierGuardTests(unittest.TestCase):
             )
             queue_path.write_text(
                 source_queue_path.read_text(encoding="utf-8").replace(
-                    "      - /docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py\n",
-                    "      - /docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py\n"
-                    "      - /docker/chummercomplete/chummer6-hub/tests/test_workspace_restore_queue_frontier_guard.py\n",
+                    "  - /docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py\n",
+                    "  - /docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py\n"
+                    "  - /docker/chummercomplete/chummer6-hub/tests/test_workspace_restore_queue_frontier_guard.py\n",
                     1,
                 ),
                 encoding="utf-8",

@@ -174,30 +174,36 @@ def load_yaml(path: Path) -> object:
     try:
         return yaml.safe_load(text)
     except yaml.YAMLError:
-        return load_hybrid_queue_yaml(text, path)
+        return load_target_queue_yaml(text, path)
 
 
-def load_hybrid_queue_yaml(text: str, path: Path) -> object:
-    mode_index = text.find("\nmode:")
-    if mode_index < 0:
+def load_target_queue_yaml(text: str, path: Path) -> object:
+    marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(marker)
+    if package_index < 0:
         raise SystemExit(f"unable to parse yaml file: {path}")
 
-    prelude_text = text[:mode_index].strip()
-    tail_text = text[mode_index + 1 :].strip()
-    prelude = yaml.safe_load(prelude_text) if prelude_text else []
-    tail = yaml.safe_load(tail_text) if tail_text else {}
-    if not isinstance(prelude, list) or not isinstance(tail, dict):
+    start_candidates = [
+        text.rfind("\n- title:", 0, package_index),
+        text.rfind("\n  - title:", 0, package_index),
+    ]
+    block_start = max(start_candidates)
+    if block_start < 0:
+        if text.startswith("- title:") or text.startswith("  - title:"):
+            block_start = 0
+        else:
+            raise SystemExit(f"unable to isolate queue block in {path}")
+    else:
+        block_start += 1
+
+    end_candidates = [index for index in (text.find("\n- title:", package_index), text.find("\n  - title:", package_index)) if index >= 0]
+    block_end = min(end_candidates) if end_candidates else len(text)
+    block = text[block_start:block_end].rstrip() + "\n"
+    payload = yaml.safe_load(block)
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
         raise SystemExit(f"unable to normalize queue staging yaml: {path}")
 
-    items = tail.get("items")
-    if items is None:
-        tail["items"] = prelude
-    elif isinstance(items, list):
-        tail["items"] = [*prelude, *items]
-    else:
-        raise SystemExit(f"unable to normalize queue staging items: {path}")
-
-    return tail
+    return {"items": payload}
 
 
 def read_text(relative_path: str) -> str:

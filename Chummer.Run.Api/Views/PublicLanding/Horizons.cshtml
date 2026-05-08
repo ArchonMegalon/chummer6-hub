@@ -15,7 +15,7 @@
         {
             Badge = "Live proof first",
             Title = "Compare with live proof instead of treating a horizon as already shipped",
-            Summary = "Use what works today when you need the current capability, current caution, or one inspectable trail before you read further into future lanes.",
+            Summary = "Use what works today when you need the current capability, current caution, or one inspectable trail before you read further into future plans.",
             Href = "/now",
             Label = "Open what works today",
             Proof = new[] { "Current proof", "Caution explicit", "No future bluff" }
@@ -23,8 +23,8 @@
         new
         {
             Badge = "Milestone pressure",
-            Title = "The milestone roadmap lives on a separate rail",
-            Summary = "Roadmap stays the public direction and milestone-pressure route. Horizons stay deeper and more editorial so research or design tracks do not read like the active claim ledger.",
+            Title = "The milestone roadmap lives on a separate page",
+            Summary = "Roadmap stays the public direction and milestone-pressure page. Horizons stay deeper and more editorial so research or design tracks do not read like the active claim ledger.",
             Href = "/roadmap",
             Label = "Open roadmap",
             Proof = new[] { "Milestone-backed", "Direction only", "Not shipped truth" }
@@ -32,20 +32,20 @@
         new
         {
             Badge = "Public signal",
-            Title = "Use the public loop when a future lane matches real user pain",
-            Summary = "Feedback is where feature demand, UX friction, and safe public bugs should enter the product loop before they become roadmap or shipped-closeout language.",
+            Title = "Use public feedback when a future idea matches real user pain",
+            Summary = "Feedback is where feature demand, UX friction, and safe public bugs should enter the product loop before they become roadmap or changelog language.",
             Href = "/feedback",
-            Label = "Open Fixer Board",
+            Label = "Open feedback",
             Proof = new[] { "Votes inform demand", "Public by default", "No private logs" }
         },
         new
         {
             Badge = "Install and help",
             Title = "Leave horizons when the next job is install, support, or recovery",
-            Summary = "The future shelf should not compete with downloads or support. Install from the release rail, and use first-party help as soon as the issue becomes private or recovery-bound.",
+            Summary = "The future shelf should not compete with downloads or support. Install from downloads, and use first-party help as soon as the issue becomes private or recovery-bound.",
             Href = "/downloads",
             Label = "Open downloads",
-            Proof = new[] { "Install rail stays primary", "Support is separate", "No route confusion" }
+            Proof = new[] { "Install path stays primary", "Support is separate", "No page confusion" }
         }
     };
     var groups = new[]
@@ -80,7 +80,7 @@
                 </div>
                 <div class="route-callout__actions">
                     <a class="inline-link" href="/roadmap">Open roadmap</a>
-                    <a class="inline-link" href="/feedback">Open Fixer Board</a>
+                    <a class="inline-link" href="/feedback">Open feedback</a>
                     <a class="inline-link" href="/now">Open what works today</a>
                     <a class="inline-link" href="/help">Open help</a>
                 </div>
@@ -94,17 +94,11 @@
     </div>
 </section>
 
-@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="status-decision-strip" aria-label="Horizon posture snapshot">
     <article class="status-decision-strip__card">
         <span class="tag">Preparing next</span>
         <h2>@preparingCount horizon@(preparingCount == 1 ? string.Empty : "s") sit closest to the current preview.</h2>
-        <p>These are the lanes that should compare directly against current proof and the active release rail before any broader flagship claim tightens.</p>
+        <p>These are the ideas that should compare directly against current proof and the active downloads page before any broader flagship claim tightens.</p>
         <a class="button-like button-like--ghost" href="#preparing">Open preparing next</a>
     </article>
     <article class="status-decision-strip__card">
@@ -123,9 +117,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Route map</p>
+        <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Pick horizons, roadmap, live proof, or help on purpose.</h2>
-        <p class="editorial-copy">The future shelf should explain why a lane matters and how far away it is. It should not replace current proof, the milestone roadmap, or the install and support rails.</p>
+        <p class="editorial-copy">The future shelf should explain why an idea matters and how far away it is. It should not replace current proof, the milestone roadmap, or the install and support pages.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -215,14 +209,14 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use horizons to understand the future, then move to the route that owns the present-tense job.</h2>
+    <h2 class="editorial-title">Use horizons to understand the future, then move to the page that owns the present-tense job.</h2>
     <p class="editorial-copy">Compare with live proof on What works today, inspect active delivery pressure on Roadmap, install from Downloads, or leave the public future shelf for Help when the issue is private or recovery-bound.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="/now">Open what works today</a>
         <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
         <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
     </div>
-    <p class="muted-copy">Need to influence direction? <a class="inline-link" href="/feedback">Open Fixer Board</a>.</p>
+    <p class="muted-copy">Need to influence direction? <a class="inline-link" href="/feedback">Open feedback</a>.</p>
 </section>
 
 @{

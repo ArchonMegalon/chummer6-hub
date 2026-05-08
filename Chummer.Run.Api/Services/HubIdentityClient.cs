@@ -109,7 +109,7 @@ public sealed class HubIdentityClient
         var accessToken = ExtractBearerToken(request);
         if (_subjectCache.TryGet(BaseUrl, accessToken, out AuthenticatedHubSubject? cachedSubject))
         {
-            return cachedSubject;
+            return cachedSubject!;
         }
 
         var introspection = await IntrospectAsync(accessToken, cancellationToken);

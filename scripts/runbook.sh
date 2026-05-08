@@ -634,9 +634,11 @@ JSON
     "/downloads/install/avalonia-linux-x64-installer",
     "/home/access",
     "/home/work",
+    "/account/access",
     "/account/work",
     "/account/support",
-    "/contact"
+    "/contact",
+    "/downloads"
   ]
 }
 JSON

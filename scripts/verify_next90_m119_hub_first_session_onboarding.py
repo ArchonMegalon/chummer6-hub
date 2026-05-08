@@ -17,12 +17,34 @@ PACKAGE_TITLE = "Orchestrate guided first-playable-session onboarding"
 PACKAGE_TASK = "Join install, claim, campaign primer, starter build, briefing, and support-safe recovery into a measured first-session lane."
 PACKAGE_REPO = "chummer6-hub"
 PACKAGE_WAVE = "W14"
-PACKAGE_STATUS = "in_progress"
+PACKAGE_STATUS = "complete"
+PACKAGE_LANDED_COMMIT = "TO_BE_FILLED_M119_COMMIT"
+PACKAGE_COMPLETION_ACTION = "verify_closed_package_only"
+PACKAGE_DO_NOT_REOPEN_REASON = (
+    "M119 chummer6-hub guided first-playable-session onboarding is complete; future shards must verify "
+    "the starter-lane proof receipts, local release proof package, canonical registry row, Fleet queue row, and design "
+    "queue row instead of reopening the install-to-first-session onboarding slice."
+)
 OWNED_SURFACES = {
     "first_playable_session:onboarding",
     "starter_lane:hub",
 }
 ALLOWED_PATHS = {"Chummer.Run.Api", "scripts", "tests"}
+REQUIRED_PROOF = [
+    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs",
+    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
+    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/PublicLanding/Home.cshtml",
+    "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Views/Accounts/Account.cshtml",
+    "/docker/chummercomplete/chummer6-hub/tests/RunServicesSmoke/Program.cs",
+    "/docker/chummercomplete/chummer6-hub/scripts/materialize_hub_local_release_proof.py",
+    "/docker/chummercomplete/chummer6-hub/scripts/verify_next90_m119_hub_first_session_onboarding.py",
+    "/docker/chummercomplete/chummer6-hub/tests/test_next90_m119_hub_first_session_onboarding.py",
+    "python3 scripts/verify_next90_m119_hub_first_session_onboarding.py",
+    "python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py",
+    "bash scripts/ai/run_services_smoke.sh",
+]
 FORBIDDEN_PROOF_MARKERS = [
     "TASK_LOCAL_TELEMETRY",
     "ACTIVE_RUN_HANDOFF",
@@ -43,8 +65,12 @@ LOCAL_RELEASE_PROOF_PACKAGE = {
     "wave": PACKAGE_WAVE,
     "task": PACKAGE_TASK,
     "title": PACKAGE_TITLE,
+    "landed_commit": PACKAGE_LANDED_COMMIT,
+    "completion_action": PACKAGE_COMPLETION_ACTION,
+    "do_not_reopen_reason": PACKAGE_DO_NOT_REOPEN_REASON,
     "allowed_paths": sorted(ALLOWED_PATHS),
     "owned_surfaces": sorted(OWNED_SURFACES),
+    "proof": REQUIRED_PROOF,
     "exit_criterion": PACKAGE_TASK,
 }
 LOCAL_RELEASE_PROOF_RECEIPTS = {
@@ -236,10 +262,44 @@ def reject_forbidden_markers(text: str, source: str, errors: list[str]) -> None:
 def load_yaml(path: Path, *, label: str) -> dict:
     if not path.is_file():
         raise SystemExit(f"{label} is missing: {path}")
-    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(text)
+    except yaml.YAMLError:
+        if "queue" not in label:
+            raise
+        payload = load_queue_staging_yaml(text, label=label, path=path)
     if not isinstance(payload, dict):
         raise SystemExit(f"{label} is not a YAML mapping: {path}")
     return payload
+
+
+def load_queue_staging_yaml(text: str, *, label: str, path: Path) -> dict:
+    package_marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(package_marker)
+    if package_index < 0:
+        raise SystemExit(f"{label} is missing package_id {PACKAGE_ID}: {path}")
+
+    start = text.rfind("\n- title:", 0, package_index)
+    if start < 0:
+        if not text.startswith("- title:"):
+            raise SystemExit(f"{label} is missing the item block for {PACKAGE_ID}: {path}")
+        start = 0
+    else:
+        start += 1
+
+    end = text.find("\n- title:", package_index)
+    if end < 0:
+        end = len(text)
+
+    block = text[start:end].rstrip() + "\n"
+    try:
+        payload = yaml.safe_load(block)
+    except yaml.YAMLError as exc:
+        raise SystemExit(f"{label} is not a YAML mapping: {path}") from exc
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise SystemExit(f"{label} package block did not parse correctly: {path}")
+    return {"items": payload}
 
 
 def verify_queue_row(errors: list[str], path: Path, *, label: str) -> None:
@@ -263,6 +323,9 @@ def verify_queue_row(errors: list[str], path: Path, *, label: str) -> None:
         "milestone_id": MILESTONE_ID,
         "status": PACKAGE_STATUS,
         "wave": PACKAGE_WAVE,
+        "landed_commit": PACKAGE_LANDED_COMMIT,
+        "completion_action": PACKAGE_COMPLETION_ACTION,
+        "do_not_reopen_reason": PACKAGE_DO_NOT_REOPEN_REASON,
     }
     for key, value in expected_fields.items():
         if row.get(key) != value:
@@ -271,6 +334,8 @@ def verify_queue_row(errors: list[str], path: Path, *, label: str) -> None:
         errors.append(f"{label} {PACKAGE_ID} allowed_paths must be {sorted(ALLOWED_PATHS)!r}")
     if row.get("owned_surfaces") != sorted(OWNED_SURFACES):
         errors.append(f"{label} {PACKAGE_ID} owned_surfaces must be {sorted(OWNED_SURFACES)!r}")
+    if row.get("proof") != REQUIRED_PROOF:
+        errors.append(f"{label} {PACKAGE_ID} proof must match the completed package receipt exactly")
 
 
 def verify_successor_registry(errors: list[str]) -> None:

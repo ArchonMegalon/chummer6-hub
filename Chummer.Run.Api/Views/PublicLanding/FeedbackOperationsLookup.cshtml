@@ -12,7 +12,7 @@
     <h1 class="page-title">@lookup.Heading</h1>
     <p class="page-copy">@lookup.Summary</p>
     <div class="stacked-actions">
-        <a class="button-like button-like--ghost" href="/feedback">Back to feedback lane</a>
+        <a class="button-like button-like--ghost" href="/feedback">Back to feedback</a>
         <a class="button-like button-like--ghost" href="/feedback/operations">Open aggregate artifact</a>
     </div>
     <p class="muted-copy">Search by source receipt id, dispatch receipt id, recipient ref, address hash, delivery id, provider message id, or item reference.</p>
@@ -21,7 +21,7 @@
 <section class="status-decision-strip" aria-label="Bounded lookup controls">
     <article class="status-decision-strip__card">
         <span class="tag">Lookup controls</span>
-        <h2>Search one bounded seam instead of scanning the whole rail.</h2>
+        <h2>Search one bounded seam instead of scanning the whole archive.</h2>
         <form class="auth-form" method="get" action="/feedback/operations/lookup">
             <label class="field" for="feedbackOperationsLookupQuery">
                 <span>Search query</span>
@@ -56,7 +56,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Lookup results</p>
-        <h2 class="editorial-title">Recent results and exact matches share one public-safe route.</h2>
+        <h2 class="editorial-title">Recent results and exact matches share one public-safe page.</h2>
         <p class="editorial-copy">When no query is present, this page shows the freshest bounded drilldowns. When a query is present, it narrows the search across source receipts and recipient threads using stored first-party identifiers only.</p>
     </div>
     @if (results.Length == 0)
@@ -65,7 +65,7 @@
             <article class="route-choice-card">
                 <span class="tag">No bounded match</span>
                 <h3>No receipt or thread matched this query</h3>
-                <p>Try a source receipt id, dispatch receipt id, recipient ref, delivery id, provider message id, or item reference from the aggregate feedback operations rail.</p>
+                <p>Try a source receipt id, dispatch receipt id, recipient ref, delivery id, provider message id, or item reference from the aggregate feedback operations page.</p>
             </article>
         </div>
     }

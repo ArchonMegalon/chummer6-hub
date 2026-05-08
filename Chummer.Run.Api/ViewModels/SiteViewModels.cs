@@ -30,7 +30,11 @@ public sealed record SiteChromeViewModel(
     string? SignedInLabel,
     string FooterCanonicalSource,
     string FooterGeneratedNote,
-    IReadOnlyList<PublicNavigationLink>? PublicSignalNavigation = null);
+    IReadOnlyList<PublicNavigationLink>? PublicSignalNavigation = null,
+    string? HelpHref = null,
+    string? HelpLabel = null,
+    string? ContactHref = null,
+    string? ContactLabel = null);
 
 public sealed class AssetCatalogViewModel
 {

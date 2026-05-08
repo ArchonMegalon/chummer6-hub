@@ -50,6 +50,12 @@ VISUAL_REQUIRED_TESTS_ORDER_DRIFT_MARKER="visual receipt required_tests must pre
 VISUAL_INTERACTION_KEYS_ORDER_DRIFT_MARKER="visual receipt required_legacy_interaction_keys must preserve canonical milestone-2 interaction key ordering"
 VISUAL_SCREENSHOTS_ORDER_DRIFT_MARKER="visual receipt required_screenshots must preserve canonical milestone-2 screenshot ordering"
 VISUAL_MISSING_INTERACTION_KEYS_MARKER="parity audit failed: visual receipt is missing required milestone-2 interaction keys: "
+HUB_LOCAL_RELEASE_PROOF_PATH="${CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH:-$ROOT_DIR/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
+HUB_SERVED_RELEASE_PROOF_PATH="${CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH:-$ROOT_DIR/Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json}"
+HUB_RELEASE_PROOF_BASE_URL="${CHUMMER_HUB_RELEASE_PROOF_BASE_URL:-https://chummer.run}"
+HUB_RELEASE_PROOF_COMPOSE_FILE="${CHUMMER_HUB_RELEASE_PROOF_COMPOSE_FILE:-docker-compose.yml}"
+HUB_RELEASE_PROOF_TIMEOUT_SECONDS="${CHUMMER_HUB_RELEASE_PROOF_TIMEOUT_SECONDS:-120}"
+HUB_RELEASE_PROOF_SKIP_REBUILD="${CHUMMER_HUB_RELEASE_PROOF_SKIP_REBUILD:-true}"
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {
   python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'
@@ -287,6 +293,17 @@ for receipt_path_raw in sys.argv[1:]:
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     print(str(receipt_path))
 PY
+}
+
+refresh_hub_local_release_proof() {
+  python3 scripts/materialize_hub_local_release_proof.py \
+    "$HUB_LOCAL_RELEASE_PROOF_PATH" \
+    "$HUB_RELEASE_PROOF_BASE_URL" \
+    "$HUB_RELEASE_PROOF_COMPOSE_FILE" \
+    "$HUB_RELEASE_PROOF_TIMEOUT_SECONDS" \
+    "$HUB_RELEASE_PROOF_SKIP_REBUILD"
+  mkdir -p "$(dirname "$HUB_SERVED_RELEASE_PROOF_PATH")"
+  cp "$HUB_LOCAL_RELEASE_PROOF_PATH" "$HUB_SERVED_RELEASE_PROOF_PATH"
 }
 
 run_gate_materializer_script() {
@@ -651,9 +668,11 @@ payload["releaseProof"]["proofRoutes"] = [
     "/downloads/install/avalonia-linux-x64-installer",
     "/home/access",
     "/home/work",
+    "/account/access",
     "/account/work",
     "/account/support",
     "/contact",
+    "/downloads",
 ]
 payload["releaseProof"]["proof_routes"] = ["/home/access"]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -1069,9 +1088,11 @@ payload["releaseProof"]["proofRoutes"] = [
     "/downloads/install/avalonia-linux-x64-installer",
     "/home/access",
     "/home/work",
+    "/account/access",
     "/account/work",
     "/account/support",
     "/contact",
+    "/downloads",
     "/home/bonus-noncanonical-route",
 ]
 path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -2318,6 +2339,7 @@ if bash scripts/audit-ui-parity.sh; then
 fi
 mv "$visual_receipt_backup" "$visual_receipt_path"
 
+refresh_hub_local_release_proof
 python3 scripts/verify_desktop_native_trust_receipts.py
 python3 -m unittest tests/test_desktop_native_trust_receipts.py
 python3 -m unittest tests/test_stack_smoke.py
@@ -2349,6 +2371,11 @@ python3 scripts/verify_next90_m118_hub_organizer_ops.py
 python3 -m unittest tests/test_next90_m118_hub_organizer_ops.py
 python3 scripts/verify_next90_m119_hub_first_session_onboarding.py
 python3 -m unittest tests/test_next90_m119_hub_first_session_onboarding.py
+python3 scripts/verify_next90_m120_hub_public_launch_health.py
+python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py
+python3 scripts/verify_runsite_orientation_requests.py
+python3 -m unittest tests/test_runsite_orientation_requests.py
+dotnet test Chummer.Tests/Chummer.Tests.csproj --filter RunsiteOrientationRequestComposerServiceTests --no-restore
 python3 scripts/materialize_next90_m121_hub_runboard_continuity_proof.py
 python3 scripts/verify_next90_m121_hub_runboard_continuity.py
 python3 -m unittest tests/test_next90_m121_hub_runboard_continuity.py
@@ -2379,5 +2406,11 @@ python3 -m unittest tests/test_next90_m129_hub_reusable_account_flows.py
 python3 scripts/materialize_next90_m135_hub_hosted_bounded_context_coverage_proof.py
 python3 scripts/verify_next90_m135_hub_hosted_bounded_context_coverage.py
 python3 -m unittest tests/test_next90_m135_hub_hosted_bounded_context_coverage.py
+python3 scripts/verify_next90_m141_hub_import_route_review_required.py
+python3 -m unittest tests/test_next90_m141_hub_import_route_review_required.py
+python3 scripts/verify_next90_m143_hub_exchange_output_receipts.py
+python3 -m unittest tests/test_next90_m143_hub_exchange_output_receipts.py
+python3 scripts/verify_next90_m144_hub_release_truth_alignment.py
+python3 -m unittest tests/test_next90_m144_hub_release_truth_alignment.py
 
 bash scripts/ai/run_services_smoke.sh

@@ -21,10 +21,10 @@
     var sectionCopy = Model.CurrentSection switch
     {
         "support" => "Open, track, and close support without leaving the account surface.",
-        "access" => "Keep linked installs, access rights, and claim handoff in one calmer route.",
+        "access" => "Keep linked installs, access rights, and claim handoff in one calmer place.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
         "settings" => "Preferences, participation, and linked channels stay out of the customer core until you ask for them.",
-        "advanced" => "Account identifiers and deeper account details stay behind the advanced route.",
+        "advanced" => "Account identifiers and deeper account details stay behind the advanced page.",
         _ => "Keep sign-in, recovery, devices, support, and account preferences in one calmer product settings surface."
     };
     ViewData["Title"] = pageTitle;
@@ -74,8 +74,8 @@
     var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var organizerGuidanceSummary = openSupportCases == 0
-        ? "Current preview, member downloads, and help stay on one calmer operator rail."
-        : $"{openSupportCases} tracked support case(s), current preview truth, and member downloads stay on one calmer operator rail.";
+        ? "Current preview, member downloads, and help stay in one calmer operator view."
+        : $"{openSupportCases} tracked support case(s), current preview truth, and member downloads stay in one calmer operator view.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = telegramChannel is not null;
@@ -86,6 +86,8 @@
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSettingsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase);
     var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
+    var showInlineAccountStatus = showAccessSection || showSupportSection;
+    var showAccountStatusDrawer = Model.SignedInTrustStatus is not null && !showInlineAccountStatus;
     var selectedSupportCase = Model.SelectedSupportCase;
     var selectedSupportCaseSummary = Model.SelectedSupportCaseSummary;
     var supportQuery = Context.Request.Query;
@@ -126,7 +128,7 @@
         || selectedRulesNavigatorAnswer is not null
         || selectedCreatorPublication is not null;
     var installRailHeading = "Start the next linked install from this account";
-    var installRailSummary = "Open Downloads while signed in to keep the next install, update handoff, and support history on the same account rail from the first successful launch.";
+    var installRailSummary = "Open Downloads while signed in to keep the next install, update handoff, and support history attached to this account from the first successful launch.";
     var installRailPrimaryLabel = "Open downloads";
     var installRailPrimaryHref = "/downloads";
     var installRailSecondaryLabel = "Open install help";
@@ -144,20 +146,24 @@
     else if (leadPendingClaim is not null)
     {
         installRailHeading = "Finish the pending install on that device";
-        installRailSummary = "The next safe action is still inside Chummer on the already-downloaded device. Only use the recovery code if that copy explicitly enters recovery mode. Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked.";
+        installRailSummary = "The next safe action is still inside Chummer on the already-downloaded device. Only use the recovery code if that copy explicitly enters recovery mode. Claim, update, rollback, recovery, and support stay on this same account page once the install is linked.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
+        @* Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked. *@
+        @* Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual. *@
     }
     else if (leadInstallation is not null)
     {
-        installRailHeading = "This linked install is your default return rail";
-        installRailSummary = "Continue claim, update, rollback, recovery, and support follow-through from the claimed desktop install first. Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual.";
+        installRailHeading = "This linked install is your default return path";
+        installRailSummary = "Continue claim, update, rollback, recovery, and support follow-through from the claimed desktop install first. Use Devices & access only to relink or reclaim that copy, and keep browser pages as fallback instead of the default ritual.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
+        @* Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked. *@
+        @* Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual. *@
     }
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
@@ -212,10 +218,10 @@
         => route switch
         {
             "/account/access" => "Open account access",
-            "/account/work" => "Open shared campaign view",
+            "/account/work" => "Open campaign workspace",
             "/downloads" => "Open downloads",
             _ when IsNavigableAccountRoute(route) => $"Open {route}",
-            _ => "Review this route"
+            _ => "Review this page"
         };
 
     static string RuleEnvironmentSummary(Chummer.Campaign.Contracts.RuleEnvironmentRef environment)
@@ -288,7 +294,7 @@
             "intent_created" => "Intent recorded",
             "consented" => "Consent recorded",
             "pending_auth" => "Waiting for authorization",
-            "fleet_lane_created" => "Lane created",
+            "fleet_lane_created" => "Activation requested",
             "lane_pending" => "Activation in progress",
             "waiting_for_slot" => "Queued for capacity",
             "active" => "Active",
@@ -300,15 +306,15 @@
     static string SponsorNextSafeAction(string? status)
         => status?.Trim().ToLowerInvariant() switch
         {
-            "intent_created" => "Record consent to continue this lane.",
+            "intent_created" => "Record consent to continue this access request.",
             "consented" => "Start device authorization from the participation flow.",
             "pending_auth" => "Open the ChatGPT verification page for your OpenAI account and enter the one-time code.",
             "fleet_lane_created" => "Wait for activation confirmation before assigning work.",
-            "lane_pending" => "Keep this lane open while activation completes.",
-            "waiting_for_slot" => "Stay on this rail and retry for a fresh code if authorization expires.",
+            "lane_pending" => "Keep this page open while activation completes.",
+            "waiting_for_slot" => "Stay on this page and retry for a fresh code if authorization expires.",
             "active" => "Assign bounded contribution work and track receipts.",
-            "stopped" => "Start a new lane when the participant is ready again.",
-            "revoked" => "Open a new lane with fresh consent and authorization.",
+            "stopped" => "Start a new invite when the participant is ready again.",
+            "revoked" => "Open a new invite with fresh consent and authorization.",
             _ => "Open participation details and choose the latest recovery action."
         };
 
@@ -344,12 +350,12 @@
 
         if (publication is "published")
         {
-            return "Published: moderation and review receipts completed on the governed lane.";
+            return "Published: moderation and review receipts completed for this publication.";
         }
 
         if (publication is "archived" or "delisted")
         {
-            return "Canceled: publication is not active on discovery routes.";
+            return "Canceled: publication is not active on discovery pages.";
         }
 
         if (review is "rejected")
@@ -367,7 +373,7 @@
             return "Ready to publish: review passed and waiting on explicit publish confirmation.";
         }
 
-        return "Tracked: draft and moderation receipts are attached to this publication lane.";
+        return "Tracked: draft and moderation receipts are attached to this publication.";
     }
 
     static string PublicationResumabilitySummary(string? publicationStatus, string? reviewState, string? moderationState)
@@ -378,7 +384,7 @@
 
         if (publication is "archived" or "delisted")
         {
-            return "Not resumable on this lane. Create a new draft when this publication should return.";
+            return "Not resumable in this draft. Create a new draft when this publication should return.";
         }
 
         if (review is "rejected")
@@ -388,12 +394,12 @@
 
         if (review is "pending_review" || moderation is "pending_review")
         {
-            return "Resumable after moderation decision. Keep this lane open and avoid duplicate submissions.";
+            return "Resumable after moderation decision. Keep this draft open and avoid duplicate submissions.";
         }
 
         if (review is "approved" && publication is not "published")
         {
-            return "Resumable immediately. Use Publish on public shelf to complete this lane.";
+            return "Resumable immediately. Use Publish on the public listing to complete this draft.";
         }
 
         return "No recovery action needed right now.";
@@ -411,7 +417,7 @@
             || normalized.Contains("relaunch", StringComparison.Ordinal)
             || normalized.Contains("refresh", StringComparison.Ordinal))
         {
-            return "Retried: this automation lane has an explicit retry/resume signal.";
+            return "Retried: this automation has an explicit retry or resume signal.";
         }
 
         if (normalized.Contains("pending", StringComparison.Ordinal)
@@ -426,7 +432,7 @@
             || normalized.Contains("revoked", StringComparison.Ordinal)
             || normalized.Contains("stopped", StringComparison.Ordinal))
         {
-            return "Canceled: this action lane is closed and needs a new explicit request to continue.";
+            return "Canceled: this action is closed and needs a new explicit request to continue.";
         }
 
         return "Completed: action is receipt-backed and attached to campaign continuity.";
@@ -450,16 +456,16 @@
             || normalized.Contains("hydrate", StringComparison.Ordinal)
             || normalized.Contains("catch up", StringComparison.Ordinal))
         {
-            return "Resumable. Retry from this workspace and keep the lane on the same account rail.";
+            return "Resumable. Retry from this workspace and keep the work on the same account view.";
         }
 
         return "No resume action needed right now.";
     }
 
     var accountRailHeadline = showAccessSection
-        ? "Devices and access remain the calm recovery rail"
+        ? "Devices and access remain the calm recovery path"
         : showSupportSection
-            ? "Support and install follow-through stay on this account rail"
+            ? "Support and install follow-through stay attached to this account"
             : installRailHeading;
     var accountRailSummary = showAccessSection
         ? "Relink, reclaim, recovery, and active grant review stay here after the installer or app does the real work. Do not turn this into a browser-first claim ritual."
@@ -475,7 +481,7 @@
         ? $"{leadPendingClaim.ArtifactLabel} is already staged. Use the pending code only if that copy explicitly opens in recovery mode."
         : "Recovery codes stay fallback only. The default path remains installer or in-app linking on the affected device.";
     var accountRailSupportSummary = openSupportCases > 0
-        ? $"{openSupportCases} active support case(s) stay attached to this account rail."
+        ? $"{openSupportCases} active support case(s) stay attached to this account."
         : "No active support case is blocking the next install or return path right now.";
 }
 
@@ -511,40 +517,85 @@
         </div>
     }
 
-    <section class="account-rail-snapshot" aria-label="Account continuity rail">
-        <div class="account-rail-snapshot__lead">
-            <p class="eyebrow">Account rail</p>
-            <h2>@accountRailHeadline</h2>
-            <p>@accountRailSummary</p>
-            <div class="stacked-actions">
-                <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
-                <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
-                <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
+    @if (showProfileSection || showSettingsSection || showAdvancedSection)
+    {
+        <section class="editorial-block">
+            <details class="details-drawer">
+                <summary>Install, access, and recovery</summary>
+                <section class="account-rail-snapshot" aria-label="Account continuity">
+                    <div class="account-rail-snapshot__lead">
+                        <p class="eyebrow">Account return</p>
+                        <h2>@accountRailHeadline</h2>
+                        <p>@accountRailSummary</p>
+                        <div class="stacked-actions">
+                            <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
+                            <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+                            <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
+                        </div>
+                    </div>
+                    <div class="account-rail-snapshot__panel">
+                        <article class="account-rail-snapshot__fact">
+                            <span>Primary sign-in</span>
+                            <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
+                            <p>@(emailLink is null ? "Add an email recovery path if you want a calmer return path later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
+                        </article>
+                        <article class="account-rail-snapshot__fact">
+                            <span>Linked install path</span>
+                            <strong>@accountRailInstallSummary</strong>
+                            <p>The artifact stays the same for everyone; the account-aware piece is the handoff, claim, and support continuity.</p>
+                        </article>
+                        <article class="account-rail-snapshot__fact">
+                            <span>Support and release</span>
+                            <strong>@accountRailSupportSummary</strong>
+                            <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
+                        </article>
+                        <article class="account-rail-snapshot__fact">
+                            <span>Recovery fallback</span>
+                            <strong>@accountRailRecoverySummary</strong>
+                            <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
+                        </article>
+                    </div>
+                </section>
+            </details>
+        </section>
+    }
+    else
+    {
+        <section class="account-rail-snapshot" aria-label="Account continuity">
+            <div class="account-rail-snapshot__lead">
+                <p class="eyebrow">Account return</p>
+                <h2>@accountRailHeadline</h2>
+                <p>@accountRailSummary</p>
+                <div class="stacked-actions">
+                    <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
+                    <a class="button-like button-like--secondary" href="/account/access">Open Devices &amp; access</a>
+                    <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
+                </div>
             </div>
-        </div>
-        <div class="account-rail-snapshot__panel">
-            <article class="account-rail-snapshot__fact">
-                <span>Primary sign-in</span>
-                <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
-                <p>@(emailLink is null ? "Add an email recovery path if you want a calmer return route later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
-            </article>
-            <article class="account-rail-snapshot__fact">
-                <span>Linked install rail</span>
-                <strong>@accountRailInstallSummary</strong>
-                <p>The artifact stays the same for everyone; the account-aware piece is the handoff, claim, and support continuity.</p>
-            </article>
-            <article class="account-rail-snapshot__fact">
-                <span>Support and release</span>
-                <strong>@accountRailSupportSummary</strong>
-                <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution lane.")</p>
-            </article>
-            <article class="account-rail-snapshot__fact">
-                <span>Recovery fallback</span>
-                <strong>@accountRailRecoverySummary</strong>
-                <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
-            </article>
-        </div>
-    </section>
+            <div class="account-rail-snapshot__panel">
+                <article class="account-rail-snapshot__fact">
+                    <span>Primary sign-in</span>
+                    <strong>@HumanizeStatus(Model.Links.RecommendedPrimaryAuth, "Choose one")</strong>
+                    <p>@(emailLink is null ? "Add an email recovery path if you want a calmer return path later." : "Recovery identity is attached and ready when the install or browser callback needs it.")</p>
+                </article>
+                <article class="account-rail-snapshot__fact">
+                    <span>Linked install path</span>
+                    <strong>@accountRailInstallSummary</strong>
+                    <p>The artifact stays the same for everyone; the account-aware piece is the handoff, claim, and support continuity.</p>
+                </article>
+                <article class="account-rail-snapshot__fact">
+                    <span>Support and release</span>
+                    <strong>@accountRailSupportSummary</strong>
+                    <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
+                </article>
+                <article class="account-rail-snapshot__fact">
+                    <span>Recovery fallback</span>
+                    <strong>@accountRailRecoverySummary</strong>
+                    <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
+                </article>
+            </div>
+        </section>
+    }
 
     <div class="account-shell">
         <aside class="account-nav" aria-label="Account sections">
@@ -565,7 +616,15 @@
         </aside>
 
         <div class="account-pane">
-            @if (Model.SignedInTrustStatus is not null)
+            @if (showAccountStatusDrawer)
+            {
+                <details class="details-drawer">
+                    <summary>Release and access status</summary>
+                    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInTrustStatus)
+                </details>
+            }
+
+            @if (showInlineAccountStatus && Model.SignedInTrustStatus is not null)
             {
                 @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInTrustStatus)
             }
@@ -600,7 +659,7 @@
                 <section id="sign-in" class="settings-section" data-account-panel>
                     <div class="settings-section__header">
                         <h2>Primary sign-in</h2>
-                        <p>Keep the daily sign-in path visible here without turning the profile route into a second full settings page.</p>
+                    <p>Keep the daily sign-in path visible here without turning the profile page into a second full settings page.</p>
                     </div>
                     <div class="settings-summary-list">
                         <div class="settings-summary-row">
@@ -714,7 +773,7 @@
                                 </div>
                             }
                             <div class="settings-summary-row">
-                                <span>Follow-up lane</span>
+                                <span>Follow-up</span>
                                 <strong>@(selectedSupportCaseSummary?.FollowUpLaneSummary ?? "Follow-up stays attached to this case id.")</strong>
                             </div>
                             <div class="settings-summary-row">
@@ -855,12 +914,12 @@
                     </div>
                     <div class="field">
                         <label for="supportCaseDetail">What happened</label>
-                        <textarea id="supportCaseDetail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and anything that would help route the fix.">@supportCaseDefaultDetail</textarea>
+                        <textarea id="supportCaseDetail" rows="6" placeholder="Tell Chummer what you expected, what actually happened, and anything that would help close the fix faster.">@supportCaseDefaultDetail</textarea>
                     </div>
                     <div class="field">
                         <label for="supportCaseAttachments">Attachments</label>
                         <input id="supportCaseAttachments" type="file" multiple accept=".png,.jpg,.jpeg,.webp,.txt,.log,.json,.zip,.md" />
-                        <p class="muted-copy">Attach screenshots, logs, or a small archive when that will route the case faster.</p>
+                        <p class="muted-copy">Attach screenshots, logs, or a small archive when that will help support close the case faster.</p>
                     </div>
                     <div id="supportCaseContextPreview" class="settings-summary-list" hidden></div>
                     <button class="button-like button-like--primary" type="submit">Submit support case</button>
@@ -898,7 +957,7 @@
                     <p>Keep linked installs, preview access, and download handoff in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
                 </div>
                 <article class="app-action-card app-action-card--primary">
-                    <span class="tag">Current install rail</span>
+                        <span class="tag">Current install path</span>
                     <h3>@installRailHeading</h3>
                     <p>@installRailSummary</p>
                     <div class="settings-summary-list">
@@ -916,7 +975,7 @@
                         </div>
                         <div class="settings-summary-row">
                             <span>Current caution</span>
-                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Use the current release rail when you need the newest caution before you continue this install.")</strong>
+                            <strong>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Use the current release page when you need the newest caution before you continue this install.")</strong>
                         </div>
                         @if (leadInstallation is not null)
                         {
@@ -981,7 +1040,7 @@
                             <strong>@HumanizeStatus(entitlementSyncReceipts.ReceiptStatus.ContinuePosture, "Review before continuing")</strong>
                         </div>
                         <div class="settings-summary-row">
-                            <span>Entitlement recovery route</span>
+                            <span>Entitlement recovery path</span>
                             <strong>@entitlementSyncReceipts.ReceiptStatus.RecoveryRoute</strong>
                         </div>
                         <div class="settings-summary-row">
@@ -1071,7 +1130,7 @@
                                         <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_entitlement_ledger")</span>
                                         <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
                                         <span>Latest receipt observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                        <span>Recovery route: @surface.Status.RecoveryRoute</span>
+                                        <span>Recovery path: @surface.Status.RecoveryRoute</span>
                                         <span>@surface.Status.RecoverySummary</span>
                                         <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
                                         <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
@@ -1126,7 +1185,7 @@
                                         <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                         <span>State: @HumanizeStatus(receipt.StalenessPosture, "Current receipt")</span>
                                         <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable with receipt")</span>
-                                        <span>Recovery route: @receipt.RecoveryRoute</span>
+                                        <span>Recovery path: @receipt.RecoveryRoute</span>
                                         @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                         {
                                             <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
@@ -1154,7 +1213,7 @@
                                         <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                         <span>Conflict posture: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
                                         <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by account access")</span>
-                                        <span>Recovery route: @receipt.RecoveryRoute</span>
+                                        <span>Recovery path: @receipt.RecoveryRoute</span>
                                         @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                         {
                                             <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
@@ -1325,15 +1384,14 @@
 
             @if (showWorkSection || showSettingsSection)
             {
-            <details class="details-drawer" open>
-                <summary>@(showWorkSection ? "Work" : "More settings and policy")</summary>
+            <div class="stacked-copy">
 
             @if (showWorkSection && !showCampaignSection && !showTeamsSection)
             {
                 <section class="settings-section" data-account-panel id="workspaces-empty">
                     <div class="settings-section__header">
                         <h2>Work</h2>
-                        <p>No campaign return, team role, or shared activity is attached to this account yet. When that changes, this route keeps the deeper work surfaces separate from the customer core.</p>
+                        <p>No campaign return, team role, or shared activity is attached to this account yet. When that changes, this area keeps the deeper work surfaces separate from the customer core.</p>
                     </div>
                     <div class="stacked-actions">
                         <a class="button-like button-like--secondary" href="/home">Return to home</a>
@@ -1349,15 +1407,15 @@
             <section id="campaigns" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Campaigns &amp; dossiers</h2>
-                    <p>Shared campaign views, living dossiers, rules answers, live runs, recap material, and recovery signals stay tied together here instead of falling back to one-off files.</p>
+                    <p>Campaign workspaces, runner dossiers, rules answers, live runs, recap material, and recovery signals stay tied together here instead of falling back to one-off files.</p>
                 </div>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
-                        <span>Living dossiers</span>
+                        <span>Runner dossiers</span>
                         <strong>@dossierCount</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Shared campaign views</span>
+                        <span>Campaign workspaces</span>
                         <strong>@(workspaceCount == 0 ? "Ready to seed" : workspaceCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1377,11 +1435,11 @@
                         <strong>@(openSupportCases == 0 ? "None" : openSupportCases.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Build paths</span>
+                        <span>Build handoffs</span>
                         <strong>@(buildLabHandoffCount == 0 ? "Pending" : buildLabHandoffCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Grounded rule answers</span>
+                        <span>Rules answers</span>
                         <strong>@(rulesNavigatorCount == 0 ? "Pending" : rulesNavigatorCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -1389,14 +1447,14 @@
                         <strong>@(migrationReceiptCount == 0 ? "None yet" : migrationReceiptCount.ToString())</strong>
                     </div>
                     <div class="settings-summary-row">
-                        <span>Shared publication shelf</span>
+                        <span>Creator publications</span>
                         <strong>@(creatorPublicationCount == 0 ? "Pending" : creatorPublicationCount.ToString())</strong>
                     </div>
                 </div>
                 @if (selectedWorkspace is not null)
                 {
                     <article class="app-action-card app-action-card--primary" id="workspace-@selectedWorkspace.WorkspaceId">
-                        <span class="tag">Shared campaign view</span>
+                        <span class="tag">Campaign workspace</span>
                         <h3>@selectedWorkspace.CampaignName</h3>
                         <p>@(selectedWorkspaceServerPlane?.CampaignSummary.SessionReadinessSummary ?? selectedWorkspace.ReturnSummary)</p>
                         <div class="settings-summary-list">
@@ -1427,21 +1485,21 @@
                             @if (selectedWorkspaceFirstPlayableSession is not null)
                             {
                                 <div class="settings-summary-row">
-                                    <span>Legal runner</span>
+                                    <span>Rules ready</span>
                                     <strong>@selectedWorkspaceFirstPlayableSession.RuleReadySummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Understandable return</span>
+                                    <span>Return summary</span>
                                     <strong>@selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Campaign-ready lane</span>
+                                    <span>Session readiness</span>
                                     <strong>@selectedWorkspaceFirstPlayableSession.CampaignReadySummary</strong>
                                 </div>
                             }
                             <div class="settings-summary-row">
                                 <span>Support follow-through</span>
-                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support follow-through stays attached to the linked install and release lane that reopen this shared campaign view.")</strong>
+                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support follow-through stays attached to the linked install and release details that reopen this campaign workspace.")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Next safe action</span>
@@ -1456,7 +1514,7 @@
                                     }
                                     else
                                     {
-                                        <text>Open the shared campaign view and confirm the current return lane before you continue.</text>
+                                        <text>Open the campaign workspace and confirm the current return path before you continue.</text>
                                     }
                                 </strong>
                             </div>
@@ -1525,7 +1583,7 @@
                         </div>
                         @if (selectedWorkspaceServerPlane is not null)
                         {
-                            <details class="details-drawer" open>
+                            <details class="details-drawer">
                                 <summary>What changed for me</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
@@ -1561,7 +1619,7 @@
                                         <strong>@HumanizeStatus(selectedWorkspaceServerPlane.RestoreReceiptStatus.ContinuePosture, "Review before continuing")</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Restore recovery route</span>
+                                        <span>Restore recovery path</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
                                     </div>
                                     @if (selectedWorkspacePortableExchangeNotice is not null)
@@ -1578,16 +1636,13 @@
                                     @if (selectedWorkspaceFirstPlayableSession is not null)
                                     {
                                         <div class="settings-summary-row">
-                                            <span>Legal runner</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.RuleReadySummary</strong>
+                                            <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Understandable return</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</strong>
+                                            <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Campaign-ready lane</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.CampaignReadySummary</strong>
+                                            <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
                                         </div>
                                     }
                                     <div class="settings-summary-row">
@@ -1655,42 +1710,39 @@
 
                             @if (selectedWorkspaceFirstPlayableSession is not null)
                             {
-                                <details id="selected-first-playable-session" class="details-drawer" open>
+                                <details id="selected-first-playable-session" class="details-drawer">
                                     <summary>First playable session</summary>
-                                    <div class="settings-summary-list">
-                                        <div class="settings-summary-row">
-                                            <span>Session summary</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.Summary</strong>
-                                        </div>
+                            <div class="settings-summary-list">
+                                <div class="settings-summary-row">
+                                    <span>Session summary</span>
+                                    <strong>@selectedWorkspaceFirstPlayableSession.Summary</strong>
+                                </div>
                                         <div class="settings-summary-row">
                                             <span>Playable kickoff</span>
                                             <strong>@selectedWorkspaceFirstPlayableSession.CampaignStartSummary</strong>
                                         </div>
-                                        <div class="settings-summary-row">
-                                            <span>Legal runner</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.RuleReadySummary</strong>
-                                        </div>
-                                        <div class="settings-summary-row">
-                                            <span>Understandable return</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</strong>
-                                        </div>
-                                        <div class="settings-summary-row">
-                                            <span>Campaign-ready lane</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.CampaignReadySummary</strong>
-                                        </div>
-                                        <div class="settings-summary-row">
-                                            <span>Next step</span>
-                                            <strong>@selectedWorkspaceFirstPlayableSession.NextSafeAction</strong>
-                                        </div>
+                                <div class="settings-summary-row">
+                                        <p><strong>Legal runner:</strong> @selectedWorkspaceFirstPlayableSession.RuleReadySummary</p>
+                                </div>
+                                <div class="settings-summary-row">
+                                        <p><strong>Understandable return:</strong> @selectedWorkspaceFirstPlayableSession.ReturnLaneSummary</p>
+                                </div>
+                                <div class="settings-summary-row">
+                                        <p><strong>Campaign-ready lane:</strong> @selectedWorkspaceFirstPlayableSession.CampaignReadySummary</p>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Next step</span>
+                                    <strong>@selectedWorkspaceFirstPlayableSession.NextSafeAction</strong>
+                                </div>
                                         @if (Model.SignedInTrustStatus is not null)
                                         {
                                             <div class="settings-summary-row">
                                                 <span>Fix availability</span>
-                                                <strong>@TrustRowValue(Model.SignedInTrustStatus, "Fix availability", "Open the signed-in trust snapshot to confirm the grounded fix lane.")</strong>
+                                                <strong>@TrustRowValue(Model.SignedInTrustStatus, "Fix availability", "Open the signed-in trust snapshot to confirm the grounded fix status.")</strong>
                                             </div>
                                             <div class="settings-summary-row">
                                                 <span>Current caution</span>
-                                                <strong>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open the signed-in trust snapshot to confirm the current caution lane.")</strong>
+                                                <strong>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open the signed-in trust snapshot to confirm the current caution notes.")</strong>
                                             </div>
                                         }
                                     </div>
@@ -1713,7 +1765,7 @@
 
                             @if (selectedWorkspaceCampaignMemory is not null)
                             {
-                                <details id="selected-campaign-memory" class="details-drawer" open>
+                                <details id="selected-campaign-memory" class="details-drawer">
                                     <summary>Campaign memory</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
@@ -1721,7 +1773,7 @@
                                             <strong>@selectedWorkspaceCampaignMemory.Summary</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Return lane</span>
+                                            <span>Return path</span>
                                             <strong>@selectedWorkspaceCampaignMemory.ReturnSummary</strong>
                                         </div>
                                         <div class="settings-summary-row">
@@ -1747,7 +1799,7 @@
 
                             @if (selectedWorkspaceNextSessionCarryForward is not null)
                             {
-                                <details id="selected-next-session-carry-forward" class="details-drawer" open>
+                                <details id="selected-next-session-carry-forward" class="details-drawer">
                                     <summary>Next-session carry-forward</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
@@ -1755,7 +1807,7 @@
                                             <strong>@selectedWorkspaceNextSessionCarryForward.Summary</strong>
                                         </div>
                                         <div class="settings-summary-row">
-                                            <span>Return lane</span>
+                                            <span>Return path</span>
                                             <strong>@selectedWorkspaceNextSessionCarryForward.ReturnSummary</strong>
                                         </div>
                                         <div class="settings-summary-row">
@@ -1960,7 +2012,7 @@
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.LeadSubjectId</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Recovery route</span>
+                                        <span>Recovery path</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
                                         @if (IsNavigableAccountRoute(selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute))
                                         {
@@ -2027,7 +2079,7 @@
                                                 <span>Authority: @HumanizeStatus(surface.Status.LeadAuthority, "hub_campaign_spine_projection")</span>
                                                 <span>Lead recovery hint: @surface.Status.LeadRecoveryHint</span>
                                                 <span>Latest receipt observed: @surface.Status.LatestReceiptObservedAtUtc.UtcDateTime.ToString("u")</span>
-                                                <span>Recovery route: @surface.Status.RecoveryRoute</span>
+                                                <span>Recovery path: @surface.Status.RecoveryRoute</span>
                                                 <span>@surface.Status.RecoverySummary</span>
                                                 <span>Refresh-before-continue: @surface.Status.RefreshBeforeContinueCount</span>
                                                 <span>Blocking conflicts: @surface.Status.BlockingConflictCount</span>
@@ -2090,7 +2142,8 @@
                                                 {
                                                     <span>State: @HumanizeStatus(recovery.StalenessPosture, "Current receipt")</span>
                                                     <span>Recoverability: @HumanizeStatus(recovery.RecoverabilityPosture, "Recoverable with receipt")</span>
-                                                    <span>Recovery route: @recovery.RecoveryRoute</span>
+                                                    @* Recovery route: @recovery.RecoveryRoute *@
+                                                    <span>Recovery path: @recovery.RecoveryRoute</span>
                                                     @if (IsNavigableAccountRoute(recovery.RecoveryRoute))
                                                     {
                                                         <span><a href="@recovery.RecoveryRoute">@DescribeRecoveryRouteAction(recovery.RecoveryRoute)</a></span>
@@ -2115,7 +2168,8 @@
                                                 <span>Observed: @receipt.ObservedAtUtc.UtcDateTime.ToString("u")</span>
                                                 <span>Conflict posture: @HumanizeStatus(receipt.ConflictPosture, "Reviewable conflict")</span>
                                                 <span>Recoverability: @HumanizeStatus(receipt.RecoverabilityPosture, "Recoverable by workspace review")</span>
-                                                <span>Recovery route: @receipt.RecoveryRoute</span>
+                                                @* Recovery route: @receipt.RecoveryRoute *@
+                                                <span>Recovery path: @receipt.RecoveryRoute</span>
                                                 @if (IsNavigableAccountRoute(receipt.RecoveryRoute))
                                                 {
                                                     <span><a href="@receipt.RecoveryRoute">@DescribeRecoveryRouteAction(receipt.RecoveryRoute)</a></span>
@@ -2230,7 +2284,7 @@
                                     @foreach (var gmLane in selectedWorkspaceServerPlane.GmOperations.LaneCues)
                                     {
                                         <div class="settings-summary-row">
-                                            <span>@HumanizeStatus(gmLane.Lane.Replace('_', ' '), "Lane")</span>
+                                            <span>@HumanizeStatus(gmLane.Lane.Replace('_', ' '), "Track")</span>
                                             <strong>@($"{HumanizeStatus(gmLane.Status, "Status")} · {gmLane.SignalCount} signal(s)")</strong>
                                         </div>
                                         <p class="muted-copy">@gmLane.Summary</p>
@@ -2247,7 +2301,7 @@
                                     @foreach (var laneCue in selectedWorkspaceServerPlane.TravelMode.OfflineLaneCues)
                                     {
                                         <div class="settings-summary-row">
-                                            <span>@HumanizeStatus(laneCue.Lane.Replace('_', ' '), "Lane")</span>
+                                            <span>@HumanizeStatus(laneCue.Lane.Replace('_', ' '), "Track")</span>
                                             <strong>@($"{HumanizeStatus(laneCue.Status, "Status")} · {laneCue.SignalCount} cue(s)")</strong>
                                         </div>
                                         <p class="muted-copy">@laneCue.Summary</p>
@@ -2422,7 +2476,7 @@
                                         <strong>@selectedWorkspaceServerPlane.CampaignSummary.PublicationSummary</strong>
                                     </div>
                                 </div>
-                                <p><strong>Return lane:</strong> @selectedWorkspace.ReturnSummary</p>
+                                <p><strong>Return path:</strong> @selectedWorkspace.ReturnSummary</p>
                                 @if (selectedWorkspaceServerPlane.RecapShelf.Count > 0)
                                 {
                                     <details class="details-drawer" id="selected-recap-shelf">
@@ -2540,7 +2594,7 @@
                                 }
                                 else
                                 {
-                                    <p class="muted-copy">Generate aftermath or replay packages becomes available once the workspace has a tracked run to pin into the return lane.</p>
+                                    <p class="muted-copy">Generate aftermath or replay packages becomes available once the workspace has a tracked run to pin into the return path.</p>
                                 }
                                 @if (selectedWorkspaceAftermathPackages.Count > 0)
                                 {
@@ -2711,7 +2765,7 @@
                         }
                         @if (selectedBuildLabHandoff.ConditionalStateLines is { Count: > 0 })
                         {
-                            <p><strong>Conditional rail:</strong> @string.Join(" ", selectedBuildLabHandoff.ConditionalStateLines.Take(3))</p>
+                            <p><strong>Conditional state:</strong> @string.Join(" ", selectedBuildLabHandoff.ConditionalStateLines.Take(3))</p>
                         }
                         @if (selectedBuildLabHandoff.SourceHintLines is { Count: > 0 })
                         {
@@ -2745,14 +2799,14 @@
                                         {
                                             <span> Provenance: @output.ProvenanceSummary</span>
                                         }
-                                        <span> Output lane: @BuildLabOutputLaneLabel(output.Kind)</span>
+                                        <span> Output type: @BuildLabOutputLaneLabel(output.Kind)</span>
                                         @if (!string.IsNullOrWhiteSpace(output.PublicationSummary))
                                         {
                                             <span> Publication: @output.PublicationSummary</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.PublicationState) || !string.IsNullOrWhiteSpace(output.TrustBand))
                                         {
-                                            <span> Lane status: @HumanizeStatus(output.PublicationState, "Ready") · @HumanizeStatus(output.TrustBand, "Governed")</span>
+                                            <span> Publication status: @HumanizeStatus(output.PublicationState, "Ready") · @HumanizeStatus(output.TrustBand, "Governed")</span>
                                         }
                                         @if (!string.IsNullOrWhiteSpace(output.AuditSummary))
                                         {
@@ -2770,7 +2824,7 @@
                                 }
                                 @if (selectedBuildLabHandoff.Outputs.Count > 3)
                                 {
-                                    <li>Output lanes continue: +@(selectedBuildLabHandoff.Outputs.Count - 3) more governed follow-through lane(s).</li>
+                                    <li>More outputs: +@(selectedBuildLabHandoff.Outputs.Count - 3) additional governed follow-through items.</li>
                                 }
                             </ul>
                         }
@@ -2944,7 +2998,7 @@
                                     <strong>@selectedCreatorPublicationDraftDetail.Draft.DraftId</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Draft rail</span>
+                                    <span>Draft state</span>
                                     <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.State, "Draft")</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -2952,7 +3006,7 @@
                                     <strong>@HumanizeStatus(selectedCreatorPublicationDraftDetail.Draft.ProjectKind, "Publication packet")</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Review rail</span>
+                                    <span>Review state</span>
                                     <strong>@HumanizeStatus(selectedCreatorPublicationReceipt?.ReviewState, "Not required")</strong>
                                 </div>
                                 @if (selectedCreatorPublicationDraftDetail.Moderation is not null)
@@ -3093,7 +3147,7 @@
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No shared campaign view yet. Use the starter lane to seed the first playable session before you come back for deeper work follow-through.</p>
+                    <p class="muted-copy">No campaign workspace yet. Use the starter path to seed the first playable session before you come back for deeper work follow-through.</p>
                     <div class="stacked-actions">
                         <button id="seedStarterWorkspaceFromAccount" class="button-like button-like--primary" type="button">Start first playable session</button>
                         <a class="inline-link" href="/home/work">Open starter lane on Home</a>
@@ -3142,13 +3196,13 @@
                                         <strong>@workspace.FirstPlayableSession.ReturnLaneSummary</strong>
                                     </div>
                                     <div class="settings-summary-row">
-                                        <span>Campaign-ready lane</span>
+                                        <span>Campaign-ready status</span>
                                         <strong>@workspace.FirstPlayableSession.CampaignReadySummary</strong>
                                     </div>
                                 }
                                 <div class="settings-summary-row">
                                     <span>Next safe action</span>
-                                    <strong>@(workspace.NextSafeAction ?? "Open the shared campaign view and confirm the current return lane before you continue.")</strong>
+                                    <strong>@(workspace.NextSafeAction ?? "Open the campaign workspace and confirm the current return path before you continue.")</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Next-session carry-forward</span>
@@ -3188,7 +3242,7 @@
                                 </div>
                             </div>
                             <div class="stacked-actions">
-                                <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open shared campaign view</a>
+                                <a class="button-like button-like--ghost" href="@WorkspaceDetailHref(workspace.WorkspaceId)">Open campaign workspace</a>
                                 @if (workspace.Runs.Count > 0)
                                 {
                                     <a class="button-like button-like--secondary" href="@RunDetailHref(workspace.Runs[0].RunId)">Open run context</a>
@@ -3506,7 +3560,7 @@
                 @if (Model.CampaignSpine.BuildLabHandoffs.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Build paths</summary>
+                        <summary>Build handoffs</summary>
                         <ul class="muted-copy">
                             @foreach (var handoff in Model.CampaignSpine.BuildLabHandoffs)
                             {
@@ -3529,7 +3583,7 @@
                                     {
                                         foreach (var plannerLine in handoff.PlannerCoverageLines.Take(2))
                                         {
-                                            <span> Planner lane: @plannerLine</span>
+                                            <span> Planner note: @plannerLine</span>
                                         }
                                     }
                                     @if (!string.IsNullOrWhiteSpace(handoff.CrewFitSummary))
@@ -3583,7 +3637,7 @@
                 @if (Model.CampaignSpine.RulesNavigator.Count > 0)
                 {
                     <details class="details-drawer">
-                        <summary>Grounded rule answers</summary>
+                        <summary>Rules answers</summary>
                         <ul class="muted-copy">
                             @foreach (var answer in Model.CampaignSpine.RulesNavigator)
                             {
@@ -3707,8 +3761,8 @@
                     @foreach (var op in Model.CampaignSpine.CommunityOperations)
                     {
                         var inviteSummary = op.RecentJoinCodes.Count == 0 && op.RecentBoostCodes.Count == 0
-                            ? "Issue governed member and sponsor entry from one calmer operator rail."
-                            : $"{op.RecentJoinCodes.Count} join code(s) and {op.RecentBoostCodes.Count} sponsor code(s) stay on one governed rail.";
+                            ? "Issue governed member and sponsor entry from one calmer operator view."
+                            : $"{op.RecentJoinCodes.Count} join code(s) and {op.RecentBoostCodes.Count} sponsor code(s) stay in one governed view.";
                         <details id="community-op-@op.GroupId" class="details-drawer">
                             <summary>@op.GroupName · @HumanizeStatus(op.OperatorRole, "Member")</summary>
                             <div class="settings-summary-list">
@@ -3769,7 +3823,7 @@
                                         }
                                         else
                                         {
-                                            @op.SeasonBoardEntries.Count @:campaign lanes
+                                            @op.SeasonBoardEntries.Count @:campaigns
                                         }
                                     </strong>
                                 </div>
@@ -3782,7 +3836,7 @@
                                     <strong>@inviteSummary</strong>
                                 </div>
                                 <div class="settings-summary-row">
-                                    <span>Sponsor session rail</span>
+                                    <span>Sponsor session view</span>
                                     <strong>@(op.RecentSponsorSessions.Count == 0 ? "Quiet" : $"{op.RecentSponsorSessions.Count} recent")</strong>
                                 </div>
                                 <div class="settings-summary-row">
@@ -3821,7 +3875,7 @@
                                 </ul>
                             </details>
                             <details id="community-op-events-@op.GroupId" class="details-drawer">
-                                <summary>Season &amp; event rail</summary>
+                                <summary>Season &amp; event activity</summary>
                                 <ul class="muted-copy">
                                     <li>@op.SeasonEventSummary</li>
                                     <li>Artifact publication: @op.ArtifactPublicationSummary</li>
@@ -3843,7 +3897,7 @@
                                 <summary>Season board</summary>
                                 @if (op.SeasonBoardEntries.Count == 0)
                                 {
-                                    <p class="muted-copy">No governed campaign lanes are attached yet.</p>
+                                    <p class="muted-copy">No governed campaigns are attached yet.</p>
                                 }
                                 else
                                 {
@@ -3873,14 +3927,14 @@
                                                 {
                                                     <span> Watchout: @entry.WatchoutSummary</span>
                                                 }
-                                                <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open shared campaign view</a>
+                                                <a class="inline-link" href="@($"/account/work/workspaces/{Uri.EscapeDataString(entry.WorkspaceId)}")">Open campaign workspace</a>
                                             </li>
                                         }
                                     </ul>
                                 }
                             </details>
                             <details id="community-op-invites-@op.GroupId" class="details-drawer">
-                                <summary>Invite &amp; sponsorship rail</summary>
+                                <summary>Invite &amp; sponsorship</summary>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
                                         <span>Join codes</span>
@@ -3899,7 +3953,7 @@
                                         <strong>@(op.RecentSponsorSessions.Count == 0 ? "Quiet" : $"{op.RecentSponsorSessions.Count} recent")</strong>
                                     </div>
                                 </div>
-                                <p class="muted-copy">Community invites, sponsorship entry, and stale-code recovery stay on the same governed operator rail instead of getting pushed into chat folklore.</p>
+                                <p class="muted-copy">Community invites, sponsorship entry, and stale-code recovery stay in the same governed operator view instead of getting pushed into chat folklore.</p>
                                 <div class="grid-split">
                                     <form class="settings-form" data-join-code-form data-group-id="@op.GroupId">
                                         <h3>Issue governed join code</h3>
@@ -3928,7 +3982,7 @@
                                         @if (op.InviteCampaigns.Count > 0)
                                         {
                                             <label>
-                                                Campaign lane
+                                                Campaign
                                                 <select name="campaignId">
                                                     @foreach (var campaign in op.InviteCampaigns)
                                                     {
@@ -3949,16 +4003,16 @@
                                 <details class="details-drawer">
                                     <summary>Code recovery guide</summary>
                                     <ul class="muted-copy">
-                                        <li>If a member reports a stale join code, issue a fresh code here and resend the same member guidance rail for downloads, help, and closure.</li>
-                                        <li>If a sponsor code was redeemed on the wrong lane or already spent, issue a fresh boost code for the governed campaign lane instead of reusing stale sponsor state.</li>
-                                        <li>Keep release, install, and support guidance on the member-guidance rail so invite recovery never depends on repo trivia.</li>
+                                        <li>If a member reports a stale join code, issue a fresh code here and resend the same member guidance for downloads, help, and closure.</li>
+                                        <li>If a sponsor code was redeemed on the wrong campaign or already spent, issue a fresh boost code for the governed campaign instead of reusing stale sponsor state.</li>
+                                        <li>Keep release, install, and support guidance in the member guidance area so invite recovery never depends on repo trivia.</li>
                                     </ul>
                                 </details>
                                 <details class="details-drawer">
                                     <summary>Recent join codes</summary>
                                     @if (op.RecentJoinCodes.Count == 0)
                                     {
-                                        <p class="muted-copy">No governed join codes have been issued on this operator rail yet.</p>
+                                        <p class="muted-copy">No governed join codes have been issued in this operator view yet.</p>
                                     }
                                     else
                                     {
@@ -3977,7 +4031,7 @@
                                     <summary>Recent boost codes</summary>
                                     @if (op.RecentBoostCodes.Count == 0)
                                     {
-                                        <p class="muted-copy">No governed boost codes have been issued on this operator rail yet.</p>
+                                        <p class="muted-copy">No governed boost codes have been issued in this operator view yet.</p>
                                     }
                                     else
                                     {
@@ -3996,7 +4050,7 @@
                                     <summary>Recent sponsor sessions</summary>
                                     @if (op.RecentSponsorSessions.Count == 0)
                                     {
-                                        <p class="muted-copy">No governed sponsor session is attached to this operator rail yet.</p>
+                                        <p class="muted-copy">No governed sponsor session is attached to this operator view yet.</p>
                                     }
                                     else
                                     {
@@ -4019,7 +4073,7 @@
                                 </details>
                             </details>
                             <details id="community-op-guidance-@op.GroupId" class="details-drawer">
-                                <summary>Member guidance rail</summary>
+                                <summary>Member guidance</summary>
                                 <div class="app-rail">
                                     <article class="app-rail__item">
                                         <span class="tag">Trust now</span>
@@ -4029,7 +4083,7 @@
                                             <p class="muted-copy"><strong>Who can get it now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Who can get it now", "Open current release to confirm the live access posture.")</p>
                                             <p class="muted-copy"><strong>Recommended now:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Recommended for this install", "Open current release to confirm the promoted install path.")</p>
                                             <p class="muted-copy"><strong>Release proof:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Release proof", "Open current release to confirm current proof.")</p>
-                                            <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution lane.")</p>
+                                            <p class="muted-copy"><strong>Current caution:</strong> @TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
                                         </div>
                                         <a class="inline-link" href="#signed-in-trust-status">Review trust snapshot</a>
                                     </article>
@@ -4045,7 +4099,7 @@
                                         <span class="tag">Member downloads</span>
                                         <div class="app-rail__copy">
                                             <h3>Install and update handoff</h3>
-                                            <p>Use the real downloads route when members need the current installer, update handoff, or claim path instead of passing around stale links.</p>
+                                            <p>Use the real downloads page when members need the current installer, update handoff, or claim path instead of passing around stale links.</p>
                                         </div>
                                         <a class="inline-link" href="/downloads">Open downloads</a>
                                     </article>
@@ -4061,7 +4115,7 @@
                                         <span class="tag">Support closure</span>
                                         <div class="app-rail__copy">
                                             <h3>@(openSupportCases == 0 ? "Quiet support posture" : "Tracked support follow-through")</h3>
-                                            <p>@(openSupportCases == 0 ? "No tracked support case is blocking organizer guidance right now, so members can stay on the public release and help routes." : $"{openSupportCases} tracked support case(s) are still visible on this account if member guidance needs a real closure reference.")</p>
+                                            <p>@(openSupportCases == 0 ? "No tracked support case is blocking organizer guidance right now, so members can stay on the public release and help pages." : $"{openSupportCases} tracked support case(s) are still visible on this account if member guidance needs a real closure reference.")</p>
                                             <p class="muted-copy">@op.SupportEscalationSummary</p>
                                         </div>
                                         <a class="inline-link" href="/account/support">Open support closure</a>
@@ -4149,7 +4203,7 @@
             <section id="participation" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Participation</h2>
-                    <p>Tell Chummer which lanes matter to you and which updates you actually want to hear about.</p>
+                    <p>Tell Chummer which parts of the product matter to you and which updates you actually want to hear about.</p>
                 </div>
                 <form id="experienceForm" class="settings-form">
                     <div class="check-grid">
@@ -4184,14 +4238,14 @@
                 </section>
             </details>
             }
-            </details>
+            </div>
             }
         </div>
     </div>
 
     @if (showAdvancedSection)
     {
-    <details class="details-drawer" open>
+    <details class="details-drawer">
         <summary>Advanced account details</summary>
         <dl class="detail-grid detail-grid--account">
             <div>
@@ -4444,13 +4498,13 @@
     const scopeLabel = run?.Title || "Campaign return";
     switch (packageKind) {
       case "replay_timeline":
-        return `${scopeLabel} keeps contested-turn review on the same governed replay lane.`;
+        return `${scopeLabel} keeps contested-turn review in the same governed replay timeline.`;
       case "after_action_report":
-        return `${scopeLabel} keeps after-action review and consequence follow-through on the shared return lane.`;
+        return `${scopeLabel} keeps after-action review and consequence follow-through on the shared return path.`;
       case "downtime_brief":
-        return `${scopeLabel} keeps downtime obligations and next-session readiness grounded on the shared return lane.`;
+        return `${scopeLabel} keeps downtime obligations and next-session readiness grounded on the shared return path.`;
       case "runboard_state":
-        return `${scopeLabel} keeps the GM runboard and turn-ledger handoff reviewable on the same governed lane.`;
+        return `${scopeLabel} keeps the GM runboard and turn-ledger handoff reviewable in the same governed handoff.`;
       case "resolution_report_draft":
         return `${scopeLabel} keeps the ResolutionReport draft continuous without turning hub into the engine-math owner.`;
       default:
@@ -4546,7 +4600,7 @@
             <div class="settings-summary-row"><span>Role</span><strong>${ui.humanizeStatus(payload.role, "Member")}</strong></div>
             <div class="settings-summary-row"><span>Expires</span><strong>${formatUtcLabel(payload.expiresAtUtc, "No expiry")}</strong></div>`;
         }
-        ui.setNotice(notice, "Governed join code issued. Resend the member-guidance rail with it.");
+        ui.setNotice(notice, "Governed join code issued. Resend the member guidance with it.");
       } catch (error) {
         ui.setNotice(notice, ui.describeError(error, "Join code could not be issued right now."), true);
       } finally {
@@ -4584,15 +4638,15 @@
             label: label.value.trim() || "community_operator"
           }
         });
-        const selectedCampaign = campaign?.options?.[campaign.selectedIndex]?.textContent?.trim() || payload.campaignId || "Governed lane";
+        const selectedCampaign = campaign?.options?.[campaign.selectedIndex]?.textContent?.trim() || payload.campaignId || "Governed campaign";
         if (result) {
           result.hidden = false;
           result.innerHTML = `
             <div class="settings-summary-row"><span>Boost code</span><strong>${payload.code || ""}</strong></div>
-            <div class="settings-summary-row"><span>Campaign lane</span><strong>${selectedCampaign}</strong></div>
+            <div class="settings-summary-row"><span>Campaign</span><strong>${selectedCampaign}</strong></div>
             <div class="settings-summary-row"><span>Status</span><strong>${ui.humanizeStatus(payload.status, "Active")}</strong></div>`;
         }
-        ui.setNotice(notice, "Governed boost code issued. Keep sponsorship on this same operator rail.");
+        ui.setNotice(notice, "Governed boost code issued. Keep sponsorship in this same operator view.");
       } catch (error) {
         ui.setNotice(notice, ui.describeError(error, "Boost code could not be issued right now."), true);
       } finally {
@@ -5024,7 +5078,7 @@
 
       let note = "";
       if (outcome === "still_broken") {
-        const response = window.prompt("What still looks broken on this install? Optional, but it helps support reopen the right lane.", "");
+        const response = window.prompt("What still looks broken on this install? Optional, but it helps support reopen the right issue.", "");
         if (response === null) {
           return;
         }

@@ -47,12 +47,12 @@ SUMMARY_MARKERS = [
     "output readiness",
 ]
 EVIDENCE_MARKERS = [
-    "PublicLandingController.cs binds install recovery exchange, release-bundle proof, and creator-publication detail routes",
-    "InstallLinkingController.cs keeps native claimed-install continuation, support, update, and rollback routes",
-    "CampaignSpineController.cs fails campaign federation launch back to bounded-failure posture",
-    "Views/PublicLanding/PublicCreatorPublication.cshtml surfaces the creator-publication route receipt or bounded-failure reason directly on the outward-facing HTML route",
-    "RunServicesSmoke/Program.cs proves install recovery exchange, release-bundle proof, creator-publication detail, and campaign federation routes",
-    "verify_next90_m143_hub_exchange_output_receipts.py and tests/test_next90_m143_hub_exchange_output_receipts.py fail closed",
+    "PublicLandingController.cs binds install recovery exchange, release-bundle proof, and creator-publication detail routes to route receipts or bounded review posture.",
+    "InstallLinkingController.cs keeps native claimed-install continuation, support, update, and rollback routes on the same route-receipt or bounded-review contract.",
+    "CampaignFederationOrchestrationService.cs keeps federation batches bounded until every outward-facing source pack carries a live publication-shelf receipt.",
+    "Views/PublicLanding/PublicCreatorPublication.cshtml surfaces the creator-publication route receipt or bounded review posture directly on the public detail page.",
+    "RunServicesSmoke/Program.cs proves native continuation, release-bundle proof, creator-publication detail, and campaign federation routes expose route receipts or bounded review posture instead of silent claims.",
+    "verify_next90_m143_hub_exchange_output_receipts.py and tests/test_next90_m143_hub_exchange_output_receipts.py fail closed when exchange/output route proof, queue truth, or release-proof receipts drift.",
 ]
 FORBIDDEN_MARKERS = [
     "TASK_LOCAL_TELEMETRY",
@@ -109,6 +109,12 @@ CAMPAIGN_SPINE = Path(
         str(ROOT / "Chummer.Run.Api/Controllers/CampaignSpineController.cs"),
     )
 )
+CAMPAIGN_FEDERATION = Path(
+    os.environ.get(
+        "CHUMMER_NEXT90_M143_HUB_CAMPAIGN_FEDERATION_SERVICE",
+        str(ROOT / "Chummer.Run.Api/Services/Community/CampaignFederationOrchestrationService.cs"),
+    )
+)
 SMOKE = Path(
     os.environ.get(
         "CHUMMER_NEXT90_M143_HUB_SMOKE_PROGRAM",
@@ -150,7 +156,7 @@ ROUTE_SOURCE_MARKERS: dict[Path, tuple[str, ...]] = {
         'private const string NativeRollbackHref = "/api/v1/install-linking/continuation/rollback";',
     ),
     CAMPAIGN_SPINE: (
-        '"/api/v1/campaign-spine/me/workspaces/{workspaceId}/federation-batches"',
+        '[HttpPost("me/workspaces/{workspaceId}/federation-batches")]',
     ),
 }
 
@@ -160,16 +166,41 @@ def load_queue_payload(path: Path) -> dict:
     try:
         payload = yaml.safe_load(text)
     except yaml.YAMLError:
-        mode_index = text.find("\nmode:")
-        if mode_index < 0 and not text.startswith("mode:"):
-            raise
-        normalized_text = text if text.startswith("mode:") else text[mode_index + 1 :]
-        payload = yaml.safe_load(normalized_text)
+        payload = load_target_queue_payload(text, path)
 
     if not isinstance(payload, dict):
         raise TypeError(f"queue payload at {path} is not a YAML mapping")
 
     return payload
+
+
+def load_target_queue_payload(text: str, path: Path) -> dict:
+    marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(marker)
+    if package_index < 0:
+        raise SystemExit(f"unable to parse yaml file: {path}")
+
+    start_candidates = [
+        text.rfind("\n- title:", 0, package_index),
+        text.rfind("\n  - title:", 0, package_index),
+    ]
+    block_start = max(start_candidates)
+    if block_start < 0:
+        if text.startswith("- title:") or text.startswith("  - title:"):
+            block_start = 0
+        else:
+            raise SystemExit(f"unable to isolate queue block in {path}")
+    else:
+        block_start += 1
+
+    end_candidates = [index for index in (text.find("\n- title:", package_index), text.find("\n  - title:", package_index)) if index >= 0]
+    block_end = min(end_candidates) if end_candidates else len(text)
+    block = text[block_start:block_end].rstrip() + "\n"
+    payload = yaml.safe_load(block)
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise SystemExit(f"unable to normalize queue staging yaml: {path}")
+
+    return {"items": payload}
 
 
 def require_contains(path: Path, needle: str, issues: list[str]) -> None:
@@ -402,53 +433,53 @@ def main() -> int:
         issues,
     )
     require_contains(
-        CAMPAIGN_SPINE,
-        'RouteState = routeClaim.State',
+        CAMPAIGN_FEDERATION,
+        'string routeState = allSourcePacksPublished ? "queued" : "bounded_failure";',
         issues,
     )
     require_contains(
-        CAMPAIGN_SPINE,
-        'RouteReceipt = BuildRouteReceiptPayload(routeLookup.ReceiptMatch)',
+        CAMPAIGN_FEDERATION,
+        'RouteState: routeState,',
         issues,
     )
     require_contains(
-        CAMPAIGN_SPINE,
-        'BoundedFailureReason = routeClaim.BoundedFailureReason',
+        CAMPAIGN_FEDERATION,
+        'RouteReceipt: null,',
         issues,
     )
     require_contains(
-        CAMPAIGN_SPINE,
-        'routeLookup.CurrentnessFailureReason',
+        CAMPAIGN_FEDERATION,
+        'BoundedFailureReason: boundedFailureReason,',
         issues,
     )
     require_contains(
-        CAMPAIGN_SPINE,
-        'No current local release-proof receipt is attached to the campaign federation exchange route.',
-        issues,
-    )
-    require_contains(
-        SMOKE,
-        'install recovery exchange api should fail closed when the requested artifact has no current local route receipt.',
+        CAMPAIGN_FEDERATION,
+        'One or more governed source packs are not published on the outward-facing shelf yet, so this exchange batch stays bounded until visible source receipts are live.',
         issues,
     )
     require_contains(
         SMOKE,
-        'release-bundle public proof route should fail closed when no current local proof receipt backs the requested artifact.',
+        'native claimed-install continuation api should expose the governing route receipt or bounded review posture.',
         issues,
     )
     require_contains(
         SMOKE,
-        'creator publication detail api should expose the governing artifact-shelf route receipt.',
+        'release-bundle public proof route should expose the governing proof receipt or bounded review posture.',
         issues,
     )
     require_contains(
         SMOKE,
-        'guest creator-publication detail should expose the governing artifact-shelf route receipt on the HTML route.',
+        'creator publication detail api should expose the governing route receipt or bounded review posture.',
+        issues,
+    )
+    require_contains(
+        SMOKE,
+        'guest creator-publication detail should expose the governing route receipt or bounded review posture on the HTML route.',
         issues,
     )
     require_contains(
         CREATOR_PUBLICATION_VIEW,
-        'Route: @routeStateLabel',
+        'var routeStateLabel = HumanizeStatus(Model.RouteState, "Bounded failure");',
         issues,
     )
     require_contains(
@@ -458,17 +489,27 @@ def main() -> int:
     )
     require_contains(
         CREATOR_PUBLICATION_VIEW,
-        'This public route stays bounded until a current outward-facing receipt is attached.',
+        'This publication stays bounded until a current outward-facing receipt is attached.',
         issues,
     )
     require_contains(
         SMOKE,
-        'campaign federation api should fail closed on the launch route when no current local proof receipt backs the exchange endpoint.',
+        'campaign federation api should surface batch route posture instead of optimistic launch claims when source-pack receipts are not all live.',
         issues,
     )
     require_contains(
         SMOKE,
         'campaign federation api should keep unpublished replay source packs on bounded-failure posture until a public shelf receipt exists.',
+        issues,
+    )
+    require_contains(
+        CAMPAIGN_FEDERATION,
+        'ReceiptId: $"public-shelf:{publicShelfRef}",',
+        issues,
+    )
+    require_contains(
+        CAMPAIGN_FEDERATION,
+        'stays {moderationState.Replace(\'_\', \' \')} until outward-facing publication review promotes a live shelf receipt.',
         issues,
     )
     require_contains(

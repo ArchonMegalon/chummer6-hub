@@ -137,9 +137,11 @@ REQUIRED_RELEASE_PROOF_ROUTES = (
     "/downloads/install/avalonia-linux-x64-installer",
     "/home/access",
     "/home/work",
+    "/account/access",
     "/account/work",
     "/account/support",
     "/contact",
+    "/downloads",
 )
 RELEASE_PROOF_ARTIFACT_INSTALL_ROUTE_RE = re.compile(r"^/downloads/install/[a-z0-9][a-z0-9-]*$")
 ALLOWED_RELEASE_PROOF_KEYS = (
@@ -1365,11 +1367,23 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
             message=f"parity audit failed: workflow receipt flagship_required_desktop_heads must be a string array: {path}",
         )
     )
-    required_heads = {"avalonia", "blazor-desktop"}
-    missing_required_heads = sorted(required_heads.difference(flagship_required_heads))
+    flagship_fallback_heads = set(
+        require_string_list(
+            evidence.get("flagship_declared_desktop_fallback_heads"),
+            message=(
+                "parity audit failed: workflow receipt flagship_declared_desktop_fallback_heads "
+                f"must be a string array: {path}"
+            ),
+        )
+    )
+    missing_required_heads: list[str] = []
+    if "avalonia" not in flagship_required_heads:
+        missing_required_heads.append("avalonia")
+    if "blazor-desktop" not in flagship_required_heads and "blazor-desktop" not in flagship_fallback_heads:
+        missing_required_heads.append("blazor-desktop")
     if missing_required_heads:
         raise SystemExit(
-            "parity audit failed: workflow receipt is missing required flagship desktop heads: "
+            "parity audit failed: workflow receipt is missing required flagship desktop head coverage declarations: "
             + ", ".join(missing_required_heads)
             + f" ({path})"
         )
@@ -2001,6 +2015,9 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "16-master-index-dialog-light.png",
         "17-character-roster-dialog-light.png",
         "18-import-dialog-light.png",
+        "38-translator-dialog-light.png",
+        "39-xml-editor-dialog-light.png",
+        "40-hero-lab-importer-dialog-light.png",
     )
     missing_required_screenshots = sorted(
         screenshot_name

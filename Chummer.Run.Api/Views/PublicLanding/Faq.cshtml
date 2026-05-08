@@ -12,19 +12,19 @@
         {
             Badge = "Reality check",
             Title = "Start on what works today when you need shipped truth",
-            Summary = "Use the current-status lane when the real question is whether something is already usable, supported, or still under caution right now.",
+            Summary = "Use the current-status page when the real question is whether something is already usable, supported, or still under caution right now.",
             Href = "/now",
             Label = "Open what works today",
-            Proof = new[] { "Shipped truth", "Current caution", "Route-level proof" }
+            Proof = new[] { "Shipped truth", "Current caution", "Current proof" }
         },
         new
         {
             Badge = "Downloads",
-            Title = "Open the release rail when the answer depends on install posture",
+            Title = "Open downloads when the answer depends on install posture",
             Summary = "Package type, account handoff, known issues, and the current support path belong on downloads, not buried inside a long answer.",
             Href = "/downloads",
             Label = "Open downloads",
-            Proof = new[] { "One release rail", "Install continuity", "Known issues nearby" }
+            Proof = new[] { "One downloads page", "Install continuity", "Known issues nearby" }
         },
         new
         {
@@ -110,16 +110,11 @@
     </div>
 </section>
 
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Fast answer map</p>
-        <h2 class="editorial-title">Get the answer or leave with the right next route.</h2>
-        <p class="editorial-copy">FAQ should answer the normal objections quickly, then hand you to the correct product lane before the question turns into guesswork or private support.</p>
+        <h2 class="editorial-title">Get the answer or leave with the right next page.</h2>
+        <p class="editorial-copy">FAQ should answer the normal objections quickly, then hand you to the correct product page before the question turns into guesswork or private support.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in faqRouteChoices)

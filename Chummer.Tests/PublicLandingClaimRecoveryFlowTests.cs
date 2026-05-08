@@ -33,16 +33,16 @@ public sealed class PublicLandingClaimRecoveryFlowTests
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Support follow-through stays on the same install rail, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.",
+            "Support follow-through stays on the same install page, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.",
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains("@Model.SupportIntake.InstallAccessHref", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
-        Assert.Contains("Recovery stays on this install rail", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
+        Assert.Contains("Recovery stays on this install page", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);
         Assert.Contains(
             "Enter each code in Chummer if it opens in recovery mode on the already-downloaded device. Do not redeem claim codes in a browser tab.",
             accountView,
             StringComparison.Ordinal);
-        Assert.Contains("Current install rail", accountView, StringComparison.Ordinal);
+        Assert.Contains("Current install path", accountView, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay below as a fallback, not the first instruction.", accountView, StringComparison.Ordinal);
         Assert.Contains("Open Devices and access", presenter, StringComparison.Ordinal);
         Assert.Contains(

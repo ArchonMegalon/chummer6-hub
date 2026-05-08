@@ -20,8 +20,12 @@ FRONTIER_ID = 2746902416
 MILESTONE_ID = 111
 LANDED_COMMIT = "3fb14923"
 COMPLETION_ACTION = "verify_closed_package_only"
-OWNED_SURFACES = ["install_aware_support_concierge", "release_concierge:hub"]
-DESIGN_OWNED_SURFACES = [*OWNED_SURFACES, "public_concierge_wrapper:hub"]
+OWNED_SURFACES = [
+    "install_aware_support_concierge",
+    "release_concierge:hub",
+    "public_concierge_wrapper:hub",
+]
+DESIGN_OWNED_SURFACES = OWNED_SURFACES
 ALLOWED_PATHS = ["Chummer.Run.Api", "scripts", "tests"]
 FORBIDDEN_PROOF_MARKERS = [
     "TASK_LOCAL_TELEMETRY",
@@ -91,8 +95,10 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "private static bool HasConcreteInstalledValue(string? value)",
         "&& HasConcreteInstalledReceiptId(installedTruth.InstalledBuildReceiptId)",
         "private static bool HasConcreteInstalledReceiptId(string? receiptId)",
-        '!string.Equals(receiptId.Trim(), "pending", StringComparison.OrdinalIgnoreCase)',
-        '!receiptId.Trim().StartsWith("missing-", StringComparison.OrdinalIgnoreCase)',
+        "string.Equals(normalized, \"pending\", StringComparison.OrdinalIgnoreCase)",
+        "string.Equals(normalized, \"n/a\", StringComparison.OrdinalIgnoreCase)",
+        "string.Equals(normalized, \"none\", StringComparison.OrdinalIgnoreCase)",
+        'normalized.StartsWith("missing-", StringComparison.OrdinalIgnoreCase)',
         "PublicTrustWrapper: new PublicConciergeTrustWrapper(",
         "FirstPartyOnlyTruth: true",
         "Installed build receipt:",
@@ -181,8 +187,8 @@ def main() -> int:
         missing,
         QUEUE_STAGING_PATH,
         "Fleet queue",
-        expected_title="Emit install-aware release and support concierge packets from installed-build truth",
-        expected_task="Compile support closure and release explainer packets from installed build, channel, and support-case truth.",
+        expected_title="Emit install-aware release, support, and public concierge packets from installed-build truth",
+        expected_task="Compile support closure and release explainer packets, plus public trust wrapper flows with first-party fallbacks, from installed build, channel, and support-case truth.",
         expected_owned_surfaces=OWNED_SURFACES,
     )
     verify_queue_authority(
@@ -216,7 +222,9 @@ def verify_queue_authority(
     if not path.is_file():
         missing.append(f"{label} is missing: {path}")
         return
-    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    payload = load_queue_payload(path)
+    if isinstance(payload, list):
+        payload = {"items": payload}
     items = payload.get("items")
     if not isinstance(items, list):
         missing.append(f"{label} items must be a list: {path}")
@@ -380,6 +388,71 @@ def decompress_marker_bytes(value: bytes) -> str | None:
     except ZlibError:
         return None
     return bytes_to_marker_text(decoded)
+
+
+def load_queue_payload(path: Path) -> dict:
+    """Load queue payload while tolerating legacy malformed top-level formatting."""
+    raw = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(raw) or {}
+        if isinstance(payload, dict):
+            return payload
+        if isinstance(payload, list):
+            return {"items": payload}
+    except yaml.YAMLError:
+        try:
+            normalized = normalize_legacy_queue_payload(raw)
+            payload = yaml.safe_load(normalized) or {}
+        except yaml.YAMLError:
+            marker = raw.find("items:")
+            if marker < 0:
+                raise
+            normalized = normalize_legacy_queue_payload(raw[marker:])
+            payload = yaml.safe_load(normalized) or {}
+        if isinstance(payload, dict):
+            return payload
+        raise
+    return {}
+
+
+def normalize_legacy_queue_payload(raw: str) -> str:
+    """Normalize legacy malformed queue YAML by joining wrapped plain lines.
+
+    The generated queue staging files have occasional wrapped plain scalars that are not valid
+    YAML (eg. long proof rows split across multiple lines). This helper merges those wrapped
+    continuations so strict YAML parsing can proceed without mutating source files.
+    """
+    marker = raw.find("items:")
+    if marker >= 0:
+        raw = raw[marker:]
+
+    def is_key_line(candidate: str) -> bool:
+        text = candidate.lstrip()
+        if not text or text.startswith(("-", "?")):
+            return False
+        if ":" not in text:
+            return False
+        key, _, _ = text.partition(":")
+        return bool(key) and " " not in key and "\t" not in key
+
+    lines = raw.splitlines()
+    normalized: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            normalized.append("")
+            continue
+        if (
+            normalized
+            and line.startswith(" ")
+            and not line.lstrip().startswith("-")
+            and not is_key_line(line)
+            and not line.strip().startswith("?")
+        ):
+            normalized[-1] = f"{normalized[-1]} {line.strip()}"
+        else:
+            normalized.append(line)
+    return "\n".join(normalized) + "\n"
 
 
 def is_plausible_marker_text(value: str) -> bool:

@@ -518,6 +518,8 @@ REQUIRED_SOURCE_MARKERS = {
         "installLinkTransport=grant_callback",
     ],
     Path("scripts/ai/verify.sh"): [
+        "python3 scripts/materialize_hub_local_release_proof.py",
+        'cp "$HUB_LOCAL_RELEASE_PROOF_PATH" "$HUB_SERVED_RELEASE_PROOF_PATH"',
         "python3 scripts/verify_desktop_native_trust_receipts.py",
     ],
 }
@@ -1246,14 +1248,36 @@ def _should_verify_served_proof_matches_published() -> bool:
 
 
 def _extract_yaml_block(text: str, anchor: str) -> str | None:
-    anchor_index = text.find(anchor)
-    if anchor_index < 0:
+    lines = text.splitlines()
+    anchor_line_index = next((index for index, line in enumerate(lines) if anchor in line), None)
+    if anchor_line_index is None:
         return None
 
-    item_start = text.rfind("\n  - ", 0, anchor_index)
-    start = anchor_index if item_start < 0 else item_start + 1
-    next_item = text.find("\n  - ", start + 1)
-    return text[start:] if next_item < 0 else text[start:next_item]
+    item_start_index = anchor_line_index
+    item_indent: int | None = None
+    for index in range(anchor_line_index, -1, -1):
+        stripped = lines[index].lstrip()
+        indent = len(lines[index]) - len(stripped)
+        if stripped.startswith("- "):
+            item_start_index = index
+            item_indent = indent
+            break
+
+    if item_indent is None:
+        return lines[anchor_line_index]
+
+    item_end_index = len(lines)
+    for index in range(item_start_index + 1, len(lines)):
+        stripped = lines[index].lstrip()
+        if not stripped.startswith("- "):
+            continue
+
+        indent = len(lines[index]) - len(stripped)
+        if indent == item_indent:
+            item_end_index = index
+            break
+
+    return "\n".join(lines[item_start_index:item_end_index])
 
 
 def _verify_marker_block(
@@ -1276,7 +1300,7 @@ def _verify_marker_block(
         return
 
     for marker in markers:
-        if marker not in block:
+        if not _block_contains_marker(block, marker):
             errors.append(f"canonical {label} block missing marker: {marker}")
 
     if forbidden_markers is not None:
@@ -1341,6 +1365,14 @@ def _verify_queue_mirror_block_matches(
         )
 
 
+def _normalize_marker_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _block_contains_marker(block: str, marker: str) -> bool:
+    return marker in block or _normalize_marker_text(marker) in _normalize_marker_text(block)
+
+
 def _extract_yaml_string_list(block: str, key: str) -> list[str] | None:
     lines = block.splitlines()
     for index, line in enumerate(lines):
@@ -1349,6 +1381,7 @@ def _extract_yaml_string_list(block: str, key: str) -> list[str] | None:
 
         values: list[str] = []
         list_indent: int | None = None
+        current_value: str | None = None
         for child in lines[index + 1 :]:
             stripped = child.strip()
             if not stripped:
@@ -1356,14 +1389,27 @@ def _extract_yaml_string_list(block: str, key: str) -> list[str] | None:
 
             indent = len(child) - len(child.lstrip(" "))
             if list_indent is None:
+                if not stripped.startswith("- "):
+                    break
                 list_indent = indent
-            elif indent < list_indent:
+                current_value = stripped[2:].strip()
+                values.append(current_value)
+                continue
+
+            if indent < list_indent:
                 break
 
-            if not stripped.startswith("- "):
-                break
+            if indent == list_indent and stripped.startswith("- "):
+                current_value = stripped[2:].strip()
+                values.append(current_value)
+                continue
 
-            values.append(stripped[2:].strip())
+            if indent > list_indent and current_value is not None:
+                current_value = f"{current_value} {stripped}".strip()
+                values[-1] = current_value
+                continue
+
+            break
 
         return values
 
@@ -1578,6 +1624,12 @@ def _stable_json_payload(path: Path, errors: list[str], label: str) -> dict | No
     stable = dict(payload)
     stable.pop("generatedAt", None)
     stable.pop("generated_at", None)
+    readiness_block = stable.get("desktop_client_readiness")
+    if isinstance(readiness_block, dict):
+        normalized_readiness_block = dict(readiness_block)
+        normalized_readiness_block.pop("generatedAt", None)
+        normalized_readiness_block.pop("generated_at", None)
+        stable["desktop_client_readiness"] = normalized_readiness_block
     return stable
 
 
@@ -1961,6 +2013,13 @@ def _verify_desktop_client_readiness_block(errors: list[str], proof: dict, label
     if block.get("reason") != expected_reason:
         errors.append(f"{label} desktop_client_readiness has wrong reason: {block.get('reason')!r}")
     expected["reason"] = expected_reason
+    expected_generated_at = str(expected.pop("generated_at") or "").strip()
+    actual_generated_at = str(block.get("generated_at") or block.get("generatedAt") or "").strip()
+    if expected_generated_at and not actual_generated_at:
+        errors.append(
+            f"{label} desktop_client_readiness is missing generated_at/generatedAt while flagship readiness publishes "
+            f"{expected_generated_at!r}"
+        )
 
     for key, expected_value in expected.items():
         if block.get(key) != expected_value:

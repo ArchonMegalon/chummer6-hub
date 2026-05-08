@@ -895,12 +895,7 @@ public sealed class PublicReleaseManifestService
             requiredPlatforms = ToJsonStringList(coverage["requiredPlatformIds"]);
         }
 
-        List<string> derivedRequiredPlatforms = DeriveRequiredDesktopPlatforms(artifacts);
-        if (derivedRequiredPlatforms.Count > 0)
-        {
-            requiredPlatforms = derivedRequiredPlatforms;
-        }
-        else if (requiredPlatforms.Count == 0)
+        if (requiredPlatforms.Count == 0)
         {
             requiredPlatforms = [.. RequiredDesktopPlatforms];
         }

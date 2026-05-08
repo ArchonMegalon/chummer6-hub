@@ -169,7 +169,26 @@ def load_queue_payload(path: Path) -> dict:
         if mode_index < 0 and not text.startswith("mode:"):
             raise
         normalized_text = text if text.startswith("mode:") else text[mode_index + 1 :]
-        payload = yaml.safe_load(normalized_text)
+        sanitized_lines: list[str] = []
+        previous_sequence_indent: int | None = None
+        for line in normalized_text.splitlines():
+            stripped = line.lstrip()
+            indent = len(line) - len(stripped)
+            if (
+                sanitized_lines
+                and previous_sequence_indent is not None
+                and stripped
+                and not stripped.startswith("- ")
+                and ":" not in stripped
+                and indent == previous_sequence_indent
+            ):
+                sanitized_lines[-1] = f"{sanitized_lines[-1]} {stripped}"
+                continue
+
+            sanitized_lines.append(line)
+            previous_sequence_indent = indent if stripped.startswith("- ") else None
+
+        payload = yaml.safe_load("\n".join(sanitized_lines) + "\n")
 
     if not isinstance(payload, dict):
         raise TypeError(f"queue payload at {path} is not a YAML mapping")

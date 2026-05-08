@@ -57,16 +57,16 @@
         {
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed a legacy shipped handoff</h3>
-                <p>The dedicated shipped-closeout rail now lives on <code class="mono-receipt">/changelog</code>. This page stays the broader reality check for what works today, what still needs caution, and whether a device should move now.</p>
+                <p>The shipped update stream now lives on <code class="mono-receipt">/changelog</code>. This page stays the quick install reality check: what is ready now, what you can verify yourself, and where to go when a device needs help first.</p>
                 <div class="route-callout__proof">
                     <span>User-available</span>
                     <span>Release-linked</span>
-                    <span>Broader install reality</span>
+                    <span>Install reality</span>
                 </div>
                 <div class="route-callout__actions">
-                    <a class="inline-link" href="/changelog">Open shipped closeout</a>
-                    <a class="inline-link" href="/feedback">Open Fixer Board</a>
-                    <a class="inline-link" href="/horizons">Open horizons</a>
+                    <a class="inline-link" href="/changelog">Open changelog</a>
+                    <a class="inline-link" href="/feedback">Open feedback</a>
+                    <a class="inline-link" href="/roadmap">Open roadmap</a>
                     <a class="inline-link" href="/help">Open help</a>
                 </div>
             </div>
@@ -88,26 +88,33 @@
     </div>
 </section>
 
-<section class="status-decision-strip" aria-label="Install decision lanes">
+<section class="status-decision-strip" aria-label="Readiness and proof decisions">
     <article class="status-decision-strip__card">
-        <span class="tag">Install now</span>
-        <h2>The current preview is real enough to start from the public shelf.</h2>
-        <p>Use Downloads when you want the recommended build, current package posture, and the calmest first-run path for this device.</p>
+        <span class="tag">Ready to install?</span>
+        <h2>Start from downloads when you want the recommended build and the calmest first-run path for this device.</h2>
+        <p>Downloads stays the primary install surface, with the current package, known issues, and the shortest path to a real first launch.</p>
         <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Inspect first</span>
-        <h2>Proof should answer the normal trust questions quickly.</h2>
-        <p>Read the core proof cards below when you need one concrete result, one visible trail, and one current caution before you commit a device.</p>
-        <a class="button-like button-like--ghost" href="#productlift-shipped-closeout">Stay on this page</a>
+        <span class="tag">What you can verify now</span>
+        <h2>The proof cards below should answer the normal trust questions without forcing a full roadmap tour.</h2>
+        <p>Use them when you want one concrete result, one visible trail, and one clear next step before you commit a device.</p>
+        <a class="button-like button-like--ghost" href="#now-proof">Open proof cards</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag tag--amber">Need caution</span>
-        <h2>Known issues, install help, and support stay close to the release rail.</h2>
-        <p>Wait, route around, or ask for help from the same first-party surfaces instead of reverse-engineering the repo or the public signal lane.</p>
+        <h2>Known issues, install help, and support stay close to downloads.</h2>
+        <p>Wait, route around, or ask for help from first-party surfaces instead of decoding internal product language or public planning pages.</p>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </article>
 </section>
+
+@if (Model.SignedInStatus is not null)
+{
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    </section>
+}
 
 <section class="evidence-wall">
     <article class="evidence-group">
@@ -148,23 +155,11 @@
     </article>
 </section>
 
-@await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
-
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
-<section class="workflow-band">
+<section class="workflow-band" id="now-proof">
     <div class="workflow-band__lead">
-        <p class="eyebrow">What you can try now</p>
-        <h2 class="editorial-title">Build, explain, and run with visible evidence</h2>
-        <p class="editorial-copy">These are the three product behaviors the current preview already shows in public: builder truth, explanation trail, and continuity under drift.</p>
+        <p class="eyebrow">What you can verify now</p>
+        <h2 class="editorial-title">Three proof cards that show the preview is more than a landing page story</h2>
+        <p class="editorial-copy">These cards stay focused on real product behavior: builder truth, explanation trail, and continuity under drift.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.ProofModules)
@@ -195,7 +190,7 @@
 {
     <section class="release-shelf release-shelf--manual">
         <details class="release-accordion">
-            <summary>Supporting proof around the core loop</summary>
+            <summary>More proof you can inspect today</summary>
             <div class="release-accordion__body">
                 <div class="evidence-row-list">
                     @foreach (var card in supportingProof)
@@ -217,8 +212,8 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Signed-in return</p>
-    <h2 class="editorial-title">Keep the return path attached when one download is not enough</h2>
-    <p class="editorial-copy">Use the account path when you want install receipts, devices, roadmap follows, and support updates to stay attached to the same return surface.</p>
+    <h2 class="editorial-title">Keep the return path attached when one install is not enough</h2>
+    <p class="editorial-copy">Use the account path when you want devices, support updates, and follow-up history attached to the same return surface without turning signup into the main public decision.</p>
     @if (signedInBenefits.Length > 0)
     {
         <div class="trust-claim__microproof">

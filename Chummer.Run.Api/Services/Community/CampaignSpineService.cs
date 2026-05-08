@@ -11,6 +11,8 @@ using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Registry.Services;
 using Chummer.Run.Api.Services.Support;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services.Community;
 
@@ -58,6 +60,15 @@ public sealed class CampaignSpineService
         CommunityStore store,
         WorkspaceLifecyclePolicyService lifecyclePolicy,
         CampaignArtifactRegistryBridge artifactRegistry,
+        IHubPublicationDraftService? publicationDrafts = null)
+        : this(store, lifecyclePolicy, artifactRegistry, CreateDefaultSupportStore(), publicationDrafts)
+    {
+    }
+
+    public CampaignSpineService(
+        CommunityStore store,
+        WorkspaceLifecyclePolicyService lifecyclePolicy,
+        CampaignArtifactRegistryBridge artifactRegistry,
         SupportStore supportStore,
         IHubPublicationDraftService? publicationDrafts = null)
     {
@@ -66,6 +77,22 @@ public sealed class CampaignSpineService
         _artifactRegistry = artifactRegistry;
         _supportStore = supportStore;
         _publicationDrafts = publicationDrafts;
+    }
+
+    private static SupportStore CreateDefaultSupportStore()
+    {
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_SUPPORT_STORE_PATH"] = Path.Combine(
+                    Path.GetTempPath(),
+                    "chummer6-hub",
+                    "support-store",
+                    $"campaign-spine-default-{Guid.NewGuid():N}.json")
+            })
+            .Build();
+
+        return new SupportStore(configuration, NullLogger<SupportStore>.Instance);
     }
 
     public AccountCampaignSummary GetAccountSummary(HubUserDto user, InstallLinkingSummaryDto? installLinking = null)
@@ -3081,6 +3108,23 @@ public sealed class CampaignSpineService
                 changed = true;
             }
 
+            _store.CampaignSpinesById.TryGetValue(sponsorCampaign.CampaignId, out var existingCampaign);
+            IReadOnlyList<CampaignConsequenceProjection> baselineConsequences = BuildCampaignConsequences(
+                sponsorCampaign,
+                group,
+                crew,
+                memberDossiers,
+                run,
+                continuity);
+            IReadOnlyList<CampaignConsequenceProjection> mergedConsequences = baselineConsequences;
+            if (existingCampaign?.Consequences is { Count: > 0 } persistedConsequences)
+            {
+                foreach (CampaignConsequenceProjection persistedConsequence in persistedConsequences)
+                {
+                    mergedConsequences = UpsertGovernedCampaignConsequence(mergedConsequences, persistedConsequence);
+                }
+            }
+
             var campaign = new CampaignProjection(
                 CampaignId: sponsorCampaign.CampaignId,
                 GroupId: sponsorCampaign.GroupId,
@@ -3095,14 +3139,8 @@ public sealed class CampaignSpineService
                 RunIds: new[] { runId },
                 LatestContinuity: continuity,
                 CreatedAtUtc: sponsorCampaign.CreatedAtUtc,
-                UpdatedAtUtc: _store.CampaignSpinesById.TryGetValue(sponsorCampaign.CampaignId, out var existingCampaign) ? existingCampaign.UpdatedAtUtc : now,
-                Consequences: BuildCampaignConsequences(
-                    sponsorCampaign,
-                    group,
-                    crew,
-                    memberDossiers,
-                    run,
-                    continuity));
+                UpdatedAtUtc: existingCampaign?.UpdatedAtUtc ?? now,
+                Consequences: mergedConsequences);
             if (existingCampaign is null || !ContentEquals(existingCampaign, campaign))
             {
                 campaign = existingCampaign is null ? campaign : campaign with { UpdatedAtUtc = now };
@@ -6391,6 +6429,7 @@ public sealed class CampaignSpineService
         string travelSummary = leadTravelPrefetch is null
             ? string.Empty
             : $"{leadTravelPrefetch.DeviceRole} on {leadTravelPrefetch.Platform} already has the staged travel packet.";
+        IReadOnlyList<string> returnLoopEvidenceLines = BuildGovernedConsequenceReturnLoopEvidenceLines(consequences);
 
         return new NextSessionCarryForwardProjection(
             CarryForwardId: StableId("next-session", $"{campaign.CampaignId}:{updatedAtUtc.ToUnixTimeMilliseconds()}"),
@@ -6399,9 +6438,10 @@ public sealed class CampaignSpineService
             ReturnSummary: continuity?.Summary ?? campaign.Summary,
             NextSafeAction: nextSafeAction,
             EvidenceLines: FinalizeLines(
-            new[]
+            new[] { continuity?.Summary ?? campaign.Summary }
+            .Concat(returnLoopEvidenceLines)
+            .Concat(new[]
             {
-                continuity?.Summary ?? campaign.Summary,
                 activeScene is null ? string.Empty : $"{activeScene.Title} is live on {leadRun?.Title ?? campaign.Name} at {activeScene.Revision}.",
                 leadObjective is null ? string.Empty : $"{leadObjective.Title} stays {leadObjective.Status} with {leadObjective.Pressure} pressure.",
                 leadAftermathPackage is null ? string.Empty : $"{leadAftermathPackage.Title}: {leadAftermathPackage.Summary}",
@@ -6414,7 +6454,7 @@ public sealed class CampaignSpineService
                 prepBindingSummary,
                 travelSummary,
                 nextSafeAction
-            }.Concat(BuildGovernedConsequenceReturnLoopEvidenceLines(consequences))),
+            })),
             UpdatedAtUtc: updatedAtUtc);
     }
 
@@ -6511,6 +6551,7 @@ public sealed class CampaignSpineService
             .Select(static item => item!.Value)
             .DefaultIfEmpty(DateTimeOffset.UtcNow)
             .Max();
+        IReadOnlyList<string> returnLoopEvidenceLines = BuildGovernedConsequenceReturnLoopEvidenceLines(consequences);
 
         return new CampaignMemoryProjection(
             MemoryId: StableId("campaign-memory", $"{campaign.CampaignId}:{updatedAtUtc.ToUnixTimeMilliseconds()}"),
@@ -6519,9 +6560,10 @@ public sealed class CampaignSpineService
             ReturnSummary: nextSessionCarryForward?.ReturnSummary ?? continuity?.Summary ?? campaign.Summary,
             NextSafeAction: nextSessionCarryForward?.NextSafeAction ?? nextSafeAction,
             EvidenceLines: FinalizeLines(
-            new[]
+            new[] { continuity?.Summary ?? campaign.Summary }
+            .Concat(returnLoopEvidenceLines)
+            .Concat(new[]
             {
-                continuity?.Summary ?? campaign.Summary,
                 activeScene is null ? string.Empty : $"{activeScene.Title} is still live on {(leadRun?.Title ?? campaign.Name)} at {activeScene.Revision}.",
                 leadObjective is null ? string.Empty : $"{leadObjective.Title} remains {leadObjective.Status} with {leadObjective.Pressure} pressure.",
                 nextSessionCarryForward?.Summary ?? string.Empty,
@@ -6536,7 +6578,7 @@ public sealed class CampaignSpineService
                 leadPrepLaunch?.Summary ?? string.Empty,
                 leadTravelPrefetch?.PrefetchSummary ?? string.Empty,
                 nextSessionCarryForward?.NextSafeAction ?? nextSafeAction
-            }.Concat(BuildGovernedConsequenceReturnLoopEvidenceLines(consequences))),
+            })),
             UpdatedAtUtc: updatedAtUtc);
     }
 

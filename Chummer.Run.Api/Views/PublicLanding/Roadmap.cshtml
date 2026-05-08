@@ -36,34 +36,34 @@
         new
         {
             Badge = "Projected direction",
-            Title = "Roadmap stays visible without claiming shipped truth",
-            Summary = "Use this route to see the next likely product lanes, milestone pressure, and public-facing direction. Use live proof before treating any roadmap note as already real today.",
+            Title = "Roadmap should stay visible without pretending it already shipped",
+            Summary = "Use this page to see likely next steps, milestone pressure, and public direction. Use live proof before treating any roadmap note as already real today.",
             Href = "#roadmap-horizons",
-            Label = "Browse horizon lanes",
+            Label = "Browse horizons",
             Proof = new[] { "Projection only", "Milestone-backed", "Not shipped truth" }
         },
         new
         {
             Badge = "Public signal",
-            Title = "Ideas and votes belong on the Fixer Board",
-            Summary = "Public ideas, votes, UX friction, and safe public bugs should enter the product loop on the feedback lane, not inside roadmap prose or support tickets.",
+            Title = "Ideas and votes belong on feedback",
+            Summary = "Public ideas, votes, UX friction, and safe public bugs should enter the loop on the feedback page, not inside roadmap prose or support tickets.",
             Href = "/feedback",
-            Label = "Open Fixer Board",
+            Label = "Open feedback",
             Proof = new[] { "Votes inform demand", "Safe public bugs", "No private logs" }
         },
         new
         {
-            Badge = "Shipped closeout",
+            Badge = "Shipped updates",
             Title = "Shipped only counts after evidence exists",
-            Summary = "When you need to know whether something actually shipped, leave roadmap and open the shipped-closeout lane backed by release, guide, route, or artifact proof.",
+            Summary = "When you need to know whether something actually shipped, leave roadmap and open the changelog backed by release, guide, live page, or artifact proof.",
             Href = "/changelog",
-            Label = "Open shipped closeout",
+            Label = "Open changelog",
             Proof = new[] { "Evidence first", "Release-linked", "User-available" }
         },
         new
         {
             Badge = "Private help",
-            Title = "Install, account, or campaign-sensitive issues leave this lane",
+            Title = "Install, account, or campaign-sensitive issues leave this page",
             Summary = "Crashes, install recovery, account access, and private campaign details should move to first-party help instead of sitting on the public roadmap or feedback board.",
             Href = "/contact#support-intake",
             Label = "Need private help instead?",
@@ -75,23 +75,35 @@
 <section class="roadmap-hero route-anchor-target" id="productlift-roadmap-projection">
     <div class="roadmap-hero__copy">
         <p class="eyebrow">Roadmap</p>
-        <h1 class="page-title">Milestones and public direction on one route</h1>
-        <p class="page-copy">Horizons explain what Chummer is trying to unlock. Milestones show the active delivery slices, the rough difficulty, what depends on what, and whether a team has already picked the work up.</p>
+        <h1 class="page-title">What looks likely next, and what is still only planned</h1>
+        <p class="page-copy">Horizons explain what Chummer is trying to unlock. Milestones show the active delivery slices, the rough difficulty, what depends on what, and which work is still only planned.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="#roadmap-milestones">Open milestone ledger</a>
-            <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse horizon lanes</a>
+            <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse horizons</a>
             <a class="button-like button-like--ghost" href="/now">Open what works today</a>
         </div>
     </div>
     <aside class="roadmap-hero__aside">
         <p class="roadmap-hero__kicker">How to read this page</p>
         <ul class="roadmap-hero__notes">
-            <li>Milestones are internal delivery slices, not public promises.</li>
-            <li>Horizons are the public-facing direction and readiness posture.</li>
-            <li>Use the live proof links before treating roadmap language as already shipped.</li>
+            <li>Milestones are delivery slices, not public promises.</li>
+            <li>Horizons are public direction and readiness posture.</li>
+            <li>Use live proof before treating roadmap language as already shipped.</li>
         </ul>
     </aside>
 </section>
+
+@if (signalProjection is not null)
+{
+    <section class="editorial-block">
+        <details class="details-drawer">
+            <summary>Planning and closeout guardrails</summary>
+            <div class="stacked-copy">
+                @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
+            </div>
+        </details>
+    </section>
+}
 
 <section class="roadmap-stats" aria-label="Roadmap snapshot">
     <article class="roadmap-stat">
@@ -112,30 +124,20 @@
     <article class="roadmap-stat">
         <span class="roadmap-stat__label">High difficulty</span>
         <strong class="roadmap-stat__value">@highDifficultyMilestones</strong>
-        <p class="roadmap-stat__summary">Multi-owner, multi-dependency work with broader coordination drag.</p>
+        <p class="roadmap-stat__summary">Bigger slices with more coordination and sequencing drag.</p>
     </article>
 </section>
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
-@if (signalProjection is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
-}
 
 <section class="roadmap-frame route-anchor-target" id="roadmap-signal">
     <div class="roadmap-frame__lead">
         <p class="eyebrow">Signal and follow-up</p>
-        <h2 class="editorial-title">Public signal, projected direction, shipped proof, and private help stay on different rails.</h2>
-        <p class="editorial-copy">Roadmap should help you understand direction fast. It should not pretend votes decide priorities, shipped means merely merged, or public signal can replace private support.</p>
+        <h2 class="editorial-title">Feedback, planning, shipped proof, and private help stay on different pages.</h2>
+        <p class="editorial-copy">Roadmap should help you understand direction fast. It should not pretend votes decide priorities, planned means shipped, or public feedback replaces private support.</p>
         @if (fromRoadmapAlias)
         {
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed the public roadmap alias</h3>
-                <p><code class="mono-receipt">/roadmap</code> is the first-party projection rail for direction and milestone pressure. It is not the shipped-proof rail and it is not the support queue.</p>
+                <p><code class="mono-receipt">/roadmap</code> is the first-party planning page for direction and milestone pressure. It is not the changelog and it is not the support queue.</p>
                 <div class="route-callout__proof">
                     <span>Projection only</span>
                     <span>Votes inform demand</span>
@@ -165,9 +167,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Route handoff</p>
-        <h2 class="editorial-title">Roadmap stays honest when it remains connected to public signal and shipped proof at the same time.</h2>
-        <p class="editorial-copy">This route should sit in the middle of the loop: it absorbs visible demand, exposes real milestone pressure, and keeps a direct contrast with evidence-backed closeout before any public promise language tightens.</p>
+        <p class="eyebrow">Page handoff</p>
+        <h2 class="editorial-title">Roadmap stays honest when it stays connected to feedback and shipped proof at the same time.</h2>
+        <p class="editorial-copy">This page should sit in the middle of the loop: it absorbs visible demand, exposes real milestone pressure, and keeps a direct contrast with evidence-backed shipped updates before any promise language tightens.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -193,7 +195,7 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Shipped contrast</span>
-            <h3>@signalLoop.ShippedFollowUpCount proof-backed closeout example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already exist on the separate shipped rail.</h3>
+            <h3>@signalLoop.ShippedFollowUpCount proof-backed shipped example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already exist on the separate changelog page.</h3>
             <p>Keep these examples nearby so roadmap language never drifts into shipped-claim territory before users can reach the result.</p>
             @if (shippedFollowUp.Length > 0)
             {
@@ -210,11 +212,11 @@
                     }
                 </div>
             }
-            <a class="editorial-strip__action" href="/changelog">Open shipped closeout</a>
+            <a class="editorial-strip__action" href="/changelog">Open changelog</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">Tracked follow-up</span>
-            <h3>Follow the loop from one calmer account rail when you want return paths, not just public reading.</h3>
+            <h3>Follow the loop from one calmer account place when you want return paths, not just public reading.</h3>
             <p>Account-aware follow-up keeps roadmap follows, install continuity, and support history attached to the same shell without turning account creation into the default public ask.</p>
             <div class="route-choice-card__proof">
                 <span>Roadmap follows</span>
@@ -238,7 +240,7 @@
         <article class="roadmap-empty">
             <span class="tag tag--quiet">Temporarily unavailable</span>
             <h3>Milestone detail is not loaded right now</h3>
-            <p>The roadmap view could not read the milestone registry on this request. The public horizon lanes below still reflect the broader direction.</p>
+            <p>The roadmap view could not read the milestone registry on this request. The public horizons below still reflect the broader direction.</p>
         </article>
     }
     else
@@ -290,8 +292,8 @@
 <section class="roadmap-frame" id="roadmap-horizons">
     <div class="roadmap-frame__lead">
         <p class="eyebrow">Direction map</p>
-        <h2 class="editorial-title">Public horizon lanes</h2>
-        <p class="editorial-copy">These are the outward-facing tracks. They explain who the work is for, what pain it is trying to remove, and which live route keeps the promise honest today.</p>
+        <h2 class="editorial-title">Public horizons</h2>
+        <p class="editorial-copy">These are the outward-facing tracks. They explain who the work is for, what pain it is trying to remove, and which live page keeps the promise honest today.</p>
     </div>
 
     <div class="roadmap-lanes">
@@ -358,7 +360,7 @@
                                 }
                                 @if (!string.IsNullOrWhiteSpace(item.Card.ProofNote))
                                 {
-                                    <p><strong>Closest live route:</strong> @item.Card.ProofNote</p>
+                                    <p><strong>Closest live page:</strong> @item.Card.ProofNote</p>
                                 }
                             </div>
                             <a class="editorial-strip__action" href="@item.Action.Href">@item.Action.Label</a>

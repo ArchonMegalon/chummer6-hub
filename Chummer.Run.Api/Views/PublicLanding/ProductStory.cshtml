@@ -39,7 +39,7 @@
     <article class="story-pain-grid__card">
         <span class="tag">Mystery math is expensive</span>
         <h2>Rules trust should be visible where the answer lands.</h2>
-        <p>Chummer matters when the table no longer has to choose between speed and inspectability. The answer, the current build, and the explanation trail stay on the same rail.</p>
+        <p>Chummer matters when the table no longer has to choose between speed and inspectability. The answer, the current build, and the explanation trail stay connected.</p>
     </article>
     <article class="story-pain-grid__card">
         <span class="tag">Campaign return should not depend on memory</span>
@@ -57,7 +57,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">The short answer</p>
         <h2 class="editorial-title">What it is, where it fits, why it is different, and who it helps</h2>
-        <p class="editorial-copy">Use this page to decide whether Chummer fits. Downloads, What works today, and Help carry the action routes.</p>
+        <p class="editorial-copy">Use this page to decide whether Chummer fits. Downloads, What works today, and Help carry the action pages.</p>
     </div>
     <div class="role-matrix__grid">
         <article class="role-matrix__cell">
@@ -78,7 +78,7 @@
         <article class="role-matrix__cell">
             <span class="tag">Who it helps</span>
             <h3>Players, GMs, and returning groups</h3>
-            <p>Each lane uses a different slice of the product, but the shared rules context, explanation trail, and support path stay aligned across the table.</p>
+            <p>Each audience uses a different slice of the product, but the shared rules context, explanation trail, and support path stay aligned across the table.</p>
         </article>
     </div>
 </section>
@@ -90,8 +90,3 @@
         Need help instead? <a class="inline-link" href="/help">Open the help hub</a>.
     </p>
 </section>
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}

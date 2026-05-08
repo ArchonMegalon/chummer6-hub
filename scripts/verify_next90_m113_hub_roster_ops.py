@@ -152,6 +152,55 @@ PROOF_MARKERS = [
 ]
 
 
+def normalize_legacy_queue_payload(raw: str) -> str:
+    """Normalize legacy malformed queue YAML so strict parsing can proceed."""
+
+    marker = raw.find("items:")
+    if marker >= 0:
+        raw = raw[marker:]
+
+    def is_key_line(candidate: str) -> bool:
+        text = candidate.lstrip()
+        if not text or text.startswith(("-", "?")):
+            return False
+        if ":" not in text:
+            return False
+        key, _, _ = text.partition(":")
+        return bool(key) and " " not in key and "\t" not in key
+
+    normalized: list[str] = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            normalized.append("")
+            continue
+        if (
+            normalized
+            and line.startswith(" ")
+            and not line.lstrip().startswith("-")
+            and not is_key_line(line)
+            and not line.strip().startswith("?")
+        ):
+            normalized[-1] = f"{normalized[-1]} {line.strip()}"
+        else:
+            normalized.append(line)
+
+    return "\n".join(normalized) + "\n"
+
+
+def load_queue_payload(path: Path) -> object:
+    raw = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(raw)
+        if payload is not None:
+            return payload
+    except yaml.YAMLError:
+        payload = yaml.safe_load(normalize_legacy_queue_payload(raw))
+        if payload is not None:
+            return payload
+    return {}
+
+
 def load_yaml(path: Path) -> object:
     with path.open("r", encoding="utf-8") as handle:
         return yaml.safe_load(handle)
@@ -162,7 +211,7 @@ def verify_queue_authority(missing: list[str], path: Path) -> None:
         missing.append(f"missing queue staging file: {path}")
         return
 
-    payload = load_yaml(path) or {}
+    payload = load_queue_payload(path) or {}
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list):
         missing.append(f"{path}: items is missing")

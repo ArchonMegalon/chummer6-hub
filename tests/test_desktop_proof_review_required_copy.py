@@ -24,15 +24,15 @@ class DesktopProofReviewRequiredCopyTests(unittest.TestCase):
 
         self.assertIn("Model.TrustPulse?.ParityClaimsReviewRequired == true", source)
         self.assertIn("publicationRouteReviewRequired", source)
-        self.assertIn("Why this publication stays on the review-required lane", source)
+        self.assertIn("Why this publication stays review-required", source)
         self.assertIn("public parity claims on the review-required lane", source)
 
     def test_publication_shelf_view_switches_discovery_copy_when_route_is_review_required(self) -> None:
         source = SHELF_VIEW.read_text(encoding="utf-8")
 
         self.assertIn("Model.TrustPulse?.ParityClaimsReviewRequired == true", source)
-        self.assertIn("Shared publications on the review-required lane", source)
-        self.assertIn("How review-required publications differ", source)
+        self.assertIn("Shared publications with limited public claims", source)
+        self.assertIn("These publications are visible now, but some public comparison language still needs one more review pass.", source)
         self.assertIn("public parity claims remain review-required until current direct parity proof receipts are green", source)
 
     def test_support_response_expectation_inherits_review_required_route_guard(self) -> None:

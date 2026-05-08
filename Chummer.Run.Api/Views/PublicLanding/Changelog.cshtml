@@ -27,8 +27,8 @@
 <section class="evidence-header route-anchor-target" id="productlift-shipped-closeout">
     <div class="page-lead">
         <p class="eyebrow">Changelog</p>
-        <h1 class="page-title">Shipped closeout with user-available proof</h1>
-        <p class="page-copy">This is the first-party shipped-closeout rail while the hosted public mirror stays secondary. Shipped means a user can actually reach the result through a release, route, guide, or artifact proof trail.</p>
+        <h1 class="page-title">Shipped updates with user-available proof</h1>
+        <p class="page-copy">Use this page when you want evidence that a person can actually reach the result through a release, live page, guide, or other visible proof.</p>
     </div>
     <div class="evidence-header__stats">
         <div>
@@ -46,42 +46,44 @@
     </div>
 </section>
 
+@if (signalProjection is not null)
+{
+    <section class="editorial-block">
+        <details class="details-drawer">
+            <summary>Shipped closeout guardrails</summary>
+            <div class="stacked-copy">
+                @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
+            </div>
+        </details>
+    </section>
+}
+
 <section class="status-decision-strip" aria-label="Shipped closeout rules">
     <article class="status-decision-strip__card">
         <span class="tag">Evidence first</span>
-        <h2>Shipped only counts when a user-facing proof trail exists.</h2>
-        <p>Release notes, live routes, artifacts, or guides need to carry the change before this rail should treat it as closed out.</p>
+        <h2>Shipped only counts when visible proof exists.</h2>
+        <p>Release notes, live pages, proof items, or guides need to carry the change before this page should treat it as closed out.</p>
         <a class="button-like button-like--ghost" href="/now">Open what works today</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Install path</span>
-        <h2>Closeout still has to land on the current install and recovery rail.</h2>
+        <h2>Shipped updates still have to land on the current install path.</h2>
         <p>Downloads, update posture, and help stay attached so shipped proof never floats away from the device path that matters.</p>
         <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag tag--amber">Private follow-up</span>
-        <h2>Support, installs, and account recovery leave the public closeout lane.</h2>
-        <p>When the issue needs logs, private account detail, or tracked support history, switch to first-party help instead of treating this rail like a ticket queue.</p>
+        <h2>Support, installs, and account recovery leave this public page.</h2>
+        <p>When the issue needs logs, private account detail, or tracked support history, switch to first-party help instead of treating the changelog like a ticket queue.</p>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </article>
 </section>
 
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
-@if (signalProjection is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
-}
-
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Loop return</p>
-        <h2 class="editorial-title">Closeout is strongest when it feeds back into the same public loop that created the demand.</h2>
-        <p class="editorial-copy">This route is not only a release diary. It is the evidence-backed return path that should clarify what pressure remains active, what movement is next, and where account-aware follow-up stays attached.</p>
+        <h2 class="editorial-title">The changelog is strongest when it clarifies what changed and what still comes next.</h2>
+        <p class="editorial-copy">This page is not only a release diary. It is the evidence-backed return path that should clarify what pressure remains active, what movement is next, and where account-aware follow-up stays attached.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -108,7 +110,7 @@
         <article class="route-choice-card">
             <span class="tag">Next movement</span>
             <h3>@signalLoop.RoadmapFollowUpCount named horizon@(signalLoop.RoadmapFollowUpCount == 1 ? string.Empty : "s") already frame what the next public movement is likely to be.</h3>
-            <p>Use the roadmap rail when you need to compare this shipped proof against what is still only direction.</p>
+            <p>Use roadmap when you need to compare this shipped proof against what is still only direction.</p>
             @if (roadmapFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -124,11 +126,11 @@
                     }
                 </div>
             }
-            <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse horizon lanes</a>
+            <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse roadmap</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">Tracked return</span>
-            <h3>Use the account rail once you want the closeout, install path, and future follow-up to keep returning to one place.</h3>
+            <h3>Use the account once you want changelog updates, install follow-up, and future returns in one place.</h3>
             <p>That keeps shipped proof, support history, and roadmap follows attached to the same calmer shell instead of scattering them across public reading surfaces.</p>
             <div class="route-choice-card__proof">
                 <span>Support history</span>
@@ -144,7 +146,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Shipped proof</p>
         <h2 class="editorial-title">The current preview already closes out a few real product claims.</h2>
-        <p class="editorial-copy">These are the capabilities that have enough user-facing proof to belong on the shipped rail instead of staying as roadmap language or internal notes.</p>
+        <p class="editorial-copy">These are the capabilities that have enough user-facing proof to belong in the changelog instead of staying as roadmap language or internal notes.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in shippedProof)
@@ -177,7 +179,7 @@
             <div class="home-stream__lead">
                 <p class="eyebrow">Closed out now</p>
                 <h2 class="home-stream__title">User-available outcomes</h2>
-                <p class="home-stream__summary">These items already have a live route or release-facing trail and belong on the shipped rail.</p>
+                <p class="home-stream__summary">These items already have a live page or release-facing trail and belong in the changelog.</p>
             </div>
             <div class="app-rail">
                 <article class="app-rail__item">
@@ -230,8 +232,8 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use the shipped rail to decide, then move to the right operational route.</h2>
-    <p class="editorial-copy">Install from Downloads, inspect direction on Roadmap, or leave the public rail for Help when the issue is private or recovery-bound.</p>
+    <h2 class="editorial-title">Use the changelog to decide, then move to the right next page.</h2>
+    <p class="editorial-copy">Install from Downloads, inspect direction on Roadmap, or leave this public page for Help when the issue is private or recovery-bound.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
         <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>

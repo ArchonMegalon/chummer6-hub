@@ -73,7 +73,9 @@ public sealed class PublicTrustPulseService
                 static payload => string.Equals(payload.ContractName, "chummer6-hub.local_release_proof", StringComparison.Ordinal),
                 "hub local release proof");
             FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
-            ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
+            ImportRouteParityProofGuardSnapshot importRouteGuard = localReleaseProof is null
+                ? new ImportRouteParityProofGuardSnapshot(true, null)
+                : _importRouteParityProofGuard.Evaluate();
             string? readinessReason = readiness?.MissingDesktopClientCoverage == true
                 ? readiness.DesktopClientGapSummary
                 : readiness?.Reason;

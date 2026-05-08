@@ -11,6 +11,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m115_hub_dossier_federation.py"
+PACKAGE_ID = "next90-m115-hub-dossier-federation-orchestration"
 SOURCE_FILES = [
     "Chummer.Run.Api/Contracts/CampaignFederationContracts.cs",
     "Chummer.Run.Api/Controllers/CampaignSpineController.cs",
@@ -54,12 +55,9 @@ class Next90M115HubDossierFederationTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
                 design_queue_path,
             )
-            queue_payload = yaml.safe_load(queue_path.read_text(encoding="utf-8"))
-            for item in queue_payload["items"]:
-                if item.get("package_id") == "next90-m115-hub-dossier-federation-orchestration":
-                    item["status"] = "in_progress"
-                    break
-            queue_path.write_text(yaml.safe_dump(queue_payload, sort_keys=False), encoding="utf-8")
+            item = self.load_queue_item(queue_path)
+            item["status"] = "in_progress"
+            self.write_queue_item(queue_path, item)
 
             result = self.run_verifier(temp_root, queue_path=queue_path, design_queue_path=design_queue_path)
 
@@ -104,6 +102,49 @@ class Next90M115HubDossierFederationTests(unittest.TestCase):
             target = temp_root / relative_path
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
+
+    @staticmethod
+    def load_queue_item(queue_path: Path) -> dict[str, object]:
+        text = queue_path.read_text(encoding="utf-8")
+        package_marker = f"package_id: {PACKAGE_ID}"
+        package_index = text.index(package_marker)
+        start = text.rfind("\n- title:", 0, package_index)
+        if start < 0:
+            if not text.startswith("- title:"):
+                raise ValueError(f"cannot locate queue item block for {PACKAGE_ID}")
+            start = 0
+        else:
+            start += 1
+
+        end = text.find("\n- title:", package_index)
+        if end < 0:
+            end = len(text)
+
+        block = text[start:end].rstrip() + "\n"
+        payload = yaml.safe_load(block)
+        if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+            raise ValueError(f"queue item block for {PACKAGE_ID} did not parse to exactly one mapping")
+        return payload[0]
+
+    @staticmethod
+    def write_queue_item(queue_path: Path, item: dict[str, object]) -> None:
+        text = queue_path.read_text(encoding="utf-8")
+        package_marker = f"package_id: {PACKAGE_ID}"
+        package_index = text.index(package_marker)
+        start = text.rfind("\n- title:", 0, package_index)
+        if start < 0:
+            if not text.startswith("- title:"):
+                raise ValueError(f"cannot locate queue item block for {PACKAGE_ID}")
+            start = 0
+        else:
+            start += 1
+
+        end = text.find("\n- title:", package_index)
+        if end < 0:
+            end = len(text)
+
+        replacement = yaml.safe_dump([item], sort_keys=False).rstrip() + "\n"
+        queue_path.write_text(text[:start] + replacement + text[end:], encoding="utf-8")
 
     def run_verifier(
         self,

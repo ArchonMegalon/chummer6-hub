@@ -61,17 +61,17 @@ class Next90M119HubFirstSessionOnboardingTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
                 design_queue_path,
             )
-            queue_payload = yaml.safe_load(queue_path.read_text(encoding="utf-8"))
+            queue_payload = self.load_queue_payload(queue_path)
             for item in queue_payload["items"]:
                 if item.get("package_id") == "next90-m119-hub-first-session-onboarding":
-                    item["status"] = "complete"
+                    item["status"] = "in_progress"
                     break
             queue_path.write_text(yaml.safe_dump(queue_payload, sort_keys=False), encoding="utf-8")
 
             result = self.run_verifier(temp_root, queue_path=queue_path, design_queue_path=design_queue_path)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("status must be 'in_progress'", result.stderr)
+        self.assertIn("status must be 'complete'", result.stderr)
 
     def test_verifier_fails_when_home_loses_starter_endpoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m119-home-") as temp_dir:
@@ -152,6 +152,39 @@ class Next90M119HubFirstSessionOnboardingTests(unittest.TestCase):
             stderr=subprocess.PIPE,
             text=True,
         )
+
+    @staticmethod
+    def load_queue_payload(path: Path) -> dict:
+        text = path.read_text(encoding="utf-8")
+        try:
+            payload = yaml.safe_load(text)
+        except yaml.YAMLError:
+            payload = None
+        if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+            return payload
+
+        package_marker = "package_id: next90-m119-hub-first-session-onboarding"
+        package_index = text.find(package_marker)
+        if package_index < 0:
+            raise AssertionError(f"queue staging is missing {package_marker}")
+
+        start = text.rfind("\n- title:", 0, package_index)
+        if start < 0:
+            if not text.startswith("- title:"):
+                raise AssertionError("queue staging is missing the target item block")
+            start = 0
+        else:
+            start += 1
+
+        end = text.find("\n- title:", package_index)
+        if end < 0:
+            end = len(text)
+
+        block = text[start:end].rstrip() + "\n"
+        payload = yaml.safe_load(block)
+        if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+            raise AssertionError("queue staging target block did not parse correctly")
+        return {"items": payload}
 
 
 if __name__ == "__main__":

@@ -1560,17 +1560,17 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             )
             queue_text = source_queue_path.read_text(encoding="utf-8")
             queue_text = queue_text.replace(
-                "    package_id: next90-m105-hub-workspace-continuity\n"
-                "    frontier_id: 4623636482\n"
-                "    milestone_id: 105\n"
-                "    wave: W8\n"
-                "    repo: chummer6-hub\n"
-                "    status: complete\n",
-                "    package_id: next90-m105-hub-workspace-continuity\n"
-                "    frontier_id: 4623636482\n"
-                "    milestone_id: 105\n"
-                "    wave: W8\n"
-                "    repo: chummer6-hub\n",
+                "  package_id: next90-m105-hub-workspace-continuity\n"
+                "  frontier_id: 4623636482\n"
+                "  milestone_id: 105\n"
+                "  wave: W8\n"
+                "  repo: chummer6-hub\n"
+                "  status: complete\n",
+                "  package_id: next90-m105-hub-workspace-continuity\n"
+                "  frontier_id: 4623636482\n"
+                "  milestone_id: 105\n"
+                "  wave: W8\n"
+                "  repo: chummer6-hub\n",
             )
             queue_path.write_text(queue_text, encoding="utf-8")
 
@@ -1606,7 +1606,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "    task: Make roaming workspace, entitlement replication, stale state, and conflict posture explicit and recoverable.\n",
+                "  task: Make roaming workspace, entitlement replication, stale state, and conflict posture explicit and recoverable.\n",
                 "",
                 1,
             )
@@ -1647,7 +1647,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer6-hub commit 4d4b3856 emits workspace_restore provenance receipts, entitlement_sync conflict receipts, stale claimed-install receipts, artifact drift receipts, authority planes, recovery hints, and block-continue posture.\n",
+                "  - /docker/chummercomplete/chummer6-hub commit 4d4b3856 emits workspace_restore provenance receipts, entitlement_sync conflict\n"
+                "    receipts, stale claimed-install receipts, artifact drift receipts, authority planes, recovery hints, and block-continue\n"
+                "    posture.\n",
                 "",
                 1,
             )
@@ -1685,21 +1687,21 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "    allowed_paths:\n"
-                "      - Chummer.Run.Api\n"
-                "      - scripts\n"
-                "      - tests\n"
-                "    owned_surfaces:\n"
-                "      - workspace_restore:provenance\n"
-                "      - entitlement_sync:conflict_receipts\n",
-                "    allowed_paths:\n"
-                "      - Chummer.Run.Api\n"
-                "      - scripts\n"
-                "      - tests\n"
-                "      - docs\n"
-                "    owned_surfaces:\n"
-                "      - workspace_restore:provenance\n"
-                "      - entitlement_sync:conflict_receipts\n",
+                "  allowed_paths:\n"
+                "  - Chummer.Run.Api\n"
+                "  - scripts\n"
+                "  - tests\n"
+                "  owned_surfaces:\n"
+                "  - workspace_restore:provenance\n"
+                "  - entitlement_sync:conflict_receipts\n",
+                "  allowed_paths:\n"
+                "  - Chummer.Run.Api\n"
+                "  - scripts\n"
+                "  - tests\n"
+                "  - docs\n"
+                "  owned_surfaces:\n"
+                "  - workspace_restore:provenance\n"
+                "  - entitlement_sync:conflict_receipts\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -1736,9 +1738,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
-                "      - /docker/chummercomplete/chummer6-hub/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs\n"
-                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
+                "  - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
+                "  - /docker/chummercomplete/chummer6-hub/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs\n"
+                "  - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -1775,9 +1777,9 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
-                "      - Review also cites /docker/chummercomplete/chummer6-hub/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs as proof.\n"
-                "      - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
+                "  - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
+                "  - Review also cites /docker/chummercomplete/chummer6-hub/Chummer.Tests/WorkspaceLifecyclePolicyServiceTests.cs as proof.\n"
+                "  - /docker/chummercomplete/chummer6-hub/scripts/verify_workspace_restore_receipts.py\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -1852,7 +1854,8 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                '      - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests" --no-restore\n',
+                '  - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests"\n'
+                '    --no-restore\n',
                 "",
                 1,
             )
@@ -2087,9 +2090,11 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
-                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
-                "      - TASK_LOCAL_TELEMETRY.generated.json active-run helper output\n",
+                "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
+                "    longer resolve locally.\n",
+                "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
+                "    longer resolve locally.\n"
+                "  - TASK_LOCAL_TELEMETRY.generated.json active-run helper output\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -2122,9 +2127,11 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
-                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n",
-                "      - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no longer resolve locally.\n"
-                "      - /docker/chummercomplete/chummer6-hub commit 00000000 is unresolved closure proof and must fail.\n",
+                "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
+                "    longer resolve locally.\n",
+                "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
+                "    longer resolve locally.\n"
+                "  - /docker/chummercomplete/chummer6-hub commit 00000000 is unresolved closure proof and must fail.\n",
                 1,
             )
             queue_path.write_text(queue_text, encoding="utf-8")
@@ -2161,8 +2168,8 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
                 "/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml"
             )
             design_queue_text = source_design_queue_path.read_text(encoding="utf-8").replace(
-                "    package_id: next90-m105-hub-workspace-continuity\n",
-                "    package_id: next90-m105-hub-workspace-continuity-removed\n",
+                "  package_id: next90-m105-hub-workspace-continuity\n",
+                "  package_id: next90-m105-hub-workspace-continuity-removed\n",
             )
             design_queue_path.write_text(design_queue_text, encoding="utf-8")
 

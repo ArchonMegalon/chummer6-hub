@@ -14,10 +14,9 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("Continuity cockpit", view, StringComparison.Ordinal);
         Assert.Contains("What changed for me", view, StringComparison.Ordinal);
         Assert.Contains("Use as guest or link this copy later.", view, StringComparison.Ordinal);
-        Assert.Contains("Keep the whole route in view, not just the current install.", view, StringComparison.Ordinal);
-        Assert.Contains("home-hub-and-registry", view, StringComparison.Ordinal);
-        Assert.Contains("home-mobile-play-shell", view, StringComparison.Ordinal);
-        Assert.Contains("home-ui-kit-and-flagship-polish", view, StringComparison.Ordinal);
+        Assert.Contains("Keep the whole product in view, not just the current install.", view, StringComparison.Ordinal);
+        Assert.Contains("Campaign workspace", view, StringComparison.Ordinal);
+        Assert.Contains("Build handoff", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -27,7 +26,7 @@ public sealed class SignedInShellContinuityViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("account-rail-snapshot", view, StringComparison.Ordinal);
-        Assert.Contains("Account rail", view, StringComparison.Ordinal);
+        Assert.Contains("Build follow-through", view, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay fallback only.", view, StringComparison.Ordinal);
         Assert.Contains("Do not turn this into a browser-first claim ritual.", view, StringComparison.Ordinal);
     }

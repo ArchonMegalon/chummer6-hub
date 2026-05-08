@@ -488,8 +488,12 @@ class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
         self.assertEqual("119.1", package["work_task_id"])
         self.assertEqual(119, package["milestone_id"])
         self.assertEqual(1130567614, package["frontier_id"])
-        self.assertEqual("in_progress", package["status"])
+        self.assertEqual("complete", package["status"])
+        self.assertEqual("TO_BE_FILLED_M119_COMMIT", package["landed_commit"])
+        self.assertEqual("verify_closed_package_only", package["completion_action"])
         self.assertEqual(["first_playable_session:onboarding", "starter_lane:hub"], package["owned_surfaces"])
+        self.assertIn("guided first-playable-session onboarding is complete", package["do_not_reopen_reason"])
+        self.assertIn("python3 scripts/verify_next90_m119_hub_first_session_onboarding.py", package["proof"])
 
         receipts = {
             receipt.get("receipt_id"): receipt
