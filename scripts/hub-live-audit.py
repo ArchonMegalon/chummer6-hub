@@ -1138,11 +1138,11 @@ def verify_signed_in_work_audit(
         )
         if status != 200:
             raise AssertionError(f"{signed_in_path} returned {status}, expected 200 for signed-in trust validation")
+        require_snippet(body, "Signed-in trust status", signed_in_path)
         require_snippet(body, "Recommended for this install", signed_in_path)
         require_snippet(body, "Install posture", signed_in_path)
-        require_snippet(body, "trust-pulse-trend__point", signed_in_path)
-        if body.count("Adoption health") < 2:
-            raise AssertionError(f"{signed_in_path} should surface adoption health in both the install-specific trust panel and the weekly trust pulse")
+        require_snippet(body, "Adoption health", signed_in_path)
+        require_snippet(body, "Current caution", signed_in_path)
 
     status, body, _, _ = fetch(
         base_url,
@@ -6398,9 +6398,9 @@ def verify_signed_in_work_audit(
     require_snippet(body, "Operations pulse", "/account/work")
     require_snippet(body, "League / season operations", "/account/work")
     require_snippet(body, "Season / event pulse", "/account/work")
-    require_snippet(body, "Season &amp; event rail", "/account/work")
+    require_snippet(body, "Season &amp; event activity", "/account/work")
     require_snippet(body, "Season board", "/account/work")
-    require_snippet(body, "Invite &amp; sponsorship rail", "/account/work")
+    require_snippet(body, "Invite &amp; sponsorship", "/account/work")
     require_snippet(body, "Issue governed join code", "/account/work")
     require_snippet(body, "Issue governed boost code", "/account/work")
     require_snippet(body, "Recent join codes", "/account/work")
@@ -6411,8 +6411,8 @@ def verify_signed_in_work_audit(
     require_snippet(body, post_transfer_operation["leagueOperationsSummary"], "/account/work")
     require_snippet(body, refreshed_sponsor_session["userDisplayName"], "/account/work")
     require_snippet(body, refreshed_sponsor_session["campaignName"], "/account/work")
-    require_snippet(body, "Member guidance rail", "/account/work")
-    require_snippet(body, "Open shared campaign view", "/account/work")
+    require_snippet(body, "Member guidance", "/account/work")
+    require_snippet(body, "Review trust snapshot", "/account/work")
     require_snippet(body, "Open current release", "/account/work")
     require_snippet(body, "Open downloads", "/account/work")
     require_snippet(body, "Open help and trust", "/account/work")
@@ -6454,11 +6454,11 @@ def verify_signed_in_work_audit(
     require_snippet(body, "League:", "/home/work")
     require_snippet(body, "Invites:", "/home/work")
     require_snippet(body, "Sponsors:", "/home/work")
-    require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same operator rail.", "/home/work")
-    require_snippet(body, "Open league rail", "/home/work")
+    require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same operator view.", "/home/work")
+    require_snippet(body, "Open league tools", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
-    require_snippet(body, "Open invite rail", "/home/work")
-    require_snippet(body, "Open sponsor rail", "/home/work")
+    require_snippet(body, "Open invite tools", "/home/work")
+    require_snippet(body, "Open sponsor tools", "/home/work")
     require_snippet(body, "Open member guidance", "/home/work")
     require_snippet(body, "Consequence watch", "/home/work")
     require_snippet(body, prep_launch["packetTitle"], "/home/work")
@@ -6610,7 +6610,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Campaign memory", "Return lane"),
+        required_texts=("Campaign memory", "Return path"),
     )
     fetch_fragment_target(
         base_url,
@@ -6626,7 +6626,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Member guidance rail", "Current preview posture"),
+        required_texts=("Member guidance", "Current preview posture"),
     )
     fetch_fragment_target(
         base_url,
@@ -6642,7 +6642,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Season board", "Open shared campaign view"),
+        required_texts=("Season board", "Open campaign workspace"),
     )
     fetch_fragment_target(
         base_url,
@@ -6650,7 +6650,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Invite &amp; sponsorship rail", "Issue governed join code", "Issue governed boost code"),
+        required_texts=("Invite &amp; sponsorship", "Issue governed join code", "Issue governed boost code"),
     )
     fetch_fragment_target(
         base_url,
