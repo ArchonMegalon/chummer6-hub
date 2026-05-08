@@ -1,106 +1,19 @@
 {
-  "active_slice": {
-    "id": "baseline:character_roster_multi_character_flow",
-    "implementation_path": [
-      "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/CharacterRosterControl.axaml",
-      "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/CharacterRosterControl.axaml.cs",
-      "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/CharacterRosterDataBinder.cs",
-      "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/MainWindow.ControlBinding.cs",
-      "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/MainWindow.ShellFrameProjector.cs",
-      "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/MainWindow.StateRefresh.cs",
-      "/docker/chummercomplete/chummer-presentation/Chummer.Presentation/Overview/CharacterOverviewState.cs"
-    ],
-    "oracle_source": [
-      "/docker/fleet/docs/chummer5a-oracle/parity_lab_capture_pack.yaml",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_MUSCLE_MEMORY_INVENTORY.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_DESKTOP_WORKFLOW_PARITY.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/SR4_DESKTOP_WORKFLOW_PARITY.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/SR6_DESKTOP_WORKFLOW_PARITY.generated.json"
-    ],
-    "priority": 0,
-    "raw": {
-      "category": "baseline_surface",
-      "current_status": "partial",
-      "difference_kind": "temporary",
-      "expected_behavior": "The screenshot baseline and matching runtime interaction proof are both present.",
-      "expected_visual_structure": "The screenshot baseline and matching runtime interaction proof are both present.",
-      "id": "baseline:character_roster_multi_character_flow",
-      "implementation_path": [
-        "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/CharacterRosterControl.axaml",
-        "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/CharacterRosterControl.axaml.cs",
-        "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/Controls/CharacterRosterDataBinder.cs",
-        "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/MainWindow.ControlBinding.cs",
-        "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/MainWindow.ShellFrameProjector.cs",
-        "/docker/chummercomplete/chummer-presentation/Chummer.Avalonia/MainWindow.StateRefresh.cs",
-        "/docker/chummercomplete/chummer-presentation/Chummer.Presentation/Overview/CharacterOverviewState.cs"
-      ],
-      "oracle_source": [
-        "/docker/fleet/docs/chummer5a-oracle/parity_lab_capture_pack.yaml",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_MUSCLE_MEMORY_INVENTORY.generated.json"
-      ],
-      "priority": 0,
-      "reason": "The screenshot baseline and matching runtime interaction proof are both present. Seed inventory requires explicit implementation and test mapping. Known owner-repo roster surface files and roster parity guard tests are pre-mapped.",
-      "remaining_differences": [
-        "OpenWorkspaces -> RosterItems binding still needs explicit runtime verification",
-        "profile tab wiring still needs explicit classic roster parity verification"
-      ],
-      "screenshot_artifact_path": [
-        "/docker/fleet/docs/chummer5a-oracle/parity_lab_capture_pack.yaml",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_MUSCLE_MEMORY_INVENTORY.generated.json"
-      ],
-      "test_coverage": [
-        "/docker/chummercomplete/chummer-presentation/Chummer.Tests/Presentation/CharacterRosterStructureParityGuardTests.cs",
-        "/docker/chummercomplete/chummer-presentation/Chummer.Tests/Compliance/CharacterRosterStructureParityGuardTests.cs"
-      ],
-      "title": "Character Roster Multi Character Flow",
-      "user_visible_surface": true,
-      "workflow_artifact_path": [
-        "/docker/fleet/docs/chummer5a-oracle/parity_lab_capture_pack.yaml",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json",
-        "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_MUSCLE_MEMORY_INVENTORY.generated.json"
-      ]
-    },
-    "reason": "The screenshot baseline and matching runtime interaction proof are both present. Seed inventory requires explicit implementation and test mapping. Known owner-repo roster surface files and roster parity guard tests are pre-mapped.",
-    "screenshot_or_workflow_proof": [
-      "/docker/fleet/docs/chummer5a-oracle/parity_lab_capture_pack.yaml",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json",
-      "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_MUSCLE_MEMORY_INVENTORY.generated.json"
-    ],
-    "status": "partial",
-    "test_coverage": [
-      "/docker/chummercomplete/chummer-presentation/Chummer.Tests/Presentation/CharacterRosterStructureParityGuardTests.cs",
-      "/docker/chummercomplete/chummer-presentation/Chummer.Tests/Compliance/CharacterRosterStructureParityGuardTests.cs"
-    ],
-    "title": "Character Roster Multi Character Flow",
-    "user_visible_surface": true
-  },
+  "active_slice": null,
   "external_blocker": false,
   "gate_results": [],
-  "generated_at": "2026-05-07T09:06:08Z",
+  "generated_at": "2026-05-08T15:45:14Z",
   "git": {
     "ahead": null,
     "behind": null,
-    "clean": false,
-    "committed_and_pushed": false,
+    "clean": true,
+    "committed_and_pushed": true,
     "is_repo": true,
-    "reason": "working_tree_dirty",
-    "upstream": ""
+    "reason": "",
+    "upstream": "origin/main"
   },
   "inventory_path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/PARITY_INVENTORY.generated.json",
-  "parity_done": false,
+  "parity_done": true,
   "repo_root": "/docker/chummercomplete/chummer-presentation",
   "requested_inventory_path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/PARITY_INVENTORY.generated.json",
   "required_gates": [],

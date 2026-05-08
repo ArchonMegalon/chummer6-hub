@@ -10,6 +10,9 @@ public sealed class PublicCanonMirrorDriftTests
     [InlineData("PUBLIC_FEATURE_REGISTRY.yaml")]
     [InlineData("PUBLIC_DOWNLOADS_POLICY.md")]
     [InlineData("PUBLIC_LANDING_POLICY.md")]
+    [InlineData("WEEKLY_PRODUCT_PULSE.generated.json")]
+    [InlineData("NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")]
+    [InlineData("NEXT_90_DAY_QUEUE_STAGING.generated.yaml")]
     [InlineData("horizons/black-ledger.md")]
     public void RunServicesPublicMirrorMatchesCanonicalChummerDesignSource(string relativePath)
     {
