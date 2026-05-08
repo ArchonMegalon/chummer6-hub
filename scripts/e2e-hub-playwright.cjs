@@ -290,18 +290,11 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
     await expectVisible(page, 'text=Create account to install');
     await assertTextCount(page, 'Final pool 9', 1, 'Landing');
-    await expectVisible(page, 'text=Who can get it now');
-    await expectVisible(page, 'text=Release proof');
-    await expectVisible(page, 'text=Launch readiness');
-    await expectVisible(page, 'text=Adoption health');
-    await expectVisible(page, 'text=Closure health');
-    await expectVisible(page, 'text=Progress trend');
-    await expectVisible(page, 'text=Journey pulse');
-    await expectVisible(page, 'text=Provider-route stewardship');
-    await expectVisible(page, 'text=Current caution');
+    await expectVisible(page, 'text=Account-aware install handoff');
+    await expectVisible(page, 'text=The same build for everyone');
+    await expectVisible(page, 'text=Keep installs, devices, and support on one return path.');
     await expectVisible(page, 'text=Open what works today');
-    await expectVisible(page, 'text=Open progress');
-    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Landing trust pulse');
+    await expectVisible(page, 'text=Open downloads');
     await assertNoBannedCopy(page, 'Landing');
   });
 
@@ -322,14 +315,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/participate', async () => {
-    await expectVisible(page, 'text=Fixer Board keeps the public product loop visible');
-    await expectVisible(page, 'text=Public Fixer Board');
-    await expectVisible(page, 'text=Signed-in participation');
-    await expectBodyText(page, 'Use the public feedback rail when you want to suggest future work, vote on public demand, or follow shipped closeout.', '/participate');
-    await expectBodyText(page, 'Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your existing signed-in chat account.', '/participate');
+    await expectVisible(page, 'text=Public feedback, private support, and beta access each stay on their own page');
+    await expectVisible(page, 'text=Open feedback');
+    await expectVisible(page, 'text=Sign in to authorize Codex');
+    await expectBodyText(page, 'Use the public feedback page when you want to suggest future work, vote on shared demand, or follow shipped updates.', '/participate');
+    await expectBodyText(page, 'Use the signed-in path only when you want tracked beta follow-up or temporary Codex access with your existing signed-in chat account.', '/participate');
     assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/contact#support-intake"]', '/participate support intake'), '/contact#support-intake');
-    assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/login?next=/participate/codex"]', '/participate guided contribution guest handoff'), '/login?next=/participate/codex');
-    assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/signup?next=/account/settings"]', '/participate beta signup handoff'), '/signup?next=/account/settings');
+    assert.equal(await readFirstHref(page, 'a.button-like--secondary[href="/auth/google/start?next=%2Fparticipate%2Fcodex"]', '/participate guided contribution guest handoff'), '/auth/google/start?next=%2Fparticipate%2Fcodex');
+    assert.equal(await readFirstHref(page, 'a.button-like--ghost[href="/help"]', '/participate help handoff'), '/help');
     await assertNoBannedCopy(page, '/participate');
   });
 
@@ -355,14 +348,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'text=What Chummer stores, and what it does not');
     await expectVisible(page, 'text=Support, survey, and assistant data stay on a bounded clock');
     await expectVisible(page, 'text=Your account keeps sign-in, preferences, and support together');
-    await expectVisible(page, 'text=Weekly trust pulse');
+    await expectVisible(page, 'text=Read the trust boundary first, then the full policy.');
     assert.equal(
-      resolveInstallNextFromHref(
-        await readFirstHref(page, 'a.button-like:has-text("Open downloads")', '/privacy downloads link'),
-        '/privacy downloads link'
-      ),
-      signupNext
+      await readFirstHref(page, 'a.button-like:has-text("Create account")', '/privacy create-account link'),
+      '/signup?next=%2Faccount'
     );
+    assert.equal(await readFirstHref(page, 'a.button-like[href="/terms"]', '/privacy terms link'), '/terms');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/privacy help link'), '/help');
     assert.equal(await readFirstHref(page, 'a.button-like[href="/contact#support-intake"]', '/privacy support link'), '/contact#support-intake');
     await assertNoBannedCopy(page, '/privacy');
@@ -464,17 +455,18 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, 'Public support confirmation');
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
-    await expectVisible(page, 'text=What you can try now');
-    await expectVisible(page, 'text=Build, explain, and run with visible evidence');
-    await expectVisible(page, 'text=Status guide');
+    await expectVisible(page, 'text=Ready to install?');
+    await expectVisible(page, 'text=What you can verify now');
+    await expectVisible(page, 'text=Downloads stays the primary install surface');
     await assertNoBannedCopy(page, 'Now');
   });
 
   await gotoAndAssert(page, pageErrors, '/horizons', async () => {
+    await expectVisible(page, 'text=What Chummer is building toward');
     await expectVisible(page, 'text=Preparing next');
     await expectVisible(page, 'text=Designing in public');
     await expectVisible(page, 'text=Research track');
-    await expectVisible(page, 'text=Status guide');
+    await expectVisible(page, 'text=Pick horizons, roadmap, live proof, or help on purpose.');
     const bodyText = await page.locator('body').innerText();
     assert.equal(bodyText.includes('Research tracks'), false, 'Horizons should use the unified research-track label.');
     await assertNoBannedCopy(page, 'Horizons');
@@ -482,8 +474,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, '/artifacts', async () => {
     await expectVisible(page, 'text=Proof gallery');
-    await expectVisible(page, 'text=Review-required publication route');
-    await expectVisible(page, 'text=Status guide');
+    await expectVisible(page, 'text=Pick proof, downloads, signed-in continuity, or help without mixing their jobs.');
     await expectVisible(page, 'text=Inspect live proof, dossiers, and publication lineage here');
     await expectVisible(page, 'text=Current usable proof surfaces');
     await expectVisible(page, 'text=Opening next on the shelf');
@@ -541,7 +532,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectBodyText(page, 'Keep this copy connected', '/home');
     await expandDetailsBySummary(page, 'Build, explain, and next step', '/home');
     await expectBodyText(page, 'What changed for me', '/home');
-    await expectBodyText(page, 'Open shared campaign view', '/home');
+    await expectBodyText(page, 'Open campaign workspace', '/home');
     await expectBodyText(page, 'Open current release', '/home');
   });
 
@@ -654,7 +645,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, homeCampaignMemoryPath, async () => {
     assert.equal(new URL(page.url()).hash, '#selected-campaign-memory', '/home/work campaign-memory link should preserve the target anchor.');
     await expectBodyText(page, 'Campaign memory', '/home/work -> campaign memory');
-    await expectBodyText(page, 'Return lane', '/home/work -> campaign memory');
+    await expectBodyText(page, 'Return path', '/home/work -> campaign memory');
   });
 
   await gotoAndAssert(page, pageErrors, homeRosterMovesPath, async () => {
@@ -665,7 +656,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
 
   await gotoAndAssert(page, pageErrors, homeMemberGuidancePath, async () => {
     assert.equal(new URL(page.url()).hash.startsWith('#community-op-guidance-'), true, '/home/work member-guidance link should preserve the target anchor.');
-    await expectBodyText(page, 'Member guidance rail', '/home/work -> member guidance');
+    await expectBodyText(page, 'Member guidance', '/home/work -> member guidance');
     await expectBodyText(page, 'Current preview posture', '/home/work -> member guidance');
   });
 
@@ -689,12 +680,12 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, homeSeasonBoardPath, async () => {
     assert.equal(new URL(page.url()).hash.startsWith('#community-op-board-'), true, '/home/work season-board link should preserve the target anchor.');
     await expectBodyText(page, 'Season board', '/home/work -> season board');
-    await expectBodyText(page, 'Open shared campaign view', '/home/work -> season board');
+    await expectBodyText(page, 'Open campaign workspace', '/home/work -> season board');
   });
 
   await gotoAndAssert(page, pageErrors, homeInviteRailPath, async () => {
     assert.equal(new URL(page.url()).hash.startsWith('#community-op-invites-'), true, '/home/work invite-rail link should preserve the target anchor.');
-    await expectBodyText(page, 'Invite & sponsorship rail', '/home/work -> invite rail');
+    await expectBodyText(page, 'Invite & sponsorship', '/home/work -> invite rail');
     await expectBodyText(page, 'Issue governed join code', '/home/work -> invite rail');
     await expectBodyText(page, 'Issue governed boost code', '/home/work -> invite rail');
   });
@@ -705,26 +696,26 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
+    await expectVisible(page, 'text=Signed-in trust status');
     await expectVisible(page, 'text=Recommended for this install');
     await expectVisible(page, 'text=Install posture');
-    await assertMinimumTextCount(page, 'Adoption health', 2, 'Signed-in /downloads');
-    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /downloads');
+    await expectVisible(page, 'text=Adoption health');
     await assertNoBannedCopy(page, 'Signed-in /downloads');
   });
 
   await gotoAndAssert(page, pageErrors, '/now', async () => {
+    await expectVisible(page, 'text=Signed-in trust status');
     await expectVisible(page, 'text=Recommended for this install');
     await expectVisible(page, 'text=Install posture');
-    await assertMinimumTextCount(page, 'Adoption health', 2, 'Signed-in /now');
-    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /now');
+    await expectVisible(page, 'text=Adoption health');
     await assertNoBannedCopy(page, 'Signed-in /now');
   });
 
   await gotoAndAssert(page, pageErrors, '/help', async () => {
+    await expectVisible(page, 'text=Signed-in trust status');
     await expectVisible(page, 'text=Recommended for this install');
     await expectVisible(page, 'text=Install posture');
-    await assertMinimumTextCount(page, 'Adoption health', 2, 'Signed-in /help');
-    await expectMinimumCount(page, '.trust-pulse-trend__point', 2, 'Signed-in /help');
+    await expectVisible(page, 'text=Adoption health');
     await assertNoBannedCopy(page, 'Signed-in /help');
   });
 

@@ -84,7 +84,7 @@ Read:
 27. `METRICS_AND_SLOS.yaml`
 28. `PRODUCT_USAGE_TELEMETRY_MODEL.md`
 29. `PRODUCT_USAGE_TELEMETRY_EVENT_SCHEMA.md`
-30. `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md`
+30. `NEXT_12_BIGGEST_WINS_GUIDE.md`
 31. `LEGACY_CLIENT_AND_ADJACENT_PARITY.md`
 32. `CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md`
 
@@ -98,7 +98,7 @@ Read:
 * What are the next confidence/readiness/continuity bets? -> `CONFIDENCE_READINESS_AND_CONTINUITY_GUIDE.md` and `CONFIDENCE_READINESS_AND_CONTINUITY_REGISTRY.yaml`
 * What are the next action-economy, adoption, prep, and consequence proofs? -> `LIVE_ACTION_ECONOMY_AND_TURN_ASSIST.md`, `CAMPAIGN_ADOPTION_WIZARD.md`, `PREP_PACKET_FACTORY_AND_PROCEDURAL_TABLES.md`, and `BLACK_LEDGER_MVP_001.md`
 * How do support packets become part of the product experience instead of a sidecar form? -> `SUPPORT_PACKET_AND_CALCULATION_REPORT_UX.md` and `FEEDBACK_AND_CRASH_REPORTING_SYSTEM.md`
-* What just closed and what is next? -> `POST_AUDIT_NEXT_20_BIG_WINS_CLOSEOUT.md` and `NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md`
+* What just closed and what is next? -> `POST_AUDIT_NEXT_20_BIG_WINS_CLOSEOUT.md` and `NEXT_12_BIGGEST_WINS_GUIDE.md`
 * What still makes the campaign OS feel unproven or uneven? -> `CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md`
 * How do we avoid Chummer6 becoming a step back from Chummer4, Chummer5a, Hero Lab, Genesis, or CommLink-class clients? -> `LEGACY_CLIENT_AND_ADJACENT_PARITY.md` and `LEGACY_CLIENT_AND_ADJACENT_PARITY_REGISTRY.yaml`
 * Which journeys must every release wave keep passable? -> `GOLDEN_JOURNEY_RELEASE_GATES.yaml`
