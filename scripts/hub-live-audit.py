@@ -11880,22 +11880,13 @@ def main() -> int:
             "/",
             "Build a runner, explain every ruling, and recover the campaign.",
             required_texts=(
-                "Open downloads",
+                "Downloads",
                 "Create account and install",
                 "Account-aware install handoff",
                 "Final pool 9",
-                "Who can get it now",
-                "Release proof",
-                "Launch readiness",
-                "Adoption health",
-                "Closure health",
-                "Progress trend",
-                "Journey pulse",
-                "Provider-route stewardship",
-                "Current caution",
-                "trust-pulse-trend__point",
-                "Open what works today",
-                "Open progress"),
+                "What works today",
+                "Open downloads",
+                "Create the account that keeps your place"),
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
@@ -11913,34 +11904,34 @@ def main() -> int:
         AuditRoute(
             "/now",
             "What works today and what still needs caution",
-            required_texts=("What you can try now", "Build, explain, and run with visible evidence", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point", "Status guide"),
+            required_texts=("Ready to install?", "What you can verify now", "Downloads stays the primary install surface", "Load Demo Runner", "Open downloads"),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install the current preview",
-            required_texts=("Sign in", "Create account to install", "Advanced download options", "Release notes, known issues, and requirements", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"),
+            required_texts=("Sign in", "Create account to install", "Advanced download options", "Release notes, known issues, and requirements", "Load Demo Runner"),
             forbidden_texts=("Package details",),
             expects_header_count=1),
-        AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Status guide"), forbidden_texts=("Research tracks",), expects_header_count=1),
-        AuditRoute("/artifacts", "Proof gallery", required_texts=("Available today", "Preview in progress", "Status guide", "Inspect proof gallery"), expects_header_count=1),
+        AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Open what works today"), forbidden_texts=("Research tracks",), expects_header_count=1),
+        AuditRoute("/artifacts", "Proof gallery", required_texts=("Available today", "Preview in progress", "Open downloads", "Proof gallery"), expects_header_count=1),
         AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "What this live artifact does, who it helps, and where to go next", "Start from the live surface", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/ghostwire", "GHOSTWIRE", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/black-ledger", "BLACK LEDGER", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Anyone evaluating the preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/ghostwire", "GHOSTWIRE", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Anyone evaluating the preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute("/roadmap/black-ledger", "BLACK LEDGER", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Anyone evaluating the preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute(
             "/participate",
-            "Fixer Board keeps the public product loop visible",
+            "Public feedback, private support, and beta access each stay on their own page",
             required_texts=(
                 "Public ideas and safe bug reports",
-                "Public direction stays visible without becoming source truth",
-                "Open Fixer Board",
+                "Feedback, roadmap, and shipped updates stay visible without pretending to be the same thing.",
+                "Open feedback",
                 "Open shipped updates",
                 "Open support intake",
                 "/contact#support-intake",
                 "/auth/google/start?next=%2Fparticipate%2Fcodex",
-                "Hosted signal mirroring stays public-only."),
+                "hosted mirroring remains incomplete"),
             expects_header_count=1),
-        AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Who can get it now", "Progress trend", "Adoption health", "trust-pulse-trend__point"), expects_header_count=1),
+        AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Downloads and setup stay clear", "Open support intake", "Sign in and recover access"), expects_header_count=1),
         AuditRoute(
             "/faq",
             "Plain answers before you spend more time",
@@ -11957,18 +11948,18 @@ def main() -> int:
             "What Chummer stores, and what it does not",
             required_texts=(
                 "Support, survey, and assistant data stay on a bounded clock",
-                "Weekly trust pulse",
-                "Open downloads",
-                "Open help"),
+                "Privacy boundary",
+                "Open support intake",
+                "Privacy and recognition"),
             expects_header_count=1),
         AuditRoute(
             "/terms",
             "Preview terms in plain language",
             required_texts=(
-                "Weekly trust pulse",
                 "Open downloads",
-                "Open help",
-                "Sign in"),
+                "Sign in",
+                "what works today",
+                "current cautions"),
             expects_header_count=1),
         AuditRoute("/robots.txt", "Disallow: /"),
     ]
@@ -12054,7 +12045,7 @@ def main() -> int:
         or final_url.rstrip("/").endswith("/status")
     ):
         raise AssertionError("/status did not resolve to /now or serve the equivalent direct route")
-    for snippet in ("Status guide", "Progress trend", "Adoption health"):
+    for snippet in ("Live proof", "Proof freshness", "Adoption health"):
         require_snippet(body, snippet, "/status")
     print(f"ok /status -> {final_url}")
 
