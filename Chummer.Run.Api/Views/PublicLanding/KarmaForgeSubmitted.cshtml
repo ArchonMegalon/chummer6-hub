@@ -24,15 +24,6 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="trust-rail-section">
     <div class="editorial-block__lead">
         <p class="eyebrow">What happened</p>
@@ -71,7 +62,7 @@
     <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE receipt sections">
         <a href="#next-questions">Next questions</a>
         <a href="#next-steps">Next steps</a>
-        <a href="#packet-json">Packet artifacts</a>
+        <a href="#packet-json">Saved packet data</a>
     </aside>
     <div class="trust-page-sections">
         <article class="trust-page-section" id="next-questions">
@@ -87,7 +78,7 @@
         </article>
 
         <article class="trust-page-section" id="next-steps">
-            <p class="eyebrow">Chummer-owned route</p>
+            <p class="eyebrow">What happens next</p>
             <h2>What should happen before any implementation talk</h2>
             <p>These next steps are attached to the normalized HouseRuleDemandPacket, not left as loose operator memory.</p>
             <ul class="trust-page-section__list">
@@ -100,11 +91,11 @@
         </article>
 
         <article class="trust-page-section" id="packet-json">
-            <p class="eyebrow">Packet artifacts</p>
+            <p class="eyebrow">Saved packet data</p>
             <h2>The normalized outputs are visible here</h2>
             <p>These JSON previews are Chummer-owned packet shapes. They are the durable intake truth for this submission, not raw interview notes.</p>
 
-            <details class="details-drawer" open>
+            <details class="details-drawer">
                 <summary>HouseRuleDemandPacket</summary>
                 <pre>@Model.PacketJson</pre>
             </details>

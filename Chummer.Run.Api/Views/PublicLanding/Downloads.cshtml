@@ -17,6 +17,8 @@
     var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0;
     var showPlatformShelf = release.PlatformAvailability.Count > 0;
     var hasAdvancedPanels = hasAdvancedDownloads || hasSignedInWindowsBuilds || hasWindowsProofRail;
+    var returningUserLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
+    var returningUserHref = Model.Chrome.Authenticated ? "/account/access" : "/auth/google/start?next=%2Fdownloads";
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
         .Concat(release.Alternatives)
         .Concat(release.OtherPlatforms)
@@ -60,7 +62,7 @@
                 ? requestedWindowsUnavailable && hasSignedInWindowsBuilds
                     ? "Windows is not promoted for guests on the current public shelf, but signed-in users can still open the latest Windows build below."
                     : requestedWindowsUnavailable && hasWindowsProofRail
-                        ? "Windows is not promoted for this browser on the current public shelf. Check the main platform downloads below, and use the Windows verification rail only if support points you there."
+                        ? "Windows is not promoted for this browser on the current public shelf. Check the main platform downloads below, and use the Windows verification page only if support points you there."
                     : release.PlatformShelfNoticeSummary
                 : recommendedUsesMacSetupScript
                         ? "On macOS, the default path is the signed-in setup handoff. It gives you one Terminal command for this install."
@@ -120,9 +122,9 @@ else
                         <p>The app can still start as guest or attach this installed copy to your account when you are ready.</p>
                     </article>
                     <article class="recommended-download__trustfact">
-                        <span>Recovery rail</span>
+                        <span>Recovery path</span>
                         <strong>Devices and access stay calm</strong>
-                        <p>Relink, reclaim, and recovery belong on the account rail after the installer or app does the real work.</p>
+                        <p>Relink, reclaim, and recovery belong on the account page after the installer or app does the real work.</p>
                     </article>
                 </div>
                 <div class="stacked-actions">
@@ -136,12 +138,12 @@ else
                         }
                         else if (requestedWindowsUnavailable && hasWindowsProofRail)
                         {
-                            <a class="button-like button-like--ghost" href="#windows-verification-rail">Open Windows verification rail</a>
+                            <a class="button-like button-like--ghost" href="#windows-verification-rail">Open Windows verification page</a>
                         }
                         <details class="release-accordion">
                             <summary>Release notes, known issues, and requirements</summary>
                             <div class="release-accordion__body">
-                                <p class="muted-copy">This platform is not on the current public shelf, but the release notes, known issues, and install help still stay attached to the same release rail.</p>
+                                <p class="muted-copy">This platform is not on the current public shelf, but the release notes, known issues, and install help still stay attached to the same downloads page.</p>
                                 <div class="stacked-actions">
                                     <a class="button-like button-like--ghost" href="/now">Open current release</a>
                                     <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
@@ -153,15 +155,14 @@ else
                     else if (guestGateRequired)
                     {
                         <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
-                        <a class="button-like button-like--secondary" href="@release.GuestGateSecondaryHref">@release.GuestGateSecondaryLabel</a>
+                        <a class="button-like button-like--secondary" href="@returningUserHref">@returningUserLabel</a>
+                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
                     else
                     {
                         <a class="button-like button-like--primary" href="@release.Recommended.DispatchHref">@release.Recommended.ActionLabel</a>
-                        @if (!Model.Chrome.Authenticated)
-                        {
-                            <a class="button-like button-like--secondary" href="/auth/google/start?next=%2Fdownloads">Already have an account? Sign in</a>
-                        }
+                        <a class="button-like button-like--secondary" href="@returningUserHref">@returningUserLabel</a>
+                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
                 </div>
                 @if (!requestedPlatformUnavailable)
@@ -171,11 +172,6 @@ else
                             ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
                             : "After install, open Chummer and use Load Demo Runner to inspect the bundled Soma-Career.chum5 sample before starting blank.")
                     </p>
-                    <div class="stacked-actions">
-                        <a class="button-like button-like--ghost" href="/now">Open current release</a>
-                        <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
-                        <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
-                    </div>
                     <details class="release-accordion">
                         <summary>Release notes, known issues, and requirements</summary>
                         <div class="release-accordion__body">
@@ -202,57 +198,32 @@ else
     @if (showPlatformShelf)
     {
         <section class="release-shelf" id="platform-shelf">
-            <div class="downloads-advanced-group">
-                <h2 class="downloads-subheading">Main platform downloads</h2>
-                <p class="muted-copy">Published installers for each supported platform stay visible here on the main downloads page. Manual packages and support-only rails stay lower on the page.</p>
-                <div class="downloads-platform-grid">
-                    @foreach (var platform in release.PlatformAvailability)
-                    {
-                        var platformOption = ResolvePlatformOption(platform.PlatformId);
-                        <article class="downloads-platform-card">
-                            <span class="platform-pill">@platform.StatusLabel</span>
-                            <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
-                            <p>@platform.Summary</p>
-                            <p class="muted-copy">@platform.PrimaryPackageLabel · @platform.SupportabilityLabel</p>
-                            @if (platformOption is not null)
+            <details class="release-accordion">
+                <summary>Other supported platforms</summary>
+                <div class="release-accordion__body">
+                    <div class="downloads-advanced-group">
+                        <h2 class="downloads-subheading">Main platform downloads</h2>
+                        <p class="muted-copy">Published installers for each supported platform stay available here, but the main page keeps the first decision focused on one install path.</p>
+                        <div class="downloads-platform-grid">
+                            @foreach (var platform in release.PlatformAvailability)
                             {
-                                <a class="button-like button-like--ghost" href="@platformOption.DispatchHref">@platformOption.ActionLabel</a>
+                                var platformOption = ResolvePlatformOption(platform.PlatformId);
+                                <article class="downloads-platform-card">
+                                    <span class="platform-pill">@platform.StatusLabel</span>
+                                    <h3>@platform.PlatformLabel@(platform.CurrentDevice ? " (this browser)" : string.Empty)</h3>
+                                    <p>@platform.Summary</p>
+                                    <p class="muted-copy">@platform.PrimaryPackageLabel · @platform.SupportabilityLabel</p>
+                                    @if (platformOption is not null)
+                                    {
+                                        <a class="button-like button-like--ghost" href="@platformOption.DispatchHref">@platformOption.ActionLabel</a>
+                                    }
+                                </article>
                             }
-                        </article>
-                    }
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </details>
         </section>
-    }
-
-    <section class="flagship-coverage flagship-coverage--downloads">
-        <div class="flagship-coverage__lead">
-            <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
-            <h2 class="editorial-title">The install shelf stays tied to the rest of the product.</h2>
-            <p class="editorial-copy">@Model.FlagshipCoverage.Intro</p>
-        </div>
-        <div class="flagship-coverage__grid">
-            @foreach (var card in Model.FlagshipCoverage.Cards)
-            {
-                <article class="flagship-coverage__card" id="downloads-@card.Id.Replace('_', '-')">
-                    <span class="tag">@card.Label</span>
-                    <h3>@card.Summary</h3>
-                    <p class="flagship-coverage__phase"><strong>Now:</strong> @card.CurrentBody</p>
-                    <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetBody</p>
-                    <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
-                </article>
-            }
-        </div>
-    </section>
-
-    @if (Model.SignedInStatus is not null)
-    {
-        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-    }
-
-    @if (Model.TrustPulse is not null)
-    {
-        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
     }
 
     @if (hasAdvancedPanels)
@@ -322,7 +293,7 @@ else
                     @if (hasWindowsProofRail)
                     {
                         <div class="downloads-advanced-group" id="windows-verification-rail">
-                            <h3 class="downloads-subheading">Windows verification and support rail</h3>
+                            <h3 class="downloads-subheading">Windows verification and support path</h3>
                             <p class="muted-copy">These direct Windows installers stay available for verification and support when a proof or support flow points to a specific build beyond the main platform shelf.</p>
                             <div class="evidence-row-list">
                                 @foreach (var proofInstaller in windowsProofInstallers)
@@ -336,7 +307,7 @@ else
                                             <p>Direct Windows installer for verification and support. Use this when a proof or support flow points to this specific build.</p>
                                         </div>
                                         <div class="download-row__meta">
-                                            <span class="platform-pill">Support rail</span>
+                                            <span class="platform-pill">Support path</span>
                                             <span class="muted-copy">Windows x64</span>
                                             <code class="mono-receipt">SHA @proofInstaller.Sha256[..Math.Min(proofInstaller.Sha256.Length, 16)]...</code>
                                         </div>
@@ -423,5 +394,10 @@ else
                 </div>
             </details>
         </section>
+    }
+
+    @if (Model.SignedInStatus is not null)
+    {
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
     }
 }

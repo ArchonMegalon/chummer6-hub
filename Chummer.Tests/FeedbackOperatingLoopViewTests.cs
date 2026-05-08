@@ -10,13 +10,13 @@ public sealed class FeedbackOperatingLoopViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("One public signal should map to actual milestone pressure, projected direction, and proof-backed closeout.", view, StringComparison.Ordinal);
+        Assert.Contains("A public signal should enter one loop and leave with an evidence-backed closeout.", view, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", view, StringComparison.Ordinal);
         Assert.Contains("Signal loop snapshot", view, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);
         Assert.Contains("Open milestone ledger", view, StringComparison.Ordinal);
-        Assert.Contains("Browse horizon lanes", view, StringComparison.Ordinal);
-        Assert.Contains("Open shipped closeout", view, StringComparison.Ordinal);
+        Assert.Contains("Browse roadmap", view, StringComparison.Ordinal);
+        Assert.Contains("Open changelog", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -30,8 +30,8 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.Contains("Participation loop snapshot", view, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);
         Assert.Contains("Open milestone ledger", view, StringComparison.Ordinal);
-        Assert.Contains("Browse horizon lanes", view, StringComparison.Ordinal);
-        Assert.Contains("Open shipped closeout", view, StringComparison.Ordinal);
+        Assert.Contains("Browse horizons", view, StringComparison.Ordinal);
+        Assert.Contains("Open shipped updates", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -44,12 +44,12 @@ public sealed class FeedbackOperatingLoopViewTests
         string changelogView = File.ReadAllText(changelogViewPath);
 
         Assert.Contains("var signalLoop = Model.SignalLoop;", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Route handoff", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Open shipped closeout", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Page handoff", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("Open changelog", roadmapView, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.FollowSettingsHref", roadmapView, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", changelogView, StringComparison.Ordinal);
         Assert.Contains("Loop return", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Browse horizon lanes", changelogView, StringComparison.Ordinal);
+        Assert.Contains("Browse roadmap", changelogView, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.FollowSettingsHref", changelogView, StringComparison.Ordinal);
     }
 

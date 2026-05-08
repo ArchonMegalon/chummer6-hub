@@ -68,13 +68,20 @@
     </div>
 </section>
 
+@if (Model.SignedInStatus is not null)
+{
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    </section>
+}
+
 <section class="release-guidance release-guidance--detail">
     <article class="release-guidance__item">
         <span class="tag">What happens next</span>
         <h2>Automatic publication and recovery-aware verification</h2>
         <ul class="trust-page-section__list">
-            <li>The upload response validates the bundle and publishes only the target platform artifact lane to the live downloads shelf.</li>
-            <li>The response returns the install handoff URL and keeps any recovery-only code on the same rail if setup explicitly enters recovery mode during verification.</li>
+            <li>The upload response validates the bundle and publishes only the target platform artifact to the live downloads shelf.</li>
+            <li>The response returns the install handoff URL and keeps any recovery-only code on the same handoff if setup explicitly enters recovery mode during verification.</li>
             <li>The promoted artifact appears in the canonical public manifest at <a href="@Model.VerifyUrl">@Model.VerifyUrl</a>, while <code>/downloads/releases.json</code> remains the compatibility view.</li>
         </ul>
     </article>
@@ -88,11 +95,6 @@
         </ul>
     </article>
 </section>
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 @section Scripts {
 <script>
 (() => {

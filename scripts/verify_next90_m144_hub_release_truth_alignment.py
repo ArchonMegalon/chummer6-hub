@@ -79,8 +79,8 @@ SOURCE_MARKERS = {
     ],
     "tests/RunServicesSmoke/Program.cs": [
         'Assert(authenticatedStatusModel?.SignedInStatus is not null, "authenticated status page should project the shared signed-in trust status.");',
-        'Assert(publicArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item => string.Equals(item.GetProperty("publicationState").GetString(), "published", StringComparison.OrdinalIgnoreCase)), "artifact shelf api public view should keep only published creator publication cards.");',
-        'Assert(publicArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("recapItems").GetArrayLength() == 0, "artifact shelf api public view should not blend private recap items into the public rail.");',
+        'Assert(publicArtifactsModel?.SignedInCreatorPublications?.All(static item => item.Discoverable && string.Equals(item.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase)) == true, "public artifact view should keep only discoverable published creator-publication cards on the signed-in public rail.");',
+        'Assert(publicArtifactsModel?.SignedInRecapShelf?.Count == 0, "public artifact view should not blend private recap artifacts into the signed-in public publication rail.");',
     ],
     "scripts/ai/verify.sh": [
         "python3 scripts/verify_next90_m144_hub_release_truth_alignment.py",
@@ -102,16 +102,43 @@ def load_yaml_with_optional_preamble(path: Path) -> dict[str, Any]:
     try:
         payload = yaml.safe_load(text)
     except yaml.YAMLError:
-        mode_index = text.find("\nmode:")
-        if mode_index < 0 and not text.startswith("mode:"):
+        if f"package_id: {PACKAGE_ID}" not in text:
             raise
-        normalized_text = text if text.startswith("mode:") else text[mode_index + 1 :]
-        payload = yaml.safe_load(normalized_text)
+        payload = load_target_queue_payload(text, path)
 
     if not isinstance(payload, dict):
         raise SystemExit(f"yaml payload at {path} is not a mapping")
 
     return payload
+
+
+def load_target_queue_payload(text: str, path: Path) -> dict[str, Any]:
+    marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(marker)
+    if package_index < 0:
+        raise SystemExit(f"unable to parse yaml file: {path}")
+
+    start_candidates = [
+        text.rfind("\n- title:", 0, package_index),
+        text.rfind("\n  - title:", 0, package_index),
+    ]
+    block_start = max(start_candidates)
+    if block_start < 0:
+        if text.startswith("- title:") or text.startswith("  - title:"):
+            block_start = 0
+        else:
+            raise SystemExit(f"unable to isolate queue block in {path}")
+    else:
+        block_start += 1
+
+    end_candidates = [index for index in (text.find("\n- title:", package_index), text.find("\n  - title:", package_index)) if index >= 0]
+    block_end = min(end_candidates) if end_candidates else len(text)
+    block = text[block_start:block_end].rstrip() + "\n"
+    payload = yaml.safe_load(block)
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise SystemExit(f"unable to normalize queue staging yaml: {path}")
+
+    return {"items": payload}
 
 
 def load_json(path: Path) -> dict[str, Any]:

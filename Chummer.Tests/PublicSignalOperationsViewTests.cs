@@ -21,14 +21,14 @@ public sealed class PublicSignalOperationsViewTests
         string partial = File.ReadAllText(partialPath);
 
         Assert.Contains("@model PublicSignalOperationsPacketViewModel", partial, StringComparison.Ordinal);
-        Assert.Contains("Hosted route promotion", partial, StringComparison.Ordinal);
+        Assert.Contains("Hosted page promotion", partial, StringComparison.Ordinal);
         Assert.Contains("Ingress and closeout", partial, StringComparison.Ordinal);
         Assert.Contains("Category routing", partial, StringComparison.Ordinal);
         Assert.Contains("Provider receipts", partial, StringComparison.Ordinal);
         Assert.Contains("Routing receipts", partial, StringComparison.Ordinal);
         Assert.Contains("Closeout follow-up", partial, StringComparison.Ordinal);
         Assert.Contains("Routing board", partial, StringComparison.Ordinal);
-        Assert.Contains("Inspect hosted route", partial, StringComparison.Ordinal);
+        Assert.Contains("Inspect hosted page", partial, StringComparison.Ordinal);
         Assert.Contains("Outbound delivery", partial, StringComparison.Ordinal);
         Assert.Contains("Journey writeback", partial, StringComparison.Ordinal);
         Assert.Contains("Replay and backfill", partial, StringComparison.Ordinal);

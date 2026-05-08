@@ -32,7 +32,7 @@ public sealed class InternalReleaseBundlesControllerTests
 
         ActionResult<ReleaseBundlePromotionResult> result = await fixture.Controller.UploadBundle(bundle: null, CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
     }
 
@@ -79,7 +79,7 @@ public sealed class InternalReleaseBundlesControllerTests
             "releases.json",
             CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(response.Result);
         ProblemDetails? problem = Assert.IsType<ProblemDetails>(badRequest.Value);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         Assert.Equal("Upload session file rejected", problem.Title);
@@ -99,7 +99,7 @@ public sealed class InternalReleaseBundlesControllerTests
             "releases.json",
             CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(response.Result);
         ProblemDetails? problem = Assert.IsType<ProblemDetails>(badRequest.Value);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         Assert.Equal("Upload session file rejected", problem.Title);
@@ -121,7 +121,7 @@ public sealed class InternalReleaseBundlesControllerTests
             totalChunks: 1,
             CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(response.Result);
         ProblemDetails? problem = Assert.IsType<ProblemDetails>(badRequest.Value);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         Assert.Equal("Upload session chunk rejected", problem.Title);
@@ -138,7 +138,7 @@ public sealed class InternalReleaseBundlesControllerTests
             "0x-not-a-guid",
             CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(response.Result);
         ProblemDetails? problem = Assert.IsType<ProblemDetails>(badRequest.Value);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         Assert.Equal("Upload session promotion rejected", problem.Title);
@@ -167,7 +167,7 @@ public sealed class InternalReleaseBundlesControllerTests
             totalChunks: 1,
             CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(response.Result);
         ProblemDetails? problem = Assert.IsType<ProblemDetails>(badRequest.Value);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         Assert.Equal("Upload session chunk rejected", problem.Title);
@@ -191,7 +191,7 @@ public sealed class InternalReleaseBundlesControllerTests
             created.SessionId,
             CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(response.Result);
         ProblemDetails? problem = Assert.IsType<ProblemDetails>(badRequest.Value);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         Assert.Equal("Upload session promotion rejected", problem.Title);
@@ -206,8 +206,9 @@ public sealed class InternalReleaseBundlesControllerTests
 
         OkObjectResult sessionResponse = Assert.IsType<OkObjectResult>(fixture.Controller.CreateUploadSession().Result);
         var created = Assert.IsType<InternalReleaseBundlesController.ReleaseUploadSessionCreatedResponse>(sessionResponse.Value);
-        fixture.WriteSessionMetadata(new ReleaseUploadSession(
-            Guid.NewGuid().ToString("N"),
+        string tamperedSessionId = Guid.NewGuid().ToString("N");
+        fixture.WriteSessionMetadata(created.SessionId, new ReleaseUploadSession(
+            tamperedSessionId,
             DateTimeOffset.UtcNow.AddHours(6),
             Path.Combine(fixture.SessionRoot, created.SessionId, "bundle")));
 
@@ -218,7 +219,7 @@ public sealed class InternalReleaseBundlesControllerTests
             "releases.json",
             CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(response.Result);
+        ObjectResult badRequest = Assert.IsType<ObjectResult>(response.Result);
         ProblemDetails? problem = Assert.IsType<ProblemDetails>(badRequest.Value);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
         Assert.Equal("Upload session file rejected", problem.Title);
@@ -405,6 +406,13 @@ public sealed class InternalReleaseBundlesControllerTests
         public void WriteSessionMetadata(ReleaseUploadSession session)
         {
             string path = Path.Combine(SessionRoot, session.SessionId, "session.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, JsonSerializer.Serialize(session));
+        }
+
+        public void WriteSessionMetadata(string storageSessionId, ReleaseUploadSession session)
+        {
+            string path = Path.Combine(SessionRoot, storageSessionId, "session.json");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, JsonSerializer.Serialize(session));
         }

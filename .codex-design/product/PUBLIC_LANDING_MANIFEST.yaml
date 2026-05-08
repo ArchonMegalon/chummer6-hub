@@ -182,7 +182,6 @@ public_routes:
     purpose: support_submission_receipt
     requires_auth: false
     guest_fallback: /contact/submitted/{caseId}
-    verification_path: /contact/submitted/{caseId}
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: first-party support submission receipt route only
@@ -240,7 +239,6 @@ public_routes:
     purpose: governed_future_signal_receipt
     requires_auth: false
     guest_fallback: /participate/karma-forge/submitted/{submissionId}
-    verification_path: /participate/karma-forge/submitted/{submissionId}
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: governed discovery submission receipt route only

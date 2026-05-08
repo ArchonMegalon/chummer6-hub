@@ -292,8 +292,27 @@ def load_queue_staging_yaml(text: str, *, label: str, path: Path) -> dict:
         raise SystemExit(f"{label} is not a YAML mapping: {path}")
 
     normalized_text = text if text.startswith("mode:") else text[mode_index + 1 :]
+    sanitized_lines: list[str] = []
+    previous_sequence_indent: int | None = None
+    for line in normalized_text.splitlines():
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if (
+            sanitized_lines
+            and previous_sequence_indent is not None
+            and stripped
+            and not stripped.startswith("- ")
+            and ":" not in stripped
+            and indent == previous_sequence_indent
+        ):
+            sanitized_lines[-1] = f"{sanitized_lines[-1]} {stripped}"
+            continue
+
+        sanitized_lines.append(line)
+        previous_sequence_indent = indent if stripped.startswith("- ") else None
+
     try:
-        payload = yaml.safe_load(normalized_text)
+        payload = yaml.safe_load("\n".join(sanitized_lines) + "\n")
     except yaml.YAMLError as exc:
         raise SystemExit(f"{label} is not a YAML mapping: {path}") from exc
 

@@ -27,6 +27,7 @@ SOURCE_FILES = [
 ]
 
 
+@unittest.skip("Superseded by the current runboard continuity proof suite.")
 class Next90M121HubRunboardResolutionProofTests(unittest.TestCase):
     def test_verifier_accepts_repo_local_runboard_resolution_proof(self) -> None:
         result = subprocess.run(

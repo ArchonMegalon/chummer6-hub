@@ -9,15 +9,15 @@
     var accountReturnHref = Model.Chrome.Authenticated ? "/home" : "/signup?next=/home";
     var accountReturnLabel = Model.Chrome.Authenticated ? "Open home" : "Create account";
     var accountReturnSummary = Model.Chrome.Authenticated
-        ? "Use Home when install follow-through, support status, and the next safe action should stay on one signed-in rail."
-        : "Create the account when you want install return, support history, and roadmap follow-up attached to one calmer path.";
+        ? "Use Home when install follow-through, support status, and the next safe action should stay in one signed-in place."
+        : "Create the account when you want install return, support history, and roadmap follow-up attached to one calmer place.";
     var statusRouteChoices = new[]
     {
         new
         {
-            Badge = "Release rail",
-            Title = "Install or update from the release rail",
-            Summary = "Downloads still owns the recommended build, platform posture, current package notes, and the calmest first-run path for this device.",
+            Badge = "Downloads",
+            Title = "Install or update from the downloads page",
+            Summary = "Downloads still owns the recommended build, platform notes, current package details, and the calmest first-run path for this device.",
             Href = "/downloads",
             Label = "Open downloads",
             Proof = new[] { "Recommended build", "Known issues nearby", "Install continuity" }
@@ -26,7 +26,7 @@
         {
             Badge = "Live proof",
             Title = "Use what works today when the question is proof, not packaging",
-            Summary = "Open the proof shelf when you need the current result, caution lane, or one inspectable explanation trail before you move a device.",
+            Summary = "Open the proof page when you need the current result, current cautions, or one inspectable explanation before you move a device.",
             Href = "/now",
             Label = "Open what works today",
             Proof = new[] { "Current proof", "Caution explicit", "One inspectable trail" }
@@ -47,7 +47,7 @@
             Summary = "This page should stay short and customer-safe. The deeper progress report remains the place for the broader operational readout.",
             Href = "/progress",
             Label = "Open progress",
-            Proof = new[] { "Short public summary", "Longer machine report", "No route confusion" }
+            Proof = new[] { "Short public summary", "Longer machine report", "No page confusion" }
         }
     };
     var campaignStatusTitle = Model.CampaignOsProof is null
@@ -78,7 +78,7 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">Current status</p>
         <h1 class="page-title">What works now, what needs caution, and where to go next</h1>
-        <p class="page-copy">Use this page for the short customer-facing summary. It should route you to install, live proof, support, or the deeper report without making you decode the whole release stack.</p>
+        <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, live proof, support, or the deeper report without making you decode the whole release stack.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
             <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
@@ -93,21 +93,11 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Status route map</p>
-        <h2 class="editorial-title">Pick the right next rail instead of treating status like a catch-all dashboard.</h2>
-        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to the correct first-party route as soon as the job becomes install, proof, help, or deeper operational context.</p>
+        <p class="eyebrow">Where to go next</p>
+        <h2 class="editorial-title">Pick the right next page instead of treating status like a catch-all dashboard.</h2>
+        <p class="editorial-copy">Status stays useful when it remains a compact public summary and hands you to downloads, proof, help, or the deeper report as soon as the job changes.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in statusRouteChoices)
@@ -134,7 +124,6 @@
         <h2 class="page-title">The short status line stays visible on one page.</h2>
         <p class="page-copy">This is the customer-safe readout: current release posture, current caution, support fallback, and campaign-proof visibility.</p>
     </div>
-    @await Html.PartialAsync("~/Views/Shared/_PublicStatusGlossary.cshtml")
     <div class="settings-summary-list">
         <div class="settings-summary-row">
             <span>Channel</span>
@@ -169,7 +158,7 @@
 <section class="status-decision-strip" aria-label="Current status decisions">
     <article class="status-decision-strip__card">
         <span class="tag">Release posture</span>
-        <h2>@Model.ReleaseExperience.Display.BuildLabel stays attached to the public release rail.</h2>
+        <h2>@Model.ReleaseExperience.Display.BuildLabel stays attached to downloads.</h2>
         <p>@(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message ?? "The current release shelf, notes, and support path should read like one honest record.")</p>
         <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
@@ -183,7 +172,7 @@
         <span class="tag">Campaign proof</span>
         <h2>@campaignStatusTitle</h2>
         <p>@campaignStatusSummary</p>
-        <a class="button-like button-like--ghost" href="/progress">Open progress</a>
+        <a class="button-like button-like--ghost" href="/now">Open what works today</a>
     </article>
 </section>
 
@@ -267,7 +256,7 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Signed-in return</p>
-    <h2 class="editorial-title">Keep status, install follow-through, and support history on one calmer rail.</h2>
+    <h2 class="editorial-title">Keep status, install follow-through, and support history in one calmer signed-in place.</h2>
     <p class="editorial-copy">@accountReturnSummary</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@accountReturnHref">@accountReturnLabel</a>

@@ -18,10 +18,6 @@
     }
     var proofNotes = Model.Workflows.Take(1).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(2).ToArray();
-    var availableHighlight = Model.AvailableToday.FirstOrDefault();
-    var comingNextHighlight = Model.ComingNext.FirstOrDefault();
-    var previewCount = Model.PreviewItems.Count;
-    var previewHighlight = Model.PreviewItems.FirstOrDefault();
     var release = Model.ReleaseExperience;
     var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
     var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
@@ -34,16 +30,12 @@
     var heroSection = Section("hero");
     var productProofSection = Section("product_proof");
     var startHereSection = Section("start_here");
-    var trustSection = Section("why_trust_it");
     var laneSection = Section("choose_your_lane");
-    var worksNowSection = Section("whats_real_now");
     var closingSection = Section("closing_cta");
     var starterWorkflowCards = Model.Workflows.Take(3).ToArray();
-    var trustPillarCards = Model.TrustPillars.Take(3).ToArray();
     var laneCards = Model.Lanes.Take(3).ToArray();
-    var futurePreviewCards = Model.ComingNext.Take(3).ToArray();
     var installRailSummary = Model.Chrome.Authenticated
-        ? "Your signed-in route keeps linked installs, device return, and support follow-through on one calmer rail."
+        ? "Your signed-in account keeps linked installs, device return, and support follow-through in one calmer place."
         : "The build stays the same for everyone. The account-aware piece is the install handoff, device continuity, and support history.";
     var installRailPrimaryLabel = Model.Chrome.Authenticated ? "Open home" : "Create account and install";
     var installRailPrimaryHref = Model.Chrome.Authenticated ? "/home" : accountAwareInstallPrimaryHref;
@@ -65,18 +57,6 @@
         string label,
         string fallback)
         => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
-
-    static string FeatureCardNarrative(PublicFeatureCardDto card)
-        => !string.IsNullOrWhiteSpace(card.Payoff)
-            ? card.Payoff!
-            : !string.IsNullOrWhiteSpace(card.ProofNote)
-                ? card.ProofNote!
-                : card.Summary;
-
-    static string FeatureCardActionLabel(PublicFeatureCardDto card, string fallback)
-        => !string.IsNullOrWhiteSpace(card.ActionLabel)
-            ? card.ActionLabel!
-            : fallback;
 
     static string ResolvedCardNarrative(ResolvedPublicCardViewModel card)
         => !string.IsNullOrWhiteSpace(card.Card.Payoff)
@@ -182,7 +162,7 @@
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.PrimaryHeroAction.Href">@Model.PrimaryHeroAction.Label</a>
         </div>
-        <p class="muted-copy">Need the broader shelf? <a class="inline-link" href="@Model.Surface.ProductProofSecondaryHref">@Model.Surface.ProductProofSecondaryLabel</a>.</p>
+        <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open what works today</a> or <a class="inline-link" href="/what-is-chummer">read the product story</a>.</p>
     </div>
     @if (proofSectionAsset is not null)
     {
@@ -192,72 +172,6 @@
     }
 </section>
 
-<section class="works-matrix">
-    <div class="works-matrix__lead">
-        <p class="eyebrow">@worksNowSection.Eyebrow</p>
-        <h2 class="editorial-title">@worksNowSection.Title</h2>
-        <p class="editorial-copy">@worksNowSection.Intro</p>
-    </div>
-    <div class="compact-rail">
-        @if (availableHighlight is not null)
-        {
-            <article class="compact-rail__item" id="@availableHighlight.Card.Id.Replace('_', '-')">
-                <div class="compact-rail__copy">
-                    <span class="tag">@PublicSurfaceStatus.DisplayLabel(availableHighlight.Card.Badge)</span>
-                    <h3>@availableHighlight.Card.Title</h3>
-                    <p>@availableHighlight.Card.Summary @(Model.AvailableToday.Count > 1 ? $"+{Model.AvailableToday.Count - 1} more working surface(s) sit on the full shelf." : string.Empty)</p>
-                </div>
-                <a class="inline-link" href="@availableHighlight.Action.Href">@availableHighlight.Action.Label</a>
-            </article>
-        }
-        @if (comingNextHighlight is not null)
-        {
-            <article class="compact-rail__item" id="@comingNextHighlight.Card.Id.Replace('_', '-')">
-                <div class="compact-rail__copy">
-                    <span class="tag @PublicSurfaceStatus.CssTone(comingNextHighlight.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(comingNextHighlight.Card.Badge)</span>
-                    <h3>@comingNextHighlight.Card.Title</h3>
-                    <p>@comingNextHighlight.Card.Summary @(Model.ComingNext.Count > 1 ? $"+{Model.ComingNext.Count - 1} more planned surface(s) stay visible on the full roadmap." : string.Empty)</p>
-                </div>
-                <a class="inline-link" href="@comingNextHighlight.Action.Href">@comingNextHighlight.Action.Label</a>
-            </article>
-        }
-    </div>
-    @if (previewHighlight is not null)
-    {
-        <p class="muted-copy">
-            Preview in progress: <a class="inline-link" href="@previewHighlight.Action.Href">@previewHighlight.Card.Title</a>
-            @if (previewCount > 1)
-            {
-                <span> plus @(previewCount - 1) more opening surface(s) on the full preview shelf.</span>
-            }
-        </p>
-    }
-    <p class="muted-copy">Need the full picture? <a class="inline-link" href="/now">Open what works today</a>.</p>
-</section>
-
-<section class="flagship-coverage">
-    <div class="flagship-coverage__lead">
-        <p class="eyebrow">@Model.FlagshipCoverage.Eyebrow</p>
-        <h2 class="editorial-title">@Model.FlagshipCoverage.Heading</h2>
-        <p class="editorial-copy">@Model.FlagshipCoverage.Intro</p>
-    </div>
-    <div class="flagship-coverage__grid">
-        @foreach (var card in Model.FlagshipCoverage.Cards)
-        {
-            <article class="flagship-coverage__card" id="@card.Id.Replace('_', '-')">
-                <span class="tag">@card.Label</span>
-                <h3>@card.Summary</h3>
-                <p class="flagship-coverage__phase"><strong>Now:</strong> @card.CurrentTitle</p>
-                <p>@card.CurrentBody</p>
-                <p class="flagship-coverage__phase"><strong>Target:</strong> @card.TargetTitle</p>
-                <p>@card.TargetBody</p>
-                <a class="inline-link" href="@card.Href">@card.ActionLabel</a>
-            </article>
-        }
-    </div>
-    <p class="muted-copy">Need the public status ledger too? <a class="inline-link" href="/progress">Open progress</a>.</p>
-</section>
-
 @if (starterWorkflowCards.Length > 0)
 {
     <section class="workflow-band">
@@ -265,6 +179,7 @@
             <p class="eyebrow">@startHereSection.Eyebrow</p>
             <h2 class="editorial-title">@startHereSection.Title</h2>
             <p class="editorial-copy">@startHereSection.Intro</p>
+            <p class="muted-copy">Landing keeps only the three clearest jobs. Broader proof, roadmap detail, and deeper page families stay on their own pages.</p>
         </div>
         <div class="workflow-grid">
             @foreach (var card in starterWorkflowCards)
@@ -292,39 +207,6 @@
     </section>
 }
 
-@if (trustPillarCards.Length > 0)
-{
-    <section class="trust-claims">
-        <div class="trust-claims__lead">
-            <p class="eyebrow">@trustSection.Eyebrow</p>
-            <h2 class="editorial-title">@trustSection.Title</h2>
-            <p class="editorial-copy">@trustSection.Intro</p>
-        </div>
-        <div class="trust-claims__grid">
-            @foreach (var pillar in trustPillarCards)
-            {
-                <article class="trust-claim" id="@pillar.Id.Replace('_', '-')">
-                    <span class="tag">@PublicSurfaceStatus.AudienceLabel(pillar.Audience)</span>
-                    <h3>@pillar.Title</h3>
-                    <p>@FeatureCardNarrative(pillar)</p>
-                    <div class="trust-claim__microproof">
-                        @if (!string.IsNullOrWhiteSpace(pillar.MicroProof))
-                        {
-                            <span>@pillar.MicroProof</span>
-                        }
-                        @if (!string.IsNullOrWhiteSpace(pillar.ProofNote))
-                        {
-                            <span>@pillar.ProofNote</span>
-                        }
-                        <span>@PublicSurfaceStatus.DisplayLabel(pillar.Badge)</span>
-                    </div>
-                    <a class="inline-link" href="@ContextualPreviewHref(pillar.GuestHref ?? pillar.Href)">@FeatureCardActionLabel(pillar, "Inspect the current proof")</a>
-                </article>
-            }
-        </div>
-    </section>
-}
-
 @if (laneCards.Length > 0)
 {
     <section class="editorial-block">
@@ -332,6 +214,7 @@
             <p class="eyebrow">@laneSection.Eyebrow</p>
             <h2 class="editorial-title">@laneSection.Title</h2>
             <p class="editorial-copy">@laneSection.Intro</p>
+            <p class="muted-copy">Choose the page that matches your job instead of reading three different page families on the landing surface.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var lane in laneCards)
@@ -384,53 +267,16 @@
         <article class="continuity-band__fact">
             <span>Support follow-through</span>
             <strong>Cases stay attached to the install story</strong>
-            <p>Support history, fix notices, and roadmap follow-up stay on the same account rail instead of becoming separate detective work.</p>
+            <p>Support history, fix notices, and roadmap follow-up stay on the same account page instead of becoming separate detective work.</p>
         </article>
     </div>
 </section>
-
-@if (futurePreviewCards.Length > 0)
-{
-    <section class="future-strip">
-        <div class="future-strip__lead">
-            <p class="eyebrow">Preparing next</p>
-            <h2 class="editorial-title">The next public unlocks already have names, pressure, and seams.</h2>
-            <p class="editorial-copy">Chummer should feel ambitious without bluffing. These lanes stay visible because they explain where the campaign OS is heading and which pain each slice is trying to remove.</p>
-        </div>
-        <div class="future-strip__grid">
-            @foreach (var card in futurePreviewCards)
-            {
-                <article class="future-strip__card" id="@card.Card.Id.Replace('_', '-')">
-                    <span class="tag @PublicSurfaceStatus.CssTone(card.Card.Badge)">@PublicSurfaceStatus.DisplayLabel(card.Card.Badge)</span>
-                    <h3>@card.Card.Title</h3>
-                    <p>@ResolvedCardNarrative(card)</p>
-                    @if (!string.IsNullOrWhiteSpace(card.Card.ProofNote))
-                    {
-                        <p class="future-strip__proof">@card.Card.ProofNote</p>
-                    }
-                    <a class="inline-link" href="@card.Action.Href">@card.Action.Label</a>
-                </article>
-            }
-        </div>
-    </section>
-}
-
-@if (Model.TrustPulse is not null)
-{
-    <section class="release-shelf" aria-label="Current trust and first-session return">
-        <article class="app-action-card">
-            <span class="tag">@Model.TrustPulse.Eyebrow</span>
-            <h2>@Model.TrustPulse.Heading</h2>
-            @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulseBody.cshtml", Model.TrustPulse)
-        </article>
-    </section>
-}
 
 @if (Model.SignedInStatus is not null)
 {
     <section class="release-shelf" aria-label="First-session return">
         <article class="app-action-card">
-            <span class="tag">Return rail</span>
+            <span class="tag">Signed-in return</span>
             <h2>@(starterFirstPlayableSession?.Label ?? "First session proof")</h2>
             <p>@(starterFirstPlayableSession?.CampaignStartSummary ?? "Your first playable session proof stays attached to the signed-in return path.")</p>
             <div class="settings-summary-list">
@@ -444,12 +290,13 @@
                 </div>
                 <div class="settings-summary-row">
                     <span>Current caution</span>
-                    <strong>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open status to confirm the current caution lane.")</strong>
+                    <strong>@TrustRowValue(Model.SignedInStatus, "Current caution", "Open status to confirm the current caution notes.")</strong>
                 </div>
             </div>
             <div class="stacked-actions">
-                <a class="button-like button-like--primary" href="/home">Open starter lane on Home</a>
+                <a class="button-like button-like--primary" href="/home">Open home workspace</a>
                 <a class="button-like button-like--secondary" href="/home#selected-first-playable-session">Open first playable session proof</a>
+                <a class="button-like button-like--secondary" href="/home/work">Open starter lane on Home</a>
                 <a class="button-like button-like--secondary" href="/contact">Open install support</a>
             </div>
         </article>
@@ -473,6 +320,6 @@
             <a class="button-like button-like--primary" href="/signup?next=/home">Create account</a>
             <p class="muted-copy">Already have one? <a class="inline-link" href="/login?next=/home">Sign in</a></p>
         }
-        <p class="muted-copy">Still evaluating? <a class="quiet-link" href="/artifacts">Open the artifact gallery</a> or <a class="quiet-link" href="/what-is-chummer">read the product story</a>.</p>
+        <p class="muted-copy">Still evaluating? <a class="quiet-link" href="/now">Open what works today</a> or <a class="quiet-link" href="/what-is-chummer">read the product story</a>.</p>
     </div>
 </section>

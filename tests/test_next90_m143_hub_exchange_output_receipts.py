@@ -13,12 +13,14 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m143_hub_exchange_output_receipts.py"
+PACKAGE_ID = "next90-m143-hub-bind-exchange-and-outward-facing-output-routes-to-visible-receipt-or-bou"
 QUEUE_STAGING = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
 SUCCESSOR_REGISTRY = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
 SOURCE_FILES = [
     "Chummer.Run.Api/Controllers/PublicLandingController.cs",
     "Chummer.Run.Api/Controllers/InstallLinkingController.cs",
     "Chummer.Run.Api/Controllers/CampaignSpineController.cs",
+    "Chummer.Run.Api/Services/Community/CampaignFederationOrchestrationService.cs",
     "Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml",
     "tests/RunServicesSmoke/Program.cs",
     "scripts/materialize_hub_local_release_proof.py",
@@ -34,16 +36,47 @@ def load_queue_payload(path: Path) -> dict:
     try:
         payload = yaml.safe_load(text)
     except yaml.YAMLError:
-        mode_index = text.find("\nmode:")
-        if mode_index < 0 and not text.startswith("mode:"):
-            raise
-        normalized_text = text if text.startswith("mode:") else text[mode_index + 1 :]
-        payload = yaml.safe_load(normalized_text)
+        payload = load_target_queue_payload(text, path)
 
     if not isinstance(payload, dict):
         raise TypeError(f"queue payload at {path} is not a YAML mapping")
 
     return payload
+
+
+def load_target_queue_payload(text: str, path: Path) -> dict:
+    marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(marker)
+    if package_index < 0:
+        raise ValueError(f"unable to parse yaml file: {path}")
+
+    start_candidates = [
+        text.rfind("\n- title:", 0, package_index),
+        text.rfind("\n  - title:", 0, package_index),
+    ]
+    block_start = max(start_candidates)
+    if block_start < 0:
+        if text.startswith("- title:") or text.startswith("  - title:"):
+            block_start = 0
+        else:
+            raise ValueError(f"unable to isolate queue block in {path}")
+    else:
+        block_start += 1
+
+    end_candidates = [
+        index
+        for index in (
+            text.find("\n- title:", package_index),
+            text.find("\n  - title:", package_index),
+        )
+        if index >= 0
+    ]
+    block_end = min(end_candidates) if end_candidates else len(text)
+    payload = yaml.safe_load(text[block_start:block_end].rstrip() + "\n")
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise ValueError(f"unable to normalize queue staging yaml: {path}")
+
+    return {"items": payload}
 
 
 class Next90M143HubExchangeOutputReceiptTests(unittest.TestCase):
@@ -84,7 +117,7 @@ class Next90M143HubExchangeOutputReceiptTests(unittest.TestCase):
             queue_path = temp_root / "fleet-queue.yaml"
             payload = load_queue_payload(queue_path)
             for item in payload["items"]:
-                if item.get("package_id") == "next90-m143-hub-bind-exchange-and-outward-facing-output-routes-to-visible-receipt-or-bou":
+                if item.get("package_id") == PACKAGE_ID:
                     item["owned_surfaces"] = ["drifted-surface"]
                     break
             queue_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -234,16 +267,17 @@ class Next90M143HubExchangeOutputReceiptTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("InstallLinkingController.cs is missing required guard: routeLookup.CurrentnessFailureReason", result.stderr)
 
-    def test_verifier_fails_when_campaign_route_currentness_guard_is_removed(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m143-campaign-currentness-") as temp_dir:
+    def test_verifier_fails_when_campaign_federation_bounded_guard_is_removed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m143-campaign-bounded-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
-            controller_path = temp_root / "Chummer.Run.Api/Controllers/CampaignSpineController.cs"
-            controller_text = controller_path.read_text(encoding="utf-8")
-            controller_path.write_text(
-                controller_text.replace(
-                    "routeLookup.CurrentnessFailureReason",
-                    "routeLookup.RouteProofFreshnessRemoved",
+            service_path = temp_root / "Chummer.Run.Api/Services/Community/CampaignFederationOrchestrationService.cs"
+            service_text = service_path.read_text(encoding="utf-8")
+            service_path.write_text(
+                service_text.replace(
+                    'string routeState = allSourcePacksPublished ? "queued" : "bounded_failure";',
+                    'string routeState = allSourcePacksPublished ? "queued" : "published";',
+                    1,
                 ),
                 encoding="utf-8",
             )
@@ -251,7 +285,7 @@ class Next90M143HubExchangeOutputReceiptTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("CampaignSpineController.cs is missing required guard: routeLookup.CurrentnessFailureReason", result.stderr)
+        self.assertIn("CampaignFederationOrchestrationService.cs is missing required guard", result.stderr)
 
     def test_verifier_fails_when_smoke_drops_campaign_federation_bounded_assertion(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m143-smoke-") as temp_dir:
@@ -261,7 +295,7 @@ class Next90M143HubExchangeOutputReceiptTests(unittest.TestCase):
             smoke_text = smoke_path.read_text(encoding="utf-8")
             smoke_path.write_text(
                 smoke_text.replace(
-                    "campaign federation api should fail closed on the launch route when no current local proof receipt backs the exchange endpoint.",
+                    "campaign federation api should surface batch route posture instead of optimistic launch claims when source-pack receipts are not all live.",
                     "campaign federation bounded assertion removed",
                     1,
                 ),
@@ -271,7 +305,7 @@ class Next90M143HubExchangeOutputReceiptTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("campaign federation api should fail closed on the launch route", result.stderr)
+        self.assertIn("campaign federation api should surface batch route posture", result.stderr)
 
     def copy_sources(self, temp_root: Path) -> None:
         for relative in SOURCE_FILES:
@@ -301,6 +335,7 @@ class Next90M143HubExchangeOutputReceiptTests(unittest.TestCase):
                 "CHUMMER_NEXT90_M143_HUB_PUBLIC_LANDING_CONTROLLER": str(temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"),
                 "CHUMMER_NEXT90_M143_HUB_INSTALL_LINKING_CONTROLLER": str(temp_root / "Chummer.Run.Api/Controllers/InstallLinkingController.cs"),
                 "CHUMMER_NEXT90_M143_HUB_CAMPAIGN_SPINE_CONTROLLER": str(temp_root / "Chummer.Run.Api/Controllers/CampaignSpineController.cs"),
+                "CHUMMER_NEXT90_M143_HUB_CAMPAIGN_FEDERATION_SERVICE": str(temp_root / "Chummer.Run.Api/Services/Community/CampaignFederationOrchestrationService.cs"),
                 "CHUMMER_NEXT90_M143_HUB_CREATOR_PUBLICATION_VIEW": str(temp_root / "Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml"),
                 "CHUMMER_NEXT90_M143_HUB_SMOKE_PROGRAM": str(temp_root / "tests/RunServicesSmoke/Program.cs"),
                 "CHUMMER_NEXT90_M143_HUB_PROOF_MATERIALIZER": str(temp_root / "scripts/materialize_hub_local_release_proof.py"),

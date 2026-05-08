@@ -1126,58 +1126,155 @@ def count_registry_task_blocks(text: str) -> int:
 
 
 def extract_queue_package_block(text: str) -> str:
-    marker = f"    package_id: {PACKAGE_ID}\n"
-    package_id_index = text.find(marker)
-    if package_id_index == -1:
+    lines = text.splitlines()
+    package_line_index = next(
+        (index for index, line in enumerate(lines) if line.lstrip() == f"package_id: {PACKAGE_ID}"),
+        None,
+    )
+    if package_line_index is None:
         return ""
 
-    start = text.rfind("\n  - title:", 0, package_id_index)
-    if start == -1:
-        start = package_id_index
-    else:
-        start += 1
+    item_start_index = package_line_index
+    item_indent: int | None = None
+    for index in range(package_line_index, -1, -1):
+        stripped = lines[index].lstrip()
+        indent = len(lines[index]) - len(stripped)
+        if stripped.startswith("- title:"):
+            item_start_index = index
+            item_indent = indent
+            break
 
-    end = text.find("\n  - title:", package_id_index + len(marker))
-    if end == -1:
-        end = len(text)
-    return text[start:end]
+    if item_indent is None:
+        return lines[package_line_index]
+
+    item_end_index = len(lines)
+    for index in range(item_start_index + 1, len(lines)):
+        stripped = lines[index].lstrip()
+        if not stripped.startswith("- title:"):
+            continue
+
+        indent = len(lines[index]) - len(stripped)
+        if indent == item_indent:
+            item_end_index = index
+            break
+
+    return "\n".join(lines[item_start_index:item_end_index])
 
 
 def count_queue_package_blocks(text: str) -> int:
-    return text.count(f"    package_id: {PACKAGE_ID}\n")
+    return sum(1 for line in text.splitlines() if line.lstrip() == f"package_id: {PACKAGE_ID}")
 
 
 def extract_queue_scalar_list(block: str, section_name: str) -> list[str] | None:
-    marker = f"    {section_name}:\n"
-    start = block.find(marker)
-    if start == -1:
+    lines = block.splitlines()
+    section_line_index = next(
+        (index for index, line in enumerate(lines) if line.lstrip() == f"{section_name}:"),
+        None,
+    )
+    if section_line_index is None:
         return None
 
+    anchor_line = lines[section_line_index]
+    anchor_indent = len(anchor_line) - len(anchor_line.lstrip())
     values: list[str] = []
-    for line in block[start + len(marker):].splitlines():
-        if line.startswith("    ") and not line.startswith("      - "):
+    list_indent: int | None = None
+    current_value: str | None = None
+    for line in lines[section_line_index + 1 :]:
+        stripped = line.lstrip()
+        if not stripped:
+            continue
+
+        indent = len(line) - len(stripped)
+        if stripped.startswith("- "):
+            if list_indent is None:
+                list_indent = indent
+            elif indent < list_indent:
+                break
+
+            if indent == list_indent:
+                current_value = stripped[2:].strip()
+                values.append(current_value)
+                continue
+
+        if list_indent is None:
+            if indent <= anchor_indent:
+                break
+            continue
+
+        if indent > list_indent and current_value is not None:
+            current_value = f"{current_value} {stripped}".strip()
+            values[-1] = current_value
+            continue
+
+        if indent <= anchor_indent or indent < list_indent:
             break
-        if line.startswith("      - "):
-            values.append(line.removeprefix("      - ").strip())
 
     return values
 
 
+def extract_scalar_occurrences(text: str) -> dict[str, list[str]]:
+    lines = text.splitlines()
+    scalars: dict[str, list[str]] = {}
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if not stripped or stripped.startswith("- ") or ":" not in stripped:
+            index += 1
+            continue
+
+        key, value = stripped.split(":", 1)
+        if not re.fullmatch(r"[A-Za-z0-9_]+", key):
+            index += 1
+            continue
+
+        value = value.strip()
+        parts = [value] if value else []
+        next_index = index + 1
+        while next_index < len(lines):
+            next_line = lines[next_index]
+            next_stripped = next_line.lstrip()
+            next_indent = len(next_line) - len(next_stripped)
+            if not next_stripped:
+                next_index += 1
+                continue
+            if next_indent <= indent or next_stripped.startswith("- "):
+                break
+            parts.append(next_stripped)
+            next_index += 1
+
+        scalars.setdefault(key, []).append(" ".join(part for part in parts if part).strip())
+        index = next_index
+
+    return scalars
+
+
 def require_markers(label: str, text: str, markers: list[str], missing: list[str]) -> None:
+    normalized_text = re.sub(r"\s+", " ", text).strip()
     for marker in markers:
+        if marker in text:
+            continue
+        normalized_marker = re.sub(r"\s+", " ", marker).strip()
+        if normalized_marker and normalized_marker in normalized_text:
+            continue
         if marker not in text:
             missing.append(f"{label}: {marker}")
 
 
 def require_exact_scalar_lines(label: str, text: str, scalar_lines: list[str], missing: list[str]) -> None:
-    lines = text.splitlines()
+    scalar_occurrences = extract_scalar_occurrences(text)
     for scalar_line in scalar_lines:
-        count = text.count(scalar_line)
-        if count != 1:
-            missing.append(f"{label}: expected exactly one {scalar_line.strip()!r}; found {count}")
+        stripped = scalar_line.strip()
+        scalar_key, scalar_value = stripped.split(":", 1)
+        expected_value = scalar_value.strip()
+        values = scalar_occurrences.get(scalar_key, [])
+        value_count = sum(1 for item in values if item == expected_value)
+        if value_count != 1:
+            missing.append(f"{label}: expected exactly one {stripped!r}; found {value_count}")
 
-        scalar_key = scalar_line.lstrip().split(":", 1)[0]
-        key_count = sum(1 for line in lines if line.lstrip().startswith(f"{scalar_key}:"))
+        key_count = len(values)
         if key_count != 1:
             missing.append(f"{label}: expected exactly one scalar key {scalar_key!r}; found {key_count}")
 

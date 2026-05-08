@@ -180,8 +180,12 @@ internal sealed record MediaRenderJobStatus(
     DateTimeOffset? StartedAtUtc,
     DateTimeOffset? CompletedAtUtc,
     string? AssetId,
+    string? AssetUrl,
     TimeSpan? CacheTtl,
-    string? Error);
+    string? Error,
+    AssetApprovalState? ApprovalState = null,
+    AssetRetentionState? RetentionState = null,
+    AssetStorageClass? StorageClass = null);
 
 [Obsolete("Use Chummer.Media.Contracts.PacketFactoryRequest.")]
 internal sealed record PacketFactoryRequest(

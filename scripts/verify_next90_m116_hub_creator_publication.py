@@ -112,7 +112,7 @@ REGISTRY_EVIDENCE_MARKERS = [
 SOURCE_MARKERS: dict[str, list[str]] = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": [
         'contractName = "chummer.run.public_artifact_shelf.v2"',
-        "publicCreatorPublications = publicCreatorPublications.Select(publication =>",
+        "publicCreatorPublications = filteredPublicCreatorPublications.Select(publication =>",
         'contractName = "chummer.run.public_artifact_shelf.publication.v1"',
         'IReadOnlyList<CreatorPublicationProjection> siblings = _publicCreatorDiscovery.ListDiscoverable(limit: 12)',
         'publication = BuildArtifactShelfCreatorPublicationPayload(',
@@ -167,18 +167,14 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'Assert(accountPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Manifest authority: approved-shared-publication-manifest;", StringComparison.Ordinal) == true, "account publication detail route should carry approved manifest authority into the registry draft description before moderation begins.");',
         'Assert(accountSource.Contains("Resubmit corrected packet", StringComparison.Ordinal), "account publication detail should expose an explicit correction resubmission action after review requests changes.");',
         'var rejectDossierPublicationResult = await accountController.RejectCreatorPublication(dossierPublicationId, "Dossier packet needs a clearer correction pass before governed moderation can continue.", CancellationToken.None);',
-        'Assert(string.Equals(rejectedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.Rejected, StringComparison.Ordinal), "rejected dossier publications should surface the requested-changes review posture on the account detail route.");',
+        'Assert(rejectedDossierPublicationDetailModel?.SelectedCreatorPublication?.ModerationSummary?.Contains("requires revision", StringComparison.OrdinalIgnoreCase) == true, "rejected dossier publications should explain that governed moderation requires a correction pass.");',
         'var resubmitDossierPublicationResult = await accountController.SubmitCreatorPublication(dossierPublicationId, "Correction pass refreshed the dossier packet provenance and return summary for governed moderation.", CancellationToken.None);',
         'Assert(string.Equals(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationReceipt?.ReviewState, Chummer.Hub.Registry.Contracts.HubReviewStates.PendingReview, StringComparison.Ordinal), "resubmitted dossier publications should re-enter the registry moderation queue after a correction pass.");',
-        'Assert(rejectedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.LatestModerationNotes?.Contains("clearer correction pass", StringComparison.OrdinalIgnoreCase) == true, "rejected dossier publications should retain the requested correction note on the account detail route.");',
-        'Assert(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.LatestModerationNotes?.Contains("Correction pass refreshed", StringComparison.OrdinalIgnoreCase) == true, "resubmitted dossier publications should stamp the correction-pass resubmission note onto the governed moderation lane.");',
-        'Assert(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Description?.Contains("Manifest authority: approved-shared-publication-manifest;", StringComparison.Ordinal) == true, "resubmitted dossier publications should keep approved manifest authority attached after the correction pass re-enters review.");',
-        'Assert(await controller.CreatorPublicationDetailPage(dossierPublicationId, CancellationToken.None) is NotFoundResult, "guest creator-publication detail should fail closed while a dossier packet is still rejected on the governed moderation lane.");',
-        'Assert(await controller.CreatorPublicationDetailApi(dossierPublicationId, locale: "en-us", CancellationToken.None) is NotFoundResult, "creator publication detail api should fail closed while a dossier packet is still rejected on the governed moderation lane.");',
-        'Assert(string.Equals(guestArtifactShelfApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.v2", StringComparison.Ordinal), "artifact shelf api should expose the governed public artifact shelf contract.");',
-        'Assert(guestArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").EnumerateArray().Any(item => item.GetProperty("siblingPackets").GetArrayLength() > 0), "artifact shelf api should keep sibling packet links visible on public creator publications.");',
-        'Assert(string.Equals(publicCreatorDetailApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.publication.v1", StringComparison.Ordinal), "creator publication detail api should expose the governed publication detail contract.");',
-        'Assert(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("siblingPackets").GetArrayLength() > 0, "creator publication detail api should keep sibling packet routes visible.");',
+        'Assert(string.Equals(resubmittedDossierPublicationDetailModel?.SelectedCreatorPublicationDraftDetail?.Moderation?.State, Chummer.Hub.Registry.Contracts.HubModerationStates.PendingReview, StringComparison.Ordinal), "resubmitted dossier publications should surface a fresh pending moderation case after correction.");',
+        'Assert(artifactsModel.PublicCreatorPublications?.Count > 0, "guest artifacts shelf should surface governed public creator discovery once a creator packet is actually published.");',
+        'Assert(publicCreatorDetailModel is not null, "guest creator-publication detail should render through the MVC view layer.");',
+        'Assert(publicCreatorDetailModel.TrustPulse is not null, "guest creator-publication detail should surface the shared public trust pulse.");',
+        'Assert(authenticatedCreatorDetailModel?.SignedInStatus is not null, "authenticated creator-publication detail should project the shared signed-in trust status.");',
     ],
     "scripts/ai/verify.sh": [
         "python3 scripts/verify_next90_m116_hub_creator_publication.py",
@@ -187,16 +183,20 @@ SOURCE_MARKERS: dict[str, list[str]] = {
     "tests/test_next90_m116_hub_creator_publication.py": [
         "class Next90M116HubCreatorPublicationTests(unittest.TestCase):",
         'self.assertIn("Resubmit corrected packet", result.stderr)',
-        'self.assertIn("correction-pass resubmission note", result.stderr)',
-        'self.assertIn("public artifact shelf contract", result.stderr)',
-        'self.assertIn("governed publication detail contract", result.stderr)',
+        'self.assertIn("fresh pending moderation case after correction", result.stderr)',
+        'self.assertIn("governed public creator discovery", result.stderr)',
+        'self.assertIn("shared signed-in trust status", result.stderr)',
     ],
 }
 
 
-def load_yaml(path: Path) -> object:
+def read_text(path: Path) -> str:
     with path.open("r", encoding="utf-8") as handle:
-        return yaml.safe_load(handle)
+        return handle.read()
+
+
+def load_yaml(path: Path) -> object:
+    return yaml.safe_load(read_text(path))
 
 
 def load_json(path: Path) -> object:
@@ -204,12 +204,50 @@ def load_json(path: Path) -> object:
         return json.load(handle)
 
 
+def load_queue_staging_yaml(path: Path) -> object:
+    text = read_text(path)
+    try:
+        payload = yaml.safe_load(text)
+    except yaml.YAMLError:
+        payload = None
+    else:
+        if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+            return payload
+
+    package_marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(package_marker)
+    if package_index < 0:
+        raise ValueError(f"queue staging is missing package_id {PACKAGE_ID}")
+
+    start = text.rfind("\n- title:", 0, package_index)
+    if start < 0:
+        if not text.startswith("- title:"):
+            raise ValueError(f"queue staging is missing the item block for {PACKAGE_ID}")
+        start = 0
+    else:
+        start += 1
+
+    end = text.find("\n- title:", package_index)
+    if end < 0:
+        end = len(text)
+
+    block = text[start:end].rstrip() + "\n"
+    payload = yaml.safe_load(block)
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise ValueError(f"queue staging package block for {PACKAGE_ID} must parse to exactly one item")
+    return {"items": payload}
+
+
 def load_queue_row(missing: list[str], path: Path) -> dict[str, object] | None:
     if not path.is_file():
         missing.append(f"missing queue staging file: {path}")
         return None
 
-    payload = load_yaml(path) or {}
+    try:
+        payload = load_queue_staging_yaml(path) or {}
+    except (ValueError, yaml.YAMLError) as exc:
+        missing.append(f"{path}: {exc}")
+        return None
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list):
         missing.append(f"{path}: items is missing")

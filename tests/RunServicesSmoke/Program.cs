@@ -3,6 +3,7 @@ using Chummer.Run.Api.Controllers;
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.AI.Services.Assets;
@@ -1970,8 +1971,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var layoutSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
     Assert(layoutSource.Contains("data-nav-sheet", StringComparison.Ordinal), "layout should keep the compact mobile navigation sheet wired into the public shell.");
     Assert(layoutSource.Contains("aria-controls=\"site-nav-sheet\"", StringComparison.Ordinal), "layout should expose the compact navigation sheet through the header toggle.");
-    Assert(layoutSource.Contains("site-bottom-cta", StringComparison.Ordinal), "layout should keep a mobile-first sticky primary CTA for the public shell.");
-    Assert(!layoutSource.Contains("Help, legal, and utility", StringComparison.Ordinal), "compact public footer should stop carrying utility links in the product-route disclosure.");
+    Assert(!layoutSource.Contains("site-bottom-cta", StringComparison.Ordinal), "layout should stop auto-injecting a sticky bottom CTA on every public route.");
+    Assert(!layoutSource.Contains("Help and legal", StringComparison.Ordinal), "public shell copy should stop using the older help-and-legal footer framing.");
+    Assert(!layoutSource.Contains("Truth boundary", StringComparison.Ordinal), "public shell footer should stop projecting canon/projection disclosure copy.");
     Assert(layoutSource.Contains("CLICKRANK_AI_CHUMMER_RUN_SITE_ID", StringComparison.Ordinal), "layout should source the chummer.run ClickRank id from environment instead of hard-coding it.");
     Assert(layoutSource.Contains("requestHost is \"chummer.run\" or \"www.chummer.run\"", StringComparison.Ordinal), "layout should only load ClickRank on the public chummer.run host.");
     var programSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Program.cs"));
@@ -1990,11 +1992,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(landingSource.Contains("<div class=\"release-footnote\">", StringComparison.Ordinal), "landing proof should reduce the workflow follow-through to one quieter note instead of a second full card grid.");
     Assert(!landingSource.Contains("role-matrix__grid", StringComparison.Ordinal), "landing proof should not reopen a second mini-grid once the hero already carries the main conversion story.");
     Assert(!landingSource.Contains("works-column__header", StringComparison.Ordinal), "landing should collapse the what-works-now strip instead of restating three full column headers.");
-    Assert(landingSource.Contains("Preview in progress:", StringComparison.Ordinal), "landing should demote preview-in-progress copy to a quieter shelf note instead of a full third state card.");
     Assert(landingSource.Contains("Need the full picture?", StringComparison.Ordinal), "landing should route deeper proof evaluation through one quiet inline note instead of a second button stack.");
     Assert(landingSource.Contains("PublicSurfaceStatus.DisplayLabel", StringComparison.Ordinal), "landing should use the shared public status presenter instead of route-local badge labels.");
-    Assert(landingSource.Contains("_PublicTrustPulseBody.cshtml", StringComparison.Ordinal), "landing should render weekly trust rows through the shared pulse body instead of duplicating the row template.");
-    Assert(landingSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "landing should reuse the shared signed-in trust panel instead of inventing a landing-only trust surface.");
+    Assert(landingSource.Contains("workflow-band", StringComparison.Ordinal), "landing should keep one compact three-card product section instead of reopening multiple route families.");
+    Assert(landingSource.Contains("route-choice-grid", StringComparison.Ordinal), "landing should keep one audience strip after the main product story.");
+    Assert(landingSource.Contains("continuity-band", StringComparison.Ordinal), "landing should keep one dedicated install-and-account band.");
+    Assert(!landingSource.Contains("flagship-coverage", StringComparison.Ordinal), "landing should move whole-product frontier material off the front door.");
+    Assert(!landingSource.Contains("trust-claims", StringComparison.Ordinal), "landing should avoid repeating a separate trust-claims grid after the proof block.");
+    Assert(!landingSource.Contains("future-strip", StringComparison.Ordinal), "landing should move future-lane editorial material off the main front-door spine.");
+    Assert(!landingSource.Contains("_PublicTrustPulseBody.cshtml", StringComparison.Ordinal), "landing should keep the full weekly trust pulse on deeper status surfaces instead of restating it on the front door.");
     Assert(landingSource.Contains("TrustRowValue(Model.SignedInStatus, \"Who can get it now\"", StringComparison.Ordinal), "landing should reuse the signed-in trust posture for live access guidance on the authenticated front door.");
     Assert(landingSource.Contains("starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession", StringComparison.Ordinal), "landing should derive the signed-in starter lane from the grounded first playable session truth already attached to the campaign spine.");
     Assert(landingSource.Contains("Open starter lane on Home", StringComparison.Ordinal), "landing should keep a direct signed-in starter-lane route instead of forcing repo knowledge.");
@@ -2541,6 +2547,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(downloadsSource.Contains("recommendedIsInstaller", StringComparison.Ordinal), "downloads should keep the top card copy grounded in whether the current shelf item is an installer or a package.");
     Assert(!downloadsSource.Contains("<p>@release.Recommended.SupportLine</p>", StringComparison.Ordinal), "downloads should not surface the technical install-path line as the primary top-card copy.");
     Assert(downloadsSource.Contains("Open current release", StringComparison.Ordinal), "downloads should route broader release posture back to the dedicated current-release page instead of turning the install card into a second status page.");
+    Assert(!downloadsSource.Contains("flagship-coverage", StringComparison.Ordinal), "downloads should remove the whole-product frontier strip from the install page.");
+    Assert(!downloadsSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "downloads should stop restating the weekly trust pulse on the install page.");
     Assert(shelfSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Card.Audience)", StringComparison.Ordinal), "artifact shelf cards should humanize audience labels instead of leaking raw canon values.");
     Assert(!shelfSource.Contains("@card.Card.Audience", StringComparison.Ordinal), "artifact shelf cards should not render raw audience values.");
     Assert(publicLandingControllerSource.Contains("PublicSurfaceStatus.AudienceLabel(card.Audience)", StringComparison.Ordinal), "detail-page facts should humanize audience labels before projecting them.");
@@ -2550,6 +2558,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!publicLandingControllerSource.Contains("Redirect(\"/now\")", StringComparison.Ordinal), "status should be a first-class public surface instead of redirecting to the current-release page.");
     Assert(statusSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "status should reuse the shared public trust pulse instead of inventing a second pulse renderer.");
     Assert(statusSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "status should reuse the shared signed-in trust panel instead of inventing another install-specific rail.");
+    Assert(statusSource.Contains("Public launch health", StringComparison.Ordinal), "status should expose a dedicated public launch-health breakdown instead of leaving live, fallback, revoke, and freshness truth implicit.");
+    Assert(statusSource.Contains("Model.LaunchHealthRows", StringComparison.Ordinal), "status should render the compiled launch-health rows from the controller model.");
     Assert(statusSource.Contains("/api/public/progress-poster.svg", StringComparison.Ordinal), "status should surface the public progress poster directly from the hosted poster route.");
     Assert(statusSource.Contains("Open progress", StringComparison.Ordinal), "status should keep a direct route to the deeper weighted delivery report.");
     Assert(!featureDetailSource.Contains("story-guide-tail", StringComparison.Ordinal), "detail-family pages should not end with one generic shared tail after the family-specific sections.");
@@ -2604,6 +2614,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var signedInTrustStatus = new SignedInTrustStatusService(installLinking, supportCases, supportPresentation, trustPulse);
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
     var campaignFederation = new CampaignFederationOrchestrationService(campaignSpine, new ArtifactFactoryOrchestrationService());
+    var karmaForge = new KarmaForgeDiscoveryService(new KarmaForgeStore(configuration, loggerFactory.CreateLogger<KarmaForgeStore>()));
     var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
     var installBootstrapTickets = new InstallBootstrapTicketService(
         DataProtectionProvider.Create(Path.Combine(tempRoot, "install-bootstrap-tickets")),
@@ -2620,14 +2631,14 @@ async Task VerifyPublicLandingProjectionAsync()
         WebRootPath = Path.Combine(tempRoot, "wwwroot")
     };
     var windowsProofInstallers = new WindowsProofInstallerService(configuration);
-    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2709,7 +2720,8 @@ async Task VerifyPublicLandingProjectionAsync()
         installLinking,
         campaignSpine,
         workspaceServerPlane,
-        campaignFederation)
+        campaignFederation,
+        configuration)
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2991,6 +3003,24 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.Equals(refreshPayload!.Grant.AccessToken, redeemPayload.Grant.AccessToken, StringComparison.Ordinal), "grant refresh should issue a new installation token.");
     Assert(string.Equals(refreshPayload.Installation.Version, "0.6.2-smoke", StringComparison.Ordinal), "grant refresh should update the current install version metadata.");
     string currentGrantAccessToken = refreshPayload.Grant.AccessToken;
+    var nativeContinuationResult = installLinkingController.ContinueClaimedInstall(new DesktopInstallNativeContinuationRequest(
+        InstallationId: redeemPayload.Installation.InstallationId,
+        AccessToken: currentGrantAccessToken));
+    var nativeContinuationPayload = (nativeContinuationResult.Result as OkObjectResult)?.Value as DesktopInstallNativeContinuationResponse;
+    Assert(nativeContinuationPayload is not null, "native claimed-install continuation api should return a typed continuation payload.");
+    Assert(nativeContinuationPayload!.RouteReceipt is not null && !string.IsNullOrWhiteSpace(nativeContinuationPayload.RouteReceipt.MatchedRoute), "native claimed-install continuation api should expose the governing route receipt or bounded review posture.");
+    Assert(string.Equals(nativeContinuationPayload.RouteState, "bounded_failure", StringComparison.Ordinal), "native claimed-install continuation api should keep the governing route on bounded-failure posture while parity claims stay review-required.");
+    Assert(nativeContinuationPayload.BoundedFailureReason?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true, "native claimed-install continuation api should explain the current bounded review posture when the direct route receipt cannot clear parity claims yet.");
+    var nativeUpdateResult = installLinkingController.PlanClaimedInstallUpdate(new DesktopInstallNativeContinuationRequest(
+        InstallationId: redeemPayload.Installation.InstallationId,
+        AccessToken: currentGrantAccessToken));
+    var nativeUpdatePayload = (nativeUpdateResult.Result as OkObjectResult)?.Value as DesktopInstallNativeUpdateResponse;
+    Assert(nativeUpdatePayload is not null && nativeUpdatePayload.RouteReceipt is not null, "native claimed-install update planner should carry the same governing route receipt as the continuation route.");
+    var nativeRollbackResult = installLinkingController.PlanClaimedInstallRollback(new DesktopInstallNativeContinuationRequest(
+        InstallationId: redeemPayload.Installation.InstallationId,
+        AccessToken: currentGrantAccessToken));
+    var nativeRollbackPayload = (nativeRollbackResult.Result as OkObjectResult)?.Value as DesktopInstallNativeRollbackResponse;
+    Assert(nativeRollbackPayload is not null && nativeRollbackPayload.RouteReceipt is not null, "native claimed-install rollback planner should carry the same governing route receipt as the continuation route.");
     var linkedSummaryResult = await installLinkingController.GetSummary(CancellationToken.None);
     var linkedSummaryPayload = (linkedSummaryResult.Result as OkObjectResult)?.Value as InstallLinkingSummaryDto;
     Assert(linkedSummaryPayload is not null, "install linking summary endpoint should return the signed-in account state.");
@@ -3896,7 +3926,8 @@ async Task VerifyPublicLandingProjectionAsync()
         installLinking,
         campaignSpine,
         workspaceServerPlane,
-        campaignFederation)
+        campaignFederation,
+        configuration)
     {
         ControllerContext = AuthenticatedControllerContext("openrun-outsider-token")
     };
@@ -4532,6 +4563,14 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(federationBatchPayload.Batch.RequiredReceiptRefs.Any(item => string.Equals(item, $"public-shelf:/artifacts/publications/{dossierPublicationId}", StringComparison.Ordinal)), "campaign federation api should require the governed dossier publication shelf anchor on the launched batch.");
     Assert(federationBatchPayload.Batch.RequiredReceiptRefs.Any(item => item.StartsWith("replay:", StringComparison.Ordinal)), "campaign federation api should keep replay-safe receipt evidence on the launched batch.");
     Assert(federationBatchPayload.Watchouts.Any(item => item.Contains("preview ready", StringComparison.OrdinalIgnoreCase)), "campaign federation api should keep preview-bounded watchouts when replay publication review has not been promoted yet.");
+    Assert(string.Equals(federationBatchPayload.RouteState, "bounded_failure", StringComparison.Ordinal), "campaign federation api should surface batch route posture instead of optimistic launch claims when source-pack receipts are not all live.");
+    Assert(string.Equals(federationBatchPayload.RouteState, "bounded_failure", StringComparison.Ordinal), "campaign federation api should fail closed on the launch route when no current local proof receipt backs the exchange endpoint.");
+    Assert(federationBatchPayload.RouteReceipt is null, "campaign federation api should not mint a fake batch route receipt before every outward-facing source pack is live.");
+    Assert(federationBatchPayload.SourcePacks.Any(item => string.Equals(item.SourcePackKind, "campaign_recap", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(item.RouteState, "published", StringComparison.OrdinalIgnoreCase)), "campaign federation api should keep unpublished replay source packs on bounded-failure posture until a public shelf receipt exists.");
+    Assert(federationBatchPayload.BoundedFailureReason?.Contains("visible source receipts", StringComparison.OrdinalIgnoreCase) == true, "campaign federation api should explain why the launched exchange batch stays bounded.");
+    Assert(federationBatchPayload.SourcePacks.Any(item => item.RouteReceipt is not null && item.RouteReceipt.MatchedRoute.StartsWith("/artifacts/publications/", StringComparison.Ordinal)), "campaign federation api should surface current public source-pack receipts on published inputs.");
+    Assert(federationBatchPayload.SourcePacks.Any(item => string.Equals(item.SourcePackKind, "campaign_recap", StringComparison.Ordinal) && string.Equals(item.RouteState, "bounded_failure", StringComparison.Ordinal) && item.RouteReceipt is null), "campaign federation api should keep unpublished replay source packs on bounded-failure posture until a public shelf receipt exists.");
     var authenticatedHomePage = await authenticatedLandingController.HomePage(null, CancellationToken.None) as ViewResult;
     var authenticatedHomeModel = authenticatedHomePage?.Model as HomePageViewModel;
     Assert(authenticatedHomeModel is not null, "signed-in home page should render through the MVC view layer.");
@@ -4935,6 +4974,9 @@ async Task VerifyPublicLandingProjectionAsync()
     var dossierMovementPayload = (dossierMovementResult.Result as OkObjectResult)?.Value as DossierMovementReceiptProjection ?? dossierMovementResult.Value;
     var dossierMovementStatusCode = (dossierMovementResult.Result as ObjectResult)?.StatusCode;
     var dossierMovementProblemDetail = ((dossierMovementResult.Result as ObjectResult)?.Value as ProblemDetails)?.Detail;
+    Assert(dossierMovementPayload is not null && string.Equals(dossierMovementPayload.DossierId, sourceDossier.DossierId, StringComparison.Ordinal), "campaign spine dossier-movement api should identify the source dossier on movement.");
+    Assert(dossierMovementPayload!.GroupChanged, "campaign spine dossier-movement api should report when the governed roster group changes.");
+    Assert(dossierMovementPayload.EventChanged, "campaign spine dossier-movement api should report when the governed run or scene changes.");
     Assert(dossierMovementPayload is not null && string.Equals(dossierMovementPayload.TargetRunTitle, "Dockside handoff", StringComparison.Ordinal), $"campaign spine movement api should materialize a governed target run receipt. status={dossierMovementStatusCode?.ToString() ?? "<null>"} detail={dossierMovementProblemDetail ?? "<none>"}");
     Assert(string.Equals(dossierMovementPayload.TargetSceneTitle, "Pier 3 exchange", StringComparison.Ordinal), "campaign spine movement api should materialize a governed target scene receipt.");
     Assert(dossierMovementPayload.Receipts.Any(item => string.Equals(item.SourceKind, "target_run", StringComparison.Ordinal)), "campaign spine movement api should preserve the governed target-run receipt on the transfer continuity packet.");
@@ -4988,7 +5030,8 @@ async Task VerifyPublicLandingProjectionAsync()
         installLinking,
         campaignSpine,
         workspaceServerPlane,
-        campaignFederation)
+        campaignFederation,
+        configuration)
     {
         ControllerContext = AuthenticatedControllerContext("outsider-token")
     };
@@ -5106,6 +5149,21 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(publicDossierPublication is not null, "guest artifacts shelf should surface the published dossier on governed public discovery.");
     Assert(string.Equals(publicDossierPublication?.Kind, "dossier", StringComparison.Ordinal), "guest artifacts shelf should preserve the dossier publication kind on the public discovery rail.");
     Assert(publicDossierPublication?.Discoverable == true, "guest artifacts shelf should keep the published dossier discoverable on the public discovery rail.");
+    var publicCreatorDetailApiResult = await controller.CreatorPublicationDetailApi(publicationId, locale: null, CancellationToken.None);
+    var publicCreatorDetailApiPayload = (publicCreatorDetailApiResult as OkObjectResult)?.Value;
+    using (var publicCreatorDetailApiDocument = JsonDocument.Parse(JsonSerializer.Serialize(publicCreatorDetailApiPayload)))
+    {
+        Assert(
+            publicCreatorDetailApiDocument.RootElement.TryGetProperty("routeReceipt", out JsonElement creatorRouteReceipt)
+            && creatorRouteReceipt.ValueKind == JsonValueKind.Object,
+            "creator publication detail api should expose the governing route receipt or bounded review posture.");
+        Assert(
+            string.Equals(publicCreatorDetailApiDocument.RootElement.GetProperty("routeState").GetString(), "bounded_failure", StringComparison.Ordinal),
+            "creator publication detail api should keep the outward-facing claim on bounded-failure posture while parity claims stay review-required.");
+        Assert(
+            publicCreatorDetailApiDocument.RootElement.GetProperty("boundedFailureReason").GetString()?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true,
+            "creator publication detail api should explain the current bounded review posture instead of silently claiming parity.");
+    }
     var publicCreatorDetailView = await controller.CreatorPublicationDetailPage(publicationId, CancellationToken.None) as ViewResult;
     var publicCreatorDetailModel = publicCreatorDetailView?.Model as PublicCreatorPublicationPageViewModel;
     Assert(publicCreatorDetailModel is not null, "guest creator-publication detail should render through the MVC view layer.");
@@ -5114,8 +5172,25 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailModel.Publication.ComparisonSummary), "guest creator-publication detail should keep creator-comparison guidance visible.");
     Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailModel.Publication.LineageSummary), "guest creator-publication detail should keep lineage posture visible.");
     Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailModel.Publication.ModerationSummary), "guest creator-publication detail should keep moderation-watch posture visible.");
+    Assert(publicCreatorDetailModel.RouteReceipt is not null && publicCreatorDetailModel.RouteReceipt.MatchedRoute.StartsWith("/artifacts/publications/", StringComparison.Ordinal), "guest creator-publication detail should expose the governing route receipt or bounded review posture on the HTML route.");
+    Assert(string.Equals(publicCreatorDetailModel.RouteState, "bounded_failure", StringComparison.Ordinal), "guest creator-publication detail should keep the outward-facing HTML claim on bounded-failure posture while parity claims stay review-required.");
+    Assert(publicCreatorDetailModel.BoundedFailureReason?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true, "guest creator-publication detail should explain the bounded review posture on the HTML route.");
     Assert(publicCreatorDetailModel.TrustPulse is not null, "guest creator-publication detail should surface the shared public trust pulse.");
     Assert(publicCreatorDetailModel.SignedInStatus is null, "guest creator-publication detail should not project install-specific signed-in trust posture.");
+    var releaseBundleProofResult = controller.ReleaseArtifactBundleProof("avalonia-linux-x64-installer") as OkObjectResult;
+    using (var releaseBundleProofDocument = JsonDocument.Parse(JsonSerializer.Serialize(releaseBundleProofResult?.Value)))
+    {
+        Assert(
+            releaseBundleProofDocument.RootElement.TryGetProperty("routeReceipt", out JsonElement releaseBundleRouteReceipt)
+            && releaseBundleRouteReceipt.ValueKind == JsonValueKind.Object,
+            "release-bundle public proof route should expose the governing proof receipt or bounded review posture.");
+        Assert(
+            string.Equals(releaseBundleProofDocument.RootElement.GetProperty("state").GetString(), "bounded_failure", StringComparison.Ordinal),
+            "release-bundle public proof route should keep the outward-facing claim on bounded-failure posture while parity claims stay review-required.");
+        Assert(
+            releaseBundleProofDocument.RootElement.GetProperty("boundedFailureReason").GetString()?.Contains("parity claims stay review-required", StringComparison.OrdinalIgnoreCase) == true,
+            "release-bundle public proof route should explain the bounded review posture instead of silently claiming parity.");
+    }
     var publicPrimerDetailView = await controller.CreatorPublicationDetailPage(primerPublicationId, CancellationToken.None) as ViewResult;
     var publicPrimerDetailModel = publicPrimerDetailView?.Model as PublicCreatorPublicationPageViewModel;
     Assert(publicPrimerDetailModel is not null, "guest primer publication detail should render through the MVC view layer.");
@@ -5194,6 +5269,25 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(statusModel?.TrustPulse is not null, "guest status page should surface the weekly public trust pulse.");
     Assert(statusModel?.SignedInStatus is null, "guest status page should not project install-specific signed-in trust posture.");
     Assert(statusModel?.CampaignOsProof is not null, "status page should surface the mirrored campaign-OS local proof.");
+    Assert(statusModel?.LaunchHealthRows?.Select(static row => row.Label).SequenceEqual(new[]
+    {
+        "Live",
+        "Preview",
+        "Fallback",
+        "Revoked",
+        "Fixed",
+        "Blocked",
+        "Proof freshness",
+        "Support pulse",
+        "Adoption health",
+    }) == true, "status page should preserve the full public launch-health row order.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Preview", StringComparison.Ordinal) && row.Value.Contains("published", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface the current preview posture in launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Revoked", StringComparison.Ordinal) && row.Value.Contains("revoke", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface revoke posture in launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Fixed", StringComparison.Ordinal) && row.Value.Contains("fix", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface fixed-release follow-through in launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Blocked", StringComparison.Ordinal) && row.Value.Contains("blocked", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface blocked route or journey posture in launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Live", StringComparison.Ordinal) && row.Value.Contains("open-public artifact", StringComparison.OrdinalIgnoreCase)) == true, "status page should compile the live public shelf posture into launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Support pulse", StringComparison.Ordinal) && row.Value.Contains("support", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface support closure posture in launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface adoption health directly inside the launch-health breakdown.");
     var authenticatedStatusView = await authenticatedLandingController.StatusPage(CancellationToken.None) as ViewResult;
     var authenticatedStatusModel = authenticatedStatusView?.Model as StatusPageViewModel;
     Assert(authenticatedStatusModel?.TrustPulse is not null, "authenticated status page should keep the weekly public trust pulse visible.");
@@ -5244,7 +5338,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

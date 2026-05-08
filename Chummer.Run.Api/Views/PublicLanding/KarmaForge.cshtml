@@ -11,27 +11,27 @@
         ? "Open signed-in packet history"
         : "Create account for packet history";
     var historyTitle = Model.Form.Authenticated
-        ? "Stay on the signed-in packet rail when you need recent KARMA FORGE continuity"
-        : "Create the account only when you want packet history and follow-through on one rail";
+        ? "Stay on the signed-in packet history page when you need recent KARMA FORGE continuity"
+        : "Create the account only when you want packet history and follow-through in one place";
     var historySummary = Model.Form.Authenticated
-        ? "Signed-in history keeps recent packets, queue posture, and follow-through attached to the same discovery lane instead of burying them in generic feedback history."
-        : "The public intake works without an account. Sign in only when you want your packet history, queue posture, and follow-through to stay visible on the same lane.";
+        ? "Signed-in history keeps recent packets, queue posture, and follow-through attached to the same discovery page instead of burying them in generic feedback history."
+        : "The public intake works without an account. Sign in only when you want your packet history, queue posture, and follow-through to stay visible in one place.";
     var routeChoices = new[]
     {
         new
         {
             Badge = "Intake",
-            Title = "Stay on this route when the job is turning table pain into a Chummer-owned packet",
-            Summary = "The intake route owns normalization, consent, and the first named packet output. It should not be replaced by generic support copy or vague future-signal chatter.",
+            Title = "Stay on this page when the job is turning table pain into a Chummer-owned packet",
+            Summary = "This intake page owns normalization, consent, and the first named packet output. It should not be replaced by generic support copy or vague future-signal chatter.",
             Href = "#karma-forge-intake",
             Label = "Start the intake",
-            Proof = new[] { "Chummer-owned packets", "Consent explicit", "One intake lane" }
+            Proof = new[] { "Chummer-owned packets", "Consent explicit", "One intake page" }
         },
         new
         {
             Badge = "Roadmap family",
             Title = "Open the horizon brief only when you need the larger product case",
-            Summary = "The intake route keeps the discovery job concrete. Move to the horizon brief when you need the broader why, planned shape, or longer strategic frame behind KARMA FORGE.",
+            Summary = "The intake page keeps the discovery job concrete. Move to the horizon brief when you need the broader why, planned shape, or longer strategic frame behind KARMA FORGE.",
             Href = "/roadmap/karma-forge",
             Label = "Read the horizon brief",
             Proof = new[] { "Broader rationale", "Planned product frame", "Still first-party" }
@@ -53,17 +53,17 @@
             Href = historyHref,
             Label = historyLabel,
             Proof = Model.Form.Authenticated
-                ? new[] { "Recent packets", "Queue posture", "Same discovery rail" }
+                ? new[] { "Recent packets", "Queue posture", "Same discovery page" }
                 : new[] { "Public first", "Account adds history", "No auth wall for intake" }
         },
         new
         {
             Badge = "Support",
             Title = "Leave KARMA FORGE for normal support as soon as the issue is no longer discovery work",
-            Summary = "If the problem is install repair, account recovery, or a normal bug/support case, stop using this discovery route and move to first-party support instead.",
+            Summary = "If the problem is install repair, account recovery, or a normal bug/support case, stop using this discovery page and move to first-party support instead.",
             Href = "/contact#support-intake",
             Label = "Open support intake",
-            Proof = new[] { "Support-owned", "Normal issue lane", "Discovery stays bounded" }
+            Proof = new[] { "Support-owned", "Normal support page", "Discovery stays bounded" }
         }
     };
 }
@@ -86,20 +86,11 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 <section class="editorial-block" id="karma-forge-route-map">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Route map</p>
-        <h2 class="editorial-title">Keep discovery intake, roadmap context, packet continuity, and support on their own rails.</h2>
-        <p class="editorial-copy">KARMA FORGE should stay a governed intake lane for table pain and house-rule demand. It should not quietly turn into generic support, the entire public signal loop, or a disguised roadmap page.</p>
+        <p class="eyebrow">Where to go next</p>
+        <h2 class="editorial-title">Keep discovery intake, roadmap context, packet continuity, and support on separate pages.</h2>
+        <p class="editorial-copy">KARMA FORGE should stay a governed intake page for table pain and house-rule demand. It should not quietly turn into generic support, the entire public signal loop, or a disguised roadmap page.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -148,7 +139,7 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
-    <h2 class="editorial-title">Use KARMA FORGE to capture one discovery packet, then move to the rail that owns the next job.</h2>
+    <h2 class="editorial-title">Use KARMA FORGE to capture one discovery packet, then move to the page that owns the next job.</h2>
     <p class="editorial-copy">Stay on the intake when the work is packet capture, open the horizon brief for broader roadmap context, and leave for support the moment the issue stops being governed discovery work.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="#karma-forge-intake">Start the intake</a>
@@ -173,7 +164,7 @@
     <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE sections">
         <a href="#karma-forge-intake">Intake</a>
         <a href="#track-questions">Track questions</a>
-        <a href="#candidate-decisions">Governor routes</a>
+        <a href="#candidate-decisions">Governor decisions</a>
         <a href="#recent-packets">Recent packets</a>
     </aside>
     <div class="trust-page-sections">
@@ -327,9 +318,9 @@
         </article>
 
         <article class="trust-page-section" id="candidate-decisions">
-            <p class="eyebrow">Priority routes</p>
+            <p class="eyebrow">Priority decisions</p>
             <h2>Every packet still has to land on a named decision.</h2>
-            <p>Discovery does not skip directly to implementation. It has to become a reject, document lane, governed candidate, or core-ruleset review with reasons.</p>
+            <p>Discovery does not skip directly to implementation. It has to become a reject, documentation outcome, governed candidate, or core-ruleset review with reasons.</p>
             <p class="muted-copy">The normalized output is explicit: HouseRuleDemandPacket, KarmaForgeCandidate, and RuleEnvironmentImpactHypothesis stay visible before any governor routing or follow-up.</p>
             <div class="settings-summary-list">
                 @foreach (var decision in Model.CandidateDecisions)

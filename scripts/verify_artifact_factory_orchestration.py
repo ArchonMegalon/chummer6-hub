@@ -834,6 +834,52 @@ def load_yaml(path: Path) -> object:
     return yaml.safe_load(read_text(path))
 
 
+def normalize_whitespace(value: str) -> str:
+    return " ".join(value.split())
+
+
+def contains_normalized(text: str, marker: str) -> bool:
+    return normalize_whitespace(marker) in normalize_whitespace(text)
+
+
+def load_queue_staging_yaml(path: Path) -> object:
+    text = read_text(path)
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError:
+        data = None
+    else:
+        if isinstance(data, dict) and isinstance(data.get("items"), list):
+            return data
+
+    package_marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(package_marker)
+    if package_index < 0:
+        raise ValueError(f"queue staging is missing package_id {PACKAGE_ID}.")
+
+    start = text.rfind("\n- title:", 0, package_index)
+    if start < 0:
+        if text.startswith("- title:"):
+            start = 0
+        else:
+            raise ValueError(f"queue staging is missing the item block for package_id {PACKAGE_ID}.")
+    else:
+        start += 1
+
+    end = text.find("\n- title:", package_index)
+    if end < 0:
+        end = len(text)
+
+    candidate = text[start:end].rstrip() + "\n"
+    try:
+        data = yaml.safe_load(candidate)
+    except yaml.YAMLError as exc:
+        raise ValueError(f"queue staging package block failed to parse: {exc}") from exc
+    if not isinstance(data, list) or len(data) != 1 or not isinstance(data[0], dict):
+        raise ValueError(f"queue staging package block for {PACKAGE_ID} must parse to exactly one item.")
+    return {"items": data}
+
+
 def find_queue_item(data: object) -> dict:
     if not isinstance(data, dict):
         raise ValueError("queue staging root must be a mapping.")
@@ -994,7 +1040,7 @@ def reject_out_of_scope_repo_citations(missing: list[str], label: str, proof_ite
 
 def verify_queue_authority(missing: list[str], path: Path) -> None:
     try:
-        item = find_queue_item(load_yaml(path))
+        item = find_queue_item(load_queue_staging_yaml(path))
     except (FileNotFoundError, ValueError, yaml.YAMLError) as exc:
         missing.append(f"{path}: {exc}")
         return
@@ -1019,7 +1065,7 @@ def verify_queue_mirror_alignment(missing: list[str], queue_paths: list[Path]) -
     queue_items: list[tuple[Path, dict]] = []
     for path in queue_paths:
         try:
-            queue_items.append((path, find_queue_item(load_yaml(path))))
+            queue_items.append((path, find_queue_item(load_queue_staging_yaml(path))))
         except (FileNotFoundError, ValueError, yaml.YAMLError):
             return
 
@@ -1111,7 +1157,7 @@ def main() -> int:
             missing.append(str(exc))
         else:
             for marker in QUEUE_MARKERS:
-                if marker not in queue_text:
+                if not contains_normalized(queue_text, marker):
                     missing.append(f"{queue_path}: {marker}")
             verify_queue_authority(missing, queue_path)
 
@@ -1123,7 +1169,7 @@ def main() -> int:
         missing.append(str(exc))
     else:
         for marker in SUCCESSOR_REGISTRY_MARKERS:
-            if marker not in registry_text:
+            if not contains_normalized(registry_text, marker):
                 missing.append(f"{SUCCESSOR_REGISTRY_PATH}: {marker}")
         verify_successor_registry_authority(missing, SUCCESSOR_REGISTRY_PATH)
 

@@ -761,7 +761,15 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 for receipt in payload["proof_receipts"]
                 if receipt["package_id"] == "next90-m102-hub-desktop-native-trust"
             ]
-            self.assertEqual(2, len(m102_receipts))
+            self.assertEqual(
+                {
+                    "desktop_native_claim_and_recovery",
+                    "support_followthrough:install_truth",
+                    "desktop_client_readiness:bounded_routes",
+                    "fleet_and_operator_loop:desktop_native_trust",
+                },
+                {receipt["receipt_id"] for receipt in m102_receipts},
+            )
             self.assertTrue(all(receipt["frontier_id"] == 2897065929 for receipt in m102_receipts))
             m105_package = next(
                 item
@@ -944,6 +952,32 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertNotEqual(0, result.returncode)
             self.assertIn("canonical design successor queue staging block missing marker: landed_commit: 160af58f", result.stderr)
+
+    def test_extract_yaml_block_handles_zero_indented_canonical_queue_items(self) -> None:
+        verifier = load_verifier_module()
+
+        queue_text = "\n".join(
+            [
+                "items:",
+                "- title: Unify claim, install, update, and support recovery into one desktop-native flow",
+                "  task: Remove browser ritual from claim, install, update, rollback, and support continuation for claimed desktop users.",
+                "  package_id: next90-m102-hub-desktop-native-trust",
+                "  proof:",
+                "  - queue-proof-a",
+                "  - queue-proof-b",
+                "  allowed_paths:",
+                "  - Chummer.Run.Api",
+                "  - scripts",
+                "- title: Another package",
+                "  package_id: next90-m999-something-else",
+            ]
+        )
+
+        block = verifier._extract_yaml_block(queue_text, "package_id: next90-m102-hub-desktop-native-trust")
+
+        self.assertIsNotNone(block)
+        self.assertEqual(["queue-proof-a", "queue-proof-b"], verifier._extract_yaml_string_list(block, "proof"))
+        self.assertEqual(["Chummer.Run.Api", "scripts"], verifier._extract_yaml_string_list(block, "allowed_paths"))
 
     def test_verifier_fail_closes_successor_queue_package_identity_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
@@ -2069,6 +2103,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 env={
                     **dict(os.environ),
                     "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
                 },
             )
 
@@ -2120,6 +2155,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                 env={
                     **dict(os.environ),
                     "CHUMMER_HUB_LOCAL_RELEASE_PROOF_PATH": str(proof_path),
+                    "CHUMMER_HUB_SERVED_RELEASE_PROOF_PATH": str(proof_path),
                 },
             )
 
@@ -2371,6 +2407,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
             proof = json.loads(proof_path.read_text(encoding="utf-8"))
             proof["generatedAt"] = "2099-01-01T00:00:00Z"
             proof["generated_at"] = "2099-01-01T00:00:00Z"
+            proof["desktop_client_readiness"]["generated_at"] = "2099-01-01T00:00:00Z"
             proof_path.write_text(json.dumps(proof, indent=2) + "\n", encoding="utf-8")
 
             result = subprocess.run(

@@ -156,9 +156,6 @@
   const header = document.querySelector("[data-site-header]");
   const navToggle = document.querySelector("[data-nav-toggle]");
   const navSheet = document.querySelector("[data-nav-sheet]");
-  const bottomCta = document.querySelector("[data-bottom-cta]");
-  const bottomCtaDismiss = document.querySelector("[data-bottom-cta-dismiss]");
-  const bottomCtaStorageKey = "chummer.bottom_cta.dismissed_routes";
 
   const syncHeader = () => {
     if (!header) return;
@@ -215,46 +212,6 @@
         closeNavSheet();
       }
     });
-  }
-
-  if (bottomCta) {
-    const routeKey = bottomCta.getAttribute("data-bottom-cta-key") || "";
-    const readDismissedRoutes = () => {
-      try {
-        const raw = window.sessionStorage.getItem(bottomCtaStorageKey);
-        if (!raw) return [];
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed.filter((value) => typeof value === "string") : [];
-      } catch {
-        return [];
-      }
-    };
-
-    const writeDismissedRoutes = (routes) => {
-      try {
-        window.sessionStorage.setItem(bottomCtaStorageKey, JSON.stringify(routes));
-      } catch {
-        // Ignore storage failures and keep the CTA interactive.
-      }
-    };
-
-    const hideBottomCta = (persist) => {
-      bottomCta.hidden = true;
-      if (!persist || !routeKey) return;
-      const dismissedRoutes = readDismissedRoutes();
-      if (!dismissedRoutes.includes(routeKey)) {
-        dismissedRoutes.push(routeKey);
-        writeDismissedRoutes(dismissedRoutes);
-      }
-    };
-
-    if (routeKey && readDismissedRoutes().includes(routeKey)) {
-      hideBottomCta(false);
-    }
-
-    if (bottomCtaDismiss) {
-      bottomCtaDismiss.addEventListener("click", () => hideBottomCta(true));
-    }
   }
 
   document.querySelectorAll("[data-copy-source]").forEach((button) => {

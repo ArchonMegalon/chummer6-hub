@@ -108,7 +108,7 @@ ordering_rule:
 waves:
   - id: W6
     name: Make desktop promotion repeatable
-    status: complete
+    status: in_progress
     milestone_ids:
       - 101
       - 102
@@ -635,7 +635,7 @@ milestones:
           - /docker/chummercomplete/chummer6-hub commit 7be45a1b hardens M102 encoded hash separator secret redaction.
           - /docker/chummercomplete/chummer6-hub commit e054d2f1 pins the M102 encoded hash proof floor.
           - /docker/chummercomplete/chummer6-hub commit 43e273e9 hardens M102 native support secret redaction.
-#           - /docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.
+          - /docker/chummercomplete/chummer6-hub commit d86cce39 tightens the M102 successor frontier proof.
           - /docker/chummercomplete/chummer6-hub commit aa318f30 tightens the M102 encoded proof marker guard.
           - /docker/chummercomplete/chummer6-hub commit 607139bc hardens M102 HTML hash separator redaction.
           - /docker/chummercomplete/chummer6-hub commit 0a007077 tightens M102 compressed helper proof guard.
@@ -2161,7 +2161,7 @@ milestones:
         status: complete
         evidence:
           - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Community/CampaignSpineService.cs projects rules navigator answers with stable ExplainEntryId values, before/after diffs, and rule-environment studio lifecycle posture on signed-in campaign surfaces.
-          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Support/SupportAssistantService.cs forwards shared ExplainEntryId values into support and install-aware build citations so assistant answers stay grounded in the same campaign and build receipt lane.
+          - /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Services/Support/SupportAssistantService.cs forwards RulesNavigator ExplainEntryId values into support citations and install-aware build citations so assistant answers stay grounded in the same campaign and build receipt lane.
           - /docker/chummercomplete/chummer.run-services/tests/RunServicesSmoke/Program.cs proves campaign rules, signed-in support answers, and install-aware build questions reuse the same explain receipt ids and return rails.
           - /docker/chummercomplete/chummer.run-services/scripts/materialize_hub_local_release_proof.py closes the successor proof package and publishes the campaign_rule_environment_receipts, support_rule_environment_receipts, and install_aware_support_receipts rows as verify-only evidence.
           - /docker/chummercomplete/chummer.run-services/scripts/verify_next90_m114_hub_rule_environment_receipts.py and /docker/chummercomplete/chummer.run-services/tests/test_next90_m114_hub_rule_environment_receipts.py fail closed on queue, registry, source, and release-proof drift for the shared rule-environment receipt lane.

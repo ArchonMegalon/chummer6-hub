@@ -53,7 +53,7 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("artifactIdentityRegistry tuple avalonia:windows:win-x64 drifted", result.stderr)
+        self.assertIn("artifactIdentityRegistry tuple avalonia:linux:linux-x64 drifted", result.stderr)
 
     def test_verifier_fails_when_install_recovery_refs_drop_tuple_marker(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m144-proof-ref-") as temp_dir:
@@ -69,7 +69,7 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("recoveryProofRefs missing desktopTupleCoverage.desktopRouteTruth[avalonia:windows:win-x64]", result.stderr)
+        self.assertIn("recoveryProofRefs missing desktopTupleCoverage.desktopRouteTruth[avalonia:linux:linux-x64]", result.stderr)
 
     def test_verifier_fails_when_release_proof_route_drops_promoted_install_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m144-proof-route-") as temp_dir:
@@ -95,10 +95,18 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             self.copy_sources(temp_root)
             release_channel_path = temp_root / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
             payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
+            for tuple_truth in payload["desktopTupleCoverage"]["desktopRouteTruth"]:
+                if tuple_truth.get("tupleId") == "avalonia:windows:win-x64":
+                    tuple_truth["artifactId"] = "avalonia-win-x64-archive"
+                    break
             payload["supportabilityState"] = "published"
             payload["rolloutState"] = "published"
             payload["message"] = "Shelf is fully live."
             release_channel_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            startup_smoke_path = temp_root / "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"
+            startup_smoke_payload = json.loads(startup_smoke_path.read_text(encoding="utf-8"))
+            startup_smoke_payload["artifactSha256"] = "deadbeef" * 8
+            startup_smoke_path.write_text(json.dumps(startup_smoke_payload, indent=2), encoding="utf-8")
 
             result = self.run_verifier(temp_root)
 

@@ -885,10 +885,15 @@ public sealed class ReleaseBundlePromotionService
             : null;
 
         List<CanonicalArtifactState> artifactRows = ExtractCanonicalArtifactRows(artifacts);
-        List<string> requiredDesktopPlatforms = DeriveRequiredDesktopPlatforms(artifactRows);
+        List<string> requiredDesktopPlatforms = ReadSourceCoverageStringList(sourceCoverage, "requiredDesktopPlatforms");
         if (requiredDesktopPlatforms.Count == 0)
         {
             requiredDesktopPlatforms = [.. RequiredDesktopPlatforms];
+        }
+        List<string> requiredDesktopHeads = ReadSourceCoverageStringList(sourceCoverage, "requiredDesktopHeads");
+        if (requiredDesktopHeads.Count == 0)
+        {
+            requiredDesktopHeads = [.. RequiredDesktopHeads];
         }
         List<Dictionary<string, string>> promotedInstallerTuples = [];
         HashSet<string> promotedHeadTokens = new(StringComparer.OrdinalIgnoreCase);
@@ -957,11 +962,11 @@ public sealed class ReleaseBundlePromotionService
         List<string> missingRequiredPlatforms = requiredDesktopPlatforms
             .Where(platform => !promotedPlatformTokens.Contains(platform))
             .ToList();
-        List<string> missingRequiredHeads = RequiredDesktopHeads
+        List<string> missingRequiredHeads = requiredDesktopHeads
             .Where(head => !promotedHeadTokens.Contains(head))
             .ToList();
         List<string> missingRequiredPlatformHeadPairs = requiredDesktopPlatforms
-            .SelectMany(platform => RequiredDesktopHeads.Select(head => $"{head}:{platform}"))
+            .SelectMany(platform => requiredDesktopHeads.Select(head => $"{head}:{platform}"))
             .Where(pair => !promotedPairs.Contains(pair))
             .ToList();
 
@@ -978,20 +983,26 @@ public sealed class ReleaseBundlePromotionService
             }
         }
 
-        List<string> requiredDesktopPlatformHeadRidTuples = requiredDesktopPlatforms
-            .SelectMany(platform =>
-            {
-                IEnumerable<string> rids = DefaultRequiredDesktopPlatformRids.TryGetValue(platform, out string[]? requiredRids)
-                    && requiredRids.Length > 0
-                        ? requiredRids
-                        : promotedRidsByPlatform.GetValueOrDefault(platform, []).OrderBy(static value => value, StringComparer.Ordinal);
-                return RequiredDesktopHeads.SelectMany(head =>
-                    rids.Where(static rid => !string.IsNullOrWhiteSpace(rid))
-                        .Select(rid => $"{head}:{rid}:{platform}"));
-            })
-            .OrderBy(static value => value, StringComparer.Ordinal)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        List<string> requiredDesktopPlatformHeadRidTuples = ReadSourceCoverageStringList(
+            sourceCoverage,
+            "requiredDesktopPlatformHeadRidTuples");
+        if (requiredDesktopPlatformHeadRidTuples.Count == 0)
+        {
+            requiredDesktopPlatformHeadRidTuples = requiredDesktopPlatforms
+                .SelectMany(platform =>
+                {
+                    IEnumerable<string> rids = DefaultRequiredDesktopPlatformRids.TryGetValue(platform, out string[]? requiredRids)
+                        && requiredRids.Length > 0
+                            ? requiredRids
+                            : promotedRidsByPlatform.GetValueOrDefault(platform, []).OrderBy(static value => value, StringComparer.Ordinal);
+                    return requiredDesktopHeads.SelectMany(head =>
+                        rids.Where(static rid => !string.IsNullOrWhiteSpace(rid))
+                            .Select(rid => $"{head}:{rid}:{platform}"));
+                })
+                .OrderBy(static value => value, StringComparer.Ordinal)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
         List<string> promotedDesktopPlatformHeadRidTuples = promotedPlatformHeadRidTuples
             .OrderBy(static value => value, StringComparer.Ordinal)
             .ToList();
@@ -1004,7 +1015,7 @@ public sealed class ReleaseBundlePromotionService
         JsonObject coverage = new()
         {
             ["requiredDesktopPlatforms"] = JsonSerializer.SerializeToNode(requiredDesktopPlatforms, JsonOptions),
-            ["requiredDesktopHeads"] = JsonSerializer.SerializeToNode(RequiredDesktopHeads, JsonOptions),
+            ["requiredDesktopHeads"] = JsonSerializer.SerializeToNode(requiredDesktopHeads, JsonOptions),
             ["promotedInstallerTuples"] = JsonSerializer.SerializeToNode(promotedInstallerTuples, JsonOptions),
             ["promotedPlatformHeads"] = JsonSerializer.SerializeToNode(promotedPlatformHeads, JsonOptions),
             ["requiredDesktopPlatformHeadRidTuples"] = JsonSerializer.SerializeToNode(requiredDesktopPlatformHeadRidTuples, JsonOptions),
@@ -1029,6 +1040,21 @@ public sealed class ReleaseBundlePromotionService
         };
 
         return coverage;
+    }
+
+    private static List<string> ReadSourceCoverageStringList(JsonObject? sourceCoverage, string propertyName)
+    {
+        if (sourceCoverage?[propertyName] is not JsonArray values)
+        {
+            return [];
+        }
+
+        return values
+            .Select(static value => NormalizeToken(GetJsonString(value)))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static value => value, StringComparer.Ordinal)
+            .ToList();
     }
 
     private static List<string> DeriveRequiredDesktopPlatforms(IReadOnlyList<CanonicalArtifactState> artifacts)
@@ -1554,7 +1580,7 @@ public sealed class ReleaseBundlePromotionService
 
     private static DateTimeOffset? TryGetJsonDateTimeOffset(JsonNode? node)
     {
-        string raw = GetJsonString(node);
+        string? raw = GetJsonString(node);
         return DateTimeOffset.TryParse(raw, out DateTimeOffset parsed)
             ? parsed
             : null;

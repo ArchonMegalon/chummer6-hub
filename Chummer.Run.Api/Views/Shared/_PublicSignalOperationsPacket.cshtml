@@ -96,8 +96,8 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Hosted route promotion</span>
-            <h3>@(Model.HostedProjectionReady ? "Hosted public-signal routes are ready for a bounded domain split." : "Hosted public-signal routes are still pending on this instance.")</h3>
+            <span class="tag">Hosted page promotion</span>
+            <h3>@(Model.HostedProjectionReady ? "Hosted public-signal pages are ready for a bounded domain split." : "Hosted public-signal pages are still pending on this instance.")</h3>
             <p>@Model.HostedProjectionSummary</p>
             <div class="route-choice-card__proof">
                 <span>@Model.HostedDomainLabel</span>
@@ -113,7 +113,7 @@
                         </div>
                         @if (!string.IsNullOrWhiteSpace(route.HostedHref))
                         {
-                            <a class="editorial-strip__action" href="@route.HostedHref" rel="noreferrer noopener" target="_blank">Inspect hosted route</a>
+                            <a class="editorial-strip__action" href="@route.HostedHref" rel="noreferrer noopener" target="_blank">Inspect hosted page</a>
                         }
                         else
                         {
@@ -126,7 +126,7 @@
         <article class="route-choice-card">
             <span class="tag">Ingress and closeout</span>
             <h3>Webhook receipts and voter follow-up stay first-party-governed before promotion.</h3>
-            <p>Hosted projection is not enough by itself. Chummer still needs receipt verification and a first-party closeout lane before a public board can become operationally real.</p>
+            <p>Hosted projection is not enough by itself. Chummer still needs receipt verification and a first-party closeout step before a public board can become operationally real.</p>
             <div class="route-choice-card__proof">
                 <span>@Model.WebhookStatusLabel</span>
                 <span>@Model.VoterCloseoutStatusLabel</span>
@@ -135,7 +135,7 @@
                 <span>@Model.GovernorStatusLabel</span>
                 <span>@Model.ReleaseProofStatusLabel</span>
                 <span>@Model.ReceiptCount bounded receipt@(Model.ReceiptCount == 1 ? string.Empty : "s")</span>
-                <span>@Model.RoutingReceiptCount routed follow-up@(Model.RoutingReceiptCount == 1 ? string.Empty : "s")</span>
+                <span>@Model.RoutingReceiptCount tracked follow-up@(Model.RoutingReceiptCount == 1 ? string.Empty : "s")</span>
             </div>
             <div class="compact-rail">
                 <article class="compact-rail__item">
@@ -198,7 +198,7 @@
                         <p>
                             @if (Model.LastReceiptAtUtc is { } lastReceiptAtUtc)
                             {
-                                @:Latest bounded provider receipt landed at @lastReceiptAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'"). Only route-safe metadata and the payload hash are retained.
+                                @:Latest bounded provider receipt landed at @lastReceiptAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'"). Only safe metadata and the payload hash are retained.
                             }
                             else
                             {
@@ -271,7 +271,7 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Category routing</span>
-            <h3>@Model.CategoryCount categories route public demand without turning the board into support or private intake.</h3>
+            <h3>@Model.CategoryCount categories organize public demand without turning the board into support or private intake.</h3>
             <p>@Model.MisrouteLikelyCount category@(Model.MisrouteLikelyCount == 1 ? string.Empty : "ies") are likely to attract install, crash, or account misroutes. @Model.PrivacySensitiveCount category@(Model.PrivacySensitiveCount == 1 ? string.Empty : "ies") carry tighter privacy pressure.</p>
             @if (rules.Length > 0)
             {
@@ -289,7 +289,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Operator lookup</p>
-        <h2 class="editorial-title">Search bounded source receipts and recipient threads when the aggregate rail gets noisy.</h2>
+        <h2 class="editorial-title">Search bounded source receipts and recipient threads when the aggregate board gets noisy.</h2>
         <p class="editorial-copy">This lookup stays on the first-party side of the boundary. It only searches stored receipt ids, recipient refs, address hashes, delivery ids, provider message ids, and item references.</p>
     </div>
     <div class="status-decision-strip">
@@ -328,8 +328,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Provider-auth ingress</p>
-            <h2 class="editorial-title">Ingress callbacks now declare their own authenticity rails instead of hiding behind one generic operations secret.</h2>
-            <p class="editorial-copy">This keeps closeout delivery truth honest: callbacks should prove themselves on ingress-specific rails before they can influence first-party retry, suppression, or shipped-notification state.</p>
+            <h2 class="editorial-title">Ingress callbacks now declare their own authenticity checks instead of hiding behind one generic operations secret.</h2>
+            <p class="editorial-copy">This keeps closeout delivery truth honest: callbacks should prove themselves on ingress-specific checks before they can influence first-party retry, suppression, or shipped-notification state.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var ingress in deliveryOutcomeIngresses)
@@ -356,7 +356,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Routing board</p>
-            <h2 class="editorial-title">The first public categories and follow-up lanes are now sourced from canon instead of living only in fallback prose.</h2>
+            <h2 class="editorial-title">The first public categories and follow-up paths are now sourced from canon instead of living only in fallback prose.</h2>
             <p class="editorial-copy">This keeps public signal classification visible before the hosted board is promoted and makes the misroute boundaries concrete for install, account, crash, and privacy-sensitive topics.</p>
         </div>
         <div class="route-choice-grid">
@@ -388,7 +388,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Provider receipts</p>
-            <h2 class="editorial-title">Hosted public-board callbacks now land as bounded first-party receipts instead of vanishing into route-level copy.</h2>
+            <h2 class="editorial-title">Hosted public-board callbacks now land as bounded first-party receipts instead of vanishing into page-level copy.</h2>
             <p class="editorial-copy">These rows show only public-board metadata, closeout posture, timestamps, and durable receipt ids. Raw user prose and provider payload bodies stay out of the stored first-party loop.</p>
         </div>
         <div class="route-choice-grid">
@@ -572,7 +572,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Recipient closeout threads</p>
-            <h2 class="editorial-title">Each bounded closeout recipient now has one joined first-party thread instead of forcing manual cross-reading across queue, dispatch, callback, and journey rails.</h2>
+            <h2 class="editorial-title">Each bounded closeout recipient now has one joined first-party thread instead of forcing manual cross-reading across queue, dispatch, callback, and journey records.</h2>
             <p class="editorial-copy">Dispatch receipts remain the spine. Chummer now projects the matching queue state, latest provider callback, and journey writeback evidence for the same recipient ref into one compact operations thread.</p>
         </div>
         <div class="route-choice-grid">
@@ -649,7 +649,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Automatic retry expiry</p>
-            <h2 class="editorial-title">Expired provider retry windows now reenter bounded recovery on a timer-driven lane instead of sitting until an operator notices them.</h2>
+            <h2 class="editorial-title">Expired provider retry windows now reenter bounded recovery on a timer-driven sweep instead of sitting until an operator notices them.</h2>
             <p class="editorial-copy">These runs stay narrow. They only touch dispatch receipts whose provider retry window has already expired, reuse stored recipient scope, and keep suppressed deliveries out of the automatic sweep.</p>
         </div>
         <div class="route-choice-grid">
@@ -678,7 +678,7 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Replay and backfill</p>
-            <h2 class="editorial-title">Ready closeout receipts can now be replayed through a bounded first-party reconcile lane when governor or proof gates arrive late.</h2>
+            <h2 class="editorial-title">Ready closeout receipts can now be replayed through a bounded first-party reconcile pass when governor or proof gates arrive late.</h2>
             <p class="editorial-copy">Replay stays narrow: it reuses the audience captured on the original closeout receipt, records a bounded run receipt, and does not broaden notification scope from later public-board state.</p>
         </div>
         <div class="route-choice-grid">
@@ -708,7 +708,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Delivery recovery</p>
             <h2 class="editorial-title">Accepted or retryable closeout dispatch receipts can now be recovered without treating suppression or provider state as public truth.</h2>
-            <p class="editorial-copy">This lane is narrower than replay. It reconciles existing bounded dispatch receipts, reuses the stored recipient scope when needed, and leaves suppressed deliveries out of automatic retry.</p>
+            <p class="editorial-copy">This recovery pass is narrower than replay. It reconciles existing bounded dispatch receipts, reuses the stored recipient scope when needed, and leaves suppressed deliveries out of automatic retry.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var run in recentRecoveryRuns)
@@ -810,8 +810,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Journey writeback</p>
-            <h2 class="editorial-title">The public closeout rail now writes bounded voter-notified journey evidence only after the first-party send path completes.</h2>
-            <p class="editorial-copy">This stays on the Hub side of the boundary: the hosted board can say something shipped, but Chummer records the notification event only after governor truth, release proof, and the first-party outbound lane line up.</p>
+            <h2 class="editorial-title">The public closeout flow now writes bounded voter-notified journey evidence only after the first-party send path completes.</h2>
+            <p class="editorial-copy">This stays on the Hub side of the boundary: the hosted board can say something shipped, but Chummer records the notification event only after governor truth, release proof, and the first-party outbound path line up.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in recentJourneyReceipts)

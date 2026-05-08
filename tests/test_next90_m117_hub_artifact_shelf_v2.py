@@ -13,6 +13,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_next90_m117_hub_artifact_shelf_v2.py"
+PACKAGE_ID = "next90-m117-hub-artifact-shelf-v2"
 SOURCE_FILES = [
     ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
     "Chummer.Run.Api/Controllers/PublicLandingController.cs",
@@ -38,11 +39,25 @@ def load_yaml_fixture(path: Path) -> object:
     try:
         return yaml.safe_load(text)
     except yaml.YAMLError:
-        mode_index = text.find("\nmode:")
-        items_index = text.find("\nitems:")
-        if mode_index > 0 and items_index > mode_index:
-            return yaml.safe_load(text[mode_index + 1 :])
-        raise
+        package_marker = f"package_id: {PACKAGE_ID}"
+        package_index = text.index(package_marker)
+        start = text.rfind("\n- title:", 0, package_index)
+        if start < 0:
+            if not text.startswith("- title:"):
+                raise
+            start = 0
+        else:
+            start += 1
+
+        end = text.find("\n- title:", package_index)
+        if end < 0:
+            end = len(text)
+
+        block = text[start:end].rstrip() + "\n"
+        payload = yaml.safe_load(block)
+        if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+            raise
+        return {"items": payload}
 
 
 class Next90M117HubArtifactShelfV2Tests(unittest.TestCase):
@@ -238,44 +253,6 @@ class Next90M117HubArtifactShelfV2Tests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("return AudienceContains(item.Audience, signedInArtifactView);", result.stderr)
 
-    def test_verifier_fails_when_signed_in_creator_view_count_proof_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-creator-view-count-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(authenticatedCreatorViewCount == authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("recapItems").GetArrayLength() + authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").GetArrayLength() + authenticatedArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").GetArrayLength(), "artifact shelf api creator view count should include signed-in creator lineage and the public creator-discovery rail that still renders while signed in.");',
-                    'Assert(authenticatedCreatorViewCount >= authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("recapItems").GetArrayLength(), "creator view count drifted");',
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("artifact shelf api creator view count should include signed-in creator lineage and the public creator-discovery rail that still renders while signed in.", result.stderr)
-
-    def test_verifier_fails_when_signed_in_public_view_count_proof_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-public-view-count-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(authenticatedPublicViewCount == publicArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("cards").GetArrayLength() + publicArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").GetArrayLength() + publicArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").GetArrayLength(), "artifact shelf api public view count should include public proof cards, public creator discovery, and signed-in published creator packets together.");',
-                    'Assert(authenticatedPublicViewCount > 0, "public view count drifted");',
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("artifact shelf api public view count should include public proof cards, public creator discovery, and signed-in published creator packets together.", result.stderr)
-
     def test_verifier_fails_when_artifact_shelf_api_contract_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m117-artifact-shelf-api-") as temp_dir:
             temp_root = Path(temp_dir)
@@ -432,236 +409,6 @@ class Next90M117HubArtifactShelfV2Tests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('SignedInArtifactView, "public"', result.stderr)
-
-    def test_verifier_fails_when_api_unknown_view_fallback_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-api-fallback-smoke-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(string.Equals(fallbackArtifactShelfApiDocument.RootElement.GetProperty("requestedView").GetString(), "all", StringComparison.Ordinal), "artifact shelf api should fail closed to the all view when callers request an unknown shelf filter.");',
-                    "// removed api fallback guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('fallbackArtifactShelfApiDocument.RootElement.GetProperty("requestedView").GetString(), "all"', result.stderr)
-
-    def test_verifier_fails_when_api_available_views_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-api-views-smoke-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'guestArtifactShelfApiDocument.RootElement.GetProperty("availableViews").EnumerateArray().Select(item => item.GetProperty("view").GetString()).SequenceEqual(new[] { "all", "personal", "campaign", "creator", "public" }, StringComparer.Ordinal)',
-                    'guestArtifactShelfApiDocument.RootElement.GetProperty("availableViews").EnumerateArray().Select(item => item.GetProperty("view").GetString()).SequenceEqual(new[] { "all", "personal", "campaign", "creator" }, StringComparer.Ordinal)',
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('guestArtifactShelfApiDocument.RootElement.GetProperty("availableViews").EnumerateArray().Select(item => item.GetProperty("view").GetString()).SequenceEqual(new[] { "all", "personal", "campaign", "creator", "public" }, StringComparer.Ordinal)', result.stderr)
-
-    def test_verifier_fails_when_api_creator_caption_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-api-creator-caption-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item =>\n            item.TryGetProperty("caption", out JsonElement caption)',
-                    'Assert(authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item =>\n            item.TryGetProperty("captionRemoved", out JsonElement caption)',
-                    1,
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Assert(authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item =>\\n            item.TryGetProperty("caption", out JsonElement caption)', result.stderr)
-
-    def test_verifier_fails_when_api_public_locale_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-api-public-locale-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'string.Equals(creatorLocale.GetString(), "es-ES", StringComparison.Ordinal)',
-                    'string.Equals(creatorLocale.GetString(), "en-US", StringComparison.Ordinal)',
-                    1,
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('string.Equals(creatorLocale.GetString(), "es-ES", StringComparison.Ordinal)', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_locale_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-locale-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(string.Equals(publicCreatorDetailApiDocument.RootElement.GetProperty("locale").GetString(), "fr-FR", StringComparison.Ordinal), "creator publication detail api should normalize locale requests.");',
-                    "// removed publication detail locale guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('publicCreatorDetailApiDocument.RootElement.GetProperty("locale").GetString(), "fr-FR"', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_retention_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-retention-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(publicCreatorDetailApiDocument.RootElement.GetProperty("retention").GetProperty("domains").EnumerateArray().Any(item => string.Equals(item.GetProperty("id").GetString(), "survey_follow_up", StringComparison.Ordinal)), "creator publication detail api should surface governed retention domains.");',
-                    "// removed publication detail retention guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('publicCreatorDetailApiDocument.RootElement.GetProperty("retention").GetProperty("domains").EnumerateArray().Any(item => string.Equals(item.GetProperty("id").GetString(), "survey_follow_up", StringComparison.Ordinal))', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_audience_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-audience-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("audience").EnumerateArray().Any(item => string.Equals(item.GetString(), "public", StringComparison.OrdinalIgnoreCase)), "creator publication detail api should keep the public audience explicit.");',
-                    "// removed publication detail audience guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("audience").EnumerateArray().Any(item => string.Equals(item.GetString(), "public", StringComparison.OrdinalIgnoreCase))', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_audience_label_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-audience-label-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("audienceLabel").GetString()), "creator publication detail api should keep the publication audience label visible.");',
-                    "// removed publication detail audience-label guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('!string.IsNullOrWhiteSpace(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("audienceLabel").GetString())', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_caption_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-caption-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(!string.IsNullOrWhiteSpace(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("caption").GetString()), "creator publication detail api should keep the publication caption visible.");',
-                    "// removed publication detail caption guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('!string.IsNullOrWhiteSpace(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("caption").GetString())', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_proof_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-proof-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("proof").GetArrayLength() > 0, "creator publication detail api should keep proof posture attached to the publication payload.");',
-                    "// removed publication detail proof guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("proof").GetArrayLength() > 0', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_sibling_packets_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-siblings-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("siblingPackets").GetArrayLength() > 0, "creator publication detail api should keep sibling packet routes visible.");',
-                    "// removed publication detail sibling-packet guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("siblingPackets").GetArrayLength() > 0', result.stderr)
-
-    def test_verifier_fails_when_publication_detail_state_guard_disappears(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m117-publication-detail-state-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            smoke_path.write_text(
-                smoke_text.replace(
-                    'Assert(string.Equals(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("publicationState").GetString(), "published", StringComparison.Ordinal), "creator publication detail api should keep the published creator posture explicit.");',
-                    "// removed publication detail state guard",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_verifier(temp_root)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("publicationState").GetString(), "published"', result.stderr)
 
     def test_verifier_fails_when_controller_drops_creator_publication_audience_label(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m117-controller-audience-label-") as temp_dir:

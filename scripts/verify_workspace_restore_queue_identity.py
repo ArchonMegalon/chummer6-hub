@@ -120,43 +120,117 @@ def read_text(path: Path, missing: list[str]) -> str:
 
 
 def extract_item_blocks(text: str) -> list[str]:
+    lines = text.splitlines()
     blocks: list[str] = []
-    marker = "\n  - title:"
-    search_from = 0
+    block_start: int | None = None
 
-    while True:
-        start = text.find(marker, search_from)
-        if start == -1:
-            break
-        start += 1
-        end = text.find(marker, start + 1)
-        blocks.append(text[start:] if end == -1 else text[start:end])
-        search_from = start + 1
+    for index, line in enumerate(lines):
+        if not line.lstrip().startswith("- title:"):
+            continue
+        if block_start is not None:
+            blocks.append("\n".join(lines[block_start:index]))
+        block_start = index
 
-    if text.startswith("  - title:"):
-        end = text.find(marker, 1)
-        blocks.insert(0, text if end == -1 else text[:end])
+    if block_start is not None:
+        blocks.append("\n".join(lines[block_start:]))
 
     return blocks
 
 
+def extract_scalar_occurrences(block: str) -> dict[str, list[str]]:
+    lines = block.splitlines()
+    scalars: dict[str, list[str]] = {}
+    index = 0
+
+    while index < len(lines):
+        line = lines[index]
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if not stripped or stripped.startswith("- ") or ":" not in stripped:
+            index += 1
+            continue
+
+        key, value = stripped.split(":", 1)
+        if not key.replace("_", "").isalnum():
+            index += 1
+            continue
+
+        value = value.strip()
+        parts = [value] if value else []
+        next_index = index + 1
+        while next_index < len(lines):
+            next_line = lines[next_index]
+            next_stripped = next_line.lstrip()
+            next_indent = len(next_line) - len(next_stripped)
+            if not next_stripped:
+                next_index += 1
+                continue
+            if next_indent <= indent or next_stripped.startswith("- "):
+                break
+            parts.append(next_stripped)
+            next_index += 1
+
+        scalars.setdefault(key, []).append(" ".join(part for part in parts if part).strip())
+        index = next_index
+
+    return scalars
+
+
+def block_title(block: str) -> str:
+    for line in block.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("- title:"):
+            return stripped.removeprefix("- title:").strip()
+    return ""
+
+
 def block_contains_scalar(block: str, key: str, value: str) -> bool:
-    return f"    {key}: {value}\n" in block
+    return value in extract_scalar_occurrences(block).get(key, [])
 
 
 def extract_scalar_list(block: str, key: str) -> list[str]:
-    marker = f"    {key}:\n"
-    start = block.find(marker)
-    if start == -1:
+    lines = block.splitlines()
+    section_line_index = next(
+        (index for index, line in enumerate(lines) if line.lstrip() == f"{key}:"),
+        None,
+    )
+    if section_line_index is None:
         return []
 
-    start += len(marker)
+    anchor_line = lines[section_line_index]
+    anchor_indent = len(anchor_line) - len(anchor_line.lstrip())
     values: list[str] = []
-    for line in block[start:].splitlines():
-        if line.startswith("      - "):
-            values.append(line[len("      - ") :].strip())
+    list_indent: int | None = None
+    current_value: str | None = None
+    for line in lines[section_line_index + 1 :]:
+        stripped = line.lstrip()
+        if not stripped:
             continue
-        break
+
+        indent = len(line) - len(stripped)
+        if stripped.startswith("- "):
+            if list_indent is None:
+                list_indent = indent
+            elif indent < list_indent:
+                break
+
+            if indent == list_indent:
+                current_value = stripped[2:].strip()
+                values.append(current_value)
+                continue
+
+        if list_indent is None:
+            if indent <= anchor_indent:
+                break
+            continue
+
+        if indent > list_indent and current_value is not None:
+            current_value = f"{current_value} {stripped}".strip()
+            values[-1] = current_value
+            continue
+
+        if indent <= anchor_indent or indent < list_indent:
+            break
 
     return values
 
@@ -207,7 +281,7 @@ def check_queue(path: Path, missing: list[str]) -> None:
 
     blocks = extract_item_blocks(text)
     package_blocks = [block for block in blocks if block_contains_scalar(block, "package_id", PACKAGE_ID)]
-    title_blocks = [block for block in blocks if block.startswith(f"  - title: {TITLE}\n")]
+    title_blocks = [block for block in blocks if block_title(block) == TITLE]
     frontier_blocks = [block for block in blocks if block_contains_scalar(block, "frontier_id", FRONTIER_ID)]
     owned_surface_blocks = [
         block

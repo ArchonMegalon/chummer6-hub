@@ -261,27 +261,52 @@ def reject_forbidden_markers(text: str, source: str, errors: list[str]) -> None:
 
 
 def queue_item_block(text: str, package_id: str) -> str:
-    marker = f"    package_id: {package_id}\n"
+    marker = f"package_id: {package_id}"
     package_index = text.find(marker)
     if package_index == -1:
         return ""
 
-    block_start = text.rfind("\n  - title:", 0, package_index)
-    if block_start == -1:
-        block_start = 0
+    start_candidates = [
+        text.rfind("\n- title:", 0, package_index),
+        text.rfind("\n  - title:", 0, package_index),
+    ]
+    block_start = max(start_candidates)
+    if block_start < 0:
+        if text.startswith("- title:") or text.startswith("  - title:"):
+            block_start = 0
+        else:
+            return ""
     else:
         block_start += 1
 
-    block_end = text.find("\n  - title:", package_index)
-    if block_end == -1:
-        block_end = len(text)
+    end_candidates = [index for index in (text.find("\n- title:", package_index), text.find("\n  - title:", package_index)) if index >= 0]
+    block_end = min(end_candidates) if end_candidates else len(text)
 
     return text[block_start:block_end]
 
 
+def load_queue_payload(path: Path) -> dict:
+    queue_text = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(queue_text)
+    except yaml.YAMLError:
+        block = queue_item_block(queue_text, PACKAGE_ID)
+        if not block:
+            raise SystemExit(f"unable to parse queue yaml: {path}")
+        payload = yaml.safe_load(block)
+        if isinstance(payload, list):
+            return {"items": payload}
+        raise SystemExit(f"unable to normalize queue staging yaml: {path}")
+
+    if not isinstance(payload, dict):
+        raise SystemExit(f"queue payload at {path} is not a mapping")
+
+    return payload
+
+
 def verify_queue_row(errors: list[str], path: Path, *, label: str) -> None:
     queue_text = path.read_text(encoding="utf-8")
-    payload = yaml.safe_load(queue_text)
+    payload = load_queue_payload(path)
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list):
         errors.append(f"{label} must expose items[]: {path}")

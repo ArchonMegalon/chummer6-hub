@@ -77,20 +77,20 @@
     {
         string installHref = ContextualPreviewHref(Model.SupportIntake.InstallAccessHref);
         string installSummary = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailSummary)
-            ? "Devices and access stays the calm relink, reclaim, and recovery rail after the installer or app does the real work."
+            ? "Devices and access stays the calm relink, reclaim, and recovery page after the installer or app does the real work."
             : Model.SupportIntake.InstallRailSummary!;
         string installTitle = Model.SupportIntake.RecoveryModeOnly
-            ? "Install recovery stays on the same device rail"
+            ? "Install recovery stays on the same device page"
             : "Install continuity stays attached to the affected copy";
         string installRouteLabel = string.IsNullOrWhiteSpace(Model.SupportIntake.InstallRailLabel)
             ? Model.SupportIntake.InstallAccessLabel
             : Model.SupportIntake.InstallRailLabel!;
         contactRouteChoices.Add((
             Badge: "Public signal",
-            Title: "Safe public feedback should start on Fixer Board",
-            Summary: "Feature requests, safe public bugs, and confusing public copy belong on the public signal lane. Install failures, account issues, logs, and private campaign detail do not.",
+            Title: "Safe public feedback should start on the public feedback page",
+            Summary: "Feature requests, safe public bugs, and confusing public copy belong on the public feedback page. Install failures, account issues, logs, and private campaign detail do not.",
             Href: "/feedback",
-            Label: "Open Fixer Board",
+            Label: "Open feedback",
             Proof: new[] { "Public by default", "Votes inform demand", "No private logs" }));
         contactRouteChoices.Add((
             Badge: "Private support",
@@ -114,7 +114,7 @@
             Label: installRouteLabel,
             Proof: new[]
             {
-                Model.SupportIntake.RecoveryModeOnly ? "Recovery mode only" : "Normal install rail",
+                Model.SupportIntake.RecoveryModeOnly ? "Recovery mode only" : "Normal install path",
                 "Devices & access stays calm",
                 "Browser handoff, not claim ritual"
             }));
@@ -159,12 +159,9 @@
 
 @if (Model.SignedInStatus is not null)
 {
-    @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
-}
-
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    </section>
 }
 
 @if (Model.PrivacyBoundary is not null)
@@ -203,9 +200,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Help route map</p>
+            <p class="eyebrow">Help choices</p>
             <h2 class="editorial-title">Choose the next safe help path.</h2>
-            <p class="editorial-copy">Downloads, recovery, product questions, and private support are separate jobs. Start on the right rail so the fix path stays short and the follow-through stays attached.</p>
+            <p class="editorial-copy">Downloads, recovery, product questions, and private support are separate jobs. Start on the right page so the fix path stays short and the follow-through stays attached.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var choice in helpRouteChoices)
@@ -231,9 +228,9 @@
 
     <section class="workflow-band">
         <div class="workflow-band__lead">
-            <p class="eyebrow">Route detail</p>
+            <p class="eyebrow">Page detail</p>
             <h2 class="editorial-title">First-party help keeps the next step concrete.</h2>
-            <p class="editorial-copy">Each lane answers one question quickly: where to get the right build, how to recover access, when to open a private case, and when a plain answer should be enough.</p>
+            <p class="editorial-copy">Each page answers one question quickly: where to get the right build, how to recover access, when to open a private case, and when a plain answer should be enough.</p>
         </div>
         <div class="workflow-grid">
             @foreach (var pageSection in Model.Sections)
@@ -306,8 +303,8 @@ else if (!contactPage)
         <section class="editorial-block">
             <div class="editorial-block__lead">
                 <p class="eyebrow">Support routing</p>
-                <h2 class="editorial-title">Public signal, private support, tracked return, and install recovery stay separate.</h2>
-                <p class="editorial-copy">This route exists to start the right first-party case. Use the public board for safe signal, then move here as soon as the problem needs logs, recovery, account help, or any private campaign detail.</p>
+                <h2 class="editorial-title">Public feedback, private support, tracked return, and install recovery stay separate.</h2>
+                <p class="editorial-copy">This page exists to start the right first-party case. Use public feedback for safe signal, then move here as soon as the problem needs logs, recovery, account help, or any private campaign detail.</p>
             </div>
             <div class="route-choice-grid">
                 @foreach (var choice in contactRouteChoices)
@@ -342,8 +339,8 @@ else if (!contactPage)
 
             <div class="editorial-block__lead trust-page-section__lead">
                 <p class="eyebrow">Case-type guide</p>
-                <h3>Choose the lane that fits the issue before you attach logs</h3>
-                <p class="muted-copy">Safe public feedback should start on Fixer Board. Choose this form only when the issue needs private or account-linked follow-up.</p>
+                <h3>Choose the path that fits the issue before you attach logs</h3>
+                <p class="muted-copy">Safe public feedback should start on the public feedback page. Choose this form only when the issue needs private or account-linked follow-up.</p>
             </div>
             <div class="compact-rail">
                 @foreach (var option in Model.SupportIntake.Options)
@@ -440,7 +437,7 @@ else if (!contactPage)
                 <div class="compact-rail">
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>@(Model.SupportIntake.RecoveryModeOnly ? "Recovery stays on this install rail" : "Return to the guided installer after support")</h3>
+                            <h3>@(Model.SupportIntake.RecoveryModeOnly ? "Recovery stays on this install page" : "Return to the guided installer after support")</h3>
                             <p>@Model.SupportIntake.InstallRailSummary</p>
                         </div>
                         <a class="inline-link" href="@Model.SupportIntake.InstallRailHref">@Model.SupportIntake.InstallRailLabel</a>

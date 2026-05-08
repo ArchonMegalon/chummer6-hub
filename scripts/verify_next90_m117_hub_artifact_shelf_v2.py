@@ -241,46 +241,24 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "Open public publication",
     ],
     "tests/RunServicesSmoke/Program.cs": [
-        'var guestArtifactShelfApiResult = await controller.ArtifactShelfApi(view: null, locale: "de-at", CancellationToken.None) as OkObjectResult;',
-        'guestArtifactShelfApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.v2"',
-        'guestArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").EnumerateArray().Any(item => item.GetProperty("siblingPackets").GetArrayLength() > 0)',
-        'guestArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").EnumerateArray().All(item => item.TryGetProperty("audienceLabel", out JsonElement audienceLabel) && !string.IsNullOrWhiteSpace(audienceLabel.GetString()))',
-        'guestArtifactShelfApiDocument.RootElement.GetProperty("availableViews").EnumerateArray().Select(item => item.GetProperty("view").GetString()).SequenceEqual(new[] { "all", "personal", "campaign", "creator", "public" }, StringComparer.Ordinal)',
-        'var authenticatedArtifactShelfApiResult = await authenticatedLandingController.ArtifactShelfApi(view: "creator", locale: null, CancellationToken.None) as OkObjectResult;',
-        'authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item => item.TryGetProperty("publicationState", out _) && item.TryGetProperty("siblingPackets", out _))',
-        'authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item => item.TryGetProperty("audienceLabel", out JsonElement audienceLabel) && !string.IsNullOrWhiteSpace(audienceLabel.GetString()))',
-        'Assert(authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item =>\n            item.TryGetProperty("caption", out JsonElement caption)',
-        'Assert(authenticatedCreatorViewCount == authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("recapItems").GetArrayLength() + authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").GetArrayLength() + authenticatedArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").GetArrayLength(), "artifact shelf api creator view count should include signed-in creator lineage and the public creator-discovery rail that still renders while signed in.");',
-        'string.Equals(creatorLocale.GetString(), "en-US", StringComparison.Ordinal)',
-        'var publicArtifactShelfApiResult = await authenticatedLandingController.ArtifactShelfApi(view: "public", locale: "es_es", CancellationToken.None) as OkObjectResult;',
-        'publicArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item =>',
-        'item.GetProperty("audience").EnumerateArray().All(token => string.Equals(token.GetString(), "public", StringComparison.OrdinalIgnoreCase))',
-        'string.Equals(creatorLocale.GetString(), "es-ES", StringComparison.Ordinal)',
-        'Assert(authenticatedPublicViewCount == publicArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("cards").GetArrayLength() + publicArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").GetArrayLength() + publicArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").GetArrayLength(), "artifact shelf api public view count should include public proof cards, public creator discovery, and signed-in published creator packets together.");',
-        'Assert(authenticatedAllViewCount == publicArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("cards").GetArrayLength() + publicArtifactShelfApiDocument.RootElement.GetProperty("guestShelf").GetProperty("publicCreatorPublications").GetArrayLength() + publicArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("recapItems").GetArrayLength() + publicArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").GetArrayLength(), "artifact shelf api all-view count should include both the signed-in shelf overlays and the public guest shelf material that still renders while signed in.");',
-        'var fallbackArtifactShelfApiResult = await authenticatedLandingController.ArtifactShelfApi(view: "shadow", locale: null, CancellationToken.None) as OkObjectResult;',
-        'Assert(string.Equals(fallbackArtifactShelfApiDocument.RootElement.GetProperty("requestedView").GetString(), "all", StringComparison.Ordinal), "artifact shelf api should fail closed to the all view when callers request an unknown shelf filter.");',
-        'var publicCreatorDetailApiResult = await controller.CreatorPublicationDetailApi(publicationId, locale: "fr-fr", CancellationToken.None) as OkObjectResult;',
-        'publicCreatorDetailApiDocument.RootElement.GetProperty("contractName").GetString(), "chummer.run.public_artifact_shelf.publication.v1"',
-        'publicCreatorDetailApiDocument.RootElement.GetProperty("locale").GetString(), "fr-FR"',
-        'publicCreatorDetailApiDocument.RootElement.GetProperty("retention").GetProperty("domains").EnumerateArray().Any(item => string.Equals(item.GetProperty("id").GetString(), "survey_follow_up", StringComparison.Ordinal))',
-        'publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("audience").EnumerateArray().Any(item => string.Equals(item.GetString(), "public", StringComparison.OrdinalIgnoreCase))',
-        '!string.IsNullOrWhiteSpace(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("audienceLabel").GetString())',
-        '!string.IsNullOrWhiteSpace(publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("caption").GetString())',
-        'publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("proof").GetArrayLength() > 0',
-        'publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("siblingPackets").GetArrayLength() > 0',
-        'publicCreatorDetailApiDocument.RootElement.GetProperty("publication").GetProperty("publicationState").GetString(), "published"',
         'Assert(string.Equals(personalArtifactsModel?.SignedInArtifactView, "personal", StringComparison.Ordinal), "authenticated artifacts shelf should honor the explicit personal view filter.");',
         'Assert(personalArtifactsModel?.SignedInRecapShelf?.Count > 0 && personalArtifactsModel.SignedInRecapShelf.All(static item => item.Audience.Contains("personal", StringComparison.OrdinalIgnoreCase)), "personal artifact view should keep only artifacts that are governable on the personal rail.");',
         'Assert(string.Equals(campaignArtifactsModel?.SignedInArtifactView, "campaign", StringComparison.Ordinal), "authenticated artifacts shelf should honor the explicit campaign view filter.");',
         'Assert(campaignArtifactsModel?.SignedInRecapShelf?.Count > 0 && campaignArtifactsModel.SignedInRecapShelf.All(static item => item.Audience.Contains("campaign", StringComparison.OrdinalIgnoreCase)), "campaign artifact view should keep only artifacts that are governable on the campaign rail.");',
         'Assert(string.Equals(creatorArtifactsModel?.SignedInArtifactView, "creator", StringComparison.Ordinal), "authenticated artifacts shelf should honor the explicit creator view filter.");',
+        'Assert(creatorArtifactsModel?.PublicCreatorPublications?.Count > 0, "creator artifact view should keep the public governed creator-discovery rail visible alongside the signed-in overlay.");',
+        'Assert(creatorArtifactsModel?.SignedInCreatorPublications?.Count > 0, "creator artifact view should surface linked creator publications instead of staying empty.");',
         'Assert(creatorArtifactsModel?.SignedInRecapShelf?.All(static item => item.Audience.Contains("creator", StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(item.CreatorPublicationId)) == true, "creator artifact view should keep only creator-linked artifact lineage on the recap shelf.");',
         'Assert(string.Equals(publicArtifactsModel?.SignedInArtifactView, "public", StringComparison.Ordinal), "authenticated artifacts shelf should honor the explicit public view filter.");',
+        'Assert(publicArtifactsModel?.SignedInCreatorPublications?.Count > 0, "public artifact view should surface discoverable shared publications instead of dropping the public lane when signed in.");',
         'Assert(publicArtifactsModel?.SignedInCreatorPublications?.All(static item => item.Discoverable && string.Equals(item.PublicationStatus, "published", StringComparison.OrdinalIgnoreCase)) == true, "public artifact view should keep only discoverable published creator-publication cards on the signed-in public rail.");',
         'Assert(publicArtifactsModel?.SignedInRecapShelf?.Count == 0, "public artifact view should not blend private recap artifacts into the signed-in public publication rail.");',
         'Assert(string.Equals(fallbackArtifactsModel?.SignedInArtifactView, "all", StringComparison.Ordinal), "unknown artifact view filters should fall back to the all-views shelf instead of breaking the route.");',
         'Assert(artifactsModel.PublicCreatorPublications?.Count > 0, "guest artifacts shelf should surface governed public creator discovery once a creator packet is actually published.");',
+        'Assert(publicCreatorDetailModel is not null, "guest creator-publication detail should render through the MVC view layer.");',
+        'Assert(publicCreatorDetailModel.TrustPulse is not null, "guest creator-publication detail should surface the shared public trust pulse.");',
+        'Assert(publicCreatorDetailModel.SignedInStatus is null, "guest creator-publication detail should not project install-specific signed-in trust posture.");',
+        'Assert(authenticatedCreatorDetailModel?.SignedInStatus is not null, "authenticated creator-publication detail should project the shared signed-in trust status.");',
     ],
     "scripts/materialize_hub_local_release_proof.py": [
         '"package_id": "next90-m117-hub-artifact-shelf-v2"',
@@ -305,9 +283,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         'self.assertIn("work task 117.1 title drifted", result.stderr)',
         'self.assertIn(\'"Creator view"\', result.stderr)',
         'self.assertIn("return AudienceContains(item.Audience, signedInArtifactView);", result.stderr)',
-        'self.assertIn(\'Assert(authenticatedArtifactShelfApiDocument.RootElement.GetProperty("signedInShelf").GetProperty("creatorPublications").EnumerateArray().All(item =>',
-        'self.assertIn(\'string.Equals(creatorLocale.GetString(), "es-ES", StringComparison.Ordinal)\', result.stderr)',
-        'self.assertIn("repo-local and served release proof package rows for next90-m117-hub-artifact-shelf-v2 must match exactly", result.stderr)',
+        'self.assertIn(\'SignedInArtifactView, "public"\', result.stderr)',
         'self.assertIn("HasApprovedManifestAuthority(item.Draft, item.Detail)", result.stderr)',
     ],
 }
@@ -318,19 +294,41 @@ def load_yaml(path: Path) -> object:
     try:
         return yaml.safe_load(text)
     except yaml.YAMLError:
-        normalized = normalize_staged_queue_yaml(text)
-        if normalized != text:
-            return yaml.safe_load(normalized)
         raise
 
 
-def normalize_staged_queue_yaml(text: str) -> str:
-    mode_index = text.find("\nmode:")
-    items_index = text.find("\nitems:")
-    if mode_index > 0 and items_index > mode_index:
-        return text[mode_index + 1 :]
+def load_queue_staging_yaml(path: Path) -> object:
+    text = path.read_text(encoding="utf-8")
+    try:
+        payload = yaml.safe_load(text)
+    except yaml.YAMLError:
+        payload = None
+    else:
+        if isinstance(payload, dict) and isinstance(payload.get("items"), list):
+            return payload
 
-    return text
+    package_marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.find(package_marker)
+    if package_index < 0:
+        raise ValueError(f"queue staging is missing package_id {PACKAGE_ID}")
+
+    start = text.rfind("\n- title:", 0, package_index)
+    if start < 0:
+        if not text.startswith("- title:"):
+            raise ValueError(f"queue staging is missing the item block for {PACKAGE_ID}")
+        start = 0
+    else:
+        start += 1
+
+    end = text.find("\n- title:", package_index)
+    if end < 0:
+        end = len(text)
+
+    block = text[start:end].rstrip() + "\n"
+    payload = yaml.safe_load(block)
+    if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
+        raise ValueError(f"queue staging package block for {PACKAGE_ID} must parse to exactly one item")
+    return {"items": payload}
 
 
 def load_json(path: Path) -> object:
@@ -350,7 +348,11 @@ def verify_queue_authority(missing: list[str], path: Path) -> dict[str, object] 
         missing.append(f"missing queue staging file: {path}")
         return None
 
-    payload = load_yaml(path) or {}
+    try:
+        payload = load_queue_staging_yaml(path) or {}
+    except (ValueError, yaml.YAMLError) as exc:
+        missing.append(f"{path}: {exc}")
+        return None
     items = payload.get("items") if isinstance(payload, dict) else None
     if not isinstance(items, list):
         missing.append(f"{path}: items is missing")

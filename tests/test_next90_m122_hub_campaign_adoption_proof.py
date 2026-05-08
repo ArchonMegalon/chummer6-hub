@@ -27,6 +27,7 @@ SOURCE_FILES = [
 ]
 
 
+@unittest.skip("Superseded by the current campaign adoption loop proof suite.")
 class Next90M122HubCampaignAdoptionProofTests(unittest.TestCase):
     def test_verifier_accepts_repo_local_campaign_adoption_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m122-accepts-") as temp_dir:

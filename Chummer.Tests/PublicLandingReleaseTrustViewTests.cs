@@ -17,34 +17,32 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void LandingViewProjectsCanonStartTrustAndRoleSectionsInsteadOfStoppingAtHeroAndReleaseProof()
+    public void LandingViewKeepsOneProofBlockThreeMainJobsAndOneAudienceStrip()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml");
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("Section(\"start_here\")", view, StringComparison.Ordinal);
-        Assert.Contains("Section(\"why_trust_it\")", view, StringComparison.Ordinal);
         Assert.Contains("Section(\"choose_your_lane\")", view, StringComparison.Ordinal);
-        Assert.Contains("Model.TrustPillars", view, StringComparison.Ordinal);
         Assert.Contains("Model.Lanes", view, StringComparison.Ordinal);
         Assert.Contains("workflow-band", view, StringComparison.Ordinal);
-        Assert.Contains("trust-claims", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
-        Assert.Contains("PublicSurfaceStatus.AudienceLabel", view, StringComparison.Ordinal);
         Assert.Contains("hero-installrail", view, StringComparison.Ordinal);
         Assert.Contains("continuity-band", view, StringComparison.Ordinal);
-        Assert.Contains("future-strip", view, StringComparison.Ordinal);
-        Assert.Contains("Model.FlagshipCoverage", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.FlagshipCoverage.Heading", view, StringComparison.Ordinal);
+        Assert.Contains("Need the full picture?", view, StringComparison.Ordinal);
         Assert.Contains("Account-aware install handoff", view, StringComparison.Ordinal);
         Assert.Contains("href=\"@guestReadableHeroPrimaryHref\"", view, StringComparison.Ordinal);
         Assert.DoesNotContain("href=\"@contextualHeroPrimaryHref\"", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access", view, StringComparison.Ordinal);
+        Assert.Contains("Signed-in return", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("trust-claims", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("future-strip", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Model.FlagshipCoverage", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("_PublicTrustPulseBody.cshtml", view, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void DownloadsViewKeepsMainPlatformShelfVisibleBeforeAdvancedAccordion()
+    public void DownloadsViewCollapsesOtherPlatformsBeforeAdvancedSupportOnlyRails()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml");
         string view = File.ReadAllText(viewPath);
@@ -52,8 +50,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         int platformShelfIndex = view.IndexOf("id=\"platform-shelf\"", StringComparison.Ordinal);
         int advancedAccordionIndex = view.IndexOf("id=\"advanced-downloads\"", StringComparison.Ordinal);
 
+        Assert.Contains("<summary>Other supported platforms</summary>", view, StringComparison.Ordinal);
         Assert.Contains("Main platform downloads", view, StringComparison.Ordinal);
-        Assert.Contains("Windows verification and support rail", view, StringComparison.Ordinal);
+        Assert.Contains("Windows verification and support path", view, StringComparison.Ordinal);
         Assert.True(platformShelfIndex >= 0, "platform shelf should stay visible on the main downloads page");
         Assert.True(advancedAccordionIndex >= 0, "advanced accordion should still exist for manual and support-directed downloads");
         Assert.True(platformShelfIndex < advancedAccordionIndex, "platform shelf should appear before the advanced accordion");
@@ -69,10 +68,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("The same build for everyone", view, StringComparison.Ordinal);
         Assert.Contains("Guest or link this copy", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access stay calm", view, StringComparison.Ordinal);
-        Assert.Contains("The install shelf stays tied to the rest of the product.", view, StringComparison.Ordinal);
-        Assert.Contains("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
-        Assert.Contains("id=\"downloads-@card.Id.Replace('_', '-')\"", view, StringComparison.Ordinal);
-        Assert.Contains("@card.ActionLabel", view, StringComparison.Ordinal);
+        Assert.Contains("Release notes, known issues, and requirements", view, StringComparison.Ordinal);
+        Assert.Contains("Open current release", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("id=\"downloads-@card.Id.Replace('_', '-')\"", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -83,7 +82,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("href=\"/now\">What works today</a>", view, StringComparison.Ordinal);
         Assert.Contains("@Model.HelpLabel", view, StringComparison.Ordinal);
-        Assert.Contains("Status, known issues, and install help stay on one release rail so recovery never depends on stale page copy.", view, StringComparison.Ordinal);
+        Assert.Contains("Status, known issues, and install help stay on one release page so recovery never depends on stale page copy.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -92,13 +91,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep install handoff, platform choice, release proof, and recovery on separate rails.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep install handoff, platform choice, release proof, and recovery on separate pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Return to downloads when the job is choosing a platform or installer shape", view, StringComparison.Ordinal);
         Assert.Contains("Open Devices and access only when this copy needs relink or reclaim help", view, StringComparison.Ordinal);
         Assert.Contains("Open what works today when the question is current proof, not this device handoff", view, StringComparison.Ordinal);
         Assert.Contains("Leave the handoff for tracked support or help as soon as the problem becomes recovery-bound", view, StringComparison.Ordinal);
-        Assert.Contains("Use this route to finish one install handoff, then move to the rail that owns the next job.", view, StringComparison.Ordinal);
+        Assert.Contains("Use this page to finish one install handoff, then move to the page that owns the next job.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -143,11 +142,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("route-anchor-target", feedbackView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Public ideas, votes, and safe public bugs on one first-party signal rail", feedbackView, StringComparison.Ordinal);
+        Assert.Contains("Public ideas, votes, and safe public bugs on one first-party feedback page", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Safe public signal", feedbackView, StringComparison.Ordinal);
-        Assert.Contains("Milestones and public direction on one route", roadmapView, StringComparison.Ordinal);
+        Assert.Contains("What looks likely next, and what is still only planned", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Milestone ledger", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Shipped closeout with user-available proof", changelogView, StringComparison.Ordinal);
+        Assert.Contains("Shipped updates with user-available proof", changelogView, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", changelogView, StringComparison.Ordinal);
     }
 
@@ -169,12 +168,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Status route map", view, StringComparison.Ordinal);
+        Assert.Contains("Install or update from the downloads page", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Install or update from the release rail", view, StringComparison.Ordinal);
+        Assert.Contains("Open the larger machine picture only when the short status line is not enough", view, StringComparison.Ordinal);
         Assert.Contains("Use what works today when the question is proof, not packaging", view, StringComparison.Ordinal);
         Assert.Contains("Leave status for first-party help as soon as the issue becomes private", view, StringComparison.Ordinal);
-        Assert.Contains("Open the larger machine picture only when the short status line is not enough", view, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
         Assert.Contains("Signed-in return", view, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref(choice.Href)", view, StringComparison.Ordinal);
@@ -190,9 +188,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Compare with live proof instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
-        Assert.Contains("The milestone roadmap lives on a separate rail", view, StringComparison.Ordinal);
-        Assert.Contains("Use the public loop when a future lane matches real user pain", view, StringComparison.Ordinal);
-        Assert.Contains("Use horizons to understand the future, then move to the route that owns the present-tense job.", view, StringComparison.Ordinal);
+        Assert.Contains("The milestone roadmap lives on a separate page", view, StringComparison.Ordinal);
+        Assert.Contains("Use public feedback when a future idea matches real user pain", view, StringComparison.Ordinal);
+        Assert.Contains("Use horizons to understand the future, then move to the page that owns the present-tense job.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -201,13 +199,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForge.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep discovery intake, roadmap context, packet continuity, and support on their own rails.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep discovery intake, roadmap context, packet continuity, and support on separate pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Stay on this route when the job is turning table pain into a Chummer-owned packet", view, StringComparison.Ordinal);
+        Assert.Contains("Stay on this page when the job is turning table pain into a Chummer-owned packet", view, StringComparison.Ordinal);
         Assert.Contains("Return to participate when the question is broader public discovery, not this intake packet", view, StringComparison.Ordinal);
-        Assert.Contains("Create the account only when you want packet history and follow-through on one rail", view, StringComparison.Ordinal);
+        Assert.Contains("Create the account only when you want packet history and follow-through in one place", view, StringComparison.Ordinal);
         Assert.Contains("Leave KARMA FORGE for normal support as soon as the issue is no longer discovery work", view, StringComparison.Ordinal);
-        Assert.Contains("Use KARMA FORGE to capture one discovery packet, then move to the rail that owns the next job.", view, StringComparison.Ordinal);
+        Assert.Contains("Use KARMA FORGE to capture one discovery packet, then move to the page that owns the next job.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -233,12 +231,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep feature detail, proof, installs, and help on their own rails.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep feature detail, proof, installs, and help on their own pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Compare with live proof instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
-        Assert.Contains("Use the release rail when the question becomes install or update posture", view, StringComparison.Ordinal);
+        Assert.Contains("Use downloads when the question becomes install or update posture", view, StringComparison.Ordinal);
         Assert.Contains("Leave feature detail for first-party help as soon as the issue becomes support or recovery", view, StringComparison.Ordinal);
-        Assert.Contains("Use the feature detail to answer one question, then move to the rail that owns the next job.", view, StringComparison.Ordinal);
+        Assert.Contains("Use the feature detail to answer one question, then move to the page that owns the next job.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -280,7 +278,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("data-nav-toggle", layout, StringComparison.Ordinal);
         Assert.Contains("data-nav-sheet", layout, StringComparison.Ordinal);
         Assert.Contains("Compact navigation", layout, StringComparison.Ordinal);
-        Assert.Contains("Help and legal", layout, StringComparison.Ordinal);
+        Assert.Contains("chrome.PublicSignalNavigation", layout, StringComparison.Ordinal);
+        Assert.Contains("Help", layout, StringComparison.Ordinal);
+        Assert.Contains("Account", layout, StringComparison.Ordinal);
         Assert.Contains("closeNavSheet", script, StringComparison.Ordinal);
         Assert.Contains("nav-sheet-open", script, StringComparison.Ordinal);
         Assert.Contains("event.key === \"Escape\"", script, StringComparison.Ordinal);
@@ -289,17 +289,14 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void LayoutUsesRouteAwareBottomQuickActionsInsteadOfGenericInstallCopyEverywhere()
+    public void LayoutKeepsQuickActionsInHeaderAndFooterInsteadOfAStickyBottomBanner()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
         string layout = File.ReadAllText(layoutPath);
 
-        Assert.Contains("bottomQuickAction = (\"Public signal\", \"Open Fixer Board\", \"/feedback\")", layout, StringComparison.Ordinal);
-        Assert.Contains("bottomQuickAction = (\"Projected movement\", \"Open roadmap\", \"/roadmap\")", layout, StringComparison.Ordinal);
-        Assert.Contains("bottomQuickAction = (\"Need help\", \"Open support\", \"/contact#support-intake\")", layout, StringComparison.Ordinal);
-        Assert.Contains("bottomQuickAction = (\"Reality check\", \"Open what works today\", \"/now\")", layout, StringComparison.Ordinal);
-        Assert.Contains("@bottomQuickAction.Value.Eyebrow", layout, StringComparison.Ordinal);
-        Assert.Contains("@bottomQuickAction.Value.Href", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("bottomQuickAction", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("site-bottom-cta", layout, StringComparison.Ordinal);
+        Assert.Contains("Preview product. Honest install and support guidance.", layout, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -311,11 +308,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         string trustView = File.ReadAllText(trustViewPath);
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Safe public feedback should start on Fixer Board", trustView, StringComparison.Ordinal);
+        Assert.Contains("Safe public feedback should start on the public feedback page", trustView, StringComparison.Ordinal);
         Assert.Contains("Href: \"/feedback\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Label: \"Open Fixer Board\"", trustView, StringComparison.Ordinal);
+        Assert.Contains("Label: \"Open feedback\"", trustView, StringComparison.Ordinal);
         Assert.Contains("string.Equals(Model.PageId, \"contact\"", trustView, StringComparison.Ordinal);
-        Assert.Contains("Safe public feedback should start on Fixer Board. Choose this form only when the issue needs private or account-linked follow-up.", controller, StringComparison.Ordinal);
+        Assert.Contains("Safe public feedback should start on the public feedback page. Choose this form only when the issue needs private or account-linked follow-up.", trustView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -328,10 +325,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string shelfView = File.ReadAllText(shelfViewPath);
 
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Review-required route", publicationView, StringComparison.Ordinal);
-        Assert.Contains("_PublicTrustPulsePanel.cshtml", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Review-required state", publicationView, StringComparison.Ordinal);
         Assert.Contains("Model.TrustPulse?.MissingDesktopClientCoverage == true", shelfView, StringComparison.Ordinal);
-        Assert.Contains("Review-required route", shelfView, StringComparison.Ordinal);
+        Assert.Contains("review-required", shelfView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -342,9 +338,9 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Choose discovery, downloads, signed-in continuity, or help on purpose.", publicationView, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Stay on the artifact shelf when the job is proof, provenance, or comparison", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Leave this route when the next job is installing the product", publicationView, StringComparison.Ordinal);
-        Assert.Contains("Use this route to inspect the publication, then move to the rail that owns the next job.", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Stay in the proof gallery when the job is proof, provenance, or comparison", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Leave this page when the next job is installing the product", publicationView, StringComparison.Ordinal);
+        Assert.Contains("Use this page to inspect the publication, then move to the page that owns the next job.", publicationView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -372,20 +368,16 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void LayoutFooterSurfacesCanonSourceProjectionAndTruthBoundary()
+    public void LayoutFooterKeepsPublicProofAndHelpLinksWithoutCanonDisclosureChrome()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
-        string cssPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css");
 
         string layout = File.ReadAllText(layoutPath);
-        string css = File.ReadAllText(cssPath);
 
-        Assert.Contains("@chrome.FooterCanonicalSource", layout, StringComparison.Ordinal);
-        Assert.Contains("@chrome.FooterGeneratedNote", layout, StringComparison.Ordinal);
-        Assert.Contains("First-party truth stays on <a class=\"quiet-link\" href=\"/now\">what works today</a> and <a class=\"quiet-link\" href=\"/status\">status</a>.", layout, StringComparison.Ordinal);
-        Assert.Contains("Truth boundary", layout, StringComparison.Ordinal);
-        Assert.Contains(".site-footer__meta-label", css, StringComparison.Ordinal);
-        Assert.Contains(".site-footer__provenance", css, StringComparison.Ordinal);
+        Assert.Contains("Use <a class=\"quiet-link\" href=\"/now\">what works today</a> for customer-facing proof and <a class=\"quiet-link\" href=\"/status\">status</a> for current cautions.", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("@chrome.FooterCanonicalSource", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("@chrome.FooterGeneratedNote", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("Truth boundary", layout, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -405,7 +397,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("isPublicSignalCurrent", layout, StringComparison.Ordinal);
         Assert.Contains("\"/feedback\" => normalizedCurrentPath is \"/feedback\"", layout, StringComparison.Ordinal);
         Assert.Contains("\"/changelog\" => normalizedCurrentPath is \"/changelog\"", layout, StringComparison.Ordinal);
-        Assert.Contains("Public loop", layout, StringComparison.Ordinal);
+        Assert.Contains("chrome.PublicSignalNavigation", layout, StringComparison.Ordinal);
         Assert.Contains("PublicSignal: BuildLinks(document.PublicSignalNav, \"public signal navigation\")", navigationService, StringComparison.Ordinal);
         Assert.Contains("PublicSignalNavigation: nav.PublicSignal", chromeService, StringComparison.Ordinal);
         Assert.Contains(".site-footer__current", css, StringComparison.Ordinal);
@@ -425,13 +417,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string feedbackView = File.ReadAllText(feedbackViewPath);
 
         Assert.Contains("You followed a legacy feedback handoff", participateView, StringComparison.Ordinal);
-        Assert.Contains("The current public signal rail lives on <code class=\"mono-receipt\">/feedback</code>", participateView, StringComparison.Ordinal);
+        Assert.Contains("The current public signal page lives on <code class=\"mono-receipt\">/feedback</code>", participateView, StringComparison.Ordinal);
         Assert.DoesNotContain("feedback returns here, roadmap resolves through Horizons, and shipped closeout resolves through What works today.", participateView, StringComparison.Ordinal);
         Assert.Contains("You followed a legacy roadmap handoff", horizonsView, StringComparison.Ordinal);
         Assert.Contains("The milestone-backed public roadmap now lives on <code class=\"mono-receipt\">/roadmap</code>", horizonsView, StringComparison.Ordinal);
         Assert.DoesNotContain("/participate?productlift=feedback#productlift-feedback", horizonsView, StringComparison.Ordinal);
         Assert.Contains("You followed a legacy shipped handoff", nowView, StringComparison.Ordinal);
-        Assert.Contains("The dedicated shipped-closeout rail now lives on <code class=\"mono-receipt\">/changelog</code>", nowView, StringComparison.Ordinal);
+        Assert.Contains("The shipped update stream now lives on <code class=\"mono-receipt\">/changelog</code>", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("/participate?productlift=feedback#productlift-feedback", nowView, StringComparison.Ordinal);
         Assert.Contains("Create the account when you want signal, installs, support, and roadmap follow-up to return to one place.", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Truth stays split on purpose", feedbackView, StringComparison.Ordinal);
@@ -452,21 +444,17 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
-    public void StickyMobileQuickActionCanBeDismissedPerRouteInSessionStorage()
+    public void StickyMobileQuickActionBannerIsGoneFromTheSharedPublicShell()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
         string scriptPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "site.js");
-        string cssPath = RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css");
 
         string layout = File.ReadAllText(layoutPath);
         string script = File.ReadAllText(scriptPath);
-        string css = File.ReadAllText(cssPath);
 
-        Assert.Contains("data-bottom-cta-key=\"@routeKey\"", layout, StringComparison.Ordinal);
-        Assert.Contains("data-bottom-cta-dismiss", layout, StringComparison.Ordinal);
-        Assert.Contains("chummer.bottom_cta.dismissed_routes", script, StringComparison.Ordinal);
-        Assert.Contains("window.sessionStorage.setItem", script, StringComparison.Ordinal);
-        Assert.Contains("bottomCta.hidden = true", script, StringComparison.Ordinal);
-        Assert.Contains(".site-bottom-cta__dismiss", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-bottom-cta-key=\"@routeKey\"", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("data-bottom-cta-dismiss", layout, StringComparison.Ordinal);
+        Assert.DoesNotContain("chummer.bottom_cta.dismissed_routes", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("bottomCta.hidden = true", script, StringComparison.Ordinal);
     }
 }

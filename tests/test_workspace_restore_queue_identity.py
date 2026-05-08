@@ -16,13 +16,65 @@ TITLE = "Emit provenance and conflict receipts for workspace restore and continu
 class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
     @staticmethod
     def _package_block_range(queue_text: str) -> tuple[int, int]:
-        package_marker = f"    package_id: {PACKAGE_ID}\n"
-        package_index = queue_text.find(package_marker)
-        package_start = queue_text.rfind("\n  - title:", 0, package_index) + 1
-        package_end = queue_text.find("\n  - title:", package_index)
-        if package_end == -1:
-            package_end = len(queue_text)
-        return package_start, package_end
+        lines = queue_text.splitlines(keepends=True)
+        package_line_index = next(
+            (index for index, line in enumerate(lines) if line.lstrip() == f"package_id: {PACKAGE_ID}\n"),
+            None,
+        )
+        if package_line_index is None:
+            raise ValueError(f"missing package_id block for {PACKAGE_ID}")
+
+        package_start_index = package_line_index
+        package_indent: int | None = None
+        for index in range(package_line_index, -1, -1):
+            stripped = lines[index].lstrip()
+            indent = len(lines[index]) - len(stripped)
+            if stripped.startswith("- title:"):
+                package_start_index = index
+                package_indent = indent
+                break
+
+        if package_indent is None:
+            raise ValueError(f"missing title row for {PACKAGE_ID}")
+
+        package_end_index = len(lines)
+        for index in range(package_start_index + 1, len(lines)):
+            stripped = lines[index].lstrip()
+            if not stripped.startswith("- title:"):
+                continue
+            indent = len(lines[index]) - len(stripped)
+            if indent == package_indent:
+                package_end_index = index
+                break
+
+        start = sum(len(line) for line in lines[:package_start_index])
+        end = sum(len(line) for line in lines[:package_end_index])
+        return start, end
+
+    @staticmethod
+    def _canonicalize_package_block(package_block: str) -> str:
+        lines = package_block.splitlines()
+        suffix = "\n" if package_block.endswith("\n") else ""
+        normalized_lines: list[str] = []
+        for line in lines:
+            if not line:
+                normalized_lines.append(line)
+                continue
+            stripped = line.lstrip()
+            if stripped.startswith("- title:"):
+                normalized_lines.append(f"  {stripped}")
+                continue
+            if line.startswith("  - "):
+                normalized_lines.append(f"      {stripped}")
+                continue
+            if line.startswith("    "):
+                normalized_lines.append(f"  {line}")
+                continue
+            if line.startswith("  "):
+                normalized_lines.append(f"  {line}")
+                continue
+            normalized_lines.append(line)
+        return "\n".join(normalized_lines) + suffix
 
     def test_queue_identity_guard_passes_current_fleet_and_design_rows(self) -> None:
         result = subprocess.run(
@@ -41,10 +93,8 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             queue_path = Path(temp_dir) / "queue.yaml"
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
-            package_marker = f"    package_id: {PACKAGE_ID}\n"
-            package_start = source_text.rfind("\n  - title:", 0, source_text.find(package_marker)) + 1
-            package_end = source_text.find("\n  - title:", source_text.find(package_marker))
-            package_block = source_text[package_start:package_end]
+            package_start, package_end = self._package_block_range(source_text)
+            package_block = self._canonicalize_package_block(source_text[package_start:package_end])
             duplicate_block = package_block.replace(
                 f"    package_id: {PACKAGE_ID}\n",
                 "    package_id: next90-m105-hub-workspace-continuity-copy\n",
@@ -78,10 +128,8 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             queue_path = Path(temp_dir) / "queue.yaml"
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
-            package_marker = f"    package_id: {PACKAGE_ID}\n"
-            package_start = source_text.rfind("\n  - title:", 0, source_text.find(package_marker)) + 1
-            package_end = source_text.find("\n  - title:", source_text.find(package_marker))
-            package_block = source_text[package_start:package_end]
+            package_start, package_end = self._package_block_range(source_text)
+            package_block = self._canonicalize_package_block(source_text[package_start:package_end])
             duplicate_block = package_block.replace(
                 f"  - title: {TITLE}\n",
                 "  - title: Copied workspace continuity closure row\n",
@@ -115,7 +163,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block.replace(
                 "    allowed_paths:\n"
                 "      - Chummer.Run.Api\n"
@@ -152,7 +200,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block.replace("      - entitlement_sync:conflict_receipts", "", 1)
             queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
 
@@ -178,7 +226,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             duplicate_block = (
                 package_block.replace(
                     f"  - title: {TITLE}\n",
@@ -218,7 +266,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block.replace(
                 "    completion_action: verify_closed_package_only\n",
                 "    completion_action: reopen_package\n",
@@ -248,12 +296,25 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
-            updated_block = package_block.replace(
-                "    do_not_reopen_reason: M105 chummer6-hub workspace continuity is complete; future shards must verify the workspace restore receipt, registry row, queue row, and design-queue row instead of reopening the workspace restore and entitlement conflict receipt package.\n",
-                "    do_not_reopen_reason: Reopen this package whenever continuity proof looks stale.\n",
-                1,
-            )
+            package_block = self._canonicalize_package_block(source_text[start:end])
+            self.assertIn("    do_not_reopen_reason:", package_block)
+            lines = package_block.splitlines(keepends=True)
+            updated_lines: list[str] = []
+            index = 0
+            replaced = False
+            while index < len(lines):
+                line = lines[index]
+                if not replaced and line.startswith("    do_not_reopen_reason:"):
+                    updated_lines.append("    do_not_reopen_reason: Reopen this package whenever continuity proof looks stale.\n")
+                    replaced = True
+                    index += 1
+                    while index < len(lines) and lines[index].startswith("      "):
+                        index += 1
+                    continue
+                updated_lines.append(line)
+                index += 1
+            self.assertTrue(replaced)
+            updated_block = "".join(updated_lines)
             queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
 
             env = os.environ.copy()
@@ -278,7 +339,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block + "      - TASK_LOCAL_TELEMETRY.generated.json copied from a worker run\n"
             queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
 
@@ -304,7 +365,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block + "      - ACTIVE_RUN_HANDOFF.generated.md copied into queue proof\n"
             queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
 
@@ -330,7 +391,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block + "      - execution rules inside this run copied from worker prompt\n"
             queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
 
@@ -356,7 +417,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = (
                 package_block
                 + "      - active_runs_count, eta_human, and remaining_not_started_milestones from task-local telemetry are not repo-local proof.\n"
@@ -387,7 +448,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block + "      - run_ooda_design_supervisor_until_quiet copied from an active-run helper command\n"
             queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
 
@@ -413,7 +474,7 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             source_queue_path = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
             source_text = source_queue_path.read_text(encoding="utf-8")
             start, end = self._package_block_range(source_text)
-            package_block = source_text[start:end]
+            package_block = self._canonicalize_package_block(source_text[start:end])
             updated_block = package_block + "      - ACTIVE&#95;RUN&#95;HANDOFF.generated.md copied into queue proof\n"
             queue_path.write_text(source_text[:start] + updated_block + source_text[end:], encoding="utf-8")
 
@@ -496,8 +557,8 @@ class WorkspaceRestoreQueueIdentityTests(unittest.TestCase):
             start, end = self._package_block_range(source_text)
             package_block = source_text[start:end]
             drifted_block = package_block.replace(
-                "    landed_commit: 4d4b3856\n",
-                "    landed_commit: 00000000\n",
+                "  landed_commit: 4d4b3856\n",
+                "  landed_commit: 00000000\n",
                 1,
             )
             self.assertNotEqual(package_block, drifted_block)

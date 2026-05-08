@@ -7,11 +7,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "verify_artifact_factory_orchestration.py"
 CANONICAL_SUCCESSOR_REGISTRY = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml")
 CANONICAL_FLEET_QUEUE = Path("/docker/fleet/.codex-studio/published/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+CANONICAL_DESIGN_QUEUE = Path("/docker/chummercomplete/chummer-design/products/chummer/NEXT_90_DAY_QUEUE_STAGING.generated.yaml")
+PACKAGE_ID = "next90-m107-hub-artifact-factory"
 SOURCE_FILES = [
     "scripts/verify_artifact_factory_orchestration.py",
     "scripts/ai/verify.sh",
@@ -24,6 +28,97 @@ SOURCE_FILES = [
     "tests/test_artifact_factory_orchestration.py",
     "tests/test_artifact_factory_source_pack_launcher.py",
 ]
+
+_ORIGINAL_PATH_READ_TEXT = Path.read_text
+
+
+def _normalize_whitespace(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _extract_canonical_queue_item_bounds(text: str) -> tuple[int, int, list[dict[str, object]], dict[str, object]]:
+    package_marker = f"package_id: {PACKAGE_ID}"
+    package_index = text.index(package_marker)
+    start = text.rfind("\n- title:", 0, package_index)
+    if start < 0:
+        if not text.startswith("- title:"):
+            raise ValueError(f"cannot locate queue item block for {PACKAGE_ID}")
+        start = 0
+    else:
+        start += 1
+
+    end = text.find("\n- title:", package_index)
+    if end < 0:
+        end = len(text)
+
+    block = text[start:end].rstrip() + "\n"
+    parsed = yaml.safe_load(block)
+    if not isinstance(parsed, list) or len(parsed) != 1 or not isinstance(parsed[0], dict):
+        raise ValueError(f"queue item block for {PACKAGE_ID} did not parse to exactly one mapping")
+    return start, end, parsed, parsed[0]
+
+
+def _replace_canonical_queue_logical_item(text: str, old: str, new: str) -> str:
+    start, end, parsed, item = _extract_canonical_queue_item_bounds(text)
+    old_line = old.strip()
+    new_lines = [line.strip() for line in new.splitlines() if line.strip()]
+    changed = False
+
+    if old_line.startswith("- "):
+        old_value = old_line[2:]
+        replacement_values = [line[2:] if line.startswith("- ") else line for line in new_lines]
+        for field_name, field_value in item.items():
+            if not isinstance(field_value, list):
+                continue
+            for index, entry in enumerate(field_value):
+                if _normalize_whitespace(str(entry)) != _normalize_whitespace(old_value):
+                    continue
+                item[field_name] = [
+                    *field_value[:index],
+                    *replacement_values,
+                    *field_value[index + 1 :],
+                ]
+                changed = True
+                break
+            if changed:
+                break
+    elif ":" in old_line:
+        field_name, _, raw_value = old_line.partition(":")
+        field_name = field_name.strip()
+        if field_name in item and _normalize_whitespace(str(item[field_name])) == _normalize_whitespace(raw_value.strip()):
+            if new_lines:
+                raise ValueError("logical queue key replacement only supports removals in these tests")
+            del item[field_name]
+            changed = True
+
+    if not changed:
+        return text
+
+    rewritten_block = yaml.safe_dump(parsed, sort_keys=False, allow_unicode=False).rstrip() + "\n"
+    return text[:start] + rewritten_block + text[end:]
+
+
+class CanonicalQueueText(str):
+    def replace(self, old: str, new: str, count: int = -1) -> "CanonicalQueueText":
+        replaced = super().replace(old, new, count)
+        if replaced != self or count == 0:
+            return CanonicalQueueText(replaced)
+
+        try:
+            replaced = _replace_canonical_queue_logical_item(str(self), old, new)
+        except (ValueError, yaml.YAMLError):
+            replaced = str(self)
+        return CanonicalQueueText(replaced)
+
+
+def _patched_path_read_text(self: Path, *args: object, **kwargs: object) -> str:
+    text = _ORIGINAL_PATH_READ_TEXT(self, *args, **kwargs)
+    if self == CANONICAL_FLEET_QUEUE or self == CANONICAL_DESIGN_QUEUE:
+        return CanonicalQueueText(text)
+    return text
+
+
+Path.read_text = _patched_path_read_text
 
 
 class ArtifactFactoryOrchestrationProofTests(unittest.TestCase):

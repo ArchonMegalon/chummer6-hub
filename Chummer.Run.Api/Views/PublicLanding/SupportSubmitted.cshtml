@@ -21,10 +21,10 @@
         responseRoutes.Add((
             Badge: Model.Chrome.Authenticated ? "Tracked return" : "Tracked follow-up",
             Title: Model.Chrome.Authenticated
-                ? "Keep this case on the account support rail"
+                ? "Keep this case on the account support page"
                 : "Create an account if you want tracked support history here",
             Summary: Model.Chrome.Authenticated
-                ? "The next routed update should stay on the same case id inside Chummer instead of vanishing into side channels."
+                ? "The next tracked update should stay on the same case id inside Chummer instead of vanishing into side channels."
                 : "Guest follow-up still works on reply email, but an account keeps later support history, linked installs, and recovery on one calmer return path.",
             Href: primaryAction.Href,
             Label: primaryAction.Label,
@@ -35,16 +35,16 @@
 
     responseRoutes.Add((
         Badge: "Reality check",
-        Title: "Use the release rail when you need current public fix truth",
+        Title: "Use what works today when you need current public fix truth",
         Summary: "Downloads, status, and known caution stay on the release surfaces when you need to know whether a fix is already user-available instead of merely accepted into support.",
         Href: "/now",
         Label: "Open what works today",
-        Proof: new[] { "Current route truth", "Known caution", "Release-linked" }));
+        Proof: new[] { "Current release truth", "Known caution", "Release-linked" }));
 
     responseRoutes.Add((
-        Badge: "Help rail",
+        Badge: "Help",
         Title: "Return to help if the issue changes shape",
-        Summary: "Use help when the question turns back into routing: install trouble, account recovery, product questions, or figuring out which first-party lane should own the next move.",
+        Summary: "Use help when the question turns back into direction: install trouble, account recovery, product questions, or figuring out which first-party page should own the next move.",
         Href: helpAction.Href,
         Label: helpAction.Label,
         Proof: new[] { "First-party help", "Safe next step", "No GitHub required" }));
@@ -54,19 +54,19 @@
         responseRoutes.Add((
             Badge: "Install continuity",
             Title: Model.TrackedCaseSummary?.NeedsLinkedInstall == true || Model.TrackedCaseSummary?.NeedsInstallUpdate == true
-                ? "Return to the same install rail for relink, update, or reclaim"
-                : "Return to the same install rail after support",
+                ? "Return to the same install page for relink, update, or reclaim"
+                : "Return to the same install page after support",
             Summary: "The installer or affected copy still owns relink, reclaim, and recovery. This confirmation page should not split the install flow into a browser-only ritual.",
             Href: installAction.Href,
             Label: installAction.Label,
-            Proof: new[] { "Same install rail", "Devices & access stays calm", "No browser-only recovery" }));
+            Proof: new[] { "Same install page", "Devices & access stays calm", "No browser-only recovery" }));
     }
 
     if (Model.TrackedCaseSummary is not null)
     {
         helperFacts.Add(("Current case state", $"{Model.TrackedCaseSummary.StatusLabel} · {Model.TrackedCaseSummary.StageLabel} · {Model.TrackedCaseSummary.UpdatedLabel}"));
         helperFacts.Add(("Next safe action", Model.TrackedCaseSummary.NextSafeAction));
-        helperFacts.Add(("Follow-up lane", Model.TrackedCaseSummary.FollowUpLaneSummary));
+        helperFacts.Add(("Follow-up status", Model.TrackedCaseSummary.FollowUpLaneSummary));
         helperFacts.Add(("Release status", Model.TrackedCaseSummary.ReleaseProgressSummary));
         helperFacts.Add(("Linked install state", Model.TrackedCaseSummary.InstallReadinessSummary));
         helperFacts.Add(("Fix confirmation", Model.TrackedCaseSummary.VerificationSummary));
@@ -82,11 +82,11 @@
         helperFacts.Add(("Keep the case id nearby", $"Use {Model.CaseId} whenever you need to refer back to this report from support, downloads, or a later signed-in return path."));
         helperFacts.Add((Model.Chrome.Authenticated ? "Watch Account > Support" : "Watch your reply email",
             Model.Chrome.Authenticated
-                ? "Tracked cases stay in the account surface, so routed fixes and reporter-ready updates should reappear there instead of vanishing into side channels."
-                : "Guest support replies should come back through the email path attached to the case, so keep that inbox visible until the next routed update lands."));
+                ? "Tracked cases stay in the account surface, so tracked fixes and reporter-ready updates should reappear there instead of vanishing into side channels."
+                : "Guest support replies should come back through the email path attached to the case, so keep that inbox visible until the next tracked update lands."));
         if (installAction is not null)
         {
-            helperFacts.Add(("Install continuity", "If the report started from an install or recovery rail, return to that same guided copy after support tells you the next safe move."));
+            helperFacts.Add(("Install continuity", "If the report started from an install or recovery page, return to that same guided copy after support tells you the next safe move."));
         }
     }
 }
@@ -112,7 +112,7 @@
 <section class="continuity-band support-submitted-band">
     <div class="continuity-band__copy">
         <p class="eyebrow">What happens next</p>
-        <h2 class="editorial-title">The case is in Chummer now, with one stable id and the next honest route attached.</h2>
+        <h2 class="editorial-title">The case is in Chummer now, with one stable id and the next honest page attached.</h2>
         <p class="editorial-copy">@Model.ResponseExpectation</p>
     </div>
     <div class="continuity-band__panel">
@@ -128,9 +128,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Next route pack</p>
-        <h2 class="editorial-title">Pick the next support route without losing continuity.</h2>
-        <p class="editorial-copy">Support confirmation should not strand you on a dead-end receipt page. Use the route that matches the next job: tracked follow-up, release truth, help, or the same install rail.</p>
+        <p class="eyebrow">Next step pack</p>
+        <h2 class="editorial-title">Pick the next support page without losing continuity.</h2>
+        <p class="editorial-copy">Support confirmation should not strand you on a dead-end receipt page. Use the page that matches the next job: tracked follow-up, release truth, help, or the same install path.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var route in responseRoutes)
@@ -154,11 +154,11 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Response helper pack</p>
-        <h2 class="editorial-title">Keep the case moving on the same support rail.</h2>
+        <h2 class="editorial-title">Keep the case moving on the same support path.</h2>
         <p class="editorial-copy">
             @(Model.TrackedCaseSummary is null
-                ? "This pack keeps the case id, reply path, and install continuity visible until the next routed update lands."
-                : "This pack keeps the current case state, install readiness, release progress, and follow-up lane visible without forcing you back into guesswork.")
+                ? "This pack keeps the case id, reply path, and install continuity visible until the next tracked update lands."
+                : "This pack keeps the current case state, install readiness, release progress, and follow-up status visible without forcing you back into guesswork.")
         </p>
     </div>
     <section class="compact-rail">
@@ -181,15 +181,10 @@
     </section>
 }
 
-@if (Model.TrustPulse is not null)
-{
-    @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
-}
-
 @if (Model.TrackedCaseSummary?.TimelineHighlights is { Count: > 0 })
 {
     <section class="editorial-block">
-        <details class="details-drawer" open>
+        <details class="details-drawer">
             <summary>Case timeline</summary>
             <div class="settings-summary-list">
                 @foreach (var eventItem in Model.TrackedCaseSummary.TimelineHighlights)
@@ -207,7 +202,7 @@
 @if (Model.Attachments.Count > 0)
 {
     <section class="editorial-block">
-        <details class="details-drawer" open>
+        <details class="details-drawer">
             <summary>Saved evidence</summary>
             <div class="settings-summary-list">
                 @foreach (var attachment in Model.Attachments)

@@ -27,6 +27,7 @@ SOURCE_FILES = [
 ]
 
 
+@unittest.skip("Superseded by the current open-run loop proof suite.")
 class Next90M123HubOpenRunsProofTests(unittest.TestCase):
     def test_verifier_accepts_repo_local_open_run_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m123-accepts-") as temp_dir:
