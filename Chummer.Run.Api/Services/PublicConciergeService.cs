@@ -897,6 +897,7 @@ internal sealed class ConciergeFlowDocument
     public string? WidgetGoal { get; init; }
     public List<ConciergeBranchDocument> Branches { get; init; } = [];
     public List<string>? ProofAnchors { get; init; }
+    public ConciergeFlowPostureDocument? Posture { get; init; }
 }
 
 internal sealed class ConciergeBranchDocument
@@ -918,6 +919,27 @@ internal sealed class ConciergeDefaultsDocument
     public string? PreviewLane { get; init; }
     public string? SurveyLane { get; init; }
     public List<string>? ApprovalLane { get; init; }
+    public List<string>? PublicOnlyWidgetSurfaces { get; init; }
     public List<string>? HardForbiddenSurfaces { get; init; }
+    public List<string>? RequiredControls { get; init; }
+    public ConciergePostureTaxonomyDocument? PostureTaxonomy { get; init; }
+    public List<string>? ForbiddenClaims { get; init; }
     public List<string>? ReceiptFields { get; init; }
+}
+
+internal sealed class ConciergeFlowPostureDocument
+{
+    public string? WidgetSurfacePosture { get; init; }
+    public string? FixedRouteTarget { get; init; }
+    public List<string>? FallbackRouteTargets { get; init; }
+    public List<string>? RecoveryRouteTargets { get; init; }
+    public List<string>? CopyRequirements { get; init; }
+}
+
+internal sealed class ConciergePostureTaxonomyDocument
+{
+    public string? Fixed { get; init; }
+    public string? Preview { get; init; }
+    public string? Fallback { get; init; }
+    public string? Recovery { get; init; }
 }
