@@ -7,7 +7,7 @@ namespace Chummer.Run.Api.Services;
 public sealed class PublicSignalProjectionService
 {
     private const string RegistryRelativePath = "products/chummer/PUBLIC_FEEDBACK_AND_CONTENT_REGISTRY.yaml";
-    private const string BridgeRelativePath = "products/chummer/PRODUCTLIFT_FEEDBACK_ROADMAP_BRIDGE.md";
+    private const string BridgeRelativePath = "products/chummer/PUBLIC_SIGNAL_FEEDBACK_ROADMAP_BRIDGE.md";
     private const string PipelineRelativePath = "products/chummer/PUBLIC_SIGNAL_TO_CANON_PIPELINE.md";
     private static readonly IDeserializer Deserializer = new DeserializerBuilder()
         .WithNamingConvention(UnderscoredNamingConvention.Instance)
@@ -80,12 +80,16 @@ public sealed class PublicSignalProjectionService
 
         return new SignalProjectionDocument(
             Surfaces: registry.Surfaces ?? new List<PublicFeedbackSurfaceDocument>(),
-            ProductLiftShippedRequirements: registry.CloseoutRequirements?.ProductliftShippedItem?.Required?.ToArray() ?? Array.Empty<string>(),
+            ProductLiftShippedRequirements: (
+                registry.CloseoutRequirements?.PublicShippedItem?.Required
+                ?? registry.CloseoutRequirements?.ProductliftShippedItem?.Required
+                ?? [])
+                .ToArray(),
             PolicyStatus: ExtractSectionParagraph(bridge, "Status"),
             CoreRule: ExtractSectionParagraph(pipeline, "Core rule"),
             AuthorityFlow: ExtractFirstCodeBlock(bridge, "Authority rule"),
             PublicWarning: ExtractBlockQuote(bridge, "Required public warning:"),
-            BoardTargets: ExtractBulletList(bridge, "First board set", "Initial ProductLift boards:"));
+            BoardTargets: ExtractBulletList(bridge, "First board set", "Initial public signal boards:"));
     }
 
     private static string ResolveHeading(PublicFeedbackSurfaceDocument surface)
@@ -102,13 +106,12 @@ public sealed class PublicSignalProjectionService
         string publicPath = RequireText(surface.PublicPath, $"public signal surface '{surface.Key}' public_path");
         string fallbackPath = RequireText(surface.FallbackPath, $"public signal surface '{surface.Key}' fallback_path");
         string truthPosture = HumanizeToken(surface.TruthPosture, "projection only").ToLowerInvariant();
-        string vendor = RequireText(surface.Vendor, $"public signal surface '{surface.Key}' vendor");
-        return $"{vendor} may project this route, but the posture stays {truthPosture}. If hosted projection is unavailable or misconfigured, the first-party path falls back to {fallbackPath} instead of hiding {publicPath}.";
+        return $"Hosted projection may mirror this route, but the posture stays {truthPosture}. If hosted projection is unavailable or misconfigured, the first-party path falls back to {fallbackPath} instead of hiding {publicPath}.";
     }
 
     private static IReadOnlyList<string> ResolveCloseoutRequirements(SignalProjectionDocument document, PublicFeedbackSurfaceDocument surface)
     {
-        return string.Equals(NormalizeKey(surface.Key), "productlift_changelog", StringComparison.OrdinalIgnoreCase)
+        return string.Equals(NormalizeKey(surface.Key), "public_changelog", StringComparison.OrdinalIgnoreCase)
             ? document.ProductLiftShippedRequirements
                 .Select(item => HumanizeToken(item, item))
                 .ToArray()
@@ -338,6 +341,7 @@ public sealed class PublicSignalProjectionService
 
     private sealed class PublicFeedbackCloseoutRequirementsDocument
     {
+        public PublicFeedbackRequirementDocument? PublicShippedItem { get; init; }
         public PublicFeedbackRequirementDocument? ProductliftShippedItem { get; init; }
     }
 

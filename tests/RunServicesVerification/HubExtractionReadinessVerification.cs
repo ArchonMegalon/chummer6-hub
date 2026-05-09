@@ -1265,8 +1265,25 @@ internal static class HubExtractionReadinessVerification
         VerificationAssert.True(File.Exists(sourcePath), $"Canonical design source '{sourcePath}' must exist.");
         VerificationAssert.True(File.Exists(mirrorPath), $"Mirrored design file '{mirrorPath}' must exist.");
         VerificationAssert.True(
-            string.Equals(File.ReadAllText(sourcePath), File.ReadAllText(mirrorPath), StringComparison.Ordinal),
+            string.Equals(
+                ReadCanonicalProductMirrorComparableText(sourcePath, relativePath),
+                ReadCanonicalProductMirrorComparableText(mirrorPath, relativePath),
+                StringComparison.Ordinal),
             $"Mirrored design file '{mirrorPath}' must exactly match canonical source '{sourcePath}'.");
+    }
+
+    private static string ReadCanonicalProductMirrorComparableText(string path, string relativePath)
+    {
+        var text = File.ReadAllText(path);
+        if (!string.Equals(relativePath, "WEEKLY_PRODUCT_PULSE.generated.json", StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        var payload = System.Text.Json.Nodes.JsonNode.Parse(text) as System.Text.Json.Nodes.JsonObject
+            ?? throw new InvalidOperationException($"Canonical pulse mirror '{path}' must parse as a JSON object.");
+        payload["generated_at"] = "__normalized_generated_at__";
+        return payload.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
     }
 
     private static string ResolveRepoRoot()

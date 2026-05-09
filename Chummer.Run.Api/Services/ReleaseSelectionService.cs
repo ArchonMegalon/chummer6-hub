@@ -163,6 +163,74 @@ public sealed class ReleaseSelectionService
         return new PublicLandingActionDto(release.GuestGatePrimaryLabel, release.GuestGatePrimaryHref, "primary");
     }
 
+    public PublicAccessPostureViewModel BuildPublicAccessPosture(PublicReleaseManifestDto manifest, string userAgent, bool authenticated)
+    {
+        var releaseExperience = BuildExperience(manifest, userAgent, authenticated);
+        return BuildPublicAccessPosture(manifest, releaseExperience);
+    }
+
+    public PublicAccessPostureViewModel BuildPublicAccessPosture(PublicReleaseManifestDto manifest, ReleaseExperienceViewModel releaseExperience)
+    {
+        var guestPlatforms = DistinctPlatformFamilies(manifest.Downloads.Where(download => !RequiresAccount(download)));
+        var accountPlatforms = DistinctPlatformFamilies(manifest.Downloads.Where(download => RequiresAccount(download)));
+        var guestInstallAvailable = releaseExperience.GuestDownloadAvailable || guestPlatforms.Count > 0;
+        var accountRequiredInstallAvailable = accountPlatforms.Count > 0;
+
+        string availabilitySummary;
+        string accountValueSummary;
+        string createAccountSummary;
+        string signInSummary;
+        string downloadFaqAnswer;
+        string accountFaqAnswer;
+
+        if (guestInstallAvailable && accountRequiredInstallAvailable)
+        {
+            availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
+            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still use a signed-in install handoff.";
+            createAccountSummary = "Some preview downloads are public now. Create an account when you want the signed-in install handoff, recovery, tracked support, or linked install history on the same return path.";
+            signInSummary = "Sign in to reopen the same account-backed install handoff, recovery path, and support history.";
+            downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
+            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to any route that still uses a signed-in install handoff.";
+        }
+        else if (guestInstallAvailable)
+        {
+            availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} Create an account when you want recovery, tracked support, or linked install history on the same return path.";
+            accountValueSummary = "The account does not change the published file. It adds recovery, tracked support, and linked install history when you want a calmer return path.";
+            createAccountSummary = "Create an account when you want recovery, tracked support, and linked install history on the same return path. The download file stays the same for everyone.";
+            signInSummary = "Sign in to reopen your account-backed recovery, support history, and any linked-install follow-through.";
+            downloadFaqAnswer = availabilitySummary;
+            accountFaqAnswer = "Account creation gives you recovery, tracked support, and linked install history. It does not change the published file.";
+        }
+        else if (accountRequiredInstallAvailable)
+        {
+            availabilitySummary = $"{GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
+            accountValueSummary = "The account does not change the published file. It is part of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            createAccountSummary = "Create the account first. The current install path uses a signed-in handoff so recovery, support, and install return stay attached from the first launch.";
+            signInSummary = "Sign in to continue the current install handoff and reopen the same recovery and support path.";
+            downloadFaqAnswer = $"Yes for the current route. {GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
+            accountFaqAnswer = "Account creation is the start of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
+        }
+        else
+        {
+            availabilitySummary = "No public preview is on the shelf right now. Create an account if you want release follow-through and support when the next build lands.";
+            accountValueSummary = "The account keeps recovery, tracked support, and release follow-through together when the next build lands.";
+            createAccountSummary = "Create an account if you want release follow-through, tracked support, and a calmer return path when the next build lands.";
+            signInSummary = "Sign in to reopen your account-backed release follow-through and support history.";
+            downloadFaqAnswer = "Not right now. No public preview is on the shelf yet.";
+            accountFaqAnswer = "Account creation gives you recovery, tracked support, and release follow-through when the next build lands.";
+        }
+
+        return new PublicAccessPostureViewModel(
+            GuestInstallAvailable: guestInstallAvailable,
+            AccountRequiredInstallAvailable: accountRequiredInstallAvailable,
+            AvailabilitySummary: availabilitySummary,
+            AccountValueSummary: accountValueSummary,
+            CreateAccountSummary: createAccountSummary,
+            SignInSummary: signInSummary,
+            DownloadFaqAnswer: downloadFaqAnswer,
+            AccountFaqAnswer: accountFaqAnswer);
+    }
+
     public ReleaseOptionViewModel BuildOption(PublicReleaseManifestDto manifest, PublicReleaseArtifactDto download, bool authenticated, bool recommended)
     {
         manifest = ApplyAccessPolicy(manifest);
@@ -746,6 +814,62 @@ public sealed class ReleaseSelectionService
             "macos" => "macOS",
             _ => null
         };
+
+    private static IReadOnlyList<string> DistinctPlatformFamilies(IEnumerable<PublicReleaseArtifactDto> downloads)
+        => downloads.Select(PlatformFamily)
+            .Where(static family => !string.IsNullOrWhiteSpace(family))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(static family => family switch
+            {
+                "windows" => 0,
+                "macos" => 1,
+                "linux" => 2,
+                _ => 9
+            })
+            .ThenBy(static family => family, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static string PublicDownloadSentence(IReadOnlyList<string> platforms)
+    {
+        if (platforms.Count == 0)
+        {
+            return "No public download is on the shelf right now.";
+        }
+
+        var labels = FormatPlatformList(platforms);
+        return platforms.Count == 1
+            ? $"A public download is available now on {labels}."
+            : $"Public downloads are available now on {labels}.";
+    }
+
+    private static string GatedInstallSentence(IReadOnlyList<string> platforms)
+    {
+        if (platforms.Count == 0)
+        {
+            return "The current preview still uses a signed-in install handoff.";
+        }
+
+        var labels = FormatPlatformList(platforms);
+        return platforms.Count == 1
+            ? $"{labels} still uses a signed-in install handoff so recovery and support stay attached from the first launch."
+            : $"{labels} still use a signed-in install handoff so recovery and support stay attached from the first launch.";
+    }
+
+    private static string FormatPlatformList(IReadOnlyList<string> platforms)
+    {
+        var labels = platforms
+            .Select(static family => RequestedPlatformLabel(family) ?? "the current preview route")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return labels.Length switch
+        {
+            0 => "the current preview route",
+            1 => labels[0],
+            2 => $"{labels[0]} and {labels[1]}",
+            _ => $"{string.Join(", ", labels.Take(labels.Length - 1))}, and {labels[^1]}"
+        };
+    }
 
     private sealed record PlatformShelfNoticeViewModel(string Title, string Summary);
 

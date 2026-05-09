@@ -85,14 +85,16 @@
     var footerProductLinks = compactFooter && compactProductLinks.Length > 0
         ? compactProductLinks
         : productLinks;
+    var supplementalSignalLinks = publicSignalLinks
+        .Where(link => !string.Equals(link.Href, "/roadmap", StringComparison.OrdinalIgnoreCase))
+        .ToArray();
     var compactDrawerLinks = chrome.PrimaryNavigation
-        .Concat(publicSignalLinks)
+        .Concat(supplementalSignalLinks)
         .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
         .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)
         .Select(group => group.First())
         .ToArray();
-    var footerLinks = footerProductLinks
-        .Concat(publicSignalLinks)
+    var footerLinks = (compactFooter ? footerProductLinks : footerProductLinks.Concat(supplementalSignalLinks))
         .Concat(supportLinks.Where(link => link.Href is "/help" or "/contact"))
         .GroupBy(link => link.Href, StringComparer.OrdinalIgnoreCase)
         .Select(group => group.First())
@@ -260,7 +262,6 @@
             <div class="site-nav-sheet" id="site-nav-sheet" data-nav-sheet hidden inert aria-hidden="true">
                 <div class="site-nav-sheet__panel">
                     <div class="site-nav-sheet__section">
-                        <p class="site-nav-sheet__heading">Browse</p>
                         <nav aria-label="Compact navigation">
                             @foreach (var link in compactDrawerLinks)
                             {
@@ -277,12 +278,9 @@
                                 }
                             }
                         </nav>
-                    </div>
-                    @if (chrome.Authenticated || nonBuildHeaderActions.Length > 0 || buildAction is not null)
-                    {
-                        <div class="site-nav-sheet__section">
-                            <p class="site-nav-sheet__heading">Account</p>
-                            <div class="site-nav-sheet__actions">
+                        @if (chrome.Authenticated || nonBuildHeaderActions.Length > 0 || buildAction is not null)
+                        {
+                            <div class="site-nav-sheet__actions" role="group" aria-label="Account and quick actions">
                                 @foreach (var action in nonBuildHeaderActions)
                                 {
                                     if (string.Equals(action.Href, "/logout", StringComparison.OrdinalIgnoreCase))
@@ -316,8 +314,8 @@
                                     }
                                 }
                             </div>
-                        </div>
-                    }
+                        }
+                    </div>
                 </div>
             </div>
         </header>

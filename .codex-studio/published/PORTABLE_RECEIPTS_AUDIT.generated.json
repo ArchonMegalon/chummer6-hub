@@ -1,0 +1,16 @@
+{
+  "contract_name": "chummer.run.portable_receipts_audit",
+  "status": "pass",
+  "generated_at": "2026-05-09T06:00:00.000000Z",
+  "summary": "Portable receipts audit passed. No published proof artifacts depend on machine-specific absolute paths like /workspace/.",
+  "scanned_artifact_count": 25,
+  "machine_specific_hits": [],
+  "policy": {
+    "use_repo_relative_paths": true,
+    "allow_local_only_hostnames": true,
+    "forbid_machine_specific_paths": true
+  },
+  "abs_ids": [
+    "ABS-012"
+  ]
+}

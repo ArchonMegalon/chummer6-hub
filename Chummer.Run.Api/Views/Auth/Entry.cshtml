@@ -3,6 +3,7 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-auth";
+    var accessPosture = Model.AccessPosture;
     var nextTarget = Model.NextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
         ? "Downloads"
         : Model.NextPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)
@@ -32,7 +33,7 @@
                 <strong>Tracked help stays attached to the same account story.</strong>
             </article>
         </div>
-        <p class="auth-entry__trust">The binary stays the same for everyone. The account adds continuity, device return, and support follow-through when you want it.</p>
+        <p class="auth-entry__trust">@(accessPosture?.AccountValueSummary ?? "The binary stays the same for everyone. The account adds continuity, device return, and support follow-through when you want it.")</p>
     </div>
 
     <div class="auth-entry__panel auth-panel auth-panel--entry">

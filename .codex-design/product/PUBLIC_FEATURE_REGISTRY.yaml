@@ -395,7 +395,7 @@ cards:
     summary: A Mac Codex session can clone the release repos, build the mac desktop artifact, sign and notarize it, publish it to chummer.run, and verify the live shelf from one public runbook.
     href: /artifacts/mac-codex-release-pipeline
     badge: Available today
-    audience: public
+    audience: operator
     image_family: facility_exterior
     asset_slot: release_current_build
     detail_route: /artifacts/mac-codex-release-pipeline
@@ -493,7 +493,7 @@ cards:
     action_label: Inspect the after-action preview
     detail_primary_href: /roadmap/ghostwire
     detail_primary_label: See related roadmap item
-  - id: productlift_feedback
+  - id: public_feedback
     bucket: participate
     title: Public feedback board
     summary: Suggest features, vote on public ideas, and keep support/private data out of the public board.
@@ -503,7 +503,7 @@ cards:
     image_family: archive_stair
     action_label: Open feedback board
     proof_note: "Projection only: the hosted public signal mirror collects demand, while Chummer-owned design, support, release, and closeout evidence remain authoritative."
-  - id: productlift_roadmap
+  - id: public_roadmap
     bucket: supporting_reads
     title: Public roadmap projection
     summary: See selected public direction without mistaking votes or roadmap cards for implementation priority.
@@ -513,7 +513,7 @@ cards:
     image_family: boulevard_of_futures
     action_label: View public roadmap
     proof_note: "Projection only: planned and shipped statuses require Chummer-owned design, milestone, release, or closeout evidence."
-  - id: productlift_changelog
+  - id: public_changelog
     bucket: supporting_reads
     title: User-requested changelog
     summary: Follow shipped updates and voter closeouts that are backed by release, guide, Hub route, or artifact proof.

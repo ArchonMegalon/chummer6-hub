@@ -23,7 +23,7 @@ public sealed class PublicSignalOperationsServiceTests
         var packet = fixture.CreateService().BuildPacket();
 
         Assert.False(packet.HostedProjectionReady);
-        Assert.Equal("No hosted ProductLift domain configured", packet.HostedDomainLabel);
+        Assert.Equal("No hosted public-board domain configured", packet.HostedDomainLabel);
         Assert.Equal("Webhook pending", packet.WebhookStatusLabel);
         Assert.Equal("Closeout mail canonized", packet.VoterCloseoutStatusLabel);
         Assert.Equal("Recipient projection pending", packet.RecipientProjectionStatusLabel);
@@ -2019,18 +2019,18 @@ categories:
   - key: build_and_explain
     label: Build & Explain
     owner_repo: chummer6-core
-    discovery_lane: productlift
+    discovery_lane: public_signal
   - key: mobile_companion
     label: Mobile Companion
     owner_repo: chummer6-mobile
-    discovery_lane: productlift_plus_metasurvey
+    discovery_lane: public_signal_plus_survey
   - key: table_pulse
     label: Table Pulse / Debrief
     owner_repo: chummer6-hub
-    discovery_lane: icanpreneur
+    discovery_lane: guided_follow_up
     privacy_sensitive: true
 rules:
-  - ProductLift categories route public signal; they do not assign implementation priority.
+  - Public signal categories route public signal; they do not assign implementation priority.
   - Support, crash, account, install, private log, and private campaign posts are misroutes, not feature votes.
 """);
             File.WriteAllText(

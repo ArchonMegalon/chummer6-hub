@@ -142,6 +142,7 @@ public sealed class PublicLandingController : Controller
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
         var assetCatalog = new AssetCatalogViewModel(surface.Assets);
         var nowCards = _landing.CardsForBucket(surface, "whats_real_now");
         var secondaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "secondary", StringComparison.OrdinalIgnoreCase))
@@ -151,13 +152,6 @@ public sealed class PublicLandingController : Controller
             manifest,
             Request.Headers.UserAgent.ToString(),
             authenticated);
-        if (!authenticated && manifest.Downloads.Count > 0)
-        {
-            primaryHeroAction = new PublicLandingActionDto(
-                releaseExperience.GuestGatePrimaryLabel,
-                releaseExperience.GuestGatePrimaryHref,
-                "primary");
-        }
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
@@ -176,7 +170,8 @@ public sealed class PublicLandingController : Controller
             ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
             Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"),
             FlagshipCoverage: _flagshipCoverage.LoadStrip(),
-            CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken));
+            CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken),
+            AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Landing.cshtml", model);
     }
 
@@ -254,6 +249,7 @@ public sealed class PublicLandingController : Controller
             surfacedWindowsArtifactIds);
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
+        var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
         var model = new DownloadsPageViewModel(
             Chrome: chrome,
             Surface: surface,
@@ -264,7 +260,8 @@ public sealed class PublicLandingController : Controller
             SignedInWindowsBuilds: signedInWindowsBuilds,
             WindowsProofInstallers: windowsProofInstallers,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
-            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken),
+            AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
     }
 
@@ -285,10 +282,8 @@ public sealed class PublicLandingController : Controller
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             var ticket = _releaseUploadTickets.Issue(subject);
             var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
-            string webRoot = _webHostEnvironment.WebRootPath
-                ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
-            string templatePath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
-            if (!System.IO.File.Exists(templatePath))
+            string? templatePath = ResolveWebAssetPath("artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+            if (string.IsNullOrWhiteSpace(templatePath))
             {
                 return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
             }
@@ -336,10 +331,8 @@ public sealed class PublicLandingController : Controller
     [Produces("text/x-shellscript", "application/problem+json")]
     public IActionResult ReleaseUploadBootstrapScript([FromQuery] string? ticket, [FromQuery] string? apiToken)
     {
-        string webRoot = _webHostEnvironment.WebRootPath
-            ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
-        string templatePath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
-        if (!System.IO.File.Exists(templatePath))
+        string? templatePath = ResolveWebAssetPath("artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+        if (string.IsNullOrWhiteSpace(templatePath))
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
         }
@@ -410,10 +403,8 @@ public sealed class PublicLandingController : Controller
             }
         }
 
-        string webRoot = _webHostEnvironment.WebRootPath
-            ?? Path.Combine(AppContext.BaseDirectory, "wwwroot");
-        string templatePath = Path.Combine(webRoot, "artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
-        if (!System.IO.File.Exists(templatePath))
+        string? templatePath = ResolveWebAssetPath("artifacts", "mac-codex-release-pipeline", "bootstrap.sh");
+        if (string.IsNullOrWhiteSpace(templatePath))
         {
             return Problem(statusCode: StatusCodes.Status503ServiceUnavailable, detail: "release upload bootstrap template is unavailable.");
         }
@@ -467,6 +458,45 @@ public sealed class PublicLandingController : Controller
             }
 
             return cleanTicket;
+        }
+
+        return null;
+    }
+
+    private string? ResolveWebAssetPath(params string[] relativeSegments)
+    {
+        static string Combine(string root, IEnumerable<string> segments)
+        {
+            string path = root;
+            foreach (string segment in segments)
+            {
+                path = Path.Combine(path, segment);
+            }
+
+            return path;
+        }
+
+        string? contentRoot = _webHostEnvironment.ContentRootPath;
+        string?[] roots =
+        [
+            _webHostEnvironment.WebRootPath,
+            Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+            string.IsNullOrWhiteSpace(contentRoot) ? null : Path.Combine(contentRoot, "wwwroot"),
+            string.IsNullOrWhiteSpace(contentRoot) ? null : Path.Combine(contentRoot, "Chummer.Run.Api", "wwwroot")
+        ];
+
+        foreach (string? root in roots)
+        {
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                continue;
+            }
+
+            string candidate = Combine(root, relativeSegments);
+            if (System.IO.File.Exists(candidate))
+            {
+                return candidate;
+            }
         }
 
         return null;
@@ -1739,13 +1769,15 @@ public sealed class PublicLandingController : Controller
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("FAQ", "Plain answers about preview status, participation, privacy, and what is already usable.", "/faq", cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
+        var model = RebindFaqAccessPosture(_trustContent.BuildFaqPage(chrome), accessPosture) with
+        {
+            TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
+        };
         return View(
             "~/Views/PublicLanding/Faq.cshtml",
-            _trustContent.BuildFaqPage(chrome) with
-            {
-                TrustPulse = BuildPublicTrustPulsePanel(manifest, releaseExperience),
-                SignedInStatus = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken)
-            });
+            model);
     }
 
     [HttpGet("/privacy")]
@@ -4632,38 +4664,26 @@ public sealed class PublicLandingController : Controller
             manifest,
             Request.Headers.UserAgent.ToString(),
             authenticated: false);
-        var reboundChrome = RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: false);
-
-        if (string.Equals(currentPath, "/", StringComparison.OrdinalIgnoreCase) && manifest.Downloads.Count > 0)
-        {
-            var headerActions = reboundChrome.HeaderActions
-                .Select(action => string.Equals(action.Tone, "primary", StringComparison.OrdinalIgnoreCase)
-                    ? action with
-                    {
-                        Label = releaseExperience.GuestGatePrimaryLabel,
-                        Href = releaseExperience.GuestGatePrimaryHref,
-                        Current = false
-                    }
-                    : action)
-                .ToArray();
-            var publicPrimaryCta = reboundChrome.PublicPrimaryCta is not null
-                ? reboundChrome.PublicPrimaryCta with
-                {
-                    Label = releaseExperience.GuestGatePrimaryLabel,
-                    Href = releaseExperience.GuestGatePrimaryHref,
-                    Current = false
-                }
-                : null;
-
-            reboundChrome = reboundChrome with
-            {
-                HeaderActions = headerActions,
-                PublicPrimaryCta = publicPrimaryCta
-            };
-        }
-
-        return reboundChrome;
+        return RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: false);
     }
+
+    private static FaqPageViewModel RebindFaqAccessPosture(FaqPageViewModel model, PublicAccessPostureViewModel accessPosture)
+        => model with
+        {
+            Sections = model.Sections
+                .Select(section => section with
+                {
+                    Entries = section.Entries
+                        .Select(entry => string.Equals(entry.Question, "Do I need an account to download the current preview?", StringComparison.Ordinal)
+                            ? entry with { Answer = accessPosture.DownloadFaqAnswer }
+                            : string.Equals(entry.Question, "What does account creation give me right away?", StringComparison.Ordinal)
+                                ? entry with { Answer = accessPosture.AccountFaqAnswer }
+                                : entry)
+                        .ToArray()
+                })
+                .ToArray(),
+            AccessPosture = accessPosture
+        };
 
     private static SiteChromeViewModel RebindDownloadsHeaderActions(SiteChromeViewModel chrome, ReleaseExperienceViewModel releaseExperience)
         => RebindGuestGateChromeActions(chrome, releaseExperience, rebindSignIn: true);

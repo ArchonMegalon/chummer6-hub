@@ -115,9 +115,6 @@ Manifest-driven public route proof:
 
 Canonical domain posture:
 1. `https://chummer.run` is the only hostname this runbook treats as publicly canonical and release-claimable.
-2. `https://chummer6.run` must either return a clean `301` or `308` redirect to `https://chummer.run` or stay unpublished until external DNS/CDN or tunnel cutover is ready.
-3. Local alias readiness can be proven before any cutover with: `python3 scripts/verify_public_routes_from_manifest.py --base-url http://127.0.0.1:8091 --public-host chummer6.run --forwarded-proto https --manifest .codex-design/product/PUBLIC_LANDING_MANIFEST.yaml --output .codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF_CHUMMER6_ALIAS.generated.json`
-4. That alias proof is app-layer only. It proves the local reverse proxy accepts `chummer6.run`; it does not claim live public DNS health.
 
 ## Strict Test Gate Commands (host-side)
 

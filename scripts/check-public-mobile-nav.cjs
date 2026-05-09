@@ -40,9 +40,10 @@ async function assertMobileNav(page, path, contentNeedle) {
   assert.equal(await navToggle.getAttribute('aria-expanded'), 'true', `${label} mobile nav should expand after the toggle opens.`);
 
   const navSheet = page.locator('[data-nav-sheet]').first();
-  await expectLocatorText(navSheet, 'NAVIGATE', label);
-  await expectLocatorText(navSheet, 'PUBLIC LOOP', label);
-  await expectLocatorText(navSheet, 'HELP AND LEGAL', label);
+  await expectLocatorText(navSheet, 'Downloads', label);
+  await expectLocatorText(navSheet, 'Participate', label);
+  await expectLocatorText(navSheet, 'Help', label);
+  await expectLocatorText(navSheet, 'Contact', label);
 
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => document.querySelector('[data-nav-toggle]')?.getAttribute('aria-expanded') === 'false');

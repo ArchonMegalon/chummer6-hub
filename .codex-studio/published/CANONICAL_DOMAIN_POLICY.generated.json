@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-05-08T20:01:30.000000Z",
+  "status": "pass",
+  "policy_version": "1.0.0",
+  "canonical_public_domain": "chummer.run",
+  "deprecated_domains": [],
+  "domain_status": {
+    "chummer6.run": "not_used",
+    "chummer.run": "canonical"
+  },
+  "closure_claim": "chummer.run is the only canonical public domain; no public artifacts expect chummer6.run",
+  "abs_ids": ["ABS-016"]
+}

@@ -112,7 +112,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("Authorize Codex access", view, StringComparison.Ordinal);
-        Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
+        Assert.Contains("/login?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
         Assert.Contains("existing signed-in chat account", view, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
         Assert.Contains("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
@@ -138,15 +138,15 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("BuildNowPageModel(", controller, StringComparison.Ordinal);
         Assert.Contains("return View(\"~/Views/PublicLanding/Roadmap.cshtml\", model);", controller, StringComparison.Ordinal);
         Assert.Contains("BuildRoadmapMilestones()", controller, StringComparison.Ordinal);
-        Assert.DoesNotContain("Redirect(\"/horizons?productlift=roadmap#productlift-roadmap-projection\")", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Redirect(\"/horizons?source=roadmap#public-roadmap-projection\")", controller, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", feedbackView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", roadmapView, StringComparison.Ordinal);
         Assert.Contains("route-anchor-target", changelogView, StringComparison.Ordinal);
-        Assert.Contains("Public ideas, votes, and safe public bugs on one first-party feedback page", feedbackView, StringComparison.Ordinal);
+        Assert.Contains("These first-party pages keep feedback visible and easy to follow without bouncing people across aliases or private support paths.", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Safe public signal", feedbackView, StringComparison.Ordinal);
         Assert.Contains("What looks likely next, and what is still only planned", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Milestone ledger", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Shipped updates with user-available proof", changelogView, StringComparison.Ordinal);
+        Assert.Contains("Shipped updates with proof you can verify", changelogView, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", changelogView, StringComparison.Ordinal);
     }
 
@@ -421,10 +421,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("feedback returns here, roadmap resolves through Horizons, and shipped closeout resolves through What works today.", participateView, StringComparison.Ordinal);
         Assert.Contains("You followed a legacy roadmap handoff", horizonsView, StringComparison.Ordinal);
         Assert.Contains("The milestone-backed public roadmap now lives on <code class=\"mono-receipt\">/roadmap</code>", horizonsView, StringComparison.Ordinal);
-        Assert.DoesNotContain("/participate?productlift=feedback#productlift-feedback", horizonsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("/participate?source=feedback#public-feedback", horizonsView, StringComparison.Ordinal);
         Assert.Contains("You followed a legacy shipped handoff", nowView, StringComparison.Ordinal);
         Assert.Contains("The shipped update stream now lives on <code class=\"mono-receipt\">/changelog</code>", nowView, StringComparison.Ordinal);
-        Assert.DoesNotContain("/participate?productlift=feedback#productlift-feedback", nowView, StringComparison.Ordinal);
+        Assert.DoesNotContain("/participate?source=feedback#public-feedback", nowView, StringComparison.Ordinal);
         Assert.Contains("Create the account when you want signal, installs, support, and roadmap follow-up to return to one place.", feedbackView, StringComparison.Ordinal);
         Assert.Contains("Truth stays split on purpose", feedbackView, StringComparison.Ordinal);
     }

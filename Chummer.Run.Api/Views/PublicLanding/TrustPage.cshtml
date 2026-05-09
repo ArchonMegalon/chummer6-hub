@@ -7,6 +7,7 @@
     var contactPage = string.Equals(Model.PageId, "contact", StringComparison.OrdinalIgnoreCase);
     var policyPage = string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
         || string.Equals(Model.PageId, "terms", StringComparison.OrdinalIgnoreCase);
+    var deferSupportPanels = helpPage || contactPage;
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
         : "/downloads";
@@ -157,14 +158,14 @@
     </div>
 </section>
 
-@if (Model.SignedInStatus is not null)
+@if (Model.SignedInStatus is not null && !deferSupportPanels)
 {
     <section class="release-footnote">
         @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
     </section>
 }
 
-@if (Model.PrivacyBoundary is not null)
+@if (Model.PrivacyBoundary is not null && !deferSupportPanels)
 {
     @await Html.PartialAsync("~/Views/Shared/_PrivacyBoundaryPanel.cshtml", Model.PrivacyBoundary)
 }
@@ -298,34 +299,6 @@ else if (!contactPage)
 
 @if (Model.SupportIntake is not null)
 {
-    if (contactPage)
-    {
-        <section class="editorial-block">
-            <div class="editorial-block__lead">
-                <p class="eyebrow">Support routing</p>
-                <h2 class="editorial-title">Public feedback, private support, tracked return, and install recovery stay separate.</h2>
-                <p class="editorial-copy">This page exists to start the right first-party case. Use public feedback for safe signal, then move here as soon as the problem needs logs, recovery, account help, or any private campaign detail.</p>
-            </div>
-            <div class="route-choice-grid">
-                @foreach (var choice in contactRouteChoices)
-                {
-                    <article class="route-choice-card">
-                        <span class="tag">@choice.Badge</span>
-                        <h3>@choice.Title</h3>
-                        <p>@choice.Summary</p>
-                        <div class="route-choice-card__proof">
-                            @foreach (var item in choice.Proof)
-                            {
-                                <span>@item</span>
-                            }
-                        </div>
-                        <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
-                    </article>
-                }
-            </div>
-        </section>
-    }
-
     <section class="trust-page-sections" id="support-intake">
         <article class="trust-page-section trust-page-section--form">
             <p class="eyebrow">Support intake</p>
@@ -445,5 +418,52 @@ else if (!contactPage)
                 </div>
             }
         </article>
+    </section>
+
+    if (contactPage)
+    {
+        <section class="editorial-block">
+            <div class="editorial-block__lead">
+                <p class="eyebrow">Need a different path?</p>
+                <h2 class="editorial-title">Public feedback, tracked return, and install recovery stay nearby.</h2>
+                <p class="editorial-copy">Start the case form first when you already know this needs private follow-up. Use the other routes below when the issue is public, install-specific, or better handled from your account.</p>
+            </div>
+            <div class="route-choice-grid">
+                @foreach (var choice in contactRouteChoices)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@choice.Badge</span>
+                        <h3>@choice.Title</h3>
+                        <p>@choice.Summary</p>
+                        <div class="route-choice-card__proof">
+                            @foreach (var item in choice.Proof)
+                            {
+                                <span>@item</span>
+                            }
+                        </div>
+                        <a class="editorial-strip__action" href="@choice.Href">@choice.Label</a>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+}
+
+@if (Model.SignedInStatus is not null && deferSupportPanels)
+{
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    </section>
+}
+
+@if (Model.PrivacyBoundary is not null && deferSupportPanels)
+{
+    <section class="editorial-block">
+        <details class="details-drawer">
+            <summary>@(helpPage ? "Privacy and retention for help" : "Privacy and retention for support")</summary>
+            <div class="stacked-copy">
+                @await Html.PartialAsync("~/Views/Shared/_PrivacyBoundaryPanel.cshtml", Model.PrivacyBoundary)
+            </div>
+        </details>
     </section>
 }

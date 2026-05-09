@@ -1978,9 +1978,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(layoutSource.Contains("requestHost is \"chummer.run\" or \"www.chummer.run\"", StringComparison.Ordinal), "layout should only load ClickRank on the public chummer.run host.");
     var programSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Program.cs"));
     Assert(programSource.Contains("CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS", StringComparison.Ordinal), "startup should honor trusted forwarded-header networks so tunnelled HTTPS stays stable.");
-    Assert(programSource.Contains("if (!hubGoogleAuth.IsConfigured())", StringComparison.Ordinal), "startup should stay alive when Google OIDC is intentionally absent.");
-    Assert(programSource.Contains("Google OIDC is not configured; Hub will start with Google sign-in surfaces disabled.", StringComparison.Ordinal), "startup should log the degraded Google sign-in posture instead of failing hard.");
-    Assert(!programSource.Contains("hubGoogleAuth.ValidateProductionReadiness();", StringComparison.Ordinal), "startup should not hard-fail on hosts that do not carry Google OIDC credentials.");
+    Assert(programSource.Contains("hubGoogleAuth.ValidateProductionReadiness();", StringComparison.Ordinal), "startup should hard-fail in production when Google OIDC credentials are missing.");
+    Assert(programSource.Contains("if (!hubGoogleAuth.IsConfigured())", StringComparison.Ordinal), "startup should still allow intentionally unconfigured non-production hosts.");
+    Assert(programSource.Contains("Google OIDC is not configured; Hub will start with Google sign-in surfaces disabled.", StringComparison.Ordinal), "startup should keep the degraded Google sign-in warning for non-production hosts.");
     var authEntrySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
     Assert(!authEntrySource.Contains("auth-panel__support", StringComparison.Ordinal), "auth entry should keep one quiet support row instead of duplicating support chrome inside the panel.");
     var landingSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
@@ -2745,15 +2745,22 @@ async Task VerifyPublicLandingProjectionAsync()
     var landingModel = landingView?.Model as LandingPageViewModel;
     Assert(landingModel is not null, "landing page should render through the MVC view layer.");
     Assert(!string.IsNullOrWhiteSpace(landingModel!.Surface.Headline), "landing page should render a non-empty headline from the public landing surface.");
-    Assert(string.Equals(landingModel.PrimaryHeroAction.Label, "Create account to install", StringComparison.Ordinal), "landing page should source the guest-gated primary CTA from release canon.");
-    Assert(landingModel.PrimaryHeroAction.Href.StartsWith("/signup?next=", StringComparison.Ordinal), "guest-gated primary CTA should route to signup through the install handoff.");
+    var expectedLandingPrimaryLabel = landingModel.ReleaseExperience.Recommended?.RequiresAccount == true
+        ? landingModel.ReleaseExperience.GuestGatePrimaryLabel
+        : landingModel.ReleaseExperience.Recommended?.ActionLabel;
+    var expectedLandingPrimaryHref = landingModel.ReleaseExperience.Recommended?.RequiresAccount == true
+        ? landingModel.ReleaseExperience.GuestGatePrimaryHref
+        : landingModel.ReleaseExperience.Recommended?.DispatchHref;
+    Assert(string.Equals(landingModel.PrimaryHeroAction.Label, expectedLandingPrimaryLabel, StringComparison.Ordinal), "landing page should bind the primary CTA from the current release access posture.");
+    Assert(string.Equals(landingModel.PrimaryHeroAction.Href, expectedLandingPrimaryHref, StringComparison.Ordinal), "landing page should route the primary CTA through the release-aware install path.");
     Assert(string.Equals(landingModel.SecondaryHeroAction.Label, "See what works today", StringComparison.Ordinal), "landing page should keep the manifest-backed secondary CTA.");
     Assert(landingModel.TrustPulse is not null, "landing page should surface a compact weekly trust pulse on the front door.");
     Assert(landingModel.TrustPulse.Rows.Count >= 5, "landing page should surface a multi-row trust pulse on the front door.");
     Assert(landingModel.TrustPulse.TrendSamples.Count > 1, "landing page should surface measured progress points alongside the trust pulse summary.");
     Assert(landingModel.SignedInStatus is null, "guest landing should not project install-specific signed-in trust posture.");
     Assert(landingModel.Workflows.Any(static card => string.Equals(card.Action.Href, "/downloads", StringComparison.Ordinal)), "landing page should keep the product-story start lane");
-    Assert(landingModel.Chrome.HeaderActions.Any(static action => string.Equals(action.Label, "Create account to install", StringComparison.Ordinal) && action.Href.StartsWith("/signup?next=", StringComparison.Ordinal)), "landing page chrome should expose the release-aware signup CTA beside sign in");
+    Assert(landingModel.Chrome.HeaderActions.Any(action => string.Equals(action.Label, expectedLandingPrimaryLabel, StringComparison.Ordinal) && string.Equals(action.Href, expectedLandingPrimaryHref, StringComparison.Ordinal)), "landing page chrome should expose the same release-aware primary CTA beside sign in");
+    Assert(landingModel.AccessPosture is not null, "landing page should project the shared public access posture.");
     Assert(landingModel.Lanes.Any(static card => string.Equals(card.Card.Title, "Creator", StringComparison.Ordinal)), "landing page should keep the creator lane in the public entry surface");
     Assert(!string.IsNullOrWhiteSpace(landingModel.Assets.BySlot("section_hero")?.PosterUrl), "landing hero should use a non-empty media asset.");
     Assert(landingModel.AvailableToday.Any(static card => string.Equals(card.Card.Id, "real_mobile_prep", StringComparison.Ordinal)), "landing should treat inspectable continuity proof as available today instead of relegating it to a preview bucket.");
@@ -2839,6 +2846,10 @@ async Task VerifyPublicLandingProjectionAsync()
     var publicFaqModel = publicFaqView?.Model as FaqPageViewModel;
     Assert(publicFaqModel?.TrustPulse is not null, "guest faq should surface the weekly public trust pulse.");
     Assert(publicFaqModel?.SignedInStatus is null, "guest faq should not project install-specific signed-in trust posture.");
+    Assert(publicFaqModel?.AccessPosture is not null, "guest faq should bind the shared public access posture.");
+    Assert(publicFaqModel!.Sections.SelectMany(static section => section.Entries).Any(entry =>
+        string.Equals(entry.Question, "Do I need an account to download the current preview?", StringComparison.Ordinal)
+        && entry.Answer.Contains("Create an account when you want recovery", StringComparison.OrdinalIgnoreCase)), "guest faq should reuse the shared access truth for the current preview-answer row.");
 
     var downloadsView = await controller.DownloadsPage(CancellationToken.None) as ViewResult;
     var downloadsModel = downloadsView?.Model as DownloadsPageViewModel;
@@ -4873,9 +4884,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "publication", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit publication truth from governed creator-publication posture.");
     Assert(hostedCompanionPacketBundle.PublicHubPackets.Any(item => string.Equals(item.OwningDomain, "public_hub", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit public-hub truth from the hosted downloads and support posture.");
     var publicSignalPackets = new PublicSignalToCanonPacketService(releases).Build(supportCase, "en-US");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/participate?productlift=feedback#productlift-feedback", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed feedback packets for the public ProductLift lane.");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "roadmap", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/horizons?productlift=roadmap#productlift-roadmap-projection", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed roadmap packets for the public horizons projection.");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?productlift=changelog#productlift-shipped-closeout", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.");
+    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/participate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.");
+    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "roadmap", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/horizons?source=roadmap#public-roadmap-projection", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed roadmap packets for the public horizons projection.");
+    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?source=changelog#public-shipped-closeout", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.");
     Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal) && string.Equals(item.Route, "/contact", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.");
     Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.");
     var hostedProofContracts = new HostedProofContractService(releases).Build(new HostedProofContractContext(
@@ -4939,7 +4950,7 @@ async Task VerifyPublicLandingProjectionAsync()
         Locale: "en-US"));
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "support_status", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep support status on the account support rail.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "crash_status", StringComparison.Ordinal) && string.Equals(item.Route, "/api/v1/support/crashes/work-items", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep crash status on the crash work-item rail.");
-    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/participate?productlift=feedback#productlift-feedback", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep feedback status on the governed Participate feedback lane.");
+    Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "feedback_status", StringComparison.Ordinal) && string.Equals(item.Route, "/participate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep feedback status on the governed Participate feedback lane.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "telemetry_rollup", StringComparison.Ordinal) && string.Equals(item.Route, "/progress", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep telemetry rollups on the privacy-bounded progress route.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "retention_clocks", StringComparison.Ordinal) && string.Equals(item.Route, "/privacy", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep retention clocks on the privacy boundary route.");
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "case_status_followthrough", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep case-status followthrough on the tracked support rail.");
@@ -5312,7 +5323,7 @@ async Task VerifyPublicLandingProjectionAsync()
         && Uri.UnescapeDataString(homeRedirect.Url["/login?next=".Length..]).Contains("/home", StringComparison.Ordinal),
         "home page should redirect signed-out guests to login while preserving the requested home route.");
 
-    var authController = new AuthController(authService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    var authController = new AuthController(authService, identityClient, landing, releases, releaseSelection, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
     {
         ControllerContext = new ControllerContext
         {
@@ -5323,10 +5334,12 @@ async Task VerifyPublicLandingProjectionAsync()
     var loginModel = (loginResult as ViewResult)?.Model as AuthPageViewModel;
     Assert(loginModel is not null && loginModel.GoogleStartHref.Contains("/auth/google/start", StringComparison.Ordinal), "login page should render the Google-first auth shell.");
     Assert(string.Equals(loginModel!.NextPath, "/home", StringComparison.Ordinal), "login page should preserve the guest next path.");
+    Assert(loginModel.AccessPosture is not null, "login page should reuse the shared public access posture copy.");
 
     var signupResult = await authController.SignupPage("/home", CancellationToken.None);
     var signupModel = (signupResult as ViewResult)?.Model as AuthPageViewModel;
     Assert(signupModel is not null && signupModel.CreateAccount, "signup page should keep the reciprocal auth lane visible.");
+    Assert(signupModel!.AccessPosture is not null, "signup page should reuse the shared public access posture copy.");
 
     var emailStartMessage = await authController.StartEmail("runner@example.invalid", null, "/downloads", CancellationToken.None);
     var emailStartModel = (emailStartMessage as ViewResult)?.Model as AuthMessagePageViewModel;
@@ -5410,7 +5423,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-mailer-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var failingEmailAuthController = new AuthController(failingAuthService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    var failingEmailAuthController = new AuthController(failingAuthService, identityClient, landing, releases, releaseSelection, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
     {
         ControllerContext = new ControllerContext
         {
@@ -5427,7 +5440,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"Unknown or expired email entry ticket 'expired-ticket'.\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var expiredEmailAuthController = new AuthController(expiredAuthService, identityClient, landing, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    var expiredEmailAuthController = new AuthController(expiredAuthService, identityClient, landing, releases, releaseSelection, chrome, google, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
     {
         ControllerContext = new ControllerContext
         {
@@ -5475,7 +5488,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var googleState = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(new Uri(googleChallenge.RedirectUrl).Query)["state"].ToString();
     googleFailureContext.Request.Headers.Cookie = $"{HubGoogleAuthConstants.StateCookieName}={googleChallenge.StateCookieValue}";
     googleFailureContext.Request.QueryString = new QueryString($"?state={Uri.EscapeDataString(googleState)}&code=smoke-auth-code");
-    var failingGoogleAuthController = new AuthController(authService, identityClient, landing, chrome, failingGoogle, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
+    var failingGoogleAuthController = new AuthController(authService, identityClient, landing, releases, releaseSelection, chrome, failingGoogle, accounts, identityLinks, emailLinks, loggerFactory.CreateLogger<AuthController>())
     {
         ControllerContext = new ControllerContext
         {

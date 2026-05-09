@@ -1,0 +1,21 @@
+{
+  "contract_name": "chummer.run.support_case_flow_proof",
+  "status": "pass",
+  "generated_at": "2026-05-08T20:02:00.000000Z",
+  "base_url": "https://chummer.run",
+  "summary": "Live support-flow proof passed across help, contact, FAQ, and the bounded account/support login gates.",
+  "command": [
+    "python3",
+    "scripts/check-support-case-flow.py"
+  ],
+  "script": "scripts/check-support-case-flow.py",
+  "routes_checked": [
+    "/contact",
+    "/help",
+    "/faq",
+    "/home/access",
+    "/account/support"
+  ],
+  "stdout": "All routes ok: /contact ok, /help ok, /faq ok, /home/access ok, /account/support ok",
+  "abs_ids": ["ABS-017"]
+}

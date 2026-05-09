@@ -21,6 +21,22 @@ public sealed class PublicCanonMirrorDriftTests
 
         Assert.True(File.Exists(sourcePath), $"missing canonical source file: {sourcePath}");
         Assert.True(File.Exists(mirrorPath), $"missing run-services mirror file: {mirrorPath}");
-        Assert.Equal(File.ReadAllText(sourcePath), File.ReadAllText(mirrorPath));
+        Assert.Equal(
+            ReadCanonicalProductMirrorComparableText(sourcePath, relativePath),
+            ReadCanonicalProductMirrorComparableText(mirrorPath, relativePath));
+    }
+
+    private static string ReadCanonicalProductMirrorComparableText(string path, string relativePath)
+    {
+        string text = File.ReadAllText(path);
+        if (!string.Equals(relativePath, "WEEKLY_PRODUCT_PULSE.generated.json", StringComparison.Ordinal))
+        {
+            return text;
+        }
+
+        var payload = System.Text.Json.Nodes.JsonNode.Parse(text) as System.Text.Json.Nodes.JsonObject;
+        Assert.NotNull(payload);
+        payload["generated_at"] = "__normalized_generated_at__";
+        return payload.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
     }
 }

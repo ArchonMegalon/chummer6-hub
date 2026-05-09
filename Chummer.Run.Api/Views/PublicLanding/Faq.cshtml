@@ -3,6 +3,7 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-faq";
+    var accessPosture = Model.AccessPosture;
     var guestPreviewHref = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.Chrome.PublicPrimaryCta?.Href)
         ? Model.Chrome.PublicPrimaryCta!.Href
         : "/downloads";
@@ -21,7 +22,7 @@
         {
             Badge = "Downloads",
             Title = "Open downloads when the answer depends on install posture",
-            Summary = "Package type, account handoff, known issues, and the current support path belong on downloads, not buried inside a long answer.",
+            Summary = accessPosture?.AvailabilitySummary ?? "Package type, account handoff, known issues, and the current support path belong on downloads, not buried inside a long answer.",
             Href = "/downloads",
             Label = "Open downloads",
             Proof = new[] { "One downloads page", "Install continuity", "Known issues nearby" }
@@ -34,7 +35,7 @@
                 : "Create an account when you want recovery, linked installs, and tracked support",
             Summary = Model.Chrome.Authenticated
                 ? "Return to account when the question is about devices, recovery identities, or support follow-through instead of public product posture."
-                : "The binary stays the same. The value is the calmer return path for linked installs, recovery, and tracked support once you want it.",
+                : accessPosture?.AccountValueSummary ?? "The binary stays the same. The value is the calmer return path for linked installs, recovery, and tracked support once you want it.",
             Href = Model.Chrome.Authenticated ? "/account" : "/signup?next=/home",
             Label = Model.Chrome.Authenticated ? "Open account" : "Create account",
             Proof = new[] { "Linked installs", "Devices & access", "Tracked follow-up" }

@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.public_route_proof",
-  "generated_at_utc": "2026-05-07T20:12:08.495545Z",
+  "generated_at_utc": "2026-05-08T21:02:12.470520Z",
   "base_url": "https://chummer.run",
   "public_host": null,
   "forwarded_proto": null,
@@ -779,7 +779,7 @@
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/auth/google/start",
-      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=NocVJt9VTrKE--ou8Ra0osbjQfzHyYmT&nonce=6LkRWuBhRYeRsv83QCPxcbaCEzOF1ipz&code_challenge=gSfujpoGZXdL3yq4BpwNlzzynsqoycZaZsVekNyG6G4&code_challenge_method=S256&prompt=select_account",
+      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=HlepZpTgZgkt3q-3p6vtCgdoRLnpcsDV&nonce=aPrMqYIMgL0v7mZS4ZlvXFKclOOCXCpQ&code_challenge=pWI2br2WKoRxoMXYmJEdsbRwnb-JP2MhWFVyTAoKpu4&code_challenge_method=S256&prompt=select_account",
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302"
     },
@@ -814,49 +814,49 @@
       "detail": "expected anonymous redirect to /login?next=/home, got /login?next=%2Fhome (status 302)"
     },
     {
-      "path": "/home/access",
+      "path": "/workspace/access",
       "audience": "registered",
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/home/access",
+      "guest_fallback": "/login?next=/workspace/access",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "https://chummer.run/home/access",
+      "final_url": "https://chummer.run/workspace/access",
       "redirect_location": "/login?next=%2Fhome%2Faccess",
-      "expectation": "anonymous request redirects to /login?next=/home/access",
-      "detail": "expected anonymous redirect to /login?next=/home/access, got /login?next=%2Fhome%2Faccess (status 302)"
+      "expectation": "anonymous request redirects to /login?next=/workspace/access",
+      "detail": "expected anonymous redirect to /login?next=/workspace/access, got /login?next=%2Fhome%2Faccess (status 302)"
     },
     {
-      "path": "/home/work",
+      "path": "/workspace/work",
       "audience": "registered",
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/home/work",
+      "guest_fallback": "/login?next=/workspace/work",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "https://chummer.run/home/work",
+      "final_url": "https://chummer.run/workspace/work",
       "redirect_location": "/login?next=%2Fhome%2Fwork",
-      "expectation": "anonymous request redirects to /login?next=/home/work",
-      "detail": "expected anonymous redirect to /login?next=/home/work, got /login?next=%2Fhome%2Fwork (status 302)"
+      "expectation": "anonymous request redirects to /login?next=/workspace/work",
+      "detail": "expected anonymous redirect to /login?next=/workspace/work, got /login?next=%2Fhome%2Fwork (status 302)"
     },
     {
-      "path": "/home/setup",
+      "path": "/workspace/setup",
       "audience": "registered",
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/home/setup",
+      "guest_fallback": "/login?next=/workspace/setup",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "https://chummer.run/home/setup",
+      "final_url": "https://chummer.run/workspace/setup",
       "redirect_location": "/login?next=%2Fhome%2Fsetup",
-      "expectation": "anonymous request redirects to /login?next=/home/setup",
-      "detail": "expected anonymous redirect to /login?next=/home/setup, got /login?next=%2Fhome%2Fsetup (status 302)"
+      "expectation": "anonymous request redirects to /login?next=/workspace/setup",
+      "detail": "expected anonymous redirect to /login?next=/workspace/setup, got /login?next=%2Fhome%2Fsetup (status 302)"
     },
     {
       "path": "/account",
@@ -954,14 +954,14 @@
       "purpose": "signed_in_participation",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/auth/google/start?next=/participate/codex",
+      "guest_fallback": "/login?next=/participate/codex",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
       "final_url": "https://chummer.run/participate/codex",
       "redirect_location": "/auth/google/start?next=%2Fparticipate%2Fcodex",
-      "expectation": "anonymous request redirects to /auth/google/start?next=/participate/codex",
-      "detail": "expected anonymous redirect to /auth/google/start?next=/participate/codex, got /auth/google/start?next=%2Fparticipate%2Fcodex (status 302)"
+      "expectation": "registered request redirects to Google OAuth start endpoint",
+      "detail": "expected registered request to redirect through Google OAuth handoff to /auth/google/start?next=%2Fparticipate%2Fcodex"
     }
   ]
 }

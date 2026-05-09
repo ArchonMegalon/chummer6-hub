@@ -19,6 +19,7 @@
     var proofNotes = Model.Workflows.Take(1).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(2).ToArray();
     var release = Model.ReleaseExperience;
+    var accessPosture = Model.AccessPosture;
     var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
     var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
@@ -36,8 +37,13 @@
     var laneCards = Model.Lanes.Take(3).ToArray();
     var installRailSummary = Model.Chrome.Authenticated
         ? "Your signed-in account keeps linked installs, device return, and support follow-through in one calmer place."
-        : "The build stays the same for everyone. The account-aware piece is the install handoff, device continuity, and support history.";
-    var installRailPrimaryLabel = Model.Chrome.Authenticated ? "Open home" : "Create account and install";
+        : accessPosture?.AvailabilitySummary
+            ?? "The build stays the same for everyone. The account-aware piece is the install handoff, device continuity, and support history.";
+    var installRailPrimaryLabel = Model.Chrome.Authenticated
+        ? "Open home"
+        : guestNeedsInstallGate
+            ? release.GuestGatePrimaryLabel
+            : Model.PrimaryHeroAction.Label;
     var installRailPrimaryHref = Model.Chrome.Authenticated ? "/home" : accountAwareInstallPrimaryHref;
     var installRailSecondaryLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
     var installRailSecondaryHref = Model.Chrome.Authenticated ? "/account/access" : "/login?next=/home";
@@ -79,7 +85,7 @@
             <div class="hero-installrail" aria-label="Recommended install path">
                 <div class="hero-installrail__lead">
                     <span class="tag tag--amber">Recommended path</span>
-                    <strong>Account-aware install handoff</strong>
+                    <strong>@(guestNeedsInstallGate ? "Account-aware install handoff" : "Current preview install")</strong>
                     <p>@installRailSummary</p>
                 </div>
                 <div class="hero-installrail__facts">
@@ -97,7 +103,7 @@
                     </div>
                     <div class="hero-installrail__fact">
                         <span>First launch</span>
-                        <strong>Use as guest or link this copy later</strong>
+                        <strong>@(guestNeedsInstallGate ? "Signed-in handoff first" : "Use as guest or link this copy later")</strong>
                     </div>
                 </div>
                 <div class="hero-installrail__actions">

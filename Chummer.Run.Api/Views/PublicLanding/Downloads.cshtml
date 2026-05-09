@@ -17,6 +17,7 @@
     var hasAdvancedDownloads = release.Alternatives.Count > 0 || release.OtherPlatforms.Count > 0 || release.ManualPackages.Count > 0;
     var showPlatformShelf = release.PlatformAvailability.Count > 0;
     var hasAdvancedPanels = hasAdvancedDownloads || hasSignedInWindowsBuilds || hasWindowsProofRail;
+    var accessPosture = Model.AccessPosture;
     var returningUserLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
     var returningUserHref = Model.Chrome.Authenticated ? "/account/access" : "/auth/google/start?next=%2Fdownloads";
     var optionPool = (release.Recommended is null ? Enumerable.Empty<ReleaseOptionViewModel>() : new[] { release.Recommended })
@@ -61,14 +62,13 @@
             @(platformShelfNotice
                 ? requestedWindowsUnavailable && hasSignedInWindowsBuilds
                     ? "Windows is not promoted for guests on the current public shelf, but signed-in users can still open the latest Windows build below."
-                    : requestedWindowsUnavailable && hasWindowsProofRail
+                : requestedWindowsUnavailable && hasWindowsProofRail
                         ? "Windows is not promoted for this browser on the current public shelf. Check the main platform downloads below, and use the Windows verification page only if support points you there."
                     : release.PlatformShelfNoticeSummary
-                : recommendedUsesMacSetupScript
-                        ? "On macOS, the default path is the signed-in setup handoff. It gives you one Terminal command for this install."
-                    : guestGateRequired
+                : accessPosture?.AvailabilitySummary
+                    ?? (guestGateRequired
                         ? release.GuestGateSummary
-                        : "Other platforms stay on the main platform downloads shelf below. Manual packages and technical detail stay collapsed underneath.")
+                        : "Other platforms stay on the main platform downloads shelf below. Manual packages and technical detail stay collapsed underneath."))
         </p>
     </div>
 </section>
@@ -118,8 +118,12 @@ else
                     </article>
                     <article class="recommended-download__trustfact">
                         <span>First launch</span>
-                        <strong>Guest or link this copy</strong>
-                        <p>The app can still start as guest or attach this installed copy to your account when you are ready.</p>
+                        <strong>@(guestGateRequired ? "Signed-in handoff first" : "Guest or link this copy")</strong>
+                        <p>
+                            @(guestGateRequired
+                                ? "This install path starts from a signed-in handoff so recovery and support stay attached from the first launch."
+                                : "The app can still start as guest or attach this installed copy to your account when you are ready.")
+                        </p>
                     </article>
                     <article class="recommended-download__trustfact">
                         <span>Recovery path</span>
@@ -245,7 +249,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>
-                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in when you want recovery, support continuity, and claim-linked install history tied to the same machine.")</strong>
+                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : accessPosture?.CreateAccountSummary ?? "Sign in when you want recovery, support continuity, and claim-linked install history tied to the same machine.")</strong>
                             </article>
                         </div>
                         <div class="stacked-actions">

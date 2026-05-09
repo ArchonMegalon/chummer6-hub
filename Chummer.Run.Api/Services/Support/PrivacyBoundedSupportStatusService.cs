@@ -143,7 +143,7 @@ public sealed class PrivacyBoundedSupportStatusService
         DateTimeOffset now,
         string locale)
     {
-        string route = feedbackPacket?.DestinationRoute ?? "/participate?productlift=feedback#productlift-feedback";
+        string route = feedbackPacket?.DestinationRoute ?? "/participate?source=feedback#public-feedback";
         string summary = feedbackPacket is null
             ? "Feedback stays privacy-bounded until it is classified on the governed Participate lane and absorbed into canon."
             : "Feedback stays bounded to the governed Participate lane instead of becoming support folklore or telemetry surveillance.";
@@ -170,7 +170,7 @@ public sealed class PrivacyBoundedSupportStatusService
             ],
             Actions:
             [
-                new PrivacyBoundedSupportStatusActionProjection("open_feedback_lane", "Open feedback lane", route, "Review the governed ProductLift feedback lane."),
+                new PrivacyBoundedSupportStatusActionProjection("open_feedback_lane", "Open feedback lane", route, "Review the governed first-party feedback lane."),
                 new PrivacyBoundedSupportStatusActionProjection("open_participate", "Open Participate", "/participate", "Inspect the broader public-signal intake lane."),
                 new PrivacyBoundedSupportStatusActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Escalate private or account-linked feedback through first-party support.")
             ],

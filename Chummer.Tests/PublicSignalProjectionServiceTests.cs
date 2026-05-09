@@ -15,14 +15,14 @@ public sealed class PublicSignalProjectionServiceTests
         var packet = fixture.CreateService().BuildPacket("/feedback");
 
         Assert.NotNull(packet);
-        Assert.Equal("ProductLift", packet!.Vendor);
+        Assert.Equal("Hosted public mirror", packet!.Vendor);
         Assert.Equal("/feedback", packet.PublicPath);
         Assert.Equal("/help/feedback", packet.FallbackPath);
         Assert.Equal("Projection Only", packet.TruthPosture);
         Assert.Equal("Public signal is input. Canon is decided by Chummer.", packet.CoreRule);
         Assert.Contains("Do not post private logs", packet.PublicWarning, StringComparison.Ordinal);
         Assert.Contains(packet.BoardTargets, item => string.Equals(item, "Desktop Preview", StringComparison.Ordinal));
-        Assert.Contains(packet.AuthorityFlow, item => string.Equals(item, "ProductLift public posts / votes / comments", StringComparison.Ordinal));
+        Assert.Contains(packet.AuthorityFlow, item => string.Equals(item, "Public signal posts / votes / comments", StringComparison.Ordinal));
         Assert.Contains(packet.DecisionRoutes, item => string.Equals(item, "Product Governor", StringComparison.Ordinal));
         Assert.Contains(packet.Forbidden, item => string.Equals(item, "Support Case Truth", StringComparison.Ordinal));
     }
@@ -88,9 +88,9 @@ public sealed class PublicSignalProjectionServiceTests
                 """
 version: 1
 surfaces:
-  - key: productlift_public_feedback
-    vendor: ProductLift
-    policy_source: products/chummer/PRODUCTLIFT_FEEDBACK_ROADMAP_BRIDGE.md
+  - key: public_feedback
+    vendor: Hosted public mirror
+    policy_source: products/chummer/PUBLIC_SIGNAL_FEEDBACK_ROADMAP_BRIDGE.md
     public_path: /feedback
     fallback_path: /help/feedback
     role: public_feedback_and_voting
@@ -101,9 +101,9 @@ surfaces:
     forbidden:
       - support_case_truth
       - release_truth
-  - key: productlift_public_roadmap
-    vendor: ProductLift
-    policy_source: products/chummer/PRODUCTLIFT_FEEDBACK_ROADMAP_BRIDGE.md
+  - key: public_roadmap
+    vendor: Hosted public mirror
+    policy_source: products/chummer/PUBLIC_SIGNAL_FEEDBACK_ROADMAP_BRIDGE.md
     public_path: /roadmap
     fallback_path: /horizons
     role: roadmap_projection
@@ -111,9 +111,9 @@ surfaces:
     canonical_source:
       - products/chummer/PROGRAM_MILESTONES.yaml
       - products/chummer/HORIZON_REGISTRY.yaml
-  - key: productlift_changelog
-    vendor: ProductLift
-    policy_source: products/chummer/PRODUCTLIFT_FEEDBACK_ROADMAP_BRIDGE.md
+  - key: public_changelog
+    vendor: Hosted public mirror
+    policy_source: products/chummer/PUBLIC_SIGNAL_FEEDBACK_ROADMAP_BRIDGE.md
     public_path: /changelog
     fallback_path: /now
     role: changelog_projection_and_voter_notification
@@ -122,15 +122,15 @@ surfaces:
       - products/chummer/PUBLIC_RELEASE_EXPERIENCE.yaml
       - public_closeout_packets
 closeout_requirements:
-  productlift_shipped_item:
+  public_shipped_item:
     required:
       - closeout_packet
       - public_changelog_entry_or_no_entry_reason
 """);
             File.WriteAllText(
-                Path.Combine(productRoot, "PRODUCTLIFT_FEEDBACK_ROADMAP_BRIDGE.md"),
+                Path.Combine(productRoot, "PUBLIC_SIGNAL_FEEDBACK_ROADMAP_BRIDGE.md"),
                 """
-# ProductLift feedback, roadmap, and changelog bridge
+# Public signal feedback, roadmap, and changelog bridge
 
 ## Status
 
@@ -139,12 +139,12 @@ Accepted design posture; implementation remains gated by Chummer-owned routes, a
 ## Authority rule
 
 ```text
-ProductLift public posts / votes / comments
+Public signal posts / votes / comments
   -> EA synthesis
   -> Product Governor decision
   -> chummer6-design canonical patch or milestone
   -> implementation / release / public guide proof
-  -> ProductLift roadmap, changelog, and voter closeout projection
+  -> hosted roadmap, changelog, and voter closeout projection
 ```
 
 Required public warning:
@@ -153,7 +153,7 @@ Required public warning:
 
 ## First board set
 
-Initial ProductLift boards:
+Initial public signal boards:
 
 - Desktop Preview
 - Build & Explain

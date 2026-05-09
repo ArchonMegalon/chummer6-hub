@@ -120,6 +120,98 @@ platforms:
     }
 
     [Fact]
+    public void BuildPublicAccessPostureExplainsWhenPreviewIsGuestReadable()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260401-065126",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-01T06:51:26Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "6b0a63c39850a257e66d142c0bad196a7cc4fcbaf027635965f138f534bb13ea",
+                    SizeBytes: 34297862,
+                    Head: "avalonia",
+                    PlatformId: "linux",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "open_public")
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: false);
+        var posture = service.BuildPublicAccessPosture(manifest, experience);
+
+        Assert.True(posture.GuestInstallAvailable);
+        Assert.False(posture.AccountRequiredInstallAvailable);
+        Assert.Contains("public download", posture.AvailabilitySummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Create an account when you want recovery", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void BuildPublicAccessPostureExplainsMixedPublicAndSignedInRoutes()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260422-101500",
+            Channel: "preview",
+            PublishedAt: DateTimeOffset.Parse("2026-04-22T10:15:00Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-installer",
+                    Platform: "Avalonia Desktop Windows X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    Sha256: "cb3493c1113c23b5e496dfe8a1e6de9afc43c802d7da865adc5255497341e5c4",
+                    SizeBytes: 96466473,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-win-x64-installer.exe",
+                    InstallAccessClass: "open_public"),
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-osx-arm64-installer",
+                    Platform: "Avalonia Desktop macOS ARM64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    Sha256: "mac-a1",
+                    SizeBytes: 101,
+                    Head: "avalonia",
+                    PlatformId: "osx-arm64",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    InstallAccessClass: "account_required")
+            ]);
+
+        var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: false);
+        var posture = service.BuildPublicAccessPosture(manifest, experience);
+
+        Assert.True(posture.GuestInstallAvailable);
+        Assert.True(posture.AccountRequiredInstallAvailable);
+        Assert.Contains("It depends on the platform", posture.DownloadFaqAnswer, StringComparison.Ordinal);
+        Assert.Contains("signed-in install handoff", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void PublicReleaseExperienceCanonAcceptsCurrentProofBoundaryFields()
     {
         var configuration = new ConfigurationBuilder()
