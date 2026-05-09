@@ -1,34 +1,14 @@
 {
-  "ts": "2026-05-09T13:59:52.751623Z",
+  "ts": "2026-05-09T14:03:04.067927Z",
   "run_id": "20260509T094222Z",
-  "status": "sleeping",
+  "status": "running",
   "supervisor_pid": 3106247,
-  "loop_id": 9,
-  "worker_pid": null,
-  "last_exit": 1,
-  "failure_streak": 3,
+  "loop_id": 10,
+  "worker_pid": 965245,
+  "last_exit": null,
+  "failure_streak": 0,
   "provider_models_url": "http://127.0.0.1:33531/v1/models",
   "completion_root": "/docker/chummercomplete/_completion/chummer6_absolute_completion",
   "run_dir": "/docker/chummercomplete/chummer.run-services/.codex-studio/out/absolute-audit-codexliz-overwatch/20260509T094222Z",
-  "note": "sleep=120s progress=False",
-  "closure_done": false,
-  "pending_abs_ids": [
-    "strict_hub_substance",
-    "run_ledger",
-    "repo_inventory_live_reconciliation",
-    "release_gates_coverage",
-    "verification_results_gates",
-    "e2e_results_coverage",
-    "target_public_routes_coverage"
-  ],
-  "pending_check_keys": [
-    "strict_hub_substance",
-    "run_ledger",
-    "repo_inventory_live_reconciliation",
-    "release_gates_coverage",
-    "verification_results_gates",
-    "e2e_results_coverage",
-    "target_public_routes_coverage"
-  ],
-  "pending_count": 7
+  "note": "loop-10.jsonl:101, loop-10.stderr.log:77"
 }
