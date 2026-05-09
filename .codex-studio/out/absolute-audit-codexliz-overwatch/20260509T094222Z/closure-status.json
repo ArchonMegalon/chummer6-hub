@@ -1,15 +1,19 @@
 {
-  "generated_at": "2026-05-09T11:48:52.298622Z",
+  "generated_at": "2026-05-09T12:19:03.835449Z",
   "closure_done": false,
   "pending_abs_ids": [
+    "strict_hub_substance",
     "run_ledger",
+    "repo_inventory_live_reconciliation",
     "release_gates_coverage",
     "verification_results_gates",
     "e2e_results_coverage",
     "target_public_routes_coverage"
   ],
   "pending_check_keys": [
+    "strict_hub_substance",
     "run_ledger",
+    "repo_inventory_live_reconciliation",
     "release_gates_coverage",
     "verification_results_gates",
     "e2e_results_coverage",
@@ -20,8 +24,8 @@
       "key": "strict_hub_substance",
       "label": "Strict hub substance gate",
       "path": "/docker/chummercomplete/chummer.run-services/scripts/check_absolute_audit_substance.py",
-      "ok": true,
-      "detail": "closure_done=true"
+      "ok": false,
+      "detail": "pending=live_route_proof"
     },
     {
       "key": "required_artifacts",
@@ -55,8 +59,8 @@
       "key": "repo_inventory_live_reconciliation",
       "label": "Repo inventory live reconciliation",
       "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/REPO_INVENTORY.yaml",
-      "ok": true,
-      "detail": "mismatches=none"
+      "ok": false,
+      "detail": "mismatches=/docker/chummercomplete/chummer.run-services:sha=eb57eca9df849f30f20355afb2c389bfad11d90d!=live=ae8e210bea25ab298e9e8491ab21089145d6404f, /docker/chummercomplete/chummer-hub-registry:sha=414c09705654c70d3450eb580afd28b2be269c3c!=live=30a326a16130603d6dec87a578be384a5d6d8cf8, /docker/chummercomplete/chummer-hub-registry:dirty=True!=live=False, /docker/fleet/repos/chummer-media-factory:sha=201a3b88dec13346807cb167515dbb97167abb2c!=live=f6af2c7929beca22858fb50ba8a6e22b934e3ab6, /docker/fleet/repos/chummer-media-factory:dirty=True!=live=False"
     },
     {
       "key": "branch_policy_alignment",
