@@ -37,3 +37,6 @@
 {"ts": "2026-05-09T11:48:42.465051Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
 {"ts": "2026-05-09T11:48:52.306364Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
 {"ts": "2026-05-09T11:48:52.724654Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=1800s"}
+{"ts": "2026-05-09T12:18:52.725363Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T12:19:03.843307Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T12:19:04.250016Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=1800s"}
