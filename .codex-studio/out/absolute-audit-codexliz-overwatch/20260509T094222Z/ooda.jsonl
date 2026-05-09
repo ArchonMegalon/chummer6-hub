@@ -1,0 +1,39 @@
+{"ts": "2026-05-09T09:42:22.874507Z", "phase": "observe", "note": "supervisor started"}
+{"ts": "2026-05-09T09:42:22.874917Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T09:42:29.934590Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T09:42:30.510607Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=30s"}
+{"ts": "2026-05-09T09:43:00.511271Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T09:43:10.728230Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T09:43:10.822441Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=60s"}
+{"ts": "2026-05-09T09:44:10.823049Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T09:44:18.578576Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T09:44:18.957896Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=120s"}
+{"ts": "2026-05-09T09:46:18.958689Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T09:46:26.973689Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T09:46:27.383008Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=240s"}
+{"ts": "2026-05-09T09:50:27.383712Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T09:50:33.807002Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T09:50:34.344060Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=480s"}
+{"ts": "2026-05-09T09:58:34.344787Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T09:58:41.552006Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T09:58:42.034334Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=960s"}
+{"ts": "2026-05-09T10:14:42.035546Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T10:14:51.073855Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T10:14:51.642550Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=1800s"}
+{"ts": "2026-05-09T10:44:51.643382Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T10:45:00.532330Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T10:45:01.520384Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T10:45:01.523267Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:0, loop-0.stderr.log:0"}
+{"ts": "2026-05-09T10:45:36.007103Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:101, loop-0.stderr.log:77"}
+{"ts": "2026-05-09T10:46:06.022792Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:101, loop-0.stderr.log:77"}
+{"ts": "2026-05-09T10:46:39.572014Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:101, loop-0.stderr.log:77"}
+{"ts": "2026-05-09T10:47:09.574158Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:15867, loop-0.stderr.log:77"}
+{"ts": "2026-05-09T10:47:39.974269Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:28025, loop-0.stderr.log:77"}
+{"ts": "2026-05-09T10:48:15.452475Z", "phase": "act", "note": "loop=0 pass0_start_missed pending=run_ledger; terminating worker"}
+{"ts": "2026-05-09T10:48:22.452971Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T11:18:31.888700Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T11:18:41.891127Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T11:18:42.464388Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=1800s"}
+{"ts": "2026-05-09T11:48:42.465051Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T11:48:52.306364Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T11:48:52.724654Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=1800s"}

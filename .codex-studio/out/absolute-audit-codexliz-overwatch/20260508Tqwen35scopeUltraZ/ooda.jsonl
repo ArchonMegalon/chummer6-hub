@@ -1,0 +1,32 @@
+{"ts": "2026-05-08T21:24:55.683831Z", "phase": "observe", "note": "supervisor started"}
+{"ts": "2026-05-08T21:24:55.683935Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T21:24:57.164904Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T21:24:57.165695Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T21:24:57.168289Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:0, loop-0.stderr.log:0"}
+{"ts": "2026-05-08T21:25:27.170222Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:101, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T21:25:57.171712Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:101, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T21:26:27.173225Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:9694, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T21:26:57.177217Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:22441, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T21:27:27.179184Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:23359, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T21:27:57.180601Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:25926, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T21:28:27.181965Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:28667, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T21:28:32.182349Z", "phase": "act", "note": "codexliz loop exited with code 0"}
+{"ts": "2026-05-08T21:29:02.182666Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T21:29:03.537073Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T21:29:03.537461Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T21:29:03.538583Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:0, loop-1.stderr.log:0"}
+{"ts": "2026-05-08T21:29:33.539872Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:101, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:30:03.541622Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:16434, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:30:33.547216Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:16434, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:31:03.550231Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:20466, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:31:33.553200Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:37308, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:32:03.554609Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:37308, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:32:33.557580Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:68368, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:33:03.558972Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:68368, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:33:33.561800Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:68368, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:34:03.563220Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:74724, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:34:33.564665Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:74724, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:35:03.566125Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:81089, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:35:33.569614Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:81089, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:36:03.571422Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:81971, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T21:36:33.573072Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:81971, loop-1.stderr.log:77"}
