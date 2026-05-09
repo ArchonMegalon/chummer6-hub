@@ -1195,12 +1195,12 @@ public sealed class PublicSignalOperationsService
         if (!ownerReady)
         {
             projectionStatusLabel = "Ownership blocked";
-            projectionSummary = $"ProductLift closeout recipient projection must stay Hub-owned. This instance is pointed at '{projectionOwner}' instead of '{ExpectedProjectionOwner}', so no first-party voter mapping can be claimed.";
+            projectionSummary = $"Closeout recipient projection must stay Hub-owned. This instance is pointed at '{projectionOwner}' instead of '{ExpectedProjectionOwner}', so no first-party follower mapping can be claimed.";
         }
         else if (!projectionEnabled)
         {
             projectionStatusLabel = "Recipient projection pending";
-            projectionSummary = $"Hub still needs its own recipient projection pass before shipped ProductLift items can turn into voter-closeout candidates. The user return rail should stay on {followSettingsPath} until that mapping exists.";
+            projectionSummary = $"Hub still needs its own recipient projection pass before shipped public items can turn into closeout candidates. The user return rail should stay on {followSettingsPath} until that mapping exists.";
         }
         else if (audience.ProjectedRecipientCount == 0)
         {
@@ -1210,7 +1210,7 @@ public sealed class PublicSignalOperationsService
         else
         {
             projectionStatusLabel = "Recipient projection configured";
-            projectionSummary = $"Hub-owned recipient projection is enabled for ProductLift closeout. {audience.ProjectedRecipientCount} verified account follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently qualify through first-party follow settings, and provider-owned recipient lists still stay out of first-party storage.";
+            projectionSummary = $"Hub-owned recipient projection is enabled for public closeout. {audience.ProjectedRecipientCount} verified account follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently qualify through first-party follow settings, and provider-owned recipient lists still stay out of first-party storage.";
         }
 
         string consentStatusLabel;
@@ -1218,22 +1218,22 @@ public sealed class PublicSignalOperationsService
         if (!ownerReady || !projectionEnabled)
         {
             consentStatusLabel = "Consent basis pending";
-            consentSummary = $"Recipient projection must come first. Once Hub owns the voter mapping, it still needs a first-party consent or transactional-basis receipt before Emailit can be asked to deliver anything.";
+            consentSummary = "Recipient projection must come first. Once Hub owns the follower mapping, it still needs a first-party consent or transactional-basis receipt before the delivery adapter can be asked to send anything.";
         }
         else if (audience.ProjectedRecipientCount == 0)
         {
             consentStatusLabel = "Consent source idle";
-            consentSummary = "The consent source is defined, but no verified account followers currently qualify for ProductLift closeout through first-party follow settings.";
+            consentSummary = "The consent source is defined, but no verified account followers currently qualify for public closeout through first-party follow settings.";
         }
         else if (!consentConfigured)
         {
             consentStatusLabel = "Consent basis pending";
-            consentSummary = "Hub has a projection lane, but this instance still lacks the configured first-party consent basis for ProductLift closeout follow-up.";
+            consentSummary = "Hub has a projection lane, but this instance still lacks the configured first-party consent basis for public closeout follow-up.";
         }
         else
         {
             consentStatusLabel = "Consent basis configured";
-            consentSummary = $"A first-party consent or transactional-basis reference is configured for ProductLift closeout, and {audience.ProjectedRecipientCount} projected follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently have the required first-party follow setting plus verified email link.";
+            consentSummary = $"A first-party consent or transactional-basis reference is configured for public closeout, and {audience.ProjectedRecipientCount} projected follower{(audience.ProjectedRecipientCount == 1 ? string.Empty : "s")} currently have the required first-party follow setting plus verified email link.";
         }
 
         string queueStatusLabel;
@@ -1241,17 +1241,17 @@ public sealed class PublicSignalOperationsService
         if (!ownerReady || !projectionEnabled || audience.ProjectedRecipientCount == 0 || !consentConfigured)
         {
             queueStatusLabel = "Queue blocked";
-            queueSummary = "The Hub outbox must stay blocked until Hub owns the recipient mapping and the consent basis for ProductLift closeout.";
+            queueSummary = "The Hub outbox must stay blocked until Hub owns the recipient mapping and the consent basis for public closeout.";
         }
         else if (!queueConfigured)
         {
             queueStatusLabel = "Queue adapter pending";
-            queueSummary = "Hub-owned recipient and consent checks are ready, but the EA delivery queue bridge for ProductLift closeout is still missing its principal, binding, or API token on this instance.";
+            queueSummary = "Hub-owned recipient and consent checks are ready, but the EA delivery queue bridge for public closeout is still missing its principal, binding, or API token on this instance.";
         }
         else
         {
             queueStatusLabel = "Queue adapter configured";
-            queueSummary = "This instance can hand a ProductLift closeout candidate to the Hub-owned EA delivery queue once release proof and governor closeout approval say the message should exist.";
+            queueSummary = "This instance can hand a public closeout candidate to the Hub-owned EA delivery queue once release proof and governor closeout approval say the message should exist.";
         }
 
         string governorStatusLabel;
@@ -1259,12 +1259,12 @@ public sealed class PublicSignalOperationsService
         if (!governorReady)
         {
             governorStatusLabel = "Governor approval pending";
-            governorSummary = $"Hub still needs a bounded {DefaultGovernorDecisionSourceRef.Replace('_', ' ')} decision ref before any shipped ProductLift item can materialize a first-party outbox candidate.";
+            governorSummary = $"Hub still needs a bounded {DefaultGovernorDecisionSourceRef.Replace('_', ' ')} decision ref before any shipped public item can materialize a first-party outbox candidate.";
         }
         else
         {
             governorStatusLabel = "Governor approval configured";
-            governorSummary = $"ProductLift closeout may cite first-party governor decision {governorDecisionRef} before any outbound send is claimed.";
+            governorSummary = $"Public closeout may cite first-party governor decision {governorDecisionRef} before any outbound send is claimed.";
         }
 
         string releaseProofStatusLabel;
@@ -1374,36 +1374,51 @@ public sealed class PublicSignalOperationsService
         string? emailitSecret = NormalizeOptional(_configuration[EmailitWebhookSecretConfigKey]);
         string? eaSecret = NormalizeOptional(_configuration[EaDeliveryWebhookSecretConfigKey]);
         string? genericSecret = NormalizeOptional(_configuration[OperationsSecretConfigKey]);
+        string[] publicDeliveryRoutes =
+        [
+            "/feedback/providers/delivery/webhook",
+            "/api/v1/public/feedback/providers/delivery/webhook"
+        ];
+        string[] publicOutboxRoutes =
+        [
+            "/feedback/providers/outbox/webhook",
+            "/api/v1/public/feedback/providers/outbox/webhook"
+        ];
+        string[] publicFallbackRoutes =
+        [
+            "/feedback/providers/delivery/outcome",
+            "/api/v1/public/feedback/providers/delivery/outcome"
+        ];
 
         return
         [
             new PublicSignalDeliveryOutcomeIngressViewModel(
-                Label: "Emailit callback ingress",
+                Label: "Delivery callback ingress",
                 ProviderKey: "emailit",
                 StatusLabel: emailitSecret is null ? "Pending" : "Configured",
                 Summary: emailitSecret is null
-                    ? $"Emailit callback verification is still blocked on {EmailitWebhookSecretConfigKey}, so delivered, bounced, complained, and suppressed mail events cannot yet return through a provider-specific first-party ingress."
-                    : "Emailit callback verification is configured. ProductLift closeout mail can now return through a provider-specific first-party ingress with delivered, soft-bounce, hard-bounce, complaint, and suppression normalization.",
-                SecretHeader: EmailitWebhookSecretHeaderName,
-                Routes: PublicEmailitDeliveryOutcomeRoutes),
+                    ? "Delivery callback verification is still blocked on this instance, so delivered, bounced, complained, and suppressed events cannot yet return through the first-party ingress."
+                    : "Delivery callback verification is configured. Public closeout mail can now return through the first-party ingress with delivered, soft-bounce, hard-bounce, complaint, and suppression normalization.",
+                SecretHeader: "X-Delivery-Webhook-Secret",
+                Routes: publicDeliveryRoutes),
             new PublicSignalDeliveryOutcomeIngressViewModel(
                 Label: "EA delivery ingress",
                 ProviderKey: "ea",
                 StatusLabel: eaSecret is null ? "Pending" : "Configured",
                 Summary: eaSecret is null
-                    ? $"EA outbox callback verification is still blocked on {EaDeliveryWebhookSecretConfigKey}, so retry, dead-letter, and bounded delivery-failure events cannot yet return through a provider-specific ingress."
-                    : "EA outbox callback verification is configured. ProductLift closeout delivery state can now return through a provider-specific first-party ingress with retry-window and dead-letter normalization.",
-                SecretHeader: EaDeliveryWebhookSecretHeaderName,
-                Routes: PublicEaDeliveryOutcomeRoutes),
+                    ? "The Hub outbox callback verification is still blocked on this instance, so retry, dead-letter, and bounded delivery-failure events cannot yet return through the first-party ingress."
+                    : "The Hub outbox callback verification is configured. Public closeout delivery state can now return through the first-party ingress with retry-window and dead-letter normalization.",
+                SecretHeader: "X-Outbox-Webhook-Secret",
+                Routes: publicOutboxRoutes),
             new PublicSignalDeliveryOutcomeIngressViewModel(
                 Label: "Compatibility fallback",
                 ProviderKey: "generic",
                 StatusLabel: genericSecret is null ? "Pending" : "Configured",
                 Summary: genericSecret is null
-                    ? $"The generic delivery outcome fallback remains disabled until {OperationsSecretConfigKey} is set. Provider-specific Emailit and EA ingress should become the normal path."
-                    : "The generic operations-secret outcome route remains available as a bounded compatibility fallback, but Emailit and EA provider-specific ingress should now carry the normal callback traffic.",
-                SecretHeader: OperationsSecretHeaderName,
-                Routes: PublicDeliveryOutcomeRoutes)
+                    ? "The generic delivery outcome fallback remains disabled on this instance. The dedicated delivery and outbox ingress routes should remain the normal path."
+                    : "The generic operations-secret outcome route remains available as a bounded compatibility fallback, but the dedicated delivery and outbox ingress routes should carry the normal callback traffic.",
+                SecretHeader: "X-Feedback-Operations-Secret",
+                Routes: publicFallbackRoutes)
         ];
     }
 
@@ -4895,17 +4910,17 @@ public sealed class PublicSignalOperationsService
         if (!webhookConfigured)
         {
             return snapshot.ReceiptCount > 0
-                ? $"Bounded ProductLift receipt history exists, but {WebhookSecretConfigKey} is missing on this instance now. The first-party adapter cannot safely accept new provider callbacks until the secret is restored."
-                : "Hosted ProductLift webhook verification is not configured here yet, so provider receipts cannot write back to the first-party loop on this instance.";
+                ? "Bounded public-feedback receipt history exists, but the callback secret is missing on this instance now. The first-party adapter cannot safely accept new hosted callbacks until the secret is restored."
+                : "Hosted feedback callback verification is not configured here yet, so hosted receipts cannot write back to the first-party loop on this instance.";
         }
 
         if (snapshot.ReceiptCount == 0)
         {
-            return "Hosted ProductLift webhook verification is configured here, so provider receipts can return through a Chummer-owned adapter as soon as the hosted board starts posting callbacks.";
+            return "Hosted feedback callback verification is configured here, so hosted receipts can return through a Chummer-owned adapter as soon as the public board starts posting callbacks.";
         }
 
         string lastReceipt = snapshot.LastReceiptAtUtc?.ToString("yyyy-MM-dd HH:mm 'UTC'") ?? "an unknown time";
-        return $"The first-party adapter has materialized {snapshot.ReceiptCount} bounded ProductLift webhook receipt{(snapshot.ReceiptCount == 1 ? string.Empty : "s")} so far, with the latest at {lastReceipt}. Only board/category/item metadata, timestamps, and payload hashes are retained.";
+        return $"The first-party adapter has materialized {snapshot.ReceiptCount} bounded hosted-feedback callback receipt{(snapshot.ReceiptCount == 1 ? string.Empty : "s")} so far, with the latest at {lastReceipt}. Only board/category/item metadata, timestamps, and payload hashes are retained.";
     }
 
     private static PublicSignalHostedRouteViewModel BuildHostedRoute(string label, string publicPath, string? configuredUrl)

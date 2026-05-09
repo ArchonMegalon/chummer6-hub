@@ -482,7 +482,12 @@ public sealed record ResolutionReportApprovalProjection(
     string NewsId,
     IReadOnlyList<string> EvidenceLines,
     string UpdatedByUserId,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string? WorldResolutionReportId = null,
+    string? WorldFrameId = null,
+    string? ShadowfeedBulletinId = null,
+    string? ResolutionConsequenceBridgeId = null,
+    string? ApprovalReceiptRef = null);
 
 public sealed record WorldTickProjection(
     string WorldTickId,
@@ -494,7 +499,11 @@ public sealed record WorldTickProjection(
     string ConsequenceSummary,
     IReadOnlyList<string> EvidenceLines,
     string UpdatedByUserId,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string? WorldFrameId = null,
+    string? WorldReceiptRef = null,
+    string? ShadowfeedBulletinId = null,
+    string? ShadowfeedBulletinReceiptRef = null);
 
 public sealed record PlayerSafeNewsProjection(
     string NewsId,
@@ -509,7 +518,9 @@ public sealed record PlayerSafeNewsProjection(
     string PublicationSummary,
     IReadOnlyList<string> EvidenceLines,
     string UpdatedByUserId,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string? BulletinId = null,
+    string? BulletinReceiptRef = null);
 
 public sealed record CampaignAdoptionLoopProjection(
     string WorkspaceId,

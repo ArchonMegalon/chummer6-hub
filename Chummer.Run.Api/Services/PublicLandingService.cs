@@ -50,13 +50,13 @@ public sealed class PublicLandingService
             ProductProofResultSummary: manifest.ProductProofResultSummary,
             ProductProofTrail: manifest.ProductProofTrail ?? new List<string>(),
             PublicRoutes: (manifest.PublicRoutes ?? new List<PublicLandingRouteDocument>())
-                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements))
+                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements, route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
                 .ToArray(),
             AuthRoutes: (manifest.AuthRoutes ?? new List<PublicLandingRouteDocument>())
-                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements))
+                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements, route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
                 .ToArray(),
             RegisteredRoutes: (manifest.RegisteredRoutes ?? new List<PublicLandingRouteDocument>())
-                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements))
+                .Select(static route => new PublicLandingRouteDto(route.Path, route.Title, route.Audience, route.Purpose, route.RequiresAuth, route.GuestFallback, route.MustExist, route.PlaceholderAllowed, route.PlaceholderRequirements, route.VerificationMode, route.VerificationFile, route.VerificationPattern, route.VerificationPath))
                 .ToArray(),
             Sections: (manifest.Sections ?? new List<PublicLandingSectionDocument>())
                 .Select(static section => new PublicLandingSectionDto(section.Id, section.Eyebrow, section.Title, section.Intro, section.Audience, section.Route, section.AssetSlot))

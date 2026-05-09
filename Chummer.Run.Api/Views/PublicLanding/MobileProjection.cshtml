@@ -1,0 +1,79 @@
+@model MobileProjectionPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-mobile-projection";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>@Model.CurrentRoleLabel</span>
+            <span>Installable PWA posture</span>
+            <span>First-party role entry</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
+    </div>
+</section>
+
+<section class="continuity-band">
+    <div class="continuity-band__copy">
+        <p class="eyebrow">Install and reconnect posture</p>
+        <h2 class="editorial-title">Mobile routes keep installability, continuity, and role entry on one rail.</h2>
+        <p class="editorial-copy">@Model.InstallabilitySummary</p>
+    </div>
+    <div class="continuity-band__panel">
+        @foreach (var capability in Model.Capabilities.Take(2))
+        {
+            <article class="continuity-band__fact">
+                <span>@capability.Label</span>
+                <strong>@capability.Summary</strong>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Role entry map</p>
+        <h2 class="editorial-title">Player, GM, and observer aliases all converge on the same play shell.</h2>
+        <p class="editorial-copy">Role-specific aliases help people arrive on the right entry point without splitting product truth across disconnected mobile pages.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var role in Model.Roles)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@(role.Current ? "Current role" : "Role alias")</span>
+                <h3>@role.Label</h3>
+                <p>@role.Summary</p>
+                <a class="editorial-strip__action" href="@role.Href">Open @role.Label</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Capability pack</p>
+        <h2 class="editorial-title">Keep the mobile rail honest about what it owns.</h2>
+        <p class="editorial-copy">The mobile route should explain play posture and reconnect expectations. Downloads still owns build choice, and Help still owns private support.</p>
+    </div>
+    <section class="compact-rail">
+        @foreach (var capability in Model.Capabilities)
+        {
+            <article class="compact-rail__item">
+                <div class="compact-rail__copy">
+                    <h3>@capability.Label</h3>
+                    <p>@capability.Summary</p>
+                </div>
+            </article>
+        }
+    </section>
+</section>

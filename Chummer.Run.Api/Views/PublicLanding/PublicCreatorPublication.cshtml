@@ -53,6 +53,8 @@
     var signedInShelfSummary = Model.Chrome.Authenticated
         ? "Use the signed-in proof shelf when you want personal, campaign, creator, and public returns to stay in one calmer place."
         : "Public discovery works without an account. Sign in only when you want private continuity, campaign return, and creator follow-through on the same shelf.";
+    var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
+    var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";
     var routeChoices = new[]
     {
         new
@@ -63,6 +65,15 @@
             Href = Model.BackHref,
             Label = "Back to publication discovery",
             Proof = new[] { "Proof first", "Publication lineage", "Comparison nearby" }
+        },
+        new
+        {
+            Badge = "Creator routing",
+            Title = "Use the creator concierge when the next job is consult, intake, or packet follow-through",
+            Summary = "The creator wrapper keeps consult routing, governed intake, and packet return separate from downloads, support, and account truth.",
+            Href = creatorConciergeHref,
+            Label = "Open creator concierge",
+            Proof = new[] { "Consult stays bounded", "Packet return visible", "No install confusion" }
         },
         new
         {
@@ -85,6 +96,15 @@
             Proof = Model.Chrome.Authenticated
                 ? new[] { "Personal and campaign returns", "Creator follow-through", "Same proof shelf" }
                 : new[] { "Public first", "Account adds continuity", "No auth wall for proof" }
+        },
+        new
+        {
+            Badge = "Public proof",
+            Title = "Use the testimonial wrapper when you want moderated public proof instead of support follow-up",
+            Summary = "The testimonial route keeps ratings, media proof, and moderation separate from support cases, install recovery, and publication approval.",
+            Href = testimonialConciergeHref,
+            Label = "Open testimonial wrapper",
+            Proof = new[] { "Moderated public proof", "Optional media capture", "Support stays separate" }
         },
         new
         {

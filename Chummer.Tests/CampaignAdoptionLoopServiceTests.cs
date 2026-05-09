@@ -116,6 +116,11 @@ public sealed class CampaignAdoptionLoopServiceTests
                 Note: "Campaign adoption loop service proof."));
 
             Assert.Equal(run.RunId, approval.RunId);
+            Assert.False(string.IsNullOrWhiteSpace(approval.WorldResolutionReportId));
+            Assert.False(string.IsNullOrWhiteSpace(approval.WorldFrameId));
+            Assert.False(string.IsNullOrWhiteSpace(approval.ShadowfeedBulletinId));
+            Assert.False(string.IsNullOrWhiteSpace(approval.ResolutionConsequenceBridgeId));
+            Assert.False(string.IsNullOrWhiteSpace(approval.ApprovalReceiptRef));
             Assert.Equal(goal.GoalId, campaignSpine.GetCampaignAdoptionLoop(user, workspace.WorkspaceId)?.RunnerGoals.First().GoalId);
 
             CommunityStore reloadedStore = new(configuration, NullLogger<CommunityStore>.Instance);
@@ -133,8 +138,21 @@ public sealed class CampaignAdoptionLoopServiceTests
             Assert.Equal(82, reloadedLoop.Adoption.ConfidencePercent);
             Assert.Contains(reloadedLoop.RunnerGoals, item => string.Equals(item.GoalId, goal.GoalId, StringComparison.OrdinalIgnoreCase));
             Assert.NotNull(reloadedLoop.ResolutionReportApproval);
-            Assert.Contains(reloadedLoop.WorldTicks, item => item.Summary.Contains("BLACK LEDGER WorldTick", StringComparison.Ordinal));
-            Assert.Contains(reloadedLoop.PlayerSafeNews, item => item.Title.Contains("Tacoma grid rumor", StringComparison.Ordinal));
+            Assert.False(string.IsNullOrWhiteSpace(reloadedLoop.ResolutionReportApproval!.WorldResolutionReportId));
+            Assert.False(string.IsNullOrWhiteSpace(reloadedLoop.ResolutionReportApproval.WorldFrameId));
+            Assert.False(string.IsNullOrWhiteSpace(reloadedLoop.ResolutionReportApproval.ShadowfeedBulletinId));
+            Assert.False(string.IsNullOrWhiteSpace(reloadedLoop.ResolutionReportApproval.ResolutionConsequenceBridgeId));
+            Assert.False(string.IsNullOrWhiteSpace(reloadedLoop.ResolutionReportApproval.ApprovalReceiptRef));
+            Assert.Contains(reloadedLoop.WorldTicks, item =>
+                item.Summary.Contains("BLACK LEDGER WorldTick", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(item.WorldFrameId)
+                && !string.IsNullOrWhiteSpace(item.WorldReceiptRef)
+                && !string.IsNullOrWhiteSpace(item.ShadowfeedBulletinId)
+                && !string.IsNullOrWhiteSpace(item.ShadowfeedBulletinReceiptRef));
+            Assert.Contains(reloadedLoop.PlayerSafeNews, item =>
+                item.Title.Contains("Tacoma grid rumor", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(item.BulletinId)
+                && !string.IsNullOrWhiteSpace(item.BulletinReceiptRef));
 
             CampaignWorkspaceProjection reloadedWorkspace = reloadedSpine.GetWorkspace(user, workspace.WorkspaceId)
                 ?? throw new InvalidOperationException("Expected the workspace after reload.");

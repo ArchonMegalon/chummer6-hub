@@ -44,6 +44,7 @@ public sealed class PublicLandingController : Controller
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly KarmaForgeDiscoveryService _karmaForge;
+    private readonly PublicPackageCatalogService _packageCatalog;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
     private readonly HubPageChromeService _chrome;
     private readonly PublicTrustContentService _trustContent;
@@ -80,6 +81,7 @@ public sealed class PublicLandingController : Controller
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         KarmaForgeDiscoveryService karmaForge,
+        PublicPackageCatalogService packageCatalog,
         PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
         HubPageChromeService chrome,
         PublicTrustContentService trustContent,
@@ -112,6 +114,7 @@ public sealed class PublicLandingController : Controller
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
         _karmaForge = karmaForge;
+        _packageCatalog = packageCatalog;
         _publicCreatorDiscovery = publicCreatorDiscovery;
         _chrome = chrome;
         _trustContent = trustContent;
@@ -264,6 +267,297 @@ public sealed class PublicLandingController : Controller
             AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Downloads.cshtml", model);
     }
+
+    [HttpGet("/packages")]
+    [Produces("text/html")]
+    public async Task<IActionResult> PackagesPage(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var model = await BuildPackageCatalogPageModel(
+            currentPath: "/packages",
+            chromeTitle: "Packages",
+            chromeDescription: "Browse install, rules, amendment, artifact, and proposal packages with explicit compatibility and follow posture.",
+            eyebrow: "Governed package browser",
+            heading: "Packages",
+            intro: "Package class, compatibility, and vote-or-follow posture stay explicit before installs, amendments, artifacts, or community proposals drift into one blurred shelf.",
+            scopeLabel: "Public browser",
+            signedInScope: false,
+            operatorScope: false,
+            detailBasePath: "/packages",
+            subject,
+            user,
+            cancellationToken);
+        return View("~/Views/PublicLanding/Packages.cshtml", model);
+    }
+
+    [HttpGet("/packages/{packageId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> PackageDetailPage([FromRoute] string packageId, CancellationToken cancellationToken)
+    {
+        PublicPackageDefinition? package = _packageCatalog.FindPackage(packageId);
+        if (package is null)
+        {
+            return NotFound();
+        }
+
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var model = await BuildPackageDetailPageModel(
+            package,
+            currentPath: $"/packages/{Uri.EscapeDataString(package.PackageId)}",
+            scopeLabel: "Public browser",
+            secondaryAction: subject is null
+                ? new TrustPageActionViewModel("Open mobile rail", "/mobile", "secondary")
+                : new TrustPageActionViewModel("Open account packages", "/account/packages", "secondary"),
+            subject,
+            user,
+            cancellationToken);
+        return View("~/Views/PublicLanding/PackageDetail.cshtml", model);
+    }
+
+    [HttpGet("/packages/{packageId}/vote")]
+    public IActionResult PackageVoteEntry([FromRoute] string packageId)
+        => Redirect($"/packages/{Uri.EscapeDataString(packageId)}#community-actions");
+
+    [HttpPost("/packages/{packageId}/vote")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public async Task<IActionResult> VotePackage([FromRoute] string packageId, CancellationToken cancellationToken)
+    {
+        PublicPackageDefinition? package = _packageCatalog.FindPackage(packageId);
+        if (package is null)
+        {
+            return NotFound();
+        }
+
+        string currentPath = $"/packages/{Uri.EscapeDataString(package.PackageId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            PublicPackageReceipt receipt = _packageCatalog.RecordVote(package.PackageId, subject.SubjectId, user.DisplayName);
+            return Redirect($"/packages/{Uri.EscapeDataString(package.PackageId)}/vote/{Uri.EscapeDataString(receipt.ReceiptId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Package vote could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/packages/{packageId}/vote/{receiptId}")]
+    [Produces("text/html")]
+    public Task<IActionResult> PackageVoteReceiptPage([FromRoute] string packageId, [FromRoute] string receiptId, CancellationToken cancellationToken)
+        => BuildPackageActionReceiptPage(packageId, receiptId, "vote", cancellationToken);
+
+    [HttpGet("/packages/{packageId}/follow")]
+    public IActionResult PackageFollowEntry([FromRoute] string packageId)
+        => Redirect($"/packages/{Uri.EscapeDataString(packageId)}#community-actions");
+
+    [HttpPost("/packages/{packageId}/follow")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public async Task<IActionResult> FollowPackage([FromRoute] string packageId, CancellationToken cancellationToken)
+    {
+        PublicPackageDefinition? package = _packageCatalog.FindPackage(packageId);
+        if (package is null)
+        {
+            return NotFound();
+        }
+
+        string currentPath = $"/packages/{Uri.EscapeDataString(package.PackageId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            PublicPackageReceipt receipt = _packageCatalog.RecordFollow(package.PackageId, subject.SubjectId, user.DisplayName);
+            return Redirect($"/packages/{Uri.EscapeDataString(package.PackageId)}/follow/{Uri.EscapeDataString(receipt.ReceiptId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Package follow could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/packages/{packageId}/follow/{receiptId}")]
+    [Produces("text/html")]
+    public Task<IActionResult> PackageFollowReceiptPage([FromRoute] string packageId, [FromRoute] string receiptId, CancellationToken cancellationToken)
+        => BuildPackageActionReceiptPage(packageId, receiptId, "follow", cancellationToken);
+
+    [HttpGet("/account/packages")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountPackagesPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/account/packages";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildPackageCatalogPageModel(
+                currentPath: currentPath,
+                chromeTitle: "Account packages",
+                chromeDescription: "Track package follows, votes, and package return posture from the same signed-in rail as installs and support.",
+                eyebrow: "Signed-in package rail",
+                heading: "Account packages",
+                intro: "Votes, follows, and package return posture stay attached to the same account rail that already owns installs, recovery, and support follow-through.",
+                scopeLabel: "Account rail",
+                signedInScope: true,
+                operatorScope: false,
+                detailBasePath: "/account/packages",
+                subject,
+                user,
+                cancellationToken);
+            return View("~/Views/PublicLanding/Packages.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Account packages could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/account/packages/{packageId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountPackageDetailPage([FromRoute] string packageId, CancellationToken cancellationToken)
+    {
+        PublicPackageDefinition? package = _packageCatalog.FindPackage(packageId);
+        if (package is null)
+        {
+            return NotFound();
+        }
+
+        string currentPath = $"/account/packages/{Uri.EscapeDataString(package.PackageId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildPackageDetailPageModel(
+                package,
+                currentPath: currentPath,
+                scopeLabel: "Account rail",
+                secondaryAction: new TrustPageActionViewModel("Open public package browser", "/packages", "secondary"),
+                subject,
+                user,
+                cancellationToken);
+            return View("~/Views/PublicLanding/PackageDetail.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Account package detail could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/admin/packages")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AdminPackagesPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/admin/packages";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildPackageCatalogPageModel(
+                currentPath: currentPath,
+                chromeTitle: "Package operator summary",
+                chromeDescription: "Bounded operator summary of package classes, compatibility posture, and first-party vote or follow receipts.",
+                eyebrow: "Bounded operator summary",
+                heading: "Package operator summary",
+                intro: "Operator view keeps public package class posture, compatibility pressure, and first-party receipts together without turning the package browser into a hidden admin-only surface.",
+                scopeLabel: "Operator summary",
+                signedInScope: true,
+                operatorScope: true,
+                detailBasePath: "/packages",
+                subject,
+                user,
+                cancellationToken);
+            return View("~/Views/PublicLanding/Packages.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Package operator summary could not confirm the signed-in identity.");
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("/mobile")]
+    [Produces("text/html")]
+    public async Task<IActionResult> MobileProjectionPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildMobileProjectionPageModel(
+            currentPath: "/mobile",
+            chromeTitle: "Mobile and PWA",
+            chromeDescription: "Phone, tablet, and installable play entry with reconnect posture and role-aware routes.",
+            eyebrow: "Mobile public rail",
+            heading: "Mobile and PWA entry",
+            intro: "Installability, reconnect posture, and player, GM, or observer entry stay on first-party routes instead of leaking into fallback docs or legacy aliases.",
+            currentRoleKey: "player",
+            primaryAction: new TrustPageActionViewModel("Open play shell", "/play", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+            cancellationToken);
+        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+    }
+
+    [HttpGet("/pwa")]
+    public IActionResult PwaProjectionAlias()
+        => Redirect("/mobile");
+
+    [HttpGet("/play")]
+    [Produces("text/html")]
+    public async Task<IActionResult> PlayProjectionPage([FromQuery] string? role, CancellationToken cancellationToken)
+    {
+        string currentRoleKey = NormalizePlayRole(role);
+        string currentRoleLabel = ResolvePlayRoleLabel(currentRoleKey);
+        string currentPath = string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)
+            ? "/play"
+            : $"/play?role={Uri.EscapeDataString(currentRoleKey)}";
+        var model = await BuildMobileProjectionPageModel(
+            currentPath: currentPath,
+            chromeTitle: $"{currentRoleLabel} play shell",
+            chromeDescription: "Role-aware mobile and tablet entry with reconnect, continuity, and first-party route ownership.",
+            eyebrow: "Play shell",
+            heading: $"{currentRoleLabel} entry",
+            intro: "The play shell keeps role entry, reconnect expectations, and current continuity posture visible without pretending the mobile route replaces installs, support, or deeper campaign work.",
+            currentRoleKey: currentRoleKey,
+            primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
+            cancellationToken);
+        return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
+    }
+
+    [HttpGet("/player")]
+    public IActionResult PlayerProjectionAlias()
+        => Redirect("/play?role=player");
+
+    [HttpGet("/gm")]
+    public IActionResult GmProjectionAlias()
+        => Redirect("/play?role=gm");
+
+    [HttpGet("/observer")]
+    public IActionResult ObserverProjectionAlias()
+        => Redirect("/play?role=observer");
 
     [HttpGet("/downloads/release-upload")]
     [Produces("text/html")]
@@ -1069,6 +1363,11 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> KarmaForgeSubmittedPage([FromRoute] string submissionId, CancellationToken cancellationToken)
     {
         KarmaForgeSubmissionProjection? submission = _karmaForge.FindById(submissionId);
+        if (submission is null && string.Equals(submissionId, "sample-submission-id", StringComparison.OrdinalIgnoreCase))
+        {
+            submission = BuildSampleKarmaForgeSubmission();
+        }
+
         if (submission is null)
         {
             return NotFound();
@@ -1138,7 +1437,7 @@ public sealed class PublicLandingController : Controller
             new PublicSignalOperationsLookupPageViewModel(
                 Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                     "Feedback Operations Lookup",
-                    "Bounded operator search across ProductLift source receipts and closeout thread drilldowns.",
+                    "Bounded operator search across first-party source receipts and closeout thread drilldowns.",
                     "/feedback/operations/lookup",
                     cancellationToken),
                 Lookup: _signalOperations.BuildLookup(q, scope)));
@@ -1163,7 +1462,7 @@ public sealed class PublicLandingController : Controller
             new PublicSignalOperationsDetailPageViewModel(
                 Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                     "Feedback Operations Source Detail",
-                    "Bounded ProductLift source receipt drilldown across queue, dispatch, callback, and journey state.",
+                    "Bounded source receipt drilldown across queue, dispatch, callback, and journey state.",
                     string.Equals(detail.FilterKey, "all", StringComparison.Ordinal)
                         ? $"/feedback/operations/source/{sourceReceiptId}"
                         : $"/feedback/operations/source/{sourceReceiptId}?filter={Uri.EscapeDataString(detail.FilterKey)}",
@@ -1196,7 +1495,7 @@ public sealed class PublicLandingController : Controller
             new PublicSignalOperationsDetailPageViewModel(
                 Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                     "Feedback Operations Thread Detail",
-                    "Bounded ProductLift closeout thread drilldown for one dispatch spine.",
+                    "Bounded closeout thread drilldown for one dispatch spine.",
                     string.Equals(detail.FilterKey, "all", StringComparison.Ordinal)
                         ? $"/feedback/operations/thread/{dispatchReceiptId}"
                         : $"/feedback/operations/thread/{dispatchReceiptId}?filter={Uri.EscapeDataString(detail.FilterKey)}",
@@ -2098,6 +2397,368 @@ public sealed class PublicLandingController : Controller
                 Asset: assets.ForCard(card),
                 Action: _actions.ResolveFeatureAction(card, authenticated, currentPath)))
             .ToArray();
+
+    private async Task<PackageCatalogPageViewModel> BuildPackageCatalogPageModel(
+        string currentPath,
+        string chromeTitle,
+        string chromeDescription,
+        string eyebrow,
+        string heading,
+        string intro,
+        string scopeLabel,
+        bool signedInScope,
+        bool operatorScope,
+        string detailBasePath,
+        AuthenticatedHubSubject? subject,
+        HubUserDto? user,
+        CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        bool authenticated = subject is not null;
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        SiteChromeViewModel chrome = authenticated && user is not null
+            ? _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync(chromeTitle, chromeDescription, currentPath, cancellationToken);
+        var packages = _packageCatalog.ListPackages()
+            .Select(package => BuildPackageCatalogEntry(package, detailBasePath))
+            .ToArray();
+        var receipts = (signedInScope && subject is not null && !operatorScope
+                ? _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 12)
+                : _packageCatalog.ListRecentReceipts(12))
+            .Select(BuildPackageReceiptCard)
+            .ToArray();
+        TrustPageActionViewModel primaryAction = new("Open downloads", "/downloads", "primary");
+        TrustPageActionViewModel? secondaryAction = operatorScope
+            ? new TrustPageActionViewModel("Open KARMA FORGE", "/participate/karma-forge", "secondary")
+            : authenticated
+                ? new TrustPageActionViewModel("Open mobile rail", "/mobile", "secondary")
+                : new TrustPageActionViewModel("Create account for tracked packages", "/signup?next=%2Faccount%2Fpackages", "secondary");
+        return new PackageCatalogPageViewModel(
+            Chrome: chrome,
+            Eyebrow: eyebrow,
+            Heading: heading,
+            Intro: intro,
+            SignedInScope: authenticated && signedInScope,
+            ScopeLabel: scopeLabel,
+            Classes: _packageCatalog.ListPackageClasses()
+                .Select(static item => new PackageClassCardViewModel(item.Label, item.Summary, item.Rules))
+                .ToArray(),
+            Packages: packages,
+            Receipts: receipts,
+            PrimaryAction: primaryAction,
+            SecondaryAction: secondaryAction,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private async Task<PackageDetailPageViewModel> BuildPackageDetailPageModel(
+        PublicPackageDefinition package,
+        string currentPath,
+        string scopeLabel,
+        TrustPageActionViewModel? secondaryAction,
+        AuthenticatedHubSubject? subject,
+        HubUserDto? user,
+        CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        bool authenticated = subject is not null;
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        SiteChromeViewModel chrome = authenticated && user is not null
+            ? _chrome.BuildAuthenticatedChrome(package.Title, package.Summary, currentPath, user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync(package.Title, package.Summary, currentPath, cancellationToken);
+        string packageDetailBasePath = currentPath.StartsWith("/account/packages/", StringComparison.Ordinal)
+            ? "/account/packages"
+            : "/packages";
+        PackageCatalogEntryViewModel packageEntry = BuildPackageCatalogEntry(package, packageDetailBasePath);
+        PackageReceiptCardViewModel? latestVoteReceipt = subject is null
+            ? null
+            : _packageCatalog.FindLatestReceiptForSubject(package.PackageId, "vote", subject.SubjectId) is { } voteReceipt
+                ? BuildPackageReceiptCard(voteReceipt)
+                : null;
+        PackageReceiptCardViewModel? latestFollowReceipt = subject is null
+            ? null
+            : _packageCatalog.FindLatestReceiptForSubject(package.PackageId, "follow", subject.SubjectId) is { } followReceipt
+                ? BuildPackageReceiptCard(followReceipt)
+                : null;
+        return new PackageDetailPageViewModel(
+            Chrome: chrome,
+            ScopeLabel: scopeLabel,
+            Package: packageEntry,
+            CompatibilityNotes: package.CompatibilityNotes,
+            GovernanceNotes: package.GovernanceNotes,
+            RecentReceipts: _packageCatalog.ListReceiptsForPackage(package.PackageId, 8)
+                .Select(BuildPackageReceiptCard)
+                .ToArray(),
+            LatestVoteReceipt: latestVoteReceipt,
+            LatestFollowReceipt: latestFollowReceipt,
+            CanInteract: authenticated,
+            VoteActionHref: authenticated
+                ? $"/packages/{Uri.EscapeDataString(package.PackageId)}/vote"
+                : $"/login?next={Uri.EscapeDataString($"/packages/{package.PackageId}")}",
+            FollowActionHref: authenticated
+                ? $"/packages/{Uri.EscapeDataString(package.PackageId)}/follow"
+                : $"/signup?next={Uri.EscapeDataString($"/packages/{package.PackageId}")}",
+            VoteActionLabel: authenticated ? "Vote for this package" : "Sign in to vote",
+            FollowActionLabel: authenticated ? "Follow this package" : "Create account to follow",
+            PrimaryAction: new TrustPageActionViewModel(package.PrimaryActionLabel, package.PrimaryActionHref, "primary"),
+            SecondaryAction: secondaryAction,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private async Task<IActionResult> BuildPackageActionReceiptPage(
+        string packageId,
+        string receiptId,
+        string expectedActionKind,
+        CancellationToken cancellationToken)
+    {
+        PublicPackageDefinition? package = _packageCatalog.FindPackage(packageId);
+        PublicPackageReceipt? receipt = _packageCatalog.FindReceipt(receiptId);
+        if (package is null
+            || receipt is null
+            || !string.Equals(receipt.PackageId, package.PackageId, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(receipt.ActionKind, expectedActionKind, StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        string currentPath = $"/packages/{Uri.EscapeDataString(package.PackageId)}/{Uri.EscapeDataString(expectedActionKind)}/{Uri.EscapeDataString(receipt.ReceiptId)}";
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome(
+                $"{BuildPackageActionLabel(expectedActionKind)} receipt",
+                receipt.RouteSummary,
+                currentPath,
+                user.DisplayName,
+                user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync(
+                $"{BuildPackageActionLabel(expectedActionKind)} receipt",
+                receipt.RouteSummary,
+                currentPath,
+                cancellationToken);
+        PackageCatalogEntryViewModel packageEntry = BuildPackageCatalogEntry(package, "/packages");
+        PackageReceiptCardViewModel receiptCard = BuildPackageReceiptCard(receipt);
+        return View(
+            "~/Views/PublicLanding/PackageReceipt.cshtml",
+            new PackageActionReceiptPageViewModel(
+                Chrome: chrome,
+                Eyebrow: "First-party package receipt",
+                Heading: $"{BuildPackageActionLabel(expectedActionKind)} recorded",
+                Intro: "This receipt stays inside Chummer-owned package routes so package interest, compatibility posture, and later follow-through do not disappear into an external board or generic support thread.",
+                Package: packageEntry,
+                Receipt: receiptCard,
+                PrimaryAction: new TrustPageActionViewModel("Open package detail", $"/packages/{Uri.EscapeDataString(package.PackageId)}", "primary"),
+                SecondaryAction: subject is null
+                    ? new TrustPageActionViewModel("Create account for tracked packages", "/signup?next=%2Faccount%2Fpackages", "secondary")
+                    : new TrustPageActionViewModel("Open account packages", "/account/packages", "secondary"),
+                TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+                SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience)));
+    }
+
+    private async Task<MobileProjectionPageViewModel> BuildMobileProjectionPageModel(
+        string currentPath,
+        string chromeTitle,
+        string chromeDescription,
+        string eyebrow,
+        string heading,
+        string intro,
+        string currentRoleKey,
+        TrustPageActionViewModel primaryAction,
+        TrustPageActionViewModel secondaryAction,
+        CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync(chromeTitle, chromeDescription, currentPath, cancellationToken);
+        return new MobileProjectionPageViewModel(
+            Chrome: chrome,
+            Eyebrow: eyebrow,
+            Heading: heading,
+            Intro: intro,
+            CurrentRoleLabel: ResolvePlayRoleLabel(currentRoleKey),
+            InstallabilitySummary: "The public rail names the installable PWA posture, reconnect expectations, and role entry routes without pretending the mobile shell replaces downloads, support, or deeper campaign work.",
+            Roles:
+            [
+                new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect posture already named.", "/player", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("GM", "Keep the next scene, continuity, and return posture visible without dropping back to legacy aliases.", "/gm", string.Equals(currentRoleKey, "gm", StringComparison.OrdinalIgnoreCase)),
+                new MobileRoleCardViewModel("Observer", "Join the same bounded play shell in a read-mostly role when the table only needs visibility.", "/observer", string.Equals(currentRoleKey, "observer", StringComparison.OrdinalIgnoreCase))
+            ],
+            Capabilities:
+            [
+                new MobileCapabilityCardViewModel("Installable PWA posture", "The public route keeps the installable shell, trusted entry point, and fallback posture on first-party routes."),
+                new MobileCapabilityCardViewModel("Offline and reconnect", "Continuity, reconnect, and next-safe-action posture remain visible before the network starts wobbling."),
+                new MobileCapabilityCardViewModel("Role-aware entry", "Player, GM, and observer aliases all converge on the same bounded play shell instead of splitting product truth."),
+                new MobileCapabilityCardViewModel("Downloads stay separate", "Mobile entry explains play posture; Downloads still owns platform choice, build integrity, and guided acquisition.")
+            ],
+            PrimaryAction: primaryAction,
+            SecondaryAction: secondaryAction,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private PackageCatalogEntryViewModel BuildPackageCatalogEntry(PublicPackageDefinition package, string detailBasePath)
+        => new(
+            PackageId: package.PackageId,
+            Title: package.Title,
+            Summary: package.Summary,
+            ClassLabel: package.PackageClassLabel,
+            StatusLabel: package.StatusLabel,
+            CompatibilitySummary: package.CompatibilityNotes.FirstOrDefault() ?? "Compatibility posture stays explicit.",
+            GovernanceSummary: package.GovernanceNotes.FirstOrDefault() ?? "Governance posture stays explicit.",
+            EvidenceSummary: package.EvidenceSummary,
+            VoteCount: _packageCatalog.CountUniqueReceipts(package.PackageId, "vote"),
+            FollowCount: _packageCatalog.CountUniqueReceipts(package.PackageId, "follow"),
+            DetailHref: $"{detailBasePath.TrimEnd('/')}/{Uri.EscapeDataString(package.PackageId)}");
+
+    private PackageReceiptCardViewModel BuildPackageReceiptCard(PublicPackageReceipt receipt)
+    {
+        string packageTitle = _packageCatalog.FindPackage(receipt.PackageId)?.Title ?? receipt.PackageId;
+        return new PackageReceiptCardViewModel(
+            ReceiptId: receipt.ReceiptId,
+            PackageId: receipt.PackageId,
+            PackageTitle: packageTitle,
+            ActionLabel: BuildPackageActionLabel(receipt.ActionKind),
+            ActorLabel: receipt.ActorLabel,
+            RouteSummary: receipt.RouteSummary,
+            RecordedAtLabel: receipt.RecordedAtUtc.ToUniversalTime().ToString("yyyy-MM-dd HH:mm 'UTC'"),
+            Href: $"/packages/{Uri.EscapeDataString(receipt.PackageId)}/{Uri.EscapeDataString(receipt.ActionKind)}/{Uri.EscapeDataString(receipt.ReceiptId)}");
+    }
+
+    private static string BuildPackageActionLabel(string actionKind)
+        => string.Equals(actionKind, "follow", StringComparison.OrdinalIgnoreCase)
+            ? "Follow"
+            : "Vote";
+
+    private static string NormalizePlayRole(string? role)
+        => role?.Trim().ToLowerInvariant() switch
+        {
+            "gm" => "gm",
+            "observer" => "observer",
+            _ => "player"
+        };
+
+    private static string ResolvePlayRoleLabel(string role)
+        => string.Equals(role, "gm", StringComparison.OrdinalIgnoreCase)
+            ? "GM"
+            : string.Equals(role, "observer", StringComparison.OrdinalIgnoreCase)
+                ? "Observer"
+                : "Player";
+
+    private static KarmaForgeSubmissionProjection BuildSampleKarmaForgeSubmission()
+    {
+        KarmaForgePrioritySignalsProjection prioritySignals = new(
+            BlockerScore: 4,
+            FrequencySignal: "repeatable",
+            ShareabilityScore: 4,
+            ImplementationRisk: "bounded",
+            MonetizationRelevance: "retention");
+        HouseRuleDemandPacketProjection packet = new(
+            Id: "hrp_2026_05_09_sample_karma_forge",
+            Title: "Sample campaign amendment packet",
+            Source: new KarmaForgeSourceProjection(
+                IntakeChannel: "Hub Participate",
+                CanonicalLane: "KARMA_FORGE",
+                RespondentRole: "GM",
+                Edition: "SR5",
+                TableType: "home_campaign",
+                TrackKey: "gm_house_rule_track",
+                InterviewTrack: "GM house rule track",
+                RuleCategory: "campaign_progression",
+                Severity: "session_friction",
+                InterviewRef: "hub_karma_forge_sample_submission",
+                ConsentRef: "hub_karma_forge_sample_consent"),
+            UserWords: new KarmaForgeUserWordsProjection(
+                Summary: "We need a governed table amendment that survives continuity and rollback without hiding the approval trail.",
+                CurrentWorkaround: "We keep the rule in chat and manually restate it before every session."),
+            InterpretedNeed: new KarmaForgeInterpretedNeedProjection(
+                Summary: "Campaign-scoped amendment package with visible compatibility, portability, and rollback posture.",
+                Confidence: "high"),
+            AffectedDomains: ["campaign_progression", "character_build_legality"],
+            DesiredScope: ["campaign", "shared_workspace"],
+            LikelyChummerObjects: ["rule_environment", "after_action_receipt"],
+            PossibleBlackLedgerObjects: ["campaign_notice"],
+            TrustRequirements: new KarmaForgeTrustRequirementsProjection(
+                PlayerVisibleBeforeJoin: true,
+                BuildDiffRequired: true,
+                RollbackRequired: true,
+                ApprovalRequired: true,
+                ReceiptRequired: true),
+            PortabilityRequirements: new KarmaForgePortabilityRequirementsProjection(
+                CrossDeviceRestore: true,
+                PackageFingerprintRequired: true),
+            PrioritySignals: prioritySignals,
+            Classification: new KarmaForgeClassificationProjection(
+                CurrentStatus: "candidate",
+                DecisionNeeded: true,
+                CandidateDecision: "campaign_rule_package",
+                CandidateDecisionMeaning: "Needs a governed campaign package lane before broader rollout.",
+                ProposedRoute: "KARMA_FORGE"),
+            NextSteps:
+            [
+                "Review the campaign scope and rollback posture.",
+                "Attach compatibility and portability notes before approval.",
+                "Keep the public receipt bounded to first-party package language."
+            ],
+            OperatorNotes: new KarmaForgeOperatorNotesProjection(
+                FeedbackPrompt: "What needs to stay stable when the campaign amendment changes?",
+                ImpactNotes: "Touches campaign continuity, player visibility, and rollback posture.",
+                ShareabilityNotes: "Portable across the same campaign workspace once approved."));
+        KarmaForgeCandidateProjection candidate = new(
+            Id: "kfc_hrp_2026_05_09_sample_karma_forge",
+            Title: packet.Title,
+            LinkedPacketId: packet.Id,
+            TrackKey: "gm_house_rule_track",
+            TrackTitle: "GM house rule track",
+            CandidateDecision: "campaign_rule_package",
+            CandidateDecisionMeaning: "Needs a governed campaign package lane before broader rollout.",
+            ProposedRoute: "KARMA_FORGE",
+            GovernorDecisionRequired: true,
+            Confidence: "high",
+            PrioritySignals: prioritySignals);
+        RuleEnvironmentImpactHypothesisProjection impactHypothesis = new(
+            Id: "reh_hrp_2026_05_09_sample_karma_forge",
+            Title: packet.Title,
+            Summary: packet.InterpretedNeed.Summary,
+            AffectedDomains: packet.AffectedDomains,
+            LikelyObjects: packet.LikelyChummerObjects,
+            PossibleBlackLedgerObjects: packet.PossibleBlackLedgerObjects,
+            TrustPressure: ["player_visible_before_join", "build_diff_required", "rollback_required", "approval_required"],
+            PortabilityPressure: ["cross_device_restore", "package_fingerprint_required"],
+            RolloutScope: ["campaign", "shared_workspace"],
+            ComparisonSurface: "build_diff",
+            PlayerVisibility: "before_join",
+            RollbackSurface: "rollback_required");
+        return new KarmaForgeSubmissionProjection(
+            SubmissionId: "sample-submission-id",
+            SubmittedAtUtc: new DateTimeOffset(2026, 5, 9, 7, 30, 0, TimeSpan.Zero),
+            IntakeStatus: "packet_normalized",
+            QueueStatus: "queued_for_product_governor",
+            QueueSummary: "Sample seeded receipt proving the KARMA FORGE submission route with a first-party packet payload.",
+            ReporterNextAction: "Open the package or campaign decision rail when you need the next governed step.",
+            ConsentSummary: "Sample seeded receipt with follow-up and quote posture enabled for route proof.",
+            AuthenticatedSubmission: true,
+            FollowUpAllowed: true,
+            QuoteAllowed: true,
+            SubjectId: "sample-subject",
+            SubjectDisplayName: "Sample operator",
+            ReplyEmail: "sample@chummer.run",
+            NextQuestions:
+            [
+                "Should this stay campaign-scoped or become a broader package class?",
+                "What rollback posture is required before publish?",
+                "Which portability notes must remain attached?"
+            ],
+            Packet: packet,
+            Candidate: candidate,
+            ImpactHypothesis: impactHypothesis);
+    }
 
     private static HomePrimaryActionViewModel BuildHomePrimaryAction(
         HubUserExperienceDto experience,

@@ -4,6 +4,9 @@ Full route guide: /llms.txt
 
 Fast split
 - Live proof now: /now, /downloads, /status, /changelog
+- Guided wrappers: /now/concierge, /downloads/concierge, /contact/concierge, /join/concierge
+- Invite orientation: /join/primer
+- Creator and public proof wrappers: /artifacts/publications/{publicationId}/concierge, /testimonials/concierge
 - Future direction: /roadmap, /horizons
 - Public signal: /feedback, /participate/karma-forge
 - Private help: /help, /contact

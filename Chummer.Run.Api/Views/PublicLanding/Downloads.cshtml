@@ -169,6 +169,14 @@ else
                         <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
                     }
                 </div>
+                <div class="route-callout" role="status" aria-live="polite">
+                    <h3>Need a guided setup path?</h3>
+                    <p>Open the setup concierge when you want one short branch into downloads, platform help, structured setup help, or a human handoff without losing the first-party fallback.</p>
+                    <div class="route-callout__actions">
+                        <a class="inline-link" href="/downloads/concierge">Open setup concierge</a>
+                        <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
+                    </div>
+                </div>
                 @if (!requestedPlatformUnavailable)
                 {
                     <p class="downloads-inline-note">

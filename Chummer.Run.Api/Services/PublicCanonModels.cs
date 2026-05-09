@@ -73,6 +73,7 @@ internal sealed class PublicLandingRouteDocument
     public string? VerificationMode { get; init; }
     public string? VerificationFile { get; init; }
     public string? VerificationPattern { get; init; }
+    public string? VerificationPath { get; init; }
 }
 
 internal sealed class PublicLandingSectionDocument

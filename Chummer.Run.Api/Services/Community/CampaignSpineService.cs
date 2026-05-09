@@ -1514,6 +1514,49 @@ public sealed class CampaignSpineService
                 ?? "Review the first governed WorldTick and player-safe news item on /account/work before reopening the shared runboard.";
             string worldTickId = StableId("world-tick", $"{workspace.WorkspaceId}:{storedRun.RunId}");
             string newsId = StableId("player-safe-news", $"{workspace.WorkspaceId}:{storedRun.RunId}");
+            string approvalId = StableId("resolution-report-approval", $"{workspace.WorkspaceId}:{storedRun.RunId}");
+            string worldResolutionReportId = StableId("resolution-report", $"{workspace.WorkspaceId}:{storedRun.RunId}");
+            string worldFrameId = StableId("world-frame", workspace.CampaignId);
+            string shadowfeedBulletinId = StableId("shadowfeed-bulletin", $"{workspace.WorkspaceId}:{storedRun.RunId}");
+            string consequenceBridgeId = StableId("resolution-consequence-bridge", $"{workspace.WorkspaceId}:{storedRun.RunId}");
+            string approvalReceiptRef = $"campaign-spine:resolution-report-approval/{approvalId}";
+            string worldTickReceiptRef = $"campaign-spine:world-tick/{worldTickId}";
+            string shadowfeedBulletinReceiptRef = $"campaign-spine:shadowfeed-bulletin/{shadowfeedBulletinId}";
+            string consequenceBridgeReceiptRef = $"campaign-spine:resolution-consequence-bridge/{consequenceBridgeId}";
+
+            var worldResolutionReport = new Chummer.World.Contracts.ResolutionReport(
+                ResolutionReportId: worldResolutionReportId,
+                RunId: storedRun.RunId,
+                Summary: normalizedSummary,
+                ConsequenceMarkers: FinalizeLines([normalizedConsequenceSummary]),
+                ResolvedAtUtc: now,
+                ApprovalReceiptRef: approvalReceiptRef,
+                WorldFrameId: worldFrameId);
+
+            var worldTickContract = new Chummer.World.Contracts.WorldTick(
+                WorldTickId: worldTickId,
+                WorldFrameId: worldFrameId,
+                Summary: normalizedWorldTickSummary,
+                ConsequenceMarkers: worldResolutionReport.ConsequenceMarkers,
+                ReceiptRef: worldTickReceiptRef,
+                IssuedAtUtc: now);
+
+            var shadowfeedBulletin = new Chummer.World.Contracts.ShadowfeedBulletin(
+                BulletinId: shadowfeedBulletinId,
+                WorldTickId: worldTickContract.WorldTickId,
+                Audience: "players",
+                Summary: normalizedNewsSummary,
+                TopicTags: FinalizeLines(["player-safe-preview", "campaign-closeout"]),
+                FactionTags: Array.Empty<string>(),
+                ReceiptRef: shadowfeedBulletinReceiptRef);
+
+            var consequenceBridge = new Chummer.World.Contracts.ResolutionConsequenceBridge(
+                BridgeId: consequenceBridgeId,
+                ResolutionReportId: worldResolutionReport.ResolutionReportId,
+                WorldTickId: worldTickContract.WorldTickId,
+                BulletinId: shadowfeedBulletin.BulletinId,
+                Summary: normalizedConsequenceSummary,
+                ReceiptRef: consequenceBridgeReceiptRef);
 
             var worldTick = new WorldTickProjection(
                 WorldTickId: worldTickId,
@@ -1528,12 +1571,19 @@ public sealed class CampaignSpineService
                     normalizedWorldTickSummary,
                     $"Source kind: {WorldTickSourceKind}.",
                     $"GM-approved closeout anchors the first BLACK LEDGER tick for {storedRun.Title}.",
+                    $"World frame: {worldFrameId}.",
+                    $"World receipt: {worldTickContract.ReceiptRef}.",
+                    $"Shadowfeed bulletin: {shadowfeedBulletin.BulletinId}.",
                     $"Consequence proof: {normalizedConsequenceSummary}",
                     $"Next safe action: {nextSafeAction}",
                     normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
                 ]),
                 UpdatedByUserId: user.UserId,
-                UpdatedAtUtc: now);
+                UpdatedAtUtc: now,
+                WorldFrameId: worldFrameId,
+                WorldReceiptRef: worldTickContract.ReceiptRef,
+                ShadowfeedBulletinId: shadowfeedBulletin.BulletinId,
+                ShadowfeedBulletinReceiptRef: shadowfeedBulletin.ReceiptRef);
 
             var playerSafeNews = new PlayerSafeNewsProjection(
                 NewsId: newsId,
@@ -1553,14 +1603,18 @@ public sealed class CampaignSpineService
                     $"Origin: {normalizedNewsSource}.",
                     "Spoiler policy: player-safe preview only; rendered news is not world truth.",
                     $"WorldTick anchor: {worldTickId}.",
+                    $"Shadowfeed bulletin: {shadowfeedBulletin.BulletinId}.",
+                    $"Shadowfeed receipt: {shadowfeedBulletin.ReceiptRef}.",
                     $"Next safe action: {nextSafeAction}",
                     normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
                 ]),
                 UpdatedByUserId: user.UserId,
-                UpdatedAtUtc: now);
+                UpdatedAtUtc: now,
+                BulletinId: shadowfeedBulletin.BulletinId,
+                BulletinReceiptRef: shadowfeedBulletin.ReceiptRef);
 
             var approval = new ResolutionReportApprovalProjection(
-                ApprovalId: StableId("resolution-report-approval", $"{workspace.WorkspaceId}:{storedRun.RunId}"),
+                ApprovalId: approvalId,
                 WorkspaceId: workspace.WorkspaceId,
                 CampaignId: workspace.CampaignId,
                 RunId: storedRun.RunId,
@@ -1573,13 +1627,21 @@ public sealed class CampaignSpineService
                 [
                     normalizedSummary,
                     $"Source kind: {ResolutionReportApprovalSourceKind}.",
+                    $"Resolution report: {worldResolutionReport.ResolutionReportId}.",
                     $"WorldTick: {normalizedWorldTickSummary}",
                     $"Player-safe news: {normalizedNewsTitle}",
+                    $"Consequence bridge: {consequenceBridge.BridgeId}.",
+                    $"Approval receipt: {approvalReceiptRef}.",
                     $"Next safe action: {nextSafeAction}",
                     normalizedNote is null ? string.Empty : $"Operator note: {normalizedNote}"
                 ]),
                 UpdatedByUserId: user.UserId,
-                UpdatedAtUtc: now);
+                UpdatedAtUtc: now,
+                WorldResolutionReportId: worldResolutionReport.ResolutionReportId,
+                WorldFrameId: worldFrameId,
+                ShadowfeedBulletinId: shadowfeedBulletin.BulletinId,
+                ResolutionConsequenceBridgeId: consequenceBridge.BridgeId,
+                ApprovalReceiptRef: approvalReceiptRef);
 
             RunboardContinuityProjection? updatedContinuity = storedRun.RunboardContinuity is null
                 ? null
@@ -6167,7 +6229,11 @@ public sealed class CampaignSpineService
             SpoilerPolicy: "player_safe_preview_only",
             EvidenceLines: worldTick.EvidenceLines,
             InitiatedByUserId: worldTick.UpdatedByUserId,
-            CreatedAtUtc: worldTick.UpdatedAtUtc);
+            CreatedAtUtc: worldTick.UpdatedAtUtc,
+            WorldFrameId: worldTick.WorldFrameId,
+            WorldReceiptRef: worldTick.WorldReceiptRef,
+            ShadowfeedBulletinId: worldTick.ShadowfeedBulletinId,
+            ShadowfeedBulletinReceiptRef: worldTick.ShadowfeedBulletinReceiptRef);
 
     private static CampaignAdoptionResolutionReportProjection BuildCampaignAdoptionResolutionReportProjection(
         CampaignWorkspaceProjection workspace,
@@ -6204,7 +6270,12 @@ public sealed class CampaignSpineService
             WorldTickId: approval.WorldTickId,
             NewsItemId: approval.NewsId,
             InitiatedByUserId: approval.UpdatedByUserId,
-            ApprovedAtUtc: approval.UpdatedAtUtc);
+            ApprovedAtUtc: approval.UpdatedAtUtc,
+            WorldResolutionReportId: approval.WorldResolutionReportId,
+            WorldFrameId: approval.WorldFrameId,
+            ShadowfeedBulletinId: approval.ShadowfeedBulletinId,
+            ResolutionConsequenceBridgeId: approval.ResolutionConsequenceBridgeId,
+            ApprovalReceiptRef: approval.ApprovalReceiptRef);
     }
 
     private static PlayerSafeNewsItemProjection BuildPlayerSafeNewsItemProjection(
@@ -6222,7 +6293,9 @@ public sealed class CampaignSpineService
             SpoilerLevel: newsItem.SpoilerPolicy,
             EvidenceLines: newsItem.EvidenceLines,
             InitiatedByUserId: newsItem.UpdatedByUserId,
-            PublishedAtUtc: newsItem.UpdatedAtUtc);
+            PublishedAtUtc: newsItem.UpdatedAtUtc,
+            ShadowfeedBulletinId: newsItem.BulletinId,
+            ShadowfeedBulletinReceiptRef: newsItem.BulletinReceiptRef);
 
     private static CampaignAdoptionLoopProjection? BuildCampaignAdoptionLoopProjection(
         string workspaceId,

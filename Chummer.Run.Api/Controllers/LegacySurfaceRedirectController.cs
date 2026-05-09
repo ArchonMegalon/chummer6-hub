@@ -20,7 +20,7 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     [HttpGet("/session")]
     [HttpGet("/session/{**path}")]
     public IActionResult Session()
-        => Redirect("/participate");
+        => Redirect("/play");
 
     [HttpGet("/coach")]
     [HttpGet("/coach/{**path}")]

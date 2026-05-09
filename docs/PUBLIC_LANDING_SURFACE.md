@@ -16,10 +16,27 @@ Front-door and proof rails:
 - `/`
 - `/what-is-chummer`
 - `/now`
+- `/now/concierge`
 - `/downloads`
+- `/downloads/concierge`
+- `/packages`
+- `/packages/{packageId}`
+- `/packages/{packageId}/vote`
+- `/packages/{packageId}/follow`
+- `/mobile`
+- `/pwa`
+- `/play`
+- `/player`
+- `/gm`
+- `/observer`
+- `/session`
 - `/status`
 - `/progress`
 - `/artifacts`
+- `/join/concierge`
+- `/join/primer`
+- `/artifacts/publications/{publicationId}/concierge`
+- `/testimonials/concierge`
 
 Direction, signal, and shipped-closeout rails:
 
@@ -40,15 +57,24 @@ Help, policy, and signed-in overlays:
 - `/privacy`
 - `/terms`
 - `/contact`
+- `/contact/concierge`
 - `/contact/submitted/{caseId}`
 - `/login`
 - `/signup`
 - `/logout`
 - `/home`
 - `/account`
+- `/account/packages`
+- `/account/packages/{packageId}`
+- `/admin/packages`
 
 `/participate/codex` remains the deeper preview booster flow behind the friendlier participate entry page.
 Guest access to `/home` and `/account` should fall back to `/login?next=...` rather than asking users to paste bearer tokens into product pages.
+Package routes are intentionally split across public browser, account tracking, and operator summary rails so install packages, rules packages, artifact bundles, and governed community proposals do not collapse into one unowned shelf.
+`/mobile`, `/pwa`, `/play`, `/player`, `/gm`, `/observer`, and the legacy `/session` alias keep installability, reconnect posture, and role-aware mobile entry on first-party routes instead of leaving them implicit in docs.
+`/downloads/concierge`, `/now/concierge`, `/contact/concierge`, and `/join/concierge` are bounded wrapper routes: optional guided branching may appear there, but download truth, release truth, support truth, account truth, and governed invite follow-through remain first-party Hub rails.
+`/join/primer` keeps first-session invite orientation on a first-party page instead of hiding it behind support, booking, or publication surfaces.
+`/artifacts/publications/{publicationId}/concierge` and `/testimonials/concierge` extend that same posture into creator consult routing and moderated public-proof capture without turning publication pages, testimonials, or public media lanes into support or install truth.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.
 `/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness shelf, while roadmap stays the public milestone and direction rail.
 `/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped proof do not collapse into one vague route family.
