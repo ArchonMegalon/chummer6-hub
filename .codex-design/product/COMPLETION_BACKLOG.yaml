@@ -1,0 +1,20 @@
+items:
+  - id: completion-backlog-synchronized
+    priority: P2
+    status: resolved
+    title: Completion-control artifacts are synchronized to the active run.
+    owner: chummer6-hub
+    repo_path: /docker/chummercomplete/chummer.run-services
+    blocked_gates:
+      - release_gates_coverage
+      - target_public_routes_coverage
+    next_action: Keep ABSOLUTE_RELEASE_GATES.yaml and run ledger artifacts updated for every slice handoff.
+  - id: completion-backlog-public-route-proof
+    priority: P2
+    status: resolved
+    title: Target public route section now fully seeded and run-bound.
+    owner: chummer6-hub
+    repo_path: /docker/chummercomplete/chummer.run-services
+    blocked_gates:
+      - target_public_routes_coverage
+    next_action: Keep route evidence bound to run 20260509T093335Z and proof paths in completion proofs.

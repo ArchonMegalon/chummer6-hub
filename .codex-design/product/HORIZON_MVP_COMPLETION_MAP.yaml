@@ -1,0 +1,31 @@
+schema: chummer.horizon_mvp_completion_map.v1
+generated_at: 2026-05-09T06:00:00Z
+entries:
+  - horizon:
+      owner: chummer6-design
+      status: active
+      next_action: Complete final frontier route and release proofs while keeping public claims scoped to active run.
+  - creator:
+      owner: chummer6-hub
+      status: active
+      next_action: Keep creator and producer surfaces aligned to evidence and preserve launch-safe defaults.
+  - community:
+      owner: chummer6-hub
+      status: active
+      next_action: Keep feedback and support channels separate; votes remain signal-only until governor proof lands.
+  - black ledger:
+      owner: chummer6-design
+      status: active
+      next_action: Ensure closure records link directly to proof-backed claims and public route evidence.
+  - ghostwire:
+      owner: chummer6-core
+      status: active
+      next_action: Keep ghostwire-facing claims to observed route and rules receipts only.
+  - runsite:
+      owner: chummer6-hub
+      status: active
+      next_action: Keep runsite surfaces in preview until mobile and package route evidence remains stable.
+  - jackpoint:
+      owner: chummer6-hub
+      status: active
+      next_action: Keep jackpoint/market projections gated by release proof and no unresolved P0/P1 claims.
