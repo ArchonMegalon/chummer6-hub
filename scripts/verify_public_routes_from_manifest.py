@@ -21,11 +21,14 @@ DEFAULT_MANIFEST = REPO_ROOT / ".codex-design" / "product" / "PUBLIC_LANDING_MAN
 DEFAULT_OUTPUT = REPO_ROOT / ".codex-studio" / "published" / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 AUTH_OPERATION_OK_STATUSES = {200, 302, 303, 307, 308, 400, 405}
-CONTROLLER_CONTRACT_OK_STATUSES = {200, 302, 303, 307, 308, 400, 404, 405}
+CONTROLLER_CONTRACT_OK_STATUSES = {200, 301, 302, 303, 307, 308}
 PLACEHOLDER_SAMPLE_LOOKUP = {
     "case": "sample-case-id",
     "caseid": "sample-case-id",
     "case_id": "sample-case-id",
+    "package": "desktop-preview",
+    "packageid": "desktop-preview",
+    "package_id": "desktop-preview",
     "submission": "sample-submission-id",
     "submissionid": "sample-submission-id",
     "submission_id": "sample-submission-id",
@@ -142,6 +145,7 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
     guest_fallback = str(route.get("guest_fallback") or "") or None
     request_path = str(route.get("verification_path") or path)
     resolved_request_path = resolve_route_path_placeholders(request_path)
+    resolved_guest_fallback = resolve_route_path_placeholders(guest_fallback) if guest_fallback else None
     verification_mode = str(route.get("verification_mode") or "").strip()
 
     if verification_mode:
@@ -248,7 +252,7 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
 
     if requires_auth:
         mode = "registered_fallback"
-        expectation = f"anonymous request redirects to {guest_fallback}"
+        expectation = f"anonymous request redirects to {resolved_guest_fallback}"
         try:
             status, _, headers, final_url = fetch(
                 base_url,
@@ -257,9 +261,9 @@ def verify_route(fetch, base_url: str, route: dict[str, Any], *, public_host: st
             forwarded_proto=forwarded_proto or None,
             follow_redirects=False)
             redirect_location = headers.get("location")
-            success = status in REDIRECT_STATUSES and normalize_target(redirect_location) == normalize_target(guest_fallback)
+            success = status in REDIRECT_STATUSES and normalize_target(redirect_location) == normalize_target(resolved_guest_fallback)
             detail = (
-                f"expected anonymous redirect to {guest_fallback}, got {redirect_location or '<none>'} "
+                f"expected anonymous redirect to {resolved_guest_fallback}, got {redirect_location or '<none>'} "
                 f"(status {status})")
             return RouteResult(
                 path=path,

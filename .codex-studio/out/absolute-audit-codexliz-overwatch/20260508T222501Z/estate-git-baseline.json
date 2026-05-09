@@ -1,0 +1,122 @@
+{
+  "generated_at": "2026-05-08T22:25:01.421797Z",
+  "repos": [
+    {
+      "path": "/docker/chummercomplete/Chummer6",
+      "dirty": true,
+      "branch": "main",
+      "head_sha": "82f07055b757865c994e13de113d65808e7b698b",
+      "upstream": "origin/main",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/EA",
+      "dirty": true,
+      "branch": "main",
+      "head_sha": "91b76f8e4f10c85b15b8c5a9a3e98bc1e9754118",
+      "upstream": "origin/main",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/fleet",
+      "dirty": true,
+      "branch": "main",
+      "head_sha": "bd0ce60c894f6533308f559dfb2b6c69af397433",
+      "upstream": "origin/main",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer.run-services",
+      "dirty": true,
+      "branch": "main",
+      "head_sha": "3f9a320733fa42d0687bc54c560dd8653b6f9139",
+      "upstream": "origin/main",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer-core-engine",
+      "dirty": true,
+      "branch": "fleet/core",
+      "head_sha": "d9a8933ed800af0b4ded5ac53d8878b6ce1d264d",
+      "upstream": null,
+      "ahead": null,
+      "behind": null
+    },
+    {
+      "path": "/docker/chummercomplete/chummer-presentation",
+      "dirty": true,
+      "branch": "main",
+      "head_sha": "4a0e5fd6f17a471484d72b71870eec98b105dfc9",
+      "upstream": "origin/main",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer-design",
+      "dirty": true,
+      "branch": "fleet/ea/newbranch",
+      "head_sha": "79282df2079a2ce6d7dd0c10570467a1d5fb6e43",
+      "upstream": "origin/fleet/ea/newbranch",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer-hub-registry",
+      "dirty": true,
+      "branch": "main",
+      "head_sha": "414c09705654c70d3450eb580afd28b2be269c3c",
+      "upstream": "origin/main",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer-play",
+      "dirty": true,
+      "branch": "fleet/mobile",
+      "head_sha": "8cc7f65ca8bd62c349697cf4584bee8acb6fc71e",
+      "upstream": "origin/fleet/mobile",
+      "ahead": "13",
+      "behind": "3"
+    },
+    {
+      "path": "/docker/chummercomplete/chummer-ui-kit",
+      "dirty": true,
+      "branch": "fleet/ui-kit",
+      "head_sha": "cb43a68dbc70d3bc7a26b4494446fcffeecc3d34",
+      "upstream": null,
+      "ahead": null,
+      "behind": null
+    },
+    {
+      "path": "/docker/fleet/repos/chummer-media-factory",
+      "dirty": true,
+      "branch": "fleet/media-factory",
+      "head_sha": "201a3b88dec13346807cb167515dbb97167abb2c",
+      "upstream": null,
+      "ahead": null,
+      "behind": null
+    },
+    {
+      "path": "/docker/chummer5a",
+      "dirty": true,
+      "branch": "Docker",
+      "head_sha": "0b8636d5a852e375409bf565b9ac9b4180ba4524",
+      "upstream": "origin/Docker",
+      "ahead": "0",
+      "behind": "0"
+    },
+    {
+      "path": "/docker/fleet/repos/chummer4",
+      "dirty": true,
+      "branch": "master",
+      "head_sha": "fe9a0c0e67be86785ccce1be041d098f3b5cfa71",
+      "upstream": "origin/master",
+      "ahead": "0",
+      "behind": "0"
+    }
+  ]
+}

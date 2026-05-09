@@ -1,0 +1,177 @@
+{"ts": "2026-05-08T22:27:00.656463Z", "phase": "observe", "note": "supervisor started"}
+{"ts": "2026-05-08T22:27:00.656829Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T22:27:03.305837Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T22:27:03.440183Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T22:27:03.443320Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:0, loop-0.stderr.log:0"}
+{"ts": "2026-05-08T22:27:35.859805Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:11967, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T22:28:05.861840Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:11967, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T22:28:37.796044Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:14229, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T22:29:07.797872Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:16185, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T22:29:39.651377Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:33552, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T22:30:07.257859Z", "phase": "act", "note": "loop=0 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T22:30:14.262455Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-08T22:30:46.780650Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T22:30:48.657121Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T22:30:48.800053Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T22:30:48.801747Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:0, loop-1.stderr.log:0"}
+{"ts": "2026-05-08T22:31:20.699429Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:101, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T22:31:50.702398Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:2517, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T22:32:23.307435Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:12812, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T22:32:53.321237Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:22876, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T22:33:25.880362Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:43742, loop-1.stderr.log:77"}
+{"ts": "2026-05-08T22:33:53.426595Z", "phase": "act", "note": "loop=1 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T22:34:00.427149Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-08T22:35:03.002199Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T22:35:04.846848Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T22:35:05.001411Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T22:35:05.003083Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:0, loop-2.stderr.log:0"}
+{"ts": "2026-05-08T22:35:36.962768Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:101, loop-2.stderr.log:582"}
+{"ts": "2026-05-08T22:36:06.964600Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:101, loop-2.stderr.log:582"}
+{"ts": "2026-05-08T22:36:38.880912Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:1868, loop-2.stderr.log:582"}
+{"ts": "2026-05-08T22:37:08.883353Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:6958, loop-2.stderr.log:582"}
+{"ts": "2026-05-08T22:37:40.895089Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:22372, loop-2.stderr.log:582"}
+{"ts": "2026-05-08T22:38:08.480358Z", "phase": "act", "note": "loop=2 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T22:38:15.480843Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-08T22:40:17.956180Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T22:40:20.449532Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T22:40:20.628383Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T22:40:20.631266Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:0, loop-3.stderr.log:0"}
+{"ts": "2026-05-08T22:40:53.726792Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:101, loop-3.stderr.log:582"}
+{"ts": "2026-05-08T22:41:23.728705Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:3095, loop-3.stderr.log:582"}
+{"ts": "2026-05-08T22:41:55.597568Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:5552, loop-3.stderr.log:709"}
+{"ts": "2026-05-08T22:42:25.601448Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:12415, loop-3.stderr.log:709"}
+{"ts": "2026-05-08T22:42:57.679398Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:20524, loop-3.stderr.log:709"}
+{"ts": "2026-05-08T22:43:24.721819Z", "phase": "act", "note": "loop=3 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T22:43:31.722858Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-08T22:47:34.225692Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T22:47:36.145111Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T22:47:36.291430Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T22:47:36.293419Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:0, loop-4.stderr.log:0"}
+{"ts": "2026-05-08T22:48:08.891427Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:101, loop-4.stderr.log:582"}
+{"ts": "2026-05-08T22:48:38.893420Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:2991, loop-4.stderr.log:582"}
+{"ts": "2026-05-08T22:49:11.454878Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:6875, loop-4.stderr.log:582"}
+{"ts": "2026-05-08T22:49:41.456946Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:18269, loop-4.stderr.log:582"}
+{"ts": "2026-05-08T22:50:13.607643Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:26146, loop-4.stderr.log:582"}
+{"ts": "2026-05-08T22:50:40.955474Z", "phase": "act", "note": "loop=4 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T22:50:47.955998Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-08T22:58:50.344068Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T22:58:52.756267Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T22:58:52.923339Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T22:58:52.924669Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:0, loop-5.stderr.log:0"}
+{"ts": "2026-05-08T22:59:25.775227Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:101, loop-5.stderr.log:582"}
+{"ts": "2026-05-08T22:59:55.777102Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:101, loop-5.stderr.log:582"}
+{"ts": "2026-05-08T23:00:27.652386Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:101, loop-5.stderr.log:582"}
+{"ts": "2026-05-08T23:00:57.654827Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:10468, loop-5.stderr.log:582"}
+{"ts": "2026-05-08T23:01:29.895615Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:14062, loop-5.stderr.log:582"}
+{"ts": "2026-05-08T23:01:57.282226Z", "phase": "act", "note": "loop=5 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T23:02:04.287354Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-08T23:18:06.300432Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T23:18:08.907171Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T23:18:09.087259Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T23:18:09.088660Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:0, loop-6.stderr.log:0"}
+{"ts": "2026-05-08T23:18:42.355869Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:101, loop-6.stderr.log:582"}
+{"ts": "2026-05-08T23:19:12.357841Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:101, loop-6.stderr.log:582"}
+{"ts": "2026-05-08T23:19:44.622475Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:101, loop-6.stderr.log:582"}
+{"ts": "2026-05-08T23:20:14.627650Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:2190, loop-6.stderr.log:582"}
+{"ts": "2026-05-08T23:20:46.733075Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:4154, loop-6.stderr.log:582"}
+{"ts": "2026-05-08T23:21:13.883842Z", "phase": "act", "note": "loop=6 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T23:21:20.885186Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-08T23:51:23.465970Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T23:51:25.962206Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T23:51:26.125694Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T23:51:26.130010Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:0, loop-7.stderr.log:0"}
+{"ts": "2026-05-08T23:51:59.205457Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:101, loop-7.stderr.log:582"}
+{"ts": "2026-05-08T23:52:29.207824Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:101, loop-7.stderr.log:582"}
+{"ts": "2026-05-08T23:53:01.132629Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:101, loop-7.stderr.log:582"}
+{"ts": "2026-05-08T23:53:31.135233Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:3037, loop-7.stderr.log:582"}
+{"ts": "2026-05-08T23:54:03.579984Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:20739, loop-7.stderr.log:582"}
+{"ts": "2026-05-08T23:54:30.835179Z", "phase": "act", "note": "loop=7 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-08T23:54:37.839512Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T00:24:40.185371Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T00:24:42.787334Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T00:24:42.940752Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T00:24:42.942371Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:0, loop-8.stderr.log:0"}
+{"ts": "2026-05-09T00:25:16.284664Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:101, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T00:25:46.286575Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:101, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T00:26:18.194689Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:101, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T00:26:48.196810Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:1819, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T00:27:20.002912Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:5540, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T00:27:47.000323Z", "phase": "act", "note": "loop=8 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T00:27:54.000854Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T00:57:56.160531Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T00:57:58.238982Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T00:57:58.396767Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T00:57:58.400112Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:0, loop-9.stderr.log:0"}
+{"ts": "2026-05-09T00:58:31.466117Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:101, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T00:59:01.468166Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:101, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T00:59:33.975214Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:101, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T01:00:03.977425Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:13481, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T01:00:35.876117Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:13481, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T01:01:02.787935Z", "phase": "act", "note": "loop=9 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T01:01:09.788476Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T01:31:11.806343Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T01:31:14.497215Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T01:31:14.658067Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T01:31:14.662426Z", "phase": "observe", "note": "loop=10 worker_alive artifacts=loop-10.jsonl:0, loop-10.stderr.log:0"}
+{"ts": "2026-05-09T01:31:48.232232Z", "phase": "observe", "note": "loop=10 worker_alive artifacts=loop-10.jsonl:101, loop-10.stderr.log:582"}
+{"ts": "2026-05-09T01:32:18.234543Z", "phase": "observe", "note": "loop=10 worker_alive artifacts=loop-10.jsonl:101, loop-10.stderr.log:582"}
+{"ts": "2026-05-09T01:32:50.767637Z", "phase": "observe", "note": "loop=10 worker_alive artifacts=loop-10.jsonl:101, loop-10.stderr.log:582"}
+{"ts": "2026-05-09T01:33:20.769857Z", "phase": "observe", "note": "loop=10 worker_alive artifacts=loop-10.jsonl:2662, loop-10.stderr.log:582"}
+{"ts": "2026-05-09T01:33:52.990420Z", "phase": "observe", "note": "loop=10 worker_alive artifacts=loop-10.jsonl:17472, loop-10.stderr.log:582"}
+{"ts": "2026-05-09T01:34:19.918279Z", "phase": "act", "note": "loop=10 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T01:34:26.918945Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T02:04:29.080908Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T02:04:30.982296Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T02:04:31.137271Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T02:04:31.139552Z", "phase": "observe", "note": "loop=11 worker_alive artifacts=loop-11.jsonl:0, loop-11.stderr.log:0"}
+{"ts": "2026-05-09T02:05:03.124262Z", "phase": "observe", "note": "loop=11 worker_alive artifacts=loop-11.jsonl:101, loop-11.stderr.log:582"}
+{"ts": "2026-05-09T02:05:33.127649Z", "phase": "observe", "note": "loop=11 worker_alive artifacts=loop-11.jsonl:101, loop-11.stderr.log:582"}
+{"ts": "2026-05-09T02:06:05.856623Z", "phase": "observe", "note": "loop=11 worker_alive artifacts=loop-11.jsonl:101, loop-11.stderr.log:582"}
+{"ts": "2026-05-09T02:06:35.858761Z", "phase": "observe", "note": "loop=11 worker_alive artifacts=loop-11.jsonl:3150, loop-11.stderr.log:582"}
+{"ts": "2026-05-09T02:07:08.170227Z", "phase": "observe", "note": "loop=11 worker_alive artifacts=loop-11.jsonl:18316, loop-11.stderr.log:582"}
+{"ts": "2026-05-09T02:07:36.047887Z", "phase": "act", "note": "loop=11 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T02:07:43.048919Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T02:37:45.630324Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T02:37:48.471746Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T02:37:48.668393Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T02:37:48.671248Z", "phase": "observe", "note": "loop=12 worker_alive artifacts=loop-12.jsonl:0, loop-12.stderr.log:0"}
+{"ts": "2026-05-09T02:38:21.832129Z", "phase": "observe", "note": "loop=12 worker_alive artifacts=loop-12.jsonl:101, loop-12.stderr.log:582"}
+{"ts": "2026-05-09T02:38:51.835208Z", "phase": "observe", "note": "loop=12 worker_alive artifacts=loop-12.jsonl:101, loop-12.stderr.log:582"}
+{"ts": "2026-05-09T02:39:23.838936Z", "phase": "observe", "note": "loop=12 worker_alive artifacts=loop-12.jsonl:101, loop-12.stderr.log:582"}
+{"ts": "2026-05-09T02:39:53.842468Z", "phase": "observe", "note": "loop=12 worker_alive artifacts=loop-12.jsonl:8068, loop-12.stderr.log:582"}
+{"ts": "2026-05-09T02:40:26.309245Z", "phase": "observe", "note": "loop=12 worker_alive artifacts=loop-12.jsonl:12634, loop-12.stderr.log:582"}
+{"ts": "2026-05-09T02:40:53.882851Z", "phase": "act", "note": "loop=12 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T02:41:00.884082Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T03:11:03.077427Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T03:11:05.323724Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T03:11:05.499459Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T03:11:05.502134Z", "phase": "observe", "note": "loop=13 worker_alive artifacts=loop-13.jsonl:0, loop-13.stderr.log:0"}
+{"ts": "2026-05-09T03:11:37.908448Z", "phase": "observe", "note": "loop=13 worker_alive artifacts=loop-13.jsonl:101, loop-13.stderr.log:582"}
+{"ts": "2026-05-09T03:12:07.910458Z", "phase": "observe", "note": "loop=13 worker_alive artifacts=loop-13.jsonl:101, loop-13.stderr.log:582"}
+{"ts": "2026-05-09T03:12:39.837606Z", "phase": "observe", "note": "loop=13 worker_alive artifacts=loop-13.jsonl:101, loop-13.stderr.log:582"}
+{"ts": "2026-05-09T03:13:09.839613Z", "phase": "observe", "note": "loop=13 worker_alive artifacts=loop-13.jsonl:4073, loop-13.stderr.log:582"}
+{"ts": "2026-05-09T03:13:41.905209Z", "phase": "observe", "note": "loop=13 worker_alive artifacts=loop-13.jsonl:14500, loop-13.stderr.log:582"}
+{"ts": "2026-05-09T03:14:08.777367Z", "phase": "act", "note": "loop=13 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T03:14:15.778352Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T03:44:17.743872Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T03:44:19.780674Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T03:44:19.931078Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T03:44:19.932957Z", "phase": "observe", "note": "loop=14 worker_alive artifacts=loop-14.jsonl:0, loop-14.stderr.log:0"}
+{"ts": "2026-05-09T03:44:52.552231Z", "phase": "observe", "note": "loop=14 worker_alive artifacts=loop-14.jsonl:101, loop-14.stderr.log:582"}
+{"ts": "2026-05-09T03:45:22.555163Z", "phase": "observe", "note": "loop=14 worker_alive artifacts=loop-14.jsonl:101, loop-14.stderr.log:582"}
+{"ts": "2026-05-09T03:45:54.521406Z", "phase": "observe", "note": "loop=14 worker_alive artifacts=loop-14.jsonl:101, loop-14.stderr.log:582"}
+{"ts": "2026-05-09T03:46:24.523338Z", "phase": "observe", "note": "loop=14 worker_alive artifacts=loop-14.jsonl:2925, loop-14.stderr.log:582"}
+{"ts": "2026-05-09T03:46:56.436929Z", "phase": "observe", "note": "loop=14 worker_alive artifacts=loop-14.jsonl:6792, loop-14.stderr.log:706"}
+{"ts": "2026-05-09T03:47:23.363258Z", "phase": "act", "note": "loop=14 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T03:47:30.364582Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T04:17:32.706251Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T04:17:34.642964Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T04:17:34.801898Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T04:17:34.804221Z", "phase": "observe", "note": "loop=15 worker_alive artifacts=loop-15.jsonl:0, loop-15.stderr.log:0"}
+{"ts": "2026-05-09T04:18:06.847907Z", "phase": "observe", "note": "loop=15 worker_alive artifacts=loop-15.jsonl:101, loop-15.stderr.log:77"}
+{"ts": "2026-05-09T04:18:36.852276Z", "phase": "observe", "note": "loop=15 worker_alive artifacts=loop-15.jsonl:101, loop-15.stderr.log:77"}
+{"ts": "2026-05-09T04:19:09.289620Z", "phase": "observe", "note": "loop=15 worker_alive artifacts=loop-15.jsonl:101, loop-15.stderr.log:77"}
+{"ts": "2026-05-09T04:19:39.291714Z", "phase": "observe", "note": "loop=15 worker_alive artifacts=loop-15.jsonl:2852, loop-15.stderr.log:77"}
+{"ts": "2026-05-09T04:20:11.799514Z", "phase": "observe", "note": "loop=15 worker_alive artifacts=loop-15.jsonl:10489, loop-15.stderr.log:77"}
+{"ts": "2026-05-09T04:20:39.050347Z", "phase": "act", "note": "loop=15 pass0_start_missed missing=REPO_INVENTORY.yaml,CANON_TRUTH_MAP.md,FALSE_COMPLETE_REGISTER.yaml pending=run_ledger,repo_inventory,repo_inventory_live_reconciliation,canon_truth_map_semantics,false_complete_seed_coverage; terminating worker"}
+{"ts": "2026-05-09T04:20:46.052278Z", "phase": "act", "note": "codexliz loop exited with code 1"}

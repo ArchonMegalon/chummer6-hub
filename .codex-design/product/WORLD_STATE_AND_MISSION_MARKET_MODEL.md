@@ -10,6 +10,36 @@ The product promise is:
 
 This layer is the path from **campaign OS** to **living Shadowrun world engine**.
 
+Companion BLACK LEDGER files:
+
+- `WORLD_MAP_AND_INTEL_ECONOMY_MODEL.md`
+- `WORLD_CONTRACTS_RESERVED.md`
+- `INTEL_REPORTING_AND_LORE_CONTRIBUTION_POLICY.md`
+- `WORLD_INTEL_CONTRIBUTION_AND_REVIEW_POLICY.md`
+- `WORLD_TICK_OPERATOR_PROCESS.md`
+- `NEWSREEL_AND_CITY_TICKER_MODEL.md`
+- `BLACK_LEDGER_MAP_AND_NEWSREEL_WORKFLOWS.yaml`
+- `OPEN_RUNS_AND_COMMUNITY_HUB.md`
+- `COMMUNITY_RULE_ENVIRONMENTS_AND_APPROVAL.md`
+- `RUN_APPLICATION_PREFLIGHT_MODEL.md`
+- `QUICKSTART_RUNNER_AND_PREGEN_FLOW.md`
+- `GM_OPPOSITION_LIBRARY_AND_PACKET_MODEL.md`
+- `VTT_HANDOFF_AND_PLAY_SURFACE_EXPORTS.md`
+- `SESSION_ZERO_AND_TABLE_CONTRACT_MODEL.md`
+- `BEGINNER_GM_AUTOPILOT.md`
+- `SEATTLE_OPEN_RUN_001_VERTICAL_SLICE.md`
+- `NETWORK_REPUTATION_AND_LEADERBOARDS_MODEL.md`
+- `SEASONAL_HONORS_AND_REPUTATION_MODEL.md`
+- `REPUTATION_EVENT_LEDGER_MODEL.md`
+- `SEASONAL_HONORS_REGISTRY.yaml`
+- `OPEN_RUNS_REPUTATION_AND_SEASONAL_HONORS.yaml`
+- `OPEN_RUN_POLICY_PRESETS.yaml`
+- `COMMUNITY_RULE_ENVIRONMENT_REGISTRY.yaml`
+- `RUN_APPLICATION_PREFLIGHT_CHECKS.yaml`
+- `OPPOSITION_PACKET_REGISTRY.yaml`
+- `VTT_EXPORT_TARGETS.yaml`
+- `INTEL_REPORT_REVIEW_STATES.yaml`
+
 ## Canonical principle
 
 World state feeds campaigns. It does not replace campaigns.
@@ -19,6 +49,7 @@ The world layer must:
 - generate pressure, conflict, and opportunity that campaigns can consume
 - make corp, syndicate, cult, and district identity feel real over time
 - surface consequences in run descriptions, rewards, opposition, and availability
+- support later open-run recruitment, scheduling, and closeout loops without making third-party tools authoritative
 - let organizers and later manager-players shape the city asynchronously
 - preserve GM curation and campaign-local intent
 
@@ -37,8 +68,10 @@ Chummer adds a governed world-state plane that can:
 - track factions, districts, projects, pressure, and strategic assets
 - resolve a periodic world tick
 - produce job seeds and curated GM-ready job packets
+- attach practical prep hooks such as opposition packets, quickstart paths, and world-memory outputs
 - accept GM-approved resolution reports after runs
 - feed campaign workspaces, artifact generation, and creator publication
+- later support open-run discovery, community rule environments, quickstart entry, roster fit, meeting handoff, and seasonal honors
 - later support opt-in human faction seats and organizer-operated seasons
 
 The public-facing fantasy is:
@@ -46,6 +79,10 @@ The public-facing fantasy is:
 > The city keeps moving between sessions.  
 > Megacorps, syndicates, cults, and other power blocs spend resources, launch projects, create pressure, and generate jobs.  
 > GMs do not have to invent all tension from a blank page anymore — they curate it.
+
+The loop should now be considered explicit:
+
+`faction pressure -> intel reports -> world tick -> job seeds -> GM adoption -> scheduled run -> resolution report -> map consequence -> newsreel -> next tick`
 
 ## Why this belongs in Chummer
 
@@ -79,6 +116,7 @@ Need a job board and consequence engine:
 - district context
 - reward posture
 - “what changes on success / failure”
+- quick prep packets instead of blank-page prep
 
 ### Organizers
 
@@ -104,6 +142,37 @@ This layer should become a new shared contract family:
 **`Chummer.World.Contracts`**
 
 It should not be folded into `Chummer.Campaign.Contracts` or `Chummer.Control.Contracts`.
+
+The reserved first-wave object family now also explicitly includes:
+
+- `Region`
+- `WorldMapMarker`
+- `HeatProfile`
+- `IntelReport`
+- `IntelReviewDecision`
+- `RunPlan`
+- `NewsReel`
+- `NewsReelItem`
+- `WorldContributionCredit`
+
+Those reservations are expanded in `WORLD_CONTRACTS_RESERVED.md`.
+
+Open-run and seasonal-honor objects may begin adjacent to this world family while BLACK LEDGER is still proving itself:
+
+- `OpenRun`
+- `JoinPolicy`
+- `RunApplication`
+- `RunApplicationPreflight`
+- `MeetingHandoff`
+- `ObserverConsent`
+- `TableContract`
+- `QuickstartRunnerPack`
+- `OppositionPacket`
+- `ReputationEvent`
+- `SeasonalBoard`
+- `BadgeAward`
+
+If those lanes become large enough to deserve their own package families later, the likely pressure points are `Chummer.Network.Contracts` and `Chummer.Reputation.Contracts`.
 
 ### `WorldFrame`
 

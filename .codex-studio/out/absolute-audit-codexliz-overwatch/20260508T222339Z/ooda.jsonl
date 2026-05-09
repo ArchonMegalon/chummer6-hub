@@ -1,0 +1,8 @@
+{"ts": "2026-05-08T22:23:41.561108Z", "phase": "observe", "note": "supervisor started"}
+{"ts": "2026-05-08T22:23:41.561652Z", "phase": "act", "note": "swept stale codexliz workers before start: 20260508T221447Z:1444040"}
+{"ts": "2026-05-08T22:23:41.561739Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T22:23:44.076273Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T22:23:44.252488Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-08T22:23:44.255122Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:0, loop-0.stderr.log:0"}
+{"ts": "2026-05-08T22:24:17.395416Z", "phase": "observe", "note": "loop=0 worker_alive artifacts=loop-0.jsonl:101, loop-0.stderr.log:77"}
+{"ts": "2026-05-08T22:24:27.398131Z", "phase": "act", "note": "codexliz loop exited with code 1"}

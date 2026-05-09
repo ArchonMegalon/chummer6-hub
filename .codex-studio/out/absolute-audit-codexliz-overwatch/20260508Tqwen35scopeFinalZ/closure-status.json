@@ -1,0 +1,423 @@
+{
+  "generated_at": "2026-05-08T21:36:58.934290Z",
+  "closure_done": false,
+  "pending_abs_ids": [
+    "strict_hub_substance",
+    "required_artifacts",
+    "pass0_control_plane",
+    "run_ledger",
+    "repo_inventory",
+    "branch_policy_alignment",
+    "estate_git_state",
+    "OWNERSHIP_TRUTH_MAP.yaml",
+    "FALSE_COMPLETE_REGISTER.yaml",
+    "BUG_AND_GAP_REGISTER.yaml",
+    "COMPLETION_BACKLOG.yaml",
+    "ABSOLUTE_RELEASE_GATES.yaml",
+    "HORIZON_MVP_COMPLETION_MAP.yaml",
+    "E2E_RESULTS.generated.json",
+    "VERIFICATION_RESULTS.generated.json",
+    "release_gates_coverage",
+    "verification_commands_coverage",
+    "verification_results_gates",
+    "e2e_results_coverage",
+    "target_public_routes_coverage",
+    "false_complete_seed_coverage",
+    "false_claim_seed_coverage",
+    "ltd_seed_coverage",
+    "CANON_TRUTH_MAP.md",
+    "ABSOLUTE_GAP_AUDIT.md",
+    "MISSED_POTENTIAL_AUDIT.md",
+    "USER_WISH_DESIGN_EXPANSION.md",
+    "LTD_COMPLETION_MAP.md",
+    "ABSOLUTE_PRODUCT_COMPLETION_PLAN.md",
+    "FEEDBACK_TO_IMPLEMENTATION_LOOP.md",
+    "KARMA_FORGE_PRODUCT_AND_IMPLEMENTATION_LOOP.md",
+    "PACKAGE_MANAGEMENT_AND_PUBLIC_PACKAGE_BROWSER.md",
+    "MOBILE_PWA_PRODUCT_SPEC.md",
+    "E2E_TEST_PLAN.md",
+    "VERIFICATION_COMMANDS.md",
+    "DEV_CHANGE_GUIDE.md",
+    "FALSE_CLAIM_RISK.md",
+    "PUBLIC_COPY_CHANGE_GUIDE.md",
+    "LTD_ADAPTER_IMPLEMENTATION_GUIDE.md",
+    "RELEASE_RUNBOOK.md",
+    "PREMIUM_FLAGSHIP_POLISH_REPORT.md",
+    "completion_verdict",
+    "completion_backlog_clear",
+    "final_next_actions",
+    "bug_register"
+  ],
+  "pending_check_keys": [
+    "strict_hub_substance",
+    "required_artifacts",
+    "pass0_control_plane",
+    "run_ledger",
+    "repo_inventory",
+    "branch_policy_alignment",
+    "estate_git_state",
+    "OWNERSHIP_TRUTH_MAP.yaml",
+    "FALSE_COMPLETE_REGISTER.yaml",
+    "BUG_AND_GAP_REGISTER.yaml",
+    "COMPLETION_BACKLOG.yaml",
+    "ABSOLUTE_RELEASE_GATES.yaml",
+    "HORIZON_MVP_COMPLETION_MAP.yaml",
+    "E2E_RESULTS.generated.json",
+    "VERIFICATION_RESULTS.generated.json",
+    "release_gates_coverage",
+    "verification_commands_coverage",
+    "verification_results_gates",
+    "e2e_results_coverage",
+    "target_public_routes_coverage",
+    "false_complete_seed_coverage",
+    "false_claim_seed_coverage",
+    "ltd_seed_coverage",
+    "CANON_TRUTH_MAP.md",
+    "ABSOLUTE_GAP_AUDIT.md",
+    "MISSED_POTENTIAL_AUDIT.md",
+    "USER_WISH_DESIGN_EXPANSION.md",
+    "LTD_COMPLETION_MAP.md",
+    "ABSOLUTE_PRODUCT_COMPLETION_PLAN.md",
+    "FEEDBACK_TO_IMPLEMENTATION_LOOP.md",
+    "KARMA_FORGE_PRODUCT_AND_IMPLEMENTATION_LOOP.md",
+    "PACKAGE_MANAGEMENT_AND_PUBLIC_PACKAGE_BROWSER.md",
+    "MOBILE_PWA_PRODUCT_SPEC.md",
+    "E2E_TEST_PLAN.md",
+    "VERIFICATION_COMMANDS.md",
+    "DEV_CHANGE_GUIDE.md",
+    "FALSE_CLAIM_RISK.md",
+    "PUBLIC_COPY_CHANGE_GUIDE.md",
+    "LTD_ADAPTER_IMPLEMENTATION_GUIDE.md",
+    "RELEASE_RUNBOOK.md",
+    "PREMIUM_FLAGSHIP_POLISH_REPORT.md",
+    "completion_verdict",
+    "completion_backlog_clear",
+    "final_next_actions",
+    "bug_register"
+  ],
+  "checks": [
+    {
+      "key": "strict_hub_substance",
+      "label": "Strict hub substance gate",
+      "path": "/docker/chummercomplete/chummer.run-services/scripts/check_absolute_audit_substance.py",
+      "ok": false,
+      "detail": "pending=live_route_proof, live_oauth_linking, portable_receipts_audit, sr5_closure"
+    },
+    {
+      "key": "required_artifacts",
+      "label": "Required completion artifacts",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion",
+      "ok": false,
+      "detail": "missing 30 artifacts: RUN_LEDGER.jsonl, REPO_INVENTORY.yaml, CANON_TRUTH_MAP.md, OWNERSHIP_TRUTH_MAP.yaml, ABSOLUTE_GAP_AUDIT.md, MISSED_POTENTIAL_AUDIT.md, USER_WISH_DESIGN_EXPANSION.md, LTD_COMPLETION_MAP.md, FALSE_COMPLETE_REGISTER.yaml, ABSOLUTE_PRODUCT_COMPLETION_PLAN.md, FEEDBACK_TO_IMPLEMENTATION_LOOP.md, KARMA_FORGE_PRODUCT_AND_IMPLEMENTATION_LOOP.md, PACKAGE_MANAGEMENT_AND_PUBLIC_PACKAGE_BROWSER.md, MOBILE_PWA_PRODUCT_SPEC.md, HORIZON_MVP_COMPLETION_MAP.yaml, ABSOLUTE_RELEASE_GATES.yaml, COMPLETION_BACKLOG.yaml, E2E_TEST_PLAN.md, E2E_RESULTS.generated.json, VERIFICATION_COMMANDS.md, VERIFICATION_RESULTS.generated.json, BUG_AND_GAP_REGISTER.yaml, DEV_CHANGE_GUIDE.md, FALSE_CLAIM_RISK.md, PUBLIC_COPY_CHANGE_GUIDE.md, LTD_ADAPTER_IMPLEMENTATION_GUIDE.md, RELEASE_RUNBOOK.md, PREMIUM_FLAGSHIP_POLISH_REPORT.md, ABSOLUTE_COMPLETION_VERDICT.md, FINAL_NEXT_ACTIONS.yaml"
+    },
+    {
+      "key": "pass0_control_plane",
+      "label": "Pass 0 control-plane artifacts",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion",
+      "ok": false,
+      "detail": "missing 6 artifacts: REPO_INVENTORY.yaml, CANON_TRUTH_MAP.md, OWNERSHIP_TRUTH_MAP.yaml, FALSE_COMPLETE_REGISTER.yaml, BUG_AND_GAP_REGISTER.yaml, ABSOLUTE_COMPLETION_VERDICT.md"
+    },
+    {
+      "key": "run_ledger",
+      "label": "Run ledger",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/RUN_LEDGER.jsonl",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "repo_inventory",
+      "label": "Repo inventory",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/REPO_INVENTORY.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "branch_policy_alignment",
+      "label": "Branch policy alignment",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/REPO_INVENTORY.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "estate_git_state",
+      "label": "Estate git state",
+      "path": "/docker/chummercomplete",
+      "ok": false,
+      "detail": "mismatches=/docker/chummercomplete/Chummer6:dirty, /docker/EA:dirty, /docker/fleet:dirty, /docker/chummercomplete/chummer.run-services:dirty, /docker/chummercomplete/chummer-core-engine:dirty, /docker/chummercomplete/chummer-presentation:dirty, /docker/chummercomplete/chummer-design:dirty, /docker/chummercomplete/chummer-hub-registry:dirty, /docker/chummercomplete/chummer-play:dirty, /docker/chummercomplete/chummer-ui-kit:dirty, /docker/fleet/repos/chummer-media-factory:dirty, /docker/chummer5a:dirty, /docker/fleet/repos/chummer4:dirty"
+    },
+    {
+      "key": "unavailable_repo_documentation",
+      "label": "Unavailable repo documentation",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion",
+      "ok": true,
+      "detail": "missing=none"
+    },
+    {
+      "key": "OWNERSHIP_TRUTH_MAP.yaml",
+      "label": "OWNERSHIP_TRUTH_MAP.yaml",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/OWNERSHIP_TRUTH_MAP.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "FALSE_COMPLETE_REGISTER.yaml",
+      "label": "FALSE_COMPLETE_REGISTER.yaml",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/FALSE_COMPLETE_REGISTER.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "BUG_AND_GAP_REGISTER.yaml",
+      "label": "BUG_AND_GAP_REGISTER.yaml",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/BUG_AND_GAP_REGISTER.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "COMPLETION_BACKLOG.yaml",
+      "label": "COMPLETION_BACKLOG.yaml",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/COMPLETION_BACKLOG.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "ABSOLUTE_RELEASE_GATES.yaml",
+      "label": "ABSOLUTE_RELEASE_GATES.yaml",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/ABSOLUTE_RELEASE_GATES.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "HORIZON_MVP_COMPLETION_MAP.yaml",
+      "label": "HORIZON_MVP_COMPLETION_MAP.yaml",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/HORIZON_MVP_COMPLETION_MAP.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "E2E_RESULTS.generated.json",
+      "label": "E2E_RESULTS.generated.json",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/E2E_RESULTS.generated.json",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "VERIFICATION_RESULTS.generated.json",
+      "label": "VERIFICATION_RESULTS.generated.json",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/VERIFICATION_RESULTS.generated.json",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "release_gates_coverage",
+      "label": "Release gates coverage",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/ABSOLUTE_RELEASE_GATES.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "verification_commands_coverage",
+      "label": "Verification commands coverage",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/VERIFICATION_COMMANDS.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "verification_results_gates",
+      "label": "Verification results gates",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/VERIFICATION_RESULTS.generated.json",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "e2e_results_coverage",
+      "label": "E2E results coverage",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/E2E_RESULTS.generated.json",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "target_public_routes_coverage",
+      "label": "Target public routes coverage",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/ABSOLUTE_RELEASE_GATES.yaml",
+      "ok": false,
+      "detail": "ABSOLUTE_RELEASE_GATES.yaml missing"
+    },
+    {
+      "key": "false_complete_seed_coverage",
+      "label": "False-complete seed coverage",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/FALSE_COMPLETE_REGISTER.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "false_claim_seed_coverage",
+      "label": "False-claim seed coverage",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/FALSE_CLAIM_RISK.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "ltd_seed_coverage",
+      "label": "LTD seed coverage",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion",
+      "ok": false,
+      "detail": "missing=LTD_COMPLETION_MAP.md, LTD_ADAPTER_IMPLEMENTATION_GUIDE.md"
+    },
+    {
+      "key": "CANON_TRUTH_MAP.md",
+      "label": "CANON_TRUTH_MAP.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/CANON_TRUTH_MAP.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "ABSOLUTE_GAP_AUDIT.md",
+      "label": "ABSOLUTE_GAP_AUDIT.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/ABSOLUTE_GAP_AUDIT.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "MISSED_POTENTIAL_AUDIT.md",
+      "label": "MISSED_POTENTIAL_AUDIT.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/MISSED_POTENTIAL_AUDIT.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "USER_WISH_DESIGN_EXPANSION.md",
+      "label": "USER_WISH_DESIGN_EXPANSION.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/USER_WISH_DESIGN_EXPANSION.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "LTD_COMPLETION_MAP.md",
+      "label": "LTD_COMPLETION_MAP.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/LTD_COMPLETION_MAP.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "ABSOLUTE_PRODUCT_COMPLETION_PLAN.md",
+      "label": "ABSOLUTE_PRODUCT_COMPLETION_PLAN.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/ABSOLUTE_PRODUCT_COMPLETION_PLAN.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "FEEDBACK_TO_IMPLEMENTATION_LOOP.md",
+      "label": "FEEDBACK_TO_IMPLEMENTATION_LOOP.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/FEEDBACK_TO_IMPLEMENTATION_LOOP.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "KARMA_FORGE_PRODUCT_AND_IMPLEMENTATION_LOOP.md",
+      "label": "KARMA_FORGE_PRODUCT_AND_IMPLEMENTATION_LOOP.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/KARMA_FORGE_PRODUCT_AND_IMPLEMENTATION_LOOP.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "PACKAGE_MANAGEMENT_AND_PUBLIC_PACKAGE_BROWSER.md",
+      "label": "PACKAGE_MANAGEMENT_AND_PUBLIC_PACKAGE_BROWSER.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/PACKAGE_MANAGEMENT_AND_PUBLIC_PACKAGE_BROWSER.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "MOBILE_PWA_PRODUCT_SPEC.md",
+      "label": "MOBILE_PWA_PRODUCT_SPEC.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/MOBILE_PWA_PRODUCT_SPEC.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "E2E_TEST_PLAN.md",
+      "label": "E2E_TEST_PLAN.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/E2E_TEST_PLAN.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "VERIFICATION_COMMANDS.md",
+      "label": "VERIFICATION_COMMANDS.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/VERIFICATION_COMMANDS.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "DEV_CHANGE_GUIDE.md",
+      "label": "DEV_CHANGE_GUIDE.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/DEV_CHANGE_GUIDE.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "FALSE_CLAIM_RISK.md",
+      "label": "FALSE_CLAIM_RISK.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/FALSE_CLAIM_RISK.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "PUBLIC_COPY_CHANGE_GUIDE.md",
+      "label": "PUBLIC_COPY_CHANGE_GUIDE.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/PUBLIC_COPY_CHANGE_GUIDE.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "LTD_ADAPTER_IMPLEMENTATION_GUIDE.md",
+      "label": "LTD_ADAPTER_IMPLEMENTATION_GUIDE.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/LTD_ADAPTER_IMPLEMENTATION_GUIDE.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "RELEASE_RUNBOOK.md",
+      "label": "RELEASE_RUNBOOK.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/RELEASE_RUNBOOK.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "PREMIUM_FLAGSHIP_POLISH_REPORT.md",
+      "label": "PREMIUM_FLAGSHIP_POLISH_REPORT.md",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/PREMIUM_FLAGSHIP_POLISH_REPORT.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "completion_verdict",
+      "label": "Completion verdict",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/ABSOLUTE_COMPLETION_VERDICT.md",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "completion_backlog_clear",
+      "label": "Completion backlog clear",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/COMPLETION_BACKLOG.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "final_next_actions",
+      "label": "Final next actions",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/FINAL_NEXT_ACTIONS.yaml",
+      "ok": false,
+      "detail": "missing"
+    },
+    {
+      "key": "bug_register",
+      "label": "Bug and gap register",
+      "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/BUG_AND_GAP_REGISTER.yaml",
+      "ok": false,
+      "detail": "missing"
+    }
+  ],
+  "summary": "QWEN35 estate completion gate is still open."
+}

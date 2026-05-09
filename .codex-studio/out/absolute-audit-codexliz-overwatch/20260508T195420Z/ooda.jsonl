@@ -1,0 +1,4 @@
+{"ts": "2026-05-08T19:54:20.217622Z", "phase": "observe", "note": "supervisor started"}
+{"ts": "2026-05-08T19:54:20.242702Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-08T19:54:20.309674Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-08T19:54:20.367970Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}

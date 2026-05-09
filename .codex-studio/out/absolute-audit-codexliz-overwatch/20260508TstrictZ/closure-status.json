@@ -1,0 +1,132 @@
+{
+  "generated_at": "2026-05-08T21:05:06.570312Z",
+  "closure_done": false,
+  "pending_abs_ids": [
+    "ABS-004",
+    "ABS-016",
+    "ABS-005",
+    "ABS-012",
+    "ABS-006"
+  ],
+  "pending_check_keys": [
+    "live_route_proof",
+    "live_oauth_linking",
+    "portable_receipts_audit",
+    "sr5_closure"
+  ],
+  "checks": [
+    {
+      "key": "canonical_domain_policy",
+      "abs_ids": [
+        "ABS-016"
+      ],
+      "label": "Canonical domain policy",
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CANONICAL_DOMAIN_POLICY.generated.json",
+      "ok": true,
+      "detail": "status=pass canonical_public_domain='chummer.run' chummer6.run='not_used' participate_codex_required=True"
+    },
+    {
+      "key": "live_route_proof",
+      "abs_ids": [
+        "ABS-004",
+        "ABS-016"
+      ],
+      "label": "Live public route proof",
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+      "ok": false,
+      "detail": "route_count=63 failed_count=1 proof_has_participate_codex=True proof_success=False proof_redirect='/auth/google/start?next=%2Fparticipate%2Fcodex' live_status=302 live_location='/auth/google/start?next=%2Fparticipate%2Fcodex'"
+    },
+    {
+      "key": "live_support_flow",
+      "abs_ids": [
+        "ABS-017"
+      ],
+      "label": "Live support/contact proof",
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/SUPPORT_CASE_FLOW_PROOF.generated.json",
+      "ok": true,
+      "detail": "exit_code=0 stdout='/contact ok (200)\\n/help ok (200)\\n/faq ok (200)\\n/home/access ok (200)\\n/account/support ok (200)\\nAll routes ok' stderr=''"
+    },
+    {
+      "key": "live_oauth_linking",
+      "abs_ids": [
+        "ABS-005"
+      ],
+      "label": "Live Google OAuth/account-linking proof",
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+      "ok": false,
+      "detail": "script_exists=True source_ok=False exit_code=0 stdout='/login ok (200)\\n/auth/google/start ok (200)\\n/account/access ok (200)\\nTest case: anonymous user starts on /login\\nTest case: Google handoff completes and lands on signed-in state\\nTest case: existing account can link Google\\nTest case: linked account can sign back in with Google\\nTest case: linked-provider state is visible on /account/access\\nTest case: logout/login preserves the expected linked state\\nGoogle OAuth linking flow ok'"
+    },
+    {
+      "key": "desktop_execution_proof",
+      "abs_ids": [
+        "ABS-001",
+        "ABS-018"
+      ],
+      "label": "Fresh desktop execution proof",
+      "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_DESKTOP_EXECUTION_PROOF.generated.json",
+      "ok": true,
+      "detail": "status='pass' receipts_bound=True"
+    },
+    {
+      "key": "human_parity_matrix",
+      "abs_ids": [
+        "ABS-001"
+      ],
+      "label": "Human parity matrix proof",
+      "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/CHUMMER5A_HUMAN_PARITY_MATRIX_PROOF.generated.json",
+      "ok": true,
+      "detail": "status='pass' row_count=75 family_count=7"
+    },
+    {
+      "key": "portable_receipts_audit",
+      "abs_ids": [
+        "ABS-012"
+      ],
+      "label": "Portable receipts audit",
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PORTABLE_RECEIPTS_AUDIT.generated.json",
+      "ok": false,
+      "detail": "scanned_artifact_count=110 machine_specific_hits=76"
+    },
+    {
+      "key": "public_claim_scan",
+      "abs_ids": [
+        "ABS-015"
+      ],
+      "label": "Public claim scan",
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_CLAIM_SCAN.generated.json",
+      "ok": true,
+      "detail": "status='pass'"
+    },
+    {
+      "key": "sr5_closure",
+      "abs_ids": [
+        "ABS-006"
+      ],
+      "label": "SR5 closure",
+      "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR5_ACCEPTANCE_PROOF.generated.json",
+      "ok": false,
+      "detail": "status='pass' ruleset='SR5' serious_implementation_claim='allowed' coverage_threshold='production_grade' accepted_workflows=5 evidence_receipts=1"
+    },
+    {
+      "key": "sr4_closure",
+      "abs_ids": [
+        "ABS-003"
+      ],
+      "label": "SR4 closure",
+      "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_CLAIM_RETIREMENT.generated.json",
+      "ok": true,
+      "detail": "status='pass' ruleset='SR4' claim_status=retired"
+    },
+    {
+      "key": "sr6_closure",
+      "abs_ids": [
+        "ABS-002"
+      ],
+      "label": "SR6 closure",
+      "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR6_CLAIM_RETIREMENT.generated.json",
+      "ok": true,
+      "detail": "status='pass' ruleset='SR6' claim_status=retired"
+    }
+  ],
+  "summary": "Absolute audit substance gate is still open."
+}
