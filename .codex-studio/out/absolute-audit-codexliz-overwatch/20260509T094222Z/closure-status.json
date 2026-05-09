@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-09T12:19:03.835449Z",
+  "generated_at": "2026-05-09T13:59:52.741618Z",
   "closure_done": false,
   "pending_abs_ids": [
     "strict_hub_substance",
@@ -60,7 +60,7 @@
       "label": "Repo inventory live reconciliation",
       "path": "/docker/chummercomplete/_completion/chummer6_absolute_completion/REPO_INVENTORY.yaml",
       "ok": false,
-      "detail": "mismatches=/docker/chummercomplete/chummer.run-services:sha=eb57eca9df849f30f20355afb2c389bfad11d90d!=live=ae8e210bea25ab298e9e8491ab21089145d6404f, /docker/chummercomplete/chummer-hub-registry:sha=414c09705654c70d3450eb580afd28b2be269c3c!=live=30a326a16130603d6dec87a578be384a5d6d8cf8, /docker/chummercomplete/chummer-hub-registry:dirty=True!=live=False, /docker/fleet/repos/chummer-media-factory:sha=201a3b88dec13346807cb167515dbb97167abb2c!=live=f6af2c7929beca22858fb50ba8a6e22b934e3ab6, /docker/fleet/repos/chummer-media-factory:dirty=True!=live=False"
+      "detail": "mismatches=/docker/chummercomplete/Chummer6:sha=82f07055b757865c994e13de113d65808e7b698b!=live=7786e76939c0e5584238676f6e5093dfaa88d571, /docker/chummercomplete/Chummer6:dirty=True!=live=False, /docker/EA:sha=91b76f8e4f10c85b15b8c5a9a3e98bc1e9754118!=live=61d648282366425fb0cdd75fa24cf3f91f3ba042, /docker/fleet:sha=bd0ce60c894f6533308f559dfb2b6c69af397433!=live=0d98769ae730f9b0230996d3e600671441954843, /docker/chummercomplete/chummer.run-services:sha=eb57eca9df849f30f20355afb2c389bfad11d90d!=live=ad4e3766531922b4c75167839d2563e3ad80454f, /docker/chummercomplete/chummer-design:sha=79282df2079a2ce6d7dd0c10570467a1d5fb6e43!=live=689ab4c975d7800d22aad98b2dba8819effbb8c2, /docker/chummercomplete/chummer-hub-registry:sha=414c09705654c70d3450eb580afd28b2be269c3c!=live=6c90eb482483f54850dcb1d7c221ee668ac731dc, /docker/fleet/repos/chummer-media-factory:sha=201a3b88dec13346807cb167515dbb97167abb2c!=live=f6af2c7929beca22858fb50ba8a6e22b934e3ab6, /docker/fleet/repos/chummer-media-factory:dirty=True!=live=False"
     },
     {
       "key": "branch_policy_alignment",

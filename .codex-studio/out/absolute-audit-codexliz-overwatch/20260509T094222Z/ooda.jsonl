@@ -40,3 +40,103 @@
 {"ts": "2026-05-09T12:18:52.725363Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
 {"ts": "2026-05-09T12:19:03.843307Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
 {"ts": "2026-05-09T12:19:04.250016Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=1800s"}
+{"ts": "2026-05-09T12:49:04.251279Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T12:49:14.534233Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T12:49:14.923219Z", "phase": "decide", "note": "provider_preflight_failed detail=HTTPError: HTTP Error 530: <none> backoff=1800s"}
+{"ts": "2026-05-09T13:19:14.923847Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:19:25.731620Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:19:26.445344Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:19:26.451126Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:0, loop-1.stderr.log:0"}
+{"ts": "2026-05-09T13:19:57.662800Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:101, loop-1.stderr.log:77"}
+{"ts": "2026-05-09T13:20:27.665249Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:101, loop-1.stderr.log:77"}
+{"ts": "2026-05-09T13:20:58.127096Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:6618, loop-1.stderr.log:77"}
+{"ts": "2026-05-09T13:21:28.129420Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:10361, loop-1.stderr.log:77"}
+{"ts": "2026-05-09T13:21:58.287844Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:18426, loop-1.stderr.log:77"}
+{"ts": "2026-05-09T13:22:28.290783Z", "phase": "observe", "note": "loop=1 worker_alive artifacts=loop-1.jsonl:26470, loop-1.stderr.log:77"}
+{"ts": "2026-05-09T13:22:46.142436Z", "phase": "act", "note": "loop=1 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:22:53.142961Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T13:23:33.534692Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:23:43.560216Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:23:44.563201Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:23:44.568855Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:0, loop-2.stderr.log:0"}
+{"ts": "2026-05-09T13:24:18.828177Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:6612, loop-2.stderr.log:77"}
+{"ts": "2026-05-09T13:24:48.830170Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:10312, loop-2.stderr.log:77"}
+{"ts": "2026-05-09T13:25:22.979149Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:18448, loop-2.stderr.log:77"}
+{"ts": "2026-05-09T13:25:52.981079Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:26614, loop-2.stderr.log:77"}
+{"ts": "2026-05-09T13:26:26.534398Z", "phase": "observe", "note": "loop=2 worker_alive artifacts=loop-2.jsonl:38588, loop-2.stderr.log:77"}
+{"ts": "2026-05-09T13:26:55.445446Z", "phase": "act", "note": "loop=2 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:27:02.445936Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T13:27:40.780242Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:27:48.276423Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:27:48.962639Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:27:48.965546Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:0, loop-3.stderr.log:0"}
+{"ts": "2026-05-09T13:28:21.873668Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:101, loop-3.stderr.log:582"}
+{"ts": "2026-05-09T13:28:51.875777Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:101, loop-3.stderr.log:582"}
+{"ts": "2026-05-09T13:29:24.789937Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:7900, loop-3.stderr.log:582"}
+{"ts": "2026-05-09T13:29:54.794684Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:25568, loop-3.stderr.log:582"}
+{"ts": "2026-05-09T13:30:24.989238Z", "phase": "observe", "note": "loop=3 worker_alive artifacts=loop-3.jsonl:25568, loop-3.stderr.log:582"}
+{"ts": "2026-05-09T13:30:59.273571Z", "phase": "act", "note": "loop=3 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:31:06.276293Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T13:32:16.748430Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:32:26.152234Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:32:27.035956Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:32:27.039798Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:0, loop-4.stderr.log:0"}
+{"ts": "2026-05-09T13:32:57.860755Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:1277, loop-4.stderr.log:582"}
+{"ts": "2026-05-09T13:33:27.862796Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:5971, loop-4.stderr.log:582"}
+{"ts": "2026-05-09T13:33:58.230911Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:10875, loop-4.stderr.log:582"}
+{"ts": "2026-05-09T13:34:28.232950Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:18626, loop-4.stderr.log:582"}
+{"ts": "2026-05-09T13:35:01.384620Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:39678, loop-4.stderr.log:582"}
+{"ts": "2026-05-09T13:35:31.387364Z", "phase": "observe", "note": "loop=4 worker_alive artifacts=loop-4.jsonl:39678, loop-4.stderr.log:582"}
+{"ts": "2026-05-09T13:35:48.697409Z", "phase": "act", "note": "loop=4 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:35:55.698205Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T13:38:05.672178Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:38:14.962662Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:38:15.817681Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:38:15.823693Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:0, loop-5.stderr.log:0"}
+{"ts": "2026-05-09T13:38:49.026232Z", "phase": "observe", "note": "loop=5 worker_alive artifacts=loop-5.jsonl:7959, loop-5.stderr.log:582"}
+{"ts": "2026-05-09T13:39:19.028174Z", "phase": "act", "note": "codexliz loop exited with code 0"}
+{"ts": "2026-05-09T13:39:29.210954Z", "phase": "act", "note": "loop=5 no_machine_state_progress detected; escalating as failure"}
+{"ts": "2026-05-09T13:43:29.225387Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:43:39.466200Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:43:40.209623Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:43:40.223032Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:0, loop-6.stderr.log:0"}
+{"ts": "2026-05-09T13:44:14.561205Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:101, loop-6.stderr.log:77"}
+{"ts": "2026-05-09T13:44:44.563763Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:101, loop-6.stderr.log:77"}
+{"ts": "2026-05-09T13:45:17.751855Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:101, loop-6.stderr.log:77"}
+{"ts": "2026-05-09T13:45:47.754229Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:4967, loop-6.stderr.log:77"}
+{"ts": "2026-05-09T13:46:17.943070Z", "phase": "observe", "note": "loop=6 worker_alive artifacts=loop-6.jsonl:4967, loop-6.stderr.log:77"}
+{"ts": "2026-05-09T13:46:52.572318Z", "phase": "act", "note": "loop=6 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:46:59.572823Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T13:47:37.561405Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:47:46.286683Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:47:46.973821Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:47:46.976667Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:0, loop-7.stderr.log:0"}
+{"ts": "2026-05-09T13:48:21.455074Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:101, loop-7.stderr.log:77"}
+{"ts": "2026-05-09T13:48:51.457107Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:101, loop-7.stderr.log:77"}
+{"ts": "2026-05-09T13:49:25.705214Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:6633, loop-7.stderr.log:77"}
+{"ts": "2026-05-09T13:49:55.707228Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:9069, loop-7.stderr.log:77"}
+{"ts": "2026-05-09T13:50:30.638624Z", "phase": "observe", "note": "loop=7 worker_alive artifacts=loop-7.jsonl:11291, loop-7.stderr.log:77"}
+{"ts": "2026-05-09T13:50:58.222277Z", "phase": "act", "note": "loop=7 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:51:05.222779Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T13:51:44.186706Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:51:51.679012Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:51:52.454579Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:51:52.457043Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:0, loop-8.stderr.log:0"}
+{"ts": "2026-05-09T13:52:26.699241Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:101, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T13:52:56.701054Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:101, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T13:53:30.061167Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:101, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T13:54:00.064187Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:8670, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T13:54:33.491597Z", "phase": "observe", "note": "loop=8 worker_alive artifacts=loop-8.jsonl:8670, loop-8.stderr.log:582"}
+{"ts": "2026-05-09T13:55:01.694060Z", "phase": "act", "note": "loop=8 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:55:08.694559Z", "phase": "act", "note": "codexliz loop exited with code 1"}
+{"ts": "2026-05-09T13:56:17.965072Z", "phase": "observe", "note": "refreshing absolute-audit closure state"}
+{"ts": "2026-05-09T13:56:25.940414Z", "phase": "orient", "note": "reviewed pending ABS ids and failing closure checks"}
+{"ts": "2026-05-09T13:56:26.796218Z", "phase": "decide", "note": "launch codexliz exec with JSON logging and qwen3.5:122b preference"}
+{"ts": "2026-05-09T13:56:26.799290Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:0, loop-9.stderr.log:0"}
+{"ts": "2026-05-09T13:57:00.136905Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:101, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T13:57:30.140103Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:101, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T13:58:04.902015Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:101, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T13:58:34.904140Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:3002, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T13:59:09.083633Z", "phase": "observe", "note": "loop=9 worker_alive artifacts=loop-9.jsonl:11048, loop-9.stderr.log:582"}
+{"ts": "2026-05-09T13:59:37.154850Z", "phase": "act", "note": "loop=9 pass0_start_missed pending=run_ledger,repo_inventory_live_reconciliation; terminating worker"}
+{"ts": "2026-05-09T13:59:44.155567Z", "phase": "act", "note": "codexliz loop exited with code 1"}
