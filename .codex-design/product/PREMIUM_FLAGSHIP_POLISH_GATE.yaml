@@ -1,0 +1,15 @@
+version: 1
+gate: premium_flagship_polish
+checks:
+  - id: first_screen_clarity
+    description: Primary landing and download surfaces explain what works now without internal jargon.
+  - id: cta_honesty
+    description: Buttons and labels do not overclaim shipped capability.
+  - id: public_copy_neutrality
+    description: Public copy stays provider-neutral and tool-neutral.
+  - id: mobile_surface_clarity
+    description: Mobile/PWA projection is visible and honestly bounded.
+  - id: empty_loading_error_recovery_states
+    description: Public and signed-in surfaces keep next-safe-action copy for non-happy paths.
+  - id: package_feedback_karma_clarity
+    description: Package, feedback, and Karma Forge surfaces explain privacy and governed followthrough.
