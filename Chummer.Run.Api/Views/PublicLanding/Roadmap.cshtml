@@ -29,18 +29,18 @@
             && !PublicSurfaceStatus.IsDesigningInPublic(item.Card.Badge)
             && !PublicSurfaceStatus.IsResearchTrack(item.Card.Badge))
         .ToArray();
-    var productliftAlias = Context?.Request?.Query["productlift"].ToString() ?? string.Empty;
-    var fromRoadmapAlias = string.Equals(productliftAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
+    var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
+    var fromRoadmapAlias = string.Equals(sourceAlias, "roadmap", StringComparison.OrdinalIgnoreCase);
     var signalLanes = new[]
     {
         new
         {
-            Badge = "Projected direction",
-            Title = "Roadmap should stay visible without pretending it already shipped",
+            Badge = "Planning view",
+            Title = "See what might come next without assuming it already shipped",
             Summary = "Use this page to see likely next steps, milestone pressure, and public direction. Use live proof before treating any roadmap note as already real today.",
             Href = "#roadmap-horizons",
             Label = "Browse horizons",
-            Proof = new[] { "Projection only", "Milestone-backed", "Not shipped truth" }
+            Proof = new[] { "Planned", "Milestone-backed", "Not shipped truth" }
         },
         new
         {
@@ -72,11 +72,11 @@
     };
 }
 
-<section class="roadmap-hero route-anchor-target" id="productlift-roadmap-projection">
+<section class="roadmap-hero route-anchor-target" id="public-roadmap-projection">
     <div class="roadmap-hero__copy">
         <p class="eyebrow">Roadmap</p>
         <h1 class="page-title">What looks likely next, and what is still only planned</h1>
-        <p class="page-copy">Horizons explain what Chummer is trying to unlock. Milestones show the active delivery slices, the rough difficulty, what depends on what, and which work is still only planned.</p>
+        <p class="page-copy">Horizons explain what Chummer is trying to unlock next. Milestones show the slices already in motion and the work still being lined up.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="#roadmap-milestones">Open milestone ledger</a>
             <a class="button-like button-like--secondary" href="#roadmap-horizons">Browse horizons</a>
@@ -84,11 +84,11 @@
         </div>
     </div>
     <aside class="roadmap-hero__aside">
-        <p class="roadmap-hero__kicker">How to read this page</p>
+        <p class="roadmap-hero__kicker">Quick read</p>
         <ul class="roadmap-hero__notes">
-            <li>Milestones are delivery slices, not public promises.</li>
-            <li>Horizons are public direction and readiness posture.</li>
-            <li>Use live proof before treating roadmap language as already shipped.</li>
+            <li>Milestones show the work in motion.</li>
+            <li>Horizons show direction, not a shipping promise.</li>
+            <li>Use the changelog or live proof when you need today&apos;s truth.</li>
         </ul>
     </aside>
 </section>
@@ -97,7 +97,7 @@
 {
     <section class="editorial-block">
         <details class="details-drawer">
-            <summary>Planning and closeout guardrails</summary>
+            <summary>How roadmap status is decided</summary>
             <div class="stacked-copy">
                 @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
             </div>
@@ -132,15 +132,15 @@
     <div class="roadmap-frame__lead">
         <p class="eyebrow">Signal and follow-up</p>
         <h2 class="editorial-title">Feedback, planning, shipped proof, and private help stay on different pages.</h2>
-        <p class="editorial-copy">Roadmap should help you understand direction fast. It should not pretend votes decide priorities, planned means shipped, or public feedback replaces private support.</p>
+        <p class="editorial-copy">Roadmap is for direction. Feedback gathers public demand, changelog shows shipped proof, and help handles private issues.</p>
         @if (fromRoadmapAlias)
         {
             <div class="route-callout" role="status" aria-live="polite">
                 <h3>You followed the public roadmap alias</h3>
                 <p><code class="mono-receipt">/roadmap</code> is the first-party planning page for direction and milestone pressure. It is not the changelog and it is not the support queue.</p>
                 <div class="route-callout__proof">
-                    <span>Projection only</span>
-                    <span>Votes inform demand</span>
+                    <span>Planning view</span>
+                    <span>Feedback lives elsewhere</span>
                     <span>Proof lives elsewhere</span>
                 </div>
             </div>
@@ -168,8 +168,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Page handoff</p>
-        <h2 class="editorial-title">Roadmap stays honest when it stays connected to feedback and shipped proof at the same time.</h2>
-        <p class="editorial-copy">This page should sit in the middle of the loop: it absorbs visible demand, exposes real milestone pressure, and keeps a direct contrast with evidence-backed shipped updates before any promise language tightens.</p>
+        <h2 class="editorial-title">Roadmap works best when it stays connected to feedback and shipped proof.</h2>
+        <p class="editorial-copy">This page should sit in the middle of the loop: it shows visible demand, real milestone pressure, and a direct comparison with shipped updates before promise language tightens.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">

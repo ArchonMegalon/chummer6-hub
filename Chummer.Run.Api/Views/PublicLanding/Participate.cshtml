@@ -5,18 +5,21 @@
     ViewData["SurfaceClass"] = "surface-participate";
     var codexHref = Model.Chrome.Authenticated
         ? "/participate/codex"
-        : "/auth/google/start?next=%2Fparticipate%2Fcodex";
+        : "/login?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
     var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
     var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
     var shippedFollowUp = signalLoop.ShippedFollowUp.Take(3).ToArray();
-    var productliftAlias = Context?.Request?.Query["productlift"].ToString() ?? string.Empty;
-    var fromFeedbackAlias = string.Equals(productliftAlias, "feedback", StringComparison.OrdinalIgnoreCase);
+    var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
+    var fromFeedbackAlias = string.Equals(sourceAlias, "feedback", StringComparison.OrdinalIgnoreCase);
+    var betaHref = Model.Chrome.Authenticated
+        ? "/account/settings"
+        : "/signup?next=%2Faccount%2Fsettings";
     var fixerRoutes = new[]
     {
         new
         {
-            Id = "productlift-feedback-lane",
+            Id = "public-feedback-lane",
             Eyebrow = "Field Reports",
             Title = "Public ideas and safe bug reports",
             Summary = "Use the public signal page for feature requests, safe public bugs, and help-copy gaps. Keep crashes, install failures, account issues, and private campaign details on first-party help pages instead.",
@@ -26,7 +29,7 @@
         },
         new
         {
-            Id = "productlift-roadmap-lane",
+            Id = "public-roadmap-lane",
             Eyebrow = "Roadmap",
             Title = "Direction stays visible without pretending a vote is the same as a promise",
             Summary = "Roadmap cards show where the product may move next. Votes help show demand, but they do not decide priority by themselves.",
@@ -36,7 +39,7 @@
         },
         new
         {
-            Id = "productlift-changelog-lane",
+            Id = "public-changelog-lane",
             Eyebrow = "Shipped updates",
             Title = "Shipped means user-available, not only merged",
             Summary = "Release notes and public follow-up should only move after real release, guide, live page, or proof evidence exists. The changelog should stay attached to what works today.",
@@ -127,14 +130,14 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Participate</p>
-    <h1 class="page-title">Public feedback, private support, and beta access each stay on their own page</h1>
-    <p class="page-copy">Use the public feedback page when you want to suggest future work, vote on shared demand, or follow shipped updates. Use the signed-in path only when you want tracked beta follow-up or temporary Codex access with your existing signed-in chat account.</p>
+    <h1 class="page-title">Share feedback, report a problem, or join the beta waitlist</h1>
+    <p class="page-copy">Start with public feedback for ideas and safe public bugs. Use Contact when the issue needs private follow-up. Join the beta waitlist when you want updates and account-backed return.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/feedback">Open feedback</a>
-        <a class="button-like button-like--secondary" href="@codexHref">@(Model.Chrome.Authenticated ? "Authorize Codex access" : "Sign in to authorize Codex")</a>
-        <a class="button-like button-like--ghost" href="/help">Open help instead</a>
+        <a class="button-like button-like--secondary" href="/contact#support-intake">Report a problem</a>
+        <a class="button-like button-like--ghost" href="@betaHref">Join beta waitlist</a>
     </div>
-    <p class="muted-copy">For crashes, install problems, account issues, private campaign details, or logs, leave the public page and use first-party help instead.</p>
+    <p class="muted-copy">Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Participation loop snapshot">
@@ -158,7 +161,7 @@
     </article>
 </section>
 
-<section class="trust-claims route-anchor-target" id="productlift-feedback">
+<section class="trust-claims route-anchor-target" id="public-feedback">
     <div class="trust-claims__lead">
         <p class="eyebrow">Public loop</p>
         <h2 class="editorial-title">Feedback, roadmap, and shipped updates stay visible without pretending to be the same thing.</h2>
@@ -350,7 +353,7 @@
             <div class="lane-strip__copy">
                 <span class="tag tag--amber">Account required</span>
                 <h2>Signed-in participation</h2>
-                <p>Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or temporary Codex access with your existing signed-in chat account.</p>
+                <p>Use the signed-in path when public signal is not enough and you want tracked beta follow-up, account-linked return, or guided contribution tools tied to your account.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.SignedInLane)
                     {

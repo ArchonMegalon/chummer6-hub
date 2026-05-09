@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-participate";
     var codexHref = Model.Chrome.Authenticated
         ? "/participate/codex"
-        : "/auth/google/start?next=%2Fparticipate%2Fcodex";
+        : "/login?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
     var signalProjection = Model.SignalProjection;
     var signalOperations = Model.SignalOperations;
@@ -18,8 +18,8 @@
     {
         new
         {
-            Badge = "Safe public signal",
-            Title = "Feature request, UX friction, or safe public bug",
+            Badge = "Public board",
+            Title = "Feature idea, UX friction, or safe public bug",
             Summary = "Use this page when the issue can stay public and does not need logs, private campaign detail, install recovery, or account repair.",
             Href = "#feedback-public-lanes",
             Label = "Review public signal pages",
@@ -28,17 +28,17 @@
         new
         {
             Badge = "Roadmap",
-            Title = "Follow direction without treating it as shipped truth",
-            Summary = "Roadmap stays the planning page. It shows the next likely product movement, not a guarantee that a vote or mention already changed delivery truth.",
+            Title = "See what might come next",
+            Summary = "Roadmap shows the next likely product movement. It is not a promise and it is not the shipped status page.",
             Href = "/roadmap",
             Label = "Open roadmap",
-            Proof = new[] { "Projection only", "Milestone-backed", "No vote authority" }
+            Proof = new[] { "Planned", "Milestone-backed", "Separate from shipped updates" }
         },
         new
         {
             Badge = "Changelog",
-            Title = "Check shipped proof only after evidence exists",
-            Summary = "When you need to know whether something is really available now, switch to the changelog backed by releases, live pages, guides, and proof.",
+            Title = "Check what is actually available now",
+            Summary = "When you need to know whether something is ready today, switch to the changelog backed by releases, live pages, guides, and proof.",
             Href = "/changelog",
             Label = "Open changelog",
             Proof = new[] { "Evidence first", "User-available", "Release-linked" }
@@ -57,35 +57,35 @@
     {
         new
         {
-            Badge = "Signal intake",
-            Title = "Post one safe public signal",
+            Badge = "Share it",
+            Title = "Post one clear public item",
             Summary = "A public feature request, UX pain point, or safe public bug should enter one visible queue instead of scattering across roadmap comments, support tickets, and social replies.",
-            Proof = "Boundary copy comes first so the page stays public-safe.",
+            Proof = "The page starts with the public/private boundary so the board stays useful.",
             Href = "#feedback-public-lanes",
             Label = "Review the public pages"
         },
         new
         {
-            Badge = "Governed review",
-            Title = "Review and decide before promising anything",
-            Summary = "Votes and comments help show demand, but Chummer-owned triage still decides whether the signal becomes research, milestone work, follow-up, or a public decline with reason.",
-            Proof = "Public signal informs demand; it never becomes product truth by itself.",
+            Badge = "Review",
+            Title = "The team reviews it before plans change",
+            Summary = "Votes and comments help show demand, but product planning still decides whether the signal becomes research, milestone work, follow-up, or a public no for now.",
+            Proof = "Public interest helps prioritize; it does not auto-ship work.",
             Href = "/roadmap",
             Label = "Open roadmap"
         },
         new
         {
-            Badge = "Changelog",
-            Title = "Close the loop only after the proof exists",
+            Badge = "Ship it",
+            Title = "The loop closes only after people can use it",
             Summary = "A signal is not done because code merged. It is done when releases, live pages, guides, or proof show that people can actually use the result.",
-            Proof = "Closeout lives in the changelog, not hidden in a comment thread.",
+            Proof = "The changelog is the public receipt.",
             Href = "/changelog",
             Label = "Open changelog"
         },
         new
         {
-            Badge = "Escalation",
-            Title = "Leave the public board when the problem is private",
+            Badge = "Take it private",
+            Title = "Move to help when the issue stops being public",
             Summary = "If the issue needs recovery, logs, support follow-through, or account detail, push it onto the first-party help path early instead of keeping it on a public signal page.",
             Proof = "Private help stays first-party even while the hosted public mirror catches up.",
             Href = "/help",
@@ -121,10 +121,10 @@
     };
 }
 
-<section class="release-footnote route-anchor-target" id="productlift-feedback">
+<section class="release-footnote route-anchor-target" id="public-feedback">
     <p class="eyebrow">Feedback</p>
-    <h1 class="page-title">Public ideas, votes, and safe public bugs on one first-party feedback page</h1>
-    <p class="page-copy">Use this page for safe public signal, then move to roadmap for direction, changelog for shipped updates, or help when the issue is private.</p>
+    <h1 class="page-title">Share product ideas and safe public bugs in one place</h1>
+    <p class="page-copy">Use this page for public feedback, then move to roadmap for what is next, changelog for shipped updates, or help when the issue is private.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="#feedback-public-lanes">Review public pages</a>
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
@@ -137,7 +137,7 @@
 {
     <section class="editorial-block">
         <details class="details-drawer">
-            <summary>Public feedback governance details</summary>
+            <summary>How this board is handled</summary>
             <div class="stacked-copy">
                 @if (signalProjection is not null)
                 {
@@ -156,7 +156,7 @@
     <article class="status-decision-strip__card">
         <span class="tag">Milestone pressure</span>
         <h2>@signalLoop.OpenMilestoneCount open slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") currently sit behind the public loop.</h2>
-        <p>@signalLoop.ClaimedMilestoneCount claimed now. @signalLoop.HighDifficultyMilestoneCount high-coordination slice@(signalLoop.HighDifficultyMilestoneCount == 1 ? string.Empty : "s") still need careful governance before public promises move.</p>
+        <p>@signalLoop.ClaimedMilestoneCount claimed now. @signalLoop.HighDifficultyMilestoneCount high-coordination slice@(signalLoop.HighDifficultyMilestoneCount == 1 ? string.Empty : "s") still need careful review before roadmap promises move.</p>
         <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open milestone ledger</a>
     </article>
     <article class="status-decision-strip__card">
@@ -177,7 +177,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Pick the right page</p>
         <h2 class="editorial-title">Public signal, roadmap direction, shipped proof, and private support should not blur together.</h2>
-        <p class="editorial-copy">The experience is calmer when each job has one page and one promise. Feedback is where the public signal starts, not where release truth or private support gets faked.</p>
+        <p class="editorial-copy">The experience is calmer when each job has one page and one promise. Feedback starts the conversation; it is not the shipped status page or the private support queue.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -201,8 +201,8 @@
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Signal loop</p>
-        <h2 class="editorial-title">A public signal should enter one loop and leave with an evidence-backed closeout.</h2>
-        <p class="editorial-copy">This keeps public product learning visible without pretending that public votes become canon, support truth, or release proof.</p>
+        <h2 class="editorial-title">A public idea should enter one loop and leave with a clear answer.</h2>
+        <p class="editorial-copy">This keeps product learning visible without pretending that comments are the same thing as release proof or private support.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var stage in signalStages)
@@ -238,7 +238,7 @@
             <div class="lane-strip__copy">
                 <span class="tag">Current public pages</span>
                 <h2>Safe public signal starts here</h2>
-                <p>These first-party pages stay visible while the hosted public-signal mirror is not yet the production default. The page still makes the public loop real instead of bouncing visitors through alias pages.</p>
+                <p>These first-party pages keep feedback visible and easy to follow without bouncing people across aliases or private support paths.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.PublicLane)
                     {

@@ -42,14 +42,14 @@ public sealed class PublicSignalToCanonPacketService
             PacketId: StableId("signal-feedback", manifest.Version),
             SurfaceId: "feedback",
             Route: "/feedback",
-            DestinationRoute: "/participate?productlift=feedback#productlift-feedback",
+            DestinationRoute: "/participate?source=feedback#public-feedback",
             SourceKind: "productlift_feedback",
             Audience: "public_feedback",
             ClaimSensitivity: "proposal_only",
             Owner: "product_governor",
             DecisionAuthority: "governed_signal_triage",
             CloseoutPosture: "Accepted feedback patches Chummer-owned source, metadata config, registry YAML, or guide content before regeneration.",
-            Summary: "Public feedback stays bounded to the governed Participate/ProductLift lane instead of becoming shipping truth by itself.",
+            Summary: "Public feedback stays bounded to the governed first-party Participate lane instead of becoming shipping truth by itself.",
             EvidenceLines:
             [
                 "/feedback redirects to the governed Participate feedback anchor.",
@@ -69,7 +69,7 @@ public sealed class PublicSignalToCanonPacketService
             PacketId: StableId("signal-roadmap", manifest.Version),
             SurfaceId: "roadmap",
             Route: "/roadmap",
-            DestinationRoute: "/horizons?productlift=roadmap#productlift-roadmap-projection",
+            DestinationRoute: "/horizons?source=roadmap#public-roadmap-projection",
             SourceKind: "productlift_roadmap_projection",
             Audience: "public_roadmap_followers",
             ClaimSensitivity: "projection_only",
@@ -96,7 +96,7 @@ public sealed class PublicSignalToCanonPacketService
             PacketId: StableId("signal-changelog", manifest.Version),
             SurfaceId: "changelog",
             Route: "/changelog",
-            DestinationRoute: "/now?productlift=changelog#productlift-shipped-closeout",
+            DestinationRoute: "/now?source=changelog#public-shipped-closeout",
             SourceKind: "productlift_shipped_closeout",
             Audience: "release_followers",
             ClaimSensitivity: "shipped_only",
@@ -171,7 +171,7 @@ public sealed class PublicSignalToCanonPacketService
             Summary: "Participate is the governed intake lane where public feedback, survey, and hosted signal sources become classified SignalToCanon packets.",
             EvidenceLines:
             [
-                "/participate is the hosted intake lane for ProductLift, survey, and adjacent public signal sources.",
+                "/participate is the hosted intake lane for public-board, survey, and adjacent public signal sources.",
                 "Signal packets classify source, audience, claim sensitivity, owner, decision, and closeout posture before any queue synthesis happens.",
                 "Fleet may synthesize bounded queue candidates from repeated clusters, but the packet is not canon by itself."
             ],

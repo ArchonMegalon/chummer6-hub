@@ -82,6 +82,7 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 
 var app = builder.Build();
 var hubGoogleAuth = app.Services.GetRequiredService<HubGoogleAuthService>();
+hubGoogleAuth.ValidateProductionReadiness();
 if (!hubGoogleAuth.IsConfigured())
 {
     app.Logger.LogWarning("Google OIDC is not configured; Hub will start with Google sign-in surfaces disabled.");

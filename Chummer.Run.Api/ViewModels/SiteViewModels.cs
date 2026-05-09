@@ -85,6 +85,16 @@ public sealed record ReleaseDisplayViewModel(
     string BuildLabel,
     string PublishedLabel);
 
+public sealed record PublicAccessPostureViewModel(
+    bool GuestInstallAvailable,
+    bool AccountRequiredInstallAvailable,
+    string AvailabilitySummary,
+    string AccountValueSummary,
+    string CreateAccountSummary,
+    string SignInSummary,
+    string DownloadFaqAnswer,
+    string AccountFaqAnswer);
+
 public sealed record ReleasePlatformAvailabilityViewModel(
     string PlatformId,
     string PlatformLabel,
@@ -172,7 +182,8 @@ public sealed record LandingPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> ComingNext,
     IReadOnlyList<ResolvedPublicCardViewModel> Artifacts,
     FlagshipCoverageStripViewModel FlagshipCoverage,
-    AccountCampaignSummary? CampaignSpine = null);
+    AccountCampaignSummary? CampaignSpine = null,
+    PublicAccessPostureViewModel? AccessPosture = null);
 
 public sealed record StoryPageViewModel(
     SiteChromeViewModel Chrome,
@@ -242,7 +253,8 @@ public sealed record DownloadsPageViewModel(
     IReadOnlyList<ReleaseOptionViewModel>? SignedInWindowsBuilds = null,
     IReadOnlyList<WindowsProofInstallerRecord>? WindowsProofInstallers = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    PublicAccessPostureViewModel? AccessPosture = null);
 
 public sealed record ReleaseUploadPageViewModel(
     SiteChromeViewModel Chrome,
@@ -544,7 +556,8 @@ public sealed record FaqPageViewModel(
     IReadOnlyList<FaqSectionViewModel> Sections,
     IReadOnlyList<TrustPageActionViewModel> Actions,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
-    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null,
+    PublicAccessPostureViewModel? AccessPosture = null);
 
 public sealed record ParticipatePageViewModel(
     SiteChromeViewModel Chrome,
@@ -1119,7 +1132,8 @@ public sealed record AuthPageViewModel(
     bool CreateAccount,
     bool GoogleAvailable,
     string? GoogleUnavailableReason,
-    string GoogleStartHref);
+    string GoogleStartHref,
+    PublicAccessPostureViewModel? AccessPosture = null);
 
 public sealed record AuthMessagePageViewModel(
     SiteChromeViewModel Chrome,

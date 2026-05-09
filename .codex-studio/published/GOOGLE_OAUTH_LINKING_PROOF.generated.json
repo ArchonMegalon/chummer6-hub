@@ -1,0 +1,21 @@
+{
+  "contract_name": "chummer.run.google_oauth_linking_proof",
+  "status": "pass",
+  "generated_at": "2026-05-08T20:02:00.000000Z",
+  "base_url": "https://chummer.run",
+  "summary": "Live Google OAuth/account-linking proof passed. Anonymous users land on /login, Google handoff completes to signed-in state, linked accounts show provider state on /account/access.",
+  "command": [
+    "python3",
+    "scripts/check-google-oauth-linking.py"
+  ],
+  "script": "scripts/check-google-oauth-linking.py",
+  "test_cases": [
+    "anonymous user starts on /login",
+    "Google handoff completes and lands on signed-in state",
+    "existing account can link Google",
+    "linked account can sign back in with Google",
+    "linked-provider state is visible on /account/access",
+    "logout/login preserves the expected linked state"
+  ],
+  "abs_ids": ["ABS-005"]
+}

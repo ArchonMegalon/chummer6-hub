@@ -135,7 +135,7 @@ public sealed class HostedProofContractService
         SignalToCanonPacketProjection? support = packets.FirstOrDefault(item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal));
 
         string route = intake?.Route ?? "/participate";
-        string comparisonRoute = roadmap?.DestinationRoute ?? "/horizons?productlift=roadmap#productlift-roadmap-projection";
+        string comparisonRoute = roadmap?.DestinationRoute ?? "/horizons?source=roadmap#public-roadmap-projection";
         string summary = "Public signal proof stays governed by SignalToCanon packets that route demand through Participate, roadmap projection, and first-party support instead of promoting feedback directly into canon.";
 
         return new HostedProofContractProjection(

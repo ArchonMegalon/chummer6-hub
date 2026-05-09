@@ -172,7 +172,7 @@ public sealed class PublicSignalOperationsService
         return new PublicSignalOperationsPacketViewModel(
             Eyebrow: "Hosted promotion seam",
             Heading: "Promotion, webhook intake, and category routing stay explicit before the hosted board becomes default.",
-            Summary: "The Fixer Board remains first-party until the hosted ProductLift domain split, webhook receipts, and closeout follow-up path are configured on this instance. Taxonomy still comes from Chummer-owned canon either way.",
+            Summary: "The Fixer Board remains first-party until the hosted public-board domain split, webhook receipts, and closeout follow-up path are configured on this instance. Taxonomy still comes from Chummer-owned canon either way.",
             HostedDomainLabel: hostedDomainLabel,
             HostedProjectionSummary: hostedProjectionSummary,
             HostedProjectionReady: hostedProjectionReady,
@@ -180,8 +180,8 @@ public sealed class PublicSignalOperationsService
             WebhookSummary: BuildWebhookSummary(webhookConfigured, receiptSnapshot),
             VoterCloseoutStatusLabel: canonDocument.CloseoutFamilyReady ? "Closeout mail canonized" : "Closeout mail pending",
             VoterCloseoutSummary: canonDocument.CloseoutFamilyReady
-                ? "The outbound notification registry already reserves a Chummer-owned product feedback closeout family, so voter follow-up can stay first-party even after ProductLift promotion."
-                : "Voter closeout remains blocked until a Chummer-owned outbound notification family exists for ProductLift shipped follow-up.",
+                ? "The outbound notification registry already reserves a Chummer-owned product feedback closeout family, so voter follow-up can stay first-party even after hosted-board promotion."
+                : "Voter closeout remains blocked until a Chummer-owned outbound notification family exists for hosted-board shipped follow-up.",
             RecipientProjectionOwner: readiness.ProjectionOwner,
             FollowSettingsPath: readiness.FollowSettingsPath,
             RecipientProjectionStatusLabel: readiness.ProjectionStatusLabel,
@@ -4917,7 +4917,7 @@ public sealed class PublicSignalOperationsService
                 PublicPath: publicPath,
                 HostedHref: null,
                 StatusLabel: "First-party only",
-                Summary: $"{publicPath} remains the customer-facing default on this instance because no hosted ProductLift URL is configured for {label.ToLowerInvariant()}.");
+                Summary: $"{publicPath} remains the customer-facing default on this instance because no hosted public-board URL is configured for {label.ToLowerInvariant()}.");
         }
 
         if (!Uri.TryCreate(configuredUrl, UriKind.Absolute, out Uri? uri) || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
@@ -4935,7 +4935,7 @@ public sealed class PublicSignalOperationsService
             PublicPath: publicPath,
             HostedHref: configuredUrl.Trim(),
             StatusLabel: "Configured",
-            Summary: $"{label} can promote to {uri.Host} once the hosted ProductLift path is approved, while {publicPath} remains the bounded first-party fallback.");
+            Summary: $"{label} can promote to {uri.Host} once the hosted public-board path is approved, while {publicPath} remains the bounded first-party fallback.");
     }
 
     private static string ResolveHostedDomainLabel(IReadOnlyList<PublicSignalHostedRouteViewModel> routes)
@@ -4956,7 +4956,7 @@ public sealed class PublicSignalOperationsService
 
         return hosts.Length switch
         {
-            0 => "No hosted ProductLift domain configured",
+            0 => "No hosted public-board domain configured",
             1 => hosts[0]!,
             _ => string.Join(" / ", hosts)
         };
@@ -4972,17 +4972,17 @@ public sealed class PublicSignalOperationsService
 
         if (hostedProjectionReady)
         {
-            return $"All three hosted ProductLift public routes are configured on {hostedDomainLabel}, so this instance is ready for a bounded domain split without losing the first-party fallbacks.";
+            return $"All three hosted public-board routes are configured on {hostedDomainLabel}, so this instance is ready for a bounded domain split without losing the first-party fallbacks.";
         }
 
         if (misconfiguredCount > 0)
         {
-            return $"{misconfiguredCount} hosted ProductLift route value(s) are misconfigured, so the first-party feedback family must stay default until the domain split is corrected.";
+            return $"{misconfiguredCount} hosted public-board route value(s) are misconfigured, so the first-party feedback family must stay default until the domain split is corrected.";
         }
 
         return configuredCount == 0
-            ? "No hosted ProductLift public routes are configured here yet, so the first-party Fixer Board, roadmap, and changelog stay authoritative for public navigation."
-            : $"{configuredCount} of {ProductLiftRoutePaths.Length} hosted ProductLift public routes are configured. Promotion stays blocked until the full domain split is complete and consistent.";
+            ? "No hosted public-board routes are configured here yet, so the first-party Fixer Board, roadmap, and changelog stay authoritative for public navigation."
+            : $"{configuredCount} of {ProductLiftRoutePaths.Length} hosted public-board routes are configured. Promotion stays blocked until the full domain split is complete and consistent.";
     }
 
     private static PublicSignalCategoryRoutingViewModel BuildCategory(PublicFeedbackCategoryDocument category)
@@ -5012,11 +5012,11 @@ public sealed class PublicSignalOperationsService
         return discoveryLane switch
         {
             "" or "none" => "First-party board only",
-            "productlift" => "Board-native ProductLift review",
-            "productlift_plus_deftform" => "ProductLift plus Deftform prescreen",
-            "productlift_plus_icanpreneur" => "ProductLift plus Icanpreneur follow-up",
-            "productlift_plus_metasurvey" => "ProductLift plus MetaSurvey follow-up",
-            "icanpreneur" => "Icanpreneur follow-up",
+            "public_signal" => "Board-native public signal review",
+            "public_signal_plus_structured_intake" => "Public signal plus structured intake",
+            "public_signal_plus_guided_follow_up" => "Public signal plus guided follow-up",
+            "public_signal_plus_survey" => "Public signal plus survey follow-up",
+            "guided_follow_up" => "Guided follow-up",
             _ => HumanizeToken(category.DiscoveryLane, "Discovery follow-up")
         };
     }

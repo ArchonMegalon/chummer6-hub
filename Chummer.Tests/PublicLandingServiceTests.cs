@@ -53,6 +53,23 @@ public sealed class PublicLandingServiceTests
     }
 
     [Fact]
+    public void CardsForBucket_HidesOperatorOnlyArtifactCardsFromPublicShelf()
+    {
+        var service = BuildService();
+        var surface = service.LoadSurface();
+
+        Assert.Contains(surface.FeatureCards, static card =>
+            string.Equals(card.Id, "artifact_mac_codex_release_pipeline", StringComparison.Ordinal));
+
+        var publicArtifacts = service.CardsForBucket(surface, "featured_artifacts");
+
+        Assert.DoesNotContain(publicArtifacts, static card =>
+            string.Equals(card.Id, "artifact_mac_codex_release_pipeline", StringComparison.Ordinal));
+        Assert.Contains(publicArtifacts, static card =>
+            string.Equals(card.Id, "artifact_preview_build", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void PublicLandingCanonAcceptsCurrentProofBoundaryFields()
     {
         var configuration = new ConfigurationBuilder()

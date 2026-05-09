@@ -44,7 +44,7 @@ public sealed class PublicSignalRetryExpiryWorker : BackgroundService
                 if (!string.Equals(result.Status, "noop", StringComparison.OrdinalIgnoreCase))
                 {
                     _logger.LogInformation(
-                        "ProductLift retry expiry sweep ended in {Status} with {RecoveredCount} recovered, {SuppressedCount} suppressed, and {BlockedCount} blocked candidate(s).",
+                        "Public-board retry expiry sweep ended in {Status} with {RecoveredCount} recovered, {SuppressedCount} suppressed, and {BlockedCount} blocked candidate(s).",
                         result.Status,
                         result.RecoveredReceiptCount,
                         result.SuppressedReceiptCount,
@@ -57,7 +57,7 @@ public sealed class PublicSignalRetryExpiryWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "ProductLift retry expiry sweep failed.");
+                _logger.LogWarning(ex, "Public-board retry expiry sweep failed.");
             }
 
             await Task.Delay(interval, stoppingToken);

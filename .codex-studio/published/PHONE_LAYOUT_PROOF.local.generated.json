@@ -1,0 +1,15 @@
+{
+  "contract_name": "chummer.run.phone_layout_proof_local",
+  "status": "pass",
+  "generated_at": "2026-05-08T18:48:09.532051Z",
+  "base_url": "http://127.0.0.1:50979",
+  "summary": "Local phone-layout proof passed against the development Hub shell using the compact mobile navigation harness.",
+  "command": [
+    "node",
+    "scripts/check-public-mobile-nav.cjs"
+  ],
+  "script": "scripts/check-public-mobile-nav.cjs",
+  "exit_code": 0,
+  "stdout": "mobile-nav: ok\n",
+  "stderr": ""
+}

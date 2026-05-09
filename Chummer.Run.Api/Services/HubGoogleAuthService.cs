@@ -73,6 +73,7 @@ public sealed class HubGoogleAuthService
     private string AuthorizationEndpoint => _configuration["GOOGLE_OIDC_AUTHORIZATION_ENDPOINT"]?.Trim() ?? "https://accounts.google.com/o/oauth2/v2/auth";
     private string TokenEndpoint => _configuration["GOOGLE_OIDC_TOKEN_ENDPOINT"]?.Trim() ?? "https://oauth2.googleapis.com/token";
     private string UserInfoEndpoint => _configuration["GOOGLE_OIDC_USERINFO_ENDPOINT"]?.Trim() ?? "https://openidconnect.googleapis.com/v1/userinfo";
+    private string JwksEndpoint => _configuration["GOOGLE_OIDC_JWKS_ENDPOINT"]?.Trim() ?? "https://www.googleapis.com/oauth2/v3/certs";
     private bool CookieSecureDefault => !_environment.IsDevelopment();
 
     public bool IsConfigured()
@@ -424,10 +425,12 @@ public sealed class HubGoogleAuthService
 
         var tokens = await tokenResponse.Content.ReadFromJsonAsync<GoogleTokenResponse>(cancellationToken: cancellationToken)
             ?? throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
-        if (string.IsNullOrWhiteSpace(tokens.AccessToken))
+        if (string.IsNullOrWhiteSpace(tokens.AccessToken) || string.IsNullOrWhiteSpace(tokens.IdToken))
         {
             throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         }
+
+        var idTokenClaims = await ValidateIdTokenAsync(tokens.IdToken, attempt, cancellationToken);
 
         using var userInfoRequest = new HttpRequestMessage(HttpMethod.Get, UserInfoEndpoint);
         userInfoRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
@@ -449,14 +452,233 @@ public sealed class HubGoogleAuthService
             throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
         }
 
+        if (!string.Equals(userInfo.Sub, idTokenClaims.Subject, StringComparison.Ordinal)
+            || !string.Equals(userInfo.Email, idTokenClaims.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "Google userinfo/id_token mismatch for subject {UserInfoSubject} and email {UserInfoEmail}.",
+                userInfo.Sub,
+                userInfo.Email);
+            throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
+        }
+
         return new GoogleIdentityClaims(
-            Subject: userInfo.Sub,
-            Email: userInfo.Email,
-            EmailVerified: userInfo.EmailVerified,
-            DisplayName: string.IsNullOrWhiteSpace(userInfo.Name)
-                ? userInfo.Email.Split('@')[0]
-                : userInfo.Name,
+            Subject: idTokenClaims.Subject,
+            Email: idTokenClaims.Email,
+            EmailVerified: idTokenClaims.EmailVerified && userInfo.EmailVerified,
+            DisplayName: string.IsNullOrWhiteSpace(idTokenClaims.DisplayName)
+                ? string.IsNullOrWhiteSpace(userInfo.Name)
+                    ? idTokenClaims.Email.Split('@')[0]
+                    : userInfo.Name
+                : idTokenClaims.DisplayName,
             NextPathHint: null);
+    }
+
+    private async Task<GoogleIdTokenClaims> ValidateIdTokenAsync(
+        string idToken,
+        GoogleAuthAttempt attempt,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            string[] parts = idToken.Split('.');
+            if (parts.Length != 3)
+            {
+                throw new InvalidOperationException("Google id_token was malformed.");
+            }
+
+            using var header = JsonDocument.Parse(WebEncoders.Base64UrlDecode(parts[0]));
+            using var payload = JsonDocument.Parse(WebEncoders.Base64UrlDecode(parts[1]));
+
+            string algorithm = ReadRequiredString(header.RootElement, "alg");
+            if (!string.Equals(algorithm, "RS256", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Google id_token algorithm was not RS256.");
+            }
+
+            string keyId = ReadRequiredString(header.RootElement, "kid");
+            await ValidateIdTokenSignatureAsync(parts[0], parts[1], parts[2], keyId, cancellationToken);
+
+            string issuer = ReadRequiredString(payload.RootElement, "iss");
+            if (!string.Equals(issuer, "https://accounts.google.com", StringComparison.Ordinal)
+                && !string.Equals(issuer, "accounts.google.com", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Google id_token issuer was not accepted.");
+            }
+
+            if (!AudienceContainsClientId(payload.RootElement, ClientId))
+            {
+                throw new InvalidOperationException("Google id_token audience did not match the configured client.");
+            }
+
+            string? authorizedParty = ReadOptionalString(payload.RootElement, "azp");
+            if (!string.IsNullOrWhiteSpace(authorizedParty)
+                && !string.Equals(authorizedParty, ClientId, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Google id_token authorized party did not match the configured client.");
+            }
+
+            string nonce = ReadRequiredString(payload.RootElement, "nonce");
+            if (!string.Equals(nonce, attempt.Nonce, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("Google id_token nonce did not match the browser challenge.");
+            }
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long expiresAt = ReadRequiredInt64(payload.RootElement, "exp");
+            if (expiresAt <= now - 30)
+            {
+                throw new InvalidOperationException("Google id_token expired.");
+            }
+
+            long? issuedAt = ReadOptionalInt64(payload.RootElement, "iat");
+            if (issuedAt is not null && issuedAt.Value > now + 300)
+            {
+                throw new InvalidOperationException("Google id_token issue time was not accepted.");
+            }
+
+            return new GoogleIdTokenClaims(
+                Subject: ReadRequiredString(payload.RootElement, "sub"),
+                Email: ReadRequiredString(payload.RootElement, "email"),
+                EmailVerified: ReadOptionalBool(payload.RootElement, "email_verified") ?? false,
+                DisplayName: ReadOptionalString(payload.RootElement, "name"));
+        }
+        catch (Exception ex) when (ex is CryptographicException or FormatException or JsonException or InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Google id_token validation failed.");
+            throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
+        }
+    }
+
+    private async Task ValidateIdTokenSignatureAsync(
+        string encodedHeader,
+        string encodedPayload,
+        string encodedSignature,
+        string keyId,
+        CancellationToken cancellationToken)
+    {
+        using var jwksResponse = await _httpClient.GetAsync(JwksEndpoint, cancellationToken);
+        if (!jwksResponse.IsSuccessStatusCode)
+        {
+            var detail = await jwksResponse.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogWarning(
+                "Google JWKS fetch failed with status {StatusCode}. Detail: {Detail}",
+                (int)jwksResponse.StatusCode,
+                string.IsNullOrWhiteSpace(detail) ? "<empty>" : detail);
+            throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
+        }
+
+        var jwks = await jwksResponse.Content.ReadFromJsonAsync<GoogleJwksResponse>(cancellationToken: cancellationToken)
+            ?? throw new InvalidOperationException("Google sign-in could not be completed right now. Try again in a moment.");
+        GoogleJwk? key = jwks.Keys.FirstOrDefault(candidate =>
+            string.Equals(candidate.KeyId, keyId, StringComparison.Ordinal)
+            && string.Equals(candidate.KeyType, "RSA", StringComparison.OrdinalIgnoreCase));
+        if (key is null
+            || string.IsNullOrWhiteSpace(key.Modulus)
+            || string.IsNullOrWhiteSpace(key.Exponent))
+        {
+            throw new InvalidOperationException("Google signing key could not be resolved.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(key.Algorithm)
+            && !string.Equals(key.Algorithm, "RS256", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Google signing key algorithm was not RS256.");
+        }
+
+        using var rsa = RSA.Create();
+        rsa.ImportParameters(new RSAParameters
+        {
+            Modulus = WebEncoders.Base64UrlDecode(key.Modulus),
+            Exponent = WebEncoders.Base64UrlDecode(key.Exponent)
+        });
+
+        byte[] signedBytes = Encoding.ASCII.GetBytes($"{encodedHeader}.{encodedPayload}");
+        byte[] signatureBytes = WebEncoders.Base64UrlDecode(encodedSignature);
+        if (!rsa.VerifyData(signedBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))
+        {
+            throw new InvalidOperationException("Google id_token signature verification failed.");
+        }
+    }
+
+    private static bool AudienceContainsClientId(JsonElement payload, string clientId)
+    {
+        if (!payload.TryGetProperty("aud", out var audienceElement))
+        {
+            return false;
+        }
+
+        return audienceElement.ValueKind switch
+        {
+            JsonValueKind.String => string.Equals(audienceElement.GetString(), clientId, StringComparison.Ordinal),
+            JsonValueKind.Array => audienceElement.EnumerateArray().Any(entry =>
+                entry.ValueKind == JsonValueKind.String
+                && string.Equals(entry.GetString(), clientId, StringComparison.Ordinal)),
+            _ => false
+        };
+    }
+
+    private static string ReadRequiredString(JsonElement element, string propertyName)
+    {
+        string? value = ReadOptionalString(element, propertyName);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"Google token claim '{propertyName}' was missing.");
+        }
+
+        return value;
+    }
+
+    private static string? ReadOptionalString(JsonElement element, string propertyName)
+    {
+        return element.TryGetProperty(propertyName, out var value)
+            && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private static long ReadRequiredInt64(JsonElement element, string propertyName)
+    {
+        long? value = ReadOptionalInt64(element, propertyName);
+        if (value is null)
+        {
+            throw new InvalidOperationException($"Google token claim '{propertyName}' was missing.");
+        }
+
+        return value.Value;
+    }
+
+    private static long? ReadOptionalInt64(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var numeric))
+        {
+            return numeric;
+        }
+
+        return value.ValueKind == JsonValueKind.String && long.TryParse(value.GetString(), out numeric)
+            ? numeric
+            : null;
+    }
+
+    private static bool? ReadOptionalBool(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String when bool.TryParse(value.GetString(), out var parsed) => parsed,
+            _ => null
+        };
     }
 
     private string ResolveRedirectUri(HttpRequest request)
@@ -503,11 +725,27 @@ public sealed class HubGoogleAuthService
         [property: JsonPropertyName("token_type")] string TokenType,
         [property: JsonPropertyName("expires_in")] int ExpiresIn);
 
+    private sealed record GoogleJwksResponse(
+        [property: JsonPropertyName("keys")] GoogleJwk[] Keys);
+
+    private sealed record GoogleJwk(
+        [property: JsonPropertyName("kid")] string KeyId,
+        [property: JsonPropertyName("kty")] string KeyType,
+        [property: JsonPropertyName("alg")] string? Algorithm,
+        [property: JsonPropertyName("n")] string Modulus,
+        [property: JsonPropertyName("e")] string Exponent);
+
     private sealed record GoogleUserInfoResponse(
         [property: JsonPropertyName("sub")] string Sub,
         [property: JsonPropertyName("email")] string Email,
         [property: JsonPropertyName("email_verified")] bool EmailVerified,
         [property: JsonPropertyName("name")] string? Name);
+
+    private sealed record GoogleIdTokenClaims(
+        string Subject,
+        string Email,
+        bool EmailVerified,
+        string? DisplayName);
 
     private sealed record GoogleIdentityClaims(
         string Subject,

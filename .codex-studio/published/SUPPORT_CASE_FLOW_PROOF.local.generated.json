@@ -1,0 +1,15 @@
+{
+  "contract_name": "chummer.run.support_case_flow_proof_local",
+  "status": "pass",
+  "generated_at": "2026-05-08T18:48:09.941985Z",
+  "base_url": "http://127.0.0.1:50979",
+  "summary": "Local first-party support-flow proof passed across help, contact, FAQ, and the bounded account/support login gates.",
+  "command": [
+    "python3",
+    "scripts/check-support-case-flow.py"
+  ],
+  "script": "scripts/check-support-case-flow.py",
+  "exit_code": 0,
+  "stdout": "support-case-flow: ok\n",
+  "stderr": ""
+}

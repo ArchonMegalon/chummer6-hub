@@ -117,7 +117,10 @@ public sealed class PublicLandingService
     }
 
     public IReadOnlyList<PublicFeatureCardDto> CardsForBucket(PublicLandingSurfaceDto surface, string bucket)
-        => surface.FeatureCards.Where(card => string.Equals(card.Bucket, bucket, StringComparison.Ordinal)).ToArray();
+        => surface.FeatureCards
+            .Where(card => string.Equals(card.Bucket, bucket, StringComparison.Ordinal))
+            .Where(CardVisibleOnPublicBucket)
+            .ToArray();
 
     public PublicFeatureCardDto? FindCardByDetailRoute(PublicLandingSurfaceDto surface, string path)
         => surface.FeatureCards.FirstOrDefault(card =>
@@ -193,6 +196,18 @@ public sealed class PublicLandingService
     {
         ValidateSelfLinkPolicy(card);
         ValidateDetailActionPolicy(card);
+    }
+
+    private static bool CardVisibleOnPublicBucket(PublicFeatureCardDto card)
+    {
+        if (string.IsNullOrWhiteSpace(card.Audience))
+        {
+            return true;
+        }
+
+        return card.Audience
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Any(static token => string.Equals(token, "public", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void ValidateRoute(string? href, IReadOnlySet<string> allowedRoutes, string description)

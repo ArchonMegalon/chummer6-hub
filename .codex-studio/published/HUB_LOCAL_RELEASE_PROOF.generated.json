@@ -837,8 +837,8 @@
   ],
   "proof_routes": [
     "/downloads/install/avalonia-linux-x64-installer",
-    "/home/access",
-    "/home/work",
+    "/workspace/access",
+    "/workspace/work",
     "/account/access",
     "/account/work",
     "/account/support",
@@ -1059,7 +1059,7 @@
       "frontier_id": 4623636482,
       "summary": "Workspace restore continuity emits provenance receipts and typed recovery actions for claimed installs, recent artifacts, rule environments, and restore inventory on the shared account workspace surfaces.",
       "routes": [
-        "/home/work",
+        "/workspace/work",
         "/account/work",
         "/account/access"
       ],
@@ -1077,7 +1077,7 @@
       "frontier_id": 4623636482,
       "summary": "Entitlement drift, stale claims, missing grants, and continue-blocking conflicts emit recoverable receipts and typed account-access actions on the same restore lane instead of falling back to support folklore.",
       "routes": [
-        "/home/work",
+        "/workspace/work",
         "/account/work",
         "/account/access",
         "/downloads"
@@ -1241,7 +1241,7 @@
         "/api/v1/public/artifacts/shelf",
         "/artifacts/publications/{publicationId}",
         "/api/v1/public/artifacts/publications/{publicationId}",
-        "/home/work",
+        "/workspace/work",
         "/account/work"
       ],
       "surfaces": [
@@ -1266,7 +1266,7 @@
       "summary": "Signed-in artifact shelf filters now fail closed to all, personal, campaign, creator, or public while workspace and campaign projections stamp recap entries with audience and publication posture before the public shelf renders them.",
       "routes": [
         "/artifacts",
-        "/home/work",
+        "/workspace/work",
         "/account/work"
       ],
       "surfaces": [
@@ -1292,7 +1292,7 @@
       "summary": "Hub now keeps governed organizer operations, roles, roster movement, and signed-in account rail follow-through on one bounded organizer dashboard instead of scattering them across ad hoc operator screens.",
       "routes": [
         "/api/v1/campaign-spine/me/organizer-ops",
-        "/home/work",
+        "/workspace/work",
         "/account/work"
       ],
       "surfaces": [
@@ -1315,7 +1315,7 @@
       "summary": "The same governed operations lane now keeps season lanes, artifact publication posture, and support escalation visible together so organizer workflows stay auditable instead of fragmenting across separate admin-only dashboards.",
       "routes": [
         "/api/v1/campaign-spine/me/organizer-ops",
-        "/home/work",
+        "/workspace/work",
         "/account/work"
       ],
       "surfaces": [
@@ -1389,7 +1389,7 @@
       "summary": "Hub now keeps signed-in install return, starter-workspace seeding, campaign-primer-backed first-session proof, and support-safe recovery on one bounded first-playable-session onboarding lane instead of a separate onboarding ritual.",
       "routes": [
         "/home",
-        "/home/work",
+        "/workspace/work",
         "/account/work",
         "/api/v1/campaign-spine/me",
         "/api/v1/campaign-spine/me/workspaces/starter"
@@ -1412,7 +1412,7 @@
       "frontier_id": 1130567614,
       "summary": "The hub-owned starter lane now gives signed-in users one calmer route from linked install into first-session proof, build follow-through, campaign-primer follow-through, and install support without hiding the next safe action behind deeper admin-only pages.",
       "routes": [
-        "/home/work",
+        "/workspace/work",
         "/account/work",
         "/account/access",
         "/contact"

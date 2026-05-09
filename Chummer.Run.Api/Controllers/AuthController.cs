@@ -13,6 +13,8 @@ public sealed class AuthController : Controller
     private readonly HubBrowserAuthService _browserAuth;
     private readonly HubIdentityClient _identity;
     private readonly PublicLandingService _landing;
+    private readonly PublicReleaseManifestService _releases;
+    private readonly ReleaseSelectionService _releaseSelection;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly AccountService _accounts;
@@ -24,6 +26,8 @@ public sealed class AuthController : Controller
         HubBrowserAuthService browserAuth,
         HubIdentityClient identity,
         PublicLandingService landing,
+        PublicReleaseManifestService releases,
+        ReleaseSelectionService releaseSelection,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         AccountService accounts,
@@ -34,6 +38,8 @@ public sealed class AuthController : Controller
         _browserAuth = browserAuth;
         _identity = identity;
         _landing = landing;
+        _releases = releases;
+        _releaseSelection = releaseSelection;
         _chrome = chrome;
         _google = google;
         _accounts = accounts;
@@ -69,7 +75,6 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Sign in",
-            supportLine: "Return to your account, linked downloads, and current release in one browser flow.",
             nextPath,
             createAccount: false));
     }
@@ -101,7 +106,6 @@ public sealed class AuthController : Controller
 
         return View("~/Views/Auth/Entry.cshtml", BuildAuthModel(
             heading: "Create account",
-            supportLine: "Create the account that unlocks preview installs, linked devices, and support follow-up.",
             nextPath,
             createAccount: true));
     }
@@ -609,9 +613,14 @@ public sealed class AuthController : Controller
         _browserAuth.ClearCookie(Request, Response);
     }
 
-    private AuthPageViewModel BuildAuthModel(string heading, string supportLine, string nextPath, bool createAccount)
+    private AuthPageViewModel BuildAuthModel(string heading, string nextPath, bool createAccount)
     {
         _landing.LoadSurface();
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, Request.Headers.UserAgent.ToString(), authenticated: false);
+        var supportLine = createAccount
+            ? accessPosture.CreateAccountSummary
+            : accessPosture.SignInSummary;
         return new AuthPageViewModel(
             Chrome: _chrome.BuildPublicChrome(heading, supportLine, createAccount ? "/signup" : "/login"),
             Heading: heading,
@@ -620,7 +629,8 @@ public sealed class AuthController : Controller
             CreateAccount: createAccount,
             GoogleAvailable: _google.IsConfigured(),
             GoogleUnavailableReason: _google.DisabledReason(),
-            GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}");
+            GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}",
+            AccessPosture: accessPosture);
     }
 
     private static string DescribeNextTarget(string nextPath)

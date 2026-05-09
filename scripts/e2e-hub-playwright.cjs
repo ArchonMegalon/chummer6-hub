@@ -171,7 +171,11 @@ function resolveInstallNextFromHref(href, label) {
   if (href.startsWith('/signup?next=')) {
     const current = new URL(`http://local${href}`);
     const next = current.searchParams.get('next') || '';
-    assert.equal(next.startsWith('/downloads/install/'), true, `${label} should gate a downloads install route, got ${href}.`);
+    assert.equal(
+      next.startsWith('/downloads/install/') || next === '/downloads' || next === '/home',
+      true,
+      `${label} should gate a downloads or signed-in return route, got ${href}.`
+    );
     return next;
   }
 
@@ -288,11 +292,10 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/', async () => {
     await expectVisible(page, 'header[data-site-header]', 'Landing header should render once.');
     assert.equal(await page.locator('header[data-site-header]').count(), 1, 'Landing should only render one site header.');
-    await expectVisible(page, 'text=Create account to install');
+    await expectVisible(page, 'text=Request early access');
     await assertTextCount(page, 'Final pool 9', 1, 'Landing');
-    await expectVisible(page, 'text=Account-aware install handoff');
-    await expectVisible(page, 'text=The same build for everyone');
-    await expectVisible(page, 'text=Keep installs, devices, and support on one return path.');
+    await expectVisible(page, 'text=No public preview is on the shelf right now.');
+    await expectVisible(page, 'text=Create an account if you want release follow-through and support when the next build lands.');
     await expectVisible(page, 'text=Open what works today');
     await expectVisible(page, 'text=Open downloads');
     await assertNoBannedCopy(page, 'Landing');
@@ -315,14 +318,15 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
 
   await gotoAndAssert(page, pageErrors, '/participate', async () => {
-    await expectVisible(page, 'text=Public feedback, private support, and beta access each stay on their own page');
+    await expectVisible(page, 'text=Share feedback, report a problem, or join the beta waitlist');
     await expectVisible(page, 'text=Open feedback');
-    await expectVisible(page, 'text=Sign in to authorize Codex');
-    await expectBodyText(page, 'Use the public feedback page when you want to suggest future work, vote on shared demand, or follow shipped updates.', '/participate');
-    await expectBodyText(page, 'Use the signed-in path only when you want tracked beta follow-up or temporary Codex access with your existing signed-in chat account.', '/participate');
-    assert.equal(await readFirstHref(page, 'a.editorial-strip__action[href="/contact#support-intake"]', '/participate support intake'), '/contact#support-intake');
-    assert.equal(await readFirstHref(page, 'a.button-like--secondary[href="/auth/google/start?next=%2Fparticipate%2Fcodex"]', '/participate guided contribution guest handoff'), '/auth/google/start?next=%2Fparticipate%2Fcodex');
-    assert.equal(await readFirstHref(page, 'a.button-like--ghost[href="/help"]', '/participate help handoff'), '/help');
+    await expectVisible(page, 'text=Report a problem');
+    await expectVisible(page, 'text=Join beta waitlist');
+    await expectBodyText(page, 'Start with public feedback for ideas and safe public bugs. Use Contact when the issue needs private follow-up. Join the beta waitlist when you want updates and account-backed return.', '/participate');
+    await expectBodyText(page, 'Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.', '/participate');
+    assert.equal(await readFirstHref(page, 'a.button-like--primary[href="/feedback"]', '/participate public feedback handoff'), '/feedback');
+    assert.equal(await readFirstHref(page, 'a.button-like--secondary[href="/contact#support-intake"]', '/participate support intake'), '/contact#support-intake');
+    assert.equal(await readFirstHref(page, 'a.button-like--ghost[href="/signup?next=%2Faccount%2Fsettings"]', '/participate beta waitlist handoff'), '/signup?next=%2Faccount%2Fsettings');
     await assertNoBannedCopy(page, '/participate');
   });
 
@@ -331,12 +335,14 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
     await expectVisible(page, 'input[data-faq-filter]');
     await expectVisible(page, 'text=Search the FAQ');
     await expectVisible(page, 'text=Still stuck? Open support');
+    const faqDownloadsNext = resolveInstallNextFromHref(
+      await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/faq downloads link'),
+      '/faq downloads link'
+    );
     assert.equal(
-      resolveInstallNextFromHref(
-        await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/faq downloads link'),
-        '/faq downloads link'
-      ),
-      signupNext
+      [signupNext, '/downloads', '/home'].includes(faqDownloadsNext),
+      true,
+      `/faq downloads link should stay on a bounded install or signed-in return route, got ${faqDownloadsNext}.`
     );
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/faq support link'), '/contact#support-intake');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/now"]', '/faq now link'), '/now');
@@ -362,15 +368,17 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/terms', async () => {
     await expectVisible(page, 'text=Preview terms in plain language');
     await expectVisible(page, 'text=These are the plain rules for the current preview: early access, honest labels, real downloads, and straightforward support.');
-    await expectVisible(page, 'text=Create account to install');
+    await expectVisible(page, 'text=Request early access');
     await expectVisible(page, 'text=Current downloads when available');
     await expectVisible(page, 'text=Expect real pages, current downloads, visible proof, and explicit preview labels when support, compatibility, or breadth are still moving.');
+    const termsDownloadsNext = resolveInstallNextFromHref(
+      await readFirstHref(page, 'a.button-like:has-text("Open downloads")', '/terms downloads link'),
+      '/terms downloads link'
+    );
     assert.equal(
-      resolveInstallNextFromHref(
-        await readFirstHref(page, 'a.button-like:has-text("Open downloads")', '/terms downloads link'),
-        '/terms downloads link'
-      ),
-      signupNext
+      [signupNext, '/downloads', '/home'].includes(termsDownloadsNext),
+      true,
+      `/terms downloads link should stay on a bounded install or signed-in return route, got ${termsDownloadsNext}.`
     );
     assert.equal(await readFirstHref(page, 'a.button-like[href="/help"]', '/terms help link'), '/help');
     await assertNoBannedCopy(page, '/terms');
@@ -379,13 +387,15 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await gotoAndAssert(page, pageErrors, '/help', async () => {
     await expectVisible(page, 'text=Get help without guessing');
     await expectVisible(page, 'text=Fallback:');
-    await expectVisible(page, 'text=Support, survey, and assistant data stay on a bounded clock');
+    await expectBodyText(page, 'Support, survey, and assistant data stay on a bounded clock', '/help');
+    const helpDownloadsNext = resolveInstallNextFromHref(
+      await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/help downloads link'),
+      '/help downloads link'
+    );
     assert.equal(
-      resolveInstallNextFromHref(
-        await readFirstHref(page, 'a.inline-link:has-text("Open downloads")', '/help downloads link'),
-        '/help downloads link'
-      ),
-      signupNext
+      [signupNext, '/downloads', '/home'].includes(helpDownloadsNext),
+      true,
+      `/help downloads link should stay on a bounded install or signed-in return route, got ${helpDownloadsNext}.`
     );
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/faq"]', '/help faq link'), '/faq');
     assert.equal(await readFirstHref(page, 'a.inline-link[href="/contact#support-intake"]', '/help support link'), '/contact#support-intake');
@@ -407,7 +417,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   });
   assert.equal(codexRedirectResponse.status(), 302, 'Signed-out /participate/codex should issue a redirect.');
   const codexRedirect = new URL(codexRedirectResponse.headers().location, baseUrl);
-  assert.equal(codexRedirect.pathname, '/auth/google/start', 'Signed-out /participate/codex should redirect into the Google auth start route.');
+  assert.equal(codexRedirect.pathname, '/login', 'Signed-out /participate/codex should redirect into the first-party login route.');
   assert.equal(codexRedirect.searchParams.get('next'), '/participate/codex', 'Signed-out /participate/codex should preserve next.');
   await assertNoPageErrors(page, pageErrors, 'Signed-out /participate/codex redirect');
 

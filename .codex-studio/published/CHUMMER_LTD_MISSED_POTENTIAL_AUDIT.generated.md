@@ -69,8 +69,7 @@ That distinction matters. Several LTDs are already named in the product canon, b
 
 ### Proof state now
 
-- Canonical route proof exists and currently passes: `63/63`
-- Alias route proof for `chummer6.run` also exists and currently passes: `63/63`
+- Repo-local canonical route proof exists and currently passes: `63/63`
 - Remaining opportunity: recurring phone viewport and tap-target evidence if the team wants stronger release discipline later, but that is not the current blocker
 
 ## Where the repo is overstating completion

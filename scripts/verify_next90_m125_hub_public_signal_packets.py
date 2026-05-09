@@ -37,11 +37,11 @@ SOURCE_MARKERS = {
     "Chummer.Run.Api/Services/Support/PublicSignalToCanonPacketService.cs": [
         "public sealed class PublicSignalToCanonPacketService",
         'Route: "/feedback"',
-        'DestinationRoute: "/participate?productlift=feedback#productlift-feedback"',
+        'DestinationRoute: "/participate?source=feedback#public-feedback"',
         'Route: "/roadmap"',
-        'DestinationRoute: "/horizons?productlift=roadmap#productlift-roadmap-projection"',
+        'DestinationRoute: "/horizons?source=roadmap#public-roadmap-projection"',
         'Route: "/changelog"',
-        'DestinationRoute: "/now?productlift=changelog#productlift-shipped-closeout"',
+        'DestinationRoute: "/now?source=changelog#public-shipped-closeout"',
         'Route: "/contact"',
         'Route: "/participate"',
     ],
@@ -55,7 +55,7 @@ SOURCE_MARKERS = {
     ],
     "tests/RunServicesSmoke/Program.cs": [
         'var publicSignalPackets = new PublicSignalToCanonPacketService(releases).Build(supportCase, "en-US");',
-        'campaign spine public signal packets should emit governed feedback packets for the public ProductLift lane.',
+        'campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.',
         'campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.',
     ],
     "scripts/materialize_next90_m125_hub_public_signal_packets_proof.py": [

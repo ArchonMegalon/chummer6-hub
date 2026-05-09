@@ -74,7 +74,7 @@ Hub should route channels and permissions into EA. It should not spawn a second 
 - `GET /api/v1/accounts/me/links`
 - `POST /api/v1/accounts/me/links/email`
 - `POST /api/v1/accounts/me/links/confirm`
-- `POST /api/v1/accounts/me/links/provider`
+- `/auth/google/link` for provider linking callbacks; the legacy `POST /api/v1/accounts/me/links/provider` surface remains retired and returns `410 Gone`
 - `POST /api/v1/accounts/me/channels`
 
 These endpoints define the product model first.
