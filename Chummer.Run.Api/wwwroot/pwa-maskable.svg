@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Chummer maskable icon</title>
+  <desc id="desc">Maskable Chummer icon for installable public and play surfaces.</desc>
+  <rect width="512" height="512" rx="112" fill="#07131c" />
+  <circle cx="256" cy="256" r="196" fill="#0d2230" />
+  <path d="M146 132h54v248h-54zm166 0h54v248h-54zM200 132h112v54H200zm0 97h112v54H200zm0 97h112v54H200z" fill="#d8f06f" />
+  <path d="M256 84c95 0 172 77 172 172s-77 172-172 172S84 351 84 256 161 84 256 84Zm0 40c-73 0-132 59-132 132s59 132 132 132 132-59 132-132-59-132-132-132Z" fill="#1f8f7a" fill-opacity="0.3" />
+</svg>

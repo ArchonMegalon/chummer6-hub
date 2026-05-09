@@ -115,6 +115,11 @@ public sealed class ProgramMilestoneDigestService
             .Replace("followthrough", "follow-through", StringComparison.OrdinalIgnoreCase)
             .Replace("refs", "references", StringComparison.OrdinalIgnoreCase)
             .Replace("posture", "status", StringComparison.OrdinalIgnoreCase)
+            .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
+            .Replace("Katteb", "guide review", StringComparison.OrdinalIgnoreCase)
+            .Replace("ClickRank", "site visibility review", StringComparison.OrdinalIgnoreCase)
+            .Replace("Emailit", "delivery adapter", StringComparison.OrdinalIgnoreCase)
+            .Replace("SignalToCanon packets", "classified intake packets", StringComparison.OrdinalIgnoreCase)
             .Replace("  ", " ", StringComparison.Ordinal);
 
         if (simplified.Length <= 220)

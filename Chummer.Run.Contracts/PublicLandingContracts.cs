@@ -17,7 +17,11 @@ public sealed record PublicLandingRouteDto(
     string? GuestFallback = null,
     bool MustExist = true,
     bool PlaceholderAllowed = false,
-    string? PlaceholderRequirements = null);
+    string? PlaceholderRequirements = null,
+    string? VerificationMode = null,
+    string? VerificationFile = null,
+    string? VerificationPattern = null,
+    string? VerificationPath = null);
 
 public sealed record PublicLandingSectionDto(
     string Id,

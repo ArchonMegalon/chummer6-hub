@@ -68,6 +68,15 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: proof shelf honesty only
+  - path: /now/concierge
+    title: Release concierge
+    audience: public
+    purpose: release_help_wrapper
+    requires_auth: false
+    guest_fallback: /now/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded release routing with visible first-party fallback only
   - path: /status
     title: Status
     audience: public
@@ -122,6 +131,114 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: proof shelf honesty only
+  - path: /downloads/concierge
+    title: Downloads concierge
+    audience: public
+    purpose: release_help_wrapper
+    requires_auth: false
+    guest_fallback: /downloads/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded setup routing with visible first-party fallback only
+  - path: /packages
+    title: Packages
+    audience: public
+    purpose: package_browser
+    requires_auth: false
+    guest_fallback: /packages
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: package class model, compatibility posture, and first-party vote/follow framing only
+  - path: /packages/{packageId}
+    title: Package detail
+    audience: public
+    purpose: package_detail
+    requires_auth: false
+    guest_fallback: /packages/{packageId}
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: package detail, compatibility posture, and governance boundary only
+  - path: /packages/{packageId}/vote
+    title: Package vote route
+    audience: public
+    purpose: package_vote_entry
+    requires_auth: false
+    guest_fallback: /packages/{packageId}/vote
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party vote route with receipt handoff only
+  - path: /packages/{packageId}/follow
+    title: Package follow route
+    audience: public
+    purpose: package_follow_entry
+    requires_auth: false
+    guest_fallback: /packages/{packageId}/follow
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party follow route with receipt handoff only
+  - path: /mobile
+    title: Mobile and PWA
+    audience: public
+    purpose: mobile_projection
+    requires_auth: false
+    guest_fallback: /mobile
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: installability, role entry, and reconnect posture only
+  - path: /pwa
+    title: PWA alias
+    audience: public
+    purpose: mobile_projection
+    requires_auth: false
+    guest_fallback: /pwa
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party alias to the mobile and PWA route
+  - path: /play
+    title: Play shell
+    audience: public
+    purpose: play_projection
+    requires_auth: false
+    guest_fallback: /play
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: player, GM, and observer role entry only
+  - path: /player
+    title: Player mobile entry
+    audience: public
+    purpose: play_projection
+    requires_auth: false
+    guest_fallback: /player
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party player alias for the play shell
+  - path: /gm
+    title: GM mobile entry
+    audience: public
+    purpose: play_projection
+    requires_auth: false
+    guest_fallback: /gm
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party GM alias for the play shell
+  - path: /observer
+    title: Observer mobile entry
+    audience: public
+    purpose: play_projection
+    requires_auth: false
+    guest_fallback: /observer
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party observer alias for the play shell
+  - path: /session
+    title: Legacy session alias
+    audience: public
+    purpose: play_projection
+    requires_auth: false
+    guest_fallback: /session
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: legacy redirect to the current first-party play shell
   - path: /help
     title: Help
     audience: public
@@ -176,6 +293,15 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: current public support/contact path only
+  - path: /contact/concierge
+    title: Support routing concierge
+    audience: public
+    purpose: support_entry
+    requires_auth: false
+    guest_fallback: /contact/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded support-routing wrapper with visible first-party fallback only
   - path: /contact/submitted/{caseId}
     title: Support case submitted
     audience: public
@@ -452,6 +578,69 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: roadmap detail only
+  - path: /now/concierge
+    title: Release concierge
+    audience: public
+    purpose: release_help_wrapper
+    requires_auth: false
+    guest_fallback: /now/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded release routing with visible first-party fallback only
+  - path: /downloads/concierge
+    title: Downloads concierge
+    audience: public
+    purpose: release_help_wrapper
+    requires_auth: false
+    guest_fallback: /downloads/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded setup routing with visible first-party fallback only
+  - path: /contact/concierge
+    title: Support routing concierge
+    audience: public
+    purpose: support_entry
+    requires_auth: false
+    guest_fallback: /contact/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded support-routing wrapper with visible first-party fallback only
+  - path: /join/concierge
+    title: Campaign invite concierge
+    audience: public
+    purpose: invite_onboarding_wrapper
+    requires_auth: false
+    guest_fallback: /join/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded invite, primer, and session-zero routing with visible first-party fallback only
+  - path: /join/primer
+    title: Campaign invite primer
+    audience: public
+    purpose: invite_primer
+    requires_auth: false
+    guest_fallback: /join/primer
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party primer and session-zero orientation page without replacing account or support truth
+  - path: /artifacts/publications/{publicationId}/concierge
+    title: Creator concierge
+    audience: public
+    purpose: creator_help_wrapper
+    requires_auth: false
+    guest_fallback: /artifacts/publications/{publicationId}/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded creator consult and packet routing with visible first-party fallback only
+  - path: /testimonials/concierge
+    title: Public proof wrapper
+    audience: public
+    purpose: public_proof_wrapper
+    requires_auth: false
+    guest_fallback: /testimonials/concierge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: bounded testimonial and moderated public-proof routing with visible first-party fallback only
 auth_routes:
   - path: /login
     title: Sign in
@@ -571,6 +760,24 @@ registered_routes:
     must_exist: true
     placeholder_allowed: true
     placeholder_requirements: tracked support route
+  - path: /account/packages
+    title: Account packages
+    audience: registered
+    purpose: package_tracking
+    requires_auth: true
+    guest_fallback: /login?next=/account/packages
+    must_exist: true
+    placeholder_allowed: true
+    placeholder_requirements: package votes, follows, and return path only
+  - path: /account/packages/{packageId}
+    title: Account package detail
+    audience: registered
+    purpose: package_tracking
+    requires_auth: true
+    guest_fallback: /login?next=/account/packages/{packageId}
+    must_exist: true
+    placeholder_allowed: true
+    placeholder_requirements: package detail with account-linked receipts only
   - path: /account/access
     title: Account access
     audience: registered
@@ -616,6 +823,15 @@ registered_routes:
     must_exist: true
     placeholder_allowed: true
     placeholder_requirements: signed-in participation flow
+  - path: /admin/packages
+    title: Package operator summary
+    audience: registered
+    purpose: package_operator
+    requires_auth: true
+    guest_fallback: /login?next=/admin/packages
+    must_exist: true
+    placeholder_allowed: true
+    placeholder_requirements: bounded operator summary of public package receipts and compatibility posture
 sections:
   - id: hero
     eyebrow: Explainable Shadowrun

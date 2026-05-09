@@ -40,6 +40,7 @@
     <ProjectReference Include="..\Chummer.Run.Contracts\Chummer.Run.Contracts.csproj" />
     <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Run.Registry\Chummer.Run.Registry.csproj" />
+    <ProjectReference Include="..\..\..\fleet\repos\chummer-media-factory\src\Chummer.Media.Factory.Runtime\Chummer.Media.Factory.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

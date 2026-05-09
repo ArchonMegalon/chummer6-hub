@@ -418,6 +418,55 @@ public sealed record TrustPageActionViewModel(
     string Href,
     string Tone);
 
+public sealed record PublicConciergeBranchCardViewModel(
+    string BranchId,
+    string Title,
+    string Summary,
+    string ActionHref,
+    string ActionLabel,
+    string Tone,
+    string DestinationLabel);
+
+public sealed record PublicConciergeWidgetViewModel(
+    string StatusLabel,
+    string Summary,
+    string? IframeHref = null,
+    string? HostLabel = null,
+    string? ContentSecurityPolicy = null);
+
+public sealed record PublicConciergePageViewModel(
+    SiteChromeViewModel Chrome,
+    string FlowId,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string EntrySurfaceLabel,
+    string Locale,
+    bool LocaleFallbackUsed,
+    IReadOnlyList<string> ProofPoints,
+    IReadOnlyList<PublicConciergeBranchCardViewModel> Branches,
+    IReadOnlyList<TrustPageActionViewModel> Actions,
+    PublicConciergeWidgetViewModel Widget);
+
+public sealed record CampaignInvitePrimerSectionViewModel(
+    string Id,
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    IReadOnlyList<string> Bullets,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction = null);
+
+public sealed record CampaignInvitePrimerPageViewModel(
+    SiteChromeViewModel Chrome,
+    string InviteCode,
+    bool InviteCodePresent,
+    string Heading,
+    string Intro,
+    IReadOnlyList<string> ProofPoints,
+    IReadOnlyList<CampaignInvitePrimerSectionViewModel> Sections,
+    IReadOnlyList<TrustPageActionViewModel> Actions);
+
 public sealed record SignedInTrustStatusRowViewModel(
     string Label,
     string Value);
@@ -945,6 +994,104 @@ public sealed record PublicSignalOperationsLookupViewModel(
 public sealed record PublicSignalOperationsLookupPageViewModel(
     SiteChromeViewModel Chrome,
     PublicSignalOperationsLookupViewModel Lookup);
+
+public sealed record PackageClassCardViewModel(
+    string Label,
+    string Summary,
+    IReadOnlyList<string> Rules);
+
+public sealed record PackageCatalogEntryViewModel(
+    string PackageId,
+    string Title,
+    string Summary,
+    string ClassLabel,
+    string StatusLabel,
+    string CompatibilitySummary,
+    string GovernanceSummary,
+    string EvidenceSummary,
+    int VoteCount,
+    int FollowCount,
+    string DetailHref);
+
+public sealed record PackageReceiptCardViewModel(
+    string ReceiptId,
+    string PackageId,
+    string PackageTitle,
+    string ActionLabel,
+    string ActorLabel,
+    string RouteSummary,
+    string RecordedAtLabel,
+    string Href);
+
+public sealed record PackageCatalogPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    bool SignedInScope,
+    string ScopeLabel,
+    IReadOnlyList<PackageClassCardViewModel> Classes,
+    IReadOnlyList<PackageCatalogEntryViewModel> Packages,
+    IReadOnlyList<PackageReceiptCardViewModel> Receipts,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record PackageDetailPageViewModel(
+    SiteChromeViewModel Chrome,
+    string ScopeLabel,
+    PackageCatalogEntryViewModel Package,
+    IReadOnlyList<string> CompatibilityNotes,
+    IReadOnlyList<string> GovernanceNotes,
+    IReadOnlyList<PackageReceiptCardViewModel> RecentReceipts,
+    PackageReceiptCardViewModel? LatestVoteReceipt,
+    PackageReceiptCardViewModel? LatestFollowReceipt,
+    bool CanInteract,
+    string VoteActionHref,
+    string FollowActionHref,
+    string VoteActionLabel,
+    string FollowActionLabel,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record PackageActionReceiptPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    PackageCatalogEntryViewModel Package,
+    PackageReceiptCardViewModel Receipt,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel? SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record MobileRoleCardViewModel(
+    string Label,
+    string Summary,
+    string Href,
+    bool Current);
+
+public sealed record MobileCapabilityCardViewModel(
+    string Label,
+    string Summary);
+
+public sealed record MobileProjectionPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CurrentRoleLabel,
+    string InstallabilitySummary,
+    IReadOnlyList<MobileRoleCardViewModel> Roles,
+    IReadOnlyList<MobileCapabilityCardViewModel> Capabilities,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record FeatureDetailFactViewModel(
     string Label,

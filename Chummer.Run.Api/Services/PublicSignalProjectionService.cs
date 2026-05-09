@@ -45,7 +45,7 @@ public sealed class PublicSignalProjectionService
             Eyebrow: "Projection packet",
             Heading: ResolveHeading(surface),
             Summary: BuildSummary(surface),
-            Vendor: RequireText(surface.Vendor, $"public signal surface '{surface.Key}' vendor"),
+            Vendor: ResolveProjectionLabel(surface),
             Role: HumanizeToken(surface.Role, "Public projection"),
             TruthPosture: HumanizeToken(surface.TruthPosture, "Projection only"),
             PublicPath: RequireText(surface.PublicPath, $"public signal surface '{surface.Key}' public_path"),
@@ -99,6 +99,15 @@ public sealed class PublicSignalProjectionService
             "roadmap_projection" => "Hosted roadmap cards stay downstream of Chummer-owned planning truth.",
             "changelog_projection_and_voter_notification" => "Hosted shipped closeout stays downstream of Chummer-owned availability proof.",
             _ => "Hosted public signal stays bounded by Chummer-owned truth."
+        };
+
+    private static string ResolveProjectionLabel(PublicFeedbackSurfaceDocument surface)
+        => NormalizeKey(surface.Role) switch
+        {
+            "public_feedback_and_voting" => "Public feedback board",
+            "roadmap_projection" => "Roadmap projection",
+            "changelog_projection_and_voter_notification" => "Shipped closeout board",
+            _ => "Hosted projection"
         };
 
     private static string BuildSummary(PublicFeedbackSurfaceDocument surface)

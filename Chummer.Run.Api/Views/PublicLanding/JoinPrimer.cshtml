@@ -1,0 +1,63 @@
+@model CampaignInvitePrimerPageViewModel
+@{
+    ViewData["Title"] = Model.InviteCodePresent ? "Campaign invite primer" : "Campaign primer";
+    ViewData["Chrome"] = Model.Chrome;
+
+    static string ToneClass(string tone) => tone switch
+    {
+        "primary" => "button-like button-like--primary",
+        "secondary" => "button-like button-like--secondary",
+        _ => "button-like button-like--ghost"
+    };
+}
+
+<section class="story-cinematic">
+    <div class="story-cinematic__copy">
+        <p class="eyebrow">Invite primer</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            @foreach (var proof in Model.ProofPoints)
+            {
+                <span>@proof</span>
+            }
+        </div>
+        <div class="stacked-actions">
+            @foreach (var action in Model.Actions)
+            {
+                <a class="@ToneClass(action.Tone)" href="@action.Href">@action.Label</a>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">First-session orientation</p>
+        <h2 class="editorial-title">Keep join, primer, and session-zero help on distinct first-party rails.</h2>
+        <p class="editorial-copy">This page exists so a new player or GM can keep the next step explicit. The primer is for orientation, the invite rail is for governed join follow-through, and support remains support.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var panel in Model.Sections)
+        {
+            <article class="route-choice-card" id="@panel.Id">
+                <span class="tag">@panel.Eyebrow</span>
+                <h3>@panel.Heading</h3>
+                <p>@panel.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var bullet in panel.Bullets)
+                    {
+                        <span>@bullet</span>
+                    }
+                </div>
+                <div class="stacked-actions">
+                    <a class="@ToneClass(panel.PrimaryAction.Tone)" href="@panel.PrimaryAction.Href">@panel.PrimaryAction.Label</a>
+                    @if (panel.SecondaryAction is not null)
+                    {
+                        <a class="@ToneClass(panel.SecondaryAction.Tone)" href="@panel.SecondaryAction.Href">@panel.SecondaryAction.Label</a>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+</section>

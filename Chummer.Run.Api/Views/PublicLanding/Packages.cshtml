@@ -1,0 +1,121 @@
+@model PackageCatalogPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-packages";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>@Model.Packages.Count package(s)</span>
+            <span>@Model.Classes.Count package class(es)</span>
+            <span>@Model.ScopeLabel</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        @if (Model.SecondaryAction is not null)
+        {
+            <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+        }
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Package class model</p>
+        <h2 class="editorial-title">Install packages, rules packages, amendments, artifacts, and proposals stay distinct.</h2>
+        <p class="editorial-copy">The package browser should explain what kind of package you are looking at before it asks you to install it, follow it, or compare it with another rail.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var packageClass in Model.Classes)
+        {
+            <article class="route-choice-card">
+                <span class="tag">Class</span>
+                <h3>@packageClass.Label</h3>
+                <p>@packageClass.Summary</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var rule in packageClass.Rules)
+                    {
+                        <span>@rule</span>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block" id="package-browser">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Package browser</p>
+        <h2 class="editorial-title">Browse the current package lanes without blurring their ownership.</h2>
+        <p class="editorial-copy">Public package routes explain class, compatibility, and governance posture. Downloads still owns acquisition, and account routes only add tracked follow-through after you choose to sign in.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var package in Model.Packages)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@package.ClassLabel</span>
+                <h3>@package.Title</h3>
+                <p>@package.Summary</p>
+                <div class="route-choice-card__proof">
+                    <span>@package.StatusLabel</span>
+                    <span>@package.VoteCount vote(s)</span>
+                    <span>@package.FollowCount follow(s)</span>
+                </div>
+                <p><strong>Compatibility:</strong> @package.CompatibilitySummary</p>
+                <p><strong>Governance:</strong> @package.GovernanceSummary</p>
+                <p><strong>Evidence:</strong> @package.EvidenceSummary</p>
+                <a class="editorial-strip__action" href="@package.DetailHref">Open package detail</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Receipt rail</p>
+        <h2 class="editorial-title">Votes and follows emit first-party receipts.</h2>
+        <p class="editorial-copy">
+            @(Model.Receipts.Count == 0
+                ? "No package receipts have been recorded on this runtime yet. The route stays ready, and the account rail will pick them up as soon as someone votes or follows."
+                : "Recent receipts stay inside Chummer-owned routes so package interest does not disappear into a vague external board or an operator-only queue.")
+        </p>
+    </div>
+    <section class="compact-rail">
+        @if (Model.Receipts.Count == 0)
+        {
+            <article class="compact-rail__item">
+                <div class="compact-rail__copy">
+                    <h3>Quiet receipt state</h3>
+                    <p>Use the package detail page to record the first vote or follow receipt.</p>
+                </div>
+            </article>
+        }
+        else
+        {
+            @foreach (var receipt in Model.Receipts)
+            {
+                <article class="compact-rail__item">
+                    <div class="compact-rail__copy">
+                        <h3>@receipt.ActionLabel · @receipt.PackageTitle</h3>
+                        <p>@receipt.RouteSummary</p>
+                        <p><strong>@receipt.ActorLabel</strong> · @receipt.RecordedAtLabel</p>
+                    </div>
+                    <a class="editorial-strip__action" href="@receipt.Href">Open receipt</a>
+                </article>
+            }
+        }
+    </section>
+</section>
+
+<section class="release-footnote">
+    <p class="eyebrow">Route split</p>
+    <h2 class="editorial-title">Use Downloads for builds, Packages for class and compatibility, and Help when the issue turns private.</h2>
+    <p class="editorial-copy">The package browser should clarify what a package is. It should not replace the install shelf, support intake, or signed-in account rail.</p>
+</section>

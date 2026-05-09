@@ -168,6 +168,34 @@ cards:
     audience: public
     image_family: facility_exterior
     action_label: Open the installer shelf
+  - id: real_package_browser
+    bucket: whats_real_now
+    title: Governed package browser
+    summary: Browse install, rules, amendment, artifact, and community proposal packages with explicit compatibility and follow posture.
+    href: /packages
+    badge: Live now
+    audience: public
+    image_family: facility_exterior
+    action_label: Browse packages
+    detail_route: /packages
+    detail_primary_href: /downloads
+    detail_primary_label: Open downloads
+    pain: Package language usually collapses installers, rules, artifacts, and proposals into one untrusted pile.
+    payoff: Package class, compatibility, and first-party follow posture stay explicit before you install or vote.
+  - id: real_mobile_projection
+    bucket: whats_real_now
+    title: Mobile and PWA entry rail
+    summary: Installable phone and tablet posture, role-aware play entry, and reconnect expectations stay on a first-party route.
+    href: /mobile
+    badge: Live now
+    audience: public
+    image_family: streetfront
+    action_label: Open mobile rail
+    detail_route: /mobile
+    detail_primary_href: /play
+    detail_primary_label: Open play shell
+    pain: Mobile follow-through disappears when installability, role entry, and reconnect live on separate folklore.
+    payoff: PWA posture, role entry, and continuity stay on one first-party public rail.
   - id: horizon_nexus_pan
     bucket: coming_next
     title: NEXUS-PAN

@@ -9,10 +9,16 @@ Primary routes
 - / : landing and product entry
 - /what-is-chummer : product story
 - /now : what works today right now
+- /now/concierge : bounded release routing wrapper
 - /downloads : install and release rail
+- /downloads/concierge : bounded setup routing wrapper
+- /join/concierge : bounded invite and primer routing wrapper
+- /join/primer : first-party campaign invite primer
 - /status : short current release and support posture
 - /progress : public telemetry and progress shelf
 - /artifacts : public artifact shelf
+- /artifacts/publications/{publicationId}/concierge : creator consult and packet-routing wrapper
+- /testimonials/concierge : moderated public-proof wrapper
 
 Direction and feedback routes
 - /horizons : deeper readiness shelf and future lanes
@@ -27,6 +33,7 @@ Help and account routes
 - /help : first-party help entry
 - /faq : public FAQ
 - /contact : private support and follow-up
+- /contact/concierge : bounded support-routing wrapper
 - /home : signed-in return surface
 - /account : signed-in account, install continuity, and follow settings
 
