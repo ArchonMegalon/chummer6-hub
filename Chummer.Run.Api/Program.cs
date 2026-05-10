@@ -10,6 +10,8 @@ using Microsoft.AspNetCore.Mvc;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddHubApiRuntimeGuardrails();
 builder.AddHubRequestObservability();
+var enableHttpsRedirection = builder.Configuration.GetValue("CHUMMER_ENABLE_HTTPS_REDIRECTION", true);
+var hasHttpsListenerConfiguration = HasHttpsListenerConfiguration(builder.Configuration);
 
 // Add services to the container.
 
@@ -111,7 +113,14 @@ app.UseExceptionHandler(errorApp =>
     });
 });
 app.UseForwardedHeaders();
-app.UseHttpsRedirection();
+if (enableHttpsRedirection && hasHttpsListenerConfiguration)
+{
+    app.UseHttpsRedirection();
+}
+else if (enableHttpsRedirection)
+{
+    app.Logger.LogWarning("CHUMMER_ENABLE_HTTPS_REDIRECTION is enabled, but Hub has no HTTPS listener configured. Skipping HTTPS redirection.");
+}
 app.Use(async (context, next) =>
 {
     bool requiresNoStore = RequiresNoStoreHeaders(context.Request.Path);
@@ -178,4 +187,18 @@ static string[] GetCsvValues(string? value)
     return string.IsNullOrWhiteSpace(value)
         ? Array.Empty<string>()
         : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+
+static bool HasHttpsListenerConfiguration(IConfiguration configuration)
+{
+    var urls = configuration["ASPNETCORE_URLS"] ?? configuration["URLS"] ?? string.Empty;
+    foreach (var url in urls.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+    {
+        if (url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+    }
+
+    return !string.IsNullOrWhiteSpace(configuration["HTTPS_PORTS"]);
 }

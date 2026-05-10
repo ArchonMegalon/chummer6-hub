@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.public_route_proof",
-  "generated_at_utc": "2026-05-08T17:40:36.947505Z",
-  "base_url": "http://127.0.0.1:5066",
+  "generated_at_utc": "2026-05-10T06:54:19.241855Z",
+  "base_url": "http://127.0.0.1:8091",
   "public_host": null,
   "forwarded_proto": null,
   "manifest_path": "/docker/chummercomplete/chummer-design/products/chummer/PUBLIC_LANDING_MANIFEST.yaml",
@@ -28,7 +28,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/",
+      "final_url": "http://127.0.0.1:8091/",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -43,7 +43,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/what-is-chummer",
+      "final_url": "http://127.0.0.1:8091/what-is-chummer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -58,7 +58,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/now",
+      "final_url": "http://127.0.0.1:8091/now",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -73,7 +73,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/status",
+      "final_url": "http://127.0.0.1:8091/status",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -88,7 +88,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/progress",
+      "final_url": "http://127.0.0.1:8091/progress",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -103,7 +103,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/horizons",
+      "final_url": "http://127.0.0.1:8091/horizons",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -118,7 +118,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap",
+      "final_url": "http://127.0.0.1:8091/roadmap",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -133,7 +133,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/changelog",
+      "final_url": "http://127.0.0.1:8091/changelog",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -148,7 +148,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/downloads",
+      "final_url": "http://127.0.0.1:8091/downloads",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -163,7 +163,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/help",
+      "final_url": "http://127.0.0.1:8091/help",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -178,7 +178,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/feedback",
+      "final_url": "http://127.0.0.1:8091/feedback",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -193,7 +193,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/faq",
+      "final_url": "http://127.0.0.1:8091/faq",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -208,7 +208,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/privacy",
+      "final_url": "http://127.0.0.1:8091/privacy",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -223,7 +223,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/terms",
+      "final_url": "http://127.0.0.1:8091/terms",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -238,7 +238,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/contact",
+      "final_url": "http://127.0.0.1:8091/contact",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -253,10 +253,10 @@
       "mode": "controller_contract",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/contact/submitted/sample-case-id",
+      "final_url": "http://127.0.0.1:8091/contact/submitted/sample-case-id",
       "redirect_location": null,
       "expectation": "controller contract contains [HttpGet(\"/contact/submitted/{caseId}\")] and resolves /contact/submitted/sample-case-id",
-      "detail": "expected [HttpGet(\"/contact/submitted/{caseId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /contact/submitted/sample-case-id to resolve one of [200, 302, 303, 307, 308, 400, 404, 405], got 200"
+      "detail": "expected [HttpGet(\"/contact/submitted/{caseId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /contact/submitted/sample-case-id to resolve one of [200, 301, 302, 303, 307, 308], got 200"
     },
     {
       "path": "/participate",
@@ -268,7 +268,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/participate",
+      "final_url": "http://127.0.0.1:8091/participate",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -283,7 +283,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/feedback",
+      "final_url": "http://127.0.0.1:8091/feedback",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -298,7 +298,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/feedback/operations",
+      "final_url": "http://127.0.0.1:8091/feedback/operations",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -313,7 +313,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/feedback/operations/lookup",
+      "final_url": "http://127.0.0.1:8091/feedback/operations/lookup",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -328,7 +328,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/participate/karma-forge",
+      "final_url": "http://127.0.0.1:8091/participate/karma-forge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -342,11 +342,11 @@
       "guest_fallback": "/participate/karma-forge/submitted/{submissionId}",
       "mode": "controller_contract",
       "success": true,
-      "status_code": 404,
-      "final_url": "http://127.0.0.1:5066/participate/karma-forge/submitted/sample-submission-id",
+      "status_code": 200,
+      "final_url": "http://127.0.0.1:8091/participate/karma-forge/submitted/sample-submission-id",
       "redirect_location": null,
       "expectation": "controller contract contains [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] and resolves /participate/karma-forge/submitted/sample-submission-id",
-      "detail": "expected [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /participate/karma-forge/submitted/sample-submission-id to resolve one of [200, 302, 303, 307, 308, 400, 404, 405], got 404"
+      "detail": "expected [HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")] in /docker/chummercomplete/chummer.run-services/Chummer.Run.Api/Controllers/PublicLandingController.cs and /participate/karma-forge/submitted/sample-submission-id to resolve one of [200, 301, 302, 303, 307, 308], got 200"
     },
     {
       "path": "/artifacts",
@@ -358,7 +358,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts",
+      "final_url": "http://127.0.0.1:8091/artifacts",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -373,7 +373,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/current-preview-build",
+      "final_url": "http://127.0.0.1:8091/artifacts/current-preview-build",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -388,7 +388,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/mac-codex-release-pipeline",
+      "final_url": "http://127.0.0.1:8091/artifacts/mac-codex-release-pipeline",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -403,7 +403,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/downloads/release-upload/bootstrap.sh",
+      "final_url": "http://127.0.0.1:8091/downloads/release-upload/bootstrap.sh",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -418,7 +418,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/mac-codex-release-pipeline/readme.md",
+      "final_url": "http://127.0.0.1:8091/artifacts/mac-codex-release-pipeline/readme.md",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -433,7 +433,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/explanation-trail",
+      "final_url": "http://127.0.0.1:8091/artifacts/explanation-trail",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -448,7 +448,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/runsite-pack",
+      "final_url": "http://127.0.0.1:8091/artifacts/runsite-pack",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -463,7 +463,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/dossier-brief",
+      "final_url": "http://127.0.0.1:8091/artifacts/dossier-brief",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -478,7 +478,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/campaign-primer",
+      "final_url": "http://127.0.0.1:8091/artifacts/campaign-primer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -493,7 +493,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/campaign-primer-video",
+      "final_url": "http://127.0.0.1:8091/artifacts/campaign-primer-video",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -508,7 +508,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/mission-brief-video",
+      "final_url": "http://127.0.0.1:8091/artifacts/mission-brief-video",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -523,7 +523,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/artifacts/replay-after-action",
+      "final_url": "http://127.0.0.1:8091/artifacts/replay-after-action",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -538,7 +538,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/nexus-pan",
+      "final_url": "http://127.0.0.1:8091/roadmap/nexus-pan",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -553,7 +553,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/alice",
+      "final_url": "http://127.0.0.1:8091/roadmap/alice",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -568,7 +568,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/knowledge-fabric",
+      "final_url": "http://127.0.0.1:8091/roadmap/knowledge-fabric",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -583,7 +583,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/karma-forge",
+      "final_url": "http://127.0.0.1:8091/roadmap/karma-forge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -598,7 +598,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/jackpoint",
+      "final_url": "http://127.0.0.1:8091/roadmap/jackpoint",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -613,7 +613,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/runsite",
+      "final_url": "http://127.0.0.1:8091/roadmap/runsite",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -628,7 +628,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/runbook-press",
+      "final_url": "http://127.0.0.1:8091/roadmap/runbook-press",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -643,7 +643,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/community-hub",
+      "final_url": "http://127.0.0.1:8091/roadmap/community-hub",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -658,7 +658,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/black-ledger",
+      "final_url": "http://127.0.0.1:8091/roadmap/black-ledger",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -673,7 +673,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/ghostwire",
+      "final_url": "http://127.0.0.1:8091/roadmap/ghostwire",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -688,7 +688,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/roadmap/local-co-processor",
+      "final_url": "http://127.0.0.1:8091/roadmap/local-co-processor",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -703,7 +703,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/login",
+      "final_url": "http://127.0.0.1:8091/login",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -718,7 +718,7 @@
       "mode": "public_route",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/signup",
+      "final_url": "http://127.0.0.1:8091/signup",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -733,7 +733,7 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/logout",
+      "final_url": "http://127.0.0.1:8091/logout",
       "redirect_location": "/",
       "expectation": "anonymous request redirects to /",
       "detail": "expected anonymous redirect to /, got / (status 302)"
@@ -748,7 +748,7 @@
       "mode": "auth_operation",
       "success": true,
       "status_code": 405,
-      "final_url": "http://127.0.0.1:5066/auth/email/start",
+      "final_url": "http://127.0.0.1:8091/auth/email/start",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 405"
@@ -763,7 +763,7 @@
       "mode": "auth_operation",
       "success": true,
       "status_code": 400,
-      "final_url": "http://127.0.0.1:5066/auth/email/callback",
+      "final_url": "http://127.0.0.1:8091/auth/email/callback",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 400"
@@ -777,11 +777,11 @@
       "guest_fallback": "/login",
       "mode": "auth_operation",
       "success": true,
-      "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/auth/google/start",
-      "redirect_location": null,
+      "status_code": 302,
+      "final_url": "http://127.0.0.1:8091/auth/google/start",
+      "redirect_location": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=am-LPxxSXNOavJRDD8gDywhKf5txbfso&nonce=Fiw48QRD0wHuqfz4pXgUF0JSQV0bbLeI&code_challenge=QE-MmBXjiBkmvgQc0TJ2QhJvafAVTXO8Pv0LTXdyFUM&code_challenge_method=S256&prompt=select_account",
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
-      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 200"
+      "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 302"
     },
     {
       "path": "/auth/google/callback",
@@ -793,7 +793,7 @@
       "mode": "auth_operation",
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:5066/auth/google/callback",
+      "final_url": "http://127.0.0.1:8091/auth/google/callback",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 200"
@@ -808,55 +808,55 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/home",
+      "final_url": "http://127.0.0.1:8091/home",
       "redirect_location": "/login?next=%2Fhome",
       "expectation": "anonymous request redirects to /login?next=/home",
       "detail": "expected anonymous redirect to /login?next=/home, got /login?next=%2Fhome (status 302)"
     },
     {
-      "path": "/workspace/access",
+      "path": "/home/access",
       "audience": "registered",
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/workspace/access",
+      "guest_fallback": "/login?next=/home/access",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/workspace/access",
+      "final_url": "http://127.0.0.1:8091/home/access",
       "redirect_location": "/login?next=%2Fhome%2Faccess",
-      "expectation": "anonymous request redirects to /login?next=/workspace/access",
-      "detail": "expected anonymous redirect to /login?next=/workspace/access, got /login?next=%2Fhome%2Faccess (status 302)"
+      "expectation": "anonymous request redirects to /login?next=/home/access",
+      "detail": "expected anonymous redirect to /login?next=/home/access, got /login?next=%2Fhome%2Faccess (status 302)"
     },
     {
-      "path": "/workspace/work",
+      "path": "/home/work",
       "audience": "registered",
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/workspace/work",
+      "guest_fallback": "/login?next=/home/work",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/workspace/work",
+      "final_url": "http://127.0.0.1:8091/home/work",
       "redirect_location": "/login?next=%2Fhome%2Fwork",
-      "expectation": "anonymous request redirects to /login?next=/workspace/work",
-      "detail": "expected anonymous redirect to /login?next=/workspace/work, got /login?next=%2Fhome%2Fwork (status 302)"
+      "expectation": "anonymous request redirects to /login?next=/home/work",
+      "detail": "expected anonymous redirect to /login?next=/home/work, got /login?next=%2Fhome%2Fwork (status 302)"
     },
     {
-      "path": "/workspace/setup",
+      "path": "/home/setup",
       "audience": "registered",
       "purpose": "signed_in_dashboard",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/workspace/setup",
+      "guest_fallback": "/login?next=/home/setup",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/workspace/setup",
+      "final_url": "http://127.0.0.1:8091/home/setup",
       "redirect_location": "/login?next=%2Fhome%2Fsetup",
-      "expectation": "anonymous request redirects to /login?next=/workspace/setup",
-      "detail": "expected anonymous redirect to /login?next=/workspace/setup, got /login?next=%2Fhome%2Fsetup (status 302)"
+      "expectation": "anonymous request redirects to /login?next=/home/setup",
+      "detail": "expected anonymous redirect to /login?next=/home/setup, got /login?next=%2Fhome%2Fsetup (status 302)"
     },
     {
       "path": "/account",
@@ -868,7 +868,7 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/account",
+      "final_url": "http://127.0.0.1:8091/account",
       "redirect_location": "/login?next=%2Faccount",
       "expectation": "anonymous request redirects to /login?next=/account",
       "detail": "expected anonymous redirect to /login?next=/account, got /login?next=%2Faccount (status 302)"
@@ -883,7 +883,7 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/account/support",
+      "final_url": "http://127.0.0.1:8091/account/support",
       "redirect_location": "/login?next=%2Faccount%2Fsupport",
       "expectation": "anonymous request redirects to /login?next=/account/support",
       "detail": "expected anonymous redirect to /login?next=/account/support, got /login?next=%2Faccount%2Fsupport (status 302)"
@@ -898,7 +898,7 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/account/access",
+      "final_url": "http://127.0.0.1:8091/account/access",
       "redirect_location": "/login?next=%2Faccount%2Faccess",
       "expectation": "anonymous request redirects to /login?next=/account/access",
       "detail": "expected anonymous redirect to /login?next=/account/access, got /login?next=%2Faccount%2Faccess (status 302)"
@@ -913,7 +913,7 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/account/work",
+      "final_url": "http://127.0.0.1:8091/account/work",
       "redirect_location": "/login?next=%2Faccount%2Fwork",
       "expectation": "anonymous request redirects to /login?next=/account/work",
       "detail": "expected anonymous redirect to /login?next=/account/work, got /login?next=%2Faccount%2Fwork (status 302)"
@@ -928,7 +928,7 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/account/settings",
+      "final_url": "http://127.0.0.1:8091/account/settings",
       "redirect_location": "/login?next=%2Faccount%2Fsettings",
       "expectation": "anonymous request redirects to /login?next=/account/settings",
       "detail": "expected anonymous redirect to /login?next=/account/settings, got /login?next=%2Faccount%2Fsettings (status 302)"
@@ -943,7 +943,7 @@
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/account/advanced",
+      "final_url": "http://127.0.0.1:8091/account/advanced",
       "redirect_location": "/login?next=%2Faccount%2Fadvanced",
       "expectation": "anonymous request redirects to /login?next=/account/advanced",
       "detail": "expected anonymous redirect to /login?next=/account/advanced, got /login?next=%2Faccount%2Fadvanced (status 302)"
@@ -954,14 +954,14 @@
       "purpose": "signed_in_participation",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/login?next=/participate/codex",
+      "guest_fallback": "/auth/google/start?next=%2Fparticipate%2Fcodex",
       "mode": "registered_fallback",
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:5066/participate/codex",
-      "redirect_location": "/login?next=%2Fparticipate%2Fcodex",
-      "expectation": "anonymous request redirects to /login?next=/participate/codex",
-      "detail": "expected anonymous redirect to /login?next=/participate/codex, got /login?next=%2Fparticipate%2Fcodex (status 302)"
+      "final_url": "http://127.0.0.1:8091/participate/codex",
+      "redirect_location": "/auth/google/start?next=%2Fparticipate%2Fcodex",
+      "expectation": "anonymous request redirects to /auth/google/start?next=%2Fparticipate%2Fcodex",
+      "detail": "expected anonymous redirect to /auth/google/start?next=%2Fparticipate%2Fcodex, got /auth/google/start?next=%2Fparticipate%2Fcodex (status 302)"
     }
   ]
 }

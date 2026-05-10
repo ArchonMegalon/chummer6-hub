@@ -552,7 +552,7 @@ cards:
     audience: public
     image_family: solo_operator
     cta_kind: explainer
-    guest_href: /login?next=/participate/codex
+    guest_href: /auth/google/start?next=%2Fparticipate%2Fcodex
     registered_href: /participate/codex
     action_label: Open guided contribution
   - id: participate_beta

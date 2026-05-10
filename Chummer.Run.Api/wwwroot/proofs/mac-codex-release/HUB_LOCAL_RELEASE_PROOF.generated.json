@@ -5,7 +5,7 @@
   "desktop_client_readiness": {
     "status": "pass",
     "scoped_status": "pass",
-    "generated_at": "2026-05-08T15:17:10Z",
+    "generated_at": "2026-05-10T07:47:36Z",
     "missing_coverage_keys": [],
     "desktop_client_missing": false,
     "reason": "Flagship product readiness proof is green.",
@@ -1494,6 +1494,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-08T15:24:51Z",
-  "generatedAt": "2026-05-08T15:24:51Z"
+  "generated_at": "2026-05-10T07:51:06Z",
+  "generatedAt": "2026-05-10T07:51:06Z"
 }
