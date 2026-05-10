@@ -111,9 +111,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string consoleView = File.ReadAllText(consoleViewPath);
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("Authorize Codex access", view, StringComparison.Ordinal);
-        Assert.Contains("/login?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
-        Assert.Contains("existing signed-in chat account", view, StringComparison.Ordinal);
+        Assert.Contains("Signed-in participation", view, StringComparison.Ordinal);
+        Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", view, StringComparison.Ordinal);
+        Assert.Contains("guided contribution tools tied to your account", view, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
         Assert.Contains("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.Contains("authorize with your OpenAI account in ChatGPT", controller, StringComparison.Ordinal);

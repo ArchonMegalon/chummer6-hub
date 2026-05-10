@@ -100,6 +100,17 @@
         .Select(group => group.First())
         .ToArray();
     var utilityLink = chrome.UtilityNavigation.FirstOrDefault();
+    var requestHost = Context?.Request?.Host.Host?.Trim().TrimEnd('.').ToLowerInvariant() ?? string.Empty;
+    var clickRankSiteId = requestHost is "chummer.run" or "www.chummer.run"
+        ? (System.Environment.GetEnvironmentVariable("CLICKRANK_AI_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
+        : string.Empty;
+    var clickRankEligible = !authSurface
+        && !chrome.Authenticated
+        && !string.IsNullOrWhiteSpace(clickRankSiteId)
+        && (
+            routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
+            || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
+            || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
 }
 <!doctype html>
 <html lang="en" data-theme="hub-front-door">
@@ -116,6 +127,41 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+    @if (clickRankEligible)
+    {
+        <script>
+            (function () {
+                var doNotTrack = window.doNotTrack === "1"
+                    || navigator.doNotTrack === "1"
+                    || navigator.msDoNotTrack === "1"
+                    || navigator.globalPrivacyControl === true;
+                if (doNotTrack || document.querySelector("script[data-clickrank-ai='seo']")) {
+                    return;
+                }
+
+                var loadClickRank = function () {
+                    if (document.querySelector("script[data-clickrank-ai='seo']")) {
+                        return;
+                    }
+
+                    var clickRankAi = document.createElement("script");
+                    clickRankAi.src = "https://js.clickrank.ai/seo/@clickRankSiteId/script";
+                    clickRankAi.async = true;
+                    clickRankAi.defer = true;
+                    clickRankAi.dataset.clickrankAi = "seo";
+                    clickRankAi.referrerPolicy = "strict-origin-when-cross-origin";
+                    document.head.appendChild(clickRankAi);
+                };
+
+                if ("requestIdleCallback" in window) {
+                    window.requestIdleCallback(loadClickRank, { timeout: 1500 });
+                    return;
+                }
+
+                window.setTimeout(loadClickRank, 250);
+            })();
+        </script>
+    }
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
 </head>
 <body class="@bodyClass">

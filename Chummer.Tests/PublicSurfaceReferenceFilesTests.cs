@@ -51,7 +51,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         string runbook = File.ReadAllText(runbookPath);
 
         Assert.Contains("/login?next=...", doc, StringComparison.Ordinal);
-        Assert.Contains("/login?next=/participate/codex", manifest, StringComparison.Ordinal);
+        Assert.Contains("/auth/google/start?next=%2Fparticipate%2Fcodex", manifest, StringComparison.Ordinal);
         Assert.Contains("/progress", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations/lookup", manifest, StringComparison.Ordinal);

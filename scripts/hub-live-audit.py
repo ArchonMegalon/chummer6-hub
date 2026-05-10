@@ -11928,7 +11928,7 @@ def main() -> int:
                 "Open shipped updates",
                 "Open support intake",
                 "/contact#support-intake",
-                "/login?next=%2Fparticipate%2Fcodex",
+                "/auth/google/start?next=%2Fparticipate%2Fcodex",
                 "hosted mirroring remains incomplete"),
             expects_header_count=1),
         AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Downloads and setup stay clear", "Open support intake", "Sign in and recover access"), expects_header_count=1),

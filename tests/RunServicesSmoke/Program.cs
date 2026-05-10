@@ -2524,7 +2524,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Title, "KARMA FORGE", StringComparison.Ordinal) && string.Equals(card.Badge, "Research", StringComparison.Ordinal)), "landing feature registry should carry the updated readiness posture for KARMA FORGE");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "real_public_guide", StringComparison.Ordinal) && string.Equals(card.Href, "/what-is-chummer#public-guide", StringComparison.Ordinal) && card.ExternalOk), "landing guide card should keep a first-party route with an explicit external fallback");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "artifact_runsite_pack", StringComparison.Ordinal) && string.Equals(card.Href, "/roadmap/runsite", StringComparison.Ordinal)), "artifact cards should point at related horizon details instead of self-linking to the shelf");
-    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
+    Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/auth/google/start?next=%2Fparticipate%2Fcodex", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/participate/codex", StringComparison.Ordinal)), "booster participation should split guest and registered destinations");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.GuestHref, "/signup?next=/account/settings", StringComparison.Ordinal) && string.Equals(card.RegisteredHref, "/account/settings", StringComparison.Ordinal)), "beta waitlist should split guest signup from the calmer account-settings follow-up path");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_booster", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open guided contribution", StringComparison.Ordinal)), "guided contribution should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Join beta waitlist", StringComparison.Ordinal)), "beta waitlist should keep an explicit signed-in action label in canon.");
@@ -2615,6 +2615,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var workspaceServerPlane = new CampaignWorkspaceServerPlaneService(campaignSpine, supportCases, supportPresentation);
     var campaignFederation = new CampaignFederationOrchestrationService(campaignSpine, new ArtifactFactoryOrchestrationService());
     var karmaForge = new KarmaForgeDiscoveryService(new KarmaForgeStore(configuration, loggerFactory.CreateLogger<KarmaForgeStore>()));
+    var packageCatalog = new PublicPackageCatalogService();
     var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
     var installBootstrapTickets = new InstallBootstrapTicketService(
         DataProtectionProvider.Create(Path.Combine(tempRoot, "install-bootstrap-tickets")),
@@ -2631,14 +2632,14 @@ async Task VerifyPublicLandingProjectionAsync()
         WebRootPath = Path.Combine(tempRoot, "wwwroot")
     };
     var windowsProofInstallers = new WindowsProofInstallerService(configuration);
-    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2808,7 +2809,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(participateModel is not null, "participate page should render through the MVC view layer.");
     Assert(participateModel!.TrustPulse is not null, "guest participate page should surface the weekly public trust pulse.");
     Assert(participateModel.SignedInStatus is null, "guest participate page should not project install-specific signed-in trust posture.");
-    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/login?next=/participate/codex", StringComparison.Ordinal)), "guest participate page should route guided contribution through login first.");
+    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Open guided contribution", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/auth/google/start?next=%2Fparticipate%2Fcodex", StringComparison.Ordinal)), "guest participate page should route guided contribution through the direct Google handoff.");
     Assert(participateModel.SignedInLane.Any(static card => string.Equals(card.Action.Label, "Join beta waitlist", StringComparison.Ordinal) && string.Equals(card.Action.Href, "/signup?next=/account/settings", StringComparison.Ordinal)), "guest participate page should route beta follow-up through signup first.");
     var authenticatedParticipateView = await authenticatedLandingController.ParticipatePage(CancellationToken.None) as ViewResult;
     var authenticatedParticipateModel = authenticatedParticipateView?.Model as ParticipatePageViewModel;
@@ -5312,7 +5313,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedHorizonsModel?.TrustPulse is not null, "authenticated horizons page should keep the weekly public trust pulse visible.");
     Assert(authenticatedHorizonsModel?.SignedInStatus is not null, "authenticated horizons page should project the shared signed-in trust status.");
 
-    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Card.GuestHref, "/login?next=/participate/codex", StringComparison.Ordinal)), "participate page should preserve the booster guest-login handoff.");
+    Assert(participateModel!.SignedInLane.Any(static card => string.Equals(card.Card.GuestHref, "/auth/google/start?next=%2Fparticipate%2Fcodex", StringComparison.Ordinal)), "participate page should preserve the booster Google handoff.");
     Assert(!participateModel.PublicLane.Any(static card => card.Card.Summary.Contains("worker host", StringComparison.OrdinalIgnoreCase)), "public participate copy should not leak worker-host jargon");
 
     var homeResult = await controller.HomePage(null, CancellationToken.None);
@@ -5351,7 +5352,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, installLinking, campaignSpine, workspaceServerPlane, karmaForge, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
