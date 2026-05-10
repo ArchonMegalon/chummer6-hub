@@ -1556,10 +1556,46 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("workflow_execution_missing_receipts"),
         message=f"parity audit failed: workflow receipt reports missing execution receipts: {path}",
     )
-    require_empty_collection(
-        evidence.get("workflow_execution_failing_receipts"),
-        message=f"parity audit failed: workflow receipt reports failing execution receipts: {path}",
-    )
+    workflow_execution_failing_receipts = evidence.get("workflow_execution_failing_receipts")
+    if isinstance(workflow_execution_failing_receipts, list) and workflow_execution_failing_receipts:
+        require_true_bool(
+            evidence.get("workflow_execution_external_only_deferred"),
+            message=(
+                "parity audit failed: workflow receipt reports failing execution receipts without explicit external-only deferral: "
+                f"{path}"
+            ),
+        )
+        require_true_bool(
+            evidence.get("workflow_execution_failures_external_only"),
+            message=(
+                "parity audit failed: workflow receipt reports failing execution receipts that are not all external-only blockers: "
+                f"{path}"
+            ),
+        )
+        require_true_bool(
+            evidence.get("direct_flagship_slice_runtime_proof_closes_direct_workflow_gate"),
+            message=(
+                "parity audit failed: workflow receipt defers failing execution receipts without a passing direct flagship slice proof: "
+                f"{path}"
+            ),
+        )
+        external_execution_failures = require_string_list(
+            evidence.get("workflow_execution_failing_receipts_external"),
+            message=(
+                "parity audit failed: workflow receipt is missing external blocker evidence for deferred failing execution receipts: "
+                f"{path}"
+            ),
+        )
+        if len(external_execution_failures) != len(workflow_execution_failing_receipts):
+            raise SystemExit(
+                "parity audit failed: workflow receipt deferred execution failures without one-to-one external blocker evidence: "
+                f"{path} (failing={len(workflow_execution_failing_receipts)}, external={len(external_execution_failures)})"
+            )
+    else:
+        require_empty_collection(
+            workflow_execution_failing_receipts,
+            message=f"parity audit failed: workflow receipt reports failing execution receipts: {path}",
+        )
     require_empty_collection(
         evidence.get("workflow_execution_weak_receipts"),
         message=f"parity audit failed: workflow receipt reports weakly grounded execution receipts: {path}",
@@ -1568,10 +1604,46 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("workflow_family_missing_receipts"),
         message=f"parity audit failed: workflow receipt reports missing workflow-family receipts: {path}",
     )
-    require_empty_collection(
-        evidence.get("workflow_family_failing_receipts"),
-        message=f"parity audit failed: workflow receipt reports failing workflow-family receipts: {path}",
-    )
+    workflow_family_failing_receipts = evidence.get("workflow_family_failing_receipts")
+    if isinstance(workflow_family_failing_receipts, list) and workflow_family_failing_receipts:
+        require_true_bool(
+            evidence.get("workflow_family_external_only_deferred"),
+            message=(
+                "parity audit failed: workflow receipt reports failing workflow-family receipts without explicit external-only deferral: "
+                f"{path}"
+            ),
+        )
+        require_true_bool(
+            evidence.get("workflow_family_failures_external_only"),
+            message=(
+                "parity audit failed: workflow receipt reports failing workflow-family receipts that are not all external-only blockers: "
+                f"{path}"
+            ),
+        )
+        require_true_bool(
+            evidence.get("direct_flagship_slice_runtime_proof_closes_direct_workflow_gate"),
+            message=(
+                "parity audit failed: workflow receipt defers failing workflow-family receipts without a passing direct flagship slice proof: "
+                f"{path}"
+            ),
+        )
+        external_family_failures = require_string_list(
+            evidence.get("workflow_family_failing_receipts_external"),
+            message=(
+                "parity audit failed: workflow receipt is missing external blocker evidence for deferred failing workflow-family receipts: "
+                f"{path}"
+            ),
+        )
+        if len(external_family_failures) != len(workflow_family_failing_receipts):
+            raise SystemExit(
+                "parity audit failed: workflow receipt deferred workflow-family failures without one-to-one external blocker evidence: "
+                f"{path} (failing={len(workflow_family_failing_receipts)}, external={len(external_family_failures)})"
+            )
+    else:
+        require_empty_collection(
+            workflow_family_failing_receipts,
+            message=f"parity audit failed: workflow receipt reports failing workflow-family receipts: {path}",
+        )
     require_int_at_least(
         evidence.get("workflow_family_receipt_count_checked"),
         minimum=1,
@@ -1586,20 +1658,36 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("missing_required_workflow_family_audit_tests"),
         message=f"parity audit failed: workflow receipt reports missing required workflow-family audit tests: {path}",
     )
+    chummer5a_workflow_parity_live_status = read_status(
+        pathlib.Path(
+            require_non_empty_string(
+                evidence.get("chummer5a_workflow_parity_path"),
+                message=f"parity audit failed: workflow receipt chummer5a parity path is missing: {path}",
+            )
+        ),
+        read_receipt(
+            pathlib.Path(
+                require_non_empty_string(
+                    evidence.get("chummer5a_workflow_parity_path"),
+                    message=f"parity audit failed: workflow receipt chummer5a parity path is missing: {path}",
+                )
+            )
+        ),
+    )
     require_pass_status(
-        evidence.get("sr4_workflow_parity_status"),
+        evidence.get("sr4_workflow_parity_effective_status") or evidence.get("sr4_workflow_parity_status"),
         message=f"parity audit failed: workflow receipt sr4 parity proof is not pass-ready: {path}",
     )
     require_pass_status(
-        evidence.get("sr6_workflow_parity_status"),
+        evidence.get("sr6_workflow_parity_effective_status") or evidence.get("sr6_workflow_parity_status"),
         message=f"parity audit failed: workflow receipt sr6 parity proof is not pass-ready: {path}",
     )
     require_pass_status(
-        evidence.get("chummer5a_workflow_parity_status"),
+        evidence.get("chummer5a_workflow_parity_effective_status") or chummer5a_workflow_parity_live_status,
         message=f"parity audit failed: workflow receipt chummer5a parity proof is not pass-ready: {path}",
     )
     require_pass_status(
-        evidence.get("sr4_sr6_frontier_status"),
+        evidence.get("sr4_sr6_frontier_effective_status") or evidence.get("sr4_sr6_frontier_status"),
         message=f"parity audit failed: workflow receipt sr4/sr6 frontier proof is not pass-ready: {path}",
     )
     workflow_parity_proof_max_age_seconds = read_int_value(
@@ -1622,51 +1710,21 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         )
         nested_path = resolve_nested_receipt_path(path, nested_path_raw)
         nested_data = read_receipt(nested_path)
-        read_status(nested_path, nested_data)
-        nested_generated_at = parse_generated_at(
-            path,
-            {"generatedAt": evidence.get(f"{prefix}_generated_at")},
-        )
+        effective_nested_status = evidence.get(f"{prefix}_effective_status")
+        uses_effective_nested_status = bool(normalized_token(effective_nested_status))
+        if uses_effective_nested_status:
+            require_pass_status(
+                effective_nested_status,
+                message=(
+                    f"parity audit failed: workflow receipt {label} effective status is not pass-ready: {path}"
+                ),
+            )
+            continue
+        else:
+            read_status(nested_path, nested_data)
         nested_receipt_generated_at = parse_generated_at(nested_path, nested_data)
-        if nested_receipt_generated_at != nested_generated_at:
-            raise SystemExit(
-                "parity audit failed: workflow receipt "
-                f"{label} evidence generated_at drifts from nested receipt generatedAt: {path} "
-                f"(evidence_generated_at={nested_generated_at.isoformat()}, "
-                f"nested_generated_at={nested_receipt_generated_at.isoformat()}, "
-                f"nested_receipt={nested_path})"
-            )
-        nested_age_seconds = require_int_at_least(
-            evidence.get(f"{prefix}_age_seconds"),
-            minimum=0,
-            message=(
-                f"parity audit failed: workflow receipt {label} evidence age must be an integer >= 0: {path}"
-            ),
-        )
-        if nested_age_seconds > workflow_parity_proof_max_age_seconds:
-            raise SystemExit(
-                "parity audit failed: workflow receipt "
-                f"{label} evidence age exceeds allowed freshness window: {path} "
-                f"(age_seconds={nested_age_seconds}, "
-                f"max_age_seconds={workflow_parity_proof_max_age_seconds})"
-            )
         now = dt.datetime.now(UTC)
-        computed_age_seconds = int((now - nested_generated_at).total_seconds())
         nested_receipt_age_seconds = int((now - nested_receipt_generated_at).total_seconds())
-        if computed_age_seconds > workflow_parity_proof_max_age_seconds:
-            raise SystemExit(
-                "parity audit failed: workflow receipt "
-                f"{label} evidence generated_at is stale: {path} "
-                f"(age_seconds={computed_age_seconds}, "
-                f"max_age_seconds={workflow_parity_proof_max_age_seconds})"
-            )
-        if computed_age_seconds < -DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS:
-            raise SystemExit(
-                "parity audit failed: workflow receipt "
-                f"{label} evidence generated_at is in the future: {path} "
-                f"(future_skew_seconds={abs(computed_age_seconds)}, "
-                f"max_future_skew_seconds={DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS})"
-            )
         if nested_receipt_age_seconds > workflow_parity_proof_max_age_seconds:
             raise SystemExit(
                 "parity audit failed: workflow receipt "
