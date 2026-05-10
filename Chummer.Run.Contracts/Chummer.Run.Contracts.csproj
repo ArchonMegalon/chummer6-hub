@@ -7,9 +7,11 @@
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
-    <ChummerMediaContractsProject Condition="'$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
-    <ChummerMediaContractsProject Condition="'$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
-    <ChummerMediaContractsProject Condition="'$(ChummerMediaContractsProject)' == '' and Exists('/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
+    <PreferBundledChummerMediaContracts Condition="'$(PreferBundledChummerMediaContracts)' == ''">false</PreferBundledChummerMediaContracts>
+    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
+    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
+    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
+    <ChummerMediaContractsAssembly Condition="'$(ChummerMediaContractsAssembly)' == '' and Exists('$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll')">$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll</ChummerMediaContractsAssembly>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,5 +19,9 @@
     <ProjectReference Include="..\..\chummer-hub-registry\Chummer.Hub.Registry.Contracts\Chummer.Hub.Registry.Contracts.csproj" />
     <ProjectReference Include="..\Chummer.Play.Contracts\Chummer.Play.Contracts.csproj" />
     <ProjectReference Include="$(ChummerMediaContractsProject)" Condition="'$(ChummerMediaContractsProject)' != ''" />
+    <Reference Include="Chummer.Media.Contracts" Condition="'$(ChummerMediaContractsProject)' == '' and '$(ChummerMediaContractsAssembly)' != ''">
+      <HintPath>$(ChummerMediaContractsAssembly)</HintPath>
+      <Private>true</Private>
+    </Reference>
   </ItemGroup>
 </Project>
