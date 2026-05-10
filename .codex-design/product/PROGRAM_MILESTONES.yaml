@@ -1,5 +1,5 @@
 product: chummer
-last_reviewed: 2026-05-09
+last_reviewed: 2026-05-10
 release_track: vnext-foundation
 repo_boundary_purity:
 - repo: chummer6-design
@@ -707,7 +707,7 @@ executable_queue:
   milestone: F3
   status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: "Latest recurring follow-up on 2026-05-09T08:08:47Z: checksum parity again matched across all seven WL-D007 review-template mirror targets, and fresh no-change parity evidence for the live canonical mirror paths plus current destination publish refs was appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` without reopening completed WL-D007/WL-D010/WL-D011/WL-D012 rows."
+  notes: "Latest recurring follow-up on 2026-05-10T06:50:59Z: checksum parity again matched across all seven WL-D007 review-template mirror targets, and fresh no-change parity evidence for the live canonical mirror roots plus current destination publish refs and alias resolutions was appended in `products/chummer/sync/REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md` without reopening completed WL-D007/WL-D010/WL-D011/WL-D012 rows."
 - id: WL-D016
   milestone: F3
   status: done
@@ -732,7 +732,7 @@ executable_queue:
   milestone: F3
   status: done
   backlog: products/chummer/sync/REVIEW_TEMPLATE_MIRROR_BACKLOG.md
-  notes: "Closed 2026-03-19; latest requested follow-up on 2026-05-09T08:08:47Z reconfirmed checksum parity across all seven review-template targets at the live canonical mirror paths, and the current no-change evidence is recorded in `REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
+  notes: "Closed 2026-03-19; latest requested follow-up on 2026-05-10T06:50:59Z reconfirmed checksum parity across all seven review-template targets at the live canonical mirror roots, with current destination refs, alias-backed resolutions, and no-change evidence recorded in `REVIEW_TEMPLATE_MIRROR_PUBLISH_EVIDENCE.md`."
 - id: WL-D018
   milestone: F3
   status: done
