@@ -39,6 +39,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout sibling repositories
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          clone_branch_or_main() {
+            local repo_url="$1"
+            local dest="$2"
+            local branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-main}}"
+
+            rm -rf "$dest"
+            mkdir -p "$(dirname "$dest")"
+
+            if git ls-remote --exit-code --heads "$repo_url" "$branch" >/dev/null 2>&1; then
+              git clone --depth 1 --branch "$branch" "$repo_url" "$dest"
+            else
+              git clone --depth 1 --branch main "$repo_url" "$dest"
+            fi
+          }
+
+          clone_branch_or_main "https://github.com/ArchonMegalon/chummer6-core.git" "$GITHUB_WORKSPACE/../chummer-core-engine"
+          clone_branch_or_main "https://github.com/ArchonMegalon/chummer6-hub-registry.git" "$GITHUB_WORKSPACE/../chummer-hub-registry"
+
+          test -f "$GITHUB_WORKSPACE/../chummer-core-engine/Chummer.Contracts/Chummer.Contracts.csproj"
+          test -f "$GITHUB_WORKSPACE/../chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.Hub.Registry.Contracts.csproj"
+          test -f "$GITHUB_WORKSPACE/../chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj"
+          test -f "$GITHUB_WORKSPACE/compat/Chummer.Media.Contracts.dll"
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -53,6 +81,7 @@ jobs:
       - name: Restore API
         run: |
           dotnet restore Chummer.Run.Api/Chummer.Run.Api.csproj \
+            -p:PreferBundledChummerMediaContracts=true \
             -p:UseChummerEngineContractsLocalFeed=false
 
       - name: Publish API bundle
@@ -65,6 +94,7 @@ jobs:
             --no-restore \
             --self-contained false \
             -p:UseAppHost=false \
+            -p:PreferBundledChummerMediaContracts=true \
             -p:UseChummerEngineContractsLocalFeed=false \
             -o out/api
           tar -C out/api -czf dist/chummer-run-api-portable.tar.gz .
