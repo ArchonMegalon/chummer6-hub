@@ -89,6 +89,7 @@ STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-1
 PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"
 PUBLIC_RELEASE_PROOF_BASE_URL="${CHUMMER_PUBLIC_RELEASE_PROOF_BASE_URL:-https://chummer.run}"
 DISABLED_ARTIFACT_IDS="${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}}"
+REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-$REPO_ROOT/../chummer-hub-registry}"
 
 detect_auto_disabled_artifact_ids() {
   local files_root="$1"
@@ -169,6 +170,32 @@ if [[ ! -f "$UI_LOCALIZATION_RELEASE_GATE_SOURCE" ]]; then
   echo "ui localization release gate missing: $UI_LOCALIZATION_RELEASE_GATE_SOURCE" >&2
   exit 1
 fi
+
+canonicalize_registry_boundary_coverage() {
+  local manifest_path="${1:-}"
+  if [[ -z "$manifest_path" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$manifest_path" <<'PY'
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+verifier_path = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+
+spec = importlib.util.spec_from_file_location("verify_public_release_channel", verifier_path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
+manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
 
 tmp_root="$(mktemp -d)"
 cleanup() {
@@ -481,6 +508,11 @@ if startup_smoke_root.exists():
             receipt_path.unlink()
 PY
 fi
+
+canonicalize_registry_boundary_coverage "$generated_root/RELEASE_CHANNEL.generated.json"
+canonicalize_registry_boundary_coverage "$generated_root/releases.json"
+canonicalize_registry_boundary_coverage "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json"
+canonicalize_registry_boundary_coverage "$OUTPUT_ROOT/releases.json"
 
 python3 - "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" <<'PY'
 import json
