@@ -124,15 +124,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -d Chummer.Portal/downloads/files
-          mkdir -p dist
+          test -d Chummer.Portal/downloads
+          test -d legacy/tooling/docker/Docker/Downloads/files
+          mkdir -p dist/files
           cp -R Chummer.Portal/downloads/. dist/
+          cp -R legacy/tooling/docker/Docker/Downloads/files/. dist/files/
 
       - name: Generate releases.json
         shell: bash
         run: |
           set -euo pipefail
           RELEASE_PUBLISHED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          SOURCE_MANIFEST_PATH="legacy/tooling/docker/Docker/Downloads/RELEASE_CHANNEL.generated.json" \
+          RELEASE_PROOF_PATH="Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json" \
           DOWNLOADS_DIR="dist/files" \
           MANIFEST_PATH="dist/releases.json" \
           PORTAL_MANIFEST_PATH="dist/releases.json" \
