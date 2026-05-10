@@ -112,10 +112,36 @@ jobs:
     needs:
       - build-api
     runs-on: ubuntu-latest
+    env:
+      CHUMMER_HUB_REGISTRY_ROOT: ${{ github.workspace }}/../chummer-hub-registry
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout hub-registry sibling
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          clone_branch_or_main() {
+            local repo_url="$1"
+            local dest="$2"
+            local branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-main}}"
+
+            rm -rf "$dest"
+            mkdir -p "$(dirname "$dest")"
+
+            if git ls-remote --exit-code --heads "$repo_url" "$branch" >/dev/null 2>&1; then
+              git clone --depth 1 --branch "$branch" "$repo_url" "$dest"
+            else
+              git clone --depth 1 --branch main "$repo_url" "$dest"
+            fi
+          }
+
+          clone_branch_or_main "https://github.com/ArchonMegalon/chummer6-hub-registry.git" "$CHUMMER_HUB_REGISTRY_ROOT"
+          test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/materialize_public_release_channel.py"
+          test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/verify_public_release_channel.py"
 
       - name: Validate amend manifests checksums
         run: bash scripts/validate-amend-manifests.sh
@@ -172,6 +198,7 @@ jobs:
     if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)) && vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR != '' }}
     runs-on: ubuntu-latest
     env:
+      CHUMMER_HUB_REGISTRY_ROOT: ${{ github.workspace }}/../chummer-hub-registry
       CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_DEPLOY_DIR }}
       CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_VERIFY_URL }}
       CHUMMER_PORTAL_DOWNLOADS_DEPLOY_ENABLED: "true"
@@ -199,6 +226,30 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout hub-registry sibling
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          clone_branch_or_main() {
+            local repo_url="$1"
+            local dest="$2"
+            local branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-main}}"
+
+            rm -rf "$dest"
+            mkdir -p "$(dirname "$dest")"
+
+            if git ls-remote --exit-code --heads "$repo_url" "$branch" >/dev/null 2>&1; then
+              git clone --depth 1 --branch "$branch" "$repo_url" "$dest"
+            else
+              git clone --depth 1 --branch main "$repo_url" "$dest"
+            fi
+          }
+
+          clone_branch_or_main "https://github.com/ArchonMegalon/chummer6-hub-registry.git" "$CHUMMER_HUB_REGISTRY_ROOT"
+          test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/materialize_public_release_channel.py"
+          test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/verify_public_release_channel.py"
 
       - name: Download manifest bundle
         uses: actions/download-artifact@v4
@@ -230,6 +281,7 @@ jobs:
     if: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_portal_downloads)) && vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI != '' }}
     runs-on: ubuntu-latest
     env:
+      CHUMMER_HUB_REGISTRY_ROOT: ${{ github.workspace }}/../chummer-hub-registry
       CHUMMER_PORTAL_DOWNLOADS_S3_URI: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_S3_URI }}
       CHUMMER_PORTAL_DOWNLOADS_S3_LATEST_URI: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_S3_LATEST_URI }}
       CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL: ${{ vars.CHUMMER_PORTAL_DOWNLOADS_S3_ENDPOINT_URL }}
@@ -256,6 +308,30 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout hub-registry sibling
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          clone_branch_or_main() {
+            local repo_url="$1"
+            local dest="$2"
+            local branch="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME:-main}}"
+
+            rm -rf "$dest"
+            mkdir -p "$(dirname "$dest")"
+
+            if git ls-remote --exit-code --heads "$repo_url" "$branch" >/dev/null 2>&1; then
+              git clone --depth 1 --branch "$branch" "$repo_url" "$dest"
+            else
+              git clone --depth 1 --branch main "$repo_url" "$dest"
+            fi
+          }
+
+          clone_branch_or_main "https://github.com/ArchonMegalon/chummer6-hub-registry.git" "$CHUMMER_HUB_REGISTRY_ROOT"
+          test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/materialize_public_release_channel.py"
+          test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/verify_public_release_channel.py"
 
       - name: Download manifest bundle
         uses: actions/download-artifact@v4
