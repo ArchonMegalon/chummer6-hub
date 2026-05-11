@@ -3,8 +3,8 @@ services:
   chummer-api:
     image: chummer-api:local
     build:
-      context: ../../..
-      dockerfile: Chummer.Run.Api/Dockerfile
+      context: /docker
+      dockerfile: chummercomplete/chummer.run-services/Chummer.Run.Api/Dockerfile
     environment:
       CHUMMER_STATE_PATH: "/app/state"
       CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
@@ -162,11 +162,29 @@ services:
     depends_on:
       - chummer-api
     profiles: ["test"]
+    working_dir: /src/chummercomplete/chummer.run-services
     environment:
       CHUMMER_API_BASE_URL: "http://chummer-api:8080"
       CHUMMER_WEB_BASE_URL: "http://chummer-api:8080"
       CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
       CHUMMER_AMENDS_EXPECTED_ID: "${CHUMMER_AMENDS_EXPECTED_ID:-local-test-amend}"
+    volumes:
+      - /docker/chummercomplete/chummer.run-services:/src/chummercomplete/chummer.run-services
+      - /docker/chummercomplete/chummer-core-engine:/src/chummercomplete/chummer-core-engine
+      - /docker/chummercomplete/chummer-hub-registry:/src/chummercomplete/chummer-hub-registry
+      - /docker/chummercomplete/chummer-design:/src/chummercomplete/chummer-design
+      - /docker/chummercomplete/chummer-presentation:/src/chummercomplete/chummer-presentation
+      - /docker/fleet/repos/chummer-media-factory:/src/fleet/repos/chummer-media-factory
+      - /docker/chummercomplete/chummer.run-services:/docker/chummercomplete/chummer.run-services
+      - /docker/chummercomplete/chummer.run-services:/docker/chummercomplete/chummer6-hub
+      - /docker/chummercomplete/chummer-core-engine:/docker/chummercomplete/chummer-core-engine
+      - /docker/chummercomplete/chummer-hub-registry:/docker/chummercomplete/chummer-hub-registry
+      - /docker/chummercomplete/chummer-design:/docker/chummercomplete/chummer-design
+      - /docker/chummercomplete/chummer-presentation:/docker/chummercomplete/chummer-presentation
+      - /docker/chummercomplete/chummer-presentation:/docker/chummercomplete/chummer6-ui
+      - /docker/chummercomplete/chummer.run-services/.codex-design/product:/docker/fleet/.codex-studio/published:ro
+      - /docker/chummercomplete/chummer.run-services/.codex-design/product:/docker/chummercomplete/chummer-design-m114/products/chummer:ro
+      - /docker/fleet/repos/chummer-media-factory:/docker/fleet/repos/chummer-media-factory
     command: >
       bash scripts/ai/verify.sh
   chummer-playwright:

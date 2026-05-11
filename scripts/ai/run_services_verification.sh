@@ -5,6 +5,65 @@ source "$(dirname "$0")/_env.sh"
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+if ! command -v rg >/dev/null 2>&1; then
+  rg() {
+    local invert=0
+    local with_line_numbers=0
+    local pattern=""
+    local files=()
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        -v)
+          invert=1
+          ;;
+        -n)
+          with_line_numbers=1
+          ;;
+        --)
+          ;;
+        -*)
+          echo "unsupported rg compatibility option: $1" >&2
+          return 2
+          ;;
+        *)
+          if [[ -z "$pattern" ]]; then
+            pattern="$1"
+          else
+            files+=("$1")
+          fi
+          ;;
+      esac
+      shift
+    done
+
+    if [[ -z "$pattern" ]]; then
+      echo "rg compatibility shim requires a pattern" >&2
+      return 2
+    fi
+
+    local args=()
+    if [[ $with_line_numbers -eq 1 ]]; then
+      args+=(-n)
+    fi
+    if [[ $invert -eq 1 ]]; then
+      args+=(-v)
+    fi
+
+    grep -E "${args[@]}" -- "$pattern" "${files[@]}"
+  }
+fi
+
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [[ -z "$PYTHON_BIN" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+  elif command -v python >/dev/null 2>&1; then
+    PYTHON_BIN="python"
+  else
+    PYTHON_BIN=""
+  fi
+fi
+
 TMP_ROOT="${ROOT_DIR}/.tmp"
 mkdir -p "$TMP_ROOT"
 TMP_DIR="$(mktemp -d "${TMP_ROOT}/run-services-verification.XXXXXX")"
@@ -280,4 +339,9 @@ if [[ "${CHUMMER_HUB_PLAYWRIGHT:-0}" == "1" ]]; then
   bash scripts/e2e-hub.sh
 fi
 
-python3 scripts/materialize_campaign_os_local_proof.py >/dev/null
+if [[ -n "$PYTHON_BIN" ]]; then
+  "$PYTHON_BIN" scripts/materialize_campaign_os_local_proof.py >/dev/null
+else
+  echo "python runtime is required to materialize campaign OS local proof." >&2
+  exit 1
+fi

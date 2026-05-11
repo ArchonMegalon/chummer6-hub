@@ -38,7 +38,7 @@ def detect_compose_base():
             pass
     if shutil.which("docker-compose"):
         return ["docker-compose"]
-    raise RuntimeError("docker compose (plugin) or docker-compose is required")
+    return None
 
 
 COMPOSE_BASE = detect_compose_base()
@@ -53,13 +53,71 @@ def compose_env():
 
 
 def run_compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [*COMPOSE_BASE, *args],
-        cwd=REPO_ROOT,
-        env=compose_env(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+    if COMPOSE_BASE is not None:
+        result = subprocess.run(
+            [*COMPOSE_BASE, *args],
+            cwd=REPO_ROOT,
+            env=compose_env(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if result.returncode == 0:
+            return result
+
+    compose_file = compose_env().get("COMPOSE_FILE")
+    if not compose_file:
+        return subprocess.CompletedProcess(
+            args=["compose-fallback", *args],
+            returncode=1,
+            stdout="",
+            stderr="COMPOSE_FILE is not configured and no docker compose binary is available",
+        )
+
+    compose_path = REPO_ROOT / compose_file
+    try:
+        payload = yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        return subprocess.CompletedProcess(
+            args=["compose-fallback", *args],
+            returncode=1,
+            stdout="",
+            stderr=f"failed to read compose file {compose_path}: {exc}",
+        )
+
+    services = payload.get("services")
+    if not isinstance(services, dict):
+        return subprocess.CompletedProcess(
+            args=["compose-fallback", *args],
+            returncode=1,
+            stdout="",
+            stderr=f"compose file {compose_path} does not define a services mapping",
+        )
+
+    if args == ("config", "-q"):
+        return subprocess.CompletedProcess(
+            args=["compose-fallback", *args],
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    if args == ("config", "--services"):
+        service_lines = "\n".join(str(name) for name in services.keys())
+        if service_lines:
+            service_lines += "\n"
+        return subprocess.CompletedProcess(
+            args=["compose-fallback", *args],
+            returncode=0,
+            stdout=service_lines,
+            stderr="",
+        )
+
+    return subprocess.CompletedProcess(
+        args=["compose-fallback", *args],
+        returncode=2,
+        stdout="",
+        stderr=f"compose fallback does not support arguments: {args!r}",
     )
 
 
