@@ -9,6 +9,13 @@
 **/.toolstarget
 **/.vs
 **/.vscode
+**/.tmp
+**/.codex-studio/out
+**/.codex-studio/archive
+**/.codex-studio/tmp
+Chummer.Portal/downloads/files
+Chummer.Portal/downloads/proof/windows
+Chummer.Portal/downloads-backups
 **/*.*proj.user
 **/*.dbmdl
 **/*.jfm
@@ -22,6 +29,8 @@
 !Chummer.Coach.Web/Dockerfile
 !Chummer.Session.Web/Dockerfile
 !Docker/Dockerfile.tests
+!legacy/tooling/docker/docker-compose.yml
+!legacy/tooling/vs-compose/docker-compose.dcproj
 **/node_modules
 **/npm-debug.log
 **/obj

@@ -89,6 +89,7 @@ STARTUP_SMOKE_MAX_AGE_SECONDS="${CHUMMER_PUBLIC_STARTUP_SMOKE_MAX_AGE_SECONDS:-1
 PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"
 PUBLIC_RELEASE_PROOF_BASE_URL="${CHUMMER_PUBLIC_RELEASE_PROOF_BASE_URL:-https://chummer.run}"
 DISABLED_ARTIFACT_IDS="${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}}"
+FORCE_ACCOUNT_REQUIRED_DOWNLOADS="${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-true}"
 REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-$REPO_ROOT/../chummer-hub-registry}"
 
 detect_auto_disabled_artifact_ids() {
@@ -171,7 +172,7 @@ if [[ ! -f "$UI_LOCALIZATION_RELEASE_GATE_SOURCE" ]]; then
   exit 1
 fi
 
-canonicalize_registry_boundary_coverage() {
+canonicalize_release_channel_registries() {
   local manifest_path="${1:-}"
   if [[ -z "$manifest_path" || ! -f "$manifest_path" ]]; then
     return 0
@@ -193,7 +194,63 @@ spec.loader.exec_module(module)
 
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
+payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+payload["publicTrustMetrics"] = module.expected_public_trust_metrics(payload)
 manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+copy_public_artifacts() {
+  local source_root="${1:-}"
+  local target_root="${2:-}"
+  local artifact_path
+  shopt -s nullglob
+  for artifact_path in "$source_root"/chummer-*; do
+    [[ -f "$artifact_path" ]] || continue
+    cp "$artifact_path" "$target_root"/
+  done
+  shopt -u nullglob
+}
+
+filter_files_to_manifest_truth() {
+  local files_root="${1:-}"
+  local manifest_path="${2:-}"
+  if [[ -z "$files_root" || -z "$manifest_path" || ! -d "$files_root" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$files_root" "$manifest_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+files_root = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+rows = payload.get("artifacts")
+if not isinstance(rows, list):
+    rows = payload.get("downloads")
+if not isinstance(rows, list):
+    rows = []
+
+allowed: set[str] = set()
+for row in rows:
+    if not isinstance(row, dict):
+        continue
+    file_name = str(row.get("fileName") or "").strip()
+    if not file_name:
+        url = str(row.get("downloadUrl") or row.get("url") or "").strip()
+        if url:
+            file_name = Path(url.split("?", 1)[0].split("#", 1)[0]).name
+    if file_name:
+        allowed.add(file_name)
+
+for artifact_path in files_root.glob("chummer-*"):
+    if not artifact_path.is_file():
+        continue
+    if artifact_path.name not in allowed:
+        artifact_path.unlink()
 PY
 }
 
@@ -208,8 +265,9 @@ combined_startup_smoke_root="$tmp_root/startup-smoke"
 generated_root="$tmp_root/generated"
 mkdir -p "$combined_files_root" "$combined_startup_smoke_root" "$generated_root"
 
-cp "$RUNSERVICES_SOURCE_FILES_ROOT"/chummer-* "$combined_files_root"/
-cp "$PRESENTATION_FILES_ROOT"/chummer-* "$combined_files_root"/
+copy_public_artifacts "$RUNSERVICES_SOURCE_FILES_ROOT" "$combined_files_root"
+copy_public_artifacts "$PRESENTATION_FILES_ROOT" "$combined_files_root"
+filter_files_to_manifest_truth "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH"
 
 AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH" | paste -sd, -)"
 if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then
@@ -300,6 +358,7 @@ STARTUP_SMOKE_DIR="$combined_startup_smoke_root" \
 RELEASE_PROOF_PATH="$sanitized_release_proof_path" \
 CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH="$UI_LOCALIZATION_RELEASE_GATE_SOURCE" \
 CHUMMER_MACOS_PUBLIC_SHELF_ENABLED=true \
+CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS="$FORCE_ACCOUNT_REQUIRED_DOWNLOADS" \
 RELEASE_CHANNEL="$release_channel" \
 RELEASE_VERSION="$release_version" \
 RELEASE_PUBLISHED_AT="$release_published_at" \
@@ -509,10 +568,10 @@ if startup_smoke_root.exists():
 PY
 fi
 
-canonicalize_registry_boundary_coverage "$generated_root/RELEASE_CHANNEL.generated.json"
-canonicalize_registry_boundary_coverage "$generated_root/releases.json"
-canonicalize_registry_boundary_coverage "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json"
-canonicalize_registry_boundary_coverage "$OUTPUT_ROOT/releases.json"
+canonicalize_release_channel_registries "$generated_root/RELEASE_CHANNEL.generated.json"
+canonicalize_release_channel_registries "$generated_root/releases.json"
+canonicalize_release_channel_registries "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json"
+canonicalize_release_channel_registries "$OUTPUT_ROOT/releases.json"
 
 python3 - "$OUTPUT_ROOT/RELEASE_CHANNEL.generated.json" <<'PY'
 import json

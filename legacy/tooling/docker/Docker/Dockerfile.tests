@@ -1,7 +1,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0
-WORKDIR /src
+WORKDIR /src/chummercomplete/chummer.run-services
 
-COPY . .
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-requests python3-yaml ripgrep \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY . /src/chummercomplete/chummer.run-services
 ENV DOTNET_NOLOGO=1
 ENV DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
