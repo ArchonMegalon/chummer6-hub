@@ -400,21 +400,21 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
             if expected_missing_marker not in missing_tuple_receipts:
                 errors.append(f"desktopTupleCoverage missingRequiredPlatformHeadRidTuples does not include {expected_missing_marker}")
 
-            receipt_path = STARTUP_SMOKE_ROOT / f"startup-smoke-{normalize(route_entry.get('head'))}-{normalize(route_entry.get('rid'))}.receipt.json"
-            if receipt_path.is_file():
-                receipt = load_json(receipt_path)
-                release_sha = normalize(artifact.get("sha256"))
-                receipt_sha = normalize(receipt.get("artifactSha256") or receipt.get("artifactDigest")).removeprefix("sha256:")
-                if release_sha and receipt_sha and release_sha != receipt_sha:
-                    supportability_state = normalize(payload.get("supportabilityState"))
-                    rollout_state = normalize(payload.get("rolloutState"))
-                    message = normalize(payload.get("message"))
-                    if supportability_state != "review_required":
-                        errors.append(f"release channel must stay review_required when tuple {tuple_id} startup-smoke digest drifts")
-                    if rollout_state != "coverage_incomplete":
-                        errors.append(f"release channel must stay coverage_incomplete when tuple {tuple_id} startup-smoke digest drifts")
-                    if "startup-smoke proof" not in message.lower():
-                        errors.append(f"release channel message must mention startup-smoke proof when tuple {tuple_id} digest drifts")
+        receipt_path = STARTUP_SMOKE_ROOT / f"startup-smoke-{normalize(route_entry.get('head'))}-{normalize(route_entry.get('rid'))}.receipt.json"
+        if receipt_path.is_file():
+            receipt = load_json(receipt_path)
+            release_sha = normalize(artifact.get("sha256"))
+            receipt_sha = normalize(receipt.get("artifactSha256") or receipt.get("artifactDigest")).removeprefix("sha256:")
+            if release_sha and receipt_sha and release_sha != receipt_sha:
+                supportability_state = normalize(payload.get("supportabilityState"))
+                rollout_state = normalize(payload.get("rolloutState"))
+                message = normalize(payload.get("message"))
+                if supportability_state != "review_required":
+                    errors.append(f"release channel must stay review_required when tuple {tuple_id} startup-smoke digest drifts")
+                if rollout_state != "coverage_incomplete":
+                    errors.append(f"release channel must stay coverage_incomplete when tuple {tuple_id} startup-smoke digest drifts")
+                if "startup-smoke proof" not in message.lower():
+                    errors.append(f"release channel message must mention startup-smoke proof when tuple {tuple_id} digest drifts")
 
 
 def verify_source_markers(errors: list[str]) -> None:

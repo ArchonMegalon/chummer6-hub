@@ -56,6 +56,45 @@ HUB_RELEASE_PROOF_BASE_URL="${CHUMMER_HUB_RELEASE_PROOF_BASE_URL:-https://chumme
 HUB_RELEASE_PROOF_COMPOSE_FILE="${CHUMMER_HUB_RELEASE_PROOF_COMPOSE_FILE:-docker-compose.yml}"
 HUB_RELEASE_PROOF_TIMEOUT_SECONDS="${CHUMMER_HUB_RELEASE_PROOF_TIMEOUT_SECONDS:-120}"
 HUB_RELEASE_PROOF_SKIP_REBUILD="${CHUMMER_HUB_RELEASE_PROOF_SKIP_REBUILD:-true}"
+LOCAL_FLAGSHIP_READINESS_PATH="${CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH:-$ROOT_DIR/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json}"
+LOCAL_NEXT90_QUEUE_STAGING_PATH="${CHUMMER_NEXT90_QUEUE_STAGING_PATH:-$ROOT_DIR/.codex-design/product/NEXT_90_DAY_QUEUE_STAGING.generated.yaml}"
+LOCAL_NEXT90_DESIGN_QUEUE_STAGING_PATH="${CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH:-$ROOT_DIR/.codex-design/product/NEXT_90_DAY_QUEUE_STAGING.generated.yaml}"
+LOCAL_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH="${CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH:-$ROOT_DIR/.codex-design/product/NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml}"
+
+export CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH="$LOCAL_FLAGSHIP_READINESS_PATH"
+export CHUMMER_NEXT90_QUEUE_STAGING_PATH="$LOCAL_NEXT90_QUEUE_STAGING_PATH"
+export CHUMMER_NEXT90_DESIGN_QUEUE_STAGING_PATH="$LOCAL_NEXT90_DESIGN_QUEUE_STAGING_PATH"
+export CHUMMER_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH="$LOCAL_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH"
+export CHUMMER_WORKSPACE_RESTORE_RECEIPTS_QUEUE_STAGING="$LOCAL_NEXT90_QUEUE_STAGING_PATH"
+export CHUMMER_WORKSPACE_RESTORE_RECEIPTS_DESIGN_QUEUE_STAGING="$LOCAL_NEXT90_DESIGN_QUEUE_STAGING_PATH"
+export CHUMMER_WORKSPACE_RESTORE_RECEIPTS_REGISTRY="$LOCAL_NEXT90_PRODUCT_ADVANCE_REGISTRY_PATH"
+export CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_FLEET_QUEUE="$LOCAL_NEXT90_QUEUE_STAGING_PATH"
+export CHUMMER_WORKSPACE_RESTORE_QUEUE_IDENTITY_DESIGN_QUEUE="$LOCAL_NEXT90_DESIGN_QUEUE_STAGING_PATH"
+
+configure_git_safe_directories() {
+  local candidate
+  for candidate in \
+    "$ROOT_DIR" \
+    "/docker/chummercomplete/chummer6-hub" \
+    "$UI_REPO_ROOT" \
+    "/docker/chummercomplete/chummer-presentation" \
+    "/docker/chummercomplete/chummer-design" \
+    "/docker/chummercomplete/chummer-hub-registry" \
+    "/docker/chummercomplete/chummer-core-engine"
+  do
+    if [[ -d "$candidate" ]]; then
+      git config --global --add safe.directory "$candidate"
+    fi
+  done
+}
+
+configure_git_safe_directories
+
+restore_run_services_test_project() {
+  dotnet restore Chummer.Tests/Chummer.Tests.csproj --nologo
+}
+
+restore_run_services_test_project
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {
   python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'
@@ -304,6 +343,56 @@ refresh_hub_local_release_proof() {
     "$HUB_RELEASE_PROOF_SKIP_REBUILD"
   mkdir -p "$(dirname "$HUB_SERVED_RELEASE_PROOF_PATH")"
   cp "$HUB_LOCAL_RELEASE_PROOF_PATH" "$HUB_SERVED_RELEASE_PROOF_PATH"
+}
+
+materialize_local_flagship_readiness_artifact() {
+  mkdir -p "$(dirname "$LOCAL_FLAGSHIP_READINESS_PATH")"
+  python3 - "$HUB_LOCAL_RELEASE_PROOF_PATH" "$LOCAL_FLAGSHIP_READINESS_PATH" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+proof_path = Path(sys.argv[1])
+readiness_path = Path(sys.argv[2])
+
+proof = {}
+if proof_path.is_file():
+    loaded = json.loads(proof_path.read_text(encoding="utf-8"))
+    if isinstance(loaded, dict):
+        proof = loaded
+
+block = proof.get("desktop_client_readiness")
+if not isinstance(block, dict):
+    block = {}
+
+missing_coverage_keys = block.get("missing_coverage_keys")
+if not isinstance(missing_coverage_keys, list):
+    missing_coverage_keys = []
+
+reason = str(block.get("reason") or "").strip() or "flagship product readiness proof did not publish a desktop-client reason."
+completion_status = str(block.get("completion_audit_status") or "").strip() or "unknown"
+completion_reason = str(block.get("completion_audit_reason") or "").strip()
+
+payload = {
+    "contract_name": "fleet.flagship_product_readiness",
+    "generated_at": str(block.get("generated_at") or block.get("generatedAt") or "").strip(),
+    "status": str(block.get("status") or "").strip() or "unknown",
+    "scoped_status": str(block.get("scoped_status") or "").strip() or "unknown",
+    "missing_keys": missing_coverage_keys,
+    "scoped_missing_keys": missing_coverage_keys,
+    "completion_audit": {
+        "status": completion_status,
+        "reason": completion_reason,
+    },
+    "flagship_readiness_audit": {
+        "reason": reason,
+        "missing_coverage_keys": missing_coverage_keys,
+        "scoped_missing_coverage_keys": missing_coverage_keys,
+    },
+}
+
+readiness_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
 }
 
 run_gate_materializer_script() {
@@ -2339,6 +2428,7 @@ if bash scripts/audit-ui-parity.sh; then
 fi
 mv "$visual_receipt_backup" "$visual_receipt_path"
 
+materialize_local_flagship_readiness_artifact
 refresh_hub_local_release_proof
 python3 scripts/verify_desktop_native_trust_receipts.py
 python3 -m unittest tests/test_desktop_native_trust_receipts.py

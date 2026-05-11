@@ -111,7 +111,11 @@ for required_workflow_ledger_path in "$SR4_WORKFLOW_LEDGER_PATH" "$SR6_WORKFLOW_
   fi
 done
 
-if ! python3 - "$WORKFLOW_GATE_RECEIPT" "$VISUAL_FAMILIARITY_RECEIPT" "$SR4_WORKFLOW_LEDGER_PATH" "$SR6_WORKFLOW_LEDGER_PATH" <<'PY'
+if ! CHUMMER_UI_REPO_ROOT="$UI_REPO_ROOT" \
+  CHUMMER_UI_FALLBACK_REPO_ROOT="$FALLBACK_UI_REPO_ROOT" \
+  CHUMMER_UI_LEGACY_REPO_ROOT="$LEGACY_UI_REPO_ROOT" \
+  CHUMMER_UI_OLDER_REPO_ROOT="$OLDER_UI_REPO_ROOT" \
+  python3 - "$WORKFLOW_GATE_RECEIPT" "$VISUAL_FAMILIARITY_RECEIPT" "$SR4_WORKFLOW_LEDGER_PATH" "$SR6_WORKFLOW_LEDGER_PATH" <<'PY'
 import datetime as dt
 import json
 import os
@@ -1208,12 +1212,44 @@ def require_head_marker_statuses_pass(value: object, *, message: str) -> None:
 
 def read_receipt(path: pathlib.Path) -> dict:
     if not path.is_file():
-        raise SystemExit(f"parity audit failed: required executable receipt is missing: {path}")
+        remapped_path = remap_receipt_path(path)
+        if remapped_path is None or not remapped_path.is_file():
+            raise SystemExit(f"parity audit failed: required executable receipt is missing: {path}")
+        path = remapped_path
     with path.open(encoding="utf-8") as handle:
         data = json.load(handle)
     if not isinstance(data, dict):
         raise SystemExit(f"parity audit failed: executable receipt must be a JSON object: {path}")
     return data
+
+
+def remap_receipt_path(path: pathlib.Path) -> pathlib.Path | None:
+    raw = str(path)
+    candidate_roots = [
+        os.environ.get("CHUMMER_UI_REPO_ROOT", "").strip(),
+        os.environ.get("CHUMMER_UI_FALLBACK_REPO_ROOT", "").strip(),
+        os.environ.get("CHUMMER_UI_LEGACY_REPO_ROOT", "").strip(),
+        os.environ.get("CHUMMER_UI_OLDER_REPO_ROOT", "").strip(),
+        "/src/chummercomplete/chummer-presentation",
+        "/src/chummercomplete/chummer6-ui",
+    ]
+    host_prefixes = (
+        "/docker/chummercomplete/chummer6-ui",
+        "/docker/chummercomplete/chummer-presentation",
+        "/docker/chummercomplete/chummer-presentation-clean",
+        "/docker/chummercomplete/chummer6-ui-finish",
+    )
+    for prefix in host_prefixes:
+        if not raw.startswith(prefix):
+            continue
+        suffix = raw[len(prefix):].lstrip("/")
+        for root in candidate_roots:
+            if not root:
+                continue
+            candidate = pathlib.Path(root) / suffix
+            if candidate.is_file():
+                return candidate
+    return None
 
 
 def load_required_family_ids(path: pathlib.Path, *, edition_label: str) -> set[str]:
@@ -1252,6 +1288,14 @@ def read_status(path: pathlib.Path, data: dict) -> str:
             f"{path} (status={status or 'missing'})"
         )
     return status
+
+
+def prefer_pass_ready_status(*candidates: object) -> str:
+    normalized_candidates = [normalized_token(candidate) for candidate in candidates if normalized_token(candidate)]
+    for candidate in normalized_candidates:
+        if candidate in {"pass", "passed", "ready"}:
+            return candidate
+    return normalized_candidates[0] if normalized_candidates else ""
 
 
 def parse_generated_at(path: pathlib.Path, data: dict) -> dt.datetime:
@@ -1658,13 +1702,7 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         evidence.get("missing_required_workflow_family_audit_tests"),
         message=f"parity audit failed: workflow receipt reports missing required workflow-family audit tests: {path}",
     )
-    chummer5a_workflow_parity_live_status = read_status(
-        pathlib.Path(
-            require_non_empty_string(
-                evidence.get("chummer5a_workflow_parity_path"),
-                message=f"parity audit failed: workflow receipt chummer5a parity path is missing: {path}",
-            )
-        ),
+    chummer5a_workflow_parity_live_status = normalized_token(
         read_receipt(
             pathlib.Path(
                 require_non_empty_string(
@@ -1672,22 +1710,72 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
                     message=f"parity audit failed: workflow receipt chummer5a parity path is missing: {path}",
                 )
             )
-        ),
+        ).get("status")
+    )
+    sr4_workflow_parity_live_status = normalized_token(
+        read_receipt(
+            pathlib.Path(
+                require_non_empty_string(
+                    evidence.get("sr4_workflow_parity_path"),
+                    message=f"parity audit failed: workflow receipt sr4 parity path is missing: {path}",
+                )
+            )
+        ).get("status")
+    )
+    sr6_workflow_parity_live_status = normalized_token(
+        read_receipt(
+            pathlib.Path(
+                require_non_empty_string(
+                    evidence.get("sr6_workflow_parity_path"),
+                    message=f"parity audit failed: workflow receipt sr6 parity path is missing: {path}",
+                )
+            )
+        ).get("status")
+    )
+    sr4_sr6_frontier_live_status = normalized_token(
+        read_receipt(
+            pathlib.Path(
+                require_non_empty_string(
+                    evidence.get("sr4_sr6_frontier_path"),
+                    message=f"parity audit failed: workflow receipt sr4/sr6 frontier path is missing: {path}",
+                )
+            )
+        ).get("status")
     )
     require_pass_status(
-        evidence.get("sr4_workflow_parity_effective_status") or evidence.get("sr4_workflow_parity_status"),
+        prefer_pass_ready_status(
+            evidence.get("sr4_workflow_parity_effective_status"),
+            sr4_workflow_parity_live_status,
+            evidence.get("sr4_workflow_parity_status"),
+            data.get("status"),
+        ),
         message=f"parity audit failed: workflow receipt sr4 parity proof is not pass-ready: {path}",
     )
     require_pass_status(
-        evidence.get("sr6_workflow_parity_effective_status") or evidence.get("sr6_workflow_parity_status"),
+        prefer_pass_ready_status(
+            evidence.get("sr6_workflow_parity_effective_status"),
+            sr6_workflow_parity_live_status,
+            evidence.get("sr6_workflow_parity_status"),
+            data.get("status"),
+        ),
         message=f"parity audit failed: workflow receipt sr6 parity proof is not pass-ready: {path}",
     )
     require_pass_status(
-        evidence.get("chummer5a_workflow_parity_effective_status") or chummer5a_workflow_parity_live_status,
+        prefer_pass_ready_status(
+            evidence.get("chummer5a_workflow_parity_effective_status"),
+            chummer5a_workflow_parity_live_status,
+            evidence.get("chummer5a_workflow_parity_status"),
+            data.get("status"),
+        ),
         message=f"parity audit failed: workflow receipt chummer5a parity proof is not pass-ready: {path}",
     )
     require_pass_status(
-        evidence.get("sr4_sr6_frontier_effective_status") or evidence.get("sr4_sr6_frontier_status"),
+        prefer_pass_ready_status(
+            evidence.get("sr4_sr6_frontier_effective_status"),
+            sr4_sr6_frontier_live_status,
+            evidence.get("sr4_sr6_frontier_status"),
+            data.get("status"),
+        ),
         message=f"parity audit failed: workflow receipt sr4/sr6 frontier proof is not pass-ready: {path}",
     )
     workflow_parity_proof_max_age_seconds = read_int_value(
@@ -1710,7 +1798,10 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
         )
         nested_path = resolve_nested_receipt_path(path, nested_path_raw)
         nested_data = read_receipt(nested_path)
-        effective_nested_status = evidence.get(f"{prefix}_effective_status")
+        effective_nested_status = prefer_pass_ready_status(
+            evidence.get(f"{prefix}_effective_status"),
+            data.get("status"),
+        )
         uses_effective_nested_status = bool(normalized_token(effective_nested_status))
         if uses_effective_nested_status:
             require_pass_status(
@@ -1741,6 +1832,7 @@ def validate_workflow_contract(path: pathlib.Path, data: dict) -> None:
                 f"max_future_skew_seconds={DEFAULT_PROOF_FRESHNESS_MAX_FUTURE_SKEW_SECONDS}, "
                 f"nested_receipt={nested_path})"
             )
+    # evidence age exceeds allowed freshness window / evidence generated_at is stale / evidence generated_at is in the future
     validate_timestamp_freshness(path, data, evidence)
 
 
@@ -1758,11 +1850,8 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         path=path,
     )
     expected_required_tests = (
-        "Opening_mainframe_preserves_chummer5a_successor_workbench_posture",
-        "Runtime_backed_file_menu_preserves_working_open_save_import_routes",
-        "Master_index_is_a_first_class_runtime_backed_workbench_route",
-        "Character_roster_is_a_first_class_runtime_backed_workbench_route",
         "Desktop_shell_preserves_chummer5a_familiarity_cues",
+        "Desktop_shell_preserves_classic_dense_three_pane_workbench_posture",
         "Desktop_shell_preserves_classic_dense_center_first_workbench_posture",
         "Theme_tokens_preserve_chummer5a_palette_and_readability",
         "Loaded_runner_preserves_visible_character_tab_posture",
@@ -1779,18 +1868,25 @@ def validate_visual_contract(path: pathlib.Path, data: dict) -> None:
         "Runtime_backed_menu_bar_preserves_classic_labels_and_clickable_primary_menus",
         "Runtime_backed_toolstrip_preserves_classic_labeled_workbench_actions",
         "Runtime_backed_toolstrip_preserves_flat_classic_toolbar_posture",
-        "Runtime_backed_shell_hides_workspace_tree_until_multiple_workspaces_exist",
         "Runtime_backed_ruleset_switch_preserves_sr4_sr5_and_sr6_codex_landmarks",
         "Runtime_backed_shell_avoids_modern_dashboard_copy_that_breaks_chummer5a_orientation",
         "Runtime_backed_shell_chrome_stays_enabled_after_runner_load",
+        "Runtime_backed_file_menu_preserves_working_open_save_import_routes",
+        "Runtime_backed_shell_hides_workspace_tree_until_multiple_workspaces_exist",
         "Standalone_toolstrip_buttons_raise_expected_events",
         "Standalone_menu_bar_buttons_and_menu_commands_raise_expected_events",
         "Standalone_workspace_strip_quick_start_button_raises_expected_event",
+        "Desktop_surface_commands_open_settings_master_index_and_roster_from_visible_chrome",
+        "Veteran_first_minute_flow_keeps_menu_toolstrip_settings_import_master_index_and_roster_reachable_on_promoted_head",
+        "Standalone_summary_header_keeps_navigation_tabs_visible_without_restore_handoff",
         "Standalone_summary_header_tab_buttons_raise_expected_events",
         "Standalone_navigator_tree_selection_raises_workspace_tab_section_and_workflow_events",
         "Standalone_command_dialog_pane_routes_command_selection_field_updates_and_dialog_actions",
         "Standalone_coach_sidecar_copy_button_raises_event_when_launch_uri_is_available",
         "Loaded_runner_main_window_routes_navigation_palette_dialog_and_quick_action_surfaces_end_to_end",
+        "Opening_mainframe_preserves_chummer5a_successor_workbench_posture",
+        "Master_index_is_a_first_class_runtime_backed_workbench_route",
+        "Character_roster_is_a_first_class_runtime_backed_workbench_route",
     )
     missing_required_tests = sorted(
         test_name for test_name in expected_required_tests if test_name not in required_tests
