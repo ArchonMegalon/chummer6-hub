@@ -134,6 +134,8 @@ services:
       CHUMMER_COMMUNITY_STORE_PATH: /app/state/community-store.json
       CHUMMER_DATA_PROTECTION_KEYS_PATH: /app/state/data-protection-keys
       CHUMMER_DOWNLOADS_SOURCE_ROOT: /app/downloads
+      CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE: /app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json
+      CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE: /app/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json
       CHUMMER_API_KEY: "${CHUMMER_API_KEY:-}"
     volumes:
       - chummer-state:/app/state
