@@ -1,5 +1,7 @@
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using Chummer.Run.Api.Contracts;
+using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 
 namespace Chummer.Run.Api.Services;
@@ -16,11 +18,16 @@ public sealed class PublicSignalProjectionService
 
     private readonly PublicCanonFileLoader _canon;
     private readonly PublicRouteCatalogService _routes;
+    private readonly PublicSignalToCanonPacketService _packets;
 
-    public PublicSignalProjectionService(PublicCanonFileLoader canon, PublicRouteCatalogService routes)
+    public PublicSignalProjectionService(
+        PublicCanonFileLoader canon,
+        PublicRouteCatalogService routes,
+        PublicSignalToCanonPacketService packets)
     {
         _canon = canon;
         _routes = routes;
+        _packets = packets;
     }
 
     public PublicSignalProjectionPacketViewModel? BuildPacket(string publicPath)
@@ -40,6 +47,7 @@ public sealed class PublicSignalProjectionService
 
         _routes.ValidateRouteTarget(surface.PublicPath, $"public signal surface '{surface.Key}'");
         _routes.ValidateRouteTarget(surface.FallbackPath, $"public signal fallback '{surface.Key}'");
+        var packet = ResolveJourneyProofPacket(normalizedPublicPath);
 
         return new PublicSignalProjectionPacketViewModel(
             Eyebrow: "Projection packet",
@@ -66,9 +74,29 @@ public sealed class PublicSignalProjectionService
             CloseoutRequirements: ResolveCloseoutRequirements(document, surface),
             PublicWarning: document.PublicWarning,
             BoardTargets: document.BoardTargets,
+            JourneyProofEventRefs: packet?.JourneyProofEventRefs ?? Array.Empty<JourneyProofEventRef>(),
             PolicySource: RequireText(surface.PolicySource, $"public signal surface '{surface.Key}' policy_source"),
             PipelineSource: PipelineRelativePath,
             RegistrySource: RegistryRelativePath);
+    }
+
+    private SignalToCanonPacketProjection? ResolveJourneyProofPacket(string normalizedPublicPath)
+    {
+        string? surfaceId = normalizedPublicPath switch
+        {
+            "/feedback" => "feedback",
+            "/roadmap" => "roadmap",
+            "/changelog" => "changelog",
+            _ => null
+        };
+
+        if (surfaceId is null)
+        {
+            return null;
+        }
+
+        return _packets.Build().Packets.FirstOrDefault(packet =>
+            string.Equals(packet.SurfaceId, surfaceId, StringComparison.OrdinalIgnoreCase));
     }
 
     private SignalProjectionDocument LoadDocument()
@@ -102,13 +130,21 @@ public sealed class PublicSignalProjectionService
         };
 
     private static string ResolveProjectionLabel(PublicFeedbackSurfaceDocument surface)
-        => NormalizeKey(surface.Role) switch
+    {
+        string vendor = (surface.Vendor ?? string.Empty).Trim();
+        if (!string.IsNullOrWhiteSpace(vendor))
+        {
+            return vendor;
+        }
+
+        return NormalizeKey(surface.Role) switch
         {
             "public_feedback_and_voting" => "Public feedback board",
             "roadmap_projection" => "Roadmap projection",
             "changelog_projection_and_voter_notification" => "Shipped closeout board",
             _ => "Hosted projection"
         };
+    }
 
     private static string BuildSummary(PublicFeedbackSurfaceDocument surface)
     {

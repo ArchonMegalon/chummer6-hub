@@ -2643,7 +2643,8 @@ async Task VerifyPublicLandingProjectionAsync()
     var trustPulse = new PublicTrustPulseService(weeklyPulseArtifact, configuration, loggerFactory.CreateLogger<PublicTrustPulseService>());
     var flagshipCoverage = new PublicFlagshipCoverageService(canon);
     var privacyBoundaries = new PublicPrivacyBoundaryService(canon, routes);
-    var signalProjection = new PublicSignalProjectionService(canon, routes);
+    var publicSignalPackets = new PublicSignalToCanonPacketService(releases);
+    var signalProjection = new PublicSignalProjectionService(canon, routes, publicSignalPackets);
     var signalOperations = new PublicSignalOperationsService(canon, configuration, store, loggerFactory.CreateLogger<PublicSignalOperationsService>());
     var supportPresentation = new SupportCasePresentationService();
     var supportConciergePackets = new SupportConciergePacketService(releases, supportPresentation);
