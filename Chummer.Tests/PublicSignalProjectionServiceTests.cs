@@ -1,4 +1,5 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Support;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
@@ -25,6 +26,7 @@ public sealed class PublicSignalProjectionServiceTests
         Assert.Contains(packet.AuthorityFlow, item => string.Equals(item, "Public signal posts / votes / comments", StringComparison.Ordinal));
         Assert.Contains(packet.DecisionRoutes, item => string.Equals(item, "Product Governor", StringComparison.Ordinal));
         Assert.Contains(packet.Forbidden, item => string.Equals(item, "Support Case Truth", StringComparison.Ordinal));
+        Assert.Contains(packet.JourneyProofEventRefs, item => string.Equals(item.EventKey, "productlift_idea_clustered", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -40,6 +42,7 @@ public sealed class PublicSignalProjectionServiceTests
         Assert.Contains(packet.CloseoutRequirements, item => string.Equals(item, "Closeout Packet", StringComparison.Ordinal));
         Assert.Contains(packet.CloseoutRequirements, item => string.Equals(item, "Public Changelog Entry Or No Entry Reason", StringComparison.Ordinal));
         Assert.Contains(packet.CanonicalSources, item => string.Equals(item, "public_closeout_packets", StringComparison.Ordinal));
+        Assert.Contains(packet.JourneyProofEventRefs, item => string.Equals(item.EventKey, "voter_notified", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -76,7 +79,9 @@ public sealed class PublicSignalProjectionServiceTests
 
             var loader = new PublicCanonFileLoader(configuration);
             var routes = new PublicRouteCatalogService(loader);
-            return new PublicSignalProjectionService(loader, routes);
+            var releases = new PublicReleaseManifestService(configuration);
+            var packets = new PublicSignalToCanonPacketService(releases);
+            return new PublicSignalProjectionService(loader, routes, packets);
         }
 
         public void WriteSupportFiles()
@@ -172,6 +177,31 @@ Initial public signal boards:
 ## Core rule
 
 Public signal is input. Canon is decided by Chummer.
+""");
+            File.WriteAllText(
+                Path.Combine(productRoot, "PUBLIC_RELEASE_EXPERIENCE.yaml"),
+                """
+channel: rolling
+version: test-run
+generated_at_utc: 2026-05-12T00:00:00Z
+display:
+  channel_label: Rolling
+  build_label: Build test-run
+  published_label: Published 2026-05-12
+artifacts:
+  - artifact_id: avalonia-win-x64-installer
+    title: Chummer for Windows
+    dispatch_href: /downloads/install/avalonia-win-x64-installer
+    direct_file_href: /downloads/files/chummer-win.exe
+    platform_label: Windows
+    head_label: Installer
+    size_label: 1 MB
+    support_line: Supported
+    action_label: Install
+    installer: true
+    install_access_class: account_required
+    requires_account: true
+    guest_download_allowed: false
 """);
 
             string manifestRoot = Path.Combine(_canonRoot, ".codex-design", "product");

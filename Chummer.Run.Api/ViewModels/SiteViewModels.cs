@@ -657,6 +657,7 @@ public sealed record PublicSignalProjectionPacketViewModel(
     IReadOnlyList<string> CloseoutRequirements,
     string PublicWarning,
     IReadOnlyList<string> BoardTargets,
+    IReadOnlyList<JourneyProofEventRef> JourneyProofEventRefs,
     string PolicySource,
     string PipelineSource,
     string RegistrySource);
