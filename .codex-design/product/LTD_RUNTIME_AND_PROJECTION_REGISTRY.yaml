@@ -86,6 +86,7 @@ product_systems:
       - Documentation.AI
       - AI Magicx
       - 1min.AI
+      - Blip AI
       - BrowserAct
       - Paperguide
     contract: horizons/knowledge-fabric.md
@@ -180,6 +181,7 @@ product_systems:
     tools:
       - 1min.AI
       - AI Magicx
+      - Blip AI
       - BrowserAct
       - Documentation.AI
     contract: horizons/local-co-processor.md
