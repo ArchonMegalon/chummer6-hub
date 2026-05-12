@@ -1,6 +1,6 @@
 # Chummer.run LTD Missed-Potential Audit
 
-Date: 2026-05-07  
+Date: 2026-05-12  
 Scope: `chummer.run-services` against `/docker/EA/LTDs.md`
 
 ## Inputs reviewed
@@ -31,6 +31,7 @@ Current code-backed LTD lanes in this repo are concentrated in:
 - `Teable` as an internal user-projection workbench
 - `ClickRank.ai` as a bounded public-site script injection on `chummer.run`
 - `FacePop`, `Deftform`, `ICanpreneur`, `MetaSurvey`, and `Lunacal` as bounded first-party projections inside KARMA FORGE and public concierge flows
+- `Blip AI` as a bounded design-mirrored helper for dictation, transcript cleanup, and operator draft capture on knowledge/help and runbook lanes only
 
 Everything else is mostly one of three things:
 
@@ -104,6 +105,13 @@ Examples:
 - `productlift_signal`, `katteb_signal`, `clickrank_signal`, and `metasurvey_signal` now materialize as classified signal-to-canon packets instead of collapsing into one generic growth row
 
 This is no longer just naming. The repo now carries a real bounded projection layer with tests. The remaining missed potential is deeper closure: more direct adapter depth, stronger cross-system receipts, and refreshed published proof.
+
+`Blip AI` now belongs in the same honest category:
+
+- present in local inventory and env wiring
+- present in the checked-in design mirror
+- intentionally bounded to helper posture only
+- not yet promoted into a runtime adapter or public-facing surface
 
 ## Highest-value missed potential
 

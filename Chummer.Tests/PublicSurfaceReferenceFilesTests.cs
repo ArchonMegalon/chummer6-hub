@@ -72,7 +72,6 @@ public sealed class PublicSurfaceReferenceFilesTests
     {
         string[] publicFiles =
         {
-            RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FEATURE_REGISTRY.yaml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"),
@@ -88,6 +87,7 @@ public sealed class PublicSurfaceReferenceFilesTests
 
         Assert.DoesNotContain("ProductLift", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Emailit", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Blip AI", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Icanpreneur", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Lunacal", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Product Governor", combined, StringComparison.Ordinal);

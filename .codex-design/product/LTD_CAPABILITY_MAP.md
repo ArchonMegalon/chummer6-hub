@@ -45,8 +45,8 @@ It does not imply that every owned tool must be integrated.
 * `Paperguide` - cited research and grounding helper
 * `Vizologi` - product strategy and ideation support only
 * `ApiX-Drive` - low-risk automation glue only, never truth
+* `Blip AI` - bounded dictation, transcript cleanup, and operator draft-capture helper
 * `Browserly` - bounded browser capture and reference-pack helper
-* `Blip AI` - bounded speech-to-polished-text dictation, transcript cleanup, and operator draft-capture helper
 * `FacePop` - bounded public trust / concierge widget and moderated testimonial capture lane
 * `hedy.ai` - bounded post-session transcript structure, highlight digest, and GM debrief helper for `TABLE PULSE`
 * `Nonverbia` - post-session coaching and social-dynamics analysis lane
@@ -113,10 +113,10 @@ Working rule:
 ## Bounded owner assignments
 
 * `Paperguide` - `chummer6-design` for design research, `chummer6-hub` for operator help/research assist
-* `Blip AI` - `chummer6-hub` for bounded dictated operator drafts and transcript cleanup before first-party editing
 * `Teable` - `chummer6-hub` for admin projections, curation queues, review boards, and AdminIntent receipt routing
 * `Emailit` - `chummer6-hub` for outbound template selection, suppression, delivery receipts, and lifecycle notification closeout
 * `ApiX-Drive` - `chummer6-hub` for low-risk automation glue
+* `Blip AI` - `chummer6-hub` for bounded dictation, transcript cleanup, and operator draft capture on knowledge/help and runbook lanes only
 * `Browserly` - `chummer6-hub` for bounded capture/reference packets
 * `Icanpreneur` - `chummer6-design` for discovery-interview posture and validation policy, `executive-assistant` for synthesis and packet normalization
 * `ProductLift` - `chummer6-hub` for public routes and fallback behavior, `chummer6-design` for taxonomy and truth boundaries, `fleet` for digest and closeout evidence synthesis
@@ -171,7 +171,7 @@ Any public-eligible horizon may additionally use `ProductLift`, `Icanpreneur`, `
   `FacePop` and other public concierge tools remain outside the runtime feature path.
 * `knowledge-fabric`
   `Prompting Systems`, `Documentation.AI`, and `AI Magicx` are the promoted explain/docs projection lanes.
-  `1min.AI`, `BrowserAct`, `Paperguide`, and `Blip AI` remain bounded specialist, capture, dictation, and citation helpers only.
+  `1min.AI`, `BrowserAct`, `Blip AI`, and `Paperguide` remain bounded specialist, capture, dictation, and citation helpers only.
 * `jackpoint`
   `vidBoard`, `MarkupGo`, `Soundmadeseen`, `PeekShot`, and `Documentation.AI` are the promoted packet, video, narration, preview, and docs lanes.
   `Unmixr AI`, `Mootion`, `Paperguide`, and `First Book ai` remain bounded helper lanes only.
@@ -188,7 +188,7 @@ Any public-eligible horizon may additionally use `ProductLift`, `Icanpreneur`, `
   `BrowserAct` and `Browserly` are bounded capture and reference support only.
 * `runbook-press`
   `First Book ai`, `MarkupGo`, `Documentation.AI`, `vidBoard`, and `Soundmadeseen` are the promoted authoring, export, explainer, and narrated companion lanes.
-  `Paperguide`, `Unmixr AI`, and `Blip AI` remain bounded helper lanes only.
+  `Blip AI`, `Paperguide`, and `Unmixr AI` remain bounded helper lanes only.
 * `karma-forge`
   `Icanpreneur`, `Deftform`, `Lunacal`, `MetaSurvey`, `Teable`, `NextStep`, and `ApproveThis` are the promoted discovery, triage, and governed process lanes.
   `FacePop`, `Signitic`, `Emailit`, `Taja`, `vidBoard`, `Prompting Systems`, and `AI Magicx` are bounded recruitment, closeout, and approved explainer lanes only.
