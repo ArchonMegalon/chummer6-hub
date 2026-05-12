@@ -57,6 +57,10 @@ public sealed class KarmaForgeDiscoveryServiceTests
             Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "review_board" && stage.Status == "bounded_ready");
             Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "decision" && stage.Status == "bounded_ready");
             Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "closeout" && stage.Status == "bounded_waiting_decision");
+            Assert.Contains(submission.Packet.Source.JourneyProofEventRefs, journey => journey.EventKey == "karma_request_submitted" && journey.JourneyKey == "karma_forge_discovery");
+            Assert.Contains(submission.Packet.Source.JourneyProofEventRefs, journey => journey.EventKey == "karma_interview_completed" && journey.JourneyKey == "karma_forge_discovery");
+            Assert.Contains(submission.Packet.Source.JourneyProofEventRefs, journey => journey.EventKey == "karma_demand_packet_created" && journey.JourneyKey == "karma_forge_discovery");
+            Assert.Contains(submission.Packet.Source.JourneyProofEventRefs, journey => journey.EventKey == "karma_candidate_reviewed" && journey.JourneyKey == "karma_forge_discovery");
         }
         finally
         {
@@ -111,6 +115,7 @@ public sealed class KarmaForgeDiscoveryServiceTests
             Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "review_board" && stage.Status == "bounded_ready");
             Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "decision" && stage.Status == "bounded_ready");
             Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "closeout" && stage.Status == "bounded_waiting_decision");
+            Assert.Contains(restored.Packet.Source.JourneyProofEventRefs, journey => journey.EventKey == "karma_demand_packet_created");
         }
         finally
         {

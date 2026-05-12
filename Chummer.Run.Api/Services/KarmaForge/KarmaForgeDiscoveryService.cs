@@ -1,11 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
+using Chummer.Run.Api.Contracts;
 using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Services.KarmaForge;
 
 public sealed class KarmaForgeDiscoveryService
 {
+    private const string KarmaForgeJourneyKey = "karma_forge_discovery";
     private const string FacePopPublicInvitePathConfigKey = "CHUMMER_KARMA_FORGE_FACEPOP_PUBLIC_INVITE_PATH";
     private const string DeftformBaseUrlConfigKey = "CHUMMER_KARMA_FORGE_DEFTFORM_BASE_URL";
     private const string IcanpreneurBaseUrlConfigKey = "CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL";
@@ -510,7 +512,8 @@ public sealed class KarmaForgeDiscoveryService
                 Severity: normalizedSeverity,
                 InterviewRef: $"hub_karma_forge_{track.Key}_{submissionId}",
                 ConsentRef: $"hub_karma_forge_consent_{submissionId}",
-                ExternalStages: Array.Empty<KarmaForgeExternalStageProjection>()),
+                ExternalStages: Array.Empty<KarmaForgeExternalStageProjection>(),
+                JourneyProofEventRefs: Array.Empty<JourneyProofEventRef>()),
             UserWords: new KarmaForgeUserWordsProjection(
                 Summary: userWordsSummary,
                 CurrentWorkaround: currentWorkaround),
@@ -580,7 +583,8 @@ public sealed class KarmaForgeDiscoveryService
                         RolloutScope: desiredScope,
                         ComparisonSurface: trustRequirements.BuildDiffRequired ? "build_diff" : "notice_only",
                         PlayerVisibility: trustRequirements.PlayerVisibleBeforeJoin ? "before_join" : "in_workspace",
-                        RollbackSurface: trustRequirements.RollbackRequired ? "rollback_required" : "inform_only")))
+                        RollbackSurface: trustRequirements.RollbackRequired ? "rollback_required" : "inform_only"))),
+                JourneyProofEventRefs = BuildJourneyProofEventRefs(packetId)
             }
         };
 
@@ -667,6 +671,34 @@ public sealed class KarmaForgeDiscoveryService
                 .ToArray();
         }
     }
+
+    public IReadOnlyList<JourneyProofEventRef> GetJourneyProofEventRefs(string? packetId = null)
+        => BuildJourneyProofEventRefs(string.IsNullOrWhiteSpace(packetId) ? "hub_karma_forge_preview" : packetId);
+
+    private static IReadOnlyList<JourneyProofEventRef> BuildJourneyProofEventRefs(string packetId)
+        =>
+        [
+            new(
+                EventKey: "karma_request_submitted",
+                JourneyKey: KarmaForgeJourneyKey,
+                SourceRef: packetId,
+                Summary: "The public discovery request entered the first-party KARMA FORGE intake lane."),
+            new(
+                EventKey: "karma_interview_completed",
+                JourneyKey: KarmaForgeJourneyKey,
+                SourceRef: packetId,
+                Summary: "Guided follow-up completed inside the bounded KARMA FORGE discovery chain."),
+            new(
+                EventKey: "karma_demand_packet_created",
+                JourneyKey: KarmaForgeJourneyKey,
+                SourceRef: packetId,
+                Summary: "The intake normalized into a Chummer-owned demand packet before Product Governor review."),
+            new(
+                EventKey: "karma_candidate_reviewed",
+                JourneyKey: KarmaForgeJourneyKey,
+                SourceRef: packetId,
+                Summary: "The candidate is visible on the governed review rail instead of staying provider-owned.")
+        ];
 
     private static string[] ResolveAffectedDomains(string text, string trackFamily)
     {
@@ -1194,7 +1226,8 @@ public sealed record KarmaForgeSourceProjection(
     string Severity,
     string InterviewRef,
     string ConsentRef,
-    IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages);
+    IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages,
+    IReadOnlyList<JourneyProofEventRef> JourneyProofEventRefs);
 
 public sealed record KarmaForgeExternalStageProjection(
     string StageKey,

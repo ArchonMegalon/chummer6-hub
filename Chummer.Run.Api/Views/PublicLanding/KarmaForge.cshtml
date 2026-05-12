@@ -163,6 +163,18 @@
     </div>
 </section>
 
+<section class="compact-rail">
+    @foreach (var journeyRef in Model.JourneyProofEventRefs)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>@journeyRef.EventKey</h3>
+                <p>@journeyRef.Summary</p>
+            </div>
+        </article>
+    }
+</section>
+
 <section class="release-footnote">
     <p class="eyebrow">Next step</p>
     <h2 class="editorial-title">Use KARMA FORGE to capture one discovery packet, then move to the page that owns the next job.</h2>

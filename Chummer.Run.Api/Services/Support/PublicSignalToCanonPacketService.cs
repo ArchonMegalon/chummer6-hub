@@ -8,6 +8,10 @@ namespace Chummer.Run.Api.Services.Support;
 
 public sealed class PublicSignalToCanonPacketService
 {
+    private const string DownloadClaimLaunchJourneyKey = "download_claim_launch_update";
+    private const string ProductLiftJourneyKey = "productlift_to_ship";
+    private const string KarmaForgeJourneyKey = "karma_forge_discovery";
+
     private readonly PublicReleaseManifestService _releases;
 
     public PublicSignalToCanonPacketService(PublicReleaseManifestService releases)
@@ -63,6 +67,14 @@ public sealed class PublicSignalToCanonPacketService
                 "Public feedback may propose demand, but design and Product Governor remain the canon decision authority.",
                 "Accepted improvements patch source-backed public content before any regenerated output is trusted."
             ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "productlift_idea_clustered",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "/feedback",
+                    summary: "Public feedback clusters must resolve into a Chummer-owned journey-proof step before queue or design interpretation.")
+            ],
             EmittedAtUtc: now,
             Locale: locale,
             ReleaseChannel: manifest.Channel,
@@ -93,6 +105,14 @@ public sealed class PublicSignalToCanonPacketService
                 "Visible roadmap maturity must stay source-backed and reuse the shared public status presenter.",
                 "Support remains the honest escalation path when a roadmap item and the live surface still diverge."
             ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "productlift_idea_clustered",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "/roadmap",
+                    summary: "Roadmap projection stays downstream of Chummer-owned ProductLift clustering and decision review.")
+            ],
             EmittedAtUtc: now,
             Locale: locale,
             ReleaseChannel: manifest.Channel,
@@ -122,6 +142,14 @@ public sealed class PublicSignalToCanonPacketService
                 "/changelog redirects to the public shipped-closeout anchor on /now.",
                 "Release proof, installer shelf, and shipped-closeout language must agree before the public changelog can claim delivery.",
                 "Unshipped or support-only fixes must not be promoted into changelog truth."
+            ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "voter_notified",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "/changelog",
+                    summary: "Shipped closeout must stay attached to the Chummer-owned voter notification journey proof before public delivery claims resolve.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -162,6 +190,14 @@ public sealed class PublicSignalToCanonPacketService
                     ? "Guest support still stays first-party and bounded by tracked case intake."
                     : $"Tracked case {trackedSupportCase.CaseId} is the support-side SignalToCanon packet anchor."
             ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "download_started",
+                    journeyKey: DownloadClaimLaunchJourneyKey,
+                    sourceRef: trackedSupportCase?.CaseId ?? "/contact",
+                    summary: "Support escalation on install and release surfaces stays linked to a Chummer-owned install journey before public help copy changes.")
+            ],
             EmittedAtUtc: now,
             Locale: locale,
             ReleaseChannel: manifest.Channel,
@@ -194,6 +230,19 @@ public sealed class PublicSignalToCanonPacketService
                 "Review-threshold ideas need either source-backed movement or an explicit no-change rationale.",
                 "Voter closeout must cite shipped proof before public delivery can claim resolution."
             ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "productlift_idea_clustered",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "productlift_signal",
+                    summary: "ProductLift demand stays downstream of a Chummer-owned clustering proof step before queue or roadmap interpretation."),
+                BuildJourneyProofEventRef(
+                    eventKey: "voter_notified",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "productlift_signal",
+                    summary: "Any shipped closeout tied to ProductLift must resolve through the bounded voter notification journey proof.")
+            ],
             EmittedAtUtc: now,
             Locale: locale,
             ReleaseChannel: manifest.Channel,
@@ -223,6 +272,14 @@ public sealed class PublicSignalToCanonPacketService
                 "Guide optimization can draft from approved source packets only.",
                 "Accepted copy changes must land in canon or source registries before public regeneration.",
                 "Human review remains required before publication."
+            ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "productlift_idea_clustered",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "katteb_signal",
+                    summary: "Public content changes can only graduate after a Chummer-owned source packet or clustered demand proof exists.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -254,6 +311,14 @@ public sealed class PublicSignalToCanonPacketService
                 "Keyword opportunities should be classified as technical, content, canon-sensitive, navigation, schema, or blocked work.",
                 "Search audits must not leave stale release, roadmap, or support claims behind."
             ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "productlift_idea_clustered",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "clickrank_signal",
+                    summary: "Search and visibility findings must attach to a Chummer-owned review packet before Product Governor interpretation.")
+            ],
             EmittedAtUtc: now,
             Locale: locale,
             ReleaseChannel: manifest.Channel,
@@ -283,6 +348,19 @@ public sealed class PublicSignalToCanonPacketService
                 "Survey output can strengthen a repeated signal cluster but cannot become backlog truth by itself.",
                 "Quant validation must flow back into Chummer-owned packets before decisions move.",
                 "Public followthrough stays bounded to first-party participate and KARMA FORGE lanes."
+            ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "karma_interview_completed",
+                    journeyKey: KarmaForgeJourneyKey,
+                    sourceRef: "metasurvey_signal",
+                    summary: "Quant validation remains downstream of a Chummer-owned KARMA FORGE interview and packet chain before decisions move."),
+                BuildJourneyProofEventRef(
+                    eventKey: "karma_demand_packet_created",
+                    journeyKey: KarmaForgeJourneyKey,
+                    sourceRef: "metasurvey_signal",
+                    summary: "Survey ranking must re-enter a Chummer-owned demand packet before Product Governor interpretation.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -314,10 +392,34 @@ public sealed class PublicSignalToCanonPacketService
                 "Signal packets classify source, audience, claim sensitivity, owner, decision, and closeout posture before any queue synthesis happens.",
                 "Fleet may synthesize bounded queue candidates from repeated clusters, but the packet is not canon by itself."
             ],
+            JourneyProofEventRefs:
+            [
+                BuildJourneyProofEventRef(
+                    eventKey: "productlift_idea_clustered",
+                    journeyKey: ProductLiftJourneyKey,
+                    sourceRef: "signal_intake",
+                    summary: "Repeated public feedback must become a clustered Chummer-owned packet before roadmap or shipped interpretation."),
+                BuildJourneyProofEventRef(
+                    eventKey: "karma_demand_packet_created",
+                    journeyKey: KarmaForgeJourneyKey,
+                    sourceRef: "signal_intake",
+                    summary: "Discovery and follow-up demand must become a Chummer-owned KARMA FORGE packet before deeper product review.")
+            ],
             EmittedAtUtc: now,
             Locale: locale,
             ReleaseChannel: manifest.Channel,
             ReleaseVersion: manifest.Version);
+
+    private static JourneyProofEventRef BuildJourneyProofEventRef(
+        string eventKey,
+        string journeyKey,
+        string sourceRef,
+        string summary)
+        => new(
+            EventKey: eventKey,
+            JourneyKey: journeyKey,
+            SourceRef: sourceRef,
+            Summary: summary);
 
     private static string StableId(string prefix, string seed)
     {

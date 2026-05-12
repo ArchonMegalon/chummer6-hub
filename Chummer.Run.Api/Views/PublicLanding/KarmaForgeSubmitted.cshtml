@@ -86,6 +86,18 @@
     </div>
 </section>
 
+<section class="compact-rail">
+    @foreach (var journeyRef in Model.JourneyProofEventRefs)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>@journeyRef.EventKey</h3>
+                <p>@journeyRef.Summary</p>
+            </div>
+        </article>
+    }
+</section>
+
 <section class="trust-page-layout">
     <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE receipt sections">
         <a href="#bounded-followthrough">Bounded follow-through</a>
