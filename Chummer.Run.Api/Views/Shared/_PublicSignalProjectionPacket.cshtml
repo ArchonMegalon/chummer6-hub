@@ -186,7 +186,7 @@
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                             <h3>Journey-proof refs</h3>
-                            <p>@string.Join(" / ", journeyProofEvents.Select(item => SanitizeProjectionText(item.EventKey)))</p>
+                            <p>@string.Join(" / ", journeyProofEvents.Select(item => item.EventKey))</p>
                         </div>
                     </article>
                 }
