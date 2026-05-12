@@ -40,6 +40,7 @@ public sealed class PublicLandingController : Controller
     private readonly HubIdentityClient _identity;
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
+    private readonly ParticipationOperatorNotificationService _participationNotifications;
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
@@ -77,6 +78,7 @@ public sealed class PublicLandingController : Controller
         HubIdentityClient identity,
         IdentityLinkService links,
         UserExperienceService experience,
+        ParticipationOperatorNotificationService participationNotifications,
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
@@ -110,6 +112,7 @@ public sealed class PublicLandingController : Controller
         _identity = identity;
         _links = links;
         _experience = experience;
+        _participationNotifications = participationNotifications;
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
@@ -151,10 +154,12 @@ public sealed class PublicLandingController : Controller
         var secondaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "secondary", StringComparison.OrdinalIgnoreCase))
             ?? surface.HeroCtas.Skip(1).FirstOrDefault()
             ?? new PublicLandingActionDto("See what works today", "/now", "secondary");
-        var primaryHeroAction = _releaseSelection.BuildPublicPrimaryAction(
-            manifest,
-            Request.Headers.UserAgent.ToString(),
-            authenticated);
+        var primaryHeroAction = surface.HeroCtas.FirstOrDefault(static action => string.Equals(action.Emphasis, "primary", StringComparison.OrdinalIgnoreCase))
+            ?? surface.HeroCtas.FirstOrDefault()
+            ?? _releaseSelection.BuildPublicPrimaryAction(
+                manifest,
+                Request.Headers.UserAgent.ToString(),
+                authenticated);
         var model = new LandingPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync("Chummer", surface.Subhead, "/", cancellationToken),
             Surface: surface,
@@ -337,6 +342,14 @@ public sealed class PublicLandingController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             PublicPackageReceipt receipt = _packageCatalog.RecordVote(package.PackageId, subject.SubjectId, user.DisplayName);
+            string authProviderFamily = ParticipationOperatorNotificationService.InferAuthProviderFamily(_links.GetSummary(subject.SubjectId));
+            await _participationNotifications.NotifyFirstActionIfNeededAsync(
+                user,
+                subject.Email,
+                intentKind: "package",
+                entryRoute: $"/packages/{package.PackageId}/vote",
+                authProviderFamily,
+                cancellationToken);
             return Redirect($"/packages/{Uri.EscapeDataString(package.PackageId)}/vote/{Uri.EscapeDataString(receipt.ReceiptId)}");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -376,6 +389,14 @@ public sealed class PublicLandingController : Controller
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
             PublicPackageReceipt receipt = _packageCatalog.RecordFollow(package.PackageId, subject.SubjectId, user.DisplayName);
+            string authProviderFamily = ParticipationOperatorNotificationService.InferAuthProviderFamily(_links.GetSummary(subject.SubjectId));
+            await _participationNotifications.NotifyFirstActionIfNeededAsync(
+                user,
+                subject.Email,
+                intentKind: "package",
+                entryRoute: $"/packages/{package.PackageId}/follow",
+                authProviderFamily,
+                cancellationToken);
             return Redirect($"/packages/{Uri.EscapeDataString(package.PackageId)}/follow/{Uri.EscapeDataString(receipt.ReceiptId)}");
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -1354,7 +1375,20 @@ public sealed class PublicLandingController : Controller
             return View("~/Views/PublicLanding/KarmaForge.cshtml", invalidModel);
         }
 
+        HubUserDto? signedInUser = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         KarmaForgeSubmissionProjection submission = _karmaForge.Submit(request, subject?.SubjectId, subject?.DisplayName);
+        if (subject is not null && signedInUser is not null)
+        {
+            string authProviderFamily = ParticipationOperatorNotificationService.InferAuthProviderFamily(_links.GetSummary(subject.SubjectId));
+            await _participationNotifications.NotifyFirstActionIfNeededAsync(
+                signedInUser,
+                subject.Email,
+                intentKind: "karma_forge",
+                entryRoute: "/participate/karma-forge",
+                authProviderFamily,
+                cancellationToken);
+        }
+
         return Redirect($"/participate/karma-forge/submitted/{Uri.EscapeDataString(submission.SubmissionId)}");
     }
 
@@ -1436,8 +1470,8 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/FeedbackOperationsLookup.cshtml",
             new PublicSignalOperationsLookupPageViewModel(
                 Chrome: await BuildPublicOrAuthenticatedChromeAsync(
-                    "Feedback Operations Lookup",
-                    "Bounded operator search across first-party source receipts and closeout thread drilldowns.",
+                    "Feedback Activity Lookup",
+                    "Bounded public lookup across first-party source receipts and follow-up thread drilldowns.",
                     "/feedback/operations/lookup",
                     cancellationToken),
                 Lookup: _signalOperations.BuildLookup(q, scope)));
@@ -1461,8 +1495,8 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/FeedbackOperationsDetail.cshtml",
             new PublicSignalOperationsDetailPageViewModel(
                 Chrome: await BuildPublicOrAuthenticatedChromeAsync(
-                    "Feedback Operations Source Detail",
-                    "Bounded source receipt drilldown across queue, dispatch, callback, and journey state.",
+                    "Feedback Activity Source Detail",
+                    "Bounded source receipt drilldown across queue, delivery update, and journey state.",
                     string.Equals(detail.FilterKey, "all", StringComparison.Ordinal)
                         ? $"/feedback/operations/source/{sourceReceiptId}"
                         : $"/feedback/operations/source/{sourceReceiptId}?filter={Uri.EscapeDataString(detail.FilterKey)}",
@@ -1494,8 +1528,8 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/FeedbackOperationsDetail.cshtml",
             new PublicSignalOperationsDetailPageViewModel(
                 Chrome: await BuildPublicOrAuthenticatedChromeAsync(
-                    "Feedback Operations Thread Detail",
-                    "Bounded closeout thread drilldown for one dispatch spine.",
+                    "Feedback Activity Thread Detail",
+                    "Bounded follow-up thread drilldown for one dispatch spine.",
                     string.Equals(detail.FilterKey, "all", StringComparison.Ordinal)
                         ? $"/feedback/operations/thread/{dispatchReceiptId}"
                         : $"/feedback/operations/thread/{dispatchReceiptId}?filter={Uri.EscapeDataString(detail.FilterKey)}",
@@ -2145,11 +2179,16 @@ public sealed class PublicLandingController : Controller
         var trackedCase = subject is null
             ? null
             : _supportCases.GetForReporter(caseId, user!.UserId, subject.SubjectId);
+        bool sampleReceipt = trackedCase is null && string.Equals(caseId, "sample-case-id", StringComparison.OrdinalIgnoreCase);
         DesktopInstallRailContext installRail = ResolveSupportIntakeRailFromQuery();
         var highlights = new List<string>
         {
-            $"Case id {caseId}",
-            authenticated ? "Tracked on your account support page" : "Guest follow-up stays on the reply email you provided"
+            sampleReceipt ? "Sample receipt used for public-route proof." : $"Case id {caseId}",
+            sampleReceipt
+                ? "This route resolves without opening a real support case."
+                : authenticated
+                    ? "Tracked on your account support page"
+                    : "Guest follow-up stays on the reply email you provided"
         };
         if (trackedCase?.Attachments is { Count: > 0 })
         {
@@ -2164,6 +2203,10 @@ public sealed class PublicLandingController : Controller
         if (trackedCase is not null)
         {
             actions.Add(new TrustPageActionViewModel("Open tracked support", $"/account/support/{trackedCase.CaseId}", "primary"));
+        }
+        else if (sampleReceipt)
+        {
+            actions.Add(new TrustPageActionViewModel("Return to contact", "/contact#support-intake", "primary"));
         }
         else if (authenticated)
         {
@@ -2184,14 +2227,18 @@ public sealed class PublicLandingController : Controller
             Chrome: chrome,
             Eyebrow: "Support",
             Heading: "Support case received",
-            Intro: trackedCase is null
-                ? "Chummer accepted the report. Keep the case id nearby if you need to mention it later."
-                : "Chummer accepted the report and linked it to the signed-in account path so the next routed update stays visible.",
+            Intro: sampleReceipt
+                ? "This sample receipt keeps the public support-submission route provable without opening a real support case."
+                : trackedCase is null
+                    ? "Chummer accepted the report. Keep the case id nearby if you need to mention it later."
+                    : "Chummer accepted the report and linked it to the signed-in account path so the next routed update stays visible.",
             CaseId: caseId,
-            StatusLabel: trackedCase?.Status ?? SupportCaseStatuses.New,
-            ResponseExpectation: BuildSupportResponseExpectation(
-                authenticated,
-                BuildPublicTrustPulsePanel(manifest, releaseExperience)),
+            StatusLabel: sampleReceipt ? "sample" : trackedCase?.Status ?? SupportCaseStatuses.New,
+            ResponseExpectation: sampleReceipt
+                ? "This sample receipt only proves the first-party support submission route resolves on the hosted surface. Real follow-up still starts from a submitted support case or the account support rail."
+                : BuildSupportResponseExpectation(
+                    authenticated,
+                    BuildPublicTrustPulsePanel(manifest, releaseExperience)),
             Highlights: highlights,
             Actions: actions,
             Attachments: trackedCase?.Attachments ?? Array.Empty<SupportCaseAttachmentProjection>(),
@@ -2673,7 +2720,8 @@ public sealed class PublicLandingController : Controller
                 RuleCategory: "campaign_progression",
                 Severity: "session_friction",
                 InterviewRef: "hub_karma_forge_sample_submission",
-                ConsentRef: "hub_karma_forge_sample_consent"),
+                ConsentRef: "hub_karma_forge_sample_consent",
+                ExternalStages: Array.Empty<KarmaForgeExternalStageProjection>()),
             UserWords: new KarmaForgeUserWordsProjection(
                 Summary: "We need a governed table amendment that survives continuity and rollback without hiding the approval trail.",
                 CurrentWorkaround: "We keep the rule in chat and manually restate it before every session."),
@@ -3645,6 +3693,7 @@ public sealed class PublicLandingController : Controller
             EntryLane: _karmaForge.EntryLane,
             Dashboard: _karmaForge.GetDashboardSummary(),
             DiscoverySteps: _karmaForge.GetDiscoverySteps(),
+            ExternalStages: _karmaForge.GetExternalStageProjections(),
             Form: new KarmaForgeIntakeFormViewModel(
                 ActionHref: "/participate/karma-forge",
                 Authenticated: chrome.Authenticated,
@@ -3762,6 +3811,7 @@ public sealed class PublicLandingController : Controller
             CandidateDecisionMeaning: submission.Candidate.CandidateDecisionMeaning,
             ReporterNextAction: submission.ReporterNextAction,
             ConsentSummary: submission.ConsentSummary,
+            ExternalStages: submission.Packet.Source.ExternalStages,
             Highlights:
             [
                 $"{HumanizeToken(submission.Packet.Source.RuleCategory, "Rule category")} · {HumanizeToken(submission.Packet.Source.Severity, "Severity")}",
@@ -3811,8 +3861,8 @@ public sealed class PublicLandingController : Controller
             MilestoneFollowUp: milestoneFollowUp,
             RoadmapFollowUp: roadmapFollowUp,
             ShippedFollowUp: shippedFollowUp,
-            FollowSettingsHref: authenticated ? "/account/settings" : "/signup?next=%2Faccount%2Fsettings",
-            FollowSettingsLabel: authenticated ? "Open account settings" : "Create account for follow-up");
+            FollowSettingsHref: authenticated ? "/account/participation" : "/signup?next=%2Faccount%2Fparticipation",
+            FollowSettingsLabel: authenticated ? "Open participation dashboard" : "Create account for follow-up");
     }
 
     private PublicSignalProjectionPacketViewModel? BuildOptionalSignalProjectionPacket(string currentPath)

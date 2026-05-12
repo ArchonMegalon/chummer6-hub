@@ -124,7 +124,7 @@
         </article>
         <article class="trust-rail">
             <span class="tag">Follow-up</span>
-            <p>@Model.Dashboard.FollowUpCandidateCount packet(s) are strong enough for a likely follow-up by product operators.</p>
+            <p>@Model.Dashboard.FollowUpCandidateCount packet(s) are strong enough for likely follow-up on the governed review rail.</p>
         </article>
         <article class="trust-rail">
             <span class="tag">Shareable</span>
@@ -134,6 +134,32 @@
             <span class="tag">Core gap</span>
             <p>@Model.Dashboard.CoreRulesetGapCount packet(s) already look closer to core-ruleset review than KARMA FORGE packaging work.</p>
         </article>
+    </div>
+</section>
+
+<section class="editorial-block" id="external-stages">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Bounded workflow stages</p>
+        <h2 class="editorial-title">The full discovery loop is explicit from public signal to first-party closeout.</h2>
+        <p class="editorial-copy">Hub still owns the packet. Some stages are external adapters, some are operator projections, and some are first-party decision or closeout steps. None of them are allowed to silently replace Chummer-owned truth.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var stage in Model.ExternalStages)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@stage.PublicLabel</span>
+                <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
+                <p>@stage.Summary</p>
+                <div class="route-choice-card__proof">
+                    <span>@stage.ReceiptId</span>
+                    <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))
+                {
+                    <a class="editorial-strip__action" href="@stage.ActionHref">@stage.ActionLabel</a>
+                }
+            </article>
+        }
     </div>
 </section>
 
@@ -163,6 +189,7 @@
 <section class="trust-page-layout">
     <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE sections">
         <a href="#karma-forge-intake">Intake</a>
+        <a href="#external-stages">Bounded stages</a>
         <a href="#track-questions">Track questions</a>
         <a href="#candidate-decisions">Governor decisions</a>
         <a href="#recent-packets">Recent packets</a>

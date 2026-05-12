@@ -1,10 +1,16 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 
 namespace Chummer.Run.Api.Services.KarmaForge;
 
 public sealed class KarmaForgeDiscoveryService
 {
+    private const string FacePopPublicInvitePathConfigKey = "CHUMMER_KARMA_FORGE_FACEPOP_PUBLIC_INVITE_PATH";
+    private const string DeftformBaseUrlConfigKey = "CHUMMER_KARMA_FORGE_DEFTFORM_BASE_URL";
+    private const string IcanpreneurBaseUrlConfigKey = "CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL";
+    private const string MetaSurveyBaseUrlConfigKey = "CHUMMER_KARMA_FORGE_METASURVEY_BASE_URL";
+    private const string LunacalBaseUrlConfigKey = "CHUMMER_KARMA_FORGE_LUNACAL_BASE_URL";
     private static readonly KarmaForgeTrackDefinition[] TrackDefinitions =
     [
         new KarmaForgeTrackDefinition(
@@ -135,10 +141,10 @@ public sealed class KarmaForgeDiscoveryService
     [
         "Public invitation",
         "Structured pre-screen",
-        "Adaptive Icanpreneur interview",
+        "Guided synthesis interview",
         "Normalized HouseRuleDemandPacket",
-        "EA clustering",
-        "Product Governor decision"
+        "Chummer-owned clustering",
+        "Governed product decision"
     ];
 
     private static readonly string[] CanonicalOutputs =
@@ -149,15 +155,17 @@ public sealed class KarmaForgeDiscoveryService
     ];
 
     private readonly KarmaForgeStore _store;
+    private readonly IConfiguration _configuration;
 
-    public KarmaForgeDiscoveryService(KarmaForgeStore store)
+    public KarmaForgeDiscoveryService(KarmaForgeStore store, IConfiguration configuration)
     {
         _store = store;
+        _configuration = configuration;
     }
 
     public string CanonicalLane => "FacePop -> Deftform -> Icanpreneur";
 
-    public string EntryLane => "Icanpreneur adaptive interview";
+    public string EntryLane => "Guided synthesis interview";
 
     public IReadOnlyList<KarmaForgeTrackDefinition> ListTracks()
         => TrackDefinitions;
@@ -186,6 +194,220 @@ public sealed class KarmaForgeDiscoveryService
 
     public IReadOnlyList<string> GetCanonicalOutputs()
         => CanonicalOutputs;
+
+    public IReadOnlyList<KarmaForgeExternalStageProjection> GetExternalStageProjections(KarmaForgeSubmissionProjection? submission = null)
+    {
+        string submissionId = submission?.SubmissionId ?? "pre_submission";
+        string packetId = submission?.Packet.Id ?? "packet_pending";
+        string trackKey = submission?.Packet.Source.TrackKey ?? TrackDefinitions[0].Key;
+        string queueStatus = submission?.QueueStatus ?? "pre_submission";
+        bool followUpAllowed = submission?.FollowUpAllowed ?? true;
+        bool packetExists = submission is not null;
+        bool queuedForReview = packetExists && !string.Equals(queueStatus, "pre_submission", StringComparison.OrdinalIgnoreCase);
+        bool queuedForScheduling = string.Equals(queueStatus, "candidate_for_lunacal_followup", StringComparison.OrdinalIgnoreCase);
+
+        return
+        [
+            BuildStageProjection(
+                stageKey: "public_signal",
+                publicLabel: "Public invitation",
+                providerLabel: "Bounded public invite adapter",
+                receiptId: "public_signal",
+                boundary: "public_signal_only",
+                summary: "Public discovery can invite a table into the governed intake, but it never becomes support, backlog, or rules truth.",
+                actionLabel: "Open the first-party invite lane",
+                actionHref: NormalizeConfiguredPath(_configuration[FacePopPublicInvitePathConfigKey]) ?? "/participate",
+                enabled: true),
+            BuildStageProjection(
+                stageKey: "structured_prescreen",
+                publicLabel: "Structured pre-screen",
+                providerLabel: "Bounded structured intake adapter",
+                receiptId: "structured_prescreen",
+                boundary: "no_raw_sourcebook_text",
+                summary: "Structured intake can collect bounded table pain and scope without turning raw copyrighted rules text into tool truth.",
+                actionLabel: "Open pre-screen handoff",
+                actionHref: BuildExternalStageUrl(_configuration[DeftformBaseUrlConfigKey], submissionId, packetId, trackKey, queueStatus),
+                enabled: true),
+            BuildStageProjection(
+                stageKey: "adaptive_interview",
+                publicLabel: "Guided synthesis interview",
+                providerLabel: "Bounded interview adapter",
+                receiptId: "adaptive_interview",
+                boundary: "interview_signal_not_product_truth",
+                summary: "Adaptive follow-up can sharpen a demand packet, but the interview stays signal only until Hub normalizes it back into Chummer-owned packets and decisions.",
+                actionLabel: "Open guided interview handoff",
+                actionHref: BuildExternalStageUrl(_configuration[IcanpreneurBaseUrlConfigKey], submissionId, packetId, trackKey, queueStatus),
+                enabled: followUpAllowed),
+            BuildStageProjection(
+                stageKey: "quant_validation",
+                publicLabel: "Validation survey",
+                providerLabel: "Bounded validation adapter",
+                receiptId: "quant_validation",
+                boundary: "ranking_signal_not_priority_truth",
+                summary: "Survey ranking can validate demand shape, but it never becomes the priority decision or canonical roadmap truth by itself.",
+                actionLabel: "Open validation survey handoff",
+                actionHref: BuildExternalStageUrl(_configuration[MetaSurveyBaseUrlConfigKey], submissionId, packetId, trackKey, queueStatus),
+                enabled: followUpAllowed),
+            BuildStageProjection(
+                stageKey: "scheduled_followup",
+                publicLabel: "Scheduled follow-up",
+                providerLabel: "Bounded scheduling adapter",
+                receiptId: "scheduled_followup",
+                boundary: "human_followup_not_case_truth",
+                summary: "Human follow-up can be scheduled when consent is explicit, but booking never becomes support-case, campaign, or product-decision truth.",
+                actionLabel: "Schedule bounded follow-up",
+                actionHref: BuildExternalStageUrl(_configuration[LunacalBaseUrlConfigKey], submissionId, packetId, trackKey, queueStatus),
+                enabled: followUpAllowed && queuedForScheduling),
+            BuildInternalStageProjection(
+                stageKey: "review_board",
+                publicLabel: "Governed review board",
+                providerLabel: "Bounded operator projection",
+                receiptId: "review_board",
+                boundary: "projection_and_process_only",
+                status: queuedForReview ? "bounded_ready" : "bounded_pending_packet",
+                summary: queuedForReview
+                    ? "The packet is ready for Teable and NextStep review handling, but those operator surfaces remain projection and process only."
+                    : "Review-board routing appears only after Hub has normalized a first-party packet. Teable and NextStep never become rules truth.",
+                actionLabel: null,
+                actionHref: null),
+            BuildInternalStageProjection(
+                stageKey: "decision",
+                publicLabel: "Product Governor decision",
+                providerLabel: "First-party canonical decision point",
+                receiptId: "decision",
+                boundary: "canonical_decision_only_here",
+                status: queuedForReview ? "bounded_ready" : "bounded_pending_packet",
+                summary: queuedForReview
+                    ? "Only Product Governor and Chummer design can turn this packet into a real product decision. No external adapter can promote itself into backlog or rules truth."
+                    : "Decision stays empty until a normalized packet exists. Public signal and interviews cannot become the decision by themselves.",
+                actionLabel: null,
+                actionHref: null),
+            BuildInternalStageProjection(
+                stageKey: "closeout",
+                publicLabel: "Public closeout",
+                providerLabel: "First-party closeout projection",
+                receiptId: "closeout",
+                boundary: "closeout_must_match_design_truth",
+                status: queuedForReview ? "bounded_waiting_decision" : "bounded_pending_packet",
+                summary: queuedForReview
+                    ? "ProductLift, Emailit, and public closeout can only speak after a governed decision exists, and the closeout must match Chummer-owned design truth."
+                    : "Closeout does not exist yet. It is only created after packet review and a first-party decision, not from public votes or survey noise.",
+                actionLabel: queuedForReview ? "Read first-party roadmap and closeout surfaces" : null,
+                actionHref: queuedForReview ? "/roadmap" : null),
+        ];
+    }
+
+    private static KarmaForgeExternalStageProjection BuildStageProjection(
+        string stageKey,
+        string publicLabel,
+        string providerLabel,
+        string receiptId,
+        string boundary,
+        string summary,
+        string actionLabel,
+        string? actionHref,
+        bool enabled)
+    {
+        if (!enabled)
+        {
+            return new KarmaForgeExternalStageProjection(
+                StageKey: stageKey,
+                PublicLabel: publicLabel,
+                ProviderLabel: providerLabel,
+                ReceiptId: receiptId,
+                Boundary: boundary,
+                Status: "bounded_pending_consent",
+                Summary: $"{summary} Follow-up stays off until the reporter explicitly allows the next stage.",
+                ActionHref: null,
+                ActionLabel: null);
+        }
+
+        if (string.IsNullOrWhiteSpace(actionHref))
+        {
+            return new KarmaForgeExternalStageProjection(
+                StageKey: stageKey,
+                PublicLabel: publicLabel,
+                ProviderLabel: providerLabel,
+                ReceiptId: receiptId,
+                Boundary: boundary,
+                Status: "bounded_unconfigured",
+                Summary: $"{summary} The bounded handoff contract exists, but this host has not configured the external adapter yet.",
+                ActionHref: null,
+                ActionLabel: null);
+        }
+
+        return new KarmaForgeExternalStageProjection(
+            StageKey: stageKey,
+            PublicLabel: publicLabel,
+            ProviderLabel: providerLabel,
+            ReceiptId: receiptId,
+            Boundary: boundary,
+            Status: "bounded_ready",
+            Summary: summary,
+            ActionHref: actionHref,
+            ActionLabel: actionLabel);
+    }
+
+    private static KarmaForgeExternalStageProjection BuildInternalStageProjection(
+        string stageKey,
+        string publicLabel,
+        string providerLabel,
+        string receiptId,
+        string boundary,
+        string status,
+        string summary,
+        string? actionLabel,
+        string? actionHref)
+        => new(
+            StageKey: stageKey,
+            PublicLabel: publicLabel,
+            ProviderLabel: providerLabel,
+            ReceiptId: receiptId,
+            Boundary: boundary,
+            Status: status,
+            Summary: summary,
+            ActionHref: actionHref,
+            ActionLabel: actionLabel);
+
+    private static string? NormalizeConfiguredPath(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+        {
+            return null;
+        }
+
+        string value = rawValue.Trim();
+        if (Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute))
+        {
+            return absolute.ToString();
+        }
+
+        return value.StartsWith("/", StringComparison.Ordinal) ? value : $"/{value}";
+    }
+
+    private static string? BuildExternalStageUrl(
+        string? baseUrl,
+        string submissionId,
+        string packetId,
+        string trackKey,
+        string queueStatus)
+    {
+        string? normalizedBaseUrl = NormalizeConfiguredPath(baseUrl);
+        if (string.IsNullOrWhiteSpace(normalizedBaseUrl))
+        {
+            return null;
+        }
+
+        string separator = normalizedBaseUrl.Contains('?', StringComparison.Ordinal) ? "&" : "?";
+        return string.Concat(
+            normalizedBaseUrl,
+            separator,
+            "source=chummer",
+            "&submissionId=", Uri.EscapeDataString(submissionId),
+            "&packetId=", Uri.EscapeDataString(packetId),
+            "&trackKey=", Uri.EscapeDataString(trackKey),
+            "&queueStatus=", Uri.EscapeDataString(queueStatus));
+    }
 
     public KarmaForgeDashboardSummary GetDashboardSummary()
     {
@@ -277,7 +499,7 @@ public sealed class KarmaForgeDiscoveryService
             Id: packetId,
             Title: title,
             Source: new KarmaForgeSourceProjection(
-                IntakeChannel: "Hub Participate -> Deftform-style pre-screen",
+                IntakeChannel: "Hub Participate -> structured pre-screen",
                 CanonicalLane: CanonicalLane,
                 RespondentRole: normalizedRole,
                 Edition: normalizedEdition,
@@ -287,7 +509,8 @@ public sealed class KarmaForgeDiscoveryService
                 RuleCategory: normalizedRuleCategory,
                 Severity: normalizedSeverity,
                 InterviewRef: $"hub_karma_forge_{track.Key}_{submissionId}",
-                ConsentRef: $"hub_karma_forge_consent_{submissionId}"),
+                ConsentRef: $"hub_karma_forge_consent_{submissionId}",
+                ExternalStages: Array.Empty<KarmaForgeExternalStageProjection>()),
             UserWords: new KarmaForgeUserWordsProjection(
                 Summary: userWordsSummary,
                 CurrentWorkaround: currentWorkaround),
@@ -312,6 +535,54 @@ public sealed class KarmaForgeDiscoveryService
                 FeedbackPrompt: NormalizeCompact(request.FeedbackPrompt) ?? string.Empty,
                 ImpactNotes: impactNotes,
                 ShareabilityNotes: shareabilityNotes));
+
+        packet = packet with
+        {
+            Source = packet.Source with
+            {
+                ExternalStages = GetExternalStageProjections(new KarmaForgeSubmissionProjection(
+                    SubmissionId: submissionId,
+                    SubmittedAtUtc: now,
+                    IntakeStatus: "packet_normalized",
+                    QueueStatus: queueStatus,
+                    QueueSummary: queueSummary,
+                    ReporterNextAction: reporterNextAction,
+                    ConsentSummary: string.Empty,
+                    AuthenticatedSubmission: !string.IsNullOrWhiteSpace(normalizedSubjectId),
+                    FollowUpAllowed: request.FollowUpAllowed,
+                    QuoteAllowed: request.QuoteAllowed,
+                    SubjectId: normalizedSubjectId,
+                    SubjectDisplayName: normalizedSubjectDisplayName,
+                    ReplyEmail: replyEmail,
+                    NextQuestions: nextQuestions,
+                    Packet: packet,
+                    Candidate: new KarmaForgeCandidateProjection(
+                        Id: $"kfc_{packetId}",
+                        Title: title,
+                        LinkedPacketId: packetId,
+                        TrackKey: track.Key,
+                        TrackTitle: track.Title,
+                        CandidateDecision: candidateDecision,
+                        CandidateDecisionMeaning: candidateDecisionMeaning,
+                        ProposedRoute: proposedRoute,
+                        GovernorDecisionRequired: true,
+                        Confidence: interpretedConfidence,
+                        PrioritySignals: prioritySignals),
+                    ImpactHypothesis: new RuleEnvironmentImpactHypothesisProjection(
+                        Id: $"reh_{packetId}",
+                        Title: title,
+                        Summary: interpretedSummary,
+                        AffectedDomains: affectedDomains,
+                        LikelyObjects: likelyObjects,
+                        PossibleBlackLedgerObjects: blackLedgerObjects,
+                        TrustPressure: ResolveEnabledKeys(trustRequirements),
+                        PortabilityPressure: ResolveEnabledKeys(portabilityRequirements),
+                        RolloutScope: desiredScope,
+                        ComparisonSurface: trustRequirements.BuildDiffRequired ? "build_diff" : "notice_only",
+                        PlayerVisibility: trustRequirements.PlayerVisibleBeforeJoin ? "before_join" : "in_workspace",
+                        RollbackSurface: trustRequirements.RollbackRequired ? "rollback_required" : "inform_only")))
+            }
+        };
 
         KarmaForgeCandidateProjection candidate = new(
             Id: $"kfc_{packetId}",
@@ -640,7 +911,7 @@ public sealed class KarmaForgeDiscoveryService
 
         if (string.Equals(candidateDecision, "research_more", StringComparison.OrdinalIgnoreCase))
         {
-            steps.Add("Cluster at least three similar signals before Product Governor classification.");
+            steps.Add("Cluster at least three similar signals before governed product classification.");
         }
         else if (string.Equals(candidateDecision, "core_ruleset_gap", StringComparison.OrdinalIgnoreCase))
         {
@@ -648,7 +919,7 @@ public sealed class KarmaForgeDiscoveryService
         }
         else
         {
-            steps.Add("Prepare a Product Governor route decision with trust, rollback, and portability evidence.");
+            steps.Add("Prepare a governed product route decision with trust, rollback, and portability evidence.");
         }
 
         return steps.Take(4).ToArray();
@@ -672,7 +943,7 @@ public sealed class KarmaForgeDiscoveryService
         {
             return (
                 "queued_for_research_cluster",
-                "The packet is normalized, but it still needs more repeated signal before Product Governor routing can be trusted.",
+                "The packet is normalized, but it still needs more repeated signal before governed product routing can be trusted.",
                 "If this blocks play repeatedly, come back with one or two concrete campaign examples instead of broader feature wording.");
         }
 
@@ -680,7 +951,7 @@ public sealed class KarmaForgeDiscoveryService
         {
             return (
                 "candidate_for_lunacal_followup",
-                "The packet is strong enough for an Icanpreneur follow-up or a Lunacal call before governor routing.",
+                "The packet is strong enough for a guided follow-up before governed product routing.",
                 "Watch the follow-up route you allowed; Chummer may ask for examples, receipts, or a cleaner shareable package shape.");
         }
 
@@ -688,13 +959,13 @@ public sealed class KarmaForgeDiscoveryService
         {
             return (
                 "queued_for_metasurvey_validation",
-                "This looks reusable across tables, so clustering and quantitative validation are the next likely moves before Product Governor routing.",
+                "This looks reusable across tables, so clustering and quantitative validation are the next likely moves before governed product routing.",
                 "If Chummer follows up, bring one table-local example and one version you would share with another table.");
         }
 
         return (
             "queued_for_product_governor",
-            "The packet is normalized into Chummer-owned outputs and is ready for EA clustering plus Product Governor classification.",
+            "The packet is normalized into Chummer-owned outputs and is ready for clustering plus governed product classification.",
             "Keep the receipt id nearby in case Chummer asks for one concrete before-and-after build example.");
     }
 
@@ -922,7 +1193,19 @@ public sealed record KarmaForgeSourceProjection(
     string RuleCategory,
     string Severity,
     string InterviewRef,
-    string ConsentRef);
+    string ConsentRef,
+    IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages);
+
+public sealed record KarmaForgeExternalStageProjection(
+    string StageKey,
+    string PublicLabel,
+    string ProviderLabel,
+    string ReceiptId,
+    string Boundary,
+    string Status,
+    string Summary,
+    string? ActionHref,
+    string? ActionLabel);
 
 public sealed record KarmaForgeUserWordsProjection(
     string Summary,
@@ -988,3 +1271,5 @@ public sealed record RuleEnvironmentImpactHypothesisProjection(
     string ComparisonSurface,
     string PlayerVisibility,
     string RollbackSurface);
+
+    

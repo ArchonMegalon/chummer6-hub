@@ -16,7 +16,7 @@ public sealed class KarmaForgeDiscoveryServiceTests
         {
             IConfiguration configuration = CreateConfiguration(tempRoot);
             KarmaForgeStore store = new(configuration, NullLogger<KarmaForgeStore>.Instance);
-            KarmaForgeDiscoveryService service = new(store);
+            KarmaForgeDiscoveryService service = new(store, configuration);
 
             KarmaForgeSubmissionProjection submission = service.Submit(
                 new KarmaForgeSubmissionRequest
@@ -50,6 +50,13 @@ public sealed class KarmaForgeDiscoveryServiceTests
             Assert.True(submission.Packet.TrustRequirements.PlayerVisibleBeforeJoin);
             Assert.True(submission.Packet.PortabilityRequirements.PackageFingerprintRequired);
             Assert.Equal("KARMA_FORGE", submission.Packet.Classification.ProposedRoute);
+            Assert.Equal(8, submission.Packet.Source.ExternalStages.Count);
+            Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "structured_prescreen" && stage.Status == "bounded_ready");
+            Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "adaptive_interview" && stage.Status == "bounded_ready");
+            Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "scheduled_followup" && stage.Status == "bounded_ready");
+            Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "review_board" && stage.Status == "bounded_ready");
+            Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "decision" && stage.Status == "bounded_ready");
+            Assert.Contains(submission.Packet.Source.ExternalStages, stage => stage.StageKey == "closeout" && stage.Status == "bounded_waiting_decision");
         }
         finally
         {
@@ -66,7 +73,7 @@ public sealed class KarmaForgeDiscoveryServiceTests
         {
             IConfiguration configuration = CreateConfiguration(tempRoot);
             KarmaForgeStore store = new(configuration, NullLogger<KarmaForgeStore>.Instance);
-            KarmaForgeDiscoveryService service = new(store);
+            KarmaForgeDiscoveryService service = new(store, configuration);
 
             KarmaForgeSubmissionProjection created = service.Submit(
                 new KarmaForgeSubmissionRequest
@@ -90,7 +97,7 @@ public sealed class KarmaForgeDiscoveryServiceTests
                 subjectDisplayName: null);
 
             KarmaForgeStore reloadedStore = new(configuration, NullLogger<KarmaForgeStore>.Instance);
-            KarmaForgeDiscoveryService reloadedService = new(reloadedStore);
+            KarmaForgeDiscoveryService reloadedService = new(reloadedStore, configuration);
             KarmaForgeSubmissionProjection? persisted = reloadedService.FindById(created.SubmissionId);
             KarmaForgeDashboardSummary summary = reloadedService.GetDashboardSummary();
 
@@ -99,6 +106,11 @@ public sealed class KarmaForgeDiscoveryServiceTests
             Assert.Equal("queued_for_product_governor", restored.QueueStatus);
             Assert.Equal(1, summary.TotalPackets);
             Assert.Equal(1, summary.GovernorQueueCount);
+            Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "adaptive_interview" && stage.Status == "bounded_pending_consent");
+            Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "quant_validation" && stage.Status == "bounded_pending_consent");
+            Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "review_board" && stage.Status == "bounded_ready");
+            Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "decision" && stage.Status == "bounded_ready");
+            Assert.Contains(restored.Packet.Source.ExternalStages, stage => stage.StageKey == "closeout" && stage.Status == "bounded_waiting_decision");
         }
         finally
         {
@@ -110,7 +122,11 @@ public sealed class KarmaForgeDiscoveryServiceTests
         => new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["CHUMMER_KARMA_FORGE_STORE_PATH"] = Path.Combine(tempRoot, "karma-forge-store.json")
+                ["CHUMMER_KARMA_FORGE_STORE_PATH"] = Path.Combine(tempRoot, "karma-forge-store.json"),
+                ["CHUMMER_KARMA_FORGE_DEFTFORM_BASE_URL"] = "https://forms.example.invalid/deftform",
+                ["CHUMMER_KARMA_FORGE_ICANPRENEUR_BASE_URL"] = "https://discover.example.invalid/icanpreneur",
+                ["CHUMMER_KARMA_FORGE_METASURVEY_BASE_URL"] = "https://surveys.example.invalid/metasurvey",
+                ["CHUMMER_KARMA_FORGE_LUNACAL_BASE_URL"] = "https://schedule.example.invalid/lunacal"
             })
             .Build();
 

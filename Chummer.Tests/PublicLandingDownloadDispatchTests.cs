@@ -622,6 +622,11 @@ public sealed class PublicLandingDownloadDispatchTests
                 NullLogger<HubIdentityClient>.Instance);
             CommunityStore communityStore = new(Configuration, NullLogger<CommunityStore>.Instance);
             Accounts = new AccountService(communityStore);
+            ParticipationOperatorNotificationService participationNotifications = new(
+                new HttpClient(new StaticJsonHandler("""{"target_ref":"delivery-test"}""")),
+                communityStore,
+                Configuration,
+                NullLogger<ParticipationOperatorNotificationService>.Instance);
             InstallLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinking = new InstallLinkingService(InstallLinkingStore, Configuration);
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
@@ -638,10 +643,11 @@ public sealed class PublicLandingDownloadDispatchTests
                 identity: identity,
                 links: null!,
                 experience: null!,
+                participationNotifications: participationNotifications,
                 installLinking: InstallLinking,
                 campaignSpine: null!,
                 workspaceServerPlane: null!,
-                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance)),
+                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: null!,
                 chrome: null!,

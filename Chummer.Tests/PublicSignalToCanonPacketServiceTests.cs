@@ -72,6 +72,12 @@ public sealed class PublicSignalToCanonPacketServiceTests
             Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?source=changelog#public-shipped-closeout", StringComparison.Ordinal));
             Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal) && string.Equals(item.CaseId, "case-public-001", StringComparison.Ordinal));
             Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "productlift_signal", StringComparison.Ordinal) && string.Equals(item.SourceClassification, "public_feedback_signal", StringComparison.Ordinal));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "katteb_signal", StringComparison.Ordinal) && string.Equals(item.SourceClassification, "content_improvement", StringComparison.Ordinal));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "clickrank_signal", StringComparison.Ordinal) && string.Equals(item.SourceClassification, "site_visibility_audit", StringComparison.Ordinal));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "metasurvey_signal", StringComparison.Ordinal) && string.Equals(item.SourceClassification, "quant_validation", StringComparison.Ordinal));
+            Assert.Contains(bundle.Packets, item => item.UpstreamPatchRequirement.Contains("source", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(bundle.Packets, item => item.NoChangeRationalePolicy.Contains("required", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
