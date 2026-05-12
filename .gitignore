@@ -232,7 +232,6 @@ WORK_QUEUE.md
 .env
 .env.*
 !.env.example
-ltds.md
 .aider*
 /ChummerHub/Services/GoogleDrive/SINners.json
 /ChummerHub/Services/GoogleDrive/TextFile.txt
