@@ -1,9 +1,12 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Contracts;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
+using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Ledger;
 using Chummer.Hub.Registry.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Leaderboards;
@@ -280,6 +283,7 @@ public sealed record KarmaForgeIntakePageViewModel(
     string EntryLane,
     KarmaForgeDashboardSummary Dashboard,
     IReadOnlyList<string> DiscoverySteps,
+    IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages,
     KarmaForgeIntakeFormViewModel Form,
     KarmaForgeTrackDefinition SelectedTrack,
     IReadOnlyList<KarmaForgeCandidateDecisionViewModel> CandidateDecisions,
@@ -341,6 +345,7 @@ public sealed record KarmaForgeSubmittedPageViewModel(
     string CandidateDecisionMeaning,
     string ReporterNextAction,
     string ConsentSummary,
+    IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages,
     IReadOnlyList<string> Highlights,
     bool FollowUpAllowed,
     IReadOnlyList<string> NextQuestions,
@@ -692,6 +697,7 @@ public sealed record PublicSignalWebhookReceiptViewModel(
     string HotFilterLabel,
     int HotFilterCount,
     string HotFilterSummary,
+    string PayloadSha256,
     DateTimeOffset ReceivedAtUtc,
     DateTimeOffset? ProviderOccurredAtUtc);
 
@@ -1269,7 +1275,13 @@ public sealed record AccountPageViewModel(
     HubDraftDetailProjection? SelectedCreatorPublicationDraftDetail = null,
     HubPublicationReceipt? SelectedCreatorPublicationReceipt = null,
     SignedInTrustStatusPanelViewModel? SignedInTrustStatus = null,
-    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null);
+    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null,
+    UserRecognitionSummaryDto? ParticipationRecognition = null,
+    SponsorSessionStatusDto? ParticipationSession = null,
+    IReadOnlyList<ContributionReceiptDto>? ParticipationReceipts = null,
+    IReadOnlyList<PublicPackageReceipt>? ParticipationPackageReceipts = null,
+    IReadOnlyList<KarmaForgeSubmissionProjection>? ParticipationKarmaSubmissions = null,
+    IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationActivityReceipts = null);
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,

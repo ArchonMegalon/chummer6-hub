@@ -80,6 +80,8 @@ public sealed class PublicSurfaceReferenceFilesTests
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicSignalOperationsPacket.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForge.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForgeSubmitted.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Concierge.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "JoinPrimer.cshtml"),
         };
 
         string combined = string.Join("\n", publicFiles.Select(static path => File.ReadAllText(path)));
