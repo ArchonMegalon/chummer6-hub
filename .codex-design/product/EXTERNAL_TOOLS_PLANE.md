@@ -54,6 +54,7 @@ Current known external-tool inventory includes:
 * AvoMap
 * BrowserAct
 * Browserly
+* Blip AI
 * ClickRank
 * Crezlo Tours
 * Deftform
@@ -93,6 +94,7 @@ Important current distinctions:
 * Teable - workspace integration Tier 2, vendor license plan Tier 4
 * Emailit - workspace integration Tier 1 on the active Hub delivery lane, with sender-domain, suppression, template, and delivery-receipt gates treated as standing requirements rather than future aspirations
 * Paperguide - workspace integration Tier 3, vendor license plan Tier 4
+* Blip AI - workspace integration Tier 3, vendor license plan Tier 4
 
 Chummer routing, rollout, and architectural ownership should follow workspace integration tier and system-of-record safety rules, not marketing or license-plan tier labels.
 
@@ -106,12 +108,12 @@ Current horizon-facing posture:
 * `nexus-pan` - no external tool may own continuity truth; bounded `Emailit`, `Documentation.AI`, `PeekShot`, and `BrowserAct` may support reconnect notices, troubleshooting projections, continuity receipts, and operator capture only
 * `alice` - `AI Magicx`, `1min.AI`, and `Prompting Systems` may summarize computed build deltas and draft compare briefs; `MarkupGo` and `PeekShot` may render approved compare packets; no tool computes mechanics, legality, or apply truth
 * `karma-forge` - governed house-rule discovery may use `Icanpreneur` for interviews and synthesis, `Deftform` for pre-screening, `Lunacal` for follow-up clinics, `MetaSurvey` for quant validation, `Teable` for candidate review boards and AdminIntent entry, `NextStep` for sprint/process execution, `ApproveThis` for bounded approval posture, and bounded `FacePop` / `Signitic` / `Emailit` / `vidBoard` / `Taja` for recruitment, closeout, and approved discovery explainers
-* `knowledge-fabric` - `Prompting Systems`, `Documentation.AI`, `AI Magicx`, `1min.AI`, `BrowserAct`, and `Paperguide` may build, audit, capture, or cite derived projections, but core-owned rules and receipts remain authoritative
+* `knowledge-fabric` - `Prompting Systems`, `Documentation.AI`, `AI Magicx`, `1min.AI`, `BrowserAct`, `Paperguide`, and `Blip AI` may build, audit, capture, dictate, or cite derived projections, but core-owned rules and receipts remain authoritative
 * `jackpoint` - structured presenter-video and multilingual briefing lanes may use `vidBoard`; narrated recap and briefing lanes may use `Soundmadeseen`; bounded candidate voice may use `Unmixr AI`; evidence/capture packets may use `Browserly`
 * `black-ledger` - world-tick and faction-war operations may use `Teable` for admin projection and AdminIntent entry, `NextStep` for SOP execution, `ApproveThis` for guest approvals, `Signitic` for passive signature campaigns, `Emailit` for Hub-owned digest and closeout mail, and `vidBoard` / `Taja` / `PeekShot` / `MarkupGo` / `Soundmadeseen` for approved artifacts, while first-party map infrastructure keeps map truth
 * `community-hub` - open-run discovery and scheduling may use `Deftform`, `Lunacal`, `MetaSurvey`, `Teable`, `NextStep`, `ApproveThis`, `Emailit`, and bounded `FacePop` / `Signitic` / `vidBoard` / `Taja` for intake, review, invite delivery, and recap projection; `hedy.ai` and `Nonverbia` may assist GM-private or consent-gated debrief flows only; Discord, Teams, generic meeting URLs, Foundry, Roll20, and comparable play surfaces remain projection-only handoff or export targets and may not own run, roster, consent, or resolution truth
 * `runsite` - explorable location artifacts may use `Crezlo Tours`, `AvoMap`, and `PeekShot`; orientation-host clips may use `vidBoard`; optional narration may use `Soundmadeseen`; bounded capture/reference packets may use `BrowserAct` or `Browserly`; route, map, and tour siblings stay first-party inspectable truth and the media layer may not become tactical authority
-* `runbook-press` - long-form authoring and export may use `First Book ai`, `MarkupGo`, and `Documentation.AI`; campaign primer and module explainer videos may use `vidBoard`; narrated companion assets may use `Soundmadeseen`; bounded candidate voice or cited research support may use `Unmixr AI` and `Paperguide`
+* `runbook-press` - long-form authoring and export may use `First Book ai`, `MarkupGo`, and `Documentation.AI`; campaign primer and module explainer videos may use `vidBoard`; narrated companion assets may use `Soundmadeseen`; bounded candidate voice, dictated draft capture, or cited research support may use `Unmixr AI`, `Blip AI`, and `Paperguide`
 * `ghostwire` - replay-safe surfaces may use `PeekShot`, `MarkupGo`, and `Soundmadeseen` after first-party reconstruction exists; `Mootion` and `Paperguide` stay bounded replay-video and cited reconstruction helpers only
 * `table-pulse` - post-session coaching packets may use `Nonverbia` as the primary analysis lane, `hedy.ai` as the bounded session-structure and debrief helper lane, with later bounded player-safe recap / GM-private debrief video from `vidBoard`, plus bounded narrated/report outputs from `Soundmadeseen`, `Unmixr AI`, `MarkupGo`, and `PeekShot`
 * `local-co-processor` - no external tool may become the local acceleration truth owner; bounded `1min.AI`, `AI Magicx`, `BrowserAct`, and `Documentation.AI` may support hosted-local parity checks, operator capture, and guidance only
