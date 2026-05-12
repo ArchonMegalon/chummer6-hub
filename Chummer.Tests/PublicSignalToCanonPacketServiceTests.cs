@@ -78,6 +78,10 @@ public sealed class PublicSignalToCanonPacketServiceTests
             Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "metasurvey_signal", StringComparison.Ordinal) && string.Equals(item.SourceClassification, "quant_validation", StringComparison.Ordinal));
             Assert.Contains(bundle.Packets, item => item.UpstreamPatchRequirement.Contains("source", StringComparison.OrdinalIgnoreCase));
             Assert.Contains(bundle.Packets, item => item.NoChangeRationalePolicy.Contains("required", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "productlift_signal", StringComparison.Ordinal) && item.JourneyProofEventRefs.Any(refItem => string.Equals(refItem.EventKey, "productlift_idea_clustered", StringComparison.Ordinal)));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && item.JourneyProofEventRefs.Any(refItem => string.Equals(refItem.EventKey, "voter_notified", StringComparison.Ordinal)));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "metasurvey_signal", StringComparison.Ordinal) && item.JourneyProofEventRefs.Any(refItem => string.Equals(refItem.EventKey, "karma_demand_packet_created", StringComparison.Ordinal)));
+            Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && item.JourneyProofEventRefs.Count >= 2);
         }
         finally
         {

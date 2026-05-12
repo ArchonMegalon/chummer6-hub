@@ -2721,7 +2721,14 @@ public sealed class PublicLandingController : Controller
                 Severity: "session_friction",
                 InterviewRef: "hub_karma_forge_sample_submission",
                 ConsentRef: "hub_karma_forge_sample_consent",
-                ExternalStages: Array.Empty<KarmaForgeExternalStageProjection>()),
+                ExternalStages: Array.Empty<KarmaForgeExternalStageProjection>(),
+                JourneyProofEventRefs:
+                [
+                    new("karma_request_submitted", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The public discovery request entered the first-party KARMA FORGE intake lane."),
+                    new("karma_interview_completed", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "Guided follow-up completed inside the bounded KARMA FORGE discovery chain."),
+                    new("karma_demand_packet_created", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The intake normalized into a Chummer-owned demand packet before Product Governor review."),
+                    new("karma_candidate_reviewed", "karma_forge_discovery", "hrp_2026_05_09_sample_karma_forge", "The candidate is visible on the governed review rail instead of staying provider-owned.")
+                ]),
             UserWords: new KarmaForgeUserWordsProjection(
                 Summary: "We need a governed table amendment that survives continuity and rollback without hiding the approval trail.",
                 CurrentWorkaround: "We keep the rule in chat and manually restate it before every session."),
@@ -3694,6 +3701,7 @@ public sealed class PublicLandingController : Controller
             Dashboard: _karmaForge.GetDashboardSummary(),
             DiscoverySteps: _karmaForge.GetDiscoverySteps(),
             ExternalStages: _karmaForge.GetExternalStageProjections(),
+            JourneyProofEventRefs: _karmaForge.GetJourneyProofEventRefs(),
             Form: new KarmaForgeIntakeFormViewModel(
                 ActionHref: "/participate/karma-forge",
                 Authenticated: chrome.Authenticated,
@@ -3812,6 +3820,7 @@ public sealed class PublicLandingController : Controller
             ReporterNextAction: submission.ReporterNextAction,
             ConsentSummary: submission.ConsentSummary,
             ExternalStages: submission.Packet.Source.ExternalStages,
+            JourneyProofEventRefs: submission.Packet.Source.JourneyProofEventRefs,
             Highlights:
             [
                 $"{HumanizeToken(submission.Packet.Source.RuleCategory, "Rule category")} · {HumanizeToken(submission.Packet.Source.Severity, "Severity")}",

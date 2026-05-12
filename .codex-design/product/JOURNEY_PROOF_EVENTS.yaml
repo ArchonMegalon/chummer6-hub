@@ -39,7 +39,13 @@ events:
     journey: productlift_to_ship
   - key: voter_notified
     journey: productlift_to_ship
+  - key: karma_request_submitted
+    journey: karma_forge_discovery
+  - key: karma_interview_completed
+    journey: karma_forge_discovery
   - key: karma_demand_packet_created
+    journey: karma_forge_discovery
+  - key: karma_candidate_reviewed
     journey: karma_forge_discovery
   - key: world_tick_approved
     journey: world_tick_distribution
