@@ -13,6 +13,42 @@ NATIVE_SUPPORT_ROUTE = "/api/v1/install-linking/continuation/support"
 
 
 class HubLocalReleaseProofNativeSupportRouteTests(unittest.TestCase):
+    def test_materialized_m141_proof_includes_direct_import_route_receipts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_root:
+            proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(MATERIALIZER),
+                    str(proof_path),
+                    "https://chummer.run",
+                    "docker-compose.yml",
+                    "120",
+                    "true",
+                ],
+                cwd=REPO_ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}")
+            proof = json.loads(proof_path.read_text(encoding="utf-8"))
+
+        receipts = {receipt.get("receipt_id"): receipt for receipt in proof["proof_receipts"]}
+        self.assertIn("menu:translator", receipts)
+        self.assertIn("menu:xml_editor", receipts)
+        self.assertIn("menu:hero_lab_importer", receipts)
+        self.assertIn("workflow:import_oracle", receipts)
+        self.assertEqual(
+            "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment",
+            receipts["menu:translator"]["package_id"],
+        )
+        self.assertIn("source:translator_route", receipts["menu:translator"]["routes"])
+        self.assertIn("source:xml_amendment_editor_route", receipts["menu:xml_editor"]["routes"])
+        self.assertIn("source:hero_lab_importer_route", receipts["menu:hero_lab_importer"]["routes"])
+        self.assertIn("family:legacy_and_adjacent_import_oracles", receipts["workflow:import_oracle"]["routes"])
+
     def test_materialized_m102_proof_includes_desktop_client_readiness_snapshot_and_bounded_routes_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as temp_root:
             proof_path = Path(temp_root) / "HUB_LOCAL_RELEASE_PROOF.generated.json"
