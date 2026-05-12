@@ -1028,6 +1028,7 @@ public sealed class ReleaseBundlePromotionService
             ["desktopRouteTruth"] = JsonSerializer.SerializeToNode(
                 BuildDesktopRouteTruth(
                     artifactRows,
+                    requiredDesktopPlatforms,
                     NormalizeToken(channelStatus),
                     NormalizeToken(rolloutState),
                     rolloutReason?.Trim() ?? string.Empty,
@@ -1105,13 +1106,14 @@ public sealed class ReleaseBundlePromotionService
 
     private static List<Dictionary<string, string>> BuildDesktopRouteTruth(
         IReadOnlyList<CanonicalArtifactState> artifacts,
+        IReadOnlyList<string> requiredDesktopPlatforms,
         string channelStatus,
         string rolloutState,
         string rolloutReason,
         string knownIssueSummary)
     {
         Dictionary<string, CanonicalArtifactState> promotedByPlatformHeadRid = new(StringComparer.OrdinalIgnoreCase);
-        Dictionary<string, HashSet<string>> requiredRidsByPlatform = RequiredDesktopPlatforms.ToDictionary(
+        Dictionary<string, HashSet<string>> requiredRidsByPlatform = requiredDesktopPlatforms.ToDictionary(
             static platform => platform,
             static platform => new HashSet<string>(
                 DefaultRequiredDesktopPlatformRids.TryGetValue(platform, out string[]? rids) ? rids : [],
@@ -1120,7 +1122,7 @@ public sealed class ReleaseBundlePromotionService
 
         foreach (CanonicalArtifactState artifact in artifacts)
         {
-            if (!RequiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
+            if (!requiredDesktopPlatforms.Contains(artifact.Platform, StringComparer.OrdinalIgnoreCase)
                 || !DesktopRouteTruthHeads.Contains(artifact.Head, StringComparer.OrdinalIgnoreCase)
                 || string.IsNullOrWhiteSpace(artifact.Rid)
                 || !IsDesktopInstallMedia(artifact.Platform, artifact.Kind))
@@ -1138,7 +1140,7 @@ public sealed class ReleaseBundlePromotionService
         }
 
         List<Dictionary<string, string>> rows = [];
-        foreach (string platform in RequiredDesktopPlatforms)
+        foreach (string platform in requiredDesktopPlatforms)
         {
             IEnumerable<string> rids = requiredRidsByPlatform.TryGetValue(platform, out HashSet<string>? ridSet)
                 ? ridSet.OrderBy(static value => value, StringComparer.Ordinal)
