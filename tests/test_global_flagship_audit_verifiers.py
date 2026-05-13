@@ -21,4 +21,7 @@ def test_global_audit_verifier_scripts_exist() -> None:
     assert (REPO_ROOT / "scripts" / "live_public_surface_audit.py").is_file()
     assert (REPO_ROOT / "scripts" / "classify_ruleset_readiness.py").is_file()
     assert (REPO_ROOT / "scripts" / "public_copy_truth_gate.py").is_file()
+    assert (REPO_ROOT / "scripts" / "public_asset_quality_gate.py").is_file()
+    assert (REPO_ROOT / "scripts" / "ledger_stats_privacy_gate.py").is_file()
+    assert (REPO_ROOT / "scripts" / "public_ip_privacy_scan.py").is_file()
     assert (REPO_ROOT / "scripts" / "release_dress_rehearsal.sh").is_file()

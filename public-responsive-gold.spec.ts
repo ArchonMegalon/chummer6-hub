@@ -13,8 +13,10 @@ test('public mobile-facing surfaces keep route-owned sections that can collapse 
   const packages = readFileSync(packagesViewPath, 'utf8');
 
   expect(landing).toContain('launch-hero__shell');
-  expect(landing).toContain('workflow-grid');
-  expect(landing).toContain('route-choice-grid');
+  expect(landing).toContain('flagship-gateway-grid');
+  expect(landing).toContain('ledger-stats-grid');
+  expect(landing).toContain('forge-pipeline');
+  expect(landing).toContain('participation-badge-grid');
 
   expect(mobile).toContain('continuity-band');
   expect(mobile).toContain('route-choice-grid');
