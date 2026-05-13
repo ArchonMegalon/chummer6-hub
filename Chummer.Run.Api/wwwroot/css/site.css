@@ -2992,6 +2992,114 @@ td {
   text-transform: uppercase;
 }
 
+.workflow-band--flagship,
+.workflow-band--pipeline {
+  margin-top: 2rem;
+}
+
+.flagship-gateway-grid,
+.ledger-stats-grid,
+.participation-badge-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.flagship-gateway-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.gateway-card,
+.ledger-stat-card,
+.forge-pipeline__stage,
+.participation-badge-card {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.2rem;
+  border-radius: 26px;
+  border: 1px solid var(--line-subtle);
+  background:
+    radial-gradient(circle at top right, rgba(90, 167, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(15, 24, 36, 0.94), rgba(12, 20, 30, 0.96));
+  box-shadow: var(--shadow-soft);
+}
+
+.gateway-card__header {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.gateway-card p,
+.ledger-stat-card p,
+.forge-pipeline__stage p,
+.participation-badge-card p {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.product-proof--ledger {
+  margin-top: 2rem;
+}
+
+.ledger-stats-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ledger-stat-card span,
+.forge-pipeline__stage span {
+  color: var(--ink-muted);
+  font-family: var(--font-family-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ledger-stat-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.ledger-stat-card__meta span,
+.ledger-stat-card__privacy {
+  display: inline-flex;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.ledger-stat-card__privacy {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.forge-pipeline {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.forge-pipeline__stage {
+  position: relative;
+  min-height: 180px;
+}
+
+.forge-pipeline__stage:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -0.6rem;
+  width: 1.2rem;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(57, 198, 255, 0.7), rgba(255, 177, 92, 0.5));
+}
+
+.participation-badge-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .workflow-card:hover,
 .workflow-card:focus-within,
 .audience-card:hover,
@@ -4409,6 +4517,49 @@ body.nav-sheet-open {
     #08182e;
 }
 
+.ledger-console {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 2;
+  width: min(300px, calc(100% - 48px));
+  display: grid;
+  gap: 12px;
+}
+
+.ledger-console__panel {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(146, 176, 217, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(57, 198, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(8, 14, 22, 0.9), rgba(6, 11, 18, 0.96));
+  box-shadow: var(--shadow-soft);
+}
+
+.ledger-console__panel span {
+  color: var(--ink-muted);
+  font-family: var(--font-family-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ledger-console__panel strong,
+.ledger-stat-card strong,
+.gateway-card h3,
+.forge-pipeline__stage span,
+.participation-badge-card h3 {
+  color: var(--ink-strong);
+}
+
+.ledger-console__panel p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
 .hero-installrail {
   display: grid;
   gap: 1rem;
@@ -5125,6 +5276,22 @@ body.nav-sheet-open {
   .site-brand__surface {
     display: none;
   }
+
+  .flagship-gateway-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .participation-badge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .forge-pipeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .forge-pipeline__stage::after {
+    display: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -5184,6 +5351,7 @@ body.nav-sheet-open {
   .continuity-band__panel,
   .flagship-coverage__grid,
   .future-strip__grid,
+  .ledger-stats-grid,
   .story-pain-grid,
   .home-cockpit-strip__panel,
   .account-rail-snapshot__panel,
@@ -5215,6 +5383,14 @@ body.nav-sheet-open {
     margin: 0 12px 12px;
   }
 
+  .ledger-console {
+    position: relative;
+    top: auto;
+    right: auto;
+    width: calc(100% - 24px);
+    margin: 0 12px 12px;
+  }
+
   .proof-chip-row {
     overflow-x: auto;
     padding-bottom: 0.25rem;
@@ -5222,9 +5398,12 @@ body.nav-sheet-open {
   }
 
   .workflow-grid,
+  .flagship-gateway-grid,
+  .participation-badge-grid,
   .audience-fit__grid,
   .artifact-gallery__grid,
-  .works-matrix__columns {
+  .works-matrix__columns,
+  .forge-pipeline {
     display: grid;
     grid-auto-flow: column;
     grid-auto-columns: 86%;
@@ -5238,6 +5417,9 @@ body.nav-sheet-open {
   }
 
   .workflow-card,
+  .gateway-card,
+  .participation-badge-card,
+  .forge-pipeline__stage,
   .audience-card,
   .artifact-card,
   .works-column {
