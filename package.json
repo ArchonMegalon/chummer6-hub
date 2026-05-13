@@ -1,0 +1,7 @@
+{
+  "name": "chummer-run-services-release-gates",
+  "private": true,
+  "devDependencies": {
+    "playwright": "^1.53.0"
+  }
+}
