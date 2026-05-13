@@ -2165,6 +2165,12 @@ public sealed class PublicLandingController : Controller
             return NotFound();
         }
 
+        bool sampleReceiptId = string.Equals(caseId, "sample-case-id", StringComparison.OrdinalIgnoreCase);
+        if (!sampleReceiptId && !caseId.StartsWith("support_case_", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
         var chrome = await BuildPublicOrAuthenticatedChromeAsync("Support case submitted", "What happens next after a first-party support report reaches Chummer.", $"/contact/submitted/{caseId}", cancellationToken);
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
         var authenticated = subject is not null;
@@ -2179,7 +2185,7 @@ public sealed class PublicLandingController : Controller
         var trackedCase = subject is null
             ? null
             : _supportCases.GetForReporter(caseId, user!.UserId, subject.SubjectId);
-        bool sampleReceipt = trackedCase is null && string.Equals(caseId, "sample-case-id", StringComparison.OrdinalIgnoreCase);
+        bool sampleReceipt = trackedCase is null && sampleReceiptId;
         DesktopInstallRailContext installRail = ResolveSupportIntakeRailFromQuery();
         var highlights = new List<string>
         {
@@ -4328,9 +4334,21 @@ public sealed class PublicLandingController : Controller
         PublicTrustPulseSnapshot? pulse)
     {
         int blockedRouteCount = EnumerateDesktopRouteTruth(manifest).Count(static route =>
-            IsBlockedStatus(TryGetJsonString(route, "updateEligibility"))
-            || IsBlockedStatus(TryGetJsonString(route, "promotionState"))
-            || IsBlockedStatus(TryGetJsonString(route, "installPosture")));
+        {
+            string routeRole = TryGetJsonString(route, "routeRole") ?? string.Empty;
+            string promotionState = TryGetJsonString(route, "promotionState") ?? string.Empty;
+            string revokeState = TryGetJsonString(route, "revokeState") ?? string.Empty;
+            if (string.Equals(routeRole, "fallback", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(promotionState, "proof_required", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(revokeState, "revoked", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return IsBlockedStatus(TryGetJsonString(route, "updateEligibility"))
+                   || IsBlockedStatus(TryGetJsonString(route, "promotionState"))
+                   || IsBlockedStatus(TryGetJsonString(route, "installPosture"));
+        });
         int blockedJourneyCount = pulse?.BlockedJourneyCount ?? 0;
         if (blockedRouteCount == 0 && blockedJourneyCount == 0)
         {
