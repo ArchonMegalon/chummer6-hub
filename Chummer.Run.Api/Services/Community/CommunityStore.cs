@@ -44,6 +44,8 @@ public sealed class CommunityStore
     public List<EntitlementGrantDto> EntitlementEntries { get; } = new();
     public List<BadgeDto> Badges { get; } = new();
     public Dictionary<string, HubUserExperienceDto> UserExperienceByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public List<ParticipationOperatorNotificationReceipt> ParticipationNotificationReceipts { get; } = new();
+    public List<BlackLedgerNewsDeliveryReceipt> BlackLedgerNewsDeliveryReceipts { get; } = new();
     public Dictionary<string, RunnerDossierProjection> DossiersById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrewProjection> CrewsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -87,6 +89,12 @@ public sealed class CommunityStore
             Badges: Badges.ToArray(),
             UserExperience: UserExperienceByUserId.Values
                 .OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            ParticipationNotificationReceipts: ParticipationNotificationReceipts
+                .OrderByDescending(static item => item.OccurredAtUtc)
+                .ToArray(),
+            BlackLedgerNewsDeliveryReceipts: BlackLedgerNewsDeliveryReceipts
+                .OrderByDescending(static item => item.CreatedAtUtc)
                 .ToArray(),
             Dossiers: DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Crews: CrewsById.Values.OrderBy(static item => item.CrewId, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -156,6 +164,8 @@ public sealed class CommunityStore
         EntitlementEntries.Clear();
         Badges.Clear();
         UserExperienceByUserId.Clear();
+        ParticipationNotificationReceipts.Clear();
+        BlackLedgerNewsDeliveryReceipts.Clear();
         DossiersById.Clear();
         CrewsById.Clear();
         CampaignSpinesById.Clear();
@@ -228,6 +238,8 @@ public sealed class CommunityStore
         {
             UserExperienceByUserId[experience.UserId] = experience;
         }
+        ParticipationNotificationReceipts.AddRange(snapshot.ParticipationNotificationReceipts ?? Array.Empty<ParticipationOperatorNotificationReceipt>());
+        BlackLedgerNewsDeliveryReceipts.AddRange(snapshot.BlackLedgerNewsDeliveryReceipts ?? Array.Empty<BlackLedgerNewsDeliveryReceipt>());
 
         foreach (var dossier in snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>())
         {
@@ -354,6 +366,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<EntitlementGrantDto> EntitlementEntries,
     IReadOnlyList<BadgeDto> Badges,
     IReadOnlyList<HubUserExperienceDto>? UserExperience = null,
+    IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationNotificationReceipts = null,
+    IReadOnlyList<BlackLedgerNewsDeliveryReceipt>? BlackLedgerNewsDeliveryReceipts = null,
     IReadOnlyList<RunnerDossierProjection>? Dossiers = null,
     IReadOnlyList<CrewProjection>? Crews = null,
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,

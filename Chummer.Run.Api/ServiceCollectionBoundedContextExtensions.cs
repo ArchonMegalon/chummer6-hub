@@ -61,6 +61,9 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<LeaderboardService>();
         services.AddSingleton<LedgerService>();
         services.AddHttpClient<ParticipationOperatorNotificationService>();
+        services.AddSingleton<BlackLedgerNewsRecipientResolver>();
+        services.AddHttpClient<BlackLedgerTickNewsNotificationService>();
+        services.AddHostedService<BlackLedgerTickNewsDispatchWorker>();
         services.AddScoped<BoostSessionService>();
         return services;
     }
