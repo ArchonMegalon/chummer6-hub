@@ -37,7 +37,11 @@ public sealed class UserExperienceService
                 BetaInterest: false,
                 OnboardingCompleted: false,
                 OnboardingCompletedAtUtc: null,
-                UpdatedAtUtc: DateTimeOffset.UtcNow);
+                UpdatedAtUtc: DateTimeOffset.UtcNow,
+                ImpactCloseoutNotifications: false,
+                PublicContributionProfileOptIn: false,
+                BlackLedgerNewsEmail: false,
+                BlackLedgerWorldsFollowed: Array.Empty<string>());
             _store.UserExperienceByUserId[user.UserId] = created;
             _store.PersistLocked();
             return created;
@@ -60,7 +64,11 @@ public sealed class UserExperienceService
                     BetaInterest: false,
                     OnboardingCompleted: false,
                     OnboardingCompletedAtUtc: null,
-                    UpdatedAtUtc: now);
+                    UpdatedAtUtc: now,
+                    ImpactCloseoutNotifications: false,
+                    PublicContributionProfileOptIn: false,
+                    BlackLedgerNewsEmail: false,
+                    BlackLedgerWorldsFollowed: Array.Empty<string>());
 
             var laneInterests = request.LaneInterests is null
                 ? existing.LaneInterests
@@ -72,6 +80,13 @@ public sealed class UserExperienceService
                     .ToArray();
 
             var onboardingCompleted = request.OnboardingCompleted ?? existing.OnboardingCompleted;
+            var blackLedgerWorldsFollowed = request.BlackLedgerWorldsFollowed is null
+                ? (existing.BlackLedgerWorldsFollowed ?? Array.Empty<string>())
+                : request.BlackLedgerWorldsFollowed
+                    .Where(static lane => !string.IsNullOrWhiteSpace(lane))
+                    .Select(static lane => lane.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
             var updated = existing with
             {
                 LaneInterests = laneInterests,
@@ -81,6 +96,10 @@ public sealed class UserExperienceService
                 OnboardingCompletedAtUtc = onboardingCompleted
                     ? existing.OnboardingCompletedAtUtc ?? now
                     : null,
+                ImpactCloseoutNotifications = request.ImpactCloseoutNotifications ?? existing.ImpactCloseoutNotifications,
+                PublicContributionProfileOptIn = request.PublicContributionProfileOptIn ?? existing.PublicContributionProfileOptIn,
+                BlackLedgerNewsEmail = request.BlackLedgerNewsEmail ?? existing.BlackLedgerNewsEmail,
+                BlackLedgerWorldsFollowed = blackLedgerWorldsFollowed,
                 UpdatedAtUtc = now
             };
 

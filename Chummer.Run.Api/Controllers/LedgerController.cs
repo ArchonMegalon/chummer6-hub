@@ -19,8 +19,9 @@ public sealed class LedgerController : ControllerBase
     private readonly FleetReceiptVerifier _receiptVerifier;
     private readonly RewardService _rewards;
     private readonly BlackLedgerPublicStatsService _blackLedgerPublicStats;
+    private readonly BlackLedgerTickNewsNotificationService _blackLedgerTickNews;
 
-    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats)
+    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats, BlackLedgerTickNewsNotificationService blackLedgerTickNews)
     {
         _accounts = accounts;
         _identity = identity;
@@ -28,6 +29,7 @@ public sealed class LedgerController : ControllerBase
         _receiptVerifier = receiptVerifier;
         _rewards = rewards;
         _blackLedgerPublicStats = blackLedgerPublicStats;
+        _blackLedgerTickNews = blackLedgerTickNews;
     }
 
     [HttpPost("receipts")]
@@ -120,7 +122,7 @@ public sealed class LedgerController : ControllerBase
 
     [HttpPost("worlds/{worldId}/ticks")]
     [Produces("application/json")]
-    public ActionResult<object> MaterializeDeterministicBlackLedgerTick([FromRoute] string worldId, [FromQuery] int turn = 2)
+    public async Task<ActionResult<object>> MaterializeDeterministicBlackLedgerTick([FromRoute] string worldId, [FromQuery] int turn = 2, CancellationToken cancellationToken = default)
     {
         if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
         {
@@ -139,6 +141,11 @@ public sealed class LedgerController : ControllerBase
             return NotFound();
         }
 
+        string baseUrl = $"{Request.Scheme}://{Request.Host}";
+        BlackLedgerWorldTickNewsEvent tickNews = _blackLedgerTickNews.BuildSeededWorldEvent(worldId, turn, baseUrl)
+            ?? throw new InvalidOperationException("Deterministic world preview is missing its BLACK LEDGER tick-news event.");
+        _ = await _blackLedgerTickNews.NotifyTickNewsAsync(tickNews, dryRun: false, policyOverride: null, cancellationToken);
+
         return Ok(new
         {
             receipt_type = "world_tick_receipt",
@@ -153,6 +160,52 @@ public sealed class LedgerController : ControllerBase
             world.LastTick.OutputStateHash,
             world.LastTick.CreatedAtUtc,
             world.LastTick.Effects,
+        });
+    }
+
+    [HttpPost("worlds/{worldId}/tick-news/send")]
+    [Produces("application/json")]
+    public async Task<ActionResult<object>> SendBlackLedgerTickNews(
+        [FromRoute] string worldId,
+        [FromQuery] int turn = 1,
+        [FromQuery] bool dryRun = true,
+        [FromQuery] string? policy = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        string baseUrl = $"{Request.Scheme}://{Request.Host}";
+        BlackLedgerWorldTickNewsEvent? tickNews = _blackLedgerTickNews.BuildSeededWorldEvent(worldId, turn, baseUrl);
+        if (tickNews is null)
+        {
+            return NotFound();
+        }
+
+        BlackLedgerTickNewsNotificationBatchReceipt receipt = await _blackLedgerTickNews.NotifyTickNewsAsync(tickNews, dryRun, policy, cancellationToken);
+        return Ok(new
+        {
+            receipt.BatchId,
+            receipt.Policy,
+            receipt.Status,
+            receipt.WorldId,
+            receipt.FromTurn,
+            receipt.ToTurn,
+            receipt.TickReceiptId,
+            receipt.NewsId,
+            receipt.DryRun,
+            receipt.Duplicate,
+            receipt.RecipientCount,
+            receipt.FailureReason,
+            receipt.Receipts,
         });
     }
 
