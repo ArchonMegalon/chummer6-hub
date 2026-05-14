@@ -14,6 +14,10 @@ from absolute_completion_common import LocalHubApp, completion_path, now_iso, wr
 
 DEFAULT_POLICY = "subscribed_or_only_user_preview_fallback"
 LOCAL_INTERNAL_TOKEN = "black-ledger-local-token"
+REMOTE_INTERNAL_TOKEN_ENV_KEYS = (
+    "CHUMMER_BLACK_LEDGER_INTERNAL_API_TOKEN",
+    "FLEET_INTERNAL_API_TOKEN",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,7 +32,18 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def invoke(base_url: str, world: str, turn: int, policy: str, dry_run: bool) -> tuple[int, dict]:
+def resolve_internal_token(base_url: str) -> str:
+    if not base_url:
+        return LOCAL_INTERNAL_TOKEN
+    for key in REMOTE_INTERNAL_TOKEN_ENV_KEYS:
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value
+    joined = ", ".join(REMOTE_INTERNAL_TOKEN_ENV_KEYS)
+    raise RuntimeError(f"missing internal API token for remote tick-news send; set one of: {joined}")
+
+
+def invoke(base_url: str, world: str, turn: int, policy: str, dry_run: bool, token: str) -> tuple[int, dict]:
     response = requests.post(
         f"{base_url.rstrip('/')}/api/v1/ledger/worlds/{world}/tick-news/send",
         params={
@@ -36,7 +51,7 @@ def invoke(base_url: str, world: str, turn: int, policy: str, dry_run: bool) -> 
             "dryRun": "true" if dry_run else "false",
             "policy": policy,
         },
-        headers={"Authorization": f"Bearer {LOCAL_INTERNAL_TOKEN}"},
+        headers={"Authorization": f"Bearer {token}"},
         timeout=60,
     )
     payload = response.json() if response.content else {}
@@ -113,7 +128,8 @@ def emit_receipts(status_code: int, payload: dict, world: str, turn: int, dry_ru
 def main() -> int:
     args = parse_args()
     if args.base_url:
-        status_code, payload = invoke(args.base_url, args.world, args.turn, args.policy, args.dry_run)
+        token = resolve_internal_token(args.base_url)
+        status_code, payload = invoke(args.base_url, args.world, args.turn, args.policy, args.dry_run, token)
         return emit_receipts(status_code, payload, args.world, args.turn, args.dry_run, args.base_url.rstrip("/"))
 
     previous = os.environ.get("FLEET_INTERNAL_API_TOKEN")
@@ -126,7 +142,7 @@ def main() -> int:
             os.environ["CHUMMER_COMMUNITY_STORE_PATH"] = str(store_path)
             try:
                 with LocalHubApp() as app:
-                    status_code, payload = invoke(app.base_url, args.world, args.turn, args.policy, args.dry_run)
+                    status_code, payload = invoke(app.base_url, args.world, args.turn, args.policy, args.dry_run, LOCAL_INTERNAL_TOKEN)
                     return emit_receipts(status_code, payload, args.world, args.turn, args.dry_run, app.base_url)
             finally:
                 if previous_store is None:

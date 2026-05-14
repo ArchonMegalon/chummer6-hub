@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
@@ -123,8 +124,14 @@ public sealed class BlackLedgerTickNewsTests
             Assert.Equal("sent", batch.Receipts[0].Status);
             Assert.Equal(subscribed.UserId, batch.Receipts[0].RecipientUserId);
             CapturedRequest request = Assert.Single(requests);
-            Assert.Contains("\"recipient\":\"ledger-one@example.com\"", request.Body, StringComparison.Ordinal);
-            Assert.DoesNotContain("ledger-two@example.com", request.Body, StringComparison.Ordinal);
+            using JsonDocument payload = JsonDocument.Parse(request.Body);
+            Assert.Equal("connector.dispatch", payload.RootElement.GetProperty("tool_name").GetString());
+            Assert.Equal("delivery.send", payload.RootElement.GetProperty("action_kind").GetString());
+            JsonElement payloadJson = payload.RootElement.GetProperty("payload_json");
+            Assert.Equal("ledger-one@example.com", payloadJson.GetProperty("recipient").GetString());
+            Assert.Equal("binding-1", payloadJson.GetProperty("binding_id").GetString());
+            Assert.True(payloadJson.TryGetProperty("idempotency_key", out _));
+            Assert.False(request.Body.Contains("ledger-two@example.com", StringComparison.Ordinal));
         }
         finally
         {
@@ -249,6 +256,46 @@ public sealed class BlackLedgerTickNewsTests
             Assert.True(second.Duplicate);
             Assert.Equal("duplicate", second.Status);
             Assert.Single(requests);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public async Task BlackLedgerTickNews_accepts_delivery_id_from_output_json()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            var requests = new List<CapturedRequest>();
+            using var http = new HttpClient(new CapturingHandler(requests, HttpStatusCode.OK, """{"output_json":{"delivery_id":"ea-delivery-output-json"}}"""));
+            IConfiguration configuration = BuildConfiguration(tempRoot, new Dictionary<string, string?>
+            {
+                ["CHUMMER_BLACK_LEDGER_NEWS_EMAIL_ENABLED"] = "true",
+                ["CHUMMER_BLACK_LEDGER_NEWS_EMAIL_POLICY"] = BlackLedgerNewsRecipientResolver.SubscribedOrOnlyUserPreviewFallbackPolicy,
+                ["CHUMMER_BLACK_LEDGER_NEWS_EA_API_TOKEN"] = "ea-token",
+                ["CHUMMER_BLACK_LEDGER_NEWS_EA_PRINCIPAL_ID"] = "principal-1",
+                ["CHUMMER_BLACK_LEDGER_NEWS_EA_BINDING_ID"] = "binding-1",
+                ["CHUMMER_BLACK_LEDGER_NEWS_EA_BASE_URL"] = "https://ea.test",
+            });
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            AccountService accounts = new(store);
+            _ = accounts.EnsureUserWithStatus("subject.ledger.one", "Ledger One", "ledger-one@example.com").User;
+
+            BlackLedgerTickNewsNotificationService service = new(
+                http,
+                store,
+                configuration,
+                new BlackLedgerNewsRecipientResolver(store, configuration),
+                NullLogger<BlackLedgerTickNewsNotificationService>.Instance);
+
+            BlackLedgerTickNewsNotificationBatchReceipt batch = await service.NotifyTickNewsAsync(CreateTickEvent(), false, null, CancellationToken.None);
+
+            Assert.Equal("sent", batch.Status);
+            Assert.Single(batch.Receipts);
+            Assert.Equal("ea-delivery-output-json", batch.Receipts[0].DeliveryRef);
         }
         finally
         {
