@@ -454,7 +454,15 @@
                     <p class="site-footer__provenance">Use <a class="quiet-link" href="/now">what works today</a> for customer-facing proof and <a class="quiet-link" href="/status">status</a> for current cautions.</p>
                     @if (utilityLink is not null)
                     {
-                        <p><a class="quiet-link" href="@utilityLink.Href">@utilityLink.Label</a> is the external source fallback.</p>
+                        var utilityIsExternal = Uri.TryCreate(utilityLink.Href, UriKind.Absolute, out _);
+                        if (utilityIsExternal)
+                        {
+                            <p><a class="quiet-link" href="@utilityLink.Href" rel="noopener noreferrer">@utilityLink.Label</a> is the external source fallback.</p>
+                        }
+                        else
+                        {
+                            <p><a class="quiet-link" href="@utilityLink.Href">@utilityLink.Label</a> is the external source fallback.</p>
+                        }
                     }
                 </div>
             </div>
