@@ -13,6 +13,8 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/roadmap", doc, StringComparison.Ordinal);
         Assert.Contains("/feedback", doc, StringComparison.Ordinal);
         Assert.Contains("/changelog", doc, StringComparison.Ordinal);
+        Assert.Contains("/ledger", doc, StringComparison.Ordinal);
+        Assert.Contains("/karma-forge", doc, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge", doc, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", doc, StringComparison.Ordinal);
         Assert.Contains("milestone-backed public direction", doc, StringComparison.Ordinal);
@@ -32,6 +34,8 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/roadmap", llms, StringComparison.Ordinal);
         Assert.Contains("/feedback", llms, StringComparison.Ordinal);
         Assert.Contains("/changelog", llms, StringComparison.Ordinal);
+        Assert.Contains("/ledger", llms, StringComparison.Ordinal);
+        Assert.Contains("/karma-forge", llms, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge", llms, StringComparison.Ordinal);
         Assert.Contains("/llms.txt", ai, StringComparison.Ordinal);
         Assert.Contains("/roadmap", ai, StringComparison.Ordinal);

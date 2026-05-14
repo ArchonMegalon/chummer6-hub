@@ -29,6 +29,9 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<HubPageChromeService>();
         services.AddSingleton<KarmaForgeStore>();
         services.AddSingleton<KarmaForgeDiscoveryService>();
+        services.AddSingleton<BlackLedgerPublicStatsService>();
+        services.AddSingleton<TeableKarmaForgeReviewBoardService>();
+        services.AddHostedService<TeableKarmaForgeReviewBoardSyncWorker>();
         services.AddSingleton<WeeklyProductPulseArtifactService>();
         services.AddSingleton<PublicProgressService>();
         services.AddSingleton<PublicTrustPulseService>();
@@ -44,7 +47,9 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         services.AddSingleton<CommunityStore>();
         services.AddSingleton<TeableUserProjectionService>();
+        services.AddSingleton<TeableBlackLedgerWorldTickService>();
         services.AddHostedService<TeableUserProjectionSyncWorker>();
+        services.AddHostedService<TeableBlackLedgerWorldTickSyncWorker>();
         services.AddHttpClient();
         services.AddSingleton<AccountService>();
         services.AddSingleton<IdentityLinkService>();
@@ -55,6 +60,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<EntitlementService>();
         services.AddSingleton<LeaderboardService>();
         services.AddSingleton<LedgerService>();
+        services.AddHttpClient<ParticipationOperatorNotificationService>();
         services.AddScoped<BoostSessionService>();
         return services;
     }
