@@ -567,47 +567,70 @@ public sealed class BlackLedgerTickNewsNotificationService
         string principalId = RequiredConfig(EaPrincipalIdConfigKey);
         string bindingId = RequiredConfig(EaBindingIdConfigKey);
         string baseUrl = (_configuration[EaBaseUrlConfigKey] ?? DefaultEaBaseUrl).Trim().TrimEnd('/');
+        string idempotencyKey = BuildEventKey(tickNews, recipient.RecipientKey);
+        var metadata = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["event_type"] = EventType,
+            ["world_id"] = tickNews.WorldId,
+            ["world_name"] = tickNews.WorldName,
+            ["from_turn"] = tickNews.FromTurn,
+            ["to_turn"] = tickNews.ToTurn,
+            ["tick_receipt_id"] = tickNews.TickReceiptId,
+            ["news_id"] = tickNews.NewsId,
+            ["email_masked"] = MaskEmail(recipient.Email),
+            ["email_hash"] = HashPrivate("email", recipient.Email),
+            ["recipient_user_id"] = recipient.RecipientUserId,
+            ["recipient_source"] = recipient.Source,
+        };
 
         using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/v1/tools/execute");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Add("x-ea-principal-id", principalId);
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
         request.Content = JsonContent.Create(new
         {
             tool_name = ConnectorDispatchTool,
-            parameters = new
+            action_kind = DeliverySendAction,
+            payload_json = new
             {
-                action_kind = DeliverySendAction,
-                channel = EmailChannel,
                 principal_id = principalId,
                 binding_id = bindingId,
+                channel = EmailChannel,
                 recipient = recipient.Email,
                 subject = $"[Chummer] Black Ledger turn {tickNews.ToTurn}: The city is moving",
-                body_text = BuildEmailBody(tickNews),
-                metadata = new
-                {
-                    event_type = EventType,
-                    world_id = tickNews.WorldId,
-                    world_name = tickNews.WorldName,
-                    from_turn = tickNews.FromTurn,
-                    to_turn = tickNews.ToTurn,
-                    tick_receipt_id = tickNews.TickReceiptId,
-                    news_id = tickNews.NewsId,
-                    email_masked = MaskEmail(recipient.Email),
-                    email_hash = HashPrivate("email", recipient.Email),
-                    recipient_user_id = recipient.RecipientUserId,
-                    recipient_source = recipient.Source,
-                }
+                content = BuildEmailBody(tickNews),
+                metadata,
+                idempotency_key = idempotencyKey,
             }
         });
         using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
         string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        response.EnsureSuccessStatusCode();
-        using JsonDocument json = JsonDocument.Parse(responseBody);
-        if (json.RootElement.TryGetProperty("target_ref", out JsonElement targetRefElement))
+        if (!response.IsSuccessStatusCode)
         {
-            return targetRefElement.GetString() ?? string.Empty;
+            throw new InvalidOperationException($"{(int)response.StatusCode}:{Truncate(responseBody, 600)}");
         }
 
-        return string.Empty;
+        if (string.IsNullOrWhiteSpace(responseBody))
+        {
+            throw new InvalidOperationException("connector_dispatch_missing_delivery_id");
+        }
+
+        using JsonDocument json = JsonDocument.Parse(responseBody);
+        if (json.RootElement.TryGetProperty("target_ref", out JsonElement targetRefElement)
+            && !string.IsNullOrWhiteSpace(targetRefElement.GetString()))
+        {
+            return targetRefElement.GetString()!;
+        }
+
+        if (json.RootElement.TryGetProperty("output_json", out JsonElement outputJson)
+            && outputJson.TryGetProperty("delivery_id", out JsonElement deliveryId)
+            && !string.IsNullOrWhiteSpace(deliveryId.GetString()))
+        {
+            return deliveryId.GetString()!;
+        }
+
+        throw new InvalidOperationException("connector_dispatch_missing_delivery_id");
     }
 
     private bool NotificationsEnabled()

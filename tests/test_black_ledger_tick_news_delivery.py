@@ -33,3 +33,24 @@ def test_black_ledger_tick_news_catchup_script_exists_and_targets_internal_route
     assert "--dry-run" in script
     assert "--send" in script
     assert "subscribed_or_only_user_preview_fallback" in script
+    assert "CHUMMER_BLACK_LEDGER_INTERNAL_API_TOKEN" in script
+    assert "FLEET_INTERNAL_API_TOKEN" in script
+    assert "missing internal API token for remote tick-news send" in script
+
+
+def test_black_ledger_tick_news_payload_parity_and_config_check_exist() -> None:
+    service = read("Chummer.Run.Api/Services/Community/BlackLedgerTickNewsNotificationService.cs")
+    config_check = read("scripts/black_ledger_tick_news_config_check.py")
+
+    assert "tool_name = ConnectorDispatchTool" in service
+    assert "action_kind = DeliverySendAction" in service
+    assert "payload_json = new" in service
+    assert 'TryGetProperty("target_ref"' in service
+    assert 'TryGetProperty("output_json"' in service
+    assert 'TryGetProperty("delivery_id"' in service
+    assert "connector_dispatch_missing_delivery_id" in service
+
+    assert "CHUMMER_BLACK_LEDGER_NEWS_EMAIL_ENABLED" in config_check
+    assert "CHUMMER_BLACK_LEDGER_NEWS_EA_API_TOKEN" in config_check
+    assert "CHUMMER_BLACK_LEDGER_NEWS_EA_PRINCIPAL_ID" in config_check
+    assert "CHUMMER_BLACK_LEDGER_NEWS_EA_BINDING_ID" in config_check
