@@ -146,9 +146,9 @@ public sealed class BlackLedgerPublicStatsService
         StewardshipPosts:
         [
             new("ledger_gm", "Ledger GM", "ai", "ai ledger architect", "Runs the deterministic world-turn shell until verified human stewards take over.", true),
-            new("public_intel_provider", "Public Intel Provider", "ai", "ai public intel provider", "Turns world movement into public-safe summaries without leaking private or operator data.", true),
+            new("public_intel_provider", "Public Intel Provider", "ai", "ai public intel provider", "Turns world movement into public-safe summaries without leaking private administrative data.", true),
             new("package_pressure_analyst", "Package Pressure Analyst", "ai", "ai package factor", "Explains package demand as governed pressure, not shipped truth.", true),
-            new("privacy_marshal", "Privacy Marshal", "ai", "ai privacy marshal", "Blocks private, identifying, sourcebook, support, or operator data from public rendering.", true),
+            new("privacy_marshal", "Privacy Marshal", "ai", "ai privacy marshal", "Blocks private, identifying, sourcebook, support, or administrative data from public rendering.", true),
             new("closeout_clerk", "Closeout Clerk", "ai", "ai closeout clerk", "Keeps closeout movement tied to first-party receipts before it appears publicly.", true),
         ],
         StewardshipTransferPreview: new(
