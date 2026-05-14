@@ -26,8 +26,17 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Modules</p>
         <h2 class="editorial-title">One hub, bounded public modules.</h2>
-        <p class="editorial-copy">Each lane stays explicit about what is preview, what is aggregate, and what cannot be shown on a public route.</p>
+        <p class="editorial-copy">Turn 1 already ran. Each lane stays explicit about what is preview, what is aggregate, and what cannot be shown on a public route.</p>
     </div>
+    @if (Model.World?.TurnNavigation?.Count > 0)
+    {
+        <div class="trust-claim__microproof" aria-label="Turn navigation">
+            @foreach (var turn in Model.World.TurnNavigation)
+            {
+                <a class="inline-link" href="@turn.Href">@(turn.Current ? $"{turn.Label} (current)" : turn.Label)</a>
+            }
+        </div>
+    }
     <div class="route-choice-grid">
         @foreach (var module in Model.Modules)
         {
@@ -41,11 +50,110 @@
     </div>
 </section>
 
+@if (Model.World is not null)
+{
+    <section class="editorial-block" id="ledger-map">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">World map</p>
+            <h2 class="editorial-title">@Model.World.PublicName</h2>
+            <p class="editorial-copy">@Model.World.TurnHeadline</p>
+            <p class="muted-copy">@Model.World.MapNote</p>
+        </div>
+        <div class="ledger-world-shell">
+            <div class="ledger-world-shell__map">
+                <svg viewBox="0 0 1200 760" role="img" aria-label="@Model.World.PublicName map">
+                    @foreach (var district in Model.World.Districts)
+                    {
+                        <a href="#district-@district.Id" aria-label="@district.Summary">
+                            <polygon class="ledger-world-shell__district" points="@district.PolygonPoints" tabindex="0">
+                                <title>@district.Name</title>
+                                <desc>@district.Summary</desc>
+                            </polygon>
+                        </a>
+                    }
+                </svg>
+                <p class="muted-copy">Keyboard focus works on each district shape, and every shape mirrors a text summary card below.</p>
+            </div>
+            <div class="ledger-world-shell__districts">
+                @foreach (var district in Model.World.Districts)
+                {
+                    <article class="route-choice-card" id="district-@district.Id">
+                        <span class="tag">@district.DominantFaction</span>
+                        <h3>@district.Name</h3>
+                        <p>@district.Summary</p>
+                        <p class="muted-copy">Influence @district.Influence · Heat @district.Heat</p>
+                    </article>
+                }
+            </div>
+        </div>
+    </section>
+
+    <section class="editorial-block" id="ledger-factions">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Faction intel</p>
+            <h2 class="editorial-title">Six starter factions, bounded public signals.</h2>
+            <p class="editorial-copy">AI interim stewards can summarize pressure, but every public lane stays privacy-bounded and receipt-backed.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var faction in Model.World.Factions)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@faction.Type</span>
+                    <h3>@faction.PublicName</h3>
+                    <p>Leader: @faction.FactionLeader · GM: @faction.FieldGm · Intel: @faction.IntelProvider</p>
+                    <div class="route-choice-card__proof">
+                        @foreach (var signal in faction.PublicSignals)
+                        {
+                            <span>@signal</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+
+    @if (Model.World.StewardshipPosts.Count > 0)
+    {
+        <section class="editorial-block" id="ledger-stewardship">
+            <div class="editorial-block__lead">
+                <p class="eyebrow">AI stewardship</p>
+                <h2 class="editorial-title">Interim bots run bounded posts until verified humans take over.</h2>
+                <p class="editorial-copy">These posts may propose, summarize, and redact. They do not outrank human stewards, and they do not become release truth by themselves.</p>
+            </div>
+            <div class="route-choice-grid">
+                @foreach (var post in Model.World.StewardshipPosts)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@post.HolderType</span>
+                        <h3>@post.PublicLabel</h3>
+                        <p>@post.PublicSummary</p>
+                        <p class="muted-copy">Fallback personality: @post.FallbackPersonality</p>
+                    </article>
+                }
+            </div>
+            @if (Model.World.StewardshipTransferPreview is not null)
+            {
+                <article class="trust-claim">
+                    <span class="tag">Stewardship transfer preview</span>
+                    <h3>@Model.World.StewardshipTransferPreview.ReceiptType</h3>
+                    <p>@Model.World.StewardshipTransferPreview.Reason</p>
+                    <div class="trust-claim__microproof">
+                        <span>Post: @Model.World.StewardshipTransferPreview.PostId</span>
+                        <span>Old holder: @Model.World.StewardshipTransferPreview.OldHolder</span>
+                        <span>New holder: @Model.World.StewardshipTransferPreview.NewHolderType</span>
+                        <span>Visibility: @Model.World.StewardshipTransferPreview.PublicVisibility</span>
+                    </div>
+                </article>
+            }
+        </section>
+    }
+}
+
 <section class="trust-claims" id="ledger-stats">
     <div class="trust-claims__lead">
         <p class="eyebrow">Public-safe stats</p>
         <h2 class="editorial-title">Aggregate only. Opt-in only. Proof-bounded.</h2>
-        <p class="editorial-copy">These preview stats are seeded through the governed Black Ledger stats model, not hardcoded in the page. If a stat is not public-safe, it does not render here. fictional runner/campaign statistics only.</p>
+        <p class="editorial-copy">These preview stats are derived from the seeded Emerald Sprawl world model, not hardcoded in the page. If a stat is not public-safe, it does not render here. fictional runner/campaign statistics only.</p>
     </div>
     <div class="trust-claims__grid">
         @foreach (var stat in Model.Stats)
@@ -59,17 +167,47 @@
                     <span>@stat.SampleSize</span>
                     <span>@stat.PrivacyNote</span>
                 </div>
+                <p class="muted-copy">@stat.SourceDetail.Label · @stat.SourceDetail.ProvenanceSummary</p>
                 <a class="inline-link" href="@stat.Href">Inspect lane</a>
             </article>
         }
     </div>
 </section>
 
+@if (Model.World?.LastTick is not null)
+{
+    <section class="editorial-block" id="ledger-last-tick">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Last tick receipt</p>
+            <h2 class="editorial-title">@Model.World.LastTick.ReceiptId</h2>
+            <p class="editorial-copy">@Model.World.LastTick.Summary</p>
+            <p class="muted-copy">World: @Model.World.LastTick.WorldId · Turn: @Model.World.LastTick.Turn · Mode: @Model.World.LastTick.Mode</p>
+            <div class="trust-claim__microproof">
+                <span>Input hash: @Model.World.LastTick.InputStateHash[..12]</span>
+                <span>Decision hash: @Model.World.LastTick.DecisionPacketHash[..12]</span>
+                <span>Output hash: @Model.World.LastTick.OutputStateHash[..12]</span>
+                <span>Created: @Model.World.LastTick.CreatedAtUtc</span>
+            </div>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var effect in Model.World.LastTick.Effects)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@effect.Target</span>
+                    <h3>@effect.Metric</h3>
+                    <p>Delta: @effect.Delta</p>
+                    <p>@effect.PublicReason</p>
+                </article>
+            }
+        </div>
+    </section>
+}
+
 <section class="editorial-block" id="ledger-privacy">
     <div class="editorial-block__lead">
         <p class="eyebrow">Privacy boundary</p>
         <h2 class="editorial-title">This page explains pressure, not people.</h2>
-        <p class="editorial-copy">No runner names, no support cases, no internal-staff addresses, no sourcebook text, and no campaign-private state are allowed on the public Ledger routes.</p>
+        <p class="editorial-copy">Seeded preview and opt-in aggregate only. No runner names, no support cases, no internal-staff addresses, no sourcebook text, and no campaign-private state are allowed on the public Ledger routes.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">

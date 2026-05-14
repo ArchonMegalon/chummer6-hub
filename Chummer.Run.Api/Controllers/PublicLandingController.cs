@@ -182,6 +182,7 @@ public sealed class PublicLandingController : Controller
             Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"),
             FlagshipCoverage: _flagshipCoverage.LoadStrip(),
             BlackLedgerStats: _blackLedgerStats.ListHomepageStats(),
+            BlackLedgerWorld: _blackLedgerStats.LoadWorldPreview(),
             CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken),
             AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Landing.cshtml", model);
@@ -1421,9 +1422,9 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/ledger")]
     [Produces("text/html")]
-    public async Task<IActionResult> LedgerPage(CancellationToken cancellationToken)
+    public async Task<IActionResult> LedgerPage([FromQuery] int? turn, CancellationToken cancellationToken)
     {
-        var model = await BuildBlackLedgerPageModel("/ledger", "hub", cancellationToken);
+        var model = await BuildBlackLedgerPageModel("/ledger", "hub", turn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
@@ -1433,33 +1434,33 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/ledger/stats")]
     [Produces("text/html")]
-    public async Task<IActionResult> LedgerStatsPage(CancellationToken cancellationToken)
+    public async Task<IActionResult> LedgerStatsPage([FromQuery] int? turn, CancellationToken cancellationToken)
     {
-        var model = await BuildBlackLedgerPageModel("/ledger/stats", "stats", cancellationToken);
+        var model = await BuildBlackLedgerPageModel("/ledger/stats", "stats", turn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
     [HttpGet("/ledger/factions")]
     [Produces("text/html")]
-    public async Task<IActionResult> LedgerFactionsPage(CancellationToken cancellationToken)
+    public async Task<IActionResult> LedgerFactionsPage([FromQuery] int? turn, CancellationToken cancellationToken)
     {
-        var model = await BuildBlackLedgerPageModel("/ledger/factions", "factions", cancellationToken);
+        var model = await BuildBlackLedgerPageModel("/ledger/factions", "factions", turn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
     [HttpGet("/ledger/packages")]
     [Produces("text/html")]
-    public async Task<IActionResult> LedgerPackagesPage(CancellationToken cancellationToken)
+    public async Task<IActionResult> LedgerPackagesPage([FromQuery] int? turn, CancellationToken cancellationToken)
     {
-        var model = await BuildBlackLedgerPageModel("/ledger/packages", "packages", cancellationToken);
+        var model = await BuildBlackLedgerPageModel("/ledger/packages", "packages", turn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
     [HttpGet("/ledger/closeouts")]
     [Produces("text/html")]
-    public async Task<IActionResult> LedgerCloseoutsPage(CancellationToken cancellationToken)
+    public async Task<IActionResult> LedgerCloseoutsPage([FromQuery] int? turn, CancellationToken cancellationToken)
     {
-        var model = await BuildBlackLedgerPageModel("/ledger/closeouts", "closeouts", cancellationToken);
+        var model = await BuildBlackLedgerPageModel("/ledger/closeouts", "closeouts", turn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
@@ -7609,11 +7610,16 @@ echo "Help: ${HELP_URL}"
     private async Task<BlackLedgerHubPageViewModel> BuildBlackLedgerPageModel(
         string currentPath,
         string currentSection,
+        int? requestedTurn,
         CancellationToken cancellationToken)
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        var world = _blackLedgerStats.LoadWorldPreview(requestedTurn);
+        var intro = world?.DeterministicPreview == true
+            ? "This deterministic turn-two preview shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
+            : "Six starter factions entered the Ledger. AI stewards are holding faction leader, GM, and intel-provider posts until humans take over. Turn 1 already ran, and the first receipt is public-safe.";
 
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
@@ -7621,15 +7627,16 @@ echo "Help: ${HELP_URL}"
                 "Public-safe campaign pressure, package heat, and proof-backed closeout movement.",
                 currentPath,
                 cancellationToken),
-            Eyebrow: "Black Ledger",
-            Heading: "Public-safe campaign pressure without private-table leakage.",
-            Intro: "This hub stays aggregate, opt-in, and proof-bounded. It shows campaign pressure, package demand, and closeout motion without exposing player identities, support traffic, or private world-state operations.",
+            Eyebrow: "Black Ledger preview",
+            Heading: "Emerald Sprawl: First Pressure",
+            Intro: intro,
             CurrentSection: currentSection,
-            Stats: _blackLedgerStats.ListPublicStats(),
+            World: world,
+            Stats: _blackLedgerStats.ListPublicStats(requestedTurn),
             Modules: _blackLedgerStats.ListModules(),
             Closeouts: _blackLedgerStats.ListCloseouts(),
-            PrimaryAction: new TrustPageActionViewModel("Open Karma Forge", "/karma-forge", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Browse packages", "/packages", "secondary"),
+            PrimaryAction: new TrustPageActionViewModel("View faction map", "/ledger/factions", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Inspect tick receipt", "/ledger/closeouts", "secondary"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }

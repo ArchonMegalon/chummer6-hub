@@ -172,13 +172,24 @@ public sealed record BlackLedgerPublicStatViewModel(
     string Title,
     string Value,
     string Scope,
+    string ScopeKey,
     string Period,
     string SampleSize,
+    int SampleCount,
     string Confidence,
+    string ConfidenceKey,
     string PrivacyNote,
     string Source,
+    BlackLedgerPublicStatSourceViewModel SourceDetail,
     string Status,
     string Href);
+
+public sealed record BlackLedgerPublicStatSourceViewModel(
+    string Kind,
+    string Label,
+    string ProvenanceSummary,
+    bool PreviewOnly,
+    bool PublicSafe);
 
 public sealed record BlackLedgerModuleViewModel(
     string Id,
@@ -192,6 +203,86 @@ public sealed record BlackLedgerCloseoutViewModel(
     string Summary,
     string Href,
     string StatusLabel);
+
+public sealed record BlackLedgerDistrictViewModel(
+    string Id,
+    string Name,
+    string PolygonPoints,
+    string DominantFaction,
+    int Influence,
+    int Heat,
+    string Summary);
+
+public sealed record BlackLedgerFactionViewModel(
+    string Id,
+    string PublicName,
+    string Type,
+    string FactionLeader,
+    string FieldGm,
+    string IntelProvider,
+    IReadOnlyList<string> PublicSignals);
+
+public sealed record BlackLedgerTickEffectViewModel(
+    string Target,
+    string Metric,
+    int Delta,
+    string PublicReason);
+
+public sealed record BlackLedgerTickReceiptViewModel(
+    string WorldId,
+    int Turn,
+    string ReceiptId,
+    string Mode,
+    string Summary,
+    string InputStateHash,
+    string DecisionPacketHash,
+    bool PrivacyPassed,
+    IReadOnlyList<string> BlockedFields,
+    string OutputStateHash,
+    string CreatedAtUtc,
+    IReadOnlyList<BlackLedgerTickEffectViewModel> Effects);
+
+public sealed record BlackLedgerTurnNavigationViewModel(
+    int Turn,
+    string Label,
+    string Href,
+    bool Current,
+    bool PreviewOnly);
+
+public sealed record BlackLedgerStewardshipPostViewModel(
+    string Id,
+    string PublicLabel,
+    string HolderType,
+    string FallbackPersonality,
+    string PublicSummary,
+    bool HumanOverrideAvailable);
+
+public sealed record BlackLedgerStewardshipTransferReceiptViewModel(
+    string ReceiptType,
+    string PostId,
+    string OldHolder,
+    string NewHolder,
+    string NewHolderType,
+    string OccurredAt,
+    string Reason,
+    string OperatorId,
+    string PublicVisibility);
+
+public sealed record BlackLedgerWorldPreviewViewModel(
+    string WorldId,
+    string PublicName,
+    string Status,
+    int CurrentTurn,
+    string TurnHeadline,
+    string SafetyNote,
+    string MapNote,
+    bool DeterministicPreview,
+    IReadOnlyList<BlackLedgerTurnNavigationViewModel> TurnNavigation,
+    IReadOnlyList<BlackLedgerDistrictViewModel> Districts,
+    IReadOnlyList<BlackLedgerFactionViewModel> Factions,
+    IReadOnlyList<BlackLedgerStewardshipPostViewModel> StewardshipPosts,
+    BlackLedgerStewardshipTransferReceiptViewModel? StewardshipTransferPreview,
+    BlackLedgerTickReceiptViewModel? LastTick);
 
 public sealed record LandingPageViewModel(
     SiteChromeViewModel Chrome,
@@ -212,6 +303,7 @@ public sealed record LandingPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> Artifacts,
     FlagshipCoverageStripViewModel FlagshipCoverage,
     IReadOnlyList<BlackLedgerPublicStatViewModel> BlackLedgerStats,
+    BlackLedgerWorldPreviewViewModel? BlackLedgerWorld = null,
     AccountCampaignSummary? CampaignSpine = null,
     PublicAccessPostureViewModel? AccessPosture = null);
 
@@ -221,6 +313,7 @@ public sealed record BlackLedgerHubPageViewModel(
     string Heading,
     string Intro,
     string CurrentSection,
+    BlackLedgerWorldPreviewViewModel? World,
     IReadOnlyList<BlackLedgerPublicStatViewModel> Stats,
     IReadOnlyList<BlackLedgerModuleViewModel> Modules,
     IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
