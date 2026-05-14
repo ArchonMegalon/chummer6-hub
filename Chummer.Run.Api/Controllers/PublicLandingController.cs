@@ -1526,9 +1526,14 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/ledger/turns/{turn}/dispatches")]
     [Produces("text/html")]
-    public async Task<IActionResult> LedgerTurnDispatchesPage([FromRoute] int turn, CancellationToken cancellationToken)
+    public async Task<IActionResult> LedgerTurnDispatchesPage([FromRoute] string turn, CancellationToken cancellationToken)
     {
-        var model = await BuildBlackLedgerPageModel($"/ledger/turns/{turn}/dispatches", "dispatches", turn, cancellationToken);
+        if (!int.TryParse(turn, out int requestedTurn) || requestedTurn < 0)
+        {
+            return NotFound();
+        }
+
+        var model = await BuildBlackLedgerPageModel($"/ledger/turns/{requestedTurn}/dispatches", "dispatches", requestedTurn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 

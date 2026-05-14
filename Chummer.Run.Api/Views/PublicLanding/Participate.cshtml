@@ -13,8 +13,8 @@
     var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
     var fromFeedbackAlias = string.Equals(sourceAlias, "feedback", StringComparison.OrdinalIgnoreCase);
     var betaHref = Model.Chrome.Authenticated
-        ? "/account/settings"
-        : "/signup?next=%2Faccount%2Fsettings";
+        ? "/account/participation"
+        : "/signup?next=%2Faccount%2Fparticipation";
     var fixerRoutes = new[]
     {
         new
@@ -137,7 +137,7 @@
         <a class="button-like button-like--secondary" href="/contact#support-intake">Report a problem</a>
         <a class="button-like button-like--ghost" href="@betaHref">Join beta waitlist</a>
     </div>
-    <p class="muted-copy">Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
+    <p class="muted-copy">Follow an item to hear when it actually changes. Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Participation loop snapshot">
@@ -268,7 +268,7 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>M@milestone.Id · @milestone.Title</h3>
+                                <h3>@($"Milestone {milestone.Id}") · @milestone.Title</h3>
                                 <p>@milestone.CasualSummary</p>
                             </div>
                             <span class="tag">@milestone.StatusLabel</span>
