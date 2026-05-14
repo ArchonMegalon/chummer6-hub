@@ -167,6 +167,32 @@ public sealed record FlagshipCoverageStripViewModel(
     string Intro,
     IReadOnlyList<FlagshipCoverageCardViewModel> Cards);
 
+public sealed record BlackLedgerPublicStatViewModel(
+    string Id,
+    string Title,
+    string Value,
+    string Scope,
+    string Period,
+    string SampleSize,
+    string Confidence,
+    string PrivacyNote,
+    string Source,
+    string Status,
+    string Href);
+
+public sealed record BlackLedgerModuleViewModel(
+    string Id,
+    string Title,
+    string Summary,
+    string Href,
+    string StatusLabel);
+
+public sealed record BlackLedgerCloseoutViewModel(
+    string Title,
+    string Summary,
+    string Href,
+    string StatusLabel);
+
 public sealed record LandingPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
@@ -185,8 +211,23 @@ public sealed record LandingPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> ComingNext,
     IReadOnlyList<ResolvedPublicCardViewModel> Artifacts,
     FlagshipCoverageStripViewModel FlagshipCoverage,
+    IReadOnlyList<BlackLedgerPublicStatViewModel> BlackLedgerStats,
     AccountCampaignSummary? CampaignSpine = null,
     PublicAccessPostureViewModel? AccessPosture = null);
+
+public sealed record BlackLedgerHubPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CurrentSection,
+    IReadOnlyList<BlackLedgerPublicStatViewModel> Stats,
+    IReadOnlyList<BlackLedgerModuleViewModel> Modules,
+    IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record StoryPageViewModel(
     SiteChromeViewModel Chrome,
@@ -300,6 +341,7 @@ public sealed record KarmaForgeIntakeFormViewModel(
     IReadOnlyList<string> ValidationErrors,
     IReadOnlyList<KarmaForgeOptionDefinition> TrackOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> RoleOptions,
+    IReadOnlyList<KarmaForgeOptionDefinition> EditionOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> TableTypeOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> RuleCategoryOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> SeverityOptions,

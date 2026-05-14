@@ -648,6 +648,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 campaignSpine: null!,
                 workspaceServerPlane: null!,
                 karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
+                blackLedgerStats: new BlackLedgerPublicStatsService(),
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: null!,
                 chrome: null!,

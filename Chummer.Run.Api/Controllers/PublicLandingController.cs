@@ -45,6 +45,7 @@ public sealed class PublicLandingController : Controller
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly KarmaForgeDiscoveryService _karmaForge;
+    private readonly BlackLedgerPublicStatsService _blackLedgerStats;
     private readonly PublicPackageCatalogService _packageCatalog;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
     private readonly HubPageChromeService _chrome;
@@ -83,6 +84,7 @@ public sealed class PublicLandingController : Controller
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         KarmaForgeDiscoveryService karmaForge,
+        BlackLedgerPublicStatsService blackLedgerStats,
         PublicPackageCatalogService packageCatalog,
         PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
         HubPageChromeService chrome,
@@ -117,6 +119,7 @@ public sealed class PublicLandingController : Controller
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
         _karmaForge = karmaForge;
+        _blackLedgerStats = blackLedgerStats;
         _packageCatalog = packageCatalog;
         _publicCreatorDiscovery = publicCreatorDiscovery;
         _chrome = chrome;
@@ -178,6 +181,7 @@ public sealed class PublicLandingController : Controller
             ComingNext: ResolveCards(_landing.CardsForBucket(surface, "coming_next").Take(3).ToArray(), assetCatalog, authenticated: false, "/"),
             Artifacts: ResolveCards(_landing.CardsForBucket(surface, "featured_artifacts"), assetCatalog, authenticated: false, "/"),
             FlagshipCoverage: _flagshipCoverage.LoadStrip(),
+            BlackLedgerStats: _blackLedgerStats.ListHomepageStats(),
             CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken),
             AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Landing.cshtml", model);
@@ -1338,6 +1342,10 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
 
+    [HttpGet("/karma-forge")]
+    public IActionResult KarmaForgeAliasPage()
+        => Redirect("/participate/karma-forge");
+
     [HttpGet("/participate/karma-forge")]
     [Produces("text/html")]
     public async Task<IActionResult> KarmaForgePage([FromQuery] string? track, CancellationToken cancellationToken)
@@ -1409,6 +1417,50 @@ public sealed class PublicLandingController : Controller
 
         var model = await BuildKarmaForgeSubmittedPageModel(submission, cancellationToken);
         return View("~/Views/PublicLanding/KarmaForgeSubmitted.cshtml", model);
+    }
+
+    [HttpGet("/ledger")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel("/ledger", "hub", cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/black-ledger")]
+    public IActionResult LedgerAliasPage()
+        => Redirect("/ledger");
+
+    [HttpGet("/ledger/stats")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerStatsPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel("/ledger/stats", "stats", cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/factions")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerFactionsPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel("/ledger/factions", "factions", cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/packages")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerPackagesPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel("/ledger/packages", "packages", cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/closeouts")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerCloseoutsPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel("/ledger/closeouts", "closeouts", cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
     [HttpGet("/feedback")]
@@ -3715,6 +3767,7 @@ public sealed class PublicLandingController : Controller
                 ValidationErrors: validationErrors,
                 TrackOptions: _karmaForge.ListTracks().Select(static track => new KarmaForgeOptionDefinition(track.Key, track.Title, track.Family)).ToArray(),
                 RoleOptions: _karmaForge.ListRoleOptions(),
+                EditionOptions: _karmaForge.ListEditionOptions(),
                 TableTypeOptions: _karmaForge.ListTableTypeOptions(),
                 RuleCategoryOptions: _karmaForge.ListRuleCategoryOptions(),
                 SeverityOptions: _karmaForge.ListSeverityOptions(),
@@ -7552,6 +7605,34 @@ echo "Help: ${HELP_URL}"
 
     private static string SingleQuoteShellLiteral(string value)
         => value.Replace("'", "'\"'\"'", StringComparison.Ordinal);
+
+    private async Task<BlackLedgerHubPageViewModel> BuildBlackLedgerPageModel(
+        string currentPath,
+        string currentSection,
+        CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+
+        return new BlackLedgerHubPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                "Black Ledger",
+                "Public-safe campaign pressure, package heat, and proof-backed closeout movement.",
+                currentPath,
+                cancellationToken),
+            Eyebrow: "Black Ledger",
+            Heading: "Public-safe campaign pressure without private-table leakage.",
+            Intro: "This hub stays aggregate, opt-in, and proof-bounded. It shows campaign pressure, package demand, and closeout motion without exposing player identities, support traffic, or private world-state operations.",
+            CurrentSection: currentSection,
+            Stats: _blackLedgerStats.ListPublicStats(),
+            Modules: _blackLedgerStats.ListModules(),
+            Closeouts: _blackLedgerStats.ListCloseouts(),
+            PrimaryAction: new TrustPageActionViewModel("Open Karma Forge", "/karma-forge", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Browse packages", "/packages", "secondary"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
 
     private static string BuildReleaseUploadBootstrapCommand(
         string bootstrapUrl,

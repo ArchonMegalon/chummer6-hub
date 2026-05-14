@@ -3,42 +3,13 @@
     ViewData["Title"] = "Chummer — Shadowrun Campaign OS";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
-    var hero = Model.Assets.BySlot("section_hero");
-    var heroProofAsset = Model.Assets.BySlot("product_proof_ui") ?? Model.Assets.BySlot("capability_check_rules");
-    var proofSectionAsset = Model.Assets.BySlot("scene_dossier_desk")
-        ?? Model.Assets.BySlot("scene_simulation_bench")
-        ?? Model.Assets.BySlot("capability_check_rules")
-        ?? heroProofAsset;
-    if (proofSectionAsset is not null
-        && heroProofAsset is not null
-        && string.Equals(proofSectionAsset.AssetSlot, heroProofAsset.AssetSlot, StringComparison.OrdinalIgnoreCase))
-    {
-        proofSectionAsset = Model.Assets.BySlot("scene_simulation_bench")
-            ?? Model.Assets.BySlot("scene_dossier_desk");
-    }
-    var proofNotes = Model.Workflows.Take(1).ToArray();
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(2).ToArray();
     var release = Model.ReleaseExperience;
-    var accessPosture = Model.AccessPosture;
-    var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
-    var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
     var guestReadableHeroPrimaryHref = Model.PrimaryHeroAction.Href;
     var accountAwareInstallPrimaryHref = guestNeedsInstallGate
         ? release.GuestGatePrimaryHref ?? guestReadableHeroPrimaryHref
         : guestReadableHeroPrimaryHref;
-    var sectionsById = Model.Surface.Sections.ToDictionary(static section => section.Id, StringComparer.OrdinalIgnoreCase);
-    var heroSection = Section("hero");
-    var productProofSection = Section("product_proof");
-    var startHereSection = Section("start_here");
-    var laneSection = Section("choose_your_lane");
-    var closingSection = Section("closing_cta");
-    var starterWorkflowCards = Model.Workflows.Take(3).ToArray();
-    var laneCards = Model.Lanes.Take(3).ToArray();
-    var installRailSummary = Model.Chrome.Authenticated
-        ? "Your signed-in account keeps linked installs, device return, and support follow-through in one calmer place."
-        : accessPosture?.AvailabilitySummary
-            ?? "The build stays the same for everyone. The account-aware piece is the install handoff, device continuity, and support history.";
     var installRailPrimaryLabel = Model.Chrome.Authenticated
         ? "Open home"
         : guestNeedsInstallGate
@@ -49,18 +20,11 @@
     var installRailSecondaryHref = Model.Chrome.Authenticated ? "/account/access" : "/login?next=/home";
     var enterHubHref = Model.Chrome.Authenticated ? "/home" : "/login?next=/home";
     var enterHubLabel = "Enter the hub";
-    var forgeHref = "/participate/karma-forge";
-    var ledgerHref = "/roadmap/black-ledger";
+    var forgeHref = "/karma-forge";
+    var ledgerHref = "/ledger";
     var playHref = "/mobile";
     var buildHref = "/downloads";
     var packagesHref = "/packages";
-    var ledgerPanelAsset = Model.Assets.BySlot("scene_simulation_bench")
-        ?? Model.Assets.BySlot("scene_dossier_desk")
-        ?? heroProofAsset
-        ?? hero;
-    var forgeAsset = Model.Assets.BySlot("scene_dossier_desk")
-        ?? Model.Assets.BySlot("scene_simulation_bench")
-        ?? heroProofAsset;
     var heroStatusChips = new[]
     {
         "Preview build live",
@@ -116,59 +80,13 @@
             Id = "ledger",
             Title = "Black Ledger",
             Summary = "Follow public-safe faction intel, package pressure, closeout movement, and campaign heat without exposing private table data.",
-            Status = "Roadmap intel",
+            Status = "Live preview",
             Href = ledgerHref,
-            Action = "View ledger stats",
+            Action = "Open ledger hub",
             Pills = new[] { "Faction pressure", "Debt heat", "Closeout feed" },
         },
     };
-    var ledgerStats = new[]
-    {
-        new
-        {
-            Title = "MysAd density",
-            Value = "Barrens adepts 34%",
-            Scope = "Public aggregate",
-            Period = "Current season",
-            SampleSize = "47 opted-in runners",
-            Confidence = "Preview",
-            Href = ledgerHref,
-            PrivacyNote = "Opt-in aggregate only",
-        },
-        new
-        {
-            Title = "Debt Heat",
-            Value = "128,400Y active favors",
-            Scope = "Public aggregate",
-            Period = "This month",
-            SampleSize = "12 crews",
-            Confidence = "Enough data",
-            Href = ledgerHref,
-            PrivacyNote = "Fictional runner/campaign statistics only",
-        },
-        new
-        {
-            Title = "Package pressure",
-            Value = "7 hot package candidates",
-            Scope = "Public aggregate",
-            Period = "Current release train",
-            SampleSize = "31 followed requests",
-            Confidence = "Preview",
-            Href = packagesHref,
-            PrivacyNote = "Proof-backed demand, not roadmap truth",
-        },
-        new
-        {
-            Title = "Chaos index",
-            Value = "Touristville crews +18",
-            Scope = "Public aggregate",
-            Period = "Current season",
-            SampleSize = "19 opted-in tables",
-            Confidence = "Low sample",
-            Href = ledgerHref,
-            PrivacyNote = "Playful fictional labels only; never point at real people.",
-        },
-    };
+    var ledgerStats = (Model.BlackLedgerStats ?? Array.Empty<BlackLedgerPublicStatViewModel>()).ToArray();
     var forgePipelineStages = new[]
     {
         new { Label = "Signal", Summary = "Public-safe pain report or governed follow-up starts the track." },
@@ -201,7 +119,7 @@
         {
             Title = "Packages and mobile routes",
             Value = "Route proof shelf live",
-            Summary = "Packages, mobile/PWA, and governed follow-up stay on real public routes instead of hidden operator rails.",
+            Summary = "Packages, mobile/PWA, and governed follow-up stay on real public routes instead of hidden internal rails.",
             Href = "/status",
             Action = "Open status",
         },
@@ -214,29 +132,6 @@
         new { Title = "Karma Forge Initiate", Summary = "Shape a rules/package pain report into a governed discovery packet.", Scope = "private" },
         new { Title = "Closeout Witness", Summary = "Track the moment a real proof-backed closeout lands.", Scope = "opt-in public" },
     };
-
-    PublicLandingSectionDto Section(string id)
-        => sectionsById.TryGetValue(id, out var section)
-            ? section
-            : throw new InvalidOperationException($"Landing section '{id}' is required.");
-
-    string ContextualPreviewHref(string? href)
-    {
-        return href ?? string.Empty;
-    }
-
-    static string TrustRowValue(
-        SignedInTrustStatusPanelViewModel? panel,
-        string label,
-        string fallback)
-        => panel?.Rows.FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.Ordinal))?.Value ?? fallback;
-
-    static string ResolvedCardNarrative(ResolvedPublicCardViewModel card)
-        => !string.IsNullOrWhiteSpace(card.Card.Payoff)
-            ? card.Card.Payoff!
-            : !string.IsNullOrWhiteSpace(card.Card.ProofNote)
-                ? card.Card.ProofNote!
-                : card.Card.Summary;
 }
 
 <section class="launch-hero">
@@ -244,7 +139,7 @@
         <div class="launch-hero__copy">
             <p class="eyebrow">Explainable Shadowrun campaign OS</p>
             <h1 class="launch-hero__title">Build the runner. Run the table. Keep the ledger honest.</h1>
-            <p class="launch-hero__support">Chummer is the explainable Shadowrun campaign OS: character building, rules proof, package governance, mobile play, and living campaign intelligence from one first-party hub.</p>
+            <p class="launch-hero__support">Character building, package governance, mobile play, and Black Ledger campaign intel in one first-party hub.</p>
             <div class="launch-hero__actions">
                 <a class="button-like button-like--primary" href="@buildHref">Open downloads</a>
                 <a class="button-like button-like--secondary" href="@enterHubHref">@enterHubLabel</a>
@@ -260,7 +155,7 @@
                 <div class="hero-installrail__lead">
                     <span class="tag tag--amber">Recommended path</span>
                     <strong>@(guestNeedsInstallGate ? "Account-aware install handoff" : "Current preview install")</strong>
-                    <p>A neon-secure gate into a living campaign OS: build runners, manage packages, join mobile play, forge house rules, and follow Black Ledger pressure without losing the current release truth.</p>
+                    <p>Open the current build, then return to the same hub for packages, mobile play, and governed closeouts.</p>
                 </div>
                 <div class="hero-installrail__facts">
                     <div class="hero-installrail__fact">
@@ -285,52 +180,72 @@
                     <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
                 </div>
             </div>
-            <p class="launch-hero__trustline">Votes show demand. Proof decides what ships. Package pressure, faction intel, and closeout motion stay downstream of first-party truth.</p>
+            <p class="launch-hero__trustline">Votes show demand. Proof decides what ships.</p>
         </div>
-        @if (hero is not null)
-        {
-            <div class="launch-hero__media">
-                @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", hero)
-                <div class="launch-hero__prooffloat" aria-label="Current preview details">
-                    <div class="launch-hero__proof-topline">
-                        <span>Black Ledger gate</span>
-                        <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
-                    </div>
-                    <div class="launch-hero__proof-summary">
-                        <strong>Living campaign pressure, not a proof dump.</strong>
-                        <p>Runner build, rules proof, package governance, mobile play, and world-state motion meet in one flagship entrance rail.</p>
-                    </div>
-                    <div class="launch-hero__proof-trail">
-                        <span>MysAd density rising</span>
-                        <span>Package pressure tracked</span>
-                        <span>Closeout feed visible</span>
-                    </div>
-                    @if (heroProofAsset is not null)
-                    {
-                        <div class="launch-hero__proof-shot">
-                            @await Html.PartialAsync("~/Views/Shared/_SceneAsset.cshtml", heroProofAsset)
-                        </div>
-                    }
+        <div class="launch-hero__stage" aria-label="Black Ledger gate">
+            <div class="launch-hero__prooffloat">
+                <div class="launch-hero__proof-topline">
+                    <span>Black Ledger gate</span>
+                    <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
                 </div>
-                <div class="ledger-console" aria-label="Ledger console preview">
-                    <article class="ledger-console__panel">
-                        <span>Faction pressure</span>
-                        <strong>Redmond fixers carry the hottest debt heat this month.</strong>
-                        <p>Opt-in aggregate only.</p>
-                    </article>
-                    <article class="ledger-console__panel">
-                        <span>Package pressure</span>
-                        <strong>Urban Brawl pack leads followed compatibility requests.</strong>
-                        <p>Proof-backed demand, not roadmap truth.</p>
-                    </article>
-                    <article class="ledger-console__panel">
-                        <span>Mobile roles</span>
-                        <strong>Player, GM, and observer rails stay preview-visible on the same public surface.</strong>
-                        <p>Travel-safe shell, same route family.</p>
-                    </article>
+                <div class="launch-hero__proof-summary">
+                    <strong>Living campaign pressure, not a wallpaper splash.</strong>
+                    <p>Runner build, package motion, mobile roles, and governed proof all route through one flagship hub with sharp public-safe telemetry.</p>
+                </div>
+                <div class="launch-hero__proof-trail">
+                    <span>MysAd density rising</span>
+                    <span>Package pressure tracked</span>
+                    <span>Closeout feed visible</span>
                 </div>
             </div>
-        }
+            <div class="ledger-console" aria-label="Ledger console preview">
+                <article class="ledger-console__panel">
+                    <span>Faction pressure</span>
+                    <strong>Redmond fixers carry the hottest debt heat this month.</strong>
+                    <p>Opt-in aggregate only.</p>
+                </article>
+                <article class="ledger-console__panel">
+                    <span>Package pressure</span>
+                    <strong>Urban Brawl pack leads followed compatibility requests.</strong>
+                    <p>Proof-backed demand, not roadmap truth.</p>
+                </article>
+                <article class="ledger-console__panel">
+                    <span>Mobile roles</span>
+                    <strong>Player, GM, and observer rails stay preview-visible on the same public surface.</strong>
+                    <p>Travel-safe shell, same route family.</p>
+                </article>
+            </div>
+            <div class="launch-hero__gridglass" aria-hidden="true">
+                <span class="launch-hero__gridline launch-hero__gridline--h1"></span>
+                <span class="launch-hero__gridline launch-hero__gridline--h2"></span>
+                <span class="launch-hero__gridline launch-hero__gridline--h3"></span>
+                <span class="launch-hero__gridline launch-hero__gridline--v1"></span>
+                <span class="launch-hero__gridline launch-hero__gridline--v2"></span>
+                <span class="launch-hero__gridline launch-hero__gridline--v3"></span>
+            </div>
+            <div class="hero-ops-board" aria-label="Karma Forge and ledger operations preview">
+                <article class="hero-ops-board__card hero-ops-board__card--large">
+                    <span class="hero-ops-board__eyebrow">Karma Forge hub</span>
+                    <strong>7 hot package candidates</strong>
+                    <p>Signal, compatibility, design decision, and release-proof status stay legible before anything claims ship truth.</p>
+                    <div class="hero-ops-board__rail">
+                        <span>Signal</span>
+                        <span>Compatibility</span>
+                        <span>Release proof</span>
+                    </div>
+                </article>
+                <article class="hero-ops-board__card">
+                    <span class="hero-ops-board__eyebrow">Fixer Rep preview</span>
+                    <strong>Impact receipts visible</strong>
+                    <p>Signal Scout and Proof Runner activity can surface publicly only when contributors opt in.</p>
+                </article>
+                <article class="hero-ops-board__card">
+                    <span class="hero-ops-board__eyebrow">Closeout motion</span>
+                    <strong>@(heroProofTrail.Length > 0 ? heroProofTrail[0] : "Rules proof visible")</strong>
+                    <p>Proof follows the route, not the other way around.</p>
+                </article>
+            </div>
+        </div>
     </div>
 </section>
 
@@ -338,7 +253,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Five gateways</p>
         <h2 class="editorial-title">Choose the door that matches your job, then keep the proof behind it honest.</h2>
-        <p class="editorial-copy">Build, play, packages, Karma Forge, and Black Ledger now read as one coherent campaign operating system instead of disconnected proof cards.</p>
+        <p class="editorial-copy">Build, play, packages, Karma Forge, and Black Ledger as one coherent campaign OS.</p>
     </div>
     <div class="flagship-gateway-grid">
         @foreach (var tile in gatewayTiles)
@@ -365,7 +280,7 @@
     <div class="continuity-band__copy">
         <p class="eyebrow">Black Ledger world panel</p>
         <h2 class="editorial-title">The Black Ledger turns opt-in campaign and package signals into public-safe world intelligence.</h2>
-        <p class="editorial-copy">Faction build heat, debt pressure, package demand, closeout movement, and mobile session roles can feel alive without exposing private campaign, support, or account data.</p>
+        <p class="editorial-copy">Faction heat, debt pressure, package demand, and closeout motion without exposing private table data.</p>
         <p class="muted-copy">These are fictional runner/campaign statistics only. Public stats stay opt-in aggregate only and never expose private players or stigmatize real people.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@ledgerHref">View Black Ledger</a>
@@ -395,7 +310,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Karma Forge pipeline</p>
         <h2 class="editorial-title">Signal to closeout, with governed package truth at every step.</h2>
-        <p class="editorial-copy">Karma Forge makes house-rule and package evolution visible without calling anything shipped before release proof exists.</p>
+        <p class="editorial-copy">Visible package evolution without overclaiming what has shipped.</p>
     </div>
     <div class="forge-pipeline" aria-label="Karma Forge pipeline">
         @foreach (var stage in forgePipelineStages)
@@ -416,7 +331,7 @@
     <div class="flagship-coverage__lead">
         <p class="eyebrow">What is real today</p>
         <h2 class="editorial-title">Proof comes after product orientation, not before it.</h2>
-        <p class="editorial-copy">The release shelf, rules explanation trail, and route proof still matter. They now sit behind the flagship story instead of acting like the flagship story.</p>
+        <p class="editorial-copy">Release shelf, rules trail, and route proof stay visible after the flagship story.</p>
     </div>
     <div class="flagship-coverage__grid">
         @foreach (var card in proofCards)
@@ -435,8 +350,8 @@
 <section class="continuity-band">
     <div class="continuity-band__copy">
         <p class="eyebrow">One account keeps the rails together</p>
-        <h2 class="editorial-title">Installs, follows, packages, and closeouts stay on one return path.</h2>
-        <p class="editorial-copy">Account value starts after the product makes sense: claim installs, follow packages and Karma Forge items, track support, and opt into public contribution display only when you want it.</p>
+        <h2 class="editorial-title">One account keeps your installs, follows, packages, and closeouts together.</h2>
+        <p class="editorial-copy">Claim installs, follow packages, track support, and opt into public contribution only when you want it.</p>
         <div class="stacked-actions">
             @if (Model.Chrome.Authenticated)
             {
@@ -478,7 +393,7 @@
     <div class="future-strip__lead">
         <p class="eyebrow">Participation / Fixer Rep preview</p>
         <h2 class="editorial-title">Votes show demand. Proof decides what ships.</h2>
-        <p class="editorial-copy">Follow the work, earn impact receipts, and build Fixer Rep through useful, public-safe contribution. No in-game Karma, Street Cred, or Nuyen becomes contribution currency here.</p>
+        <p class="editorial-copy">Follow the work, earn impact receipts, and build Fixer Rep through public-safe contribution.</p>
     </div>
     <div class="future-strip__grid participation-badge-grid">
         @foreach (var badge in participationBadges)
@@ -490,13 +405,18 @@
             </article>
         }
     </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="/feedback">Open feedback</a>
+        <a class="button-like button-like--secondary" href="/beta">Join beta</a>
+        <a class="button-like button-like--ghost" href="/participate">Guided contribution</a>
+    </div>
 </section>
 
 <section class="access-band">
     <div class="access-band__copy">
         <p class="eyebrow">Final trust footer</p>
         <h2 class="editorial-title">Take the route that matches your job, then verify the proof behind it.</h2>
-        <p class="editorial-copy">Status, privacy, terms, help, and source audit fallback stay short here because the flagship job is to orient you first.</p>
+        <p class="editorial-copy">Status, privacy, terms, help, and source stay short here.</p>
     </div>
     <div class="access-band__actions">
         <a class="button-like button-like--primary" href="/status">Open status</a>

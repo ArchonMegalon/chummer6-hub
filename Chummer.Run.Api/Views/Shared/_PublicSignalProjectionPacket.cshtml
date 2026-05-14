@@ -77,7 +77,7 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">@Model.Vendor</span>
+            <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
             <h3>Public page and first-party fallback stay paired.</h3>
             <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
             <div class="route-choice-card__proof">

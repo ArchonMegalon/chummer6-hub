@@ -42,7 +42,10 @@ Direction, signal, and shipped-closeout rails:
 - `/roadmap` for milestone-backed public direction
 - `/feedback` for safe public signal and votes
 - `/changelog` for shipped closeout
+- `/ledger`
+- `/black-ledger`
 - `/participate`
+- `/karma-forge`
 - `/participate/karma-forge`
 - `/participate/karma-forge/submitted/{submissionId}`
 - `/feedback/operations`

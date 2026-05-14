@@ -1,0 +1,100 @@
+@model BlackLedgerHubPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-ledger";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>Opt-in aggregate only</span>
+            <span>No player identities</span>
+            <span>No support or internal-staff leakage</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Modules</p>
+        <h2 class="editorial-title">One hub, bounded public modules.</h2>
+        <p class="editorial-copy">Each lane stays explicit about what is preview, what is aggregate, and what cannot be shown on a public route.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var module in Model.Modules)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@module.StatusLabel</span>
+                <h3>@module.Title</h3>
+                <p>@module.Summary</p>
+                <a class="editorial-strip__action" href="@module.Href">Open module</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="trust-claims" id="ledger-stats">
+    <div class="trust-claims__lead">
+        <p class="eyebrow">Public-safe stats</p>
+        <h2 class="editorial-title">Aggregate only. Opt-in only. Proof-bounded.</h2>
+        <p class="editorial-copy">These preview stats are seeded through the governed Black Ledger stats model, not hardcoded in the page. If a stat is not public-safe, it does not render here. fictional runner/campaign statistics only.</p>
+    </div>
+    <div class="trust-claims__grid">
+        @foreach (var stat in Model.Stats)
+        {
+            <article class="trust-claim" id="@stat.Id">
+                <span class="tag">@stat.Confidence</span>
+                <h3>@stat.Title</h3>
+                <p class="trust-claim__value"><strong>@stat.Value</strong></p>
+                <p>@stat.Scope · @stat.Period</p>
+                <div class="trust-claim__microproof">
+                    <span>@stat.SampleSize</span>
+                    <span>@stat.PrivacyNote</span>
+                </div>
+                <a class="inline-link" href="@stat.Href">Inspect lane</a>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block" id="ledger-privacy">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Privacy boundary</p>
+        <h2 class="editorial-title">This page explains pressure, not people.</h2>
+        <p class="editorial-copy">No runner names, no support cases, no internal-staff addresses, no sourcebook text, and no campaign-private state are allowed on the public Ledger routes.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Allowed</span>
+            <h3>Opt-in aggregate pressure</h3>
+            <p>Season snapshots, package heat, and closeout motion can render when the data is aggregated and privacy-safe.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Blocked</span>
+            <h3>Private or identifying detail</h3>
+            <p>Individual runners, support traffic, private missions, account state, and hidden campaign levers fail closed instead of leaking into the public hub.</p>
+        </article>
+    </div>
+</section>
+
+<section class="compact-rail" id="ledger-closeouts">
+    @foreach (var item in Model.Closeouts)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>@item.Title</h3>
+                <p>@item.Summary</p>
+                <p class="muted-copy">@item.StatusLabel</p>
+                <a class="inline-link" href="@item.Href">Open lane</a>
+            </div>
+        </article>
+    }
+</section>
