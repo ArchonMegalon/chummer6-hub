@@ -1,59 +1,96 @@
 using Chummer.Run.Api.ViewModels;
+using Microsoft.Extensions.Configuration;
+using System.Security.Cryptography;
+using System.Text;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
 
 namespace Chummer.Run.Api.Services.Community;
 
 public sealed class BlackLedgerPublicStatsService
 {
-    private static readonly BlackLedgerPublicStatViewModel[] SeededPreviewStats =
+    private const string SeedRelativePath = "black-ledger/worlds/emerald-sprawl-prelude.yaml";
+    private static readonly string[] ForbiddenPublicTerms =
     [
-        new(
-            Id: "mysad-density",
-            Title: "MysAd density",
-            Value: "Barrens adepts 34%",
-            Scope: "Public aggregate",
-            Period: "Current season",
-            SampleSize: "47 opted-in runners",
-            Confidence: "Preview",
-            PrivacyNote: "Opt-in aggregate only",
-            Source: "seeded_preview",
-            Status: "preview",
-            Href: "/ledger/stats#mysad-density"),
-        new(
-            Id: "debt-heat",
-            Title: "Debt Heat",
-            Value: "128,400Y active favors",
-            Scope: "Public aggregate",
-            Period: "This month",
-            SampleSize: "12 crews",
-            Confidence: "Enough data",
-            PrivacyNote: "Fictional runner/campaign statistics only",
-            Source: "seeded_preview",
-            Status: "preview",
-            Href: "/ledger/stats#debt-heat"),
-        new(
-            Id: "package-pressure",
-            Title: "Package pressure",
-            Value: "7 hot package candidates",
-            Scope: "Public aggregate",
-            Period: "Current release train",
-            SampleSize: "31 followed requests",
-            Confidence: "Preview",
-            PrivacyNote: "Proof-backed demand, not roadmap truth",
-            Source: "package_registry",
-            Status: "preview",
-            Href: "/ledger/packages"),
-        new(
-            Id: "chaos-index",
-            Title: "Chaos index",
-            Value: "Touristville crews +18",
-            Scope: "Public aggregate",
-            Period: "Current season",
-            SampleSize: "19 opted-in tables",
-            Confidence: "Low sample",
-            PrivacyNote: "Playful fictional labels only; never point at real people.",
-            Source: "seeded_preview",
-            Status: "preview",
-            Href: "/ledger/factions#chaos-index"),
+        "productlift",
+        "emailit",
+        "deftform",
+        "icanpreneur",
+        "webhook secret",
+        "chummer_",
+        "support_case",
+        "private_campaign",
+        "account_email",
+        "operator_secret",
+        "sourcebook_text",
+    ];
+    private static readonly IDeserializer Deserializer = new DeserializerBuilder()
+        .WithNamingConvention(UnderscoredNamingConvention.Instance)
+        .WithDuplicateKeyChecking()
+        .IgnoreUnmatchedProperties()
+        .Build();
+    private static readonly BlackLedgerPublicStatViewModel[] FallbackPreviewStats =
+    [
+        CreatePublicStat(
+            id: "mysad-density",
+            title: "MysAd density",
+            value: "Ashline Circle 39%",
+            period: "Turn 1",
+            sampleSize: "6 seeded factions / 8 districts",
+            sampleCount: 6,
+            confidenceKey: "preview",
+            confidence: "Preview",
+            privacyNote: "Opt-in aggregate only",
+            sourceKind: "seeded_preview",
+            sourceLabel: "Seeded preview world",
+            sourceSummary: "Derived from the canonical Emerald Sprawl seed before any live opt-in campaign aggregation is allowed.",
+            status: "preview",
+            href: "/ledger/stats#mysad-density"),
+        CreatePublicStat(
+            id: "debt-heat",
+            title: "Debt Heat",
+            value: "Rust Bazaar 99 heat",
+            period: "Turn 1",
+            sampleSize: "Seeded preview world",
+            sampleCount: 8,
+            confidenceKey: "preview",
+            confidence: "Preview",
+            privacyNote: "Fictional runner/campaign statistics only",
+            sourceKind: "seeded_preview",
+            sourceLabel: "Seeded preview world",
+            sourceSummary: "Computed from the canonical seeded faction and district model, not from private campaign telemetry.",
+            status: "preview",
+            href: "/ledger/stats#debt-heat"),
+        CreatePublicStat(
+            id: "package-pressure",
+            title: "Package pressure",
+            value: "7 hot package candidates",
+            period: "Turn 1",
+            sampleSize: "3 candidate lanes",
+            sampleCount: 3,
+            confidenceKey: "preview",
+            confidence: "Preview",
+            privacyNote: "Proof-backed demand, not roadmap truth",
+            sourceKind: "package_registry",
+            sourceLabel: "Package registry pressure lanes",
+            sourceSummary: "Summarizes seeded package-pressure lanes and keeps release truth separate from demand signals.",
+            status: "preview",
+            href: "/ledger/packages"),
+        CreatePublicStat(
+            id: "chaos-index",
+            title: "Chaos index",
+            value: "Rust Bazaar heat 77",
+            period: "Turn 1",
+            sampleSize: "8 seeded districts",
+            sampleCount: 8,
+            confidenceKey: "preview",
+            confidence: "Preview",
+            privacyNote: "Playful fictional labels only; never point at real people.",
+            sourceKind: "seeded_preview",
+            sourceLabel: "Seeded preview world",
+            sourceSummary: "Uses district heat from the canonical public-safe seed and fails closed if the source becomes unsafe.",
+            status: "preview",
+            href: "/ledger/factions#chaos-index"),
     ];
 
     private static readonly BlackLedgerModuleViewModel[] Modules =
@@ -67,16 +104,102 @@ public sealed class BlackLedgerPublicStatsService
 
     private static readonly BlackLedgerCloseoutViewModel[] Closeouts =
     [
+        new("Last tick receipt", "Turn 1 already ran, and the preseeded receipt stays visible before any human steward takes over.", "/ledger/closeouts", "Public-safe receipt"),
         new("Closeout witness feed", "Proof-backed closeout updates only appear after package, route, and release receipts all agree.", "/ledger/closeouts", "Proof-backed"),
         new("Package recovery watch", "Recovery and rollback posture stays visible without implying promoted shipment.", "/packages", "Governed preview"),
         new("Karma Forge dispatch", "Discovery packets can point at candidate motion, but not shipped status, until release proof is real.", "/karma-forge", "Signal only"),
     ];
+    private static readonly BlackLedgerWorldPreviewViewModel FallbackWorldPreview = new(
+        WorldId: "emerald-sprawl-prelude",
+        PublicName: "Emerald Sprawl: First Pressure",
+        Status: "preseeded_preview",
+        CurrentTurn: 1,
+        TurnHeadline: "Turn 1 already ran. Debt Heat rose in Rust Bazaar while Ashline MysAd density pushed package pressure toward awakened build support.",
+        SafetyNote: "Seeded preview and opt-in aggregate only. The Ledger explains pressure, not people.",
+        MapNote: "Influence spheres are preview geometry, not private campaign truth. Use the map to inspect public faction pressure, package heat, and closeout motion.",
+        DeterministicPreview: false,
+        TurnNavigation:
+        [
+            new(1, "Turn 1 live preview", "/ledger?turn=1", true, false),
+            new(2, "Turn 2 deterministic preview", "/ledger?turn=2", false, true),
+        ],
+        Districts:
+        [
+            new("glass-heights", "Glass Heights", "520,80 760,70 850,210 790,330 560,300 470,190", "glass tower compact", 71, 34, "Glass Heights is led by glass tower compact with influence 71 and heat 34."),
+            new("rust-bazaar", "Rust Bazaar", "390,390 620,340 730,520 650,690 420,650 310,500", "rust market syndicate", 68, 77, "Rust Bazaar is led by rust market syndicate with influence 68 and heat 77."),
+            new("ashline-ward", "Ashline Ward", "820,180 1080,160 1130,340 990,500 800,430 760,300", "ashline circle", 64, 52, "Ashline Ward is led by ashline circle with influence 64 and heat 52."),
+            new("neon-docks", "Neon Docks", "60,260 300,210 390,390 310,500 130,520 40,400", "neon docks union", 73, 49, "Neon Docks is led by neon docks union with influence 73 and heat 49."),
+            new("ghostline-east", "Ghostline East", "850,500 1030,500 1160,620 1100,735 820,700 650,690", "ghostline network", 58, 41, "Ghostline East is led by ghostline network with influence 58 and heat 41."),
+            new("free-ward", "Free Ward", "120,520 310,500 420,650 350,735 90,730 40,630", "barrens free wardens", 61, 69, "Free Ward is led by barrens free wardens with influence 61 and heat 69."),
+            new("transit-spine", "Transit Spine", "300,210 470,190 560,300 620,340 390,390", "contested", 43, 56, "Transit Spine is contested with influence 43 and heat 56."),
+            new("old-signal-loop", "Old Signal Loop", "760,300 800,430 850,500 650,690 730,520 620,340", "contested", 39, 62, "Old Signal Loop is contested with influence 39 and heat 62."),
+        ],
+        Factions:
+        [
+            new("glass_tower_compact", "Glass Tower Compact", "corporate-facing brokers", "ai glass director", "ai contract referee", "ai ledger notary", ["license polish 88", "public trust 51", "debt heat 42"]),
+            new("rust_market_syndicate", "Rust Market Syndicate", "gear/debt logistics", "ai rust broker", "ai debt clock", "ai receipt hawk", ["debt heat 99", "favor load 86", "package pressure 83"]),
+            new("ashline_circle", "Ashline Circle", "mystic-adjacent street coalition", "ai ashline seer", "ai drain keeper", "ai ritual scribe", ["drain magnet index 72", "source clarity 48", "mysad density 39"]),
+            new("neon_docks_union", "Neon Docks Union", "riggers and logistics crews", "ai dock boss", "ai route dispatcher", "ai container oracle", ["route control 76", "vehicle package demand 75", "drone herd size 64"]),
+            new("ghostline_network", "Ghostline Network", "intel and matrix rumor verification", "ai ghost handler", "ai signal referee", "ai redaction spider", ["intel volume 82", "false signal suppression 80", "proof trail strength 67"]),
+            new("barrens_free_wardens", "Barrens Free Wardens", "street-level mutual protection", "ai warden marshal", "ai survival clock", "ai closeout witness", ["survival pressure 81", "attrition risk 63", "closeout witnesses 36"]),
+        ],
+        StewardshipPosts:
+        [
+            new("ledger_gm", "Ledger GM", "ai", "ai ledger architect", "Runs the deterministic world-turn shell until verified human stewards take over.", true),
+            new("public_intel_provider", "Public Intel Provider", "ai", "ai public intel provider", "Turns world movement into public-safe summaries without leaking private or operator data.", true),
+            new("package_pressure_analyst", "Package Pressure Analyst", "ai", "ai package factor", "Explains package demand as governed pressure, not shipped truth.", true),
+            new("privacy_marshal", "Privacy Marshal", "ai", "ai privacy marshal", "Blocks private, identifying, sourcebook, support, or operator data from public rendering.", true),
+            new("closeout_clerk", "Closeout Clerk", "ai", "ai closeout clerk", "Keeps closeout movement tied to first-party receipts before it appears publicly.", true),
+        ],
+        StewardshipTransferPreview: new(
+            "stewardship_transfer",
+            "ledger_gm",
+            "ai_ledger_architect",
+            "verified_human_steward_pending",
+            "human",
+            "2026-05-14T12:00:00Z",
+            "Preview handoff receipt proves that verified human takeover outranks interim AI stewardship.",
+            "stewarding_operator",
+            "public_safe"),
+        LastTick: new(
+            "emerald-sprawl-prelude",
+            1,
+            "ledger_tick_0001_preseeded",
+            "preseeded",
+            "Debt Heat rises while Ashline MysAd density pulls package pressure toward awakened build support.",
+            ComputeHash("emerald-sprawl-prelude:0:seeded_initial_state:input"),
+            ComputeHash("emerald-sprawl-prelude:1:preseeded:decision"),
+            true,
+            Array.Empty<string>(),
+            ComputeHash("emerald-sprawl-prelude:1:preseeded_tick_complete:output"),
+            "2026-05-14T12:00:00Z",
+            [
+                new("rust market syndicate", "debt heat", 8, "Old favors were called in after a failed gear reconciliation."),
+                new("ashline circle", "mysad density", 5, "Awakened build demand increased after a visible source-clarity dispute."),
+                new("neon docks union", "vehicle package demand", 4, "Cargo-route pressure created demand for drone and vehicle overlays."),
+                new("ghostline network", "false signal suppression", 6, "Ghostline filtered two rumor lanes before they became package truth."),
+                new("barrens free wardens", "closeout witnesses", 3, "Two public-safe table outcomes were recorded as closeout witnesses."),
+                new("glass tower compact", "public trust", -4, "License polish increased but public confidence fell after a quiet contract sweep."),
+            ]));
+    private readonly IConfiguration? _configuration;
+
+    public BlackLedgerPublicStatsService(IConfiguration? configuration = null)
+    {
+        _configuration = configuration;
+    }
 
     public IReadOnlyList<BlackLedgerPublicStatViewModel> ListHomepageStats()
         => ListPublicStats().Take(4).ToArray();
 
-    public IReadOnlyList<BlackLedgerPublicStatViewModel> ListPublicStats()
-        => SeededPreviewStats.Where(IsPublicSafe).ToArray();
+    public IReadOnlyList<BlackLedgerPublicStatViewModel> ListPublicStats(int? requestedTurn = null)
+    {
+        BlackLedgerWorldSeedDocument? seed = TryLoadSeed();
+        IReadOnlyList<BlackLedgerPublicStatViewModel> stats = seed is null
+            ? FallbackPreviewStats
+            : BuildSeedBackedStats(seed, requestedTurn);
+        int minimumLiveSampleSize = seed?.PublicSafety?.MinSampleSizeForLivePublicStats ?? 10;
+        return stats.Where(stat => IsPublicSafe(stat, minimumLiveSampleSize)).ToArray();
+    }
 
     public IReadOnlyList<BlackLedgerModuleViewModel> ListModules()
         => Modules;
@@ -84,16 +207,610 @@ public sealed class BlackLedgerPublicStatsService
     public IReadOnlyList<BlackLedgerCloseoutViewModel> ListCloseouts()
         => Closeouts;
 
-    private static bool IsPublicSafe(BlackLedgerPublicStatViewModel stat)
+    public BlackLedgerWorldPreviewViewModel? LoadWorldPreview(int? requestedTurn = null)
+    {
+        BlackLedgerWorldSeedDocument? seed = TryLoadSeed();
+        return seed is null ? FallbackWorldPreview : BuildWorldPreview(seed, requestedTurn);
+    }
+
+    public BlackLedgerWorldSeedDocument? LoadSeedDocument()
+        => TryLoadSeed();
+
+    private BlackLedgerWorldSeedDocument? TryLoadSeed()
+    {
+        foreach (string path in ResolveSeedPathCandidates())
+        {
+            if (!File.Exists(path))
+            {
+                continue;
+            }
+
+            try
+            {
+                using var reader = File.OpenText(path);
+                var document = Deserializer.Deserialize<BlackLedgerWorldSeedDocument>(reader);
+                if (document is null || !IsWorldPublicSafe(document))
+                {
+                    return null;
+                }
+
+                return document;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private IEnumerable<string> ResolveSeedPathCandidates()
+    {
+        string? configured = _configuration?["CHUMMER_BLACK_LEDGER_SEED_PATH"];
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            yield return Path.GetFullPath(configured);
+        }
+
+        foreach (string root in ResolveRootCandidates())
+        {
+            yield return Path.Combine(root, SeedRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            yield return Path.Combine(root, "chummer-hub-registry", SeedRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        }
+    }
+
+    private static IEnumerable<string> ResolveRootCandidates()
+    {
+        string[] candidates =
+        [
+            Directory.GetCurrentDirectory(),
+            AppContext.BaseDirectory,
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..")),
+            "/docker/chummercomplete",
+            "/docker/chummercomplete/chummer-hub-registry",
+        ];
+
+        foreach (string candidate in candidates
+                     .Where(static value => !string.IsNullOrWhiteSpace(value))
+                     .Select(static value => Path.GetFullPath(value))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            yield return candidate;
+        }
+    }
+
+    private static IReadOnlyList<BlackLedgerPublicStatViewModel> BuildSeedBackedStats(BlackLedgerWorldSeedDocument seed, int? requestedTurn)
+    {
+        var selectedTurn = SelectTurn(seed, requestedTurn);
+        var currentTurn = selectedTurn.Turn;
+        string period = currentTurn is null ? "Turn 0" : $"Turn {currentTurn.Turn}";
+        var factionById = (seed.Factions ?? [])
+            .Where(static faction => !string.IsNullOrWhiteSpace(faction.Id))
+            .ToDictionary(static faction => faction.Id, StringComparer.OrdinalIgnoreCase);
+        var districtById = (seed.Map?.Districts ?? [])
+            .Where(static district => !string.IsNullOrWhiteSpace(district.Id))
+            .ToDictionary(static district => district.Id, StringComparer.OrdinalIgnoreCase);
+        var effects = (currentTurn?.Effects ?? [])
+            .GroupBy(static effect => $"{effect.Target}:{effect.Metric}", StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.Sum(static effect => effect.Delta),
+                StringComparer.OrdinalIgnoreCase);
+
+        int AdjustedStat(string factionId, string metric)
+        {
+            if (!factionById.TryGetValue(factionId, out var faction)
+                || faction.Stats is null
+                || !faction.Stats.TryGetValue(metric, out int value))
+            {
+                return 0;
+            }
+
+            effects.TryGetValue($"{factionId}:{metric}", out int delta);
+            return value + delta;
+        }
+
+        string TopDistrictHeat()
+        {
+            var hottest = (seed.Map?.Districts ?? [])
+                .OrderByDescending(static district => district.Heat)
+                .FirstOrDefault();
+            return hottest is null ? "Transit Spine heat 56" : $"{hottest.Name} heat {hottest.Heat}";
+        }
+
+        string TopPackagePressure()
+        {
+            int topPressure = (currentTurn?.PackagePressure ?? [])
+                .Select(static package => package.Pressure)
+                .DefaultIfEmpty(0)
+                .Max();
+            return $"{topPressure} hot package candidates";
+        }
+
+        string SeededFactionSample() => $"{(seed.Factions?.Count ?? 0)} seeded factions / {(seed.Map?.Districts?.Count ?? 0)} districts";
+
+        int minimumLiveSampleSize = seed.PublicSafety?.MinSampleSizeForLivePublicStats ?? 10;
+        string packagePressureConfidenceKey = (currentTurn?.PackagePressure?.Count ?? 0) >= minimumLiveSampleSize
+            ? "enough_data"
+            : "preview";
+
+        BlackLedgerPublicStatViewModel[] stats =
+        [
+            CreatePublicStat(
+                id: "mysad-density",
+                title: "MysAd density",
+                value: $"Ashline Circle {AdjustedStat("ashline_circle", "mysad_density")}%",
+                period: period,
+                sampleSize: SeededFactionSample(),
+                sampleCount: seed.Factions?.Count ?? 0,
+                confidenceKey: "preview",
+                confidence: "Preview",
+                privacyNote: "Opt-in aggregate only",
+                sourceKind: "seeded_preview",
+                sourceLabel: "Seeded preview world",
+                sourceSummary: "Derived from the preseeded Emerald Sprawl faction model until opted-in live data clears privacy thresholds.",
+                status: "preview",
+                href: "/ledger/stats#mysad-density"),
+            CreatePublicStat(
+                id: "debt-heat",
+                title: "Debt Heat",
+                value: $"Rust Bazaar {AdjustedStat("rust_market_syndicate", "debt_heat")} heat",
+                period: period,
+                sampleSize: "Seeded preview world",
+                sampleCount: districtById.Count,
+                confidenceKey: "preview",
+                confidence: "Preview",
+                privacyNote: "Fictional runner/campaign statistics only",
+                sourceKind: "seeded_preview",
+                sourceLabel: "Seeded preview world",
+                sourceSummary: "Computed from the public-safe seed and last applied tick receipt, never from support or account-linked traffic.",
+                status: "preview",
+                href: "/ledger/stats#debt-heat"),
+            CreatePublicStat(
+                id: "package-pressure",
+                title: "Package pressure",
+                value: TopPackagePressure(),
+                period: period,
+                sampleSize: $"{currentTurn?.PackagePressure?.Count ?? 0} candidate lanes",
+                sampleCount: currentTurn?.PackagePressure?.Count ?? 0,
+                confidenceKey: packagePressureConfidenceKey,
+                confidence: packagePressureConfidenceKey == "enough_data" ? "Enough data" : "Preview",
+                privacyNote: "Proof-backed demand, not roadmap truth",
+                sourceKind: "package_registry",
+                sourceLabel: "Package registry pressure lanes",
+                sourceSummary: "Uses the seed-backed package-pressure lane set and stays preview until live public-safe sample thresholds are satisfied.",
+                status: "preview",
+                href: "/ledger/packages"),
+            CreatePublicStat(
+                id: "chaos-index",
+                title: "Chaos index",
+                value: TopDistrictHeat(),
+                period: period,
+                sampleSize: $"{districtById.Count} seeded districts",
+                sampleCount: districtById.Count,
+                confidenceKey: "preview",
+                confidence: "Preview",
+                privacyNote: "Playful fictional labels only; never point at real people.",
+                sourceKind: "seeded_preview",
+                sourceLabel: "Seeded preview world",
+                sourceSummary: "Uses district heat snapshots from the canonical public seed and blocks publication if the map becomes unsafe.",
+                status: "preview",
+                href: "/ledger/factions#chaos-index"),
+        ];
+
+        return stats;
+    }
+
+    private static BlackLedgerWorldPreviewViewModel BuildWorldPreview(BlackLedgerWorldSeedDocument seed, int? requestedTurn)
+    {
+        var selectedTurn = SelectTurn(seed, requestedTurn);
+        var currentTurn = selectedTurn.Turn;
+        string turnHeadline = currentTurn is null
+            ? "Turn 0 is loaded."
+            : selectedTurn.IsDeterministicPreview
+                ? $"Turn {currentTurn.Turn} deterministic preview is ready. {currentTurn.Summary}"
+                : $"Turn {currentTurn.Turn} already ran. {currentTurn.Summary}";
+        string safetyNote = "Seeded preview and opt-in aggregate only. The Ledger explains pressure, not people.";
+        string mapNote = "Influence spheres are preview geometry, not private campaign truth. Use the map to inspect public faction pressure, package heat, and closeout motion.";
+        var aiNames = (seed.AiPersonalities ?? [])
+            .Where(static personality => !string.IsNullOrWhiteSpace(personality.Id))
+            .ToDictionary(static personality => personality.Id, static personality => personality.Id.Replace('_', ' '), StringComparer.OrdinalIgnoreCase);
+        var districts = (seed.Map?.Districts ?? [])
+            .Select(district => new BlackLedgerDistrictViewModel(
+                district.Id,
+                district.Name,
+                string.Join(" ", (district.Polygon ?? []).Select(static point => point.Count >= 2 ? $"{point[0]},{point[1]}" : string.Empty).Where(static point => !string.IsNullOrWhiteSpace(point))),
+                district.DominantFaction.Replace('_', ' '),
+                district.Influence,
+                district.Heat,
+                BuildDistrictSummary(district)))
+            .ToArray();
+        var factions = (seed.Factions ?? [])
+            .Select(faction => new BlackLedgerFactionViewModel(
+                faction.Id,
+                faction.PublicName,
+                faction.Type,
+                ResolveAiName(aiNames, faction.ManagementPosts?.FactionLeader),
+                ResolveAiName(aiNames, faction.ManagementPosts?.FieldGm),
+                ResolveAiName(aiNames, faction.ManagementPosts?.IntelProvider),
+                BuildFactionSignals(faction)))
+            .ToArray();
+        BlackLedgerTickReceiptViewModel? lastTick = currentTurn is null || string.IsNullOrWhiteSpace(currentTurn.ReceiptId)
+            ? null
+            : new BlackLedgerTickReceiptViewModel(
+                seed.WorldId,
+                currentTurn.Turn,
+                currentTurn.ReceiptId,
+                selectedTurn.Mode,
+                currentTurn.Summary,
+                ComputeHash($"{seed.WorldId}:{currentTurn.Turn - 1}:{currentTurn.State}:input"),
+                ComputeHash($"{seed.WorldId}:{currentTurn.Turn}:{string.Join('|', (currentTurn.Effects ?? []).Select(effect => $"{effect.Target}:{effect.Metric}:{effect.Delta}:{effect.PublicReason}"))}:decision"),
+                true,
+                Array.Empty<string>(),
+                ComputeHash($"{seed.WorldId}:{currentTurn.Turn}:{currentTurn.State}:output"),
+                selectedTurn.CreatedAtUtc ?? "2026-05-14T12:00:00Z",
+                (currentTurn.Effects ?? [])
+                .Select(effect => new BlackLedgerTickEffectViewModel(
+                    effect.Target.Replace('_', ' '),
+                    effect.Metric.Replace('_', ' '),
+                    effect.Delta,
+                    effect.PublicReason))
+                .ToArray());
+
+        return new BlackLedgerWorldPreviewViewModel(
+            seed.WorldId,
+            seed.PublicName,
+            seed.Status,
+            currentTurn?.Turn ?? 0,
+            turnHeadline,
+            safetyNote,
+            mapNote,
+            selectedTurn.IsDeterministicPreview,
+            BuildTurnNavigation(seed, currentTurn?.Turn ?? 0),
+            districts,
+            factions,
+            BuildStewardshipPosts(seed),
+            BuildStewardshipTransferPreview(seed),
+            lastTick);
+    }
+
+    private static SelectedTurnContext SelectTurn(BlackLedgerWorldSeedDocument seed, int? requestedTurn)
+    {
+        var publishedTurn = seed.Turns?
+            .OrderByDescending(static turn => turn.Turn)
+            .FirstOrDefault();
+        if (requestedTurn == 2)
+        {
+            var deterministicTurn = seed.DeterministicTestTicks?
+                .FirstOrDefault(static tick => tick.Turn == 2);
+            if (deterministicTurn is not null)
+            {
+                return new SelectedTurnContext(
+                    Turn: new BlackLedgerTurnDocument
+                    {
+                        Turn = deterministicTurn.Turn,
+                        State = deterministicTurn.State,
+                        Summary = deterministicTurn.Summary,
+                        ReceiptId = deterministicTurn.ReceiptId,
+                        Effects = deterministicTurn.Effects,
+                        PackagePressure = deterministicTurn.PackagePressure,
+                    },
+                    IsDeterministicPreview: true,
+                    Mode: string.IsNullOrWhiteSpace(deterministicTurn.Mode) ? "deterministic_test" : deterministicTurn.Mode,
+                    CreatedAtUtc: deterministicTurn.CreatedAtUtc);
+            }
+        }
+
+        return new SelectedTurnContext(
+            Turn: publishedTurn,
+            IsDeterministicPreview: false,
+            Mode: "preseeded",
+            CreatedAtUtc: "2026-05-14T12:00:00Z");
+    }
+
+    private static IReadOnlyList<BlackLedgerTurnNavigationViewModel> BuildTurnNavigation(BlackLedgerWorldSeedDocument seed, int currentTurn)
+        => new[]
+        {
+            new BlackLedgerTurnNavigationViewModel(1, "Turn 1 live preview", "/ledger?turn=1", currentTurn == 1, false),
+            new BlackLedgerTurnNavigationViewModel(2, "Turn 2 deterministic preview", "/ledger?turn=2", currentTurn == 2, true),
+        };
+
+    private static IReadOnlyList<BlackLedgerStewardshipPostViewModel> BuildStewardshipPosts(BlackLedgerWorldSeedDocument seed)
+    {
+        var personalities = (seed.AiPersonalities ?? [])
+            .Where(static personality => !string.IsNullOrWhiteSpace(personality.Id))
+            .ToDictionary(static personality => personality.Id, StringComparer.OrdinalIgnoreCase);
+        return (seed.GlobalPosts ?? [])
+            .Select(post =>
+            {
+                personalities.TryGetValue(post.FallbackPersonality ?? string.Empty, out var personality);
+                string fallback = string.IsNullOrWhiteSpace(post.FallbackPersonality)
+                    ? "unassigned"
+                    : post.FallbackPersonality.Replace('_', ' ');
+                string summary = post.PublicSummary;
+                if (personality?.Goals?.Any() == true)
+                {
+                    summary = $"{summary} Current brief: {personality.Goals[0]}.";
+                }
+
+                return new BlackLedgerStewardshipPostViewModel(
+                    post.Id,
+                    post.PublicLabel,
+                    post.HolderType,
+                    fallback,
+                    summary,
+                    HumanOverrideAvailable: true);
+            })
+            .ToArray();
+    }
+
+    private static BlackLedgerStewardshipTransferReceiptViewModel? BuildStewardshipTransferPreview(BlackLedgerWorldSeedDocument seed)
+    {
+        var receipt = seed.StewardshipTransferPreview;
+        return receipt is null
+            ? null
+            : new BlackLedgerStewardshipTransferReceiptViewModel(
+                receipt.ReceiptType,
+                receipt.PostId,
+                receipt.OldHolder,
+                receipt.NewHolder,
+                receipt.NewHolderType,
+                receipt.OccurredAt,
+                receipt.Reason,
+                receipt.OperatorId,
+                receipt.PublicVisibility);
+    }
+
+    private static string ResolveAiName(IReadOnlyDictionary<string, string> aiNames, string? id)
+        => !string.IsNullOrWhiteSpace(id) && aiNames.TryGetValue(id, out string? value)
+            ? value
+            : string.IsNullOrWhiteSpace(id)
+                ? "unassigned"
+                : id.Replace('_', ' ');
+
+    private static IReadOnlyList<string> BuildFactionSignals(BlackLedgerFactionDocument faction)
+        => (faction.Stats ?? new Dictionary<string, int>())
+            .OrderByDescending(static pair => pair.Value)
+            .Take(3)
+            .Select(static pair => $"{pair.Key.Replace('_', ' ')} {pair.Value}")
+            .ToArray();
+
+    private static string BuildDistrictSummary(BlackLedgerDistrictDocument district)
+        => $"{district.Name} is led by {district.DominantFaction.Replace('_', ' ')} with influence {district.Influence} and heat {district.Heat}.";
+
+    private static bool IsWorldPublicSafe(BlackLedgerWorldSeedDocument world)
+    {
+        if (!string.Equals(world.Status, "preseeded_preview", StringComparison.Ordinal)
+            || !string.Equals(world.Source, "chummer-owned seed", StringComparison.Ordinal)
+            || world.PublicSafety is null
+            || world.PublicSafety.OfficialLore
+            || world.PublicSafety.UsesSourcebookText
+            || world.PublicSafety.UsesPrivateUserData
+            || world.PublicSafety.RealUserIdentificationAllowed
+            || !string.Equals(world.PublicSafety.PublicStatsScope, "opt_in_aggregate_or_seeded_fictional_preview", StringComparison.Ordinal)
+            || (world.Map?.Districts?.Count ?? 0) < 8
+            || (world.Factions?.Count ?? 0) < 6)
+        {
+            return false;
+        }
+
+        var aiIds = (world.AiPersonalities ?? [])
+            .Select(static personality => personality.Id)
+            .Where(static id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if ((world.Turns ?? []).All(static turn => turn.Turn != 1 || string.IsNullOrWhiteSpace(turn.ReceiptId)))
+        {
+            return false;
+        }
+
+        return (world.Factions ?? []).All(faction =>
+            faction.ManagementPosts is not null
+            && aiIds.Contains(faction.ManagementPosts.FactionLeader)
+            && aiIds.Contains(faction.ManagementPosts.FieldGm)
+            && aiIds.Contains(faction.ManagementPosts.IntelProvider));
+    }
+
+    private static BlackLedgerPublicStatViewModel CreatePublicStat(
+        string id,
+        string title,
+        string value,
+        string period,
+        string sampleSize,
+        int sampleCount,
+        string confidenceKey,
+        string confidence,
+        string privacyNote,
+        string sourceKind,
+        string sourceLabel,
+        string sourceSummary,
+        string status,
+        string href)
+        => new(
+            Id: id,
+            Title: title,
+            Value: value,
+            Scope: "Public aggregate",
+            ScopeKey: "public_aggregate",
+            Period: period,
+            SampleSize: sampleSize,
+            SampleCount: sampleCount,
+            Confidence: confidence,
+            ConfidenceKey: confidenceKey,
+            PrivacyNote: privacyNote,
+            Source: sourceKind,
+            SourceDetail: new BlackLedgerPublicStatSourceViewModel(
+                Kind: sourceKind,
+                Label: sourceLabel,
+                ProvenanceSummary: sourceSummary,
+                PreviewOnly: !string.Equals(status, "live", StringComparison.Ordinal),
+                PublicSafe: true),
+            Status: status,
+            Href: href);
+
+    private static bool IsPublicSafe(BlackLedgerPublicStatViewModel stat, int minimumLiveSampleSize)
         => !string.IsNullOrWhiteSpace(stat.Id)
            && !string.IsNullOrWhiteSpace(stat.Title)
            && !string.IsNullOrWhiteSpace(stat.Value)
            && string.Equals(stat.Scope, "Public aggregate", StringComparison.Ordinal)
+           && string.Equals(stat.ScopeKey, "public_aggregate", StringComparison.Ordinal)
            && !string.IsNullOrWhiteSpace(stat.Period)
            && !string.IsNullOrWhiteSpace(stat.SampleSize)
+           && stat.SampleCount >= 0
            && !string.IsNullOrWhiteSpace(stat.Confidence)
+           && !string.IsNullOrWhiteSpace(stat.ConfidenceKey)
            && !string.IsNullOrWhiteSpace(stat.PrivacyNote)
            && !string.IsNullOrWhiteSpace(stat.Source)
+           && stat.SourceDetail is not null
+           && stat.SourceDetail.PublicSafe
            && !string.IsNullOrWhiteSpace(stat.Status)
-           && !string.IsNullOrWhiteSpace(stat.Href);
+           && !string.IsNullOrWhiteSpace(stat.Href)
+           && (!string.Equals(stat.Status, "live", StringComparison.Ordinal) || stat.SampleCount >= minimumLiveSampleSize)
+           && !ContainsForbiddenPublicTerms(stat.Title)
+           && !ContainsForbiddenPublicTerms(stat.Value)
+           && !ContainsForbiddenPublicTerms(stat.PrivacyNote)
+           && !ContainsForbiddenPublicTerms(stat.Source)
+           && !ContainsForbiddenPublicTerms(stat.SourceDetail.Label)
+           && !ContainsForbiddenPublicTerms(stat.SourceDetail.ProvenanceSummary);
+
+    private static bool ContainsForbiddenPublicTerms(string value)
+        => ForbiddenPublicTerms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+    private static string ComputeHash(string value)
+        => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+
+    private sealed record SelectedTurnContext(
+        BlackLedgerTurnDocument? Turn,
+        bool IsDeterministicPreview,
+        string Mode,
+        string? CreatedAtUtc);
+
+    public sealed class BlackLedgerWorldSeedDocument
+    {
+        public int SchemaVersion { get; set; }
+        public string WorldId { get; set; } = string.Empty;
+        public string PublicName { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string Source { get; set; } = string.Empty;
+        public BlackLedgerPublicSafetyDocument? PublicSafety { get; set; }
+        public BlackLedgerMapDocument? Map { get; set; }
+        public List<BlackLedgerFactionDocument>? Factions { get; set; }
+        public List<BlackLedgerAiPersonalityDocument>? AiPersonalities { get; set; }
+        public List<BlackLedgerGlobalPostDocument>? GlobalPosts { get; set; }
+        public BlackLedgerStewardshipTransferDocument? StewardshipTransferPreview { get; set; }
+        public List<BlackLedgerTurnDocument>? Turns { get; set; }
+        public List<BlackLedgerDeterministicTickDocument>? DeterministicTestTicks { get; set; }
+    }
+
+    public sealed class BlackLedgerPublicSafetyDocument
+    {
+        public bool OfficialLore { get; set; }
+        public bool UsesSourcebookText { get; set; }
+        public bool UsesPrivateUserData { get; set; }
+        public string PublicStatsScope { get; set; } = string.Empty;
+        public bool RealUserIdentificationAllowed { get; set; }
+        public int MinSampleSizeForLivePublicStats { get; set; }
+    }
+
+    public sealed class BlackLedgerMapDocument
+    {
+        public List<BlackLedgerDistrictDocument>? Districts { get; set; }
+    }
+
+    public sealed class BlackLedgerDistrictDocument
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public List<List<int>>? Polygon { get; set; }
+        public string DominantFaction { get; set; } = string.Empty;
+        public int Influence { get; set; }
+        public int Heat { get; set; }
+    }
+
+    public sealed class BlackLedgerFactionDocument
+    {
+        public string Id { get; set; } = string.Empty;
+        public string PublicName { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public BlackLedgerManagementPostsDocument? ManagementPosts { get; set; }
+        public Dictionary<string, int>? Stats { get; set; }
+    }
+
+    public sealed class BlackLedgerManagementPostsDocument
+    {
+        public string FactionLeader { get; set; } = string.Empty;
+        public string FieldGm { get; set; } = string.Empty;
+        public string IntelProvider { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerAiPersonalityDocument
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Role { get; set; } = string.Empty;
+        public string? Faction { get; set; }
+        public string? Tone { get; set; }
+        public List<string>? Goals { get; set; }
+        public string? RiskAppetite { get; set; }
+    }
+
+    public sealed class BlackLedgerGlobalPostDocument
+    {
+        public string Id { get; set; } = string.Empty;
+        public string HolderType { get; set; } = string.Empty;
+        public string? FallbackPersonality { get; set; }
+        public string PublicLabel { get; set; } = string.Empty;
+        public string PublicSummary { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerStewardshipTransferDocument
+    {
+        public string ReceiptType { get; set; } = string.Empty;
+        public string PostId { get; set; } = string.Empty;
+        public string OldHolder { get; set; } = string.Empty;
+        public string NewHolder { get; set; } = string.Empty;
+        public string NewHolderType { get; set; } = string.Empty;
+        public string OccurredAt { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public string OperatorId { get; set; } = string.Empty;
+        public string PublicVisibility { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerTurnDocument
+    {
+        public int Turn { get; set; }
+        public string State { get; set; } = string.Empty;
+        public string Summary { get; set; } = string.Empty;
+        public string? ReceiptId { get; set; }
+        public List<BlackLedgerTurnEffectDocument>? Effects { get; set; }
+        public List<BlackLedgerPackagePressureDocument>? PackagePressure { get; set; }
+    }
+
+    public sealed class BlackLedgerDeterministicTickDocument
+    {
+        public int Turn { get; set; }
+        public string SeedId { get; set; } = string.Empty;
+        public string Mode { get; set; } = string.Empty;
+        public string State { get; set; } = string.Empty;
+        public string Summary { get; set; } = string.Empty;
+        public string ReceiptId { get; set; } = string.Empty;
+        public string CreatedAtUtc { get; set; } = string.Empty;
+        public List<BlackLedgerTurnEffectDocument>? Effects { get; set; }
+        public List<BlackLedgerPackagePressureDocument>? PackagePressure { get; set; }
+    }
+
+    public sealed class BlackLedgerTurnEffectDocument
+    {
+        public string Target { get; set; } = string.Empty;
+        public string Metric { get; set; } = string.Empty;
+        public int Delta { get; set; }
+        public string PublicReason { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerPackagePressureDocument
+    {
+        public string PackageId { get; set; } = string.Empty;
+        public int Pressure { get; set; }
+        public string Status { get; set; } = string.Empty;
+    }
 }
