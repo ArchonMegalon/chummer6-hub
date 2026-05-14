@@ -41,6 +41,12 @@ public sealed class PublicLandingServiceTests
         Assert.Contains(surface.PublicRoutes, static route =>
             string.Equals(route.Path, "/karma-forge", StringComparison.Ordinal));
         Assert.Contains(surface.PublicRoutes, static route =>
+            string.Equals(route.Path, "/anarchy", StringComparison.Ordinal));
+        Assert.Contains(surface.PublicRoutes, static route =>
+            string.Equals(route.Path, "/play/anarchy", StringComparison.Ordinal));
+        Assert.Contains(surface.PublicRoutes, static route =>
+            string.Equals(route.Path, "/ledger/anarchy", StringComparison.Ordinal));
+        Assert.Contains(surface.PublicRoutes, static route =>
             string.Equals(route.Path, "/roadmap/black-ledger", StringComparison.Ordinal));
         Assert.Contains(surface.PublicRoutes, static route =>
             string.Equals(route.Path, "/roadmap/community-hub", StringComparison.Ordinal));
@@ -52,7 +58,7 @@ public sealed class PublicLandingServiceTests
 
         Assert.Equal("/roadmap/community-hub", communityHub.DetailRoute);
         Assert.Equal("/ledger", communityHub.DetailPrimaryHref);
-        Assert.Equal("/ledger", blackLedger.DetailRoute);
+        Assert.Equal("/roadmap/black-ledger", blackLedger.DetailRoute);
         Assert.Equal("/artifacts/replay-after-action", blackLedger.DetailPrimaryHref);
     }
 
@@ -106,6 +112,18 @@ public sealed class PublicLandingServiceTests
             string.Equals(route.Path, "/karma-forge", StringComparison.Ordinal)
             && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
             && string.Equals(route.VerificationPattern, "[HttpGet(\"/karma-forge\")]", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/anarchy", StringComparison.Ordinal)
+            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
+            && string.Equals(route.VerificationPattern, "[HttpGet(\"/anarchy\")]", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/play/anarchy", StringComparison.Ordinal)
+            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
+            && string.Equals(route.VerificationPattern, "[HttpGet(\"/play/anarchy\")]", StringComparison.Ordinal));
+        Assert.Contains(document.PublicRoutes!, static route =>
+            string.Equals(route.Path, "/ledger/anarchy", StringComparison.Ordinal)
+            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
+            && string.Equals(route.VerificationPattern, "[HttpGet(\"/ledger/anarchy\")]", StringComparison.Ordinal));
     }
 
     [Fact]
