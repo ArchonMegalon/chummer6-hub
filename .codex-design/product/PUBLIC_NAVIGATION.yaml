@@ -27,6 +27,8 @@ public_signal_nav:
 secondary_nav:
   - label: Status
     href: /status
+  - label: Anarchy
+    href: /anarchy
   - label: Help
     href: /help
   - label: FAQ

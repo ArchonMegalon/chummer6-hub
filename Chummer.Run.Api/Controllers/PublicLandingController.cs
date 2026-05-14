@@ -46,6 +46,8 @@ public sealed class PublicLandingController : Controller
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly KarmaForgeDiscoveryService _karmaForge;
     private readonly BlackLedgerPublicStatsService _blackLedgerStats;
+    private readonly BlackLedgerDispatchService _blackLedgerDispatches;
+    private readonly AnarchyPreviewService _anarchyPreview;
     private readonly PublicPackageCatalogService _packageCatalog;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
     private readonly HubPageChromeService _chrome;
@@ -85,6 +87,8 @@ public sealed class PublicLandingController : Controller
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         KarmaForgeDiscoveryService karmaForge,
         BlackLedgerPublicStatsService blackLedgerStats,
+        BlackLedgerDispatchService blackLedgerDispatches,
+        AnarchyPreviewService anarchyPreview,
         PublicPackageCatalogService packageCatalog,
         PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
         HubPageChromeService chrome,
@@ -120,6 +124,8 @@ public sealed class PublicLandingController : Controller
         _workspaceServerPlane = workspaceServerPlane;
         _karmaForge = karmaForge;
         _blackLedgerStats = blackLedgerStats;
+        _blackLedgerDispatches = blackLedgerDispatches;
+        _anarchyPreview = anarchyPreview;
         _packageCatalog = packageCatalog;
         _publicCreatorDiscovery = publicCreatorDiscovery;
         _chrome = chrome;
@@ -183,6 +189,7 @@ public sealed class PublicLandingController : Controller
             FlagshipCoverage: _flagshipCoverage.LoadStrip(),
             BlackLedgerStats: _blackLedgerStats.ListHomepageStats(),
             BlackLedgerWorld: _blackLedgerStats.LoadWorldPreview(),
+            LatestBlackLedgerDispatch: _blackLedgerDispatches.ListPublishedDispatches().FirstOrDefault(),
             CampaignSpine: await BuildLandingCampaignSpineAsync(cancellationToken),
             AccessPosture: accessPosture);
         return View("~/Views/PublicLanding/Landing.cshtml", model);
@@ -584,6 +591,38 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/observer")]
     public IActionResult ObserverProjectionAlias()
         => Redirect("/play?role=observer");
+
+    [HttpGet("/anarchy")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AnarchyOverviewPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildAnarchyPageModel(
+            currentPath: "/anarchy",
+            currentSection: "overview",
+            eyebrow: "Dedicated ruleset preview",
+            heading: "Shadowrun Anarchy",
+            intro: "A dedicated rules-light lane for mobile play, dispatches, faction consequence, and fast continuity. This is a playable preview, not full book-level rules completeness.",
+            primaryAction: new TrustPageActionViewModel("Open Anarchy play shell", "/play/anarchy", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open Anarchy ledger lane", "/ledger/anarchy", "secondary"),
+            cancellationToken);
+        return View("~/Views/PublicLanding/Anarchy.cshtml", model);
+    }
+
+    [HttpGet("/play/anarchy")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AnarchyPlayPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildAnarchyPageModel(
+            currentPath: "/play/anarchy",
+            currentSection: "play",
+            eyebrow: "Rules-light play shell",
+            heading: "Anarchy play shell",
+            intro: "This route keeps a one-page runner sheet, continuity cues, and explainable export in one first-party play lane without pretending to be full dense-builder parity.",
+            primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
+            secondaryAction: new TrustPageActionViewModel("View dispatches through the Anarchy lens", "/ledger/dispatches?ruleset=anarchy", "secondary"),
+            cancellationToken);
+        return View("~/Views/PublicLanding/Anarchy.cshtml", model);
+    }
 
     [HttpGet("/downloads/release-upload")]
     [Produces("text/html")]
@@ -1462,6 +1501,64 @@ public sealed class PublicLandingController : Controller
     {
         var model = await BuildBlackLedgerPageModel("/ledger/closeouts", "closeouts", turn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/dispatches")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerDispatchesPage([FromQuery] int? turn, [FromQuery] string? ruleset, CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel("/ledger/dispatches", "dispatches", turn, cancellationToken, selectedRulesetId: ruleset);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/dispatches/{dispatchId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerDispatchDetailPage([FromRoute] string dispatchId, [FromQuery] int? turn, CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel($"/ledger/dispatches/{dispatchId}", "dispatches", turn, cancellationToken, dispatchId);
+        if (model.SelectedDispatch is null)
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/turns/{turn}/dispatches")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerTurnDispatchesPage([FromRoute] int turn, CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel($"/ledger/turns/{turn}/dispatches", "dispatches", turn, cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/dispatches")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerFactionDispatchesPage([FromRoute] string factionId, [FromQuery] int? turn, CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel($"/ledger/factions/{factionId}/dispatches", "dispatches", turn, cancellationToken, selectedFactionId: factionId);
+        if (model.Dispatches.Count == 0)
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/anarchy")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AnarchyLedgerPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildAnarchyPageModel(
+            currentPath: "/ledger/anarchy",
+            currentSection: "ledger",
+            eyebrow: "Anarchy and Black Ledger",
+            heading: "Anarchy consequence lane",
+            intro: "Anarchy belongs here as a dedicated narrative ruleset lane: dispatch-friendly, mobile-first, and bound to the same public-safe World Tick receipts as the rest of Black Ledger.",
+            primaryAction: new TrustPageActionViewModel("Open Black Ledger", "/ledger", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Read Anarchy-compatible dispatches", "/ledger/dispatches?ruleset=anarchy", "secondary"),
+            cancellationToken);
+        return View("~/Views/PublicLanding/Anarchy.cshtml", model);
     }
 
     [HttpGet("/feedback")]
@@ -7611,15 +7708,31 @@ echo "Help: ${HELP_URL}"
         string currentPath,
         string currentSection,
         int? requestedTurn,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? selectedDispatchId = null,
+        string? selectedFactionId = null,
+        string? selectedRulesetId = null)
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var world = _blackLedgerStats.LoadWorldPreview(requestedTurn);
+        var dispatches = _blackLedgerDispatches.ListPublishedDispatches(requestedTurn, selectedFactionId);
+        var selectedDispatch = string.IsNullOrWhiteSpace(selectedDispatchId)
+            ? dispatches.FirstOrDefault()
+            : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase));
         var intro = world?.DeterministicPreview == true
             ? "This deterministic turn-two preview shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
             : "Six starter factions entered the Ledger. AI stewards are holding faction leader, GM, and intel-provider posts until humans take over. Turn 1 already ran, and the first receipt is public-safe.";
+        if (!string.IsNullOrWhiteSpace(selectedFactionId))
+        {
+            intro = $"Receipt-backed faction dispatches for {selectedFactionId}. This lane stays public-safe and never publishes free-floating lore.";
+        }
+        else if (string.Equals(selectedRulesetId, "anarchy", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(selectedRulesetId, AnarchyPreviewService.RulesetId, StringComparison.OrdinalIgnoreCase))
+        {
+            intro = "This Anarchy lens reads the same public-safe Black Ledger dispatch receipts through a rules-light play profile. It does not invent separate unsupported fiction or flatten Anarchy into an SR5/SR6 toggle.";
+        }
 
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
@@ -7635,8 +7748,47 @@ echo "Help: ${HELP_URL}"
             Stats: _blackLedgerStats.ListPublicStats(requestedTurn),
             Modules: _blackLedgerStats.ListModules(),
             Closeouts: _blackLedgerStats.ListCloseouts(),
+            Dispatches: dispatches,
+            SelectedDispatch: selectedDispatch,
             PrimaryAction: new TrustPageActionViewModel("View faction map", "/ledger/factions", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Inspect tick receipt", "/ledger/closeouts", "secondary"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private async Task<AnarchyPageViewModel> BuildAnarchyPageModel(
+        string currentPath,
+        string currentSection,
+        string eyebrow,
+        string heading,
+        string intro,
+        TrustPageActionViewModel primaryAction,
+        TrustPageActionViewModel secondaryAction,
+        CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
+        return new AnarchyPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                "Shadowrun Anarchy",
+                "Rules-light play, Black Ledger consequence, and dispatch-backed mobile continuity.",
+                currentPath,
+                cancellationToken),
+            Eyebrow: eyebrow,
+            Heading: heading,
+            Intro: intro,
+            CurrentSection: currentSection,
+            RulesetId: AnarchyPreviewService.RulesetId,
+            VerdictLabel: "Playable preview",
+            ScopeLabel: "Dedicated ruleset lane",
+            FeaturedProfile: _anarchyPreview.LoadFeaturedProfile(),
+            LedgerStats: _anarchyPreview.BuildLedgerStats(),
+            Dispatches: _anarchyPreview.ListDispatches(),
+            ExplainReceipt: _anarchyPreview.BuildExplainReceipt(),
+            ExportJson: _anarchyPreview.BuildExportJson(),
+            PrimaryAction: primaryAction,
+            SecondaryAction: secondaryAction,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }

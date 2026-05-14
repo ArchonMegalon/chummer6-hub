@@ -268,6 +268,28 @@ public sealed record BlackLedgerStewardshipTransferReceiptViewModel(
     string OperatorId,
     string PublicVisibility);
 
+public sealed record BlackLedgerDispatchViewModel(
+    string DispatchId,
+    string WorldId,
+    int Turn,
+    string Type,
+    string Scope,
+    string SourceReceiptId,
+    string SourceReceiptHref,
+    string Title,
+    string Summary,
+    string Body,
+    IReadOnlyList<string> InvolvedFactions,
+    IReadOnlyList<string> InvolvedDistricts,
+    IReadOnlyList<string> PackagePressureLinks,
+    string PrivacyStatus,
+    string GeneratedBy,
+    string HumanReviewStatus,
+    string CreatedAtUtc,
+    bool PublicSafe,
+    bool AiGenerated,
+    string Href);
+
 public sealed record BlackLedgerWorldPreviewViewModel(
     string WorldId,
     string PublicName,
@@ -304,6 +326,7 @@ public sealed record LandingPageViewModel(
     FlagshipCoverageStripViewModel FlagshipCoverage,
     IReadOnlyList<BlackLedgerPublicStatViewModel> BlackLedgerStats,
     BlackLedgerWorldPreviewViewModel? BlackLedgerWorld = null,
+    BlackLedgerDispatchViewModel? LatestBlackLedgerDispatch = null,
     AccountCampaignSummary? CampaignSpine = null,
     PublicAccessPostureViewModel? AccessPosture = null);
 
@@ -317,6 +340,60 @@ public sealed record BlackLedgerHubPageViewModel(
     IReadOnlyList<BlackLedgerPublicStatViewModel> Stats,
     IReadOnlyList<BlackLedgerModuleViewModel> Modules,
     IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
+    IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
+    BlackLedgerDispatchViewModel? SelectedDispatch,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record AnarchyRunnerProfileViewModel(
+    string RunnerId,
+    string Handle,
+    string Concept,
+    string MetatypeOrIdentityTag,
+    IReadOnlyList<string> ArchetypeTags,
+    IReadOnlyList<string> NarrativeCues,
+    IReadOnlyList<string> Capabilities,
+    IReadOnlyList<string> ShadowAmps,
+    IReadOnlyList<string> GearTags,
+    IReadOnlyList<string> Contacts,
+    IReadOnlyList<string> Complications,
+    IReadOnlyList<string> FactionLinks,
+    string DebtHeat,
+    IReadOnlyList<string> LedgerFlags,
+    string Notes,
+    string RulesetId,
+    string VerdictLabel,
+    string PostureLabel);
+
+public sealed record AnarchyLedgerStatViewModel(
+    string Label,
+    string Value,
+    string Summary);
+
+public sealed record AnarchyExplainReceiptViewModel(
+    string ReceiptId,
+    string SourceReceiptId,
+    string RulesetId,
+    string Status,
+    IReadOnlyList<string> ProvenanceNotes,
+    string CreatedAtUtc);
+
+public sealed record AnarchyPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CurrentSection,
+    string RulesetId,
+    string VerdictLabel,
+    string ScopeLabel,
+    AnarchyRunnerProfileViewModel FeaturedProfile,
+    IReadOnlyList<AnarchyLedgerStatViewModel> LedgerStats,
+    IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
+    AnarchyExplainReceiptViewModel ExplainReceipt,
+    string ExportJson,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
     PublicTrustPulsePanelViewModel? TrustPulse = null,

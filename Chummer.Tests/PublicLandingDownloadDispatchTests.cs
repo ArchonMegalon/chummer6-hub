@@ -622,6 +622,9 @@ public sealed class PublicLandingDownloadDispatchTests
                 NullLogger<HubIdentityClient>.Instance);
             CommunityStore communityStore = new(Configuration, NullLogger<CommunityStore>.Instance);
             Accounts = new AccountService(communityStore);
+            BlackLedgerPublicStatsService blackLedgerStats = new(Configuration);
+            BlackLedgerDispatchService blackLedgerDispatches = new(communityStore, blackLedgerStats, NullLogger<BlackLedgerDispatchService>.Instance);
+            AnarchyPreviewService anarchyPreview = new(blackLedgerDispatches);
             ParticipationOperatorNotificationService participationNotifications = new(
                 new HttpClient(new StaticJsonHandler("""{"target_ref":"delivery-test"}""")),
                 communityStore,
@@ -648,7 +651,9 @@ public sealed class PublicLandingDownloadDispatchTests
                 campaignSpine: null!,
                 workspaceServerPlane: null!,
                 karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
-                blackLedgerStats: new BlackLedgerPublicStatsService(),
+                blackLedgerStats: blackLedgerStats,
+                blackLedgerDispatches: blackLedgerDispatches,
+                anarchyPreview: anarchyPreview,
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: null!,
                 chrome: null!,
