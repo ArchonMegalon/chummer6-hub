@@ -18,4 +18,16 @@ public sealed class ReleaseUploadEntryPointTests
         Assert.Contains("ReleaseUploadAccessPolicy.CanAccess(signedInEmail)", chromeService, StringComparison.Ordinal);
         Assert.DoesNotContain("chrome.Authenticated && !hasBuildAction", layout, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ReleaseUploadRouteStartsWithNavigationCollapsedAndSkipsStoredDesktopNavPreference()
+    {
+        string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
+        string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "site.js"));
+
+        Assert.Contains("var defaultNavOpen = !authSurface && !isBuildCurrent;", layout, StringComparison.Ordinal);
+        Assert.Contains("route-downloads-release-upload", script, StringComparison.Ordinal);
+        Assert.Contains("if (forceDesktopNavCollapsed)", script, StringComparison.Ordinal);
+        Assert.Contains("closeNavPanel();", script, StringComparison.Ordinal);
+    }
 }

@@ -159,6 +159,8 @@
   const navClose = document.querySelector("[data-nav-close]");
   const navBackdrop = document.querySelector("[data-nav-backdrop]");
   const navStorageKey = "chummer.navPanelOpen";
+  const forceDesktopNavCollapsed =
+    document.body.classList.contains("route-downloads-release-upload");
 
   const syncHeader = () => {
     if (!header) return;
@@ -224,6 +226,11 @@
 
     const initializeNavPanel = () => {
       if (isMobileNav()) {
+        closeNavPanel();
+        return;
+      }
+
+      if (forceDesktopNavCollapsed) {
         closeNavPanel();
         return;
       }
