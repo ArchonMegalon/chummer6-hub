@@ -1467,6 +1467,14 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
+    [HttpGet("/ledger/map")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerMapPage([FromQuery] int? turn, [FromQuery] string? mode, CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel("/ledger/map", "map", turn, cancellationToken, selectedMapMode: mode);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
     [HttpGet("/black-ledger")]
     public IActionResult LedgerAliasPage()
         => Redirect("/ledger");
@@ -1484,6 +1492,22 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> LedgerFactionsPage([FromQuery] int? turn, CancellationToken cancellationToken)
     {
         var model = await BuildBlackLedgerPageModel("/ledger/factions", "factions", turn, cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/factions/{factionId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerFactionProfilePage([FromRoute] string factionId, [FromQuery] int? turn, CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel($"/ledger/factions/{factionId}", "factions", turn, cancellationToken, selectedFactionId: factionId);
+        bool knownFaction = model.World?.Factions.Any(faction =>
+            string.Equals(faction.Id, factionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(faction.Id.Replace('_', '-'), factionId, StringComparison.OrdinalIgnoreCase)) == true;
+        if (!knownFaction)
+        {
+            return NotFound();
+        }
+
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
@@ -1521,6 +1545,19 @@ public sealed class PublicLandingController : Controller
             return NotFound();
         }
 
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/turns/{turn}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerTurnPage([FromRoute] string turn, [FromQuery] string? mode, CancellationToken cancellationToken)
+    {
+        if (!int.TryParse(turn, out int requestedTurn) || requestedTurn < 0)
+        {
+            return NotFound();
+        }
+
+        var model = await BuildBlackLedgerPageModel($"/ledger/turns/{requestedTurn}", "map", requestedTurn, cancellationToken, selectedMapMode: mode);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
@@ -7716,7 +7753,8 @@ echo "Help: ${HELP_URL}"
         CancellationToken cancellationToken,
         string? selectedDispatchId = null,
         string? selectedFactionId = null,
-        string? selectedRulesetId = null)
+        string? selectedRulesetId = null,
+        string? selectedMapMode = null)
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
@@ -7726,6 +7764,7 @@ echo "Help: ${HELP_URL}"
         var selectedDispatch = string.IsNullOrWhiteSpace(selectedDispatchId)
             ? dispatches.FirstOrDefault()
             : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase));
+        var commandMap = _blackLedgerStats.LoadCommandMap(requestedTurn, selectedMapMode ?? "influence");
         var intro = world?.DeterministicPreview == true
             ? "This deterministic turn-two preview shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
             : "Six starter factions entered the Ledger. AI stewards are holding faction leader, GM, and intel-provider posts until humans take over. Turn 1 already ran, and the first receipt is public-safe.";
@@ -7755,7 +7794,8 @@ echo "Help: ${HELP_URL}"
             Closeouts: _blackLedgerStats.ListCloseouts(),
             Dispatches: dispatches,
             SelectedDispatch: selectedDispatch,
-            PrimaryAction: new TrustPageActionViewModel("View faction map", "/ledger/factions", "primary"),
+            CommandMap: commandMap,
+            PrimaryAction: new TrustPageActionViewModel("Open command map", "/ledger/map", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Inspect tick receipt", "/ledger/closeouts", "secondary"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
