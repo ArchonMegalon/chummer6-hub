@@ -3178,6 +3178,126 @@ td {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.ledger-command-map {
+  display: grid;
+  gap: 1rem;
+}
+
+.ledger-command-map__toolbar,
+.ledger-command-map__shell {
+  display: grid;
+  gap: 1rem;
+}
+
+.ledger-command-map__toolbar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ledger-command-map__modes,
+.ledger-command-map__replay {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.ledger-command-map__mode-button,
+.ledger-command-map__step {
+  border-radius: 999px;
+  border: 1px solid rgba(125, 188, 255, 0.25);
+  background: rgba(7, 18, 29, 0.82);
+  color: var(--ink-strong);
+  padding: 0.55rem 0.9rem;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.ledger-command-map__mode-button.is-active,
+.ledger-command-map__step.is-current {
+  background: rgba(92, 226, 255, 0.14);
+  border-color: rgba(92, 226, 255, 0.48);
+  color: #f6fbff;
+}
+
+.ledger-command-map__shell {
+  grid-template-columns: minmax(0, 1.25fr) minmax(18rem, 0.75fr);
+  align-items: start;
+}
+
+.ledger-command-map__panel {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  border-radius: 26px;
+  border: 1px solid var(--line-subtle);
+  background:
+    radial-gradient(circle at top right, rgba(92, 226, 255, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(8, 17, 29, 0.94), rgba(12, 20, 30, 0.98));
+  box-shadow: var(--shadow-soft);
+}
+
+.ledger-world-panel__map--teaser {
+  margin-bottom: 0.75rem;
+}
+
+.ledger-command-map__grid line {
+  stroke: rgba(92, 226, 255, 0.13);
+  stroke-width: 2;
+}
+
+.ledger-command-map__district {
+  cursor: pointer;
+}
+
+.ledger-command-map__arcs {
+  opacity: 0.82;
+}
+
+.ledger-command-map__arc {
+  stroke-width: 5;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 10 12;
+  animation: ledger-arc-flow 4s linear infinite;
+}
+
+.ledger-command-map__arc--debt { stroke: rgba(255, 138, 61, 0.72); }
+.ledger-command-map__arc--magic { stroke: rgba(156, 108, 255, 0.72); }
+.ledger-command-map__arc--logistics { stroke: rgba(99, 242, 182, 0.72); }
+.ledger-command-map__arc--intel { stroke: rgba(169, 184, 207, 0.72); }
+.ledger-command-map__arc--conflict { stroke: rgba(255, 93, 115, 0.72); }
+
+.ledger-command-map__event {
+  fill: rgba(92, 226, 255, 0.9);
+  stroke: rgba(246, 251, 255, 0.86);
+  stroke-width: 3;
+  transform-origin: center;
+  animation: ledger-event-pulse 1.8s ease-in-out infinite;
+}
+
+.ledger-command-map__event--debt { fill: rgba(255, 138, 61, 0.92); }
+.ledger-command-map__event--magic { fill: rgba(156, 108, 255, 0.92); }
+.ledger-command-map__event--logistics { fill: rgba(99, 242, 182, 0.92); }
+.ledger-command-map__event--intel { fill: rgba(169, 184, 207, 0.92); }
+.ledger-command-map__event--conflict { fill: rgba(255, 93, 115, 0.92); }
+.ledger-command-map__event.is-new { filter: drop-shadow(0 0 14px rgba(92, 226, 255, 0.45)); }
+
+@keyframes ledger-event-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.88; }
+  50% { transform: scale(1.14); opacity: 1; }
+}
+
+@keyframes ledger-arc-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -44; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ledger-command-map__arc,
+  .ledger-command-map__event {
+    animation: none;
+  }
+}
+
 .ledger-world-panel__legend {
   display: flex;
   flex-wrap: wrap;
@@ -5632,6 +5752,7 @@ body.nav-sheet-open {
   .future-strip__grid,
   .ledger-world-panel,
   .ledger-world-shell,
+  .ledger-command-map__shell,
   .ledger-world-shell__districts,
   .ledger-stats-grid,
   .story-pain-grid,

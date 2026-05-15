@@ -3,6 +3,8 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
+    var commandMap = Model.CommandMap;
+    var featuredEvent = commandMap?.Events.FirstOrDefault();
 }
 
 <section class="trust-page-hero">
@@ -59,20 +61,92 @@
             <p class="editorial-copy">@Model.World.TurnHeadline</p>
             <p class="muted-copy">@Model.World.MapNote</p>
         </div>
-        <div class="ledger-world-shell">
-            <div class="ledger-world-shell__map">
-                <svg viewBox="0 0 1200 760" role="img" aria-label="@Model.World.PublicName map">
-                    @foreach (var district in Model.World.Districts)
+        <div class="ledger-command-map" data-current-mode="@(commandMap?.CurrentMode ?? "influence")">
+            @if (commandMap is not null)
+            {
+                <div class="ledger-command-map__toolbar">
+                    <div class="ledger-command-map__modes" role="tablist" aria-label="Ledger map modes">
+                        @foreach (var mode in commandMap.Modes)
+                        {
+                            <button type="button" class="ledger-command-map__mode-button@(mode.Active ? " is-active" : string.Empty)" data-map-mode="@mode.Id" aria-pressed="@(mode.Active ? "true" : "false")" title="@mode.Summary">@mode.Label</button>
+                        }
+                    </div>
+                    <div class="ledger-command-map__replay" aria-label="Tick replay">
+                        @foreach (var step in commandMap.ReplaySteps)
+                        {
+                            <a class="ledger-command-map__step@(step.Current ? " is-current" : string.Empty)" href="/ledger/turns/@step.Turn">@(step.Label)</a>
+                        }
+                    </div>
+                </div>
+            }
+            <div class="ledger-command-map__shell">
+                <div class="ledger-world-shell__map ledger-command-map__map">
+                    <svg viewBox="0 0 1200 760" role="img" aria-label="@Model.World.PublicName command map">
+                        <g class="ledger-command-map__grid" aria-hidden="true">
+                            <line x1="0" y1="180" x2="1200" y2="180"></line>
+                            <line x1="0" y1="380" x2="1200" y2="380"></line>
+                            <line x1="0" y1="580" x2="1200" y2="580"></line>
+                            <line x1="240" y1="0" x2="240" y2="760"></line>
+                            <line x1="600" y1="0" x2="600" y2="760"></line>
+                            <line x1="920" y1="0" x2="920" y2="760"></line>
+                        </g>
+                        @if (commandMap is not null)
+                        {
+                            <g class="ledger-command-map__arcs" aria-hidden="true">
+                                @foreach (var arc in commandMap.Arcs)
+                                {
+                                    var source = Model.World.Districts.FirstOrDefault(item => item.Id == arc.SourceRegionId);
+                                    var target = Model.World.Districts.FirstOrDefault(item => item.Id == arc.TargetRegionId);
+                                    if (source is not null && target is not null)
+                                    {
+                                        <line class="ledger-command-map__arc ledger-command-map__arc--@arc.ArcType" data-arc-type="@arc.ArcType" x1="@source.CenterX" y1="@source.CenterY" x2="@target.CenterX" y2="@target.CenterY">
+                                            <title>@arc.Summary</title>
+                                        </line>
+                                    }
+                                }
+                            </g>
+                        }
+                        @foreach (var district in Model.World.Districts)
+                        {
+                            <a href="#district-@district.Id" aria-label="@district.Summary" data-region-link="@district.Id">
+                                <polygon class="ledger-world-shell__district ledger-command-map__district" data-region-id="@district.Id" data-dominant-faction="@district.DominantFaction" data-region-heat="@district.Heat" data-region-influence="@district.Influence" data-region-summary="@district.Summary" points="@district.PolygonPoints" tabindex="0">
+                                    <title>@district.Name</title>
+                                    <desc>@district.Summary</desc>
+                                </polygon>
+                            </a>
+                        }
+                        @if (commandMap is not null)
+                        {
+                            <g class="ledger-command-map__events">
+                                @foreach (var item in commandMap.Events)
+                                {
+                                    <a href="#district-@item.RegionId" aria-label="@item.Summary" data-event-link="@item.EventId">
+                                        <circle class="ledger-command-map__event ledger-command-map__event--@item.EventType@(item.NewThisTurn ? " is-new" : string.Empty)" cx="@item.X" cy="@item.Y" r="12" data-event-id="@item.EventId" data-region-id="@item.RegionId" data-event-title="@item.Title" data-event-summary="@item.Summary" data-event-status="@item.Status" data-event-severity="@item.Severity" tabindex="0">
+                                            <title>@item.Title</title>
+                                        </circle>
+                                    </a>
+                                }
+                            </g>
+                        }
+                    </svg>
+                    <p class="muted-copy">@((commandMap?.AccessibilityNote) ?? "Keyboard focus works on each district shape, and every shape mirrors a text summary card below.")</p>
+                </div>
+                <aside class="ledger-command-map__panel" aria-live="polite">
+                    <span class="tag">Faction intel</span>
+                    <h3 class="ledger-command-map__panel-title">@(featuredEvent?.Title ?? Model.World.Districts.First().Name)</h3>
+                    <p class="ledger-command-map__panel-summary">@(featuredEvent?.Summary ?? Model.World.Districts.First().Summary)</p>
+                    <div class="trust-claim__microproof">
+                        <span>Mode: @(commandMap?.CurrentMode ?? "influence")</span>
+                        <span>Receipt: @(featuredEvent?.SourceReceiptId ?? Model.World.LastTick?.ReceiptId)</span>
+                        <span>@((commandMap?.PublicSafetyNote) ?? Model.World.SafetyNote)</span>
+                    </div>
+                    @if (featuredEvent?.DispatchHref is not null)
                     {
-                        <a href="#district-@district.Id" aria-label="@district.Summary">
-                            <polygon class="ledger-world-shell__district" points="@district.PolygonPoints" tabindex="0">
-                                <title>@district.Name</title>
-                                <desc>@district.Summary</desc>
-                            </polygon>
-                        </a>
+                        <a class="inline-link" href="@featuredEvent.DispatchHref">Open linked dispatch</a>
                     }
-                </svg>
-                <p class="muted-copy">Keyboard focus works on each district shape, and every shape mirrors a text summary card below.</p>
+                    <a class="inline-link" href="/ledger/closeouts">Open receipt lane</a>
+                    <p class="muted-copy">@((commandMap?.PerformanceNote) ?? "SVG fallback stays first-party and bounded.")</p>
+                </aside>
             </div>
             <div class="ledger-world-shell__districts">
                 @foreach (var district in Model.World.Districts)
@@ -81,7 +155,7 @@
                         <span class="tag">@district.DominantFaction</span>
                         <h3>@district.Name</h3>
                         <p>@district.Summary</p>
-                        <p class="muted-copy">Influence @district.Influence · Heat @district.Heat</p>
+                        <p class="muted-copy">Influence @district.Influence · Heat @district.Heat · Confidence @district.Confidence · Trend @district.Trend</p>
                     </article>
                 }
             </div>
@@ -294,3 +368,44 @@
         </article>
     }
 </section>
+
+<script>
+(() => {
+  const root = document.querySelector('.ledger-command-map');
+  if (!root) return;
+  const panelTitle = document.querySelector('.ledger-command-map__panel-title');
+  const panelSummary = document.querySelector('.ledger-command-map__panel-summary');
+  const buttons = Array.from(root.querySelectorAll('[data-map-mode]'));
+  const regions = Array.from(root.querySelectorAll('[data-region-id]'));
+  const eventNodes = Array.from(root.querySelectorAll('[data-event-id]'));
+
+  const applyMode = (mode) => {
+    root.dataset.currentMode = mode;
+    buttons.forEach((button) => {
+      const active = button.dataset.mapMode === mode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+  };
+
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => applyMode(button.dataset.mapMode || 'influence'));
+  });
+
+  regions.forEach((region) => {
+    region.addEventListener('focus', () => {
+      if (panelTitle) panelTitle.textContent = region.getAttribute('data-region-id')?.replaceAll('-', ' ') || 'Region';
+      if (panelSummary) panelSummary.textContent = region.getAttribute('data-region-summary') || '';
+    });
+    region.addEventListener('mouseenter', () => region.dispatchEvent(new FocusEvent('focus')));
+  });
+
+  eventNodes.forEach((eventNode) => {
+    eventNode.addEventListener('focus', () => {
+      if (panelTitle) panelTitle.textContent = eventNode.getAttribute('data-event-title') || 'Event';
+      if (panelSummary) panelSummary.textContent = eventNode.getAttribute('data-event-summary') || '';
+    });
+    eventNode.addEventListener('mouseenter', () => eventNode.dispatchEvent(new FocusEvent('focus')));
+  });
+})();
+</script>

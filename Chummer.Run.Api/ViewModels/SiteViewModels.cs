@@ -211,7 +211,13 @@ public sealed record BlackLedgerDistrictViewModel(
     string DominantFaction,
     int Influence,
     int Heat,
-    string Summary);
+    string Summary,
+    int CenterX,
+    int CenterY,
+    int Confidence,
+    int Volatility,
+    string Trend,
+    int DeltaSinceLastTick);
 
 public sealed record BlackLedgerFactionViewModel(
     string Id,
@@ -220,7 +226,59 @@ public sealed record BlackLedgerFactionViewModel(
     string FactionLeader,
     string FieldGm,
     string IntelProvider,
-    IReadOnlyList<string> PublicSignals);
+    IReadOnlyList<string> PublicSignals,
+    string ColorPrimary,
+    string ColorSecondary,
+    string Icon);
+
+public sealed record BlackLedgerMapModeViewModel(
+    string Id,
+    string Label,
+    string Summary,
+    bool Active);
+
+public sealed record BlackLedgerMapEventViewModel(
+    string EventId,
+    string EventType,
+    string RegionId,
+    string Title,
+    string Summary,
+    int Severity,
+    int Confidence,
+    string Status,
+    int X,
+    int Y,
+    bool NewThisTurn,
+    string SourceReceiptId,
+    string SourceReceiptHref,
+    string? DispatchHref);
+
+public sealed record BlackLedgerMapArcViewModel(
+    string ArcId,
+    string SourceRegionId,
+    string TargetRegionId,
+    string ArcType,
+    int Intensity,
+    string Direction,
+    string Summary);
+
+public sealed record BlackLedgerMapReplayStepViewModel(
+    int Turn,
+    string Label,
+    string Summary,
+    bool Current);
+
+public sealed record BlackLedgerCommandMapViewModel(
+    string WorldId,
+    string RenderMode,
+    string CurrentMode,
+    IReadOnlyList<BlackLedgerMapModeViewModel> Modes,
+    IReadOnlyList<BlackLedgerMapEventViewModel> Events,
+    IReadOnlyList<BlackLedgerMapArcViewModel> Arcs,
+    IReadOnlyList<BlackLedgerMapReplayStepViewModel> ReplaySteps,
+    string AccessibilityNote,
+    string PerformanceNote,
+    string PublicSafetyNote);
 
 public sealed record BlackLedgerTickEffectViewModel(
     string Target,
@@ -342,6 +400,7 @@ public sealed record BlackLedgerHubPageViewModel(
     IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
     IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
     BlackLedgerDispatchViewModel? SelectedDispatch,
+    BlackLedgerCommandMapViewModel? CommandMap,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
     PublicTrustPulsePanelViewModel? TrustPulse = null,

@@ -122,6 +122,45 @@ public sealed class LedgerController : ControllerBase
         }
     }
 
+    [HttpGet("worlds/{worldId}/map")]
+    [Produces("application/json")]
+    public ActionResult<BlackLedgerMapApiDocument> GetBlackLedgerWorldMap([FromRoute] string worldId, [FromQuery] int? turn, [FromQuery] string? mode = null)
+    {
+        if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        BlackLedgerMapApiDocument? world = _blackLedgerPublicStats.LoadCommandMapDocument(turn, mode ?? "influence");
+        return world is null ? NotFound() : Ok(world);
+    }
+
+    [HttpGet("worlds/{worldId}/map/turns/{turn:int}")]
+    [Produces("application/json")]
+    public ActionResult<BlackLedgerMapApiDocument> GetBlackLedgerWorldMapTurn([FromRoute] string worldId, [FromRoute] int turn, [FromQuery] string? mode = null)
+    {
+        if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        BlackLedgerMapApiDocument? world = _blackLedgerPublicStats.LoadCommandMapDocument(turn, mode ?? "influence");
+        return world is null ? NotFound() : Ok(world);
+    }
+
+    [HttpGet("worlds/{worldId}/map/tick-delta/{fromTurn:int}/{toTurn:int}")]
+    [Produces("application/json")]
+    public ActionResult<BlackLedgerTickDeltaApiDocument> GetBlackLedgerWorldMapTickDelta([FromRoute] string worldId, [FromRoute] int fromTurn, [FromRoute] int toTurn)
+    {
+        if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        BlackLedgerTickDeltaApiDocument? delta = _blackLedgerPublicStats.LoadTickDelta(fromTurn, toTurn);
+        return delta is null ? NotFound() : Ok(delta);
+    }
+
     [HttpPost("worlds/{worldId}/ticks")]
     [Produces("application/json")]
     public async Task<ActionResult<object>> MaterializeDeterministicBlackLedgerTick([FromRoute] string worldId, [FromQuery] int turn = 2, CancellationToken cancellationToken = default)

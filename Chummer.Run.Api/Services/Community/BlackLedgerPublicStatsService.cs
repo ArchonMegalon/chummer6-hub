@@ -125,23 +125,23 @@ public sealed class BlackLedgerPublicStatsService
         ],
         Districts:
         [
-            new("glass-heights", "Glass Heights", "520,80 760,70 850,210 790,330 560,300 470,190", "glass tower compact", 71, 34, "Glass Heights is led by glass tower compact with influence 71 and heat 34."),
-            new("rust-bazaar", "Rust Bazaar", "390,390 620,340 730,520 650,690 420,650 310,500", "rust market syndicate", 68, 77, "Rust Bazaar is led by rust market syndicate with influence 68 and heat 77."),
-            new("ashline-ward", "Ashline Ward", "820,180 1080,160 1130,340 990,500 800,430 760,300", "ashline circle", 64, 52, "Ashline Ward is led by ashline circle with influence 64 and heat 52."),
-            new("neon-docks", "Neon Docks", "60,260 300,210 390,390 310,500 130,520 40,400", "neon docks union", 73, 49, "Neon Docks is led by neon docks union with influence 73 and heat 49."),
-            new("ghostline-east", "Ghostline East", "850,500 1030,500 1160,620 1100,735 820,700 650,690", "ghostline network", 58, 41, "Ghostline East is led by ghostline network with influence 58 and heat 41."),
-            new("free-ward", "Free Ward", "120,520 310,500 420,650 350,735 90,730 40,630", "barrens free wardens", 61, 69, "Free Ward is led by barrens free wardens with influence 61 and heat 69."),
-            new("transit-spine", "Transit Spine", "300,210 470,190 560,300 620,340 390,390", "contested", 43, 56, "Transit Spine is contested with influence 43 and heat 56."),
-            new("old-signal-loop", "Old Signal Loop", "760,300 800,430 850,500 650,690 730,520 620,340", "contested", 39, 62, "Old Signal Loop is contested with influence 39 and heat 62."),
+            new("glass-heights", "Glass Heights", "520,80 760,70 850,210 790,330 560,300 470,190", "glass tower compact", 71, 34, "Glass Heights is led by glass tower compact with influence 71 and heat 34.", 658, 197, 82, 21, "stable", 0),
+            new("rust-bazaar", "Rust Bazaar", "390,390 620,340 730,520 650,690 420,650 310,500", "rust market syndicate", 68, 77, "Rust Bazaar is led by rust market syndicate with influence 68 and heat 77.", 520, 515, 76, 74, "rising", 8),
+            new("ashline-ward", "Ashline Ward", "820,180 1080,160 1130,340 990,500 800,430 760,300", "ashline circle", 64, 52, "Ashline Ward is led by ashline circle with influence 64 and heat 52.", 930, 318, 69, 57, "rising", 5),
+            new("neon-docks", "Neon Docks", "60,260 300,210 390,390 310,500 130,520 40,400", "neon docks union", 73, 49, "Neon Docks is led by neon docks union with influence 73 and heat 49.", 205, 380, 78, 49, "rising", 4),
+            new("ghostline-east", "Ghostline East", "850,500 1030,500 1160,620 1100,735 820,700 650,690", "ghostline network", 58, 41, "Ghostline East is led by ghostline network with influence 58 and heat 41.", 935, 624, 73, 38, "stable", 6),
+            new("free-ward", "Free Ward", "120,520 310,500 420,650 350,735 90,730 40,630", "barrens free wardens", 61, 69, "Free Ward is led by barrens free wardens with influence 61 and heat 69.", 222, 627, 67, 66, "rising", 3),
+            new("transit-spine", "Transit Spine", "300,210 470,190 560,300 620,340 390,390", "contested", 43, 56, "Transit Spine is contested with influence 43 and heat 56.", 468, 286, 55, 81, "volatile", 2),
+            new("old-signal-loop", "Old Signal Loop", "760,300 800,430 850,500 650,690 730,520 620,340", "contested", 39, 62, "Old Signal Loop is contested with influence 39 and heat 62.", 735, 463, 51, 84, "volatile", 6),
         ],
         Factions:
         [
-            new("glass_tower_compact", "Glass Tower Compact", "corporate-facing brokers", "ai glass director", "ai contract referee", "ai ledger notary", ["license polish 88", "public trust 51", "debt heat 42"]),
-            new("rust_market_syndicate", "Rust Market Syndicate", "gear/debt logistics", "ai rust broker", "ai debt clock", "ai receipt hawk", ["debt heat 99", "favor load 86", "package pressure 83"]),
-            new("ashline_circle", "Ashline Circle", "mystic-adjacent street coalition", "ai ashline seer", "ai drain keeper", "ai ritual scribe", ["drain magnet index 72", "source clarity 48", "mysad density 39"]),
-            new("neon_docks_union", "Neon Docks Union", "riggers and logistics crews", "ai dock boss", "ai route dispatcher", "ai container oracle", ["route control 76", "vehicle package demand 75", "drone herd size 64"]),
-            new("ghostline_network", "Ghostline Network", "intel and matrix rumor verification", "ai ghost handler", "ai signal referee", "ai redaction spider", ["intel volume 82", "false signal suppression 80", "proof trail strength 67"]),
-            new("barrens_free_wardens", "Barrens Free Wardens", "street-level mutual protection", "ai warden marshal", "ai survival clock", "ai closeout witness", ["survival pressure 81", "attrition risk 63", "closeout witnesses 36"]),
+            new("glass_tower_compact", "Glass Tower Compact", "corporate-facing brokers", "ai glass director", "ai contract referee", "ai ledger notary", ["license polish 88", "public trust 51", "debt heat 42"], "#5ce2ff", "#89a7ff", "grid"),
+            new("rust_market_syndicate", "Rust Market Syndicate", "gear/debt logistics", "ai rust broker", "ai debt clock", "ai receipt hawk", ["debt heat 99", "favor load 86", "package pressure 83"], "#ff8a3d", "#ff5d73", "credit-chip-broken"),
+            new("ashline_circle", "Ashline Circle", "mystic-adjacent street coalition", "ai ashline seer", "ai drain keeper", "ai ritual scribe", ["drain magnet index 72", "source clarity 48", "mysad density 39"], "#9c6cff", "#ffb84d", "ritual-eye"),
+            new("neon_docks_union", "Neon Docks Union", "riggers and logistics crews", "ai dock boss", "ai route dispatcher", "ai container oracle", ["route control 76", "vehicle package demand 75", "drone herd size 64"], "#63f2b6", "#5ce2ff", "cargo-node"),
+            new("ghostline_network", "Ghostline Network", "intel and matrix rumor verification", "ai ghost handler", "ai signal referee", "ai redaction spider", ["intel volume 82", "false signal suppression 80", "proof trail strength 67"], "#a9b8cf", "#5ce2ff", "signal-mask"),
+            new("barrens_free_wardens", "Barrens Free Wardens", "street-level mutual protection", "ai warden marshal", "ai survival clock", "ai closeout witness", ["survival pressure 81", "attrition risk 63", "closeout witnesses 36"], "#ffb84d", "#63f2b6", "ward-shield"),
         ],
         StewardshipPosts:
         [
@@ -211,6 +211,133 @@ public sealed class BlackLedgerPublicStatsService
     {
         BlackLedgerWorldSeedDocument? seed = TryLoadSeed();
         return seed is null ? FallbackWorldPreview : BuildWorldPreview(seed, requestedTurn);
+    }
+
+    public BlackLedgerCommandMapViewModel? LoadCommandMap(int? requestedTurn = null, string currentMode = "influence")
+    {
+        BlackLedgerWorldPreviewViewModel? world = LoadWorldPreview(requestedTurn);
+        if (world is null || world.LastTick is null)
+        {
+            return null;
+        }
+
+        string normalizedMode = NormalizeMode(currentMode);
+        var modes = BuildMapModes(normalizedMode);
+        var events = BuildMapEvents(world);
+        var arcs = BuildMapArcs(world);
+        var replaySteps = BuildReplaySteps(world);
+
+        return new BlackLedgerCommandMapViewModel(
+            WorldId: world.WorldId,
+            RenderMode: "svg_tactical",
+            CurrentMode: normalizedMode,
+            Modes: modes,
+            Events: events,
+            Arcs: arcs,
+            ReplaySteps: replaySteps,
+            AccessibilityNote: "Keyboard focus, button-based mode switching, and a region/event list fallback stay available even when motion is reduced.",
+            PerformanceNote: "The homepage teaser stays SVG-first. The full Ledger map adds no provider runtime and keeps the seed payload bounded.",
+            PublicSafetyNote: world.SafetyNote);
+    }
+
+    public BlackLedgerMapApiDocument? LoadCommandMapDocument(int? requestedTurn = null, string currentMode = "influence")
+    {
+        BlackLedgerWorldPreviewViewModel? world = LoadWorldPreview(requestedTurn);
+        BlackLedgerCommandMapViewModel? commandMap = LoadCommandMap(requestedTurn, currentMode);
+        if (world is null || commandMap is null || world.LastTick is null)
+        {
+            return null;
+        }
+
+        return new BlackLedgerMapApiDocument(
+            WorldId: world.WorldId,
+            DisplayName: world.PublicName,
+            CurrentTurn: world.CurrentTurn,
+            Projection: commandMap.RenderMode,
+            CurrentMode: commandMap.CurrentMode,
+            SafetyNote: world.SafetyNote,
+            MapNote: world.MapNote,
+            Regions: world.Districts.Select(static district => new BlackLedgerMapRegionApiDocument(
+                RegionId: district.Id,
+                Name: district.Name,
+                DominantFactionId: NormalizeSlug(district.DominantFaction),
+                Influence: district.Influence,
+                Heat: district.Heat,
+                Confidence: district.Confidence,
+                Volatility: district.Volatility,
+                Trend: district.Trend,
+                DeltaSinceLastTick: district.DeltaSinceLastTick,
+                CenterX: district.CenterX,
+                CenterY: district.CenterY,
+                Summary: district.Summary)).ToArray(),
+            Factions: world.Factions.Select(static faction => new BlackLedgerMapFactionApiDocument(
+                FactionId: faction.Id,
+                Name: faction.PublicName,
+                PublicSummary: string.Join(" · ", faction.PublicSignals),
+                ColorPrimary: faction.ColorPrimary,
+                ColorSecondary: faction.ColorSecondary,
+                Icon: faction.Icon,
+                Type: faction.Type)).ToArray(),
+            Events: commandMap.Events.Select(static item => new BlackLedgerMapEventApiDocument(
+                EventId: item.EventId,
+                EventType: item.EventType,
+                RegionId: item.RegionId,
+                Severity: item.Severity,
+                Confidence: item.Confidence,
+                Status: item.Status,
+                Turn: 1,
+                SourceReceiptId: item.SourceReceiptId,
+                DispatchHref: item.DispatchHref,
+                Title: item.Title,
+                Summary: item.Summary,
+                X: item.X,
+                Y: item.Y,
+                NewThisTurn: item.NewThisTurn)).ToArray(),
+            Arcs: commandMap.Arcs.Select(static item => new BlackLedgerMapArcApiDocument(
+                ArcId: item.ArcId,
+                SourceRegionId: item.SourceRegionId,
+                TargetRegionId: item.TargetRegionId,
+                ArcType: item.ArcType,
+                Intensity: item.Intensity,
+                Direction: item.Direction,
+                Summary: item.Summary)).ToArray(),
+            Modes: commandMap.Modes,
+            ReplaySteps: commandMap.ReplaySteps,
+            LatestTick: world.LastTick);
+    }
+
+    public BlackLedgerTickDeltaApiDocument? LoadTickDelta(int fromTurn, int toTurn)
+    {
+        if (fromTurn < 0 || toTurn < 0 || toTurn < fromTurn)
+        {
+            return null;
+        }
+
+        BlackLedgerWorldPreviewViewModel? world = LoadWorldPreview(toTurn);
+        BlackLedgerCommandMapViewModel? commandMap = LoadCommandMap(toTurn);
+        if (world is null || commandMap is null || world.LastTick is null)
+        {
+            return null;
+        }
+
+        return new BlackLedgerTickDeltaApiDocument(
+            WorldId: world.WorldId,
+            FromTurn: fromTurn,
+            ToTurn: toTurn,
+            Summary: world.LastTick.Summary,
+            RegionDeltas: world.Districts
+                .Where(static district => district.DeltaSinceLastTick != 0)
+                .Select(static district => new BlackLedgerRegionDeltaApiDocument(
+                    RegionId: district.Id,
+                    Name: district.Name,
+                    DeltaSinceLastTick: district.DeltaSinceLastTick,
+                    Trend: district.Trend,
+                    Heat: district.Heat,
+                    Influence: district.Influence))
+                .ToArray(),
+            EventIds: commandMap.Events.Where(static item => item.NewThisTurn).Select(static item => item.EventId).ToArray(),
+            ArcIds: commandMap.Arcs.Select(static item => item.ArcId).ToArray(),
+            DispatchIds: ListDispatches(toTurn).Select(static item => item.DispatchId).ToArray());
     }
 
     public IReadOnlyList<BlackLedgerDispatchViewModel> ListDispatches(int? requestedTurn = null, string? factionId = null)
@@ -678,7 +805,13 @@ public sealed class BlackLedgerPublicStatsService
                 district.DominantFaction.Replace('_', ' '),
                 district.Influence,
                 district.Heat,
-                BuildDistrictSummary(district)))
+                BuildDistrictSummary(district),
+                ComputePolygonCenter(district.Polygon).x,
+                ComputePolygonCenter(district.Polygon).y,
+                ComputeDistrictConfidence(district),
+                ComputeDistrictVolatility(district),
+                ComputeDistrictTrend(district),
+                ComputeDistrictDelta(district)))
             .ToArray();
         var factions = (seed.Factions ?? [])
             .Select(faction => new BlackLedgerFactionViewModel(
@@ -688,7 +821,10 @@ public sealed class BlackLedgerPublicStatsService
                 ResolveAiName(aiNames, faction.ManagementPosts?.FactionLeader),
                 ResolveAiName(aiNames, faction.ManagementPosts?.FieldGm),
                 ResolveAiName(aiNames, faction.ManagementPosts?.IntelProvider),
-                BuildFactionSignals(faction)))
+                BuildFactionSignals(faction),
+                ResolveFactionVisual(faction.Id).primary,
+                ResolveFactionVisual(faction.Id).secondary,
+                ResolveFactionVisual(faction.Id).icon))
             .ToArray();
         BlackLedgerTickReceiptViewModel? lastTick = currentTurn is null || string.IsNullOrWhiteSpace(currentTurn.ReceiptId)
             ? null
@@ -832,6 +968,185 @@ public sealed class BlackLedgerPublicStatsService
 
     private static string BuildDistrictSummary(BlackLedgerDistrictDocument district)
         => $"{district.Name} is led by {district.DominantFaction.Replace('_', ' ')} with influence {district.Influence} and heat {district.Heat}.";
+
+    private static (string primary, string secondary, string icon) ResolveFactionVisual(string factionId)
+        => NormalizeSlug(factionId) switch
+        {
+            "glass-tower-compact" => ("#5ce2ff", "#89a7ff", "grid"),
+            "rust-market-syndicate" => ("#ff8a3d", "#ff5d73", "credit-chip-broken"),
+            "ashline-circle" => ("#9c6cff", "#ffb84d", "ritual-eye"),
+            "neon-docks-union" => ("#63f2b6", "#5ce2ff", "cargo-node"),
+            "ghostline-network" => ("#a9b8cf", "#5ce2ff", "signal-mask"),
+            "barrens-free-wardens" => ("#ffb84d", "#63f2b6", "ward-shield"),
+            _ => ("#5ce2ff", "#a9b8cf", "signal-node"),
+        };
+
+    private static (int x, int y) ComputePolygonCenter(List<List<int>>? polygon)
+    {
+        if (polygon is null || polygon.Count == 0)
+        {
+            return (0, 0);
+        }
+
+        int count = 0;
+        int x = 0;
+        int y = 0;
+        foreach (List<int> point in polygon)
+        {
+            if (point.Count < 2)
+            {
+                continue;
+            }
+
+            x += point[0];
+            y += point[1];
+            count++;
+        }
+
+        return count == 0 ? (0, 0) : (x / count, y / count);
+    }
+
+    private static int ComputeDistrictConfidence(BlackLedgerDistrictDocument district)
+        => Math.Clamp(100 - Math.Abs(district.Heat - district.Influence), 38, 91);
+
+    private static int ComputeDistrictVolatility(BlackLedgerDistrictDocument district)
+        => Math.Clamp(Math.Abs(district.Heat - district.Influence) + 18, 21, 94);
+
+    private static string ComputeDistrictTrend(BlackLedgerDistrictDocument district)
+        => district.Heat >= 70 ? "rising" : district.Influence <= 45 ? "volatile" : "stable";
+
+    private static int ComputeDistrictDelta(BlackLedgerDistrictDocument district)
+        => NormalizeSlug(district.Id) switch
+        {
+            "rust-bazaar" => 8,
+            "ashline-ward" => 5,
+            "neon-docks" => 4,
+            "ghostline-east" => 6,
+            "free-ward" => 3,
+            "transit-spine" => 2,
+            "old-signal-loop" => 6,
+            _ => 0,
+        };
+
+    private static string NormalizeMode(string currentMode)
+        => currentMode.Trim().ToLowerInvariant() switch
+        {
+            "conflict" => "conflict",
+            "intel" => "intel",
+            "economy" => "economy",
+            "magic" => "magic",
+            "matrix" => "matrix",
+            "recent-changes" => "recent-changes",
+            _ => "influence",
+        };
+
+    private static IReadOnlyList<BlackLedgerMapModeViewModel> BuildMapModes(string currentMode)
+        => [
+            new("influence", "Influence", "Faction control, confidence, and contested zones.", currentMode == "influence"),
+            new("conflict", "Conflict", "Heat spikes, suppression, and pressure fronts.", currentMode == "conflict"),
+            new("intel", "Intel", "What the public-safe receipts can actually support.", currentMode == "intel"),
+            new("economy", "Economy", "Debt, logistics, and package pressure lanes.", currentMode == "economy"),
+            new("magic", "Magic", "Awakened pressure and ritual fallout.", currentMode == "magic"),
+            new("matrix", "Matrix", "Signal routing, rumor suppression, and data pressure.", currentMode == "matrix"),
+            new("recent-changes", "Recent changes", "Turn replay and the latest visible delta.", currentMode == "recent-changes"),
+        ];
+
+    private IReadOnlyList<BlackLedgerMapEventViewModel> BuildMapEvents(BlackLedgerWorldPreviewViewModel world)
+    {
+        BlackLedgerTickReceiptViewModel tick = world.LastTick ?? throw new InvalidOperationException("World preview is missing the last tick.");
+        var regionByName = world.Districts.ToDictionary(static item => item.Name, StringComparer.OrdinalIgnoreCase);
+        var dispatches = ListDispatches(world.CurrentTurn).ToDictionary(static item => item.DispatchId, StringComparer.OrdinalIgnoreCase);
+        var events = new List<BlackLedgerMapEventViewModel>();
+
+        foreach (BlackLedgerTickEffectViewModel effect in tick.Effects)
+        {
+            BlackLedgerDistrictViewModel region = ResolveEventRegion(effect, world);
+            string eventType = ResolveEventType(effect);
+            string? dispatchHref = dispatches.Values.FirstOrDefault(dispatch =>
+                dispatch.InvolvedDistricts.Any(district => regionByName.ContainsKey(district) && string.Equals(district, region.Name, StringComparison.OrdinalIgnoreCase))
+                || dispatch.InvolvedFactions.Any(faction => effect.Target.Contains(faction, StringComparison.OrdinalIgnoreCase)))?.Href;
+            events.Add(new BlackLedgerMapEventViewModel(
+                EventId: $"event-{NormalizeSlug(effect.Target)}-{NormalizeSlug(effect.Metric)}",
+                EventType: eventType,
+                RegionId: region.Id,
+                Title: $"{effect.Target} — {effect.Metric}",
+                Summary: effect.PublicReason,
+                Severity: Math.Clamp(Math.Abs(effect.Delta) * 10 + region.Heat / 2, 24, 96),
+                Confidence: region.Confidence,
+                Status: effect.Delta >= 0 ? "active" : "suppressed",
+                X: region.CenterX,
+                Y: region.CenterY,
+                NewThisTurn: true,
+                SourceReceiptId: tick.ReceiptId,
+                SourceReceiptHref: "/ledger/closeouts",
+                DispatchHref: dispatchHref));
+        }
+
+        return events;
+    }
+
+    private static IReadOnlyList<BlackLedgerMapArcViewModel> BuildMapArcs(BlackLedgerWorldPreviewViewModel world)
+    {
+        var arcs = new List<BlackLedgerMapArcViewModel>();
+        void Add(string id, string source, string target, string type, int intensity, string summary)
+            => arcs.Add(new BlackLedgerMapArcViewModel(id, source, target, type, intensity, "forward", summary));
+
+        Add("arc-rust-transit", "rust-bazaar", "transit-spine", "debt", 88, "Rust Bazaar debt heat spills into the contested transit lane.");
+        Add("arc-ashline-signal", "ashline-ward", "old-signal-loop", "magic", 74, "Ashline source clarity disputes bleed into the old signal corridor.");
+        Add("arc-neon-transit", "neon-docks", "transit-spine", "logistics", 67, "Cargo and drone pressure route through the central spine.");
+        Add("arc-ghost-neon", "ghostline-east", "neon-docks", "intel", 63, "Ghostline suppression keeps the dock rumor lane bounded.");
+        Add("arc-free-rust", "free-ward", "rust-bazaar", "conflict", 58, "Street attrition and debt collections share the same pressure edge.");
+
+        return arcs;
+    }
+
+    private static IReadOnlyList<BlackLedgerMapReplayStepViewModel> BuildReplaySteps(BlackLedgerWorldPreviewViewModel world)
+        => [
+            new(0, "Turn 0 seed", "Seed geometry, districts, and bounded starter factions loaded.", world.CurrentTurn == 0),
+            new(1, "Turn 1 receipt", world.LastTick?.Summary ?? "Turn 1 receipt is public-safe and receipt-backed.", world.CurrentTurn == 1),
+            new(2, "Turn 2 preview", "Deterministic preview shows what the next pressure reveal would look like without claiming live truth.", world.DeterministicPreview),
+        ];
+
+    private static BlackLedgerDistrictViewModel ResolveEventRegion(BlackLedgerTickEffectViewModel effect, BlackLedgerWorldPreviewViewModel world)
+    {
+        string target = effect.Target.ToLowerInvariant();
+        return world.Districts.FirstOrDefault(district =>
+                   target.Contains(district.Name.ToLowerInvariant(), StringComparison.Ordinal)
+                   || target.Contains(district.DominantFaction.ToLowerInvariant(), StringComparison.Ordinal))
+               ?? (target.Contains("rust", StringComparison.Ordinal) ? world.Districts.First(d => d.Id == "rust-bazaar")
+                   : target.Contains("ashline", StringComparison.Ordinal) ? world.Districts.First(d => d.Id == "ashline-ward")
+                   : target.Contains("neon", StringComparison.Ordinal) ? world.Districts.First(d => d.Id == "neon-docks")
+                   : target.Contains("ghost", StringComparison.Ordinal) ? world.Districts.First(d => d.Id == "ghostline-east")
+                   : target.Contains("barrens", StringComparison.Ordinal) ? world.Districts.First(d => d.Id == "free-ward")
+                   : world.Districts.First(d => d.Id == "transit-spine"));
+    }
+
+    private static string ResolveEventType(BlackLedgerTickEffectViewModel effect)
+    {
+        string target = effect.Target.ToLowerInvariant();
+        string metric = effect.Metric.ToLowerInvariant();
+        if (target.Contains("ghost", StringComparison.Ordinal) || metric.Contains("signal", StringComparison.Ordinal))
+        {
+            return "intel";
+        }
+
+        if (target.Contains("ashline", StringComparison.Ordinal) || metric.Contains("mysad", StringComparison.Ordinal) || metric.Contains("drain", StringComparison.Ordinal))
+        {
+            return "magic";
+        }
+
+        if (target.Contains("neon", StringComparison.Ordinal) || metric.Contains("vehicle", StringComparison.Ordinal) || metric.Contains("drone", StringComparison.Ordinal))
+        {
+            return "logistics";
+        }
+
+        if (metric.Contains("debt", StringComparison.Ordinal) || metric.Contains("favor", StringComparison.Ordinal))
+        {
+            return "debt";
+        }
+
+        return "conflict";
+    }
 
     private static bool IsWorldPublicSafe(BlackLedgerWorldSeedDocument world)
     {
@@ -1068,3 +1383,85 @@ public sealed class BlackLedgerPublicStatsService
         public string Status { get; set; } = string.Empty;
     }
 }
+
+public sealed record BlackLedgerMapApiDocument(
+    string WorldId,
+    string DisplayName,
+    int CurrentTurn,
+    string Projection,
+    string CurrentMode,
+    string SafetyNote,
+    string MapNote,
+    IReadOnlyList<BlackLedgerMapRegionApiDocument> Regions,
+    IReadOnlyList<BlackLedgerMapFactionApiDocument> Factions,
+    IReadOnlyList<BlackLedgerMapEventApiDocument> Events,
+    IReadOnlyList<BlackLedgerMapArcApiDocument> Arcs,
+    IReadOnlyList<BlackLedgerMapModeViewModel> Modes,
+    IReadOnlyList<BlackLedgerMapReplayStepViewModel> ReplaySteps,
+    BlackLedgerTickReceiptViewModel LatestTick);
+
+public sealed record BlackLedgerMapRegionApiDocument(
+    string RegionId,
+    string Name,
+    string DominantFactionId,
+    int Influence,
+    int Heat,
+    int Confidence,
+    int Volatility,
+    string Trend,
+    int DeltaSinceLastTick,
+    int CenterX,
+    int CenterY,
+    string Summary);
+
+public sealed record BlackLedgerMapFactionApiDocument(
+    string FactionId,
+    string Name,
+    string PublicSummary,
+    string ColorPrimary,
+    string ColorSecondary,
+    string Icon,
+    string Type);
+
+public sealed record BlackLedgerMapEventApiDocument(
+    string EventId,
+    string EventType,
+    string RegionId,
+    int Severity,
+    int Confidence,
+    string Status,
+    int Turn,
+    string SourceReceiptId,
+    string? DispatchHref,
+    string Title,
+    string Summary,
+    int X,
+    int Y,
+    bool NewThisTurn);
+
+public sealed record BlackLedgerMapArcApiDocument(
+    string ArcId,
+    string SourceRegionId,
+    string TargetRegionId,
+    string ArcType,
+    int Intensity,
+    string Direction,
+    string Summary);
+
+public sealed record BlackLedgerRegionDeltaApiDocument(
+    string RegionId,
+    string Name,
+    int DeltaSinceLastTick,
+    string Trend,
+    int Heat,
+    int Influence);
+
+public sealed record BlackLedgerTickDeltaApiDocument(
+    string WorldId,
+    int FromTurn,
+    int ToTurn,
+    string Summary,
+    IReadOnlyList<BlackLedgerRegionDeltaApiDocument> RegionDeltas,
+    IReadOnlyList<string> EventIds,
+    IReadOnlyList<string> ArcIds,
+    IReadOnlyList<string> DispatchIds);

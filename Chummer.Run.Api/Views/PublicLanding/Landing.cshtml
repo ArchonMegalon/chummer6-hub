@@ -275,6 +275,26 @@
         }
     </div>
     <div class="continuity-band__panel">
+        @if (ledgerWorld is not null)
+        {
+            <article class="ledger-world-panel__map ledger-world-panel__map--teaser">
+                <div class="ledger-world-panel__legend">
+                    <span class="tag">Command preview</span>
+                    <span class="muted-copy">Turn @ledgerWorld.CurrentTurn</span>
+                    <a class="inline-link" href="/ledger/map">Open full map</a>
+                </div>
+                <svg viewBox="0 0 1200 760" role="img" aria-label="@ledgerWorld.PublicName command preview">
+                    @foreach (var district in ledgerWorld.Districts.Take(8))
+                    {
+                        <a href="/ledger/map#district-@district.Id" aria-label="@district.Summary">
+                            <polygon class="ledger-world-panel__district" points="@district.PolygonPoints" tabindex="0">
+                                <title>@district.Name</title>
+                            </polygon>
+                        </a>
+                    }
+                </svg>
+            </article>
+        }
         @foreach (var highlight in previewHighlights)
         {
             <article class="continuity-band__fact">
