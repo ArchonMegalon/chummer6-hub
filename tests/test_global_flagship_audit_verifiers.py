@@ -24,6 +24,7 @@ def test_global_audit_verifier_scripts_exist() -> None:
     assert (REPO_ROOT / "scripts" / "public_asset_quality_gate.py").is_file()
     assert (REPO_ROOT / "scripts" / "ledger_stats_privacy_gate.py").is_file()
     assert (REPO_ROOT / "scripts" / "black_ledger_world_tick_e2e.py").is_file()
+    assert (REPO_ROOT / "scripts" / "black_ledger_dispatch_e2e.py").is_file()
     assert (REPO_ROOT / "scripts" / "black_ledger_ai_stewardship_gate.py").is_file()
     assert (REPO_ROOT / "scripts" / "black_ledger_send_tick_news.py").is_file()
     assert (REPO_ROOT / "scripts" / "audit_black_ledger_feature_completion.py").is_file()

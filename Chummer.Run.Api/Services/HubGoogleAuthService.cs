@@ -26,6 +26,7 @@ public sealed record GoogleMergeCandidate(
 public sealed record GoogleAuthCompletionResult(
     IdentitySessionIssueResponse? Session,
     string NextPath,
+    bool AccountCreated = false,
     string? ErrorTitle = null,
     string? ErrorDetail = null,
     GoogleMergeCandidate? MergeCandidate = null);
@@ -382,7 +383,7 @@ public sealed class HubGoogleAuthService
             requestedRoles: new[] { "player" },
             cancellationToken);
 
-        _accounts.EnsureUser(subjectId, claims.DisplayName, claims.Email);
+        HubUserEnsureResult ensuredUser = _accounts.EnsureUserWithStatus(subjectId, claims.DisplayName, claims.Email);
         _links.LinkExternalIdentity(new LinkExternalIdentityRequest(
             SubjectId: subjectId,
             Provider: "google",
@@ -392,7 +393,8 @@ public sealed class HubGoogleAuthService
 
         return new GoogleAuthCompletionResult(
             Session: session,
-            NextPath: HubBrowserAuthService.SanitizeNextPath(nextPath));
+            NextPath: HubBrowserAuthService.SanitizeNextPath(nextPath),
+            AccountCreated: ensuredUser.Created);
     }
 
     private async Task<GoogleIdentityClaims> ExchangeForClaimsAsync(

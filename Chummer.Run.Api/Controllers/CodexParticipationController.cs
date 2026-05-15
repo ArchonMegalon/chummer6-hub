@@ -21,6 +21,7 @@ public sealed class CodexParticipationController : Controller
     private readonly BoostSessionService _sessions;
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
+    private readonly ParticipationOperatorNotificationService _participationNotifications;
     private readonly HubPageChromeService _chrome;
     private readonly IConfiguration _configuration;
     private readonly ILogger<CodexParticipationController> _logger;
@@ -32,6 +33,7 @@ public sealed class CodexParticipationController : Controller
         BoostSessionService sessions,
         IdentityLinkService links,
         UserExperienceService experience,
+        ParticipationOperatorNotificationService participationNotifications,
         HubPageChromeService chrome,
         IConfiguration configuration,
         ILogger<CodexParticipationController> logger)
@@ -42,6 +44,7 @@ public sealed class CodexParticipationController : Controller
         _sessions = sessions;
         _links = links;
         _experience = experience;
+        _participationNotifications = participationNotifications;
         _chrome = chrome;
         _configuration = configuration;
         _logger = logger;
@@ -138,6 +141,14 @@ public sealed class CodexParticipationController : Controller
                     TierSource: null),
                 cancellationToken);
             session = started.Session;
+            string authProviderFamily = ParticipationOperatorNotificationService.InferAuthProviderFamily(_links.GetSummary(subject.SubjectId));
+            await _participationNotifications.NotifyFirstActionIfNeededAsync(
+                _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email),
+                subject.Email,
+                intentKind: "guided_contribution",
+                entryRoute: "/participate/codex",
+                authProviderFamily,
+                cancellationToken);
             return Ok(BuildContributionEnvelope(
                 started.Session,
                 started.Fleet,

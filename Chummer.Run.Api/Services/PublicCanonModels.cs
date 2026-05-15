@@ -31,6 +31,7 @@ internal sealed class PublicLandingManifestDocument
     public List<PublicLandingActionDocument>? HeroCtas { get; init; }
     public List<string>? SecondaryHighlights { get; init; }
     public List<PublicLandingActionDocument>? GuestShellActions { get; init; }
+    public string? AccountAwareInstallCtaLabel { get; init; }
     public string? ProductProofEyebrow { get; init; }
     public string? ProductProofIntro { get; init; }
     public string? ProductProofPrimaryLabel { get; init; }
@@ -264,6 +265,8 @@ internal sealed class PublicReleaseExperienceDocument
     public string? FlagshipClaimSummary { get; init; }
     public string? FlagshipGradeSummary { get; init; }
     public string? FlagshipAcceptanceSource { get; init; }
+    public string? KnownIssueLanguageSource { get; init; }
+    public string? ResponsivenessBudgetsSource { get; init; }
     public string? DesktopFlagshipHead { get; init; }
     public string? DesktopFallbackHead { get; init; }
     public string? DesktopCutSummary { get; init; }

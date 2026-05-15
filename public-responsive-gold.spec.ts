@@ -1,30 +1,43 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { test, expect } from 'playwright/test';
+import { expect, test } from 'playwright/test';
+import { completionPath, writeMarkdownArtifact } from './tests/public/ux-artifacts';
 
-const repoRoot = process.cwd();
-const landingViewPath = path.join(repoRoot, 'Chummer.Run.Api', 'Views', 'PublicLanding', 'Landing.cshtml');
-const mobileViewPath = path.join(repoRoot, 'Chummer.Run.Api', 'Views', 'PublicLanding', 'MobileProjection.cshtml');
-const packagesViewPath = path.join(repoRoot, 'Chummer.Run.Api', 'Views', 'PublicLanding', 'Packages.cshtml');
+const baseUrl = 'https://chummer.run';
+const viewports = [
+  { width: 390, height: 844 },
+  { width: 412, height: 915 },
+  { width: 768, height: 1024 },
+  { width: 1366, height: 768 },
+  { width: 1440, height: 900 },
+  { width: 1920, height: 1080 },
+];
 
-test('public mobile-facing surfaces keep route-owned sections that can collapse responsively', async () => {
-  const landing = readFileSync(landingViewPath, 'utf8');
-  const mobile = readFileSync(mobileViewPath, 'utf8');
-  const packages = readFileSync(packagesViewPath, 'utf8');
+test('public homepage stays readable across flagship responsive viewports', async ({ browser }) => {
+  test.setTimeout(180000);
+  const reportLines = [
+    '# Screenshot QA Report',
+    '',
+    `- Generated: ${new Date().toISOString()}`,
+    '',
+  ];
 
-  expect(landing).toContain('launch-hero__shell');
-  expect(landing).toContain('data-homepage-section="hero"');
-  expect(landing).toContain('data-homepage-section="choose-your-path"');
-  expect(landing).toContain('data-homepage-section="what-works-today"');
-  expect(landing).toContain('data-homepage-section="preview"');
-  expect(landing).toContain('data-homepage-section="account-value"');
-  expect(landing).toContain('data-homepage-section="trust-footer"');
-  expect((landing.match(/data-homepage-section=/g) ?? []).length).toBe(6);
+  for (const viewport of viewports) {
+    const page = await browser.newPage({ baseURL: baseUrl, viewport });
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await expect(page.locator('.launch-hero__title')).toContainText('Build the runner. Run the table. Keep the ledger honest.');
+    await expect(page.locator('[data-homepage-section="preview"]')).toContainText('Black Ledger');
+    await expect(page.locator('[data-homepage-section="preview"]')).toContainText('Karma Forge');
 
-  expect(mobile).toContain('continuity-band');
-  expect(mobile).toContain('route-choice-grid');
-  expect(mobile).toContain('compact-rail');
+    const overflow = await page.evaluate(() => {
+      const root = document.documentElement;
+      return root.scrollWidth - root.clientWidth;
+    });
+    expect(overflow, `${viewport.width}x${viewport.height} has horizontal overflow`).toBeLessThanOrEqual(1);
 
-  expect(packages).toContain('route-choice-grid');
-  expect(packages).toContain('compact-rail');
+    const screenshotName = `homepage-${viewport.width}x${viewport.height}.png`;
+    await page.screenshot({ path: completionPath(screenshotName), fullPage: true });
+    reportLines.push(`- ${viewport.width}x${viewport.height}: pass`);
+    await page.close();
+  }
+
+  writeMarkdownArtifact('SCREENSHOT_QA_REPORT.md', reportLines.join('\n'));
 });

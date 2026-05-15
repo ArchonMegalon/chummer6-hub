@@ -106,6 +106,15 @@ public sealed class KarmaForgeDiscoveryService
         new KarmaForgeOptionDefinition("Other", "Other", "Use when the current role does not fit cleanly.")
     ];
 
+    private static readonly KarmaForgeOptionDefinition[] EditionOptions =
+    [
+        new KarmaForgeOptionDefinition("SR6", "SR6", "Current Sixth World table flow."),
+        new KarmaForgeOptionDefinition("SR5", "SR5", "Fifth Edition and Chummer5A migration cases."),
+        new KarmaForgeOptionDefinition("SR4A", "SR4A", "Fourth Edition Anniversary migration and legacy cases."),
+        new KarmaForgeOptionDefinition("Anarchy", "Anarchy", "Narrative/Anarchy adjacency and crossover pressure."),
+        new KarmaForgeOptionDefinition("Other", "Other / mixed", "Mixed tables, conversions, or non-standard forks.")
+    ];
+
     private static readonly KarmaForgeOptionDefinition[] TableTypeOptions =
     [
         new KarmaForgeOptionDefinition("home_campaign", "Home campaign", "One table or one ongoing campaign."),
@@ -165,7 +174,7 @@ public sealed class KarmaForgeDiscoveryService
         _configuration = configuration;
     }
 
-    public string CanonicalLane => "FacePop -> Deftform -> Icanpreneur";
+    public string CanonicalLane => "Public invitation -> structured pre-screen -> guided synthesis";
 
     public string EntryLane => "Guided synthesis interview";
 
@@ -181,6 +190,9 @@ public sealed class KarmaForgeDiscoveryService
 
     public IReadOnlyList<KarmaForgeOptionDefinition> ListRoleOptions()
         => RoleOptions;
+
+    public IReadOnlyList<KarmaForgeOptionDefinition> ListEditionOptions()
+        => EditionOptions;
 
     public IReadOnlyList<KarmaForgeOptionDefinition> ListTableTypeOptions()
         => TableTypeOptions;

@@ -49,7 +49,7 @@ public sealed class PublicSignalOperationsService
     private const string DefaultFromName = "Wageslave";
     private const string DefaultReplyTo = "support@chummer.run";
     private const string ExpectedProjectionOwner = "chummer6-hub";
-    private const string DefaultFollowSettingsPath = "/account/settings";
+    private const string DefaultFollowSettingsPath = "/account/participation";
     private const string DefaultProjectionSourceRef = "hub_follow_horizons:verified_email";
     private const string DefaultConsentSourceRef = "hub_preferences:follow_horizons";
     private const string DefaultGovernorDecisionSourceRef = "product_governor";
@@ -172,7 +172,7 @@ public sealed class PublicSignalOperationsService
         return new PublicSignalOperationsPacketViewModel(
             Eyebrow: "Hosted promotion seam",
             Heading: "Promotion, webhook intake, and category routing stay explicit before the hosted board becomes default.",
-            Summary: "The Fixer Board remains first-party until the hosted public-board domain split, webhook receipts, and closeout follow-up path are configured on this instance. Taxonomy still comes from Chummer-owned canon either way.",
+            Summary: "The public signal lane remains first-party until the hosted board split, receipt intake, and closeout follow-up path are configured on this instance. Taxonomy still comes from Chummer-owned canon either way.",
             HostedDomainLabel: hostedDomainLabel,
             HostedProjectionSummary: hostedProjectionSummary,
             HostedProjectionReady: hostedProjectionReady,
@@ -540,7 +540,7 @@ public sealed class PublicSignalOperationsService
                 Scope: normalizedScope,
                 ScopeLabel: ResolveLookupScopeLabel(normalizedScope),
                 QueryProvided: queryProvided,
-                Eyebrow: "Bounded operator lookup",
+                Eyebrow: "Bounded activity lookup",
                 Heading: queryProvided ? "Search bounded receipt and thread drilldowns" : "Recent bounded receipt and thread drilldowns",
                 Summary: BuildLookupSummary(normalizedQuery, normalizedScope, queryProvided, ordered.Length),
                 ResultCount: ordered.Length,
@@ -999,169 +999,66 @@ public sealed class PublicSignalOperationsService
     public string LoadArtifactJson()
     {
         var packet = BuildPacket();
-        var artifact = new
+        JsonObject artifact = new()
         {
-            contractName = "chummer.public_signal_operations",
-            generatedAtUtc = DateTimeOffset.UtcNow,
-            hostedProjectionReady = packet.HostedProjectionReady,
-            hostedDomainLabel = packet.HostedDomainLabel,
-            hostedProjectionSummary = packet.HostedProjectionSummary,
-            webhookStatusLabel = packet.WebhookStatusLabel,
-            webhookSummary = packet.WebhookSummary,
-            webhookSecretHeader = WebhookSecretHeaderName,
-            webhookRoutes = PublicWebhookRoutes,
-            operationsSecretHeader = OperationsSecretHeaderName,
-            reconcileRoutes = PublicReconcileRoutes,
-            recoveryRoutes = PublicRecoveryRoutes,
-            deliveryOutcomeRoutes = PublicDeliveryOutcomeRoutes,
-            emailitDeliveryOutcomeSecretHeader = EmailitWebhookSecretHeaderName,
-            emailitDeliveryOutcomeRoutes = PublicEmailitDeliveryOutcomeRoutes,
-            eaDeliveryOutcomeSecretHeader = EaDeliveryWebhookSecretHeaderName,
-            eaDeliveryOutcomeRoutes = PublicEaDeliveryOutcomeRoutes,
-            voterCloseoutStatusLabel = packet.VoterCloseoutStatusLabel,
-            voterCloseoutSummary = packet.VoterCloseoutSummary,
-            recipientProjectionOwner = packet.RecipientProjectionOwner,
-            followSettingsPath = packet.FollowSettingsPath,
-            recipientProjectionStatusLabel = packet.RecipientProjectionStatusLabel,
-            recipientProjectionSummary = packet.RecipientProjectionSummary,
-            projectionSourceRef = packet.ProjectionSourceRef,
-            projectedRecipientCount = packet.ProjectedRecipientCount,
-            consentStatusLabel = packet.ConsentStatusLabel,
-            consentSummary = packet.ConsentSummary,
-            consentSourceRef = packet.ConsentSourceRef,
-            queueStatusLabel = packet.QueueStatusLabel,
-            queueSummary = packet.QueueSummary,
-            governorStatusLabel = packet.GovernorStatusLabel,
-            governorSummary = packet.GovernorSummary,
-            governorDecisionRef = packet.GovernorDecisionRef,
-            releaseProofStatusLabel = packet.ReleaseProofStatusLabel,
-            releaseProofSummary = packet.ReleaseProofSummary,
-            releaseProofRoute = packet.ReleaseProofRoute,
-            releaseProofReceiptId = packet.ReleaseProofReceiptId,
-            receiptCount = packet.ReceiptCount,
-            closeoutReceiptCount = packet.CloseoutReceiptCount,
-            lastReceiptAtUtc = packet.LastReceiptAtUtc,
-            routingReceiptCount = packet.RoutingReceiptCount,
-            moderationReceiptCount = packet.ModerationReceiptCount,
-            closeoutDeliveryReceiptCount = packet.CloseoutDeliveryReceiptCount,
-            closeoutDeliveryCandidateCount = packet.CloseoutDeliveryCandidateCount,
-            closeoutQueueReceiptCount = packet.CloseoutQueueReceiptCount,
-            closeoutQueueReadyCount = packet.CloseoutQueueReadyCount,
-            closeoutDispatchReceiptCount = packet.CloseoutDispatchReceiptCount,
-            closeoutDispatchSentCount = packet.CloseoutDispatchSentCount,
-            journeyReceiptCount = packet.JourneyReceiptCount,
-            deliveryOutcomeReceiptCount = packet.DeliveryOutcomeReceiptCount,
-            automaticRetryPendingCount = packet.AutomaticRetryPendingCount,
-            lastDeliveryOutcomeAtUtc = packet.LastDeliveryOutcomeAtUtc,
-            replayCandidateCount = packet.ReplayCandidateCount,
-            reconcileRunCount = packet.ReconcileRunCount,
-            lastReconcileAtUtc = packet.LastReconcileAtUtc,
-            deliveryRecoveryCandidateCount = packet.DeliveryRecoveryCandidateCount,
-            suppressedDispatchCount = packet.SuppressedDispatchCount,
-            deliveryRecoveryRunCount = packet.DeliveryRecoveryRunCount,
-            lastDeliveryRecoveryAtUtc = packet.LastDeliveryRecoveryAtUtc,
-            retryExpiryCandidateCount = packet.RetryExpiryCandidateCount,
-            retryExpiryRunCount = packet.RetryExpiryRunCount,
-            lastRetryExpiryAtUtc = packet.LastRetryExpiryAtUtc,
-            categoryCount = packet.CategoryCount,
-            misrouteLikelyCount = packet.MisrouteLikelyCount,
-            privacySensitiveCount = packet.PrivacySensitiveCount,
-            sourceDocuments = new[]
+            ["contractName"] = "chummer.public_signal_operations",
+            ["generatedAtUtc"] = DateTimeOffset.UtcNow,
+            ["eyebrow"] = SanitizePublicArtifactText(packet.Eyebrow),
+            ["heading"] = SanitizePublicArtifactText(packet.Heading),
+            ["summary"] = SanitizePublicArtifactText(packet.Summary),
+            ["hostedDomainLabel"] = packet.HostedDomainLabel,
+            ["hostedProjectionReady"] = packet.HostedProjectionReady,
+            ["hostedProjectionSummary"] = SanitizePublicArtifactText(packet.HostedProjectionSummary),
+            ["intakeStatusLabel"] = SanitizePublicArtifactText(packet.WebhookStatusLabel),
+            ["intakeSummary"] = SanitizePublicArtifactText(packet.WebhookSummary),
+            ["closeoutStatusLabel"] = SanitizePublicArtifactText(packet.VoterCloseoutStatusLabel),
+            ["closeoutSummary"] = SanitizePublicArtifactText(packet.VoterCloseoutSummary),
+            ["followSettingsPath"] = packet.FollowSettingsPath,
+            ["recipientProjectionStatusLabel"] = SanitizePublicArtifactText(packet.RecipientProjectionStatusLabel),
+            ["recipientProjectionSummary"] = SanitizePublicArtifactText(packet.RecipientProjectionSummary),
+            ["consentStatusLabel"] = SanitizePublicArtifactText(packet.ConsentStatusLabel),
+            ["consentSummary"] = SanitizePublicArtifactText(packet.ConsentSummary),
+            ["queueStatusLabel"] = SanitizePublicArtifactText(packet.QueueStatusLabel),
+            ["queueSummary"] = SanitizePublicArtifactText(packet.QueueSummary),
+            ["decisionStatusLabel"] = SanitizePublicArtifactText(packet.GovernorStatusLabel),
+            ["decisionSummary"] = SanitizePublicArtifactText(packet.GovernorSummary),
+            ["releaseProofStatusLabel"] = SanitizePublicArtifactText(packet.ReleaseProofStatusLabel),
+            ["releaseProofSummary"] = SanitizePublicArtifactText(packet.ReleaseProofSummary),
+            ["releaseProofRoute"] = packet.ReleaseProofRoute,
+            ["releaseProofReceiptId"] = packet.ReleaseProofReceiptId,
+            ["counts"] = new JsonObject
             {
-                TaxonomyRelativePath,
-                OutboundRegistryRelativePath
-            },
-            hostedRoutes = packet.HostedRoutes.Select(route => new
-            {
-                route.Label,
-                route.PublicPath,
-                route.HostedHref,
-                route.StatusLabel,
-                route.Summary
-            }),
-            deliveryOutcomeIngresses = packet.DeliveryOutcomeIngresses.Select(ingress => new
-            {
-                ingress.Label,
-                ingress.ProviderKey,
-                ingress.StatusLabel,
-                ingress.Summary,
-                ingress.SecretHeader,
-                ingress.Routes
-            }),
-            categories = packet.Categories.Select(category => new
-            {
-                category.Label,
-                category.OwnerRepo,
-                category.FollowUpLane,
-                category.Summary,
-                    category.SupportMisrouteLikely,
-                    category.PrivacySensitive
-                }),
-            recentReceipts = LoadRecentReceiptArtifactRows(),
-            recentRoutingReceipts = LoadRecentRoutingReceiptArtifactRows(),
-            recentCloseoutReceipts = LoadRecentCloseoutReceiptArtifactRows(),
-            recentQueueReceipts = packet.RecentQueueReceipts.Select(receipt => new
-            {
-                receipt.ReceiptId,
-                receipt.SourceReceiptId,
-                receipt.StatusLabel,
-                receipt.QueueState,
-                receipt.QueueLane,
-                receipt.DispatchTool,
-                receipt.DispatchAction,
-                receipt.JourneyEventKey,
-                receipt.GovernorDecisionRef,
-                receipt.ReleaseProofRoute,
-                receipt.ReleaseProofReceiptId,
-                receipt.QueueReason,
-                receipt.Summary,
-                receipt.ReadyForOutbox,
-                receipt.PublicClaimAllowed,
-                receipt.SourceHotFilterKey,
-                receipt.SourceHotFilterLabel,
-                receipt.SourceHotFilterCount,
-                receipt.SourceHotFilterSummary,
-                receipt.RecordedAtUtc
-            }),
-            recentDispatchReceipts = LoadRecentDispatchReceiptArtifactRows(),
-            recentJourneyReceipts = LoadRecentJourneyReceiptArtifactRows(),
-            recentDeliveryOutcomes = LoadRecentDeliveryOutcomeArtifactRows(),
-            recentRecipientThreads = packet.RecentRecipientThreads.Select(thread => new
-            {
-                thread.RecipientRef,
-                thread.AddressHash,
-                thread.SourceReceiptId,
-                thread.SourceLabel,
-                thread.CurrentStageLabel,
-                thread.Summary,
-                thread.QueueReceiptId,
-                thread.QueueState,
-                thread.QueueStatusLabel,
-                thread.QueueRecordedAtUtc,
-                thread.DispatchReceiptId,
-                thread.DispatchState,
-                thread.DispatchStatusLabel,
-                thread.DispatchRequestedAtUtc,
-                thread.OutcomeReceiptId,
-                thread.OutcomeStatusLabel,
-                thread.OutcomeProvider,
-                thread.OutcomeProviderState,
-                thread.OutcomeIdentityMatchMode,
-                thread.OutcomeRecordedAtUtc,
-                thread.JourneyReceiptId,
-                thread.JourneyStatusLabel,
-                thread.JourneyEventKey,
-                thread.JourneyRecordedAtUtc,
-                thread.LastTouchedAtUtc,
-                thread.PublicClaimAllowed
-            }),
-            recentReconcileRuns = LoadRecentOperationsRunArtifactRows("replay"),
-            recentRecoveryRuns = LoadRecentOperationsRunArtifactRows("dispatch_recovery"),
-            recentRetryExpiryRuns = LoadRecentOperationsRunArtifactRows("retry_expiry"),
-            rules = packet.Rules
+                ["categoryCount"] = packet.CategoryCount,
+                ["receiptCount"] = packet.ReceiptCount,
+                ["routingReceiptCount"] = packet.RoutingReceiptCount,
+                ["closeoutReceiptCount"] = packet.CloseoutReceiptCount,
+                ["journeyReceiptCount"] = packet.JourneyReceiptCount,
+                ["deliveryOutcomeReceiptCount"] = packet.DeliveryOutcomeReceiptCount,
+                ["projectedRecipientCount"] = packet.ProjectedRecipientCount,
+                ["replayCandidateCount"] = packet.ReplayCandidateCount,
+                ["reconcileRunCount"] = packet.ReconcileRunCount,
+                ["deliveryRecoveryCandidateCount"] = packet.DeliveryRecoveryCandidateCount,
+                ["retryExpiryCandidateCount"] = packet.RetryExpiryCandidateCount
+            }
         };
+        return artifact.ToJsonString(JsonOptions);
+    }
 
-        return JsonSerializer.Serialize(artifact, JsonOptions);
+    private static string SanitizePublicArtifactText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("Webhook", "Intake", StringComparison.OrdinalIgnoreCase)
+            .Replace("Product Governor", "governed product decision", StringComparison.OrdinalIgnoreCase)
+            .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
+            .Replace("Emailit", "delivery adapter", StringComparison.OrdinalIgnoreCase)
+            .Replace("operator", "review", StringComparison.OrdinalIgnoreCase)
+            .Replace("provider", "delivery", StringComparison.OrdinalIgnoreCase)
+            .Replace("callback", "outcome update", StringComparison.OrdinalIgnoreCase);
     }
 
     public static string WebhookSecretHeader => WebhookSecretHeaderName;
@@ -1259,12 +1156,12 @@ public sealed class PublicSignalOperationsService
         if (!governorReady)
         {
             governorStatusLabel = "Governor approval pending";
-            governorSummary = $"Hub still needs a bounded {DefaultGovernorDecisionSourceRef.Replace('_', ' ')} decision ref before any shipped public item can materialize a first-party outbox candidate.";
+            governorSummary = "Hub still needs a bounded governed product decision ref before any shipped public item can materialize a first-party outbox candidate.";
         }
         else
         {
             governorStatusLabel = "Governor approval configured";
-            governorSummary = $"Public closeout may cite first-party governor decision {governorDecisionRef} before any outbound send is claimed.";
+            governorSummary = $"Public closeout may cite first-party governed product decision {governorDecisionRef} before any outbound send is claimed.";
         }
 
         string releaseProofStatusLabel;
@@ -1983,7 +1880,7 @@ public sealed class PublicSignalOperationsService
     {
         string itemReference = NormalizeOptional(sourceReceipt.ItemReference) ?? sourceReceipt.ReceiptId;
         string categoryLabel = NormalizeOptional(sourceReceipt.CategoryLabel) ?? "Uncategorized";
-        return $"{categoryLabel} signal {itemReference} currently spans {threadCount} bounded recipient thread{(threadCount == 1 ? string.Empty : "s")}, {outcomeCount} provider callback{(outcomeCount == 1 ? string.Empty : "s")}, and {journeyCount} journey receipt{(journeyCount == 1 ? string.Empty : "s")}.";
+        return $"{categoryLabel} signal {itemReference} currently spans {threadCount} bounded recipient thread{(threadCount == 1 ? string.Empty : "s")}, {outcomeCount} delivery update{(outcomeCount == 1 ? string.Empty : "s")}, and {journeyCount} journey receipt{(journeyCount == 1 ? string.Empty : "s")}.";
     }
 
     private static string BuildRecipientThreadDetailSummary(
@@ -1991,7 +1888,7 @@ public sealed class PublicSignalOperationsService
         int outcomeCount,
         int journeyCount)
     {
-        return $"{thread.SourceLabel} currently resolves through {thread.DispatchStatusLabel.ToLowerInvariant()} for {thread.RecipientRef}, with {outcomeCount} provider callback{(outcomeCount == 1 ? string.Empty : "s")} and {journeyCount} journey receipt{(journeyCount == 1 ? string.Empty : "s")} on the bounded closeout timeline.";
+        return $"{thread.SourceLabel} currently resolves through {thread.DispatchStatusLabel.ToLowerInvariant()} for {thread.RecipientRef}, with {outcomeCount} delivery update{(outcomeCount == 1 ? string.Empty : "s")} and {journeyCount} journey receipt{(journeyCount == 1 ? string.Empty : "s")} on the bounded closeout timeline.";
     }
 
     private static string NormalizeDetailFilter(string? filter)
@@ -2023,7 +1920,7 @@ public sealed class PublicSignalOperationsService
             "sent" => "Focus on recipient threads that already reached a first-party sent state.",
             "retrying" => "Focus on retry holds and recovery candidates still waiting for another bounded delivery attempt.",
             "suppressed" => "Focus on recipients held back by suppression, bounce, or explicit no-send posture.",
-            "callback_pending" => "Focus on outbound attempts that still do not have a bounded provider callback receipt.",
+            "callback_pending" => "Focus on outbound attempts that still do not have a bounded delivery update receipt.",
             _ => "Reopen the full bounded recipient list for this source receipt."
         };
 
@@ -2351,11 +2248,11 @@ public sealed class PublicSignalOperationsService
         };
         if (!queryProvided)
         {
-            return $"Showing the most recent {subject}{(resultCount == 1 ? string.Empty : "s")} so operators can jump into one bounded source or closeout timeline without scanning the full feedback ops rail.";
+            return $"Showing the most recent {subject}{(resultCount == 1 ? string.Empty : "s")} so people can jump into one bounded source or follow-up timeline without scanning the full feedback rail.";
         }
 
         return resultCount == 0
-            ? $"No {subject} matched '{query}'. Try a source receipt id, dispatch receipt id, recipient ref, delivery id, provider message id, or item reference."
+            ? $"No {subject} matched '{query}'. Try a source receipt id, dispatch receipt id, recipient ref, delivery id, delivery message id, or item reference."
             : $"Found {resultCount} matching {subject}{(resultCount == 1 ? string.Empty : "s")} for '{query}'.";
     }
 
@@ -2377,6 +2274,7 @@ public sealed class PublicSignalOperationsService
             HotFilterLabel: hotFilter.FilterLabel,
             HotFilterCount: hotFilter.Count,
             HotFilterSummary: hotFilter.Summary,
+            PayloadSha256: receipt.PayloadSha256,
             ReceivedAtUtc: receipt.ReceivedAtUtc,
             ProviderOccurredAtUtc: receipt.ProviderOccurredAtUtc);
     }
@@ -5476,7 +5374,7 @@ public sealed class PublicSignalOperationsService
         string normalized = NormalizeToken(providerState);
         if (!matchedDispatch)
         {
-            return "Unmatched provider callback";
+            return "Unmatched delivery update";
         }
 
         if (IsProviderSentState(normalized))

@@ -531,8 +531,8 @@ else
                                         <p class="eyebrow">Work</p>
                                         <h2 class="home-stream__title">Pick up where you actually left off</h2>
                                         @* Campaign workspace. GM readiness cues. *@
-                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here with shared return context, rules context, and GM cues so the signed-in home view points to the next safe page without turning Home into a deeper work page.</p>
-                                        <p class="muted-copy">Campaign workspace return, rules answers, rules context, and GM cues stay visible here before you open the deeper account work page.</p>
+                                        <p class="home-stream__summary">Dossiers, runs, and current continuity stay visible here with shared return context, Rule environments, and GM readiness cues so the signed-in home view points to the next safe page without turning Home into a deeper work page.</p>
+                                        <p class="muted-copy">Campaign workspace return, rules answers, Device roles, Rule environments, and GM readiness cues stay visible here before you open the deeper account work page.</p>
                                     </div>
                                     <div class="app-rail">
                                         @if (dossiers.Length == 0 && campaigns.Length == 0 && runs.Length == 0 && workspaces.Length == 0)
@@ -987,7 +987,7 @@ else
                                                                 {
                                                                     <span> Sponsors: @leadCommunitySponsorSession.UserDisplayName on @leadCommunitySponsorSession.CampaignName. @leadCommunitySponsorSession.StatusSummary.</span>
                                                                 }
-                                                                <span> Guide: current preview, downloads, and closure posture stay on the same operator view.</span>
+                                                                <span> Guide: current preview, downloads, and closure posture stay on the same guided view.</span>
                                                                 <span> Access now: @TrustRowValue(Model.SignedInStatus, "Who can get it now", "Open the current release to confirm the live access posture.")</span>
                                                                 <span> Fix: @TrustRowValue(Model.SignedInStatus, "Fix availability", "Open the current release to confirm the tracked fix status.")</span>
                                                                 <span> Caution: @TrustRowValue(Model.SignedInStatus, "Current caution", "Open the current release to confirm the current caution notes.")</span>

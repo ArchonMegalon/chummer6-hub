@@ -155,7 +155,10 @@
 
   const header = document.querySelector("[data-site-header]");
   const navToggle = document.querySelector("[data-nav-toggle]");
-  const navSheet = document.querySelector("[data-nav-sheet]");
+  const navPanel = document.querySelector("[data-nav-panel]");
+  const navClose = document.querySelector("[data-nav-close]");
+  const navBackdrop = document.querySelector("[data-nav-backdrop]");
+  const navStorageKey = "chummer.navPanelOpen";
 
   const syncHeader = () => {
     if (!header) return;
@@ -165,52 +168,136 @@
   syncHeader();
   window.addEventListener("scroll", syncHeader, { passive: true });
 
-  if (navToggle && navSheet) {
-    const closeNavSheet = () => {
-      navToggle.setAttribute("aria-expanded", "false");
-      navSheet.hidden = true;
-      navSheet.setAttribute("aria-hidden", "true");
-      navSheet.toggleAttribute("inert", true);
-      document.body.classList.remove("nav-sheet-open");
+  if (navToggle && navPanel) {
+    const isMobileNav = () => window.innerWidth <= 980;
+
+    const setDesktopPreference = (open) => {
+      try {
+        window.localStorage.setItem(navStorageKey, open ? "1" : "0");
+      } catch {
+        // Ignore storage failures; state still applies for this session.
+      }
     };
 
-    const openNavSheet = () => {
-      navToggle.setAttribute("aria-expanded", "true");
-      navSheet.hidden = false;
-      navSheet.setAttribute("aria-hidden", "false");
-      navSheet.toggleAttribute("inert", false);
-      document.body.classList.add("nav-sheet-open");
+    const getDesktopPreference = () => {
+      try {
+        return window.localStorage.getItem(navStorageKey);
+      } catch {
+        return null;
+      }
     };
 
-    navToggle.addEventListener("click", () => {
-      const expanded = navToggle.getAttribute("aria-expanded") === "true";
-      if (expanded) {
-        closeNavSheet();
+    const applyNavState = () => {
+      const mobile = isMobileNav();
+      const open = document.body.classList.contains("nav-panel-open");
+      navToggle.setAttribute("aria-expanded", open ? "true" : "false");
+
+      if (mobile) {
+        navPanel.hidden = !open;
+        navPanel.setAttribute("aria-hidden", open ? "false" : "true");
+        navPanel.toggleAttribute("inert", !open);
+        if (navBackdrop) {
+          navBackdrop.hidden = !open;
+        }
+        document.body.classList.toggle("nav-sheet-open", open);
         return;
       }
 
-      openNavSheet();
+      navPanel.hidden = false;
+      navPanel.setAttribute("aria-hidden", open ? "false" : "true");
+      navPanel.toggleAttribute("inert", !open);
+      if (navBackdrop) {
+        navBackdrop.hidden = true;
+      }
+      document.body.classList.remove("nav-sheet-open");
+    };
+
+    const openNavPanel = () => {
+      document.body.classList.add("nav-panel-open");
+      applyNavState();
+    };
+
+    const closeNavPanel = () => {
+      document.body.classList.remove("nav-panel-open");
+      applyNavState();
+    };
+
+    const initializeNavPanel = () => {
+      if (isMobileNav()) {
+        closeNavPanel();
+        return;
+      }
+
+      const stored = getDesktopPreference();
+      if (stored === "0") {
+        closeNavPanel();
+        return;
+      }
+
+      openNavPanel();
+    };
+
+    initializeNavPanel();
+
+    navToggle.addEventListener("click", () => {
+      const open = document.body.classList.contains("nav-panel-open");
+      if (open) {
+        closeNavPanel();
+        if (!isMobileNav()) {
+          setDesktopPreference(false);
+        }
+        return;
+      }
+
+      openNavPanel();
+      if (!isMobileNav()) {
+        setDesktopPreference(true);
+      }
     });
 
-    navSheet.querySelectorAll("a").forEach((link) => {
-      link.addEventListener("click", closeNavSheet);
+    if (navClose) {
+      navClose.addEventListener("click", () => {
+        closeNavPanel();
+        if (!isMobileNav()) {
+          setDesktopPreference(false);
+        }
+        navToggle.focus();
+      });
+    }
+
+    if (navBackdrop) {
+      navBackdrop.addEventListener("click", () => {
+        closeNavPanel();
+        navToggle.focus();
+      });
+    }
+
+    navPanel.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => {
+        if (isMobileNav()) {
+          closeNavPanel();
+        }
+      });
     });
 
-    navSheet.querySelectorAll("form").forEach((form) => {
-      form.addEventListener("submit", closeNavSheet);
+    navPanel.querySelectorAll("form").forEach((form) => {
+      form.addEventListener("submit", () => {
+        if (isMobileNav()) {
+          closeNavPanel();
+        }
+      });
     });
 
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && navToggle.getAttribute("aria-expanded") === "true") {
-        closeNavSheet();
+      if (event.key === "Escape" && document.body.classList.contains("nav-panel-open")) {
+        closeNavPanel();
         navToggle.focus();
       }
     });
 
     window.addEventListener("resize", () => {
-      if (window.innerWidth > 980 && navToggle.getAttribute("aria-expanded") === "true") {
-        closeNavSheet();
-      }
+      initializeNavPanel();
+      applyNavState();
     });
   }
 

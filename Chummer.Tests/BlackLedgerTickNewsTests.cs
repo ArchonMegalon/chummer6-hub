@@ -315,6 +315,7 @@ public sealed class BlackLedgerTickNewsTests
             PublicSummary: publicSummary,
             PublicHighlights: ["Rust Bazaar pressure rose."],
             LedgerUrl: "https://chummer.run/ledger?turn=1",
+            DispatchUrl: "https://chummer.run/ledger/dispatches/ledger_dispatch_emerald-sprawl-prelude_turn_0001",
             TickReceiptUrl: "https://chummer.run/ledger/closeouts",
             OccurredAtUtc: DateTimeOffset.UtcNow);
 

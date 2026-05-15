@@ -21,6 +21,7 @@ PORTAL_CANONICAL_MANIFEST_PATH="${PORTAL_CANONICAL_MANIFEST_PATH:-$(dirname "$PO
 SOURCE_MANIFEST_PATH="${SOURCE_MANIFEST_PATH:-}"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
 PREVIEW_INSTALL_ACCESS_CLASS="${CHUMMER_PREVIEW_INSTALL_ACCESS_CLASS:-}"
+FORCE_ACCOUNT_REQUIRED_DOWNLOADS="${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-}"
 
 resolve_ui_localization_release_gate_path() {
   local explicit_path="${CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH:-}"
@@ -224,7 +225,7 @@ normalize_preview_install_access_classes() {
   local release_channel="$2"
   : "$release_channel"
 
-  python3 - "$manifest_path" "$release_channel" "$PREVIEW_INSTALL_ACCESS_CLASS" "${CHUMMER_PREVIEW_WINDOWS_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_LINUX_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_MACOS_INSTALL_ACCESS_CLASS:-account_required}" <<'PY'
+  python3 - "$manifest_path" "$release_channel" "$PREVIEW_INSTALL_ACCESS_CLASS" "${CHUMMER_PREVIEW_WINDOWS_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_LINUX_INSTALL_ACCESS_CLASS:-open_public}" "${CHUMMER_PREVIEW_MACOS_INSTALL_ACCESS_CLASS:-account_required}" "$FORCE_ACCOUNT_REQUIRED_DOWNLOADS" <<'PY'
 from __future__ import annotations
 
 import json
@@ -237,6 +238,7 @@ global_access_class = str(sys.argv[3] or "").strip().lower()
 windows_access_class = str(sys.argv[4] or "open_public").strip().lower() or "open_public"
 linux_access_class = str(sys.argv[5] or "open_public").strip().lower() or "open_public"
 macos_access_class = str(sys.argv[6] or "account_required").strip().lower() or "account_required"
+force_account_required_downloads = str(sys.argv[7] or "").strip().lower() in {"1", "true", "yes", "on"}
 
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
 if not isinstance(payload, dict):
@@ -264,6 +266,8 @@ def normalize_platform(artifact: dict[str, object]) -> str:
 
 
 def resolved_access_class(artifact: dict[str, object]) -> str:
+    if force_account_required_downloads:
+        return "account_required"
     if global_access_class:
         return global_access_class
     platform = normalize_platform(artifact)
@@ -281,9 +285,10 @@ if isinstance(downloads, list):
     for artifact in downloads:
         if not isinstance(artifact, dict):
             continue
-        kind = str(artifact.get("kind") or "").strip().lower()
-        if kind not in {"installer", "dmg", "pkg", "msix"}:
-            continue
+        if not force_account_required_downloads:
+            kind = str(artifact.get("kind") or "").strip().lower()
+            if kind not in {"installer", "dmg", "pkg", "msix"}:
+                continue
         access_class = resolved_access_class(artifact)
         if not access_class:
             continue
@@ -300,9 +305,10 @@ for artifact in payload.get("artifacts") or []:
     if not isinstance(artifact, dict):
         continue
 
-    kind = str(artifact.get("kind") or "").strip().lower()
-    if kind not in {"installer", "dmg", "pkg", "msix"}:
-        continue
+    if not force_account_required_downloads:
+        kind = str(artifact.get("kind") or "").strip().lower()
+        if kind not in {"installer", "dmg", "pkg", "msix"}:
+            continue
 
     access_class = resolved_access_class(artifact)
     if not access_class:
@@ -316,6 +322,76 @@ for artifact in payload.get("artifacts") or []:
 
 if changed:
     manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+canonicalize_release_channel_registries() {
+  local manifest_path="${1:-}"
+  if [[ -z "$manifest_path" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$manifest_path" <<'PY'
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+verifier_path = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+
+spec = importlib.util.spec_from_file_location("verify_public_release_channel", verifier_path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
+payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+payload["publicTrustMetrics"] = module.expected_public_trust_metrics(payload)
+manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+filter_files_to_manifest_truth() {
+  local files_root="${1:-}"
+  local manifest_path="${2:-}"
+  if [[ -z "$files_root" || -z "$manifest_path" || ! -d "$files_root" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$files_root" "$manifest_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+files_root = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+rows = payload.get("artifacts")
+if not isinstance(rows, list):
+    rows = payload.get("downloads")
+if not isinstance(rows, list):
+    rows = []
+
+allowed: set[str] = set()
+for row in rows:
+    if not isinstance(row, dict):
+        continue
+    file_name = str(row.get("fileName") or "").strip()
+    if not file_name:
+        url = str(row.get("downloadUrl") or row.get("url") or "").strip()
+        if url:
+            file_name = Path(url.split("?", 1)[0].split("#", 1)[0]).name
+    if file_name:
+        allowed.add(file_name)
+
+for artifact_path in files_root.glob("chummer-*"):
+    if not artifact_path.is_file():
+        continue
+    if artifact_path.name not in allowed:
+        artifact_path.unlink()
 PY
 }
 
@@ -398,6 +474,9 @@ fi
 python3 "$REGISTRY_ROOT/scripts/materialize_public_release_channel.py" "${materialize_args[@]}" >/dev/null
 normalize_preview_install_access_classes "$CANONICAL_MANIFEST_PATH" "$RELEASE_CHANNEL"
 normalize_preview_install_access_classes "$MANIFEST_PATH" "$RELEASE_CHANNEL"
+canonicalize_release_channel_registries "$CANONICAL_MANIFEST_PATH"
+canonicalize_release_channel_registries "$MANIFEST_PATH"
+filter_files_to_manifest_truth "$DOWNLOADS_DIR" "$CANONICAL_MANIFEST_PATH"
 promoted_file_names=()
 while IFS= read -r file_name; do
   [[ -n "$file_name" ]] || continue
@@ -428,6 +507,8 @@ if [[ "$resolved_manifest_path" == "$resolved_portal_manifest_path" ]]; then
 else
   cp "$MANIFEST_PATH" "$PORTAL_MANIFEST_PATH"
   cp "$CANONICAL_MANIFEST_PATH" "$PORTAL_CANONICAL_MANIFEST_PATH"
+  canonicalize_release_channel_registries "$PORTAL_MANIFEST_PATH"
+  canonicalize_release_channel_registries "$PORTAL_CANONICAL_MANIFEST_PATH"
   echo "synced portal manifest -> $PORTAL_MANIFEST_PATH"
 
   portal_files_dir="$PORTAL_DOWNLOADS_DIR/files"
@@ -456,6 +537,7 @@ else
   done
   if [[ "${#portal_artifacts[@]}" -gt 0 ]]; then
     cp "${portal_artifacts[@]}" "$portal_files_dir"/
+    filter_files_to_manifest_truth "$portal_files_dir" "$PORTAL_CANONICAL_MANIFEST_PATH"
     echo "synced ${#portal_artifacts[@]} local portal artifact(s) -> $portal_files_dir"
   else
     echo "no local desktop artifacts found in $DOWNLOADS_DIR for portal file sync"

@@ -173,6 +173,9 @@ static bool RequiresNoStoreHeaders(PathString path)
     return path.StartsWithSegments("/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || IsLegacyMacReleaseBootstrapArtifactPath(path)
         || path.StartsWithSegments("/downloads/proof/windows", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/file", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/files", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/downloads/get", StringComparison.OrdinalIgnoreCase)
         || path.StartsWithSegments("/downloads/install", StringComparison.OrdinalIgnoreCase)
         || path.Value?.StartsWith("/install-", StringComparison.OrdinalIgnoreCase) == true;
 }

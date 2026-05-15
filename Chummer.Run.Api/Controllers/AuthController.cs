@@ -18,6 +18,7 @@ public sealed class AuthController : Controller
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly AccountService _accounts;
+    private readonly ParticipationOperatorNotificationService _participationNotifications;
     private readonly IdentityLinkService _links;
     private readonly HubEmailLinkVerificationService _emailLinks;
     private readonly ILogger<AuthController> _logger;
@@ -31,6 +32,7 @@ public sealed class AuthController : Controller
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         AccountService accounts,
+        ParticipationOperatorNotificationService participationNotifications,
         IdentityLinkService links,
         HubEmailLinkVerificationService emailLinks,
         ILogger<AuthController> logger)
@@ -43,6 +45,7 @@ public sealed class AuthController : Controller
         _chrome = chrome;
         _google = google;
         _accounts = accounts;
+        _participationNotifications = participationNotifications;
         _links = links;
         _emailLinks = emailLinks;
         _logger = logger;
@@ -226,7 +229,7 @@ public sealed class AuthController : Controller
         var isRecoveryVerification = nextPath.StartsWith("/auth/email/link/callback", StringComparison.OrdinalIgnoreCase);
         if (!isRecoveryVerification)
         {
-            _accounts.EnsureUser(session.SubjectId, session.DisplayName, session.Email);
+            HubUserEnsureResult ensuredUser = _accounts.EnsureUserWithStatus(session.SubjectId, session.DisplayName, session.Email);
             if (!string.IsNullOrWhiteSpace(session.Email))
             {
                 var emailLink = _links.LinkEmail(new LinkEmailIdentityRequest(
@@ -235,6 +238,14 @@ public sealed class AuthController : Controller
                     MakePrimary: true));
                 _links.ConfirmIdentityLink(new ConfirmIdentityLinkRequest(session.SubjectId, emailLink.IdentityLinkId));
             }
+
+            await _participationNotifications.NotifyAccountOpenedIfNeededAsync(
+                ensuredUser.User,
+                session.Email,
+                nextPath,
+                authProviderFamily: "email",
+                accountCreated: ensuredUser.Created,
+                cancellationToken);
         }
 
         return Redirect(nextPath);
@@ -471,6 +482,15 @@ public sealed class AuthController : Controller
         if (result.Session is not null)
         {
             _browserAuth.WriteCookie(Request, Response, result.Session);
+            HubUserDto user = _accounts.GetBySubject(result.Session.SubjectId)
+                ?? _accounts.EnsureUser(result.Session.SubjectId, result.Session.DisplayName, result.Session.Email);
+            await _participationNotifications.NotifyAccountOpenedIfNeededAsync(
+                user,
+                result.Session.Email,
+                result.NextPath,
+                authProviderFamily: "google",
+                accountCreated: result.AccountCreated,
+                cancellationToken);
             return Redirect(result.NextPath);
         }
 
@@ -512,6 +532,15 @@ public sealed class AuthController : Controller
         if (result.Session is not null)
         {
             _browserAuth.WriteCookie(Request, Response, result.Session);
+            HubUserDto user = _accounts.GetBySubject(result.Session.SubjectId)
+                ?? _accounts.EnsureUser(result.Session.SubjectId, result.Session.DisplayName, result.Session.Email);
+            await _participationNotifications.NotifyAccountOpenedIfNeededAsync(
+                user,
+                result.Session.Email,
+                result.NextPath,
+                authProviderFamily: "google",
+                accountCreated: result.AccountCreated,
+                cancellationToken);
             return Redirect(result.NextPath);
         }
 

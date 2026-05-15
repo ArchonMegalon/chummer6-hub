@@ -294,6 +294,7 @@ button.button-like {
 .shell-public.nav-panel-open .site-main,
 .shell-public.nav-panel-open .site-footer {
   margin-left: calc(var(--nav-panel-width) + 1.25rem);
+  width: calc(100% - var(--nav-panel-width) - 1.25rem);
   transition: margin-left 180ms ease;
 }
 
@@ -301,6 +302,7 @@ button.button-like {
 .shell-public:not(.nav-panel-open) .site-main,
 .shell-public:not(.nav-panel-open) .site-footer {
   margin-left: 0;
+  width: auto;
   transition: margin-left 180ms ease;
 }
 
@@ -5813,6 +5815,10 @@ body.nav-sheet-open {
   color: #15598d;
 }
 
+.route-landing .launch-hero {
+  margin-inline: 0;
+}
+
 .route-landing .launch-hero__shell,
 .route-landing .workflow-band,
 .route-landing .product-proof,
@@ -5927,8 +5933,22 @@ body.nav-sheet-open {
 }
 
 @media (max-width: 720px) {
+  .route-landing .launch-hero__shell {
+    grid-template-columns: 1fr;
+    width: calc(100% - 1.5rem);
+    max-width: calc(100% - 1.5rem);
+  }
+
   .route-landing .flagship-gateway-grid,
   .route-landing .continuity-band__panel {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .route-landing .flagship-gateway-grid {
+    display: grid;
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+    overflow-x: visible;
+    padding-bottom: 0;
   }
 }

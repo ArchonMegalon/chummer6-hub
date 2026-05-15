@@ -18,7 +18,7 @@ public sealed class LeaderboardService
             var rows = _store.RewardEntries
                 .GroupBy(entry => entry.UserId, StringComparer.OrdinalIgnoreCase)
                 .Select(group => BuildUserMetricsLocked(group.Key))
-                .Where(row => !publicOnly || string.Equals(row.Visibility, "public", StringComparison.OrdinalIgnoreCase))
+                .Where(row => !publicOnly || (string.Equals(row.Visibility, "public", StringComparison.OrdinalIgnoreCase) && row.PublicContributionProfileOptIn))
                 .OrderByDescending(row => row.Points)
                 .ThenBy(row => row.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .Take(Math.Max(1, limit))
@@ -42,7 +42,7 @@ public sealed class LeaderboardService
             var rows = _store.UsersById.Keys
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Select(BuildUserMetricsLocked)
-                .Where(row => !publicOnly || string.Equals(row.Visibility, "public", StringComparison.OrdinalIgnoreCase))
+                .Where(row => !publicOnly || (string.Equals(row.Visibility, "public", StringComparison.OrdinalIgnoreCase) && row.PublicContributionProfileOptIn))
                 .Where(row => row.Points > 0 || row.ActiveSessions > 0 || row.CurrentSponsorBonus > 0)
                 .OrderByDescending(row => row.CurrentRankScore)
                 .ThenByDescending(row => row.Points)
@@ -189,6 +189,8 @@ public sealed class LeaderboardService
         var currentTier = SponsorStatusPolicy.NormalizeAuthorizationTier(bestCurrentSession?.AuthorizationTier);
         var currentTierSource = SponsorStatusPolicy.NormalizeTierSource(bestCurrentSession?.TierSource);
         var currentSponsorBonus = SponsorStatusPolicy.TierBonus(currentTier) + (activeSessions > 0 ? SponsorStatusPolicy.ActiveSessionBonus : 0);
+        bool publicContributionProfileOptIn = _store.UserExperienceByUserId.TryGetValue(userId, out var experience)
+            && experience.PublicContributionProfileOptIn;
 
         return new UserMetrics(
             UserId: userId,
@@ -202,6 +204,7 @@ public sealed class LeaderboardService
             CurrentTierSource: currentTierSource,
             CurrentSponsorBonus: currentSponsorBonus,
             CurrentRankScore: points + currentSponsorBonus,
+            PublicContributionProfileOptIn: publicContributionProfileOptIn,
             CurrentStatusBadges: activeStatusBadges,
             PersistentBadges: persistentBadges,
             RevokedBadges: revokedBadges);
@@ -219,6 +222,7 @@ public sealed class LeaderboardService
         string CurrentTierSource,
         int CurrentSponsorBonus,
         int CurrentRankScore,
+        bool PublicContributionProfileOptIn,
         IReadOnlyList<BadgeDto> CurrentStatusBadges,
         IReadOnlyList<BadgeDto> PersistentBadges,
         IReadOnlyList<BadgeDto> RevokedBadges);

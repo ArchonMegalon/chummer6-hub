@@ -1,4 +1,5 @@
-import { test, expect } from 'playwright/test';
+import { expect, request, test } from 'playwright/test';
+import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = 'https://chummer.run';
 const routes = [
@@ -23,98 +24,277 @@ const genericLabels = new Set([
   'more',
   'open',
   'go',
+  'read more',
 ]);
 
-const checkedUrls = new Set<string>();
+type AuditRow = {
+  source_page: string;
+  selector: string;
+  role: string;
+  interaction_class: 'inline' | 'button_like';
+  visible_text: string;
+  accessible_name: string;
+  href_or_action: string | null;
+  bounding_box: { x: number; y: number; width: number; height: number } | null;
+  visible: boolean;
+  enabled: boolean;
+  focusable: boolean;
+  tab_reachable: boolean;
+  tap_target_size: { width: number; height: number } | null;
+  final_url: string | null;
+  status: number | null;
+  auth_redirect_expected: boolean;
+  hash_target_exists: boolean | null;
+  result: 'pass' | 'fail';
+  failures: string[];
+};
 
-function extractAnchors(html: string) {
-  const anchors: Array<{ href: string; rel: string; text: string; target: string }> = [];
-  const regex = /<a\b([^>]*?)href="([^"]+)"([^>]*)>(.*?)<\/a>/gis;
-  for (const match of html.matchAll(regex)) {
-    const attrs = `${match[1]} ${match[3]}`;
-    const rel = /rel="([^"]*)"/i.exec(attrs)?.[1] ?? '';
-    const target = /target="([^"]*)"/i.exec(attrs)?.[1] ?? '';
-    const text = match[4].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    anchors.push({ href: match[2], rel, text, target });
-  }
-  return anchors;
+function normalizeLabel(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-function extractForms(html: string) {
-  return Array.from(html.matchAll(/<form\b[^>]*action="([^"]+)"/gi)).map((match) => match[1]);
+function isExternal(url: string): boolean {
+  try {
+    return new URL(url, baseUrl).origin !== baseUrl;
+  } catch {
+    return false;
+  }
 }
 
-async function auditPage(route: string) {
-  const response = await fetch(`${baseUrl}${route}`);
-  expect(response.status, `${route} should load`).toBeLessThan(400);
-  const html = await response.text();
+function isAuthRedirect(pathname: string): boolean {
+  return pathname.startsWith('/login') || pathname.startsWith('/auth/');
+}
 
-  const anchorData = extractAnchors(html);
+function isButtonLike(meta: {
+  tagName: string;
+  role: string;
+  className: string;
+  hrefOrAction: string | null;
+}): boolean {
+  if (meta.tagName === 'button' || meta.tagName === 'form') {
+    return true;
+  }
+  if (meta.tagName === 'input') {
+    return true;
+  }
+  if (meta.role === 'button') {
+    return true;
+  }
+  if (/\bbutton-like\b|\bcta\b|\bcard-link\b|\bnav-link\b|\bsite-sidebar__nav\b/i.test(meta.className)) {
+    return true;
+  }
+  if (meta.tagName === 'a' && meta.hrefOrAction) {
+    if (/^#/.test(meta.hrefOrAction)) {
+      return false;
+    }
+    if (/\blaunch-hero__action\b|\bpath-card\b|\baccount-value__action\b|\bpreview-card\b/i.test(meta.className)) {
+      return true;
+    }
+  }
+  return false;
+}
 
-  for (const anchor of anchorData) {
-    expect(anchor.href, `${route} contains an anchor without href`).not.toBe('');
+function isIntrinsicFocusable(meta: {
+  tagName: string;
+  hrefOrAction: string | null;
+  enabled: boolean;
+}): boolean {
+  if (!meta.enabled) {
+    return false;
+  }
+  if (meta.tagName === 'button' || meta.tagName === 'input' || meta.tagName === 'select' || meta.tagName === 'textarea') {
+    return true;
+  }
+  if (meta.tagName === 'a') {
+    return !!meta.hrefOrAction;
+  }
+  return false;
+}
 
-    const lowered = anchor.text.toLowerCase();
-    expect(genericLabels.has(lowered), `${route} contains generic link label "${anchor.text}"`).toBeFalsy();
-    expect(anchor.href.startsWith('javascript:'), `${route} contains javascript link`).toBeFalsy();
-    expect(anchor.href.includes('/admin/'), `${route} leaked operator route ${anchor.href}`).toBeFalsy();
-    expect(anchor.href.includes('/api/internal/'), `${route} leaked internal route ${anchor.href}`).toBeFalsy();
+test('all visible public links and actions stay usable in the rendered DOM', async ({ browser }) => {
+  test.setTimeout(180000);
+  const api = await request.newContext();
+  const checkedUrls = new Map<string, { status: number; finalUrl: string }>();
+  const rows: AuditRow[] = [];
+  const failures: string[] = [];
 
-    if (anchor.href.startsWith('#')) {
-      const id = anchor.href.slice(1);
-      const targetPattern = new RegExp(`id="${id}"|name="${id}"`, 'i');
-      expect(targetPattern.test(html), `${route} missing hash target ${anchor.href}`).toBeTruthy();
-      continue;
+  for (const route of routes) {
+    const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: 1366, height: 768 } });
+    const response = await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
+    expect(response, `${route} should load`).not.toBeNull();
+    expect(response!.status(), `${route} should load`).toBeLessThan(400);
+
+    const locator = page.locator('a, button, [role="button"], input[type="submit"], input[type="button"], form');
+    const count = await locator.count();
+
+    for (let index = 0; index < count; index += 1) {
+      const handle = locator.nth(index);
+      const meta = await handle.evaluate((element, i) => {
+        const htmlElement = element as HTMLElement;
+        const rect = htmlElement.getBoundingClientRect();
+        const text = (htmlElement.innerText || htmlElement.textContent || '').replace(/\s+/g, ' ').trim();
+        const aria = htmlElement.getAttribute('aria-label') || '';
+        const title = htmlElement.getAttribute('title') || '';
+        const accessibleName = (aria || title || text).replace(/\s+/g, ' ').trim();
+        const role = htmlElement.getAttribute('role') || element.tagName.toLowerCase();
+        const href = htmlElement.getAttribute('href');
+        const action = htmlElement.getAttribute('action');
+        const rel = htmlElement.getAttribute('rel') || '';
+        const target = htmlElement.getAttribute('target') || '';
+        const className = htmlElement.className || '';
+        const selector = `${element.tagName.toLowerCase()}[data-ux-index="${i}"]`;
+        const focusable = !htmlElement.hasAttribute('disabled')
+          && htmlElement.tabIndex >= 0
+          && !htmlElement.hasAttribute('aria-hidden');
+        return {
+          selector,
+          role,
+          visibleText: text,
+          accessibleName,
+          hrefOrAction: href || action,
+          rel,
+          target,
+          className,
+          tagName: element.tagName.toLowerCase(),
+          visible: !!(rect.width > 0 && rect.height > 0),
+          enabled: !(htmlElement as HTMLButtonElement).disabled,
+          focusable,
+          boundingBox: rect.width > 0 && rect.height > 0
+            ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+            : null,
+        };
+      }, index);
+
+      if (!meta.visible) {
+        continue;
+      }
+
+      const row: AuditRow = {
+        source_page: route,
+        selector: meta.selector,
+        role: meta.role,
+        interaction_class: isButtonLike(meta) ? 'button_like' : 'inline',
+        visible_text: meta.visibleText,
+        accessible_name: meta.accessibleName,
+        href_or_action: meta.hrefOrAction,
+        bounding_box: meta.boundingBox,
+        visible: meta.visible,
+        enabled: meta.enabled,
+        focusable: meta.focusable,
+        tab_reachable: false,
+        tap_target_size: meta.boundingBox ? { width: meta.boundingBox.width, height: meta.boundingBox.height } : null,
+        final_url: null,
+        status: null,
+        auth_redirect_expected: false,
+        hash_target_exists: null,
+        result: 'pass',
+        failures: [],
+      };
+
+      if (!meta.accessibleName) {
+        row.failures.push('missing accessible name');
+      }
+
+      if (genericLabels.has(normalizeLabel(meta.accessibleName))) {
+        row.failures.push(`generic label: ${meta.accessibleName}`);
+      }
+
+      if (meta.tagName === 'form') {
+        row.tab_reachable = true;
+      } else if (!meta.focusable || !isIntrinsicFocusable(meta)) {
+        row.failures.push('visible interactive element is not keyboard focusable');
+      } else if (row.interaction_class === 'button_like') {
+        await handle.focus();
+        row.tab_reachable = await handle.evaluate((element) => document.activeElement === element);
+        if (!row.tab_reachable && (meta.tagName === 'button' || meta.role === 'button')) {
+          row.failures.push('focus() did not move active element to the clickable control');
+        }
+      } else {
+        row.tab_reachable = true;
+      }
+
+      if (
+        row.interaction_class === 'button_like'
+        && row.tap_target_size
+        && (row.tap_target_size.width < 44 || row.tap_target_size.height < 44)
+      ) {
+        row.failures.push(`tap target below 44x44 (${Math.round(row.tap_target_size.width)}x${Math.round(row.tap_target_size.height)})`);
+      }
+
+      const destination = meta.hrefOrAction?.trim() || '';
+      if ((meta.tagName === 'a' || meta.tagName === 'form') && !destination) {
+        row.failures.push('missing href/action');
+      }
+
+      if (destination === '#') {
+        row.failures.push('href/action is bare #');
+      }
+
+      if (destination.startsWith('javascript:')) {
+        row.failures.push('javascript pseudo-link exposed publicly');
+      }
+
+      if (destination.includes('/admin/') || destination.includes('/api/internal/')) {
+        row.failures.push(`operator/internal route linked publicly: ${destination}`);
+      }
+
+      if (destination.startsWith('#')) {
+        const targetId = destination.slice(1);
+        row.hash_target_exists = targetId.length > 0
+          ? await page.locator(`#${targetId}, [name="${targetId}"]`).count() > 0
+          : false;
+        if (!row.hash_target_exists) {
+          row.failures.push(`missing hash target: ${destination}`);
+        }
+      } else if (destination) {
+        const resolved = new URL(destination, `${baseUrl}${route}`);
+        if (resolved.protocol === 'mailto:' || resolved.protocol === 'tel:') {
+          row.final_url = resolved.toString();
+        } else if (isExternal(resolved.toString())) {
+          row.final_url = resolved.toString();
+          if (!meta.rel.includes('noopener') || !meta.rel.includes('noreferrer')) {
+            row.failures.push('external link missing rel=noopener noreferrer');
+          }
+        } else {
+          const normalized = resolved.toString();
+          row.auth_redirect_expected = isAuthRedirect(resolved.pathname);
+          if (!checkedUrls.has(normalized)) {
+            const linkResponse = await api.get(normalized, { maxRedirects: 5 });
+            checkedUrls.set(normalized, {
+              status: linkResponse.status(),
+              finalUrl: linkResponse.url(),
+            });
+          }
+          const checked = checkedUrls.get(normalized)!;
+          row.status = checked.status;
+          row.final_url = checked.finalUrl;
+          if (checked.status >= 400) {
+            row.failures.push(`broken route status ${checked.status}`);
+          }
+        }
+      }
+
+      if (row.failures.length > 0) {
+        row.result = 'fail';
+        failures.push(`${route} ${meta.role} ${meta.accessibleName || meta.visibleText || destination || '<unnamed>'}: ${row.failures.join('; ')}`);
+      }
+
+      rows.push(row);
     }
 
-    const resolved = new URL(anchor.href, `${baseUrl}${route}`);
-    if (resolved.protocol === 'mailto:' || resolved.protocol === 'tel:') {
-      continue;
-    }
-    if (resolved.origin !== baseUrl) {
-      expect(anchor.rel.includes('noopener') && anchor.rel.includes('noreferrer'),
-        `${route} external link ${resolved.href} is missing rel`).toBeTruthy();
-      continue;
-    }
-
-    const normalizedHref = resolved.href;
-    if (checkedUrls.has(normalizedHref)) {
-      continue;
-    }
-    checkedUrls.add(normalizedHref);
-
-    const linkResponse = await fetch(normalizedHref, { redirect: 'follow' });
-    expect(linkResponse.status, `${route} link ${resolved.pathname} is broken`).toBeLessThan(400);
+    await page.close();
   }
 
-  const buttonData = Array.from(html.matchAll(/<button\b([^>]*)>(.*?)<\/button>/gis)).map((match) => {
-    const attrs = match[1];
-    const text = match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-    return {
-      text,
-      type: /type="([^"]*)"/i.exec(attrs)?.[1] ?? '',
-      ariaControls: /aria-controls="([^"]*)"/i.exec(attrs)?.[1] ?? '',
-      name: /name="([^"]*)"/i.exec(attrs)?.[1] ?? '',
-    };
+  writeJsonArtifact('LIVE_LINK_AUDIT.generated.json', {
+    generated_at_utc: new Date().toISOString(),
+    status: failures.length === 0 ? 'pass' : 'fail',
+    verdict: failures.length === 0 ? 'READY' : 'NOT_READY',
+    audited_routes: routes,
+    element_count: rows.length,
+    issues_found: failures.length,
+    failures,
+    rows,
   });
 
-  for (const button of buttonData) {
-    const lowered = button.text.toLowerCase();
-    expect(button.text.length > 0 || button.ariaControls.length > 0,
-      `${route} has an unlabeled visible button`).toBeTruthy();
-    expect(genericLabels.has(lowered), `${route} contains generic button label "${button.text}"`).toBeFalsy();
-  }
-
-  const formActions = extractForms(html);
-
-  for (const action of formActions) {
-    expect(action, `${route} contains a form without action`).not.toBe('');
-  }
-}
-
-test('all visible public links and actions stay usable', async () => {
-  test.setTimeout(120000);
-  for (const route of routes) {
-    await auditPage(route);
-  }
+  expect(failures, failures.join('\n')).toEqual([]);
 });

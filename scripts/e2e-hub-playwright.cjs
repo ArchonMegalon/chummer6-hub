@@ -422,7 +422,7 @@ async function gotoAndAssert(page, pageErrors, path, checks) {
   await assertNoPageErrors(page, pageErrors, 'Signed-out /participate/codex redirect');
 
   await gotoAndAssert(page, pageErrors, '/downloads', async () => {
-    await expectVisible(page, 'text=Create account to install');
+    await expectVisible(page, 'text=Create account for guided install');
     await expectVisible(page, 'text=Advanced download options');
     await assertNoBannedCopy(page, 'Downloads');
   });

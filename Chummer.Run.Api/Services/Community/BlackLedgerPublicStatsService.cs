@@ -213,6 +213,27 @@ public sealed class BlackLedgerPublicStatsService
         return seed is null ? FallbackWorldPreview : BuildWorldPreview(seed, requestedTurn);
     }
 
+    public IReadOnlyList<BlackLedgerDispatchViewModel> ListDispatches(int? requestedTurn = null, string? factionId = null)
+    {
+        BlackLedgerWorldPreviewViewModel? world = LoadWorldPreview(requestedTurn);
+        if (world?.LastTick is null)
+        {
+            return Array.Empty<BlackLedgerDispatchViewModel>();
+        }
+
+        IEnumerable<BlackLedgerDispatch> dispatches = BuildDispatchRecords(world);
+        if (!string.IsNullOrWhiteSpace(factionId))
+        {
+            dispatches = dispatches.Where(item => item.InvolvedFactions.Any(faction =>
+                NormalizeSlug(faction).Equals(NormalizeSlug(factionId), StringComparison.OrdinalIgnoreCase)));
+        }
+
+        return dispatches.Select(ToViewModel).ToArray();
+    }
+
+    public BlackLedgerDispatchViewModel? LoadDispatch(string dispatchId, int? requestedTurn = null, string? factionId = null)
+        => ListDispatches(requestedTurn, factionId).FirstOrDefault(item => string.Equals(item.DispatchId, dispatchId, StringComparison.OrdinalIgnoreCase));
+
     public BlackLedgerWorldSeedDocument? LoadSeedDocument()
         => TryLoadSeed();
 
@@ -259,6 +280,239 @@ public sealed class BlackLedgerPublicStatsService
             yield return Path.Combine(root, "chummer-hub-registry", SeedRelativePath.Replace('/', Path.DirectorySeparatorChar));
         }
     }
+
+    public DispatchEmailDigest? BuildDispatchEmailDigest(int? requestedTurn = null)
+    {
+        BlackLedgerDispatchViewModel? latest = ListDispatches(requestedTurn).FirstOrDefault();
+        if (latest is null)
+        {
+            return null;
+        }
+
+        string excerpt = latest.Body.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? latest.Summary;
+        return new DispatchEmailDigest(
+            DispatchId: latest.DispatchId,
+            Title: latest.Title,
+            Excerpt: excerpt,
+            Highlights: latest.PackagePressureLinks.Count > 0
+                ? latest.PackagePressureLinks.Select(static item => item.Trim()).Where(static item => item.Length > 0).ToArray()
+                : Array.Empty<string>(),
+            DispatchUrl: latest.Href,
+            SourceReceiptUrl: latest.SourceReceiptHref,
+            PrivacyNote: "Generated from a receipt-backed public-safe dispatch. No private campaign, support, or administrative data is included.");
+    }
+
+    private static IReadOnlyList<BlackLedgerDispatch> BuildDispatchRecords(BlackLedgerWorldPreviewViewModel world)
+    {
+        BlackLedgerTickReceiptViewModel tick = world.LastTick ?? throw new InvalidOperationException("World preview is missing the last tick.");
+        string turnLabel = $"Turn {tick.Turn}";
+        string baseCreatedAt = tick.CreatedAtUtc;
+        var dispatches = new List<BlackLedgerDispatch>
+        {
+            CreateDispatch(
+                dispatchId: $"ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}",
+                worldId: world.WorldId,
+                turn: tick.Turn,
+                type: "turn_dispatch",
+                title: $"{turnLabel} — The city is moving",
+                summary: world.TurnHeadline,
+                body:
+                    $"Turn {tick.Turn} already ran.\n\n" +
+                    $"{tick.Summary}\n\n" +
+                    $"The Ledger marked the movement, not the people: faction pressure shifted, package demand moved, and public-safe closeout witnesses stayed tied to one receipt before any dispatch was allowed to talk.\n\n" +
+                    $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                involvedFactions: world.Factions.Take(4).Select(static item => item.PublicName).ToArray(),
+                involvedDistricts: world.Districts.Take(4).Select(static item => item.Name).ToArray(),
+                packagePressureLinks: ["/ledger/packages", "/karma-forge"],
+                sourceReceiptId: tick.ReceiptId,
+                sourceReceiptHref: "/ledger/closeouts",
+                createdAtUtc: baseCreatedAt),
+        };
+
+        dispatches.AddRange(BuildEffectDispatches(world, tick, turnLabel, baseCreatedAt));
+        if (!dispatches.Any(item => item.DispatchId.Contains("drone_logistics", StringComparison.OrdinalIgnoreCase)))
+        {
+            dispatches.Add(
+                CreateDispatch(
+                    dispatchId: $"ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}_drone_logistics_overlay",
+                    worldId: world.WorldId,
+                    turn: tick.Turn,
+                    type: "package_pressure_dispatch",
+                    title: "Drone Logistics Overlay — Candidate heat rising",
+                    summary: "Useful route-and-drone pressure crossed from rumor to watched package signal.",
+                    body:
+                        "The requests were not glamorous: better cargo state, clearer drone loadouts, fewer lost handoffs. The Ledger marked it as boring, useful, and therefore dangerous to ignore.\n\n" +
+                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                    involvedFactions: ["Neon Docks Union", "Ghostline Network"],
+                    involvedDistricts: ["Neon Docks", "Old Signal Loop"],
+                    packagePressureLinks: ["/ledger/packages", "/karma-forge"],
+                    sourceReceiptId: tick.ReceiptId,
+                    sourceReceiptHref: "/ledger/closeouts",
+                    createdAtUtc: baseCreatedAt));
+        }
+
+        return dispatches;
+    }
+
+    private static IEnumerable<BlackLedgerDispatch> BuildEffectDispatches(
+        BlackLedgerWorldPreviewViewModel world,
+        BlackLedgerTickReceiptViewModel tick,
+        string turnLabel,
+        string createdAtUtc)
+    {
+        foreach (BlackLedgerTickEffectViewModel effect in tick.Effects)
+        {
+            string normalizedTarget = effect.Target.Trim().ToLowerInvariant();
+            if (normalizedTarget.Contains("rust", StringComparison.Ordinal))
+            {
+                yield return CreateDispatch(
+                    dispatchId: $"ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}_rust_bazaar",
+                    worldId: world.WorldId,
+                    turn: tick.Turn,
+                    type: "district_dispatch",
+                    title: "The Rust Bazaar called in old favors.",
+                    summary: "Debt markers moved first, and package pressure followed.",
+                    body:
+                        $"{effect.PublicReason}\n\n" +
+                        "The Bazaar did not need names. Gear requests spiked, favors got counted twice, and the district made boring logistics feel dangerous again.\n\n" +
+                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                    involvedFactions: ["Rust Market Syndicate"],
+                    involvedDistricts: ["Rust Bazaar"],
+                    packagePressureLinks: ["/ledger/packages"],
+                    sourceReceiptId: tick.ReceiptId,
+                    sourceReceiptHref: "/ledger/closeouts",
+                    createdAtUtc: createdAtUtc);
+                continue;
+            }
+
+            if (normalizedTarget.Contains("ashline", StringComparison.Ordinal))
+            {
+                yield return CreateDispatch(
+                    dispatchId: $"ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}_ashline_circle",
+                    worldId: world.WorldId,
+                    turn: tick.Turn,
+                    type: "faction_dispatch",
+                    title: "Ashline Circle — Source clarity dispute",
+                    summary: "Awakened build demand rose because the paperwork stayed murkier than the intent.",
+                    body:
+                        $"{effect.PublicReason}\n\n" +
+                        "The Circle did not argue about power. It argued about proof. Clean intent with dirty paperwork pushed MysAd density upward and nudged package demand toward explainers instead of swagger.\n\n" +
+                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                    involvedFactions: ["Ashline Circle"],
+                    involvedDistricts: ["Ashline Ward"],
+                    packagePressureLinks: ["/ledger/packages", "/karma-forge"],
+                    sourceReceiptId: tick.ReceiptId,
+                    sourceReceiptHref: "/ledger/closeouts",
+                    createdAtUtc: createdAtUtc);
+                continue;
+            }
+
+            if (normalizedTarget.Contains("neon", StringComparison.Ordinal))
+            {
+                yield return CreateDispatch(
+                    dispatchId: $"ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}_neon_docks",
+                    worldId: world.WorldId,
+                    turn: tick.Turn,
+                    type: "district_dispatch",
+                    title: "Neon Docks — Drone logistics pressure",
+                    summary: "Cargo trouble turned into visible demand for route and drone overlays.",
+                    body:
+                        $"{effect.PublicReason}\n\n" +
+                        "Containers moved, drones failed, and somebody's maintenance debt became everybody's routing problem. The Docks did not ask for attention. Package pressure did that for them.\n\n" +
+                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                    involvedFactions: ["Neon Docks Union"],
+                    involvedDistricts: ["Neon Docks"],
+                    packagePressureLinks: ["/ledger/packages"],
+                    sourceReceiptId: tick.ReceiptId,
+                    sourceReceiptHref: "/ledger/closeouts",
+                    createdAtUtc: createdAtUtc);
+                continue;
+            }
+
+            if (normalizedTarget.Contains("ghostline", StringComparison.Ordinal))
+            {
+                yield return CreateDispatch(
+                    dispatchId: $"ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}_ghostline",
+                    worldId: world.WorldId,
+                    turn: tick.Turn,
+                    type: "closeout_dispatch",
+                    title: "Ghostline — Rumor lane suppressed",
+                    summary: "Two rumor lanes died before they could pretend to be package truth.",
+                    body:
+                        $"{effect.PublicReason}\n\n" +
+                        "Ghostline killed the noise before it touched the shelf. No heroics, no badges, just one less false truth for the table to trip over.\n\n" +
+                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                    involvedFactions: ["Ghostline Network"],
+                    involvedDistricts: ["Ghostline East", "Old Signal Loop"],
+                    packagePressureLinks: ["/ledger/closeouts", "/ledger/packages"],
+                    sourceReceiptId: tick.ReceiptId,
+                    sourceReceiptHref: "/ledger/closeouts",
+                    createdAtUtc: createdAtUtc);
+            }
+        }
+    }
+
+    private static BlackLedgerDispatch CreateDispatch(
+        string dispatchId,
+        string worldId,
+        int turn,
+        string type,
+        string title,
+        string summary,
+        string body,
+        IReadOnlyList<string> involvedFactions,
+        IReadOnlyList<string> involvedDistricts,
+        IReadOnlyList<string> packagePressureLinks,
+        string sourceReceiptId,
+        string sourceReceiptHref,
+        string createdAtUtc)
+        => new(
+            DispatchId: dispatchId,
+            WorldId: worldId,
+            Turn: turn,
+            Type: type,
+            Scope: "public_safe_seeded_preview",
+            SourceReceiptId: sourceReceiptId,
+            SourceReceiptHref: sourceReceiptHref,
+            Title: title,
+            Summary: summary,
+            Body: body,
+            InvolvedFactions: involvedFactions,
+            InvolvedDistricts: involvedDistricts,
+            PackagePressureLinks: packagePressureLinks,
+            PrivacyStatus: "public_safe",
+            GeneratedBy: "ai_seeded_dispatch_generator",
+            HumanReviewStatus: "optional",
+            CreatedAtUtc: createdAtUtc,
+            PublicSafe: true,
+            AiGenerated: true,
+            Href: $"/ledger/dispatches/{dispatchId}");
+
+    private static BlackLedgerDispatchViewModel ToViewModel(BlackLedgerDispatch dispatch)
+        => new(
+            DispatchId: dispatch.DispatchId,
+            WorldId: dispatch.WorldId,
+            Turn: dispatch.Turn,
+            Type: dispatch.Type,
+            Scope: dispatch.Scope,
+            SourceReceiptId: dispatch.SourceReceiptId,
+            SourceReceiptHref: dispatch.SourceReceiptHref,
+            Title: dispatch.Title,
+            Summary: dispatch.Summary,
+            Body: dispatch.Body,
+            InvolvedFactions: dispatch.InvolvedFactions,
+            InvolvedDistricts: dispatch.InvolvedDistricts,
+            PackagePressureLinks: dispatch.PackagePressureLinks,
+            PrivacyStatus: dispatch.PrivacyStatus,
+            GeneratedBy: dispatch.GeneratedBy,
+            HumanReviewStatus: dispatch.HumanReviewStatus,
+            CreatedAtUtc: dispatch.CreatedAtUtc,
+            PublicSafe: dispatch.PublicSafe,
+            AiGenerated: dispatch.AiGenerated,
+            Href: dispatch.Href);
+
+    private static string NormalizeSlug(string value)
+        => value.Trim().ToLowerInvariant().Replace("_", "-", StringComparison.Ordinal).Replace(" ", "-", StringComparison.Ordinal);
 
     private static IEnumerable<string> ResolveRootCandidates()
     {

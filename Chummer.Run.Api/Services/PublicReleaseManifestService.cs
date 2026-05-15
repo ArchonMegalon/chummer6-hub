@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 
 namespace Chummer.Run.Api.Services;
@@ -16,6 +17,7 @@ public sealed class PublicReleaseManifestService
     private const string LocalProofFileKey = "CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE";
     private const string PublicDisabledArtifactIdsKey = "CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS";
     private const string ReleaseDisabledArtifactIdsKey = "CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS";
+    private const string ForceAccountRequiredDownloadsKey = "CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS";
     private static readonly string[] RequiredDesktopPlatforms = ["linux", "windows", "macos"];
     private static readonly string[] RequiredDesktopHeads = ["avalonia"];
     private static readonly IReadOnlyDictionary<string, string[]> DefaultRequiredDesktopPlatformRids = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
@@ -91,8 +93,8 @@ public sealed class PublicReleaseManifestService
         return ApplyImportRouteParityGuard(ApplyFlagshipReadinessGuard(ApplyArtifactSuppressionPolicy(ApplyLocalReleaseProofFallback(LoadReleaseManifestPayload(FilterManifestPayload(File.ReadAllText(manifestPath)))))));
     }
 
-    public bool HasArtifactSuppressions()
-        => ResolveDisabledArtifactIds().Count > 0;
+    public bool RequiresCanonicalManifestRewrite()
+        => ResolveDisabledArtifactIds().Count > 0 || ForceAccountRequiredDownloads();
 
     public string? LoadCanonicalManifestJson()
     {
@@ -585,7 +587,8 @@ public sealed class PublicReleaseManifestService
     private string FilterManifestPayload(string json)
     {
         HashSet<string> disabledArtifactIds = ResolveDisabledArtifactIds();
-        if (disabledArtifactIds.Count == 0)
+        bool forceAccountRequiredDownloads = ForceAccountRequiredDownloads();
+        if (disabledArtifactIds.Count == 0 && !forceAccountRequiredDownloads)
         {
             return json;
         }
@@ -596,7 +599,16 @@ public sealed class PublicReleaseManifestService
             return json;
         }
 
-        ApplyArtifactSuppressionPolicy(manifest, disabledArtifactIds);
+        if (disabledArtifactIds.Count > 0)
+        {
+            ApplyArtifactSuppressionPolicy(manifest, disabledArtifactIds);
+        }
+
+        if (forceAccountRequiredDownloads)
+        {
+            ApplyForcedAccountRequiredDownloadPolicy(manifest);
+        }
+
         return manifest.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));
     }
 
@@ -757,6 +769,231 @@ public sealed class PublicReleaseManifestService
         }
     }
 
+    private void ApplyForcedAccountRequiredDownloadPolicy(JsonObject manifest)
+    {
+        ApplyForcedAccountRequiredDownloadPolicy(manifest["artifacts"]);
+        ApplyForcedAccountRequiredDownloadPolicy(manifest["downloads"]);
+        ApplyForcedAccountRequiredDesktopSurfacePolicy(manifest["desktopSurfaceRefs"], manifest["artifacts"]);
+        ApplyForcedAccountRequiredPublicTrustMetricsPolicy(manifest["publicTrustMetrics"], manifest["desktopTupleCoverage"], manifest["artifacts"]);
+        ApplyForcedAccountRequiredRegistryBoundaryCoveragePolicy(manifest["registryBoundaryCoverage"], manifest["desktopSurfaceRefs"]);
+    }
+
+    private static void ApplyForcedAccountRequiredDownloadPolicy(JsonNode? node)
+    {
+        if (node is not JsonArray rows)
+        {
+            return;
+        }
+
+        foreach (JsonNode? rowNode in rows)
+        {
+            if (rowNode is not JsonObject row)
+            {
+                continue;
+            }
+
+            row["installAccessClass"] = InstallAccessClasses.AccountRequired;
+        }
+    }
+
+    private static void ApplyForcedAccountRequiredDesktopSurfacePolicy(JsonNode? node, JsonNode? artifactsNode)
+    {
+        if (node is not JsonArray rows)
+        {
+            return;
+        }
+
+        HashSet<string> accountRequiredArtifactIds = new(StringComparer.OrdinalIgnoreCase);
+        if (artifactsNode is JsonArray artifacts)
+        {
+            foreach (JsonNode? artifactNode in artifacts)
+            {
+                if (artifactNode is not JsonObject artifact)
+                {
+                    continue;
+                }
+
+                string? artifactId = GetJsonString(artifact["artifactId"]) ?? GetJsonString(artifact["id"]);
+                if (string.IsNullOrWhiteSpace(artifactId))
+                {
+                    continue;
+                }
+
+                if (string.Equals(GetJsonString(artifact["installAccessClass"]), InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
+                {
+                    accountRequiredArtifactIds.Add(artifactId);
+                }
+            }
+        }
+
+        foreach (JsonNode? rowNode in rows)
+        {
+            if (rowNode is not JsonObject row)
+            {
+                continue;
+            }
+
+            string? artifactId = GetJsonString(row["artifactId"]);
+            if (string.IsNullOrWhiteSpace(artifactId) || !accountRequiredArtifactIds.Contains(artifactId))
+            {
+                continue;
+            }
+
+            row["installAccessClass"] = InstallAccessClasses.AccountRequired;
+
+            string rationale = GetJsonString(row["rationale"]) ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(rationale))
+            {
+                continue;
+            }
+
+            rationale = rationale
+                .Replace("guest-readable so desktop channel", "entitlement-backed so desktop channel", StringComparison.OrdinalIgnoreCase)
+                .Replace("guest-readable install guidance", "entitlement-backed install guidance", StringComparison.OrdinalIgnoreCase);
+
+            row["rationale"] = rationale;
+        }
+    }
+
+    private static void ApplyForcedAccountRequiredPublicTrustMetricsPolicy(JsonNode? metricsNode, JsonNode? coverageNode, JsonNode? artifactsNode)
+    {
+        if (metricsNode is not JsonObject metrics || coverageNode is not JsonObject coverage)
+        {
+            return;
+        }
+
+        if (metrics["adoptionHealth"] is not JsonObject adoptionHealth || coverage["desktopRouteTruth"] is not JsonArray routeTruth)
+        {
+            return;
+        }
+
+        Dictionary<string, string> installAccessByArtifactId = new(StringComparer.OrdinalIgnoreCase);
+        if (artifactsNode is JsonArray artifacts)
+        {
+            foreach (JsonNode? artifactNode in artifacts)
+            {
+                if (artifactNode is not JsonObject artifact)
+                {
+                    continue;
+                }
+
+                string? artifactId = GetJsonString(artifact["artifactId"]) ?? GetJsonString(artifact["id"]);
+                string? installAccessClass = GetJsonString(artifact["installAccessClass"]);
+                if (string.IsNullOrWhiteSpace(artifactId) || string.IsNullOrWhiteSpace(installAccessClass))
+                {
+                    continue;
+                }
+
+                installAccessByArtifactId[artifactId] = installAccessClass;
+            }
+        }
+
+        int publicInstallCount = 0;
+        int accountLinkedInstallCount = 0;
+
+        foreach (JsonNode? routeNode in routeTruth)
+        {
+            if (routeNode is not JsonObject route)
+            {
+                continue;
+            }
+
+            if (!string.Equals(GetJsonString(route["routeRole"]), "primary", StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(GetJsonString(route["promotionState"]), "promoted", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(GetJsonString(route["revokeState"]), "revoked", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string? artifactId = GetJsonString(route["artifactId"]);
+            if (string.IsNullOrWhiteSpace(artifactId) || !installAccessByArtifactId.TryGetValue(artifactId, out string? installAccessClass))
+            {
+                publicInstallCount++;
+                continue;
+            }
+
+            if (string.Equals(installAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
+            {
+                accountLinkedInstallCount++;
+            }
+            else
+            {
+                publicInstallCount++;
+            }
+        }
+
+        adoptionHealth["publicInstallCount"] = publicInstallCount;
+        adoptionHealth["accountLinkedInstallCount"] = accountLinkedInstallCount;
+        adoptionHealth["summary"] =
+            $"{GetJsonInt32(adoptionHealth["primaryPromotedCount"])} primary routes are promoted; " +
+            $"{publicInstallCount} are guest-readable, " +
+            $"{accountLinkedInstallCount} require account-linked install handoff, " +
+            $"{GetJsonInt32(adoptionHealth["fallbackRecoveryCount"])} fallback recovery routes are promoted, " +
+            $"and {GetJsonInt32(adoptionHealth["blockedRouteCount"])} routes are still blocked on proof.";
+    }
+
+    private static int GetJsonInt32(JsonNode? node)
+    {
+        if (node is null)
+        {
+            return 0;
+        }
+
+        if (node is JsonValue jsonValue && jsonValue.TryGetValue<int>(out int value))
+        {
+            return value;
+        }
+
+        if (int.TryParse(GetJsonString(node), out value))
+        {
+            return value;
+        }
+
+        return 0;
+    }
+
+    private static void ApplyForcedAccountRequiredRegistryBoundaryCoveragePolicy(JsonNode? coverageNode, JsonNode? desktopSurfaceRefsNode)
+    {
+        if (coverageNode is not JsonObject coverage ||
+            coverage["entitlement"] is not JsonObject entitlement ||
+            desktopSurfaceRefsNode is not JsonArray desktopSurfaceRefs)
+        {
+            return;
+        }
+
+        int desktopSurfaceRefCount = 0;
+        int openPublicSurfaceCount = 0;
+        int accountRequiredSurfaceCount = 0;
+
+        foreach (JsonNode? rowNode in desktopSurfaceRefs)
+        {
+            if (rowNode is not JsonObject row)
+            {
+                continue;
+            }
+
+            desktopSurfaceRefCount++;
+            string? installAccessClass = GetJsonString(row["installAccessClass"]);
+            if (string.Equals(installAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
+            {
+                accountRequiredSurfaceCount++;
+            }
+            else
+            {
+                openPublicSurfaceCount++;
+            }
+        }
+
+        entitlement["desktopSurfaceRefCount"] = desktopSurfaceRefCount;
+        entitlement["openPublicSurfaceCount"] = openPublicSurfaceCount;
+        entitlement["accountRequiredSurfaceCount"] = accountRequiredSurfaceCount;
+        entitlement["summary"] =
+            $"Entitlement and install-hand-off truth spans {GetJsonInt32(entitlement["installAwareArtifactCount"])} install-aware registry rows, " +
+            $"{desktopSurfaceRefCount} desktop surface refs, " +
+            $"{openPublicSurfaceCount} guest-readable surfaces, and " +
+            $"{accountRequiredSurfaceCount} account-required surfaces.";
+    }
+
     private HashSet<string> ResolveDisabledArtifactIds()
     {
         HashSet<string> values = new(StringComparer.OrdinalIgnoreCase);
@@ -764,6 +1001,16 @@ public sealed class PublicReleaseManifestService
         AddDisabledArtifacts(values, _configuration[ReleaseDisabledArtifactIdsKey]);
         return values;
     }
+
+    private bool ForceAccountRequiredDownloads()
+        => ParseBooleanSetting(_configuration[ForceAccountRequiredDownloadsKey]);
+
+    private static bool ParseBooleanSetting(string? value)
+        => value?.Trim().ToLowerInvariant() switch
+        {
+            "1" or "true" or "yes" or "on" => true,
+            _ => false
+        };
 
     private static void AddDisabledArtifacts(HashSet<string> destination, string? rawValue)
     {
@@ -889,6 +1136,7 @@ public sealed class PublicReleaseManifestService
 
     private static void RebuildDesktopTupleCoverage(JsonObject coverage, IReadOnlyList<ManifestArtifactShape> artifacts)
     {
+        List<string> derivedRequiredPlatforms = DeriveRequiredDesktopPlatforms(artifacts);
         List<string> requiredPlatforms = ToJsonStringList(coverage["requiredDesktopPlatforms"]);
         if (requiredPlatforms.Count == 0)
         {
@@ -897,7 +1145,16 @@ public sealed class PublicReleaseManifestService
 
         if (requiredPlatforms.Count == 0)
         {
-            requiredPlatforms = [.. RequiredDesktopPlatforms];
+            requiredPlatforms = derivedRequiredPlatforms.Count > 0
+                ? derivedRequiredPlatforms
+                : [.. RequiredDesktopPlatforms];
+        }
+        else if (derivedRequiredPlatforms.Count > 0)
+        {
+            requiredPlatforms = requiredPlatforms
+                .Where(platform => derivedRequiredPlatforms.Contains(platform, StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         List<string> requiredHeads = ToJsonStringList(coverage["requiredDesktopHeads"]);
@@ -952,6 +1209,18 @@ public sealed class PublicReleaseManifestService
         }
 
         List<string> requiredTupleIds = ToJsonStringList(coverage["requiredDesktopPlatformHeadRidTuples"]);
+        if (requiredTupleIds.Count > 0)
+        {
+            requiredTupleIds = requiredTupleIds
+                .Where(tupleId =>
+                {
+                    string[] parts = tupleId.Split(':', 3, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    return parts.Length == 3
+                        && requiredPlatforms.Contains(parts[2], StringComparer.OrdinalIgnoreCase);
+                })
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
         if (requiredTupleIds.Count == 0)
         {
             requiredTupleIds = BuildRequiredDesktopTupleIds(requiredPlatforms, requiredHeads, promotedPlatformHeadRidTuples);
