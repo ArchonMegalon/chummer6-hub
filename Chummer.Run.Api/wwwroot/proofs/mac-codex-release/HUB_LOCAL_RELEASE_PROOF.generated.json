@@ -5,7 +5,7 @@
   "desktop_client_readiness": {
     "status": "pass",
     "scoped_status": "pass",
-    "generated_at": "2026-05-12T15:47:51Z",
+    "generated_at": "2026-05-15T16:06:33Z",
     "missing_coverage_keys": [],
     "desktop_client_missing": false,
     "reason": "Flagship product readiness proof is green.",
@@ -825,8 +825,8 @@
     }
   },
   "base_url": "https://chummer.run",
-  "compose_file": "legacy/tooling/docker/docker-compose.yml",
-  "playwright_timeout_seconds": 120,
+  "compose_file": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+  "playwright_timeout_seconds": 180,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
@@ -1581,6 +1581,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-12T16:01:07Z",
-  "generatedAt": "2026-05-12T16:01:07Z"
+  "generated_at": "2026-05-15T16:07:39Z",
+  "generatedAt": "2026-05-15T16:07:39Z"
 }
