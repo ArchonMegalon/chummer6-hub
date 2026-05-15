@@ -8,7 +8,6 @@
     var surfaceClass = ViewData["SurfaceClass"] as string ?? string.Empty;
     var authSurface = string.Equals(surfaceClass, "surface-auth", StringComparison.Ordinal);
     var headerClass = routeKey is "landing" or "login" or "signup" ? "site-header site-header--immersive" : "site-header";
-    var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass} {(authSurface ? string.Empty : "nav-panel-open")}".Trim();
     var supportLinks = chrome.SecondaryNavigation.Where(link =>
         link.Href is "/help" or "/faq" or "/privacy" or "/terms" or "/contact").ToArray();
     var productLinks = chrome.SecondaryNavigation.Except(supportLinks).ToArray();
@@ -76,6 +75,8 @@
     var nonBuildHeaderActions = chrome.HeaderActions.Where(action => !isBuildAction(action.Href)).ToArray();
     var isBuildCurrent = string.Equals(chrome.CurrentPath, "/downloads/release-upload", StringComparison.OrdinalIgnoreCase)
         || chrome.CurrentPath.StartsWith("/downloads/release-upload/", StringComparison.OrdinalIgnoreCase);
+    var defaultNavOpen = !authSurface && !isBuildCurrent;
+    var bodyClass = $"shell-body {(chrome.Authenticated ? "shell-authenticated" : "shell-public")} route-{routeKey} {surfaceClass} {(defaultNavOpen ? "nav-panel-open" : string.Empty)}".Trim();
     var compactFooter = routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "artifacts" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "privacy" or "terms" or "contact"
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
