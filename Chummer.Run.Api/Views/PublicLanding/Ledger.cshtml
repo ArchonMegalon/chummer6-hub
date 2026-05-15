@@ -5,6 +5,7 @@
     ViewData["SurfaceClass"] = "surface-ledger";
     var commandMap = Model.CommandMap;
     var featuredEvent = commandMap?.Events.FirstOrDefault();
+    var mapFocused = string.Equals(Model.CurrentSection, "map", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="trust-page-hero">
@@ -12,6 +13,13 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        @if (mapFocused)
+        {
+            <div class="trust-claim__microproof" aria-label="Map route focus">
+                <span>Focused route: /ledger/map</span>
+                <span>Command map section pinned below</span>
+            </div>
+        }
         <div class="trust-claim__microproof">
             <span>Opt-in aggregate only</span>
             <span>No player identities</span>
@@ -54,7 +62,7 @@
 
 @if (Model.World is not null)
 {
-    <section class="editorial-block" id="ledger-map">
+    <section class="editorial-block@(mapFocused ? " editorial-block--focused" : string.Empty)" id="ledger-map" tabindex="-1">
         <div class="editorial-block__lead">
             <p class="eyebrow">World map</p>
             <h2 class="editorial-title">@Model.World.PublicName</h2>
@@ -371,6 +379,17 @@
 
 <script>
 (() => {
+  const mapFocused = @Html.Raw(mapFocused ? "true" : "false");
+  if (mapFocused) {
+    const mapSection = document.getElementById('ledger-map');
+    if (mapSection) {
+      queueMicrotask(() => {
+        mapSection.scrollIntoView({ behavior: 'auto', block: 'start' });
+        mapSection.focus({ preventScroll: true });
+      });
+    }
+  }
+
   const root = document.querySelector('.ledger-command-map');
   if (!root) return;
   const panelTitle = document.querySelector('.ledger-command-map__panel-title');

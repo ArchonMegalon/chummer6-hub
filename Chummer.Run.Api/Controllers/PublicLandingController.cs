@@ -44,6 +44,12 @@ public sealed class PublicLandingController : Controller
     private readonly InstallLinkingService _installLinking;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
+    private readonly ReadyForTonightService _readyForTonight;
+    private readonly KnowledgeFabricService _knowledgeFabric;
+    private readonly NexusPanContinuityService _nexusPan;
+    private readonly MediaArtifactHorizonsService _mediaHorizons;
+    private readonly CommunityCreatorHorizonsService _communityCreatorHorizons;
+    private readonly WaveEightHorizonsService _waveEightHorizons;
     private readonly KarmaForgeDiscoveryService _karmaForge;
     private readonly BlackLedgerPublicStatsService _blackLedgerStats;
     private readonly BlackLedgerDispatchService _blackLedgerDispatches;
@@ -85,6 +91,12 @@ public sealed class PublicLandingController : Controller
         InstallLinkingService installLinking,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
+        ReadyForTonightService readyForTonight,
+        KnowledgeFabricService knowledgeFabric,
+        NexusPanContinuityService nexusPan,
+        MediaArtifactHorizonsService mediaHorizons,
+        CommunityCreatorHorizonsService communityCreatorHorizons,
+        WaveEightHorizonsService waveEightHorizons,
         KarmaForgeDiscoveryService karmaForge,
         BlackLedgerPublicStatsService blackLedgerStats,
         BlackLedgerDispatchService blackLedgerDispatches,
@@ -122,6 +134,12 @@ public sealed class PublicLandingController : Controller
         _installLinking = installLinking;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
+        _readyForTonight = readyForTonight;
+        _knowledgeFabric = knowledgeFabric;
+        _nexusPan = nexusPan;
+        _mediaHorizons = mediaHorizons;
+        _communityCreatorHorizons = communityCreatorHorizons;
+        _waveEightHorizons = waveEightHorizons;
         _karmaForge = karmaForge;
         _blackLedgerStats = blackLedgerStats;
         _blackLedgerDispatches = blackLedgerDispatches;
@@ -225,7 +243,7 @@ public sealed class PublicLandingController : Controller
             title: "What Is Real Now",
             description: "Readiness labels and direct evidence for what you can use today.",
             currentPath: "/now",
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Now.cshtml", model);
     }
 
@@ -304,7 +322,7 @@ public sealed class PublicLandingController : Controller
             detailBasePath: "/packages",
             subject,
             user,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Packages.cshtml", model);
     }
 
@@ -329,7 +347,7 @@ public sealed class PublicLandingController : Controller
                 : new TrustPageActionViewModel("Open account packages", "/account/packages", "secondary"),
             subject,
             user,
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/PackageDetail.cshtml", model);
     }
 
@@ -380,6 +398,12 @@ public sealed class PublicLandingController : Controller
     public Task<IActionResult> PackageVoteReceiptPage([FromRoute] string packageId, [FromRoute] string receiptId, CancellationToken cancellationToken)
         => BuildPackageActionReceiptPage(packageId, receiptId, "vote", cancellationToken);
 
+    [HttpPost("/packages/{packageId}/vote/revoke")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public async Task<IActionResult> RevokePackageVote([FromRoute] string packageId, CancellationToken cancellationToken)
+        => await RevokePackageAction(packageId, "vote", cancellationToken);
+
     [HttpGet("/packages/{packageId}/follow")]
     public IActionResult PackageFollowEntry([FromRoute] string packageId)
         => Redirect($"/packages/{Uri.EscapeDataString(packageId)}#community-actions");
@@ -426,6 +450,12 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public Task<IActionResult> PackageFollowReceiptPage([FromRoute] string packageId, [FromRoute] string receiptId, CancellationToken cancellationToken)
         => BuildPackageActionReceiptPage(packageId, receiptId, "follow", cancellationToken);
+
+    [HttpPost("/packages/{packageId}/follow/revoke")]
+    [ValidateAntiForgeryToken]
+    [Produces("text/html")]
+    public async Task<IActionResult> RevokePackageFollow([FromRoute] string packageId, CancellationToken cancellationToken)
+        => await RevokePackageAction(packageId, "follow", cancellationToken);
 
     [HttpGet("/account/packages")]
     [Produces("text/html")]
@@ -549,7 +579,7 @@ public sealed class PublicLandingController : Controller
             currentRoleKey: "player",
             primaryAction: new TrustPageActionViewModel("Open play shell", "/play", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
     }
 
@@ -576,7 +606,7 @@ public sealed class PublicLandingController : Controller
             currentRoleKey: currentRoleKey,
             primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open downloads", "/downloads", "secondary"),
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/MobileProjection.cshtml", model);
     }
 
@@ -604,7 +634,7 @@ public sealed class PublicLandingController : Controller
             intro: "A dedicated rules-light lane for mobile play, dispatches, faction consequence, and fast continuity. This is a playable preview, not full book-level rules completeness.",
             primaryAction: new TrustPageActionViewModel("Open Anarchy play shell", "/play/anarchy", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open Anarchy ledger lane", "/ledger/anarchy", "secondary"),
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Anarchy.cshtml", model);
     }
 
@@ -620,9 +650,19 @@ public sealed class PublicLandingController : Controller
             intro: "This route keeps a one-page runner sheet, continuity cues, and explainable export in one first-party play lane without pretending to be full dense-builder parity.",
             primaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "primary"),
             secondaryAction: new TrustPageActionViewModel("View dispatches through the Anarchy lens", "/ledger/dispatches?ruleset=anarchy", "secondary"),
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Anarchy.cshtml", model);
     }
+
+    [HttpGet("/anarchy/export/runner.json")]
+    [Produces("application/json")]
+    public IActionResult AnarchyExportJson()
+        => Content(_waveEightHorizons.BuildAnarchyExportJson(), "application/json");
+
+    [HttpGet("/anarchy/receipts/explain.json")]
+    [Produces("application/json")]
+    public IActionResult AnarchyExplainReceiptJson()
+        => Content(_waveEightHorizons.BuildAnarchyExplainJson(), "application/json");
 
     [HttpGet("/downloads/release-upload")]
     [Produces("text/html")]
@@ -1042,7 +1082,7 @@ public sealed class PublicLandingController : Controller
             "Supplemental Windows installer",
             "Direct Windows installer for verification and support outside the main recommended shelf.",
             $"/downloads/install/{artifactId}",
-            cancellationToken);
+            cancellationToken: cancellationToken);
         var release = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         string headLabel = string.Equals(proofInstaller.Head, "blazor-desktop", StringComparison.OrdinalIgnoreCase)
             ? "Blazor Desktop"
@@ -1378,9 +1418,239 @@ public sealed class PublicLandingController : Controller
             title: "Participate",
             description: "Public product signal stays visible here, while signed-in Codex access remains an optional account-linked lane.",
             currentPath: "/participate",
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
+
+    [HttpGet("/ready")]
+    [Produces("text/html")]
+    public async Task<IActionResult> ReadyForTonightPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildReadyForTonightPageModel(cancellationToken);
+        return View("~/Views/PublicLanding/ReadyForTonight.cshtml", model);
+    }
+
+    [HttpGet("/tonight")]
+    public IActionResult TonightAliasPage()
+        => Redirect("/ready");
+
+    [HttpGet("/ready/packet/{role}.md")]
+    [Produces("text/markdown")]
+    public IActionResult ReadyForTonightPacketMarkdown([FromRoute] string role)
+    {
+        var bytes = Encoding.UTF8.GetBytes(_readyForTonight.BuildPacketMarkdown(role));
+        return File(bytes, "text/markdown; charset=utf-8", $"chummer-ready-{role.Trim().ToLowerInvariant()}.md");
+    }
+
+    [HttpGet("/ready/packet/{role}.json")]
+    [Produces("application/json")]
+    public IActionResult ReadyForTonightPacketJson([FromRoute] string role)
+        => Content(_readyForTonight.BuildPacketJson(role), "application/json");
+
+    [HttpGet("/ready/loadout/{kitId}.json")]
+    [Produces("application/json")]
+    public IActionResult ReadyForTonightLoadoutJson([FromRoute] string kitId)
+        => Content(_readyForTonight.BuildLoadoutJson(kitId), "application/json");
+
+    [HttpGet("/ready/handoff/mobile.json")]
+    [Produces("application/json")]
+    public IActionResult ReadyForTonightMobileHandoff()
+        => Content(_readyForTonight.BuildMobileHandoffJson(), "application/json");
+
+    [HttpGet("/rules")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RulesKnowledgePage(CancellationToken cancellationToken)
+    {
+        var model = await BuildKnowledgeFabricPageModel(cancellationToken);
+        return View("~/Views/PublicLanding/KnowledgeFabric.cshtml", model);
+    }
+
+    [HttpGet("/knowledge")]
+    public IActionResult KnowledgeAliasPage()
+        => Redirect("/rules");
+
+    [HttpGet("/rules/receipts")]
+    [Produces("application/json")]
+    public IActionResult KnowledgeFabricReceiptIndex()
+        => Content(_knowledgeFabric.BuildIndexJson(), "application/json");
+
+    [HttpGet("/rules/receipts/{receiptId}.json")]
+    [Produces("application/json")]
+    public IActionResult KnowledgeFabricReceiptJson([FromRoute] string receiptId)
+        => Content(_knowledgeFabric.BuildReceiptJson(receiptId), "application/json");
+
+    [HttpGet("/play/continuity")]
+    [Produces("text/html")]
+    public async Task<IActionResult> ContinuityPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/NexusPanContinuity.cshtml", await BuildNexusPanContinuityPageModel(cancellationToken));
+
+    [HttpGet("/play/continuity/receipts")]
+    [Produces("application/json")]
+    public IActionResult NexusPanReceiptIndex()
+        => Content(_nexusPan.BuildIndexJson(), "application/json");
+
+    [HttpGet("/play/continuity/receipts/{receiptId}.json")]
+    [Produces("application/json")]
+    public IActionResult NexusPanReceiptJson([FromRoute] string receiptId)
+        => Content(_nexusPan.BuildReceiptJson(receiptId), "application/json");
+
+    [HttpGet("/mobile/pwa.json")]
+    [Produces("application/json")]
+    public IActionResult MobilePwaJson()
+        => Content(_nexusPan.BuildMobilePwaJson(), "application/json");
+
+    [HttpGet("/jackpoint")]
+    [Produces("text/html")]
+    public async Task<IActionResult> JackpointPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildJackpointPageModel(cancellationToken));
+
+    [HttpGet("/jackpoint/briefings/{briefingId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult JackpointBriefingMarkdown([FromRoute] string briefingId)
+        => Content(_mediaHorizons.BuildDocumentMarkdown(_mediaHorizons.GetJackpointBriefing(briefingId), "JACKPOINT", "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public rail."), "text/markdown");
+
+    [HttpGet("/jackpoint/briefings/{briefingId}.json")]
+    [Produces("application/json")]
+    public IActionResult JackpointBriefingJson([FromRoute] string briefingId)
+        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetJackpointBriefing(briefingId), "jackpoint", "Player-safe dossier and mission-brief output only. GM-private spoiler packets stay off the public rail."), "application/json");
+
+    [HttpGet("/briefings")]
+    public IActionResult BriefingsAliasPage()
+        => Redirect("/jackpoint");
+
+    [HttpGet("/runsites")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunsitePreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunsitePageModel(cancellationToken));
+
+    [HttpGet("/runsites/packs/{packId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult RunsitePackMarkdown([FromRoute] string packId)
+        => Content(_mediaHorizons.BuildDocumentMarkdown(_mediaHorizons.GetRunsitePack(packId), "RUNSITE", "Spatial-prep packet only. This route does not claim a full overlay, VTT, or tactical authority stack."), "text/markdown");
+
+    [HttpGet("/runsites/packs/{packId}.json")]
+    [Produces("application/json")]
+    public IActionResult RunsitePackJson([FromRoute] string packId)
+        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetRunsitePack(packId), "runsite", "Spatial-prep packet only. This route does not claim a full overlay, VTT, or tactical authority stack."), "application/json");
+
+    [HttpGet("/runbook")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunbookPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunbookPageModel(cancellationToken));
+
+    [HttpGet("/runbook/primers/{primerId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult RunbookPrimerMarkdown([FromRoute] string primerId)
+        => Content(_mediaHorizons.BuildDocumentMarkdown(_mediaHorizons.GetRunbookPrimer(primerId), "RUNBOOK PRESS", "Printable onboarding and prep packets only. This route does not claim a full long-form publishing studio."), "text/markdown");
+
+    [HttpGet("/runbook/primers/{primerId}.json")]
+    [Produces("application/json")]
+    public IActionResult RunbookPrimerJson([FromRoute] string primerId)
+        => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetRunbookPrimer(primerId), "runbook_press", "Printable onboarding and prep packets only. This route does not claim a full long-form publishing studio."), "application/json");
+
+    [HttpGet("/primers")]
+    public IActionResult PrimersAliasPage()
+        => Redirect("/runbook");
+
+    [HttpGet("/community")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CommunityPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildCommunityHubPageModel(cancellationToken));
+
+    [HttpGet("/runs")]
+    public IActionResult RunsAliasPage()
+        => Redirect("/community");
+
+    [HttpGet("/organizers")]
+    public IActionResult OrganizersAliasPage()
+        => Redirect("/community");
+
+    [HttpGet("/creator")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CreatorPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildCreatorOsPageModel(cancellationToken));
+
+    [HttpGet("/ghostwire")]
+    [Produces("text/html")]
+    public async Task<IActionResult> GhostwirePreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildGhostwirePageModel(cancellationToken));
+
+    [HttpGet("/ghostwire/after-action/{packetId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult GhostwirePacketMarkdown([FromRoute] string packetId)
+        => Content(_waveEightHorizons.BuildGhostwireMarkdown(packetId), "text/markdown");
+
+    [HttpGet("/ghostwire/after-action/{packetId}.json")]
+    [Produces("application/json")]
+    public IActionResult GhostwirePacketJson([FromRoute] string packetId)
+        => Content(_waveEightHorizons.BuildGhostwireJson(packetId), "application/json");
+
+    [HttpGet("/exports/foundry")]
+    [Produces("text/html")]
+    public async Task<IActionResult> FoundryHandoffPage(CancellationToken cancellationToken)
+    {
+        var model = await BuildHorizonPreviewPageModel(
+            pageId: "foundry-handoff",
+            title: "Foundry handoff",
+            description: "Governed Foundry export remains intentionally parked until packet truth and map metadata transport can be proven together.",
+            currentPath: "/exports/foundry",
+            eyebrow: "Honestly parked",
+            heading: "Foundry handoff",
+            intro: "Foundry handoff is intentionally parked. Chummer does not currently claim a shipped public Foundry packet lane, and this route exists to make that boundary explicit instead of vague.",
+            summaryPoints:
+            [
+                "Honestly parked",
+                "No public Foundry packet claim",
+                "Map authority not exported"
+            ],
+            sections:
+            [
+                new TrustPageSectionViewModel("foundry-boundary", "Boundary", "Do not overclaim the export lane", "Foundry handoff stays parked until first-party export truth, map metadata transport, and moderation-safe publication posture can be proven together.", ["Parked on purpose", "No fake public export", "No third-party truth owner"]),
+                new TrustPageSectionViewModel("foundry-next", "Next real step", "Proof before promotion", "The next honest promotion step is a governed handoff packet with first-party receipts, not roadmap prose alone.", ["Governed packet", "Receipt proof", "Future promotion gate"])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Open runsites", "/runsites", "primary"),
+                new TrustPageActionViewModel("Open roadmap", "/roadmap/foundry-vtt-handoff", "secondary")
+            ],
+            cancellationToken: cancellationToken);
+        return View("~/Views/PublicLanding/TrustPage.cshtml", model);
+    }
+
+    [HttpGet("/passport")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunnerPassportPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunnerPassportPageModel(cancellationToken));
+
+    [HttpGet("/community/open-runs/{packetId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult CommunityOpenRunPacketMarkdown([FromRoute] string packetId)
+        => Content(_communityCreatorHorizons.BuildCommunityMarkdown(packetId), "text/markdown");
+
+    [HttpGet("/community/open-runs/{packetId}.json")]
+    [Produces("application/json")]
+    public IActionResult CommunityOpenRunPacketJson([FromRoute] string packetId)
+        => Content(_communityCreatorHorizons.BuildCommunityJson(packetId), "application/json");
+
+    [HttpGet("/creator/packets/{packetId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult CreatorPacketMarkdown([FromRoute] string packetId)
+        => Content(_communityCreatorHorizons.BuildCreatorMarkdown(packetId), "text/markdown");
+
+    [HttpGet("/creator/packets/{packetId}.json")]
+    [Produces("application/json")]
+    public IActionResult CreatorPacketJson([FromRoute] string packetId)
+        => Content(_communityCreatorHorizons.BuildCreatorJson(packetId), "application/json");
+
+    [HttpGet("/passport/receipts/{receiptId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult PassportReceiptMarkdown([FromRoute] string receiptId)
+        => Content(_communityCreatorHorizons.BuildPassportMarkdown(receiptId), "text/markdown");
+
+    [HttpGet("/passport/receipts/{receiptId}.json")]
+    [Produces("application/json")]
+    public IActionResult PassportReceiptJson([FromRoute] string receiptId)
+        => Content(_communityCreatorHorizons.BuildPassportJson(receiptId), "application/json");
 
     [HttpGet("/karma-forge")]
     public IActionResult KarmaForgeAliasPage()
@@ -1400,7 +1670,7 @@ public sealed class PublicLandingController : Controller
             request,
             submissionNotice: null,
             validationErrors: Array.Empty<string>(),
-            cancellationToken);
+            cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/KarmaForge.cshtml", model);
     }
 
@@ -2737,12 +3007,16 @@ public sealed class PublicLandingController : Controller
             LatestVoteReceipt: latestVoteReceipt,
             LatestFollowReceipt: latestFollowReceipt,
             CanInteract: authenticated,
+            CanRevokeVote: latestVoteReceipt is not null,
+            CanRevokeFollow: latestFollowReceipt is not null,
             VoteActionHref: authenticated
                 ? $"/packages/{Uri.EscapeDataString(package.PackageId)}/vote"
                 : $"/login?next={Uri.EscapeDataString($"/packages/{package.PackageId}")}",
             FollowActionHref: authenticated
                 ? $"/packages/{Uri.EscapeDataString(package.PackageId)}/follow"
                 : $"/signup?next={Uri.EscapeDataString($"/packages/{package.PackageId}")}",
+            RevokeVoteActionHref: authenticated ? $"/packages/{Uri.EscapeDataString(package.PackageId)}/vote/revoke" : null,
+            RevokeFollowActionHref: authenticated ? $"/packages/{Uri.EscapeDataString(package.PackageId)}/follow/revoke" : null,
             VoteActionLabel: authenticated ? "Vote for this package" : "Sign in to vote",
             FollowActionLabel: authenticated ? "Follow this package" : "Create account to follow",
             PrimaryAction: new TrustPageActionViewModel(package.PrimaryActionLabel, package.PrimaryActionHref, "primary"),
@@ -2759,10 +3033,13 @@ public sealed class PublicLandingController : Controller
     {
         PublicPackageDefinition? package = _packageCatalog.FindPackage(packageId);
         PublicPackageReceipt? receipt = _packageCatalog.FindReceipt(receiptId);
+        bool actionKindMatches = receipt is not null
+            && (string.Equals(receipt.ActionKind, expectedActionKind, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(receipt.ActionKind, $"revoke_{expectedActionKind}", StringComparison.OrdinalIgnoreCase));
         if (package is null
             || receipt is null
             || !string.Equals(receipt.PackageId, package.PackageId, StringComparison.OrdinalIgnoreCase)
-            || !string.Equals(receipt.ActionKind, expectedActionKind, StringComparison.OrdinalIgnoreCase))
+            || !actionKindMatches)
         {
             return NotFound();
         }
@@ -2774,13 +3051,13 @@ public sealed class PublicLandingController : Controller
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
         SiteChromeViewModel chrome = subject is not null && user is not null
             ? _chrome.BuildAuthenticatedChrome(
-                $"{BuildPackageActionLabel(expectedActionKind)} receipt",
+                $"{BuildPackageActionLabel(receipt.ActionKind)} receipt",
                 receipt.RouteSummary,
                 currentPath,
                 user.DisplayName,
                 user.Email)
             : await BuildPublicOrAuthenticatedChromeAsync(
-                $"{BuildPackageActionLabel(expectedActionKind)} receipt",
+                $"{BuildPackageActionLabel(receipt.ActionKind)} receipt",
                 receipt.RouteSummary,
                 currentPath,
                 cancellationToken);
@@ -2791,7 +3068,7 @@ public sealed class PublicLandingController : Controller
             new PackageActionReceiptPageViewModel(
                 Chrome: chrome,
                 Eyebrow: "First-party package receipt",
-                Heading: $"{BuildPackageActionLabel(expectedActionKind)} recorded",
+                Heading: $"{BuildPackageActionLabel(receipt.ActionKind)} recorded",
                 Intro: "This receipt stays inside Chummer-owned package routes so package interest, compatibility posture, and later follow-through do not disappear into an external board or generic support thread.",
                 Package: packageEntry,
                 Receipt: receiptCard,
@@ -2801,6 +3078,71 @@ public sealed class PublicLandingController : Controller
                     : new TrustPageActionViewModel("Open account packages", "/account/packages", "secondary"),
                 TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
                 SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience)));
+    }
+
+    private async Task<IActionResult> RevokePackageAction(
+        string packageId,
+        string actionKind,
+        CancellationToken cancellationToken)
+    {
+        PublicPackageDefinition? package = _packageCatalog.FindPackage(packageId);
+        if (package is null)
+        {
+            return NotFound();
+        }
+
+        string currentPath = $"/packages/{Uri.EscapeDataString(package.PackageId)}";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            PublicPackageReceipt receipt = _packageCatalog.RecordRevoke(package.PackageId, actionKind, subject.SubjectId, user.DisplayName);
+            return Redirect($"/packages/{Uri.EscapeDataString(package.PackageId)}/{Uri.EscapeDataString(actionKind)}/{Uri.EscapeDataString(receipt.ReceiptId)}");
+        }
+        catch (InvalidOperationException)
+        {
+            return Redirect($"{currentPath}#community-actions");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Package {ActionKind} revoke could not confirm the signed-in identity.", actionKind);
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    private async Task<KnowledgeFabricPageViewModel> BuildKnowledgeFabricPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome("Knowledge Fabric", "Source-aware explain, provenance, and public-safe receipts on one first-party rail.", "/rules", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Knowledge Fabric", "Source-aware explain, provenance, and public-safe receipts on one first-party rail.", "/rules", cancellationToken);
+
+        return new KnowledgeFabricPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Trust horizon",
+            Heading: "Knowledge Fabric",
+            Intro: "This page turns rules trust into an inspectable surface: provenance, source-safe summaries, and downloadable explain receipts stay attached without leaking copyrighted text or private campaign state.",
+            SummaryPoints:
+            [
+                "Provenance stays attached",
+                "Source-safe summaries only",
+                "Explain receipts stay downloadable"
+            ],
+            Receipts: _knowledgeFabric.ListReceipts()
+                .Select(receipt => new KnowledgeFabricReceiptViewModel(receipt.ReceiptId, receipt.Topic, receipt.Summary, receipt.Provenance, receipt.Route, receipt.Status))
+                .ToArray(),
+            PrimaryAction: new TrustPageActionViewModel("Open receipt index JSON", "/rules/receipts", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("See what works today", "/now#real-rules-truth", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open packages", "/packages", "ghost"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
 
     private async Task<MobileProjectionPageViewModel> BuildMobileProjectionPageModel(
@@ -2819,6 +3161,7 @@ public sealed class PublicLandingController : Controller
         HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        var continuitySummary = _nexusPan.BuildPublicSummary();
         SiteChromeViewModel chrome = subject is not null && user is not null
             ? _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email)
             : await BuildPublicOrAuthenticatedChromeAsync(chromeTitle, chromeDescription, currentPath, cancellationToken);
@@ -2828,7 +3171,7 @@ public sealed class PublicLandingController : Controller
             Heading: heading,
             Intro: intro,
             CurrentRoleLabel: ResolvePlayRoleLabel(currentRoleKey),
-            InstallabilitySummary: "The public rail names the installable PWA posture, reconnect expectations, and role entry routes without pretending the mobile shell replaces downloads, support, or deeper campaign work.",
+            InstallabilitySummary: $"The public rail names the installable PWA posture, reconnect expectations, and role entry routes without pretending the mobile shell replaces downloads, support, or deeper campaign work. Claimed installs currently tracked: {continuitySummary.ActiveInstallationCount}; pending recovery rails: {continuitySummary.PendingClaimCount + continuitySummary.PendingBrowserCallbackCount}.",
             Roles:
             [
                 new MobileRoleCardViewModel("Player", "Resume the session, keep the dossier visible, and re-enter with reconnect posture already named.", "/player", string.Equals(currentRoleKey, "player", StringComparison.OrdinalIgnoreCase)),
@@ -2840,10 +3183,235 @@ public sealed class PublicLandingController : Controller
                 new MobileCapabilityCardViewModel("Installable PWA posture", "The public route keeps the installable shell, trusted entry point, and fallback posture on first-party routes."),
                 new MobileCapabilityCardViewModel("Offline and reconnect", "Continuity, reconnect, and next-safe-action posture remain visible before the network starts wobbling."),
                 new MobileCapabilityCardViewModel("Role-aware entry", "Player, GM, and observer aliases all converge on the same bounded play shell instead of splitting product truth."),
+                new MobileCapabilityCardViewModel("Claimed install truth", $"Active claimed installs: {continuitySummary.ActiveInstallationCount}; active grants: {continuitySummary.ActiveGrantCount}; observed platforms: {string.Join(", ", continuitySummary.PlatformLabels.DefaultIfEmpty("none yet"))}."),
                 new MobileCapabilityCardViewModel("Downloads stay separate", "Mobile entry explains play posture; Downloads still owns platform choice, build integrity, and guided acquisition.")
             ],
             PrimaryAction: primaryAction,
             SecondaryAction: secondaryAction,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private async Task<NexusPanContinuityPageViewModel> BuildNexusPanContinuityPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        var summary = _nexusPan.BuildPublicSummary();
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome("NEXUS-PAN continuity", "Claimed installs, reconnect posture, and public-safe continuity receipts on a first-party rail.", "/play/continuity", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("NEXUS-PAN continuity", "Claimed installs, reconnect posture, and public-safe continuity receipts on a first-party rail.", "/play/continuity", cancellationToken);
+
+        string platformSummary = summary.PlatformLabels.Count == 0
+            ? "No claimed-install platform labels are public yet, but the route still proves the continuity contract and the public/private boundary."
+            : $"Observed claimed-install platforms on the first-party rail: {string.Join(", ", summary.PlatformLabels)}.";
+
+        return new NexusPanContinuityPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Continuity horizon",
+            Heading: "NEXUS-PAN continuity",
+            Intro: "This route is no longer vague preview copy. It exposes the real continuity contract: claimed installs, reconnect posture, public-safe receipts, and the explicit boundary where signed-in runboard state begins.",
+            VerdictSummary: "Continuity is now a first-party MVP surface: the public route shows aggregate install and recovery posture, while deeper device and workspace history stays on signed-in rails.",
+            PlatformSummary: platformSummary,
+            SummaryPoints:
+            [
+                "Claimed install truth stays first-party",
+                "Reconnect posture stays inspectable",
+                "Signed-in runboard history stays private"
+            ],
+            ActiveInstallationCount: summary.ActiveInstallationCount,
+            ActiveGrantCount: summary.ActiveGrantCount,
+            PendingClaimCount: summary.PendingClaimCount,
+            PendingBrowserCallbackCount: summary.PendingBrowserCallbackCount,
+            PlatformLabels: summary.PlatformLabels.Count == 0 ? ["No public platform labels yet"] : summary.PlatformLabels,
+            Receipts: _nexusPan.ListReceipts()
+                .Select(receipt => new NexusPanReceiptViewModel(receipt.ReceiptId, receipt.Topic, receipt.Summary, receipt.Route, receipt.Status))
+                .ToArray(),
+            PrimaryAction: new TrustPageActionViewModel("Open receipt index JSON", "/play/continuity/receipts", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open mobile PWA JSON", "/mobile/pwa.json", "ghost"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildJackpointPageModel(CancellationToken cancellationToken)
+        => await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/jackpoint",
+            title: "JACKPOINT briefings",
+            description: "Player-safe dossier cards, mission briefs, and first-party artifact packets.",
+            eyebrow: "Media horizon",
+            heading: "JACKPOINT briefings",
+            intro: "JACKPOINT is now a real packet lane: dossier cards and mission briefs can be opened as first-party markdown or JSON instead of surviving only as horizon prose.",
+            boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers and private campaign notes stay off the public rail.",
+            summaryPoints: ["Dossier cards", "Mission brief packets", "Public-safe artifact rail"],
+            documents: _mediaHorizons.ListJackpointBriefings(),
+            primaryAction: new TrustPageActionViewModel("Open first briefing", "/jackpoint/briefings/emerald-sprawl-briefing.md", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open JSON packet", "/jackpoint/briefings/emerald-sprawl-briefing.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open artifacts", "/artifacts", "ghost"),
+            cancellationToken: cancellationToken);
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildRunsitePageModel(CancellationToken cancellationToken)
+        => await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/runsites",
+            title: "RUNSITE packets",
+            description: "Site cards, threat clocks, and first-party runsite packets.",
+            eyebrow: "Packet horizon",
+            heading: "RUNSITE packets",
+            intro: "RUNSITE now ships as a packet lane: site cards, pressure clocks, and entry/exit notes live on real routes instead of generic preview copy.",
+            boundaryLine: "Spatial-prep packet only. This rail does not claim tactical overlays, live map authority, or full VTT integration.",
+            summaryPoints: ["Site cards", "Threat clocks", "Entry and exit notes"],
+            documents: _mediaHorizons.ListRunsitePacks(),
+            primaryAction: new TrustPageActionViewModel("Open first runsite pack", "/runsites/packs/redmond-dockyard-pack.md", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open JSON pack", "/runsites/packs/redmond-dockyard-pack.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open runbook", "/runbook", "ghost"),
+            cancellationToken: cancellationToken);
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildRunbookPageModel(CancellationToken cancellationToken)
+        => await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/runbook",
+            title: "RUNBOOK PRESS",
+            description: "Printable primers and first-session onboarding packets.",
+            eyebrow: "Primer horizon",
+            heading: "RUNBOOK PRESS",
+            intro: "RUNBOOK PRESS now ships real first-party primers: packets you can hand to a player or GM without sending them into scattered docs.",
+            boundaryLine: "Printable onboarding and prep packets only. This rail does not claim a full long-form publication studio yet.",
+            summaryPoints: ["New-player primer", "GM primer", "Printable packet posture"],
+            documents: _mediaHorizons.ListRunbookPrimers(),
+            primaryAction: new TrustPageActionViewModel("Open first primer", "/runbook/primers/new-runner-primer.md", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open primer JSON", "/runbook/primers/new-runner-primer.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open Ready for Tonight", "/ready", "ghost"),
+            cancellationToken: cancellationToken);
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildCommunityHubPageModel(CancellationToken cancellationToken)
+    {
+        CommunityHubPublicSummary summary = _communityCreatorHorizons.BuildCommunitySummary();
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/community",
+            title: "Community Hub",
+            description: "Open-run board, organizer closeout posture, and moderation-safe public rails.",
+            eyebrow: "Community horizon",
+            heading: "Community Hub",
+            intro: "Community Hub now ships first-party packet rails: open-run board posture, organizer closeout proof, and moderation boundaries live on real markdown and JSON routes.",
+            boundaryLine: "Public route shows board posture and safety boundaries only. Private roster notes, meeting access, and case handling stay signed-in.",
+            summaryPoints:
+            [
+                $"{summary.OpenRuns.Count} open runs visible",
+                $"{summary.PendingJoinCount} pending join requests",
+                $"{summary.CloseoutCount} closeouts on record"
+            ],
+            documents: _communityCreatorHorizons.ListCommunityDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            primaryAction: new TrustPageActionViewModel("Open run board packet", "/community/open-runs/open_run_board.md", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open JSON board", "/community/open-runs/open_run_board.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open participate", "/participate", "ghost"),
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildCreatorOsPageModel(CancellationToken cancellationToken)
+    {
+        CreatorOsPublicSummary summary = _communityCreatorHorizons.BuildCreatorSummary();
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/creator",
+            title: "Creator OS",
+            description: "Governed publication discovery, trust posture, and campaign return loops.",
+            eyebrow: "Creator horizon",
+            heading: "Creator OS",
+            intro: "Creator OS now ships first-party publication packets: governed discovery, trust-boundary receipts, and campaign-return posture on real routes.",
+            boundaryLine: "Creator truth comes from Chummer-owned publication receipts. Private review state and provider dashboards stay off the public lane.",
+            summaryPoints:
+            [
+                $"{summary.Publications.Count} discoverable publications",
+                $"{summary.CuratedLiveCount} curated live",
+                $"{summary.ReturnLoopCount} with campaign return summaries"
+            ],
+            documents: _communityCreatorHorizons.ListCreatorDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            primaryAction: new TrustPageActionViewModel("Open publication board", "/creator/packets/publication_board.md", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open publication JSON", "/creator/packets/publication_board.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open artifacts", "/artifacts", "ghost"),
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildRunnerPassportPageModel(CancellationToken cancellationToken)
+    {
+        RunnerPassportPublicSummary summary = _communityCreatorHorizons.BuildPassportSummary();
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/passport",
+            title: "Runner Passport",
+            description: "Public-safe runner return posture, participation proof, and bounded cross-table trust.",
+            eyebrow: "Identity horizon",
+            heading: "Runner Passport",
+            intro: "Runner Passport now ships real public-safe receipts: runner return posture, bounded cross-table trust, and privacy-safe participation proof on first-party routes.",
+            boundaryLine: "The public lane exposes aggregate readiness and trust boundaries only. Private identity links, moderation state, and account recovery stay signed-in.",
+            summaryPoints:
+            [
+                $"{summary.ActiveInstallationCount} active claimed installs",
+                $"{summary.OpenRunCount} open runs on the public board",
+                $"{summary.PendingJoinCount} pending join requests"
+            ],
+            documents: _communityCreatorHorizons.ListPassportDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            primaryAction: new TrustPageActionViewModel("Open runner return receipt", "/passport/receipts/runner_return_posture.md", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open receipt JSON", "/passport/receipts/runner_return_posture.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open community", "/community", "ghost"),
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildGhostwirePageModel(CancellationToken cancellationToken)
+    {
+        GhostwirePublicSummary summary = _waveEightHorizons.BuildGhostwireSummary();
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/ghostwire",
+            title: "GHOSTWIRE after-action",
+            description: "Receipt-backed replay packets, after-action reports, and consequence carry-forward.",
+            eyebrow: "Replay horizon",
+            heading: "GHOSTWIRE after-action",
+            intro: "GHOSTWIRE now ships first-party after-action packet rails: replay timelines, after-action reports, and consequence-chain packets live on real markdown and JSON routes.",
+            boundaryLine: "Replay stays receipt-backed and public-safe. No private transcript lane and no retrospective fiction engine are claimed here.",
+            summaryPoints:
+            [
+                $"{summary.Packages.Count} aftermath packets on record",
+                $"{summary.AfterActionCount} after-action reports",
+                $"{summary.ReplayCount} replay timelines"
+            ],
+            documents: _waveEightHorizons.ListGhostwireDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            primaryAction: new TrustPageActionViewModel("Open replay timeline", "/ghostwire/after-action/replay_timeline.md", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open replay JSON", "/ghostwire/after-action/replay_timeline.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open ledger", "/ledger", "ghost"),
+            cancellationToken: cancellationToken);
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildMediaArtifactHorizonPageModel(
+        string currentPath,
+        string title,
+        string description,
+        string eyebrow,
+        string heading,
+        string intro,
+        string boundaryLine,
+        IReadOnlyList<string> summaryPoints,
+        IReadOnlyList<MediaArtifactDocument> documents,
+        TrustPageActionViewModel primaryAction,
+        TrustPageActionViewModel secondaryAction,
+        TrustPageActionViewModel tertiaryAction,
+        CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome(title, description, currentPath, user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync(title, description, currentPath, cancellationToken);
+        return new MediaArtifactHorizonPageViewModel(
+            Chrome: chrome,
+            Eyebrow: eyebrow,
+            Heading: heading,
+            Intro: intro,
+            BoundaryLine: boundaryLine,
+            SummaryPoints: summaryPoints,
+            Documents: documents.Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            PrimaryAction: primaryAction,
+            SecondaryAction: secondaryAction,
+            TertiaryAction: tertiaryAction,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
@@ -2877,9 +3445,65 @@ public sealed class PublicLandingController : Controller
     }
 
     private static string BuildPackageActionLabel(string actionKind)
-        => string.Equals(actionKind, "follow", StringComparison.OrdinalIgnoreCase)
-            ? "Follow"
-            : "Vote";
+        => actionKind.Trim().ToLowerInvariant() switch
+        {
+            "follow" => "Follow",
+            "revoke_follow" => "Follow revoked",
+            "revoke_vote" => "Vote revoked",
+            _ => "Vote"
+        };
+
+    private async Task<ReadyForTonightPageViewModel> BuildReadyForTonightPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome("Ready for Tonight", "Get a player, GM, or organizer to a usable session packet without pretending the whole product collapses into one screen.", "/ready", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Ready for Tonight", "Role verdicts, starter loadouts, and packet exports for the shortest honest route into tonight's run.", "/ready", cancellationToken);
+
+        var verdicts = _readyForTonight.ListRoleVerdicts()
+            .Select(verdict => new ReadyVerdictCardViewModel(
+                verdict.RoleId,
+                verdict.RoleLabel,
+                verdict.Status,
+                verdict.StatusLabel,
+                verdict.Summary,
+                verdict.BlockingReasons,
+                verdict.ChangedSinceLastSession,
+                verdict.FixNowActions.Select(action => new TrustPageActionViewModel(action.Label, action.Href, action.Tone)).ToArray(),
+                verdict.NextBestScreen,
+                verdict.ProofReceipts))
+            .ToArray();
+        var kits = _readyForTonight.ListRoleKits()
+            .Select(kit => new ReadyRoleKitViewModel(kit.KitId, kit.RoleLane, kit.Label, kit.Summary, kit.DownloadHref, kit.Highlights))
+            .ToArray();
+        var packets = _readyForTonight.ListPacketAssets()
+            .Select(packet => new ReadyPacketAssetViewModel(packet.RoleId, packet.Label, packet.Summary, packet.MarkdownHref, packet.JsonHref))
+            .ToArray();
+
+        return new ReadyForTonightPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Session-start mode",
+            Heading: "Ready for Tonight",
+            Intro: "This page answers the only urgent question before a game starts: are you ready, what still blocks you, and which packet should you carry into the session right now.",
+            VerdictSummary: "Chummer now ships one bounded first-party session-start rail: role verdict, starter loadout, packet export, and mobile handoff in one place.",
+            SummaryPoints:
+            [
+                "Role-aware readiness verdicts",
+                "Starter loadouts with downloadable JSON",
+                "Printable packets and mobile handoff"
+            ],
+            Verdicts: verdicts,
+            RoleKits: kits,
+            Packets: packets,
+            PrimaryAction: new TrustPageActionViewModel("Download player packet", "/ready/packet/player.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open mobile and PWA", "/mobile", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open help", "/help", "ghost"),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
 
     private static string NormalizePlayRole(string? role)
         => role?.Trim().ToLowerInvariant() switch
@@ -3866,6 +4490,36 @@ public sealed class PublicLandingController : Controller
             SignalLoop: signalLoop,
             SignalProjection: signalProjection,
             SignalOperations: signalOperations,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private async Task<TrustPageViewModel> BuildHorizonPreviewPageModel(
+        string pageId,
+        string title,
+        string description,
+        string currentPath,
+        string eyebrow,
+        string heading,
+        string intro,
+        IReadOnlyList<TrustPageSectionViewModel> sections,
+        IReadOnlyList<TrustPageActionViewModel> actions,
+        CancellationToken cancellationToken,
+        IReadOnlyList<string>? summaryPoints = null)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync(title, description, currentPath, cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+
+        return new TrustPageViewModel(
+            PageId: pageId,
+            Chrome: chrome,
+            Eyebrow: eyebrow,
+            Heading: heading,
+            Intro: intro,
+            Sections: sections,
+            Actions: actions,
+            SummaryPoints: summaryPoints,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }
@@ -7765,9 +8419,10 @@ echo "Help: ${HELP_URL}"
             ? dispatches.FirstOrDefault()
             : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase));
         var commandMap = _blackLedgerStats.LoadCommandMap(requestedTurn, selectedMapMode ?? "influence");
+        var mapFocused = string.Equals(currentSection, "map", StringComparison.OrdinalIgnoreCase);
         var intro = world?.DeterministicPreview == true
             ? "This deterministic turn-two preview shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
-            : "Six starter factions entered the Ledger. AI stewards are holding faction leader, GM, and intel-provider posts until humans take over. Turn 1 already ran, and the first receipt is public-safe.";
+            : "A fictional, public-safe seed world with six factions, visible pressure zones, and bounded dispatches.";
         if (!string.IsNullOrWhiteSpace(selectedFactionId))
         {
             intro = $"Receipt-backed faction dispatches for {selectedFactionId}. This lane stays public-safe and never publishes free-floating lore.";
@@ -7777,6 +8432,10 @@ echo "Help: ${HELP_URL}"
         {
             intro = "This Anarchy lens reads the same public-safe Black Ledger dispatch receipts through a rules-light play profile. It does not invent separate unsupported fiction or flatten Anarchy into an SR5/SR6 toggle.";
         }
+        else if (mapFocused)
+        {
+            intro = "Focused command-map view for the seeded Emerald Sprawl world. District pressure, event arcs, and replay controls stay public-safe, route-backed, and visibly distinct from the broader ledger overview.";
+        }
 
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
@@ -7784,8 +8443,10 @@ echo "Help: ${HELP_URL}"
                 "Public-safe campaign pressure, package heat, and proof-backed closeout movement.",
                 currentPath,
                 cancellationToken),
-            Eyebrow: "Black Ledger preview",
-            Heading: "Emerald Sprawl: First Pressure",
+            Eyebrow: mapFocused ? "Black Ledger command map" : "Black Ledger preview",
+            Heading: mapFocused
+                ? $"{world?.PublicName ?? "Emerald Sprawl: First Pressure"} command map"
+                : world?.PublicName ?? "Emerald Sprawl: First Pressure",
             Intro: intro,
             CurrentSection: currentSection,
             World: world,
@@ -7795,8 +8456,10 @@ echo "Help: ${HELP_URL}"
             Dispatches: dispatches,
             SelectedDispatch: selectedDispatch,
             CommandMap: commandMap,
-            PrimaryAction: new TrustPageActionViewModel("Open command map", "/ledger/map", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Inspect tick receipt", "/ledger/closeouts", "secondary"),
+            PrimaryAction: mapFocused
+                ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
+                : new TrustPageActionViewModel("Open command map", "/ledger/map#ledger-map", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Read dispatches", "/ledger/dispatches", "secondary"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }
