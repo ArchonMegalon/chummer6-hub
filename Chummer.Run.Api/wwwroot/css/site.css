@@ -286,13 +286,17 @@ button.button-like {
   display: inline-flex;
 }
 
-.shell-public {
+.shell-public,
+.shell-authenticated {
   --nav-panel-width: 20rem;
 }
 
 .shell-public.nav-panel-open .site-header,
 .shell-public.nav-panel-open .site-main,
-.shell-public.nav-panel-open .site-footer {
+.shell-public.nav-panel-open .site-footer,
+.shell-authenticated.nav-panel-open .site-header,
+.shell-authenticated.nav-panel-open .site-main,
+.shell-authenticated.nav-panel-open .site-footer {
   margin-left: calc(var(--nav-panel-width) + 1.25rem);
   width: calc(100% - var(--nav-panel-width) - 1.25rem);
   transition: margin-left 180ms ease;
@@ -300,7 +304,10 @@ button.button-like {
 
 .shell-public:not(.nav-panel-open) .site-header,
 .shell-public:not(.nav-panel-open) .site-main,
-.shell-public:not(.nav-panel-open) .site-footer {
+.shell-public:not(.nav-panel-open) .site-footer,
+.shell-authenticated:not(.nav-panel-open) .site-header,
+.shell-authenticated:not(.nav-panel-open) .site-main,
+.shell-authenticated:not(.nav-panel-open) .site-footer {
   margin-left: 0;
   width: auto;
   transition: margin-left 180ms ease;
@@ -442,7 +449,8 @@ button.button-like {
     opacity: 1;
   }
 
-  .shell-public:not(.nav-panel-open) .site-sidebar {
+  .shell-public:not(.nav-panel-open) .site-sidebar,
+  .shell-authenticated:not(.nav-panel-open) .site-sidebar {
     transform: translateX(calc(-100% - 1.5rem));
     opacity: 0;
     pointer-events: none;
@@ -4171,7 +4179,10 @@ td {
 
   .shell-public.nav-panel-open .site-header,
   .shell-public.nav-panel-open .site-main,
-  .shell-public.nav-panel-open .site-footer {
+  .shell-public.nav-panel-open .site-footer,
+  .shell-authenticated.nav-panel-open .site-header,
+  .shell-authenticated.nav-panel-open .site-main,
+  .shell-authenticated.nav-panel-open .site-footer {
     margin-left: 0;
   }
 
@@ -4184,7 +4195,8 @@ td {
     opacity: 0;
   }
 
-  .shell-public.nav-panel-open .site-sidebar {
+  .shell-public.nav-panel-open .site-sidebar,
+  .shell-authenticated.nav-panel-open .site-sidebar {
     transform: translateX(0);
     opacity: 1;
   }
