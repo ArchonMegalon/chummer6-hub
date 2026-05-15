@@ -24,10 +24,13 @@ public sealed class ReleaseUploadEntryPointTests
     {
         string layout = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml"));
         string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "site.js"));
+        string css = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css"));
 
         Assert.Contains("var defaultNavOpen = !authSurface && !isBuildCurrent;", layout, StringComparison.Ordinal);
         Assert.Contains("route-downloads-release-upload", script, StringComparison.Ordinal);
         Assert.Contains("if (forceDesktopNavCollapsed)", script, StringComparison.Ordinal);
         Assert.Contains("closeNavPanel();", script, StringComparison.Ordinal);
+        Assert.Contains(".shell-authenticated:not(.nav-panel-open) .site-sidebar", css, StringComparison.Ordinal);
+        Assert.Contains(".shell-authenticated.nav-panel-open .site-sidebar", css, StringComparison.Ordinal);
     }
 }
