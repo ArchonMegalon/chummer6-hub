@@ -288,7 +288,7 @@ public sealed class PublicPackageCatalogService
                 "Desktop install package",
                 "Live now",
                 [
-                    "Matches the current preview channels on Downloads across Windows, macOS, and Linux.",
+                    "Matches the current release channels on Downloads across Windows, macOS, and Linux.",
                     "Guided claim, recovery, and install help stay tied to the same published build instead of a separate account-only binary.",
                     "The public package route explains the package class; Downloads still owns the actual acquisition decision."
                 ],

@@ -19,9 +19,10 @@ public sealed class LedgerController : ControllerBase
     private readonly FleetReceiptVerifier _receiptVerifier;
     private readonly RewardService _rewards;
     private readonly BlackLedgerPublicStatsService _blackLedgerPublicStats;
+    private readonly BlackLedgerDispatchService _blackLedgerDispatches;
     private readonly BlackLedgerTickNewsNotificationService _blackLedgerTickNews;
 
-    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats, BlackLedgerTickNewsNotificationService blackLedgerTickNews)
+    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats, BlackLedgerDispatchService blackLedgerDispatches, BlackLedgerTickNewsNotificationService blackLedgerTickNews)
     {
         _accounts = accounts;
         _identity = identity;
@@ -29,6 +30,7 @@ public sealed class LedgerController : ControllerBase
         _receiptVerifier = receiptVerifier;
         _rewards = rewards;
         _blackLedgerPublicStats = blackLedgerPublicStats;
+        _blackLedgerDispatches = blackLedgerDispatches;
         _blackLedgerTickNews = blackLedgerTickNews;
     }
 
@@ -209,6 +211,59 @@ public sealed class LedgerController : ControllerBase
         });
     }
 
+    [HttpPost("dispatches")]
+    [Produces("application/json")]
+    public ActionResult<object> CreateBlackLedgerDispatch([FromBody] CreateLedgerDispatchApiRequest request)
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        BlackLedgerDispatchMutationResult result = _blackLedgerDispatches.CreateDraft(new CreateBlackLedgerDispatchRequest(
+            WorldId: string.IsNullOrWhiteSpace(request.WorldId) ? "emerald-sprawl-prelude" : request.WorldId.Trim(),
+            Turn: request.Turn <= 0 ? 1 : request.Turn,
+            DispatchId: request.DispatchId,
+            Adapter: request.Adapter,
+            AutoApproveSeededPreview: request.AutoApproveSeededPreview,
+            Reviewer: request.Reviewer));
+        return Ok(new
+        {
+            result.Facts,
+            result.Draft,
+            result.GateReceipt,
+            result.ApprovalReceipt,
+            result.PublicationReceipt,
+            result.PublishedDispatch,
+        });
+    }
+
+    [HttpPost("dispatches/{dispatchId}/approve")]
+    [Produces("application/json")]
+    public ActionResult<object> ApproveBlackLedgerDispatch([FromRoute] string dispatchId, [FromBody] ApproveLedgerDispatchApiRequest request)
+    {
+        ActionResult? denied = RequireInternalAutomationAuth();
+        if (denied is not null)
+        {
+            return denied;
+        }
+
+        BlackLedgerDispatchMutationResult result = _blackLedgerDispatches.ApproveDispatch(dispatchId, new ApproveBlackLedgerDispatchRequest(
+            Reviewer: string.IsNullOrWhiteSpace(request.Reviewer) ? "operator" : request.Reviewer.Trim(),
+            HumanReviewStatus: string.IsNullOrWhiteSpace(request.HumanReviewStatus) ? "approved" : request.HumanReviewStatus.Trim(),
+            Publish: request.Publish));
+        return Ok(new
+        {
+            result.Facts,
+            result.Draft,
+            result.GateReceipt,
+            result.ApprovalReceipt,
+            result.PublicationReceipt,
+            result.PublishedDispatch,
+        });
+    }
+
     private ActionResult? RequireInternalAutomationAuth()
     {
         string expectedToken = (HttpContext.RequestServices.GetRequiredService<IConfiguration>()["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
@@ -236,4 +291,17 @@ public sealed class LedgerController : ControllerBase
         byte[] rightBytes = Encoding.UTF8.GetBytes(right);
         return CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
     }
+
+    public sealed record CreateLedgerDispatchApiRequest(
+        string WorldId,
+        int Turn,
+        string? DispatchId,
+        string? Adapter,
+        bool AutoApproveSeededPreview = false,
+        string? Reviewer = null);
+
+    public sealed record ApproveLedgerDispatchApiRequest(
+        string Reviewer,
+        string HumanReviewStatus = "approved",
+        bool Publish = true);
 }

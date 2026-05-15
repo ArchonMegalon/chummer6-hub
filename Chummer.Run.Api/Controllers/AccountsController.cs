@@ -1,11 +1,13 @@
 using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
+using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Campaign.Contracts;
 using Chummer.Run.Api.Contracts;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Ledger;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Chummer.Run.Api.Controllers;
@@ -19,12 +21,17 @@ public sealed class AccountsController : Controller
     private readonly HubIdentityClient _identity;
     private readonly IdentityLinkService _links;
     private readonly UserExperienceService _experience;
+    private readonly ParticipationOperatorNotificationService _participationNotifications;
     private readonly InstallLinkingService _installLinking;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly CampaignSpineService _campaignSpine;
     private readonly CampaignWorkspaceServerPlaneService _workspaceServerPlane;
     private readonly CreatorPublicationRegistryBridge _creatorPublicationRegistry;
+    private readonly BoostSessionService _sessions;
+    private readonly LeaderboardService _leaderboards;
+    private readonly PublicPackageCatalogService _packageCatalog;
+    private readonly KarmaForgeDiscoveryService _karmaForge;
     private readonly HubPageChromeService _chrome;
     private readonly HubGoogleAuthService _google;
     private readonly PublicReleaseManifestService _releases;
@@ -38,12 +45,17 @@ public sealed class AccountsController : Controller
         HubIdentityClient identity,
         IdentityLinkService links,
         UserExperienceService experience,
+        ParticipationOperatorNotificationService participationNotifications,
         InstallLinkingService installLinking,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
         CampaignSpineService campaignSpine,
         CampaignWorkspaceServerPlaneService workspaceServerPlane,
         CreatorPublicationRegistryBridge creatorPublicationRegistry,
+        BoostSessionService sessions,
+        LeaderboardService leaderboards,
+        PublicPackageCatalogService packageCatalog,
+        KarmaForgeDiscoveryService karmaForge,
         HubPageChromeService chrome,
         HubGoogleAuthService google,
         PublicReleaseManifestService releases,
@@ -56,12 +68,17 @@ public sealed class AccountsController : Controller
         _identity = identity;
         _links = links;
         _experience = experience;
+        _participationNotifications = participationNotifications;
         _installLinking = installLinking;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
         _campaignSpine = campaignSpine;
         _workspaceServerPlane = workspaceServerPlane;
         _creatorPublicationRegistry = creatorPublicationRegistry;
+        _sessions = sessions;
+        _leaderboards = leaderboards;
+        _packageCatalog = packageCatalog;
+        _karmaForge = karmaForge;
         _chrome = chrome;
         _google = google;
         _releases = releases;
@@ -103,6 +120,8 @@ public sealed class AccountsController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var links = _links.GetSummary(subject.SubjectId);
+            var experience = _experience.GetOrCreate(subject.SubjectId);
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var supportCases = _supportCases.ListForReporter(user.UserId, subject.SubjectId).Items;
             var supportCaseSummaries = _supportPresentation.BuildList(supportCases, installLinking);
@@ -134,14 +153,18 @@ public sealed class AccountsController : Controller
             var selectedCreatorPublicationRegistry = selectedCreatorPublication is null
                 ? null
                 : _creatorPublicationRegistry.GetOrCreatePublicationLane(user, selectedCreatorPublication, selectedCreatorPublicationWorkspace);
+            var participationSession = _sessions.FindMostRelevantForUser(subject.SubjectId);
+            IReadOnlyList<ContributionReceiptDto> participationReceipts = participationSession is null
+                ? Array.Empty<ContributionReceiptDto>()
+                : _sessions.ListReceipts(participationSession.SponsorSessionId);
             var model = new AccountPageViewModel(
                 Chrome: _chrome.BuildAuthenticatedChrome(chromeTitle, chromeDescription, currentPath, user.DisplayName, user.Email),
                 CurrentSection: selectedSection,
                 CoreSections: BuildAccountCoreSections(selectedSection),
                 SecondarySections: BuildAccountSecondarySections(selectedSection),
                 User: user,
-                Links: _links.GetSummary(subject.SubjectId),
-                Experience: _experience.GetOrCreate(subject.SubjectId),
+                Links: links,
+                Experience: experience,
                 GoogleAvailable: _google.IsConfigured(),
                 InstallLinking: installLinking,
                 SupportCases: supportCases,
@@ -162,7 +185,13 @@ public sealed class AccountsController : Controller
                 SelectedCreatorPublicationDraftDetail: selectedCreatorPublicationRegistry?.DraftDetail,
                 SelectedCreatorPublicationReceipt: selectedCreatorPublicationRegistry?.PublicationReceipt,
                 SignedInTrustStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience),
-                PrivacyBoundary: _privacyBoundaries.BuildPanel("account"));
+                PrivacyBoundary: _privacyBoundaries.BuildPanel("account"),
+                ParticipationRecognition: _leaderboards.UserRecognitionSummary(user.UserId),
+                ParticipationSession: participationSession,
+                ParticipationReceipts: participationReceipts,
+                ParticipationPackageReceipts: _packageCatalog.ListReceiptsForSubject(subject.SubjectId, 8),
+                ParticipationKarmaSubmissions: _karmaForge.ListRecentForSubject(subject.SubjectId, 5),
+                ParticipationActivityReceipts: _participationNotifications.ListReceiptsForUser(user.UserId, 6));
             return View("~/Views/Accounts/Account.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
@@ -354,6 +383,7 @@ public sealed class AccountsController : Controller
                 "support" => "support",
                 "access" => "access",
                 "work" => "work",
+                "participation" => "participation",
                 "settings" => "settings",
                 "advanced" => "advanced",
                 _ => "profile"
@@ -363,6 +393,7 @@ public sealed class AccountsController : Controller
         => new[]
         {
             new SectionLinkViewModel("profile", "Profile", "/account", string.Equals(currentSection, "profile", StringComparison.OrdinalIgnoreCase)),
+            new SectionLinkViewModel("participation", "Participation", "/account/participation", string.Equals(currentSection, "participation", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("support", "Support", "/account/support", string.Equals(currentSection, "support", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("access", "Devices & access", "/account/access", string.Equals(currentSection, "access", StringComparison.OrdinalIgnoreCase)),
             new SectionLinkViewModel("work", "Work", "/account/work", string.Equals(currentSection, "work", StringComparison.OrdinalIgnoreCase))
@@ -378,6 +409,7 @@ public sealed class AccountsController : Controller
     private static (string Title, string Description) DescribeAccountSection(string currentSection)
         => currentSection switch
         {
+            "participation" => ("Account · Participation", "Followed package work, guided contribution receipts, and privacy-safe recognition settings."),
             "support" => ("Account · Support", "Open, track, and close support without leaving the account surface."),
             "access" => ("Account · Devices & access", "Linked installs, access rights, and claim handoff in one calmer route."),
             "work" => ("Account · Work", "Campaign return, shared work, and deeper follow-through when you explicitly need them."),
@@ -457,7 +489,22 @@ public sealed class AccountsController : Controller
             var subject = string.IsNullOrWhiteSpace(request.SubjectId)
                 ? await _identity.RequireSubjectAsync(Request, cancellationToken)
                 : await _identity.RequireMatchingSubjectAsync(Request, request.SubjectId, cancellationToken);
-            return Ok(_experience.Upsert(request with { SubjectId = subject.SubjectId }));
+            HubUserExperienceDto existing = _experience.GetOrCreate(subject.SubjectId);
+            HubUserExperienceDto updated = _experience.Upsert(request with { SubjectId = subject.SubjectId });
+            if (!existing.BetaInterest && updated.BetaInterest)
+            {
+                HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+                string authProviderFamily = ParticipationOperatorNotificationService.InferAuthProviderFamily(_links.GetSummary(subject.SubjectId));
+                await _participationNotifications.NotifyFirstActionIfNeededAsync(
+                    user,
+                    subject.Email,
+                    intentKind: "beta",
+                    entryRoute: "/account/participation",
+                    authProviderFamily,
+                    cancellationToken);
+            }
+
+            return Ok(updated);
         }
         catch (HubRequestAuthException ex)
         {

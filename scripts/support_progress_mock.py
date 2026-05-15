@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import hashlib
+import html
 import json
 import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib import error, request
 
 
 def _json_response(handler: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
@@ -39,6 +41,7 @@ class SupportProgressMockHandler(BaseHTTPRequestHandler):
 
         if self.path == "/v1/tools/execute":
             delivery_id = self._build_delivery_id(payload)
+            self._maybe_forward_email_delivery(delivery_id, payload)
             _json_response(
                 self,
                 200,
@@ -77,6 +80,61 @@ class SupportProgressMockHandler(BaseHTTPRequestHandler):
             return
 
         _json_response(self, 404, {"error": "not_found"})
+
+    def _maybe_forward_email_delivery(self, delivery_id: str, payload: object) -> None:
+        if not isinstance(payload, dict):
+            return
+        if payload.get("tool_name") != "connector.dispatch":
+            return
+        if payload.get("action_kind") != "delivery.send":
+            return
+        payload_json = payload.get("payload_json")
+        if not isinstance(payload_json, dict):
+            return
+        if str(payload_json.get("channel") or "").strip().lower() != "email":
+            return
+
+        api_key = (os.environ.get("SUPPORT_PROGRESS_EMAILIT_API_KEY") or "").strip()
+        if not api_key:
+            return
+
+        recipient = str(payload_json.get("recipient") or "").strip()
+        subject = str(payload_json.get("subject") or "").strip()
+        content = str(payload_json.get("content") or "").strip()
+        if not recipient or not subject or not content:
+            return
+
+        base_url = (os.environ.get("SUPPORT_PROGRESS_EMAILIT_BASE_URL") or "https://api.emailit.com/v2").strip().rstrip("/")
+        from_email = (os.environ.get("SUPPORT_PROGRESS_EMAILIT_FROM_EMAIL") or "concierge@chummer.run").strip()
+        from_name = (os.environ.get("SUPPORT_PROGRESS_EMAILIT_FROM_NAME") or "Chummer Concierge").strip()
+        reply_to = (os.environ.get("SUPPORT_PROGRESS_EMAILIT_REPLY_TO") or "support@chummer.run").strip()
+        email_payload = {
+            "from": f"{from_name} <{from_email}>",
+            "to": recipient,
+            "subject": subject,
+            "text": content,
+            "html": f"<pre>{html.escape(content)}</pre>",
+            "reply_to": reply_to,
+            "tracking": False,
+            "meta": {"delivery_id": delivery_id},
+        }
+        req = request.Request(
+            f"{base_url}/emails",
+            data=json.dumps(email_payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=30) as response:
+                if response.status >= 400:
+                    raise RuntimeError(f"emailit_error_{response.status}")
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"emailit_error_{exc.code}:{detail}") from exc
 
     @staticmethod
     def _build_delivery_id(payload: object) -> str:

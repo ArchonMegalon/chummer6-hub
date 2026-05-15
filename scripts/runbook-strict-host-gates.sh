@@ -50,6 +50,7 @@ run_docker_tests() {
   RUNBOOK_MODE=docker-tests \
   DOCKER_TESTS_SOFT_FAIL=0 \
   DOCKER_TESTS_BUILD="${DOCKER_TESTS_BUILD:-1}" \
+  CHUMMER_RUN_CF_TUNNEL_TOKEN="${CHUMMER_RUN_CF_TUNNEL_TOKEN:-disabled-for-local-strict-host-gates}" \
   TEST_FILTER="$STRICT_FILTER" \
   TEST_FRAMEWORK="$STRICT_FRAMEWORK" \
   bash "$REPO_ROOT/scripts/runbook.sh"

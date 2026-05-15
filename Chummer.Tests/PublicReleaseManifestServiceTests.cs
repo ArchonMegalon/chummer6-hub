@@ -100,6 +100,184 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadCanonicalManifestJsonRewritesDesktopSurfaceRefsWhenDownloadsAreForceGated()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-20260513-221500",
+            ["publishedAt"] = "2026-05-13T00:36:30Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = "abc123",
+                    ["sizeBytes"] = 123456789L,
+                    ["installAccessClass"] = "open_public"
+                }
+            },
+            ["desktopSurfaceRefs"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["registryId"] = "desktop-surface:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["channelId"] = "public_stable",
+                    ["releaseVersion"] = "run-20260513-221500",
+                    ["tupleId"] = "avalonia:linux:linux-x64",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["installAccessClass"] = "open_public",
+                    ["desktopChannelRef"] = "desktop-channel:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["installGuidanceRef"] = "install-guidance:public_stable:run-20260513-221500:avalonia-linux-x64-installer",
+                    ["participationReceiptRef"] = "participation-receipt:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["rewardPublicationRef"] = "reward-publication:binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["publicationBindingId"] = "binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["publicInstallRoute"] = "/downloads/install/avalonia-linux-x64-installer",
+                    ["rationale"] = "public_stable keeps avalonia:linux:linux-x64 guest-readable so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals."
+                }
+            },
+            ["desktopTupleCoverage"] = new Dictionary<string, object?>
+            {
+                ["complete"] = true,
+                ["desktopRouteTruth"] = new object[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["tupleId"] = "avalonia:linux:linux-x64",
+                        ["head"] = "avalonia",
+                        ["platform"] = "linux",
+                        ["rid"] = "linux-x64",
+                        ["arch"] = "x64",
+                        ["artifactId"] = "avalonia-linux-x64-installer",
+                        ["installPosture"] = "installer_first",
+                        ["publicInstallRoute"] = "/downloads/install/avalonia-linux-x64-installer"
+                    }
+                }
+            }
+        });
+
+        string json = fixture.CreateService(additionalSettings: new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS"] = "true"
+        }).LoadCanonicalManifestJson()!;
+
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement artifact = document.RootElement.GetProperty("artifacts")[0];
+        JsonElement surface = document.RootElement.GetProperty("desktopSurfaceRefs")[0];
+
+        Assert.Equal("account_required", artifact.GetProperty("installAccessClass").GetString());
+        Assert.Equal("account_required", surface.GetProperty("installAccessClass").GetString());
+        Assert.Contains("entitlement-backed", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("guest-readable", surface.GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LoadCanonicalManifestJsonKeepsFallbackDesktopSurfaceOpenWhenNoArtifactExists()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-20260513-221500",
+            ["publishedAt"] = "2026-05-13T00:36:30Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = "abc123",
+                    ["sizeBytes"] = 123456789L,
+                    ["installAccessClass"] = "open_public"
+                }
+            },
+            ["desktopSurfaceRefs"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["registryId"] = "desktop-surface:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["channelId"] = "public_stable",
+                    ["releaseVersion"] = "run-20260513-221500",
+                    ["tupleId"] = "avalonia:linux:linux-x64",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["installAccessClass"] = "open_public",
+                    ["desktopChannelRef"] = "desktop-channel:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["installGuidanceRef"] = "install-guidance:public_stable:run-20260513-221500:avalonia-linux-x64-installer",
+                    ["participationReceiptRef"] = "participation-receipt:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["rewardPublicationRef"] = "reward-publication:binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["publicationBindingId"] = "binding:public_stable:run-20260513-221500:avalonia:linux:linux-x64",
+                    ["publicInstallRoute"] = "/downloads/install/avalonia-linux-x64-installer",
+                    ["rationale"] = "public_stable keeps avalonia:linux:linux-x64 guest-readable so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals."
+                },
+                new Dictionary<string, object?>
+                {
+                    ["registryId"] = "desktop-surface:public_stable:run-20260513-221500:blazor-desktop:linux:linux-x64",
+                    ["artifactId"] = "blazor-desktop-linux-x64-installer",
+                    ["channelId"] = "public_stable",
+                    ["releaseVersion"] = "run-20260513-221500",
+                    ["tupleId"] = "blazor-desktop:linux:linux-x64",
+                    ["head"] = "blazor-desktop",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["installAccessClass"] = "open_public",
+                    ["desktopChannelRef"] = "desktop-channel:public_stable:run-20260513-221500:blazor-desktop:linux:linux-x64",
+                    ["installGuidanceRef"] = "install-guidance:public_stable:run-20260513-221500:blazor-desktop-linux-x64-installer",
+                    ["participationReceiptRef"] = "participation-receipt:public_stable:run-20260513-221500:blazor-desktop:linux:linux-x64",
+                    ["rewardPublicationRef"] = "reward-publication:binding:public_stable:run-20260513-221500:blazor-desktop:linux:linux-x64",
+                    ["publicationBindingId"] = "binding:public_stable:run-20260513-221500:blazor-desktop:linux:linux-x64",
+                    ["publicInstallRoute"] = "/downloads/install/blazor-desktop-linux-x64-installer",
+                    ["rationale"] = "public_stable keeps fallback tuple blazor-desktop:linux:linux-x64 retained with guest-readable install guidance so recovery participation and reward refs stay governed."
+                }
+            }
+        });
+
+        string json = fixture.CreateService(additionalSettings: new Dictionary<string, string?>
+        {
+            ["CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS"] = "true"
+        }).LoadCanonicalManifestJson()!;
+
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement surfaces = document.RootElement.GetProperty("desktopSurfaceRefs");
+
+        Assert.Equal("account_required", surfaces[0].GetProperty("installAccessClass").GetString());
+        Assert.Equal("open_public", surfaces[1].GetProperty("installAccessClass").GetString());
+        Assert.Contains("entitlement-backed", surfaces[0].GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("guest-readable", surfaces[1].GetProperty("rationale").GetString(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ManifestSerializationKeepsLegacyReleaseProofObject()
     {
         using var fixture = new PublicReleaseManifestFixture();
@@ -439,7 +617,7 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
-    public void LoadManifestSuppressesDisabledArtifactsAndMarksCoverageIncomplete()
+    public void LoadManifestSuppressesDisabledArtifactsAndRebuildsCoverage()
     {
         using var fixture = new PublicReleaseManifestFixture();
         fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
@@ -538,21 +716,15 @@ public sealed class PublicReleaseManifestServiceTests
         }).LoadManifest();
 
         Assert.DoesNotContain(manifest.Downloads, item => string.Equals(item.Id, "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
-        Assert.Equal("coverage_incomplete", manifest.RolloutState);
-        Assert.Equal("review_required", manifest.SupportabilityState);
         Assert.DoesNotContain(manifest.ProofRoutes ?? [], route => route.Contains("avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
 
         JsonElement coverage = Assert.IsType<JsonElement>(manifest.DesktopTupleCoverage);
-        Assert.False(coverage.GetProperty("complete").GetBoolean());
-        bool missingWindowsPlatform = coverage.GetProperty("missingRequiredPlatforms")
-            .EnumerateArray()
-            .Select(static value => value.GetString())
-            .Contains("windows", StringComparer.OrdinalIgnoreCase);
-        bool missingWindowsTuple = coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
-            .EnumerateArray()
-            .Select(static value => value.GetString())
-            .Any(static value => value is not null && value.Contains("windows", StringComparison.OrdinalIgnoreCase));
-        Assert.True(missingWindowsPlatform || missingWindowsTuple);
+        Assert.True(coverage.GetProperty("complete").GetBoolean());
+        Assert.DoesNotContain(
+            coverage.GetProperty("promotedPlatformHeadRidTuples")
+                .EnumerateArray()
+                .Select(static value => value.GetString()),
+            tupleId => tupleId is not null && tupleId.Contains("win-x64", StringComparison.OrdinalIgnoreCase));
     }
 
     private sealed class PublicReleaseManifestFixture : IDisposable

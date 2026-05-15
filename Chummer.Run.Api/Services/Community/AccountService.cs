@@ -4,6 +4,11 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chummer.Run.Api.Services.Community;
 
+public sealed record HubUserEnsureResult(
+    HubUserDto User,
+    bool Created,
+    bool Changed);
+
 public sealed class AccountService
 {
     private readonly CommunityStore _store;
@@ -78,11 +83,15 @@ public sealed class AccountService
     }
 
     public HubUserDto EnsureUser(string subjectId, string? displayName = null, string? email = null)
+        => EnsureUserWithStatus(subjectId, displayName, email).User;
+
+    public HubUserEnsureResult EnsureUserWithStatus(string subjectId, string? displayName = null, string? email = null)
     {
         var normalizedSubjectId = NormalizeRequired(subjectId, nameof(subjectId));
         var requestedDisplayName = NormalizeUserFacingDisplayName(displayName, normalizedSubjectId);
         var normalizedEmail = NormalizeOptional(email) ?? string.Empty;
         HubUserDto result;
+        bool wasCreated;
         bool changed;
         lock (_store.Gate)
         {
@@ -100,7 +109,7 @@ public sealed class AccountService
                     && string.Equals(existing.Timezone, resolvedTimezone, StringComparison.Ordinal)
                     && string.Equals(NormalizeOptional(existing.Email) ?? string.Empty, resolvedEmail, StringComparison.Ordinal))
                 {
-                    return existing;
+                    return new HubUserEnsureResult(existing, Created: false, Changed: false);
                 }
 
                 var updated = existing with
@@ -114,6 +123,7 @@ public sealed class AccountService
                 _store.UsersById[updated.UserId] = updated;
                 _store.PersistLocked();
                 result = updated;
+                wasCreated = false;
                 changed = true;
             }
             else
@@ -121,7 +131,7 @@ public sealed class AccountService
                 var createdDisplayName = ResolveDisplayName(normalizedSubjectId, requestedDisplayName, email);
                 var createdHandle = ResolveHandle(normalizedSubjectId, preferredHandle: null, createdDisplayName, email);
                 var now = DateTimeOffset.UtcNow;
-                var created = new HubUserDto(
+                var createdUser = new HubUserDto(
                     UserId: NewId("usr"),
                     SubjectId: normalizedSubjectId,
                     DisplayName: createdDisplayName,
@@ -136,10 +146,11 @@ public sealed class AccountService
                 {
                     Email = normalizedEmail,
                 };
-                _store.UserIdBySubjectId[normalizedSubjectId] = created.UserId;
-                _store.UsersById[created.UserId] = created;
+                _store.UserIdBySubjectId[normalizedSubjectId] = createdUser.UserId;
+                _store.UsersById[createdUser.UserId] = createdUser;
                 _store.PersistLocked();
-                result = created;
+                result = createdUser;
+                wasCreated = true;
                 changed = true;
             }
         }
@@ -149,7 +160,7 @@ public sealed class AccountService
             QueueTeableSync(result);
         }
 
-        return result;
+        return new HubUserEnsureResult(result, wasCreated, changed);
     }
 
     public HubUserDto? GetBySubject(string subjectId)

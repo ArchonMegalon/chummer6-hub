@@ -539,8 +539,8 @@ public sealed class ReleaseSelectionService
             }
 
             return string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Create account to install on Mac"
-                : "Sign in to install on Mac";
+                ? "Open guided Mac install"
+                : "Sign in for Mac install";
         }
 
         if (authenticated)
@@ -550,7 +550,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return recommended ? "Create account to install" : "Create account to download";
+            return recommended ? "Open guided install" : "Open guided download";
         }
 
         return recommended ? RecommendedActionLabel(download) : AlternativeActionLabel(download);
@@ -711,7 +711,8 @@ public sealed class ReleaseSelectionService
             return false;
         }
 
-        if (string.Equals(platform.PublicManifestVisibility, "visible_as_account_gated_setup_script_preview", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(platform.PublicManifestVisibility, "visible_as_account_gated_setup_script_release", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(platform.PublicManifestVisibility, "visible_as_account_gated_setup_script_preview", StringComparison.OrdinalIgnoreCase))
         {
             return string.Equals(manifest.Status, "published", StringComparison.OrdinalIgnoreCase)
                    && UsesMacBootstrapFlow(download)
@@ -969,6 +970,7 @@ public sealed class ReleaseSelectionService
             "primary" => "primary",
             "secondary" => "secondary",
             "account_gated_setup_script_preview" => "account-gated setup-script preview",
+            "account_gated_setup_script_release" => "account-gated setup-script release",
             "signed_notarized_preview" => "signed and notarized preview",
             _ => string.IsNullOrWhiteSpace(platform?.Supportability) ? "not specified" : platform!.Supportability.Replace('_', ' ')
         };

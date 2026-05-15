@@ -56,7 +56,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpGet("/downloads/RELEASE_CHANNEL.generated.json")]
     public IActionResult CanonicalReleaseManifest()
     {
-        if (_releases.HasArtifactSuppressions())
+        if (_releases.RequiresCanonicalManifestRewrite())
         {
             string? filteredManifest = _releases.LoadCanonicalManifestJson();
             return filteredManifest is null

@@ -776,10 +776,12 @@ public sealed class ReleaseBundlePromotionService
             desktopCoverageComplete,
             coverage);
         string supportabilityState = DeriveSupportabilityState(
+            mergedCompatibilityManifest.Channel,
             mergedCompatibilityManifest.Status,
             proofPassed,
             desktopCoverageComplete);
         string supportabilitySummary = DeriveSupportabilitySummary(
+            mergedCompatibilityManifest.Channel,
             mergedCompatibilityManifest.Status,
             proofPassed,
             desktopCoverageComplete,
@@ -885,10 +887,20 @@ public sealed class ReleaseBundlePromotionService
             : null;
 
         List<CanonicalArtifactState> artifactRows = ExtractCanonicalArtifactRows(artifacts);
+        List<string> derivedRequiredDesktopPlatforms = DeriveRequiredDesktopPlatforms(artifactRows);
         List<string> requiredDesktopPlatforms = ReadSourceCoverageStringList(sourceCoverage, "requiredDesktopPlatforms");
         if (requiredDesktopPlatforms.Count == 0)
         {
-            requiredDesktopPlatforms = [.. RequiredDesktopPlatforms];
+            requiredDesktopPlatforms = derivedRequiredDesktopPlatforms.Count > 0
+                ? derivedRequiredDesktopPlatforms
+                : [.. RequiredDesktopPlatforms];
+        }
+        else if (derivedRequiredDesktopPlatforms.Count > 0)
+        {
+            requiredDesktopPlatforms = requiredDesktopPlatforms
+                .Where(platform => derivedRequiredDesktopPlatforms.Contains(platform, StringComparer.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
         List<string> requiredDesktopHeads = ReadSourceCoverageStringList(sourceCoverage, "requiredDesktopHeads");
         if (requiredDesktopHeads.Count == 0)
@@ -986,6 +998,18 @@ public sealed class ReleaseBundlePromotionService
         List<string> requiredDesktopPlatformHeadRidTuples = ReadSourceCoverageStringList(
             sourceCoverage,
             "requiredDesktopPlatformHeadRidTuples");
+        if (requiredDesktopPlatformHeadRidTuples.Count > 0)
+        {
+            requiredDesktopPlatformHeadRidTuples = requiredDesktopPlatformHeadRidTuples
+                .Where(tupleId =>
+                {
+                    string[] parts = tupleId.Split(':', 3, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    return parts.Length == 3
+                        && requiredDesktopPlatforms.Contains(parts[2], StringComparer.OrdinalIgnoreCase);
+                })
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
         if (requiredDesktopPlatformHeadRidTuples.Count == 0)
         {
             requiredDesktopPlatformHeadRidTuples = requiredDesktopPlatforms
@@ -1249,9 +1273,18 @@ public sealed class ReleaseBundlePromotionService
                         }
                         else
                         {
-                            rollbackState = "manual_recovery_required";
-                            rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
-                            rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is not promoted for {tupleLabel} because matching artifact bytes and fresh startup-smoke proof are still required; primary route {routeTupleLabel} therefore requires manual recovery.";
+                            if (string.Equals(rolloutState, "public_stable", StringComparison.OrdinalIgnoreCase) && promoted)
+                            {
+                                rollbackState = "primary_reinstall_available";
+                                rollbackReasonCode = "primary_installer_reinstall_available";
+                                rollbackReason = $"Fallback route {fallbackRouteTupleLabel} remains an unpromoted compatibility lane for {tupleLabel}; recover {routeTupleLabel} from the promoted primary installer {artifactId} until a separately proved fallback is published.";
+                            }
+                            else
+                            {
+                                rollbackState = "manual_recovery_required";
+                                rollbackReasonCode = "fallback_missing_artifact_or_startup_smoke_proof";
+                                rollbackReason = $"Fallback route {fallbackRouteTupleLabel} is not promoted for {tupleLabel} because matching artifact bytes and fresh startup-smoke proof are still required; primary route {routeTupleLabel} therefore requires manual recovery.";
+                            }
                         }
                     }
                     else
@@ -1388,7 +1421,7 @@ public sealed class ReleaseBundlePromotionService
             : "Current release shelf is published.";
     }
 
-    private static string DeriveSupportabilityState(string? status, bool proofPassed, bool desktopCoverageComplete)
+    private static string DeriveSupportabilityState(string? channel, string? status, bool proofPassed, bool desktopCoverageComplete)
     {
         string normalizedStatus = NormalizeToken(status);
         if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
@@ -1402,11 +1435,14 @@ public sealed class ReleaseBundlePromotionService
         }
 
         return proofPassed
-            ? "preview_supported"
+            ? string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal)
+                ? "gold_supported"
+                : "preview_supported"
             : "review_required";
     }
 
     private static string DeriveSupportabilitySummary(
+        string? channel,
         string? status,
         bool proofPassed,
         bool desktopCoverageComplete,
@@ -1438,7 +1474,9 @@ public sealed class ReleaseBundlePromotionService
             ?? [];
         if (journeys.Count == 0)
         {
-            return "Local release proof passed for the current shelf.";
+            return string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal)
+                ? "Gold release proof passed for the current shelf."
+                : "Local release proof passed for the current shelf.";
         }
 
         List<string> proofNotes = [];
@@ -1460,7 +1498,7 @@ public sealed class ReleaseBundlePromotionService
         string noteSuffix = proofNotes.Count > 0
             ? " " + string.Join(" ", proofNotes)
             : string.Empty;
-        return $"Local release proof passed for: {string.Join(", ", journeys)}.{noteSuffix}";
+        return $"{(string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal) ? "Gold release proof passed" : "Local release proof passed")} for: {string.Join(", ", journeys)}.{noteSuffix}";
     }
 
     private static string DeriveKnownIssueSummary(
@@ -1511,6 +1549,13 @@ public sealed class ReleaseBundlePromotionService
         string proofNoteClause = proofNotes.Count > 0
             ? ", " + string.Join(", ", proofNotes)
             : string.Empty;
+        if (string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal))
+        {
+            return "No blocking release caveat is mirrored for the current public shelf. The promoted routes have recent install"
+                + proofNoteClause
+                + ", bounded offline prefetch, and support proof instead of only manifest presence.";
+        }
+
         return "Preview caveats still apply, but the current shelf has recent install"
             + proofNoteClause
             + ", bounded offline prefetch, and support proof instead of only manifest presence.";

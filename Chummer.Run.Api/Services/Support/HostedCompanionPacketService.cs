@@ -620,7 +620,7 @@ public sealed class HostedCompanionPacketService
             [
                 new HostedCompanionActionProjection("open_downloads", "Open downloads", "/downloads", "Inspect the current installer shelf, release posture, and published proof rail."),
                 new HostedCompanionActionProjection("open_support_intake", "Open support intake", "/contact#support-intake", "Use the first-party public support entry when the public hub posture still needs help."),
-                new HostedCompanionActionProjection("open_account_access", "Create account to install", "/account/access", "Move from public posture into the first-party claimed install and restore lane.")
+                new HostedCompanionActionProjection("open_account_access", "Create account for guided install", "/account/access", "Move from public posture into the first-party claimed install and restore lane.")
             ],
             Suppression: BuildSuppression("trigger_class_per_surface", 43200, 1, true),
             EaCompile: BuildEaCompile(true, "line_variant_pack", ["line_variant_pack"], runtimeBlocking: false),

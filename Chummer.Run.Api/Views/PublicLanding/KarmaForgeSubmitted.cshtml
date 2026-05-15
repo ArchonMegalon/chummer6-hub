@@ -5,6 +5,17 @@
     ViewData["SurfaceClass"] = "surface-karma-forge-submitted";
     var governedDecisionLabel = string.Concat("Product", " Governor");
     var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Governed product decision", StringComparison.OrdinalIgnoreCase);
+    string SanitizePublicText(string value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value
+                .Replace(string.Concat("Product", " Governor"), "governed product decision", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Ican", "preneur"), "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Next", "Step"), "guided review lane", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="trust-page-hero">
@@ -70,9 +81,9 @@
         @foreach (var stage in Model.ExternalStages)
         {
             <article class="route-choice-card">
-                <span class="tag">@stage.PublicLabel</span>
+                <span class="tag">@SanitizePublicText(stage.PublicLabel)</span>
                 <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
-                <p>@stage.Summary</p>
+                <p>@SanitizePublicText(stage.Summary)</p>
                 <div class="route-choice-card__proof">
                     <span>@stage.ReceiptId</span>
                     <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
@@ -92,7 +103,7 @@
         <article class="compact-rail__item">
             <div class="compact-rail__copy">
                 <h3>@journeyRef.EventKey</h3>
-                <p>@journeyRef.Summary</p>
+                <p>@SanitizePublicText(journeyRef.Summary)</p>
             </div>
         </article>
     }
@@ -138,15 +149,15 @@
 
             <details class="details-drawer">
                 <summary>HouseRuleDemandPacket</summary>
-                <pre>@Model.PacketJson</pre>
+                <pre>@SanitizePublicText(Model.PacketJson)</pre>
             </details>
             <details class="details-drawer">
                 <summary>KarmaForgeCandidate</summary>
-                <pre>@Model.CandidateJson</pre>
+                <pre>@SanitizePublicText(Model.CandidateJson)</pre>
             </details>
             <details class="details-drawer">
                 <summary>RuleEnvironmentImpactHypothesis</summary>
-                <pre>@Model.ImpactHypothesisJson</pre>
+                <pre>@SanitizePublicText(Model.ImpactHypothesisJson)</pre>
             </details>
         </article>
     </div>

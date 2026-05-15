@@ -22,6 +22,7 @@ public sealed record BlackLedgerWorldTickNewsEvent(
     string PublicSummary,
     IReadOnlyList<string> PublicHighlights,
     string LedgerUrl,
+    string DispatchUrl,
     string TickReceiptUrl,
     DateTimeOffset OccurredAtUtc);
 
@@ -436,6 +437,7 @@ public sealed class BlackLedgerTickNewsNotificationService
             PublicSummary: news.Summary,
             PublicHighlights: (news.EvidenceLines ?? Array.Empty<string>()).Take(3).ToArray(),
             LedgerUrl: $"{trimmedBase}/ledger",
+            DispatchUrl: $"{trimmedBase}/ledger/dispatches/ledger_dispatch_emerald-sprawl-prelude_turn_{ExtractCurrentTurn(worldTick):0000}",
             TickReceiptUrl: $"{trimmedBase}/ledger/closeouts",
             OccurredAtUtc: worldTick.UpdatedAtUtc);
     }
@@ -455,6 +457,7 @@ public sealed class BlackLedgerTickNewsNotificationService
             PublicSummary: tick.Summary,
             PublicHighlights: tick.Effects.Select(effect => $"{effect.Target}: {effect.PublicReason}").Take(4).ToArray(),
             LedgerUrl: $"{trimmedBase}/ledger?turn={tick.Turn}",
+            DispatchUrl: $"{trimmedBase}/ledger/dispatches/ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}",
             TickReceiptUrl: $"{trimmedBase}/ledger/closeouts",
             OccurredAtUtc: DateTimeOffset.TryParse(tick.CreatedAtUtc, out DateTimeOffset createdAtUtc) ? createdAtUtc : DateTimeOffset.UtcNow);
     }
@@ -653,6 +656,7 @@ public sealed class BlackLedgerTickNewsNotificationService
                 tickNews.PublicHeadline,
                 tickNews.PublicSummary,
                 tickNews.LedgerUrl,
+                tickNews.DispatchUrl,
                 tickNews.TickReceiptUrl,
             }.Concat(tickNews.PublicHighlights ?? Array.Empty<string>()));
         string lowered = payload.ToLowerInvariant();
@@ -662,27 +666,35 @@ public sealed class BlackLedgerTickNewsNotificationService
     private string BuildEmailBody(BlackLedgerWorldTickNewsEvent tickNews)
     {
         StringBuilder builder = new();
-        builder.AppendLine(tickNews.PublicHeadline);
+        builder.AppendLine($"{tickNews.PublicHeadline}");
+        builder.AppendLine();
+        builder.AppendLine($"Turn {tickNews.ToTurn} already ran.");
         builder.AppendLine();
         builder.AppendLine(tickNews.PublicSummary);
         builder.AppendLine();
-        builder.AppendLine($"World: {tickNews.WorldName} ({tickNews.WorldId})");
-        builder.AppendLine($"Turn: {tickNews.FromTurn} -> {tickNews.ToTurn}");
-        builder.AppendLine($"Tick receipt: {tickNews.TickReceiptId}");
+        builder.AppendLine("Ledger dispatch:");
         if (tickNews.PublicHighlights.Count > 0)
         {
-            builder.AppendLine();
-            builder.AppendLine("Highlights:");
             foreach (string highlight in tickNews.PublicHighlights)
             {
                 builder.Append("- ").AppendLine(highlight);
             }
         }
+        else
+        {
+            builder.AppendLine("- Public-safe world movement posted for this turn.");
+        }
 
-        builder.AppendLine();
+        if (tickNews.PublicHighlights.Count > 0)
+        {
+            builder.AppendLine();
+            builder.AppendLine("Read the dispatch and receipt:");
+        }
+        builder.AppendLine($"Dispatch: {tickNews.DispatchUrl}");
         builder.AppendLine($"Ledger: {tickNews.LedgerUrl}");
         builder.AppendLine($"Tick receipt lane: {tickNews.TickReceiptUrl}");
         builder.AppendLine($"Manage notifications: {tickNews.LedgerUrl}");
+        builder.AppendLine($"Receipt: {tickNews.TickReceiptId}");
         builder.AppendLine("Privacy note: public-safe aggregate/news only. No private campaign, support, or administrative data is included.");
         return builder.ToString().Trim();
     }

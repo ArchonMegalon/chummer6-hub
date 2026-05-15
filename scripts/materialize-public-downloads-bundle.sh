@@ -267,7 +267,6 @@ mkdir -p "$combined_files_root" "$combined_startup_smoke_root" "$generated_root"
 
 copy_public_artifacts "$RUNSERVICES_SOURCE_FILES_ROOT" "$combined_files_root"
 copy_public_artifacts "$PRESENTATION_FILES_ROOT" "$combined_files_root"
-filter_files_to_manifest_truth "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH"
 
 AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH" | paste -sd, -)"
 if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then
@@ -357,7 +356,7 @@ PORTAL_DOWNLOADS_DIR="$OUTPUT_ROOT" \
 STARTUP_SMOKE_DIR="$combined_startup_smoke_root" \
 RELEASE_PROOF_PATH="$sanitized_release_proof_path" \
 CHUMMER_UI_LOCALIZATION_RELEASE_GATE_PATH="$UI_LOCALIZATION_RELEASE_GATE_SOURCE" \
-CHUMMER_MACOS_PUBLIC_SHELF_ENABLED=true \
+CHUMMER_MACOS_PUBLIC_SHELF_ENABLED="${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}" \
 CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS="$FORCE_ACCOUNT_REQUIRED_DOWNLOADS" \
 RELEASE_CHANNEL="$release_channel" \
 RELEASE_VERSION="$release_version" \

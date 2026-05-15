@@ -27,6 +27,7 @@ def main() -> int:
         "BLACK_LEDGER_PRESEEDED_WORLD_SPEC.md",
         "BLACK_LEDGER_AI_STEWARDSHIP_SPEC.md",
         "BLACK_LEDGER_WORLD_TICK_SPEC.md",
+        "BLACK_LEDGER_DISPATCHES_SPEC.md",
         "BLACK_LEDGER_MAP_AND_FACTION_INTEL_SPEC.md",
         "BLACK_LEDGER_TICK_EMAIL_FAILURE_AUDIT.md",
         "BLACK_LEDGER_TICK_EMAIL_DEV_CHANGE_GUIDE.md",
@@ -51,16 +52,22 @@ def main() -> int:
         '[HttpPost("worlds/{worldId}/ticks")]',
         '[HttpPost("worlds/{worldId}/tick-news/send")]',
         '[HttpGet("/ledger")]',
+        '[HttpGet("/ledger/dispatches")]',
+        '[HttpGet("/ledger/dispatches/{dispatchId}")]',
     ):
         require(marker in (ledger_controller + public_controller), f"missing controller contract: {marker}", failures)
 
     require("/ledger?turn=2" in ledger_service, "missing runtime turn-two preview route", failures)
+    require("ListDispatches" in ledger_service, "missing dispatch generator", failures)
+    require("LoadDispatch" in ledger_service, "missing dispatch detail loader", failures)
     require("public sealed class BlackLedgerTickNewsNotificationService" in tick_news_service, "missing tick-news notification service", failures)
     require("public sealed class BlackLedgerNewsRecipientResolver" in tick_news_service, "missing tick-news recipient resolver", failures)
     require('CHUMMER_BLACK_LEDGER_NEWS_EMAIL_POLICY' in tick_news_service, "missing tick-news policy config contract", failures)
+    require("Dispatch:" in tick_news_service, "missing dispatch link in tick-news digest", failures)
     for marker in (
         "Stewardship transfer preview",
         "Interim bots run bounded posts until verified humans take over.",
+        "Latest dispatches",
     ):
         require(marker in ledger_view, f"missing live ledger view marker: {marker}", failures)
 

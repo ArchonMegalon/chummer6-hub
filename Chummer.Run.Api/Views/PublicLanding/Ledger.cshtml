@@ -203,6 +203,64 @@
     </section>
 }
 
+@if (Model.Dispatches.Count > 0)
+{
+    <section class="editorial-block" id="ledger-dispatches">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Latest dispatches</p>
+            <h2 class="editorial-title">Receipt-backed narrative, not free-floating lore.</h2>
+            <p class="editorial-copy">Every dispatch is generated from a world tick, public-safe pressure change, or closeout-facing movement. No private table data, no sourcebook text, no provider internals.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var dispatch in Model.Dispatches)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@dispatch.Type</span>
+                    <h3>@dispatch.Title</h3>
+                    <p>@dispatch.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <span>Receipt @dispatch.SourceReceiptId</span>
+                        <span>Turn @dispatch.Turn</span>
+                        <span>@dispatch.PrivacyStatus</span>
+                    </div>
+                    <a class="editorial-strip__action" href="@dispatch.Href">Read dispatch</a>
+                </article>
+            }
+        </div>
+        @if (Model.SelectedDispatch is not null)
+        {
+            <article class="trust-claim" id="dispatch-@Model.SelectedDispatch.DispatchId">
+                <span class="tag">Dispatch detail</span>
+                <h3>@Model.SelectedDispatch.Title</h3>
+                @foreach (var paragraph in Model.SelectedDispatch.Body.Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
+                {
+                    <p>@paragraph</p>
+                }
+                <div class="trust-claim__microproof">
+                    <span>Generated from @Model.SelectedDispatch.SourceReceiptId</span>
+                    <span>@Model.SelectedDispatch.Scope</span>
+                    <span>Human review: @Model.SelectedDispatch.HumanReviewStatus</span>
+                </div>
+                @if (Model.SelectedDispatch.InvolvedFactions.Count > 0)
+                {
+                    <p class="muted-copy">Factions: @string.Join(", ", Model.SelectedDispatch.InvolvedFactions)</p>
+                }
+                @if (Model.SelectedDispatch.InvolvedDistricts.Count > 0)
+                {
+                    <p class="muted-copy">Districts: @string.Join(", ", Model.SelectedDispatch.InvolvedDistricts)</p>
+                }
+                <div class="trust-claim__microproof">
+                    <a class="inline-link" href="@Model.SelectedDispatch.SourceReceiptHref">Open receipt lane</a>
+                    @foreach (var link in Model.SelectedDispatch.PackagePressureLinks.Distinct())
+                    {
+                        <a class="inline-link" href="@link">Open linked lane</a>
+                    }
+                </div>
+            </article>
+        }
+    </section>
+}
+
 <section class="editorial-block" id="ledger-privacy">
     <div class="editorial-block__lead">
         <p class="eyebrow">Privacy boundary</p>

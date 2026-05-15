@@ -26,15 +26,21 @@ public sealed class BlackLedgerStatsViewTests
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string ledgerController = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "LedgerController.cs"));
         string ledgerView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
+        string landingView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));
 
         Assert.Contains("[HttpGet(\"/ledger\")]", controller, System.StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/black-ledger\")]", controller, System.StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/ledger/dispatches\")]", controller, System.StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/ledger/dispatches/{dispatchId}\")]", controller, System.StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/karma-forge\")]", controller, System.StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}\")]", ledgerController, System.StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"worlds/{worldId}/ticks\")]", ledgerController, System.StringComparison.Ordinal);
         Assert.Contains("Opt-in aggregate only", ledgerView, System.StringComparison.Ordinal);
         Assert.Contains("This page explains pressure, not people.", ledgerView, System.StringComparison.Ordinal);
         Assert.Contains("Stewardship transfer preview", ledgerView, System.StringComparison.Ordinal);
+        Assert.Contains("Latest dispatches", ledgerView, System.StringComparison.Ordinal);
+        Assert.Contains("Latest dispatch", landingView, System.StringComparison.Ordinal);
+        Assert.Contains("Open Black Ledger", landingView, System.StringComparison.Ordinal);
     }
 
     [Fact]
@@ -118,6 +124,38 @@ public sealed class BlackLedgerStatsViewTests
         Assert.Contains(stats, static stat =>
             string.Equals(stat.Id, "package-pressure", System.StringComparison.Ordinal)
             && string.Equals(stat.Value, "8 hot package candidates", System.StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SeedBackedWorldGeneratesReceiptBackedDispatches()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_BLACK_LEDGER_SEED_PATH"] = Path.GetFullPath(Path.Combine(
+                    "/docker/chummercomplete",
+                    "chummer-hub-registry",
+                    "black-ledger",
+                    "worlds",
+                    "emerald-sprawl-prelude.yaml")),
+            })
+            .Build();
+
+        var service = new BlackLedgerPublicStatsService(configuration);
+        var dispatches = service.ListDispatches();
+        var latest = Assert.Single(dispatches, static item =>
+            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001", System.StringComparison.Ordinal));
+
+        Assert.Equal("ledger_tick_0001_preseeded", latest.SourceReceiptId);
+        Assert.Equal("/ledger/closeouts", latest.SourceReceiptHref);
+        Assert.True(latest.PublicSafe);
+        Assert.True(latest.AiGenerated);
+        Assert.Contains("public-safe seeded preview", latest.Body, System.StringComparison.Ordinal);
+        Assert.Contains(dispatches, static item =>
+            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001_rust_bazaar", System.StringComparison.Ordinal)
+            && item.InvolvedDistricts.Any(static district => string.Equals(district, "Rust Bazaar", System.StringComparison.Ordinal)));
+        Assert.Contains(dispatches, static item =>
+            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001_ghostline", System.StringComparison.Ordinal));
     }
 
     [Fact]

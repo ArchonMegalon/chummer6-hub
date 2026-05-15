@@ -46,6 +46,11 @@ public sealed class CommunityStore
     public Dictionary<string, HubUserExperienceDto> UserExperienceByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<ParticipationOperatorNotificationReceipt> ParticipationNotificationReceipts { get; } = new();
     public List<BlackLedgerNewsDeliveryReceipt> BlackLedgerNewsDeliveryReceipts { get; } = new();
+    public List<BlackLedgerDispatch> BlackLedgerDispatches { get; } = new();
+    public List<DispatchDraft> BlackLedgerDispatchDrafts { get; } = new();
+    public List<DispatchGateReceipt> BlackLedgerDispatchGateReceipts { get; } = new();
+    public List<DispatchApprovalReceipt> BlackLedgerDispatchApprovalReceipts { get; } = new();
+    public List<DispatchPublicationReceipt> BlackLedgerDispatchPublicationReceipts { get; } = new();
     public Dictionary<string, RunnerDossierProjection> DossiersById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CrewProjection> CrewsById { get; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, CampaignProjection> CampaignSpinesById { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -95,6 +100,21 @@ public sealed class CommunityStore
                 .ToArray(),
             BlackLedgerNewsDeliveryReceipts: BlackLedgerNewsDeliveryReceipts
                 .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray(),
+            BlackLedgerDispatches: BlackLedgerDispatches
+                .OrderByDescending(static item => item.CreatedAtUtc, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            BlackLedgerDispatchDrafts: BlackLedgerDispatchDrafts
+                .OrderByDescending(static item => item.GeneratedAtUtc, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            BlackLedgerDispatchGateReceipts: BlackLedgerDispatchGateReceipts
+                .OrderByDescending(static item => item.CheckedAtUtc, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            BlackLedgerDispatchApprovalReceipts: BlackLedgerDispatchApprovalReceipts
+                .OrderByDescending(static item => item.ApprovedAtUtc, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            BlackLedgerDispatchPublicationReceipts: BlackLedgerDispatchPublicationReceipts
+                .OrderByDescending(static item => item.PublishedAtUtc, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
             Dossiers: DossiersById.Values.OrderBy(static item => item.DossierId, StringComparer.OrdinalIgnoreCase).ToArray(),
             Crews: CrewsById.Values.OrderBy(static item => item.CrewId, StringComparer.OrdinalIgnoreCase).ToArray(),
@@ -166,6 +186,11 @@ public sealed class CommunityStore
         UserExperienceByUserId.Clear();
         ParticipationNotificationReceipts.Clear();
         BlackLedgerNewsDeliveryReceipts.Clear();
+        BlackLedgerDispatches.Clear();
+        BlackLedgerDispatchDrafts.Clear();
+        BlackLedgerDispatchGateReceipts.Clear();
+        BlackLedgerDispatchApprovalReceipts.Clear();
+        BlackLedgerDispatchPublicationReceipts.Clear();
         DossiersById.Clear();
         CrewsById.Clear();
         CampaignSpinesById.Clear();
@@ -240,6 +265,11 @@ public sealed class CommunityStore
         }
         ParticipationNotificationReceipts.AddRange(snapshot.ParticipationNotificationReceipts ?? Array.Empty<ParticipationOperatorNotificationReceipt>());
         BlackLedgerNewsDeliveryReceipts.AddRange(snapshot.BlackLedgerNewsDeliveryReceipts ?? Array.Empty<BlackLedgerNewsDeliveryReceipt>());
+        BlackLedgerDispatches.AddRange(snapshot.BlackLedgerDispatches ?? Array.Empty<BlackLedgerDispatch>());
+        BlackLedgerDispatchDrafts.AddRange(snapshot.BlackLedgerDispatchDrafts ?? Array.Empty<DispatchDraft>());
+        BlackLedgerDispatchGateReceipts.AddRange(snapshot.BlackLedgerDispatchGateReceipts ?? Array.Empty<DispatchGateReceipt>());
+        BlackLedgerDispatchApprovalReceipts.AddRange(snapshot.BlackLedgerDispatchApprovalReceipts ?? Array.Empty<DispatchApprovalReceipt>());
+        BlackLedgerDispatchPublicationReceipts.AddRange(snapshot.BlackLedgerDispatchPublicationReceipts ?? Array.Empty<DispatchPublicationReceipt>());
 
         foreach (var dossier in snapshot.Dossiers ?? Array.Empty<RunnerDossierProjection>())
         {
@@ -368,6 +398,11 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<HubUserExperienceDto>? UserExperience = null,
     IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationNotificationReceipts = null,
     IReadOnlyList<BlackLedgerNewsDeliveryReceipt>? BlackLedgerNewsDeliveryReceipts = null,
+    IReadOnlyList<BlackLedgerDispatch>? BlackLedgerDispatches = null,
+    IReadOnlyList<DispatchDraft>? BlackLedgerDispatchDrafts = null,
+    IReadOnlyList<DispatchGateReceipt>? BlackLedgerDispatchGateReceipts = null,
+    IReadOnlyList<DispatchApprovalReceipt>? BlackLedgerDispatchApprovalReceipts = null,
+    IReadOnlyList<DispatchPublicationReceipt>? BlackLedgerDispatchPublicationReceipts = null,
     IReadOnlyList<RunnerDossierProjection>? Dossiers = null,
     IReadOnlyList<CrewProjection>? Crews = null,
     IReadOnlyList<CampaignProjection>? CampaignSpines = null,
