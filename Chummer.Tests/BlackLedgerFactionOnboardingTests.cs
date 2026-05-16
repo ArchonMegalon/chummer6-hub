@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.ViewModels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -18,12 +19,15 @@ public sealed class BlackLedgerFactionAllegianceTests
         string onboardingView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerOnboarding.cshtml"));
 
         Assert.Contains("[HttpGet(\"/account/ledger\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/ledger/notifications\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/ledger/onboarding\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/ledger/factions/{factionId}/promo\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/account/ledger/onboarding/join\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/api/v1/account/ledger/allegiance\")]", ledgerController, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/api/v1/account/ledger/allegiance/join\")]", ledgerController, StringComparison.Ordinal);
         Assert.Contains("Choose your flag.", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Join this faction", onboardingView, StringComparison.Ordinal);
+        Assert.Contains("Open promo brief", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Major Faction", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Challenger", onboardingView, StringComparison.Ordinal);
     }
@@ -465,5 +469,19 @@ public sealed class FactionCharterBuilderTests
         var restored = service.GetPrivateLoreOverlay("cmp_demo", charter.FactionId);
         Assert.NotNull(restored);
         Assert.Equal("Glassline", restored!.LabelMap["district_beta"]);
+    }
+
+    [Fact]
+    public void FactionPromoArtifact_stays_in_provider_verified_fallback_mode()
+    {
+        var service = BlackLedgerFactionAllegianceTests.CreateService();
+
+        BlackLedgerFactionPromoArtifactViewModel? promo = service.GetPromoArtifact("ashline-circle");
+
+        Assert.NotNull(promo);
+        Assert.Equal("NEEDS_PROVIDER_VERIFICATION", promo!.ProviderStatus);
+        Assert.Equal("fallback_static_storyboard", promo.RenderMode);
+        Assert.Contains("/ledger/factions/ashline-circle/promo", promo.HtmlHref, StringComparison.Ordinal);
+        Assert.Contains("Captions required", promo.FormatLabels, StringComparer.Ordinal);
     }
 }

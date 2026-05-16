@@ -53,6 +53,7 @@ public sealed class PublicLandingController : Controller
     private readonly KarmaForgeDiscoveryService _karmaForge;
     private readonly BlackLedgerPublicStatsService _blackLedgerStats;
     private readonly BlackLedgerDispatchService _blackLedgerDispatches;
+    private readonly BlackLedgerTickNewsNotificationService _blackLedgerTickNews;
     private readonly BlackLedgerFactionOnboardingService _blackLedgerFactions;
     private readonly AnarchyPreviewService _anarchyPreview;
     private readonly PublicPackageCatalogService _packageCatalog;
@@ -101,6 +102,7 @@ public sealed class PublicLandingController : Controller
         KarmaForgeDiscoveryService karmaForge,
         BlackLedgerPublicStatsService blackLedgerStats,
         BlackLedgerDispatchService blackLedgerDispatches,
+        BlackLedgerTickNewsNotificationService blackLedgerTickNews,
         BlackLedgerFactionOnboardingService blackLedgerFactions,
         AnarchyPreviewService anarchyPreview,
         PublicPackageCatalogService packageCatalog,
@@ -145,6 +147,7 @@ public sealed class PublicLandingController : Controller
         _karmaForge = karmaForge;
         _blackLedgerStats = blackLedgerStats;
         _blackLedgerDispatches = blackLedgerDispatches;
+        _blackLedgerTickNews = blackLedgerTickNews;
         _blackLedgerFactions = blackLedgerFactions;
         _anarchyPreview = anarchyPreview;
         _packageCatalog = packageCatalog;
@@ -1883,6 +1886,61 @@ public sealed class PublicLandingController : Controller
             : NotFound();
     }
 
+    [HttpGet("/ledger/factions/{factionId}/promo")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerFactionPromoPage([FromRoute] string factionId, CancellationToken cancellationToken)
+    {
+        BlackLedgerFactionPromoPageViewModel? model = await BuildLedgerFactionPromoPageModel(factionId, cancellationToken);
+        return model is null
+            ? NotFound()
+            : View("~/Views/PublicLanding/LedgerFactionPromo.cshtml", model);
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/promo.json")]
+    [Produces("application/json")]
+    public IActionResult LedgerFactionPromoJson([FromRoute] string factionId)
+    {
+        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
+        return promo is null
+            ? NotFound()
+            : Ok(new
+            {
+                promo.FactionId,
+                promo.PublicName,
+                provider_status = promo.ProviderStatus,
+                render_mode = promo.RenderMode,
+                formats = promo.FormatLabels,
+                static_card_label = promo.StaticCardLabel,
+                captions = promo.CaptionLines,
+                html_href = promo.HtmlHref,
+                captions_href = promo.CaptionsHref,
+            });
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/promo.vtt")]
+    [Produces("text/vtt")]
+    public IActionResult LedgerFactionPromoCaptions([FromRoute] string factionId)
+    {
+        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
+        if (promo is null)
+        {
+            return NotFound();
+        }
+
+        var lines = new List<string> { "WEBVTT", string.Empty };
+        for (int index = 0; index < promo.CaptionLines.Count; index += 1)
+        {
+            int start = index * 6;
+            int end = start + 5;
+            lines.Add($"{index + 1}");
+            lines.Add($"00:00:{start:00}.000 --> 00:00:{end:00}.000");
+            lines.Add(promo.CaptionLines[index]);
+            lines.Add(string.Empty);
+        }
+
+        return Content(string.Join('\n', lines), "text/vtt");
+    }
+
     [HttpGet("/account/ledger")]
     [Produces("text/html")]
     public async Task<IActionResult> AccountLedgerHomePage(CancellationToken cancellationToken)
@@ -1902,6 +1960,24 @@ public sealed class PublicLandingController : Controller
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect("/login?next=%2Faccount%2Fledger");
+        }
+    }
+
+    [HttpGet("/account/ledger/notifications")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerNotificationsPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/account/ledger/notifications";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildLedgerNotificationsPageModel(user, cancellationToken);
+            return View("~/Views/PublicLanding/LedgerNotifications.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
         }
     }
 
@@ -8636,6 +8712,15 @@ echo "Help: ${HELP_URL}"
             intro = "Focused command-map view for the seeded Emerald Sprawl world. District pressure, event arcs, and replay controls stay public-safe, route-backed, and visibly distinct from the broader ledger overview.";
         }
 
+        int newsTurn = requestedTurn ?? world?.CurrentTurn ?? 1;
+        BlackLedgerNewsStatusViewModel newsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
+            worldId: "emerald-sprawl-prelude",
+            turn: newsTurn,
+            scopeLabel: "Public Black Ledger lane",
+            notificationsHref: "/account/ledger/notifications",
+            turnHref: $"/ledger/turns/{newsTurn}",
+            dispatchHref: string.IsNullOrWhiteSpace(selectedFactionId) ? $"/ledger/turns/{newsTurn}/dispatches" : $"/ledger/factions/{selectedFactionId}/dispatches");
+
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 selectedFaction?.PublicName ?? "Black Ledger",
@@ -8657,6 +8742,8 @@ echo "Help: ${HELP_URL}"
             Closeouts: _blackLedgerStats.ListCloseouts(),
             Dispatches: dispatches,
             SelectedDispatch: selectedDispatch,
+            NewsreelStatus: newsreelStatus,
+            SelectedFactionPromo: selectedFaction is null ? null : _blackLedgerFactions.GetPromoArtifact(selectedFaction.Id),
             CommandMap: commandMap,
             PrimaryAction: mapFocused
                 ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
@@ -8818,7 +8905,44 @@ echo "Help: ${HELP_URL}"
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
         var chrome = _chrome.BuildAuthenticatedChrome("My Black Ledger faction", "Signed-in Black Ledger faction home, welcome kit, and action trail.", "/account/ledger", user.DisplayName, user.Email);
-        return _blackLedgerFactions.BuildFactionHome(chrome, user);
+        BlackLedgerFactionHomeViewModel model = _blackLedgerFactions.BuildFactionHome(chrome, user);
+        return model with
+        {
+            NewsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
+                worldId: "emerald-sprawl-prelude",
+                turn: 1,
+                scopeLabel: "Signed-in account lane",
+                notificationsHref: "/account/ledger/notifications",
+                turnHref: "/ledger/turns/1",
+                dispatchHref: "/ledger/turns/1/dispatches",
+                recipientUserId: user.UserId)
+        };
+    }
+
+    private async Task<BlackLedgerNotificationsPageViewModel> BuildLedgerNotificationsPageModel(HubUserDto user, CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+        _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
+        var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger notifications", "Signed-in Black Ledger newsreel delivery posture and receipts.", "/account/ledger/notifications", user.DisplayName, user.Email);
+        return new BlackLedgerNotificationsPageViewModel(
+            Chrome: chrome,
+            Heading: "Turn 1 newsreel delivery",
+            Intro: "This route shows whether the seeded Black Ledger Turn 1 newsreel was sent, suppressed, dry-run only, or blocked by configuration for this account.",
+            Status: _blackLedgerTickNews.BuildStatusViewModel(
+                worldId: "emerald-sprawl-prelude",
+                turn: 1,
+                scopeLabel: "Signed-in account lane",
+                notificationsHref: "/account/ledger/notifications",
+                turnHref: "/ledger/turns/1",
+                dispatchHref: "/ledger/turns/1/dispatches",
+                recipientUserId: user.UserId),
+            DeliveryNotes:
+            [
+                "Newsreel email stays public-safe and never includes private campaign labels.",
+                "Operator preview policy can suppress delivery to regular accounts without hiding the reason.",
+                "Duplicate sends are blocked by the stored event key."
+            ]);
     }
 
     private async Task<BlackLedgerFactionOnboardingViewModel> BuildLedgerOnboardingPageModel(HubUserDto user, string? step, CancellationToken cancellationToken)
@@ -8837,6 +8961,31 @@ echo "Help: ${HELP_URL}"
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
         var chrome = _chrome.BuildAuthenticatedChrome("Create Black Ledger faction", "Signed-in faction charter builder with route-backed major and challenger flows.", "/account/ledger/factions/create", user.DisplayName, user.Email);
         return _blackLedgerFactions.BuildCreatePage(chrome, user, charterType);
+    }
+
+    private async Task<BlackLedgerFactionPromoPageViewModel?> BuildLedgerFactionPromoPageModel(string factionId, CancellationToken cancellationToken)
+    {
+        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
+        if (promo is null)
+        {
+            return null;
+        }
+
+        return new BlackLedgerFactionPromoPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                $"{promo.PublicName} promo",
+                "Public-safe faction onboarding promo artifacts with verified provider posture.",
+                $"/ledger/factions/{promo.FactionId}/promo",
+                cancellationToken),
+            Heading: $"{promo.PublicName} onboarding promo",
+            Intro: "This route ships the honest first-party fallback: storyboard formats, static card, captions, and explicit provider-verification posture instead of an unverified external render claim.",
+            Promo: promo,
+            DeliveryNotes:
+            [
+                "Provider status stays explicit until a verified media adapter exists.",
+                "No official lore text and no provider branding appear here.",
+                "These links are route-backed fallback artifacts, not placeholder buttons."
+            ]);
     }
 
     private async Task<AnarchyPageViewModel> BuildAnarchyPageModel(

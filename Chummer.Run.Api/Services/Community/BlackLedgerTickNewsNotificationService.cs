@@ -300,6 +300,81 @@ public sealed class BlackLedgerTickNewsNotificationService
         }
     }
 
+    public BlackLedgerNewsStatusViewModel BuildStatusViewModel(
+        string worldId,
+        int turn,
+        string scopeLabel,
+        string notificationsHref,
+        string turnHref,
+        string dispatchHref,
+        string? recipientUserId = null)
+    {
+        var allReceipts = ListReceipts(worldId, turn, 24).ToArray();
+        var scopedReceipts = string.IsNullOrWhiteSpace(recipientUserId)
+            ? allReceipts
+            : allReceipts.Where(item => string.Equals(item.RecipientUserId, recipientUserId, StringComparison.OrdinalIgnoreCase)).ToArray();
+        BlackLedgerNewsRecipientResolution resolution = _resolver.Resolve(worldId);
+        BlackLedgerNewsDeliveryReceipt? latest = scopedReceipts.FirstOrDefault() ?? allReceipts.FirstOrDefault();
+
+        string status;
+        string summary;
+        string? failureReason;
+        if (latest is not null && scopedReceipts.Length > 0)
+        {
+            status = latest.Status;
+            summary = BuildStatusSummary(latest.Status, latest.FailureReason, isRecipientScoped: !string.IsNullOrWhiteSpace(recipientUserId));
+            failureReason = latest.FailureReason;
+        }
+        else if (!string.IsNullOrWhiteSpace(recipientUserId) && latest is not null)
+        {
+            status = "suppressed_not_current_recipient";
+            summary = string.Equals(resolution.Policy, BlackLedgerNewsRecipientResolver.OperatorOnlyPolicy, StringComparison.Ordinal)
+                ? "Turn 1 newsreel ran under operator preview policy. This signed-in account is not an email recipient on this runtime."
+                : "Turn 1 newsreel exists, but this signed-in account is not one of the current recipients.";
+            failureReason = "not_current_recipient";
+        }
+        else if (latest is not null)
+        {
+            status = latest.Status;
+            summary = BuildStatusSummary(latest.Status, latest.FailureReason, isRecipientScoped: false);
+            failureReason = latest.FailureReason;
+        }
+        else
+        {
+            status = resolution.Status == "resolved" ? "unconfigured" : resolution.Status;
+            summary = resolution.Status == "resolved"
+                ? "Recipient resolution is configured, but no stored Turn 1 newsreel receipt exists yet."
+                : BuildStatusSummary(resolution.Status, resolution.FailureReason, isRecipientScoped: !string.IsNullOrWhiteSpace(recipientUserId));
+            failureReason = resolution.FailureReason;
+        }
+
+        return new BlackLedgerNewsStatusViewModel(
+            WorldId: worldId,
+            Turn: turn,
+            Status: status,
+            StatusLabel: BuildStatusLabel(status),
+            Summary: summary,
+            FailureReason: failureReason,
+            Policy: resolution.Policy,
+            ReceiptCount: scopedReceipts.Length > 0 ? scopedReceipts.Length : allReceipts.Length,
+            RecipientCount: allReceipts.Count(item => string.Equals(item.Status, "sent", StringComparison.OrdinalIgnoreCase)),
+            ScopeLabel: scopeLabel,
+            NotificationsHref: notificationsHref,
+            TurnHref: turnHref,
+            DispatchHref: dispatchHref,
+            Receipts: (scopedReceipts.Length > 0 ? scopedReceipts : allReceipts)
+                .Take(6)
+                .Select(item => new BlackLedgerNewsReceiptEntryViewModel(
+                    ReceiptId: item.ReceiptId,
+                    Status: item.Status,
+                    Summary: BuildStatusSummary(item.Status, item.FailureReason, isRecipientScoped: !string.IsNullOrWhiteSpace(recipientUserId)),
+                    FailureReason: item.FailureReason,
+                    RecipientLabel: string.IsNullOrWhiteSpace(item.EmailMasked) ? "system" : item.EmailMasked,
+                    DeliveryRef: item.DeliveryRef,
+                    AttemptedAtUtc: item.AttemptedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'")))
+                .ToArray());
+    }
+
     public async Task<BlackLedgerTickNewsNotificationBatchReceipt> NotifyTickNewsAsync(
         BlackLedgerWorldTickNewsEvent tickNews,
         bool dryRun,
@@ -735,6 +810,38 @@ public sealed class BlackLedgerTickNewsNotificationService
 
     private static string Truncate(string value, int maxLength)
         => value.Length <= maxLength ? value : value[..maxLength];
+
+    private static string BuildStatusLabel(string status)
+        => status switch
+        {
+            "sent" => "Sent",
+            "duplicate" => "Duplicate prevented",
+            "pending_dry_run" or "dry_run" => "Dry run",
+            "suppressed_disabled" => "Suppressed: disabled",
+            "suppressed_no_recipients" => "Suppressed: no recipients",
+            "suppressed_multiple_users_no_subscription" => "Suppressed: ambiguous recipients",
+            "suppressed_delivery_unconfigured" => "Suppressed: delivery unconfigured",
+            "suppressed_privacy_failed" => "Suppressed: privacy gate",
+            "suppressed_not_current_recipient" => "Suppressed: not a current recipient",
+            "failed_delivery" => "Delivery failed",
+            _ => "Unconfigured"
+        };
+
+    private static string BuildStatusSummary(string status, string? failureReason, bool isRecipientScoped)
+        => status switch
+        {
+            "sent" => "Turn 1 newsreel email was sent with a delivery receipt.",
+            "duplicate" => "Turn 1 newsreel was already delivered for this event key, so a duplicate send was prevented.",
+            "pending_dry_run" or "dry_run" => "Turn 1 newsreel was rendered in dry-run mode without sending email.",
+            "suppressed_disabled" => "Turn 1 newsreel email is disabled on this runtime.",
+            "suppressed_no_recipients" => "Turn 1 newsreel email had no eligible recipients on this runtime.",
+            "suppressed_multiple_users_no_subscription" => "Turn 1 newsreel preview fallback refused delivery because multiple users exist without an explicit subscription.",
+            "suppressed_delivery_unconfigured" => "Turn 1 newsreel email could not send because EA delivery configuration is missing.",
+            "suppressed_privacy_failed" => "Turn 1 newsreel email was blocked by the privacy gate before delivery.",
+            "suppressed_not_current_recipient" when isRecipientScoped => "A Turn 1 newsreel exists, but this account is not part of the current recipient policy.",
+            "failed_delivery" => $"Turn 1 newsreel email attempted delivery, but the downstream dispatch failed{(string.IsNullOrWhiteSpace(failureReason) ? "." : $": {failureReason}.")}",
+            _ => "Turn 1 newsreel email has not produced a usable receipt yet."
+        };
 
     private static int ExtractCurrentTurn(WorldTickProjection worldTick)
     {
