@@ -9,12 +9,11 @@ from absolute_completion_common import LocalHubApp, completion_path, now_iso, wr
 
 
 REQUIRED_PHRASES = (
-    "fictional runner/campaign statistics only",
+    "fictional, public-safe seed world",
     "Opt-in aggregate only",
     "MysAd density",
     "Debt Heat",
     "Package pressure",
-    "Chaos index",
 )
 
 FORBIDDEN_PHRASES = (

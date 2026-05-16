@@ -25,16 +25,16 @@ FORBIDDEN_PUBLIC_TERMS = (
 )
 
 ROOT_REQUIRED_PHRASES = (
-    "Black Ledger world panel",
+    "Black Ledger preview",
     "Turn 1 already ran",
-    "View Black Ledger",
+    "Open Black Ledger",
 )
 
 LEDGER_REQUIRED_PHRASES = (
     "Emerald Sprawl: First Pressure",
     "Last tick receipt",
     "Privacy boundary",
-    "fictional runner/campaign statistics only",
+    "fictional, public-safe seed world",
 )
 
 TURN_TWO_REQUIRED_PHRASES = (

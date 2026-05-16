@@ -16,11 +16,12 @@ test('public CTA hierarchy keeps downloads primary and account install contextua
   expect(manifest).toContain('account_aware_install_cta_label: Create account to install');
   expect(manifest).toContain('product_proof_primary_label: Open downloads');
 
-  expect(landing).toContain('@Model.PrimaryHeroAction.Label');
+  expect(landing).toContain('Open downloads');
   expect(landing).toContain('Recommended path');
   expect(landing).toContain('Account-aware install handoff');
   expect(landing).toContain('Current preview install');
   expect(landing).toContain('Already have an account? Sign in');
+  expect(landing).toContain('Downloads first. Hub second. Ledger and Forge when you need context.');
 
   expect(downloads).toContain('Open downloads first. Create account for guided install only when you want first-launch recovery, linked restore, and support follow-through to stay attached.');
   expect(downloads).not.toContain('Create account to install</a>');
