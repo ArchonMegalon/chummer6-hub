@@ -72,6 +72,7 @@ public sealed class CommunityStore
     public List<OpenRunMeetingHandoffProjection> OpenRunMeetingHandoffs { get; } = new();
     public List<OpenRunCloseoutProjection> OpenRunCloseouts { get; } = new();
     public Dictionary<string, WorkspaceRestoreProjection> RestoreByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboardingState { get; set; }
 
     public void PersistLocked()
     {
@@ -136,7 +137,8 @@ public sealed class CommunityStore
             OpenRunSchedules: OpenRunSchedules.OrderByDescending(static item => item.ScheduledAtUtc).ToArray(),
             OpenRunMeetingHandoffs: OpenRunMeetingHandoffs.OrderByDescending(static item => item.CreatedAtUtc).ToArray(),
             OpenRunCloseouts: OpenRunCloseouts.OrderByDescending(static item => item.ClosedAtUtc).ToArray(),
-            RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray());
+            RestoreSummaries: RestoreByUserId.Values.OrderBy(static item => item.UserId, StringComparer.OrdinalIgnoreCase).ToArray(),
+            BlackLedgerFactionOnboarding: BlackLedgerFactionOnboardingState);
 
         Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
         var tempPath = $"{_storagePath}.tmp";
@@ -212,6 +214,7 @@ public sealed class CommunityStore
         OpenRunMeetingHandoffs.Clear();
         OpenRunCloseouts.Clear();
         RestoreByUserId.Clear();
+        BlackLedgerFactionOnboardingState = null;
 
         foreach (var user in snapshot.Users ?? Array.Empty<HubUserDto>())
         {
@@ -312,6 +315,8 @@ public sealed class CommunityStore
         {
             RestoreByUserId[restore.UserId] = restore;
         }
+
+        BlackLedgerFactionOnboardingState = snapshot.BlackLedgerFactionOnboarding;
     }
 
     private static string ResolveStoragePath(IConfiguration configuration)
@@ -423,7 +428,8 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<OpenRunScheduleReceiptProjection>? OpenRunSchedules = null,
     IReadOnlyList<OpenRunMeetingHandoffProjection>? OpenRunMeetingHandoffs = null,
     IReadOnlyList<OpenRunCloseoutProjection>? OpenRunCloseouts = null,
-    IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null);
+    IReadOnlyList<WorkspaceRestoreProjection>? RestoreSummaries = null,
+    BlackLedgerFactionOnboardingState? BlackLedgerFactionOnboarding = null);
 
 internal sealed record SponsorSessionStateSnapshot(
     string SponsorSessionId,

@@ -480,12 +480,22 @@ public sealed record BlackLedgerFactionJoinOptionViewModel(
     string Href,
     string PromoHref);
 
+public sealed record BlackLedgerWizardStepViewModel(
+    string Id,
+    string Label,
+    string Href,
+    bool Current,
+    bool Complete);
+
 public sealed record BlackLedgerFactionOnboardingViewModel(
     SiteChromeViewModel Chrome,
     string Heading,
     string Intro,
     bool HasActiveAllegiance,
     BlackLedgerAccountFactionAllegianceDto? CurrentAllegiance,
+    string CurrentStep,
+    int CurrentRunnerCount,
+    IReadOnlyList<BlackLedgerWizardStepViewModel> Steps,
     string ExistingFactionSummary,
     string MajorFounderSummary,
     string ChallengerFounderSummary,
@@ -522,12 +532,15 @@ public sealed record BlackLedgerFactionCreatePageViewModel(
     SiteChromeViewModel Chrome,
     string Heading,
     string Intro,
+    string PreferredCharterType,
     int MajorSlotsAvailable,
     BlackLedgerFactionCharterRulesDto MajorRules,
     BlackLedgerFactionCharterRulesDto ChallengerRules,
     IReadOnlyList<BlackLedgerFactionArchetypeDto> Archetypes,
     IReadOnlyList<BlackLedgerFactionPerkDto> Perks,
-    IReadOnlyList<BlackLedgerFactionFlawDto> Flaws);
+    IReadOnlyList<BlackLedgerFactionFlawDto> Flaws,
+    IReadOnlyList<string> StartingDistrictIds,
+    IReadOnlyList<BlackLedgerFactionJoinOptionViewModel> RivalFactions);
 
 public sealed record AnarchyRunnerProfileViewModel(
     string RunnerId,

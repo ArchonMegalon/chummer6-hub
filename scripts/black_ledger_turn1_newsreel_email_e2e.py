@@ -100,15 +100,6 @@ class EaDispatchStub:
             self._thread.join(timeout=5)
 
 
-def prepare_session(base_url: str, access_token: str) -> requests.Session:
-    session = requests.Session()
-    session.headers["Authorization"] = f"Bearer {access_token}"
-    response = session.get(f"{base_url}/account/ledger/onboarding", timeout=30, allow_redirects=False)
-    if response.status_code not in {200, 302}:
-        raise RuntimeError(f"failed to establish signed-in ledger session: {response.status_code}")
-    return session
-
-
 def send_tick_news(base_url: str, *, dry_run: bool) -> dict[str, Any]:
     response = requests.post(
         f"{base_url}/api/v1/ledger/worlds/{WORLD_ID}/tick-news/send",
@@ -154,15 +145,16 @@ def run_sent_and_duplicate_scenario() -> dict[str, Any]:
                 email="turn1-proof@chummer.run",
             ) as identity:
                 with LocalHubApp(identity_base_url=identity.base_url) as app:
-                    session = prepare_session(app.base_url, ACCESS_TOKEN)
-                    joined = session.post(
+                    first = send_tick_news(app.base_url, dry_run=False)
+                    duplicate = send_tick_news(app.base_url, dry_run=False)
+                    session = requests.Session()
+                    session.headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
+                    join = session.post(
                         f"{app.base_url}/api/v1/account/ledger/allegiance/join",
                         json={"factionId": "ashline-circle"},
                         timeout=30,
                     )
-                    joined.raise_for_status()
-                    first = send_tick_news(app.base_url, dry_run=False)
-                    duplicate = send_tick_news(app.base_url, dry_run=False)
+                    join.raise_for_status()
                     account = fetch_route(session, f"{app.base_url}/account/ledger")
                     notifications = fetch_route(session, f"{app.base_url}/account/ledger/notifications")
                     turn_page = fetch_route(None, f"{app.base_url}/ledger/turns/1")
@@ -181,7 +173,6 @@ def run_sent_and_duplicate_scenario() -> dict[str, Any]:
                         "notifications_route": notifications,
                         "turn_route": turn_page,
                         "base_url": app.base_url,
-                        "join_receipt": joined.json(),
                     }
 
 
@@ -195,10 +186,11 @@ def run_disabled_scenario() -> dict[str, Any]:
     with patched_env(env):
         with TokenIdentityStub(access_token=ACCESS_TOKEN, subject_id="subject.turn1.disabled", display_name="Disabled Proof", email="disabled@chummer.run") as identity:
             with LocalHubApp(identity_base_url=identity.base_url) as app:
-                session = prepare_session(app.base_url, ACCESS_TOKEN)
+                session = requests.Session()
+                session.headers["Authorization"] = f"Bearer {ACCESS_TOKEN}"
                 payload = send_tick_news(app.base_url, dry_run=False)
                 notifications = fetch_route(session, f"{app.base_url}/account/ledger/notifications")
-                return {"batch": payload, "notifications_route": notifications}
+            return {"batch": payload, "notifications_route": notifications}
 
 
 def run_unconfigured_scenario() -> dict[str, Any]:
