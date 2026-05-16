@@ -694,10 +694,12 @@ public sealed class PublicLandingController : Controller
             }
 
             string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
+            string hubLocalReleaseProofUrl = BuildAbsoluteUrl("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json");
             string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
             string command = BuildReleaseUploadBootstrapCommand(
                 bootstrapUrl,
                 ComputeSha256Hex(bootstrapTemplate),
+                hubLocalReleaseProofUrl,
                 ReleaseUploadTicketEnvironmentVariable,
                 ticket.Ticket);
             var model = new ReleaseUploadPageViewModel(
@@ -815,10 +817,12 @@ public sealed class PublicLandingController : Controller
         }
 
         string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
+        string hubLocalReleaseProofUrl = BuildAbsoluteUrl("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json");
         string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
         string command = BuildReleaseUploadBootstrapCommand(
             bootstrapUrl,
             ComputeSha256Hex(bootstrapTemplate),
+            hubLocalReleaseProofUrl,
             releaseUploadAuthEnvironmentVariable,
             releaseUploadAuth);
 
@@ -9028,6 +9032,7 @@ echo "Help: ${HELP_URL}"
     private static string BuildReleaseUploadBootstrapCommand(
         string bootstrapUrl,
         string bootstrapSha256,
+        string hubLocalReleaseProofUrl,
         string releaseUploadAuthEnvironmentVariable,
         string releaseUploadAuth)
     {
@@ -9039,7 +9044,8 @@ echo "Help: ${HELP_URL}"
             "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
             "CHUMMER_RELEASE_CHANNEL='preview' " +
             "CHUMMER_ALLOW_UNSIGNED_PREVIEW='1' " +
-            "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0' " +
+            "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='1' " +
+            "CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL=" + SingleQuoteShellValue(hubLocalReleaseProofUrl) + " " +
             "CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0' " +
             "CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0' " +
             "CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4' " +
