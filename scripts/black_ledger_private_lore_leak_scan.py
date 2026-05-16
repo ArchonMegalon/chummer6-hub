@@ -16,10 +16,15 @@ targets = [
     "/ledger/factions/ashline-circle/dispatches",
     "/ledger/factions/ashline-circle/packages",
 ]
-forbidden = [
-    "internal tag",
-    "lore overlay alpha",
-    "district pressure lane",
+private_lore_tokens = [
+    "campaign alias",
+    "safehouse codename",
+    "pressure lane beta",
+]
+no_noise_forbidden = private_lore_tokens + [
+    'href="#"',
+    "javascript:void",
+    "Learn more",
 ]
 
 results = []
@@ -34,7 +39,7 @@ source_files = [
 for file in source_files:
     text = file.read_text()
     file_violations = []
-    for token in forbidden + ['href="#"', "javascript:void", "Learn more"]:
+    for token in no_noise_forbidden:
         if token in text:
             file_violations.append(token)
             source_status = "fail"
@@ -44,16 +49,23 @@ for path in targets:
     try:
         response = requests.get(args.base_url.rstrip("/") + path, timeout=20)
         body = response.text
-        leaked = [token for token in forbidden if token in body]
+        leaked = [token for token in private_lore_tokens if token in body]
         if leaked:
             status = "fail"
         results.append({"path": path, "status_code": response.status_code, "leaks": leaked})
     except Exception as exc:
         results.append({"path": path, "runtime_unavailable": str(exc)})
 
-out = Path("/docker/chummercomplete/_completion/black_ledger_faction_onboarding/BLACK_LEDGER_FACTION_NO_NOISE.generated.json")
-out.parent.mkdir(parents=True, exist_ok=True)
 combined = "pass" if status == "pass" and source_status == "pass" else "fail"
-payload = {"status": combined, "runtime_status": status, "source_status": source_status, "results": results}
-out.write_text(json.dumps(payload, indent=2))
+payload = {
+    "status": combined,
+    "runtime_status": status,
+    "source_status": source_status,
+    "results": results,
+}
+
+base = Path("/docker/chummercomplete/_completion/black_ledger_faction_onboarding")
+base.mkdir(parents=True, exist_ok=True)
+(base / "BLACK_LEDGER_PRIVATE_LORE_LEAK_SCAN.generated.json").write_text(json.dumps(payload, indent=2))
+(base / "BLACK_LEDGER_FACTION_NO_NOISE.generated.json").write_text(json.dumps(payload, indent=2))
 print(json.dumps(payload))

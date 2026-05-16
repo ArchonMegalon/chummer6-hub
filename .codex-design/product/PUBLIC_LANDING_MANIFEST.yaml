@@ -1110,6 +1110,55 @@ public_routes:
     verification_file: Chummer.Run.Api/Controllers/PublicLandingController.cs
     verification_pattern: '[HttpGet("/ledger/factions/{factionId}/dispatches")]'
     verification_path: /ledger/factions/ashline-circle/dispatches
+  - path: /ledger/factions/{factionId}/packages
+    title: BLACK LEDGER faction package pressure
+    audience: public
+    purpose: flagship_public_hub
+    requires_auth: false
+    guest_fallback: /ledger/factions/{factionId}/packages
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public-safe faction package pressure only
+    verification_mode: controller_contract
+    verification_file: Chummer.Run.Api/Controllers/PublicLandingController.cs
+    verification_pattern: '[HttpGet("/ledger/factions/{factionId}/packages")]'
+    verification_path: /ledger/factions/ashline-circle/packages
+  - path: /account/ledger
+    title: BLACK LEDGER faction home
+    audience: signed_in
+    purpose: flagship_account_hub
+    requires_auth: true
+    guest_fallback: /login?next=/account/ledger
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: authenticated allegiance home only
+    verification_mode: controller_contract
+    verification_file: Chummer.Run.Api/Controllers/PublicLandingController.cs
+    verification_pattern: '[HttpGet("/account/ledger")]'
+  - path: /account/ledger/onboarding
+    title: BLACK LEDGER onboarding
+    audience: signed_in
+    purpose: flagship_account_hub
+    requires_auth: true
+    guest_fallback: /login?next=/account/ledger/onboarding
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: authenticated account onboarding wizard only
+    verification_mode: controller_contract
+    verification_file: Chummer.Run.Api/Controllers/PublicLandingController.cs
+    verification_pattern: '[HttpGet("/account/ledger/onboarding")]'
+  - path: /account/ledger/factions/create
+    title: BLACK LEDGER faction charter builder
+    audience: signed_in
+    purpose: flagship_account_hub
+    requires_auth: true
+    guest_fallback: /login?next=/account/ledger/factions/create
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: authenticated faction charter builder only
+    verification_mode: controller_contract
+    verification_file: Chummer.Run.Api/Controllers/PublicLandingController.cs
+    verification_pattern: '[HttpGet("/account/ledger/factions/create")]'
   - path: /api/v1/ledger/worlds/{worldId}/map
     title: BLACK LEDGER map API
     audience: public

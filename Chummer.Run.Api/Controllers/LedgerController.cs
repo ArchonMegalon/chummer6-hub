@@ -218,13 +218,14 @@ public sealed class LedgerController : ControllerBase
         [FromForm] string[]? flawIds,
         [FromForm] string? startingDistrictId,
         [FromForm] string? rivalFactionId,
+        [FromForm] bool? warningAccepted,
         CancellationToken cancellationToken)
     {
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var charter = _blackLedgerFactions.CreateFaction(user, body ?? new BlackLedgerCreateFactionRequest(publicName, charterType, archetypeId, perkIds, flawIds, startingDistrictId, rivalFactionId));
+            var charter = _blackLedgerFactions.CreateFaction(user, body ?? new BlackLedgerCreateFactionRequest(publicName, charterType, archetypeId, perkIds, flawIds, startingDistrictId, rivalFactionId, warningAccepted));
             return Ok(charter);
         }
         catch (HubRequestAuthException ex)
@@ -453,28 +454,16 @@ public sealed class LedgerController : ControllerBase
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            if (!string.Equals(request.WorldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest("worldId must be emerald-sprawl-prelude.");
-            }
-
-            var receipt = new
-            {
-                overlay_id = $"overlay_{Guid.NewGuid():N}",
-                owner_account_id = subject.SubjectId,
-                campaign_id = campaignId,
-                world_id = request.WorldId,
-                label_map = request.LabelMap,
-                public_projection_allowed = false,
-                created_at_utc = DateTimeOffset.UtcNow.ToString("O"),
-                updated_at_utc = DateTimeOffset.UtcNow.ToString("O"),
-            };
-
-            return Ok(receipt);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.UpsertPrivateLoreOverlay(user, campaignId, request));
         }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
         }
     }
 
@@ -520,8 +509,4 @@ public sealed class LedgerController : ControllerBase
         bool Publish = true);
 
     public sealed record JoinFactionRequest(string? FactionId);
-
-    public sealed record PrivateLoreOverlayRequest(
-        string WorldId,
-        Dictionary<string, string> LabelMap);
 }

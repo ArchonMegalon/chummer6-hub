@@ -10,6 +10,25 @@ namespace Chummer.Run.Api.Services.Community;
 public sealed class BlackLedgerFactionOnboardingService
 {
     private const string WorldId = "emerald-sprawl-prelude";
+    private static readonly string[] ForbiddenFactionNameTerms =
+    [
+        "ares",
+        "aztechnology",
+        "renraku",
+        "mitsuhama",
+        "saeder",
+        "shiawase",
+        "horizon",
+        "neonet",
+        "spinrad",
+        "evo",
+        "shadowrun",
+        "sourcebook",
+        "fuck",
+        "shit",
+        "nigger",
+        "retard"
+    ];
     private readonly object _gate = new();
     private readonly string _storagePath;
     private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
@@ -17,11 +36,13 @@ public sealed class BlackLedgerFactionOnboardingService
         WriteIndented = true
     };
     private readonly BlackLedgerPublicStatsService _stats;
+    private readonly CampaignSpineService _campaignSpine;
     private BlackLedgerFactionOnboardingState _state = new();
 
-    public BlackLedgerFactionOnboardingService(IConfiguration configuration, BlackLedgerPublicStatsService stats)
+    public BlackLedgerFactionOnboardingService(IConfiguration configuration, BlackLedgerPublicStatsService stats, CampaignSpineService campaignSpine)
     {
         _stats = stats;
+        _campaignSpine = campaignSpine;
         _storagePath = configuration["CHUMMER_BLACK_LEDGER_FACTION_STORAGE"]
             ?? Path.Combine(AppContext.BaseDirectory, "App_Data", "black-ledger-faction-onboarding.json");
         Load();
@@ -110,13 +131,15 @@ public sealed class BlackLedgerFactionOnboardingService
         }
 
         var now = DateTimeOffset.UtcNow;
+        EnsureAllegianceChangeAllowed(user.UserId, normalizedFactionId, now);
+        var membership = BuildRunnerMembershipSnapshot(user);
         var receipt = new BlackLedgerFactionJoinReceiptDto(
             ReceiptId: NewId("fmem"),
             AccountIdHash: Hash(user.UserId),
             FactionId: normalizedFactionId,
             MembershipType: "joined_existing",
             AppliesToAllRunners: true,
-            RunnerCount: 2,
+            RunnerCount: membership.RunnerIds.Count,
             FutureRunnersInherit: true,
             CreatedAtUtc: now,
             PrivacyResult: "passed",
@@ -130,7 +153,7 @@ public sealed class BlackLedgerFactionOnboardingService
             JoinedAtUtc: now,
             LockUntilUtc: now.AddDays(30),
             SwitchCount: GetSwitchCount(user.UserId) + 1,
-            CurrentRunnerIdsSnapshot: new[] { $"{user.Handle}-runner-alpha", $"{user.Handle}-runner-beta" },
+            CurrentRunnerIdsSnapshot: membership.RunnerIds,
             ReceiptId: receipt.ReceiptId,
             PublicProjectionAllowed: false,
             NotificationPreferences: new BlackLedgerFactionNotificationPreferencesDto(true, true, true));
@@ -151,6 +174,7 @@ public sealed class BlackLedgerFactionOnboardingService
         var rules = BuildCharterRules(charterType);
         var perkIds = (request.PerkIds ?? Array.Empty<string>()).Select(NormalizeToken).Where(static item => item.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var flawIds = (request.FlawIds ?? Array.Empty<string>()).Select(NormalizeToken).Where(static item => item.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        bool warningAccepted = request.WarningAccepted ?? false;
         var archetype = Archetypes.FirstOrDefault(item => string.Equals(item.Id, NormalizeToken(request.ArchetypeId), StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("Unknown archetype.");
         var selectedPerks = Perks.Where(item => perkIds.Contains(item.Id, StringComparer.OrdinalIgnoreCase)).ToArray();
@@ -166,14 +190,29 @@ public sealed class BlackLedgerFactionOnboardingService
             throw new InvalidOperationException("No major charter slots remain.");
         }
 
+        if (charterType == "challenger" && !warningAccepted)
+        {
+            throw new InvalidOperationException("Challenger founder warning acknowledgement is required.");
+        }
+
         if (selectedFlaws.Length < rules.RequiredFlaws)
         {
             throw new InvalidOperationException("Selected flaws do not meet the required minimum.");
         }
 
+        if (selectedFlaws.Length > 4)
+        {
+            throw new InvalidOperationException("Selected flaws exceed the charter cap.");
+        }
+
         if (selectedPerks.Length > rules.MaxPerks)
         {
             throw new InvalidOperationException("Selected perks exceed the charter cap.");
+        }
+
+        if (charterType == "major" && selectedPerks.Any(static perk => perk.ChallengerOnly))
+        {
+            throw new InvalidOperationException("Challenger-only perks are not allowed on a major charter.");
         }
 
         int spent = selectedPerks.Sum(static item => item.Cost) + selectedFlaws.Sum(static item => item.Cost);
@@ -184,6 +223,9 @@ public sealed class BlackLedgerFactionOnboardingService
 
         string publicName = NormalizePublicName(request.PublicName);
         string factionId = BuildFactionId(publicName);
+        EnsureFactionNameSafe(publicName, factionId);
+        EnsureAllegianceChangeAllowed(user.UserId, factionId, DateTimeOffset.UtcNow);
+        var membership = BuildRunnerMembershipSnapshot(user);
         var faction = new BlackLedgerFactionViewModel(
             factionId,
             publicName,
@@ -219,7 +261,7 @@ public sealed class BlackLedgerFactionOnboardingService
             FactionId: factionId,
             MembershipType: charterType == "major" ? "founder_major" : "founder_challenger",
             AppliesToAllRunners: true,
-            RunnerCount: 2,
+            RunnerCount: membership.RunnerIds.Count,
             FutureRunnersInherit: true,
             CreatedAtUtc: charter.CreatedAtUtc,
             PrivacyResult: "passed",
@@ -233,7 +275,7 @@ public sealed class BlackLedgerFactionOnboardingService
             JoinedAtUtc: charter.CreatedAtUtc,
             LockUntilUtc: charter.CreatedAtUtc.AddDays(30),
             SwitchCount: GetSwitchCount(user.UserId) + 1,
-            CurrentRunnerIdsSnapshot: new[] { $"{user.Handle}-runner-alpha", $"{user.Handle}-runner-beta" },
+            CurrentRunnerIdsSnapshot: membership.RunnerIds,
             ReceiptId: receipt.ReceiptId,
             PublicProjectionAllowed: false,
             NotificationPreferences: new BlackLedgerFactionNotificationPreferencesDto(true, true, true));
@@ -244,6 +286,18 @@ public sealed class BlackLedgerFactionOnboardingService
             _state.Charters[factionId] = charter;
             _state.Allegiances[user.UserId] = allegiance;
             _state.MembershipReceipts.Add(receipt);
+            _state.FactionOperationalStates[factionId] = new BlackLedgerFactionOperationalState(
+                WorldId,
+                1,
+                rules.StartingActionPointsPerTick,
+                0,
+                0,
+                0,
+                0,
+                charter.CreatedAtUtc,
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+                new List<string>(),
+                new List<string>());
             PersistLocked();
         }
 
@@ -301,6 +355,19 @@ public sealed class BlackLedgerFactionOnboardingService
 
         var action = ActionDefinitions.FirstOrDefault(item => string.Equals(item.ActionId, NormalizeToken(request.ActionId), StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("Unknown faction action.");
+        var now = DateTimeOffset.UtcNow;
+        BlackLedgerFactionOperationalState actionState;
+        lock (_gate)
+        {
+            actionState = GetOrCreateActionStateLocked(normalizedFactionId, now);
+            if (actionState.ActionPointsSpent + action.Cost > actionState.ActionPointsTotal)
+            {
+                throw new InvalidOperationException("Faction action points are exhausted for the current turn.");
+            }
+
+            ReduceActionLocked(actionState, action, request, now);
+        }
+
         var receipt = new BlackLedgerFactionActionReceiptDto(
             ReceiptId: NewId("fact"),
             FactionId: normalizedFactionId,
@@ -310,13 +377,17 @@ public sealed class BlackLedgerFactionOnboardingService
             Stake: request.Stake ?? "pressure",
             TargetDistrictId: NormalizeToken(request.TargetDistrictId),
             TargetFactionId: NormalizeToken(request.TargetFactionId),
-            ResultSummary: BuildActionResultSummary(action, request),
-            CreatedAtUtc: DateTimeOffset.UtcNow,
+            ResultSummary: BuildActionResultSummary(action, request, actionState),
+            CreatedAtUtc: now,
             PublicProjectionAllowed: false,
-            Href: $"/account/ledger/factions/{normalizedFactionId.Replace('_', '-')}/manage");
+            Href: $"/account/ledger/factions/{normalizedFactionId.Replace('_', '-')}/manage",
+            Turn: actionState.CurrentTurn,
+            RemainingActionPoints: Math.Max(0, actionState.ActionPointsTotal - actionState.ActionPointsSpent),
+            Effects: BuildActionEffects(actionState));
 
         lock (_gate)
         {
+            _state.FactionOperationalStates[normalizedFactionId] = actionState;
             if (!_state.ActionReceiptsByFactionId.TryGetValue(normalizedFactionId, out var receipts))
             {
                 receipts = new List<BlackLedgerFactionActionReceiptDto>();
@@ -361,23 +432,47 @@ public sealed class BlackLedgerFactionOnboardingService
     }
 
     private BlackLedgerFactionDetailDto BuildDetail(BlackLedgerFactionViewModel faction, BlackLedgerFactionCharterDto? charter)
-        => new(
+    {
+        BlackLedgerFactionOperationalState? state;
+        lock (_gate)
+        {
+            _state.FactionOperationalStates.TryGetValue(faction.Id, out state);
+        }
+
+        var signals = faction.PublicSignals.ToList();
+        if (state is not null)
+        {
+            signals.Add($"AP {Math.Max(0, state.ActionPointsTotal - state.ActionPointsSpent)}/{state.ActionPointsTotal}");
+            signals.Add($"Influence {FormatSigned(state.InfluenceDelta)}");
+            signals.Add($"Heat {FormatSigned(state.HeatDelta)}");
+            signals.Add($"Trust {FormatSigned(state.PublicTrustDelta)}");
+        }
+
+        string summary = charter?.Summary ?? "Seeded faction with route-backed public-safe pressure signals.";
+        if (state is not null)
+        {
+            summary += $" Current faction-state reducer: influence {FormatSigned(state.InfluenceDelta)}, heat {FormatSigned(state.HeatDelta)}, trust {FormatSigned(state.PublicTrustDelta)}.";
+        }
+
+        return new(
             faction.Id,
             faction.PublicName,
             faction.Type,
             $"Public-safe faction intel. This page shows pressure, dispatches, package lanes, and AI steward posture. It does not show private campaign data.",
-            faction.PublicSignals,
+            signals.Take(6).ToArray(),
             faction.FactionLeader,
             faction.FieldGm,
             faction.IntelProvider,
             faction.ColorPrimary,
             faction.ColorSecondary,
             faction.Icon,
-            charter?.Summary ?? "Seeded faction with route-backed public-safe pressure signals.",
+            summary,
             $"/ledger/factions/{faction.Id.Replace('_', '-')}",
             $"/ledger/factions/{faction.Id.Replace('_', '-')}/dispatches",
             $"/ledger/factions/{faction.Id.Replace('_', '-')}/packages",
-            charter);
+            charter,
+            state);
+    }
 
     private static BlackLedgerFactionSummaryDto BuildSummary(BlackLedgerFactionViewModel faction)
         => new(
@@ -421,18 +516,18 @@ public sealed class BlackLedgerFactionOnboardingService
         return signals.ToArray();
     }
 
-    private static string BuildActionResultSummary(BlackLedgerFactionActionDefinitionDto action, BlackLedgerFactionActionRequest request)
+    private static string BuildActionResultSummary(BlackLedgerFactionActionDefinitionDto action, BlackLedgerFactionActionRequest request, BlackLedgerFactionOperationalState state)
         => action.ActionId switch
         {
-            "scout" => $"Scout run raised confidence in {request.TargetDistrictId ?? "the chosen district"}.",
-            "recruit" => "Recruit action improved cohesion and faction reach.",
-            "secure-district" => $"Secure District hardened pressure around {request.TargetDistrictId ?? "the current front"}.",
-            "sponsor-package" => "Sponsor Package added bounded pressure to a package candidate.",
-            "publish-dispatch" => "Publish Dispatch queued a clean receipt-backed summary for the faction feed.",
-            "reduce-heat" => "Reduce Heat cooled public pressure at the cost of momentum.",
-            "challenge-faction" => $"Challenge Faction targeted {request.TargetFactionId ?? "a larger rival"} for visible underdog pressure.",
-            "fortify-safehouse" => "Fortify Safehouse reduced attrition risk before the next tick.",
-            "gather-receipts" => "Gather Receipts improved proof-trail strength for the next closeout.",
+            "scout" => $"Scout run raised confidence in {request.TargetDistrictId ?? "the chosen district"}. AP now {Math.Max(0, state.ActionPointsTotal - state.ActionPointsSpent)}/{state.ActionPointsTotal}.",
+            "recruit" => $"Recruit action improved cohesion and faction reach. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
+            "secure-district" => $"Secure District hardened pressure around {request.TargetDistrictId ?? "the current front"}. Influence is now {FormatSigned(state.InfluenceDelta)}.",
+            "sponsor-package" => $"Sponsor Package added bounded pressure to a package candidate. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
+            "publish-dispatch" => $"Publish Dispatch queued a clean receipt-backed summary for the faction feed. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
+            "reduce-heat" => $"Reduce Heat cooled public pressure at the cost of momentum. Heat is now {FormatSigned(state.HeatDelta)}.",
+            "challenge-faction" => $"Challenge Faction targeted {request.TargetFactionId ?? "a larger rival"} for visible underdog pressure. Influence is now {FormatSigned(state.InfluenceDelta)}.",
+            "fortify-safehouse" => $"Fortify Safehouse reduced attrition risk before the next tick. Heat is now {FormatSigned(state.HeatDelta)}.",
+            "gather-receipts" => $"Gather Receipts improved proof-trail strength for the next closeout. Trust is now {FormatSigned(state.PublicTrustDelta)}.",
             _ => $"{action.Label} resolved."
         };
 
@@ -504,6 +599,11 @@ public sealed class BlackLedgerFactionOnboardingService
             throw new InvalidOperationException("Faction name is required.");
         }
 
+        if (value.Length < 4 || value.Length > 48)
+        {
+            throw new InvalidOperationException("Faction name must stay between 4 and 48 characters.");
+        }
+
         return value;
     }
 
@@ -523,6 +623,193 @@ public sealed class BlackLedgerFactionOnboardingService
         => string.Equals(charterType, "challenger", StringComparison.OrdinalIgnoreCase)
             ? new("challenger", 65, 2, 12, 4, 3, 3, false, 22, 48, 35, "This faction starts weaker and must challenge larger factions to grow.")
             : new("major", 100, 3, 18, 5, 2, 5, true, 55, 35, 50, null);
+
+    public BlackLedgerPrivateLoreOverlayDto UpsertPrivateLoreOverlay(HubUserDto user, string campaignId, PrivateLoreOverlayRequest request)
+    {
+        if (!string.Equals(request.WorldId, WorldId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("worldId must be emerald-sprawl-prelude.");
+        }
+
+        string normalizedFactionId = NormalizeFactionId(request.FactionId);
+        var allegiance = GetAllegiance(user) ?? throw new InvalidOperationException("No faction allegiance.");
+        if (!string.Equals(allegiance.ActiveFactionId, normalizedFactionId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("You can only write private lore for your active faction.");
+        }
+
+        var overlay = new BlackLedgerPrivateLoreOverlayDto(
+            OverlayId: string.IsNullOrWhiteSpace(request.OverlayId) ? NewId("overlay") : NormalizeToken(request.OverlayId),
+            CampaignId: campaignId,
+            WorldId: WorldId,
+            FactionId: normalizedFactionId,
+            LabelMap: request.LabelMap,
+            Notes: request.Notes ?? Array.Empty<string>(),
+            PublicProjectionAllowed: false,
+            UpdatedAtUtc: DateTimeOffset.UtcNow);
+
+        lock (_gate)
+        {
+            _state.PrivateLoreOverlays[$"{campaignId}:{normalizedFactionId}"] = overlay;
+            PersistLocked();
+        }
+
+        return overlay;
+    }
+
+    public BlackLedgerPrivateLoreOverlayDto? GetPrivateLoreOverlay(string campaignId, string factionId)
+    {
+        lock (_gate)
+        {
+            return _state.PrivateLoreOverlays.TryGetValue($"{campaignId}:{NormalizeFactionId(factionId)}", out var overlay)
+                ? overlay
+                : null;
+        }
+    }
+
+    private RunnerMembershipSnapshot BuildRunnerMembershipSnapshot(HubUserDto user)
+    {
+        var summary = _campaignSpine.GetAccountSummary(user);
+        var runnerIds = summary.Dossiers
+            .Select(static dossier => dossier.DossierId)
+            .Where(static dossierId => !string.IsNullOrWhiteSpace(dossierId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (runnerIds.Length == 0)
+        {
+            runnerIds = [$"dossier-{Hash(user.UserId)[..12]}"];
+        }
+
+        return new RunnerMembershipSnapshot(runnerIds);
+    }
+
+    private void EnsureAllegianceChangeAllowed(string userId, string factionId, DateTimeOffset now)
+    {
+        var existing = GetAllegianceByUserId(userId);
+        if (existing is null)
+        {
+            return;
+        }
+
+        if (string.Equals(existing.ActiveFactionId, factionId, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Account is already aligned with this faction.");
+        }
+
+        if (existing.LockUntilUtc is not null && existing.LockUntilUtc > now)
+        {
+            throw new InvalidOperationException("Faction defection cooldown is still active.");
+        }
+    }
+
+    private void EnsureFactionNameSafe(string publicName, string factionId)
+    {
+        string normalized = publicName.Trim().ToLowerInvariant();
+        if (ForbiddenFactionNameTerms.Any(term => normalized.Contains(term, StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("Faction name failed public-safety moderation.");
+        }
+
+        if (GetFactionDetail(factionId) is not null)
+        {
+            throw new InvalidOperationException("Faction name is already taken.");
+        }
+    }
+
+    private BlackLedgerFactionOperationalState GetOrCreateActionStateLocked(string factionId, DateTimeOffset now)
+    {
+        if (!_state.FactionOperationalStates.TryGetValue(factionId, out var state))
+        {
+            int total = _state.Charters.TryGetValue(factionId, out var charter)
+                ? BuildCharterRules(charter.CharterType).StartingActionPointsPerTick
+                : 3;
+            state = new BlackLedgerFactionOperationalState(
+                WorldId,
+                1,
+                total,
+                0,
+                0,
+                0,
+                0,
+                now,
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+                new List<string>(),
+                new List<string>());
+            _state.FactionOperationalStates[factionId] = state;
+        }
+
+        return state;
+    }
+
+    private static void ReduceActionLocked(
+        BlackLedgerFactionOperationalState state,
+        BlackLedgerFactionActionDefinitionDto action,
+        BlackLedgerFactionActionRequest request,
+        DateTimeOffset now)
+    {
+        state.ActionPointsSpent += action.Cost;
+        state.LastUpdatedAtUtc = now;
+        string district = NormalizeToken(request.TargetDistrictId);
+        string rival = NormalizeToken(request.TargetFactionId);
+        switch (action.ActionId)
+        {
+            case "scout":
+                state.InfluenceDelta += 1;
+                if (district.Length > 0)
+                {
+                    state.DistrictPressure[district] = state.DistrictPressure.GetValueOrDefault(district) + 1;
+                }
+                break;
+            case "recruit":
+                state.PublicTrustDelta += 1;
+                break;
+            case "secure-district":
+                state.InfluenceDelta += 2;
+                state.HeatDelta -= 1;
+                if (district.Length > 0)
+                {
+                    state.DistrictPressure[district] = state.DistrictPressure.GetValueOrDefault(district) + 2;
+                }
+                break;
+            case "sponsor-package":
+                state.PublicTrustDelta += 1;
+                break;
+            case "publish-dispatch":
+                state.PublicTrustDelta += 2;
+                break;
+            case "reduce-heat":
+                state.HeatDelta -= 2;
+                state.InfluenceDelta -= 1;
+                break;
+            case "challenge-faction":
+                state.InfluenceDelta += 1;
+                state.HeatDelta += 1;
+                if (rival.Length > 0 && !state.RivalsChallenged.Contains(rival, StringComparer.OrdinalIgnoreCase))
+                {
+                    state.RivalsChallenged.Add(rival);
+                }
+                break;
+            case "fortify-safehouse":
+                state.HeatDelta -= 1;
+                break;
+            case "gather-receipts":
+                state.PublicTrustDelta += 1;
+                break;
+        }
+    }
+
+    private static IReadOnlyList<string> BuildActionEffects(BlackLedgerFactionOperationalState state)
+        =>
+        [
+            $"influence {FormatSigned(state.InfluenceDelta)}",
+            $"heat {FormatSigned(state.HeatDelta)}",
+            $"trust {FormatSigned(state.PublicTrustDelta)}",
+            $"ap {Math.Max(0, state.ActionPointsTotal - state.ActionPointsSpent)}/{state.ActionPointsTotal}"
+        ];
+
+    private static string FormatSigned(int value)
+        => value >= 0 ? $"+{value}" : value.ToString();
 
     public static readonly IReadOnlyList<BlackLedgerFactionActionDefinitionDto> ActionDefinitions =
     [
@@ -652,7 +939,10 @@ public sealed record BlackLedgerFactionActionReceiptDto(
     string ResultSummary,
     DateTimeOffset CreatedAtUtc,
     bool PublicProjectionAllowed,
-    string Href);
+    string Href,
+    int Turn,
+    int RemainingActionPoints,
+    IReadOnlyList<string> Effects);
 
 public sealed record BlackLedgerFactionSummaryDto(
     string FactionId,
@@ -677,7 +967,8 @@ public sealed record BlackLedgerFactionDetailDto(
     string ProfileHref,
     string DispatchesHref,
     string PackagesHref,
-    BlackLedgerFactionCharterDto? Charter);
+    BlackLedgerFactionCharterDto? Charter,
+    BlackLedgerFactionOperationalState? OperationalState = null);
 
 public sealed record BlackLedgerFactionSlotAvailabilityDto(
     int MajorSlotsTotal,
@@ -721,7 +1012,8 @@ public sealed record BlackLedgerCreateFactionRequest(
     IReadOnlyList<string>? PerkIds,
     IReadOnlyList<string>? FlawIds,
     string? StartingDistrictId,
-    string? RivalFactionId);
+    string? RivalFactionId,
+    bool? WarningAccepted = null);
 
 public sealed record BlackLedgerFactionActionRequest(
     string? ActionId,
@@ -729,11 +1021,73 @@ public sealed record BlackLedgerFactionActionRequest(
     string? TargetFactionId,
     string? Stake);
 
+public sealed record PrivateLoreOverlayRequest(
+    string WorldId,
+    string FactionId,
+    IReadOnlyDictionary<string, string> LabelMap,
+    IReadOnlyList<string>? Notes = null,
+    string? OverlayId = null);
+
+public sealed record BlackLedgerPrivateLoreOverlayDto(
+    string OverlayId,
+    string CampaignId,
+    string WorldId,
+    string FactionId,
+    IReadOnlyDictionary<string, string> LabelMap,
+    IReadOnlyList<string> Notes,
+    bool PublicProjectionAllowed,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed class BlackLedgerFactionOperationalState
+{
+    public BlackLedgerFactionOperationalState(
+        string worldId,
+        int currentTurn,
+        int actionPointsTotal,
+        int actionPointsSpent,
+        int influenceDelta,
+        int heatDelta,
+        int publicTrustDelta,
+        DateTimeOffset lastUpdatedAtUtc,
+        Dictionary<string, int> districtPressure,
+        List<string> rivalsChallenged,
+        List<string> overlayIds)
+    {
+        WorldId = worldId;
+        CurrentTurn = currentTurn;
+        ActionPointsTotal = actionPointsTotal;
+        ActionPointsSpent = actionPointsSpent;
+        InfluenceDelta = influenceDelta;
+        HeatDelta = heatDelta;
+        PublicTrustDelta = publicTrustDelta;
+        LastUpdatedAtUtc = lastUpdatedAtUtc;
+        DistrictPressure = districtPressure;
+        RivalsChallenged = rivalsChallenged;
+        OverlayIds = overlayIds;
+    }
+
+    public string WorldId { get; set; }
+    public int CurrentTurn { get; set; }
+    public int ActionPointsTotal { get; set; }
+    public int ActionPointsSpent { get; set; }
+    public int InfluenceDelta { get; set; }
+    public int HeatDelta { get; set; }
+    public int PublicTrustDelta { get; set; }
+    public DateTimeOffset LastUpdatedAtUtc { get; set; }
+    public Dictionary<string, int> DistrictPressure { get; init; }
+    public List<string> RivalsChallenged { get; init; }
+    public List<string> OverlayIds { get; init; }
+}
+
+internal sealed record RunnerMembershipSnapshot(IReadOnlyList<string> RunnerIds);
+
 internal sealed class BlackLedgerFactionOnboardingState
 {
     public Dictionary<string, BlackLedgerAccountFactionAllegianceDto> Allegiances { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, BlackLedgerFactionViewModel> CreatedFactions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, BlackLedgerFactionCharterDto> Charters { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, List<BlackLedgerFactionActionReceiptDto>> ActionReceiptsByFactionId { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, BlackLedgerFactionOperationalState> FactionOperationalStates { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, BlackLedgerPrivateLoreOverlayDto> PrivateLoreOverlays { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public List<BlackLedgerFactionJoinReceiptDto> MembershipReceipts { get; init; } = new();
 }

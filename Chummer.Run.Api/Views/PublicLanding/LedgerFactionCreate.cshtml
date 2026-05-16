@@ -32,6 +32,7 @@
         <input type="hidden" name="perkIds" value="public_trust" />
         <input type="hidden" name="flawIds" value="overexposed" />
         <input type="hidden" name="flawIds" value="thin_resources" />
+        <input type="hidden" name="warningAccepted" value="false" />
         <button class="button-like button-like--secondary" type="submit">Found Major Faction</button>
     </form>
 </section>
@@ -43,6 +44,7 @@
         <p class="editorial-copy">You start weaker, with fewer points and more risk. You can still challenge larger factions and force your way onto the map.</p>
         <p class="editorial-copy">It starts weaker, has fewer points, more flaws, and must challenge larger factions to grow.</p>
         <p class="editorial-copy">@Model.ChallengerRules.MandatoryWarning</p>
+        <p class="editorial-copy">Submitting this route acknowledges the challenger warning, the thirty-day allegiance cooldown, and bounded action-point enforcement.</p>
     </div>
     <form method="post" action="/account/ledger/factions/create" class="route-choice-card">
         @Html.AntiForgeryToken()
@@ -55,6 +57,7 @@
         <input type="hidden" name="flawIds" value="overexposed" />
         <input type="hidden" name="flawIds" value="thin_resources" />
         <input type="hidden" name="flawIds" value="rival_target" />
+        <input type="hidden" name="warningAccepted" value="true" />
         <button class="button-like button-like--secondary" type="submit">Found Challenger</button>
     </form>
 </section>
