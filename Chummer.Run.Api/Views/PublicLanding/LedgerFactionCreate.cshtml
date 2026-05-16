@@ -1,0 +1,81 @@
+@model BlackLedgerFactionCreatePageViewModel
+@{
+    ViewData["Title"] = "Create Black Ledger faction";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">Faction charter builder</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>Major slots available: @Model.MajorSlotsAvailable</span>
+            <span>Major: 100 points / 3 AP</span>
+            <span>Challenger: 65 points / 2 AP</span>
+        </div>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Major founder path</p>
+        <h2 class="editorial-title">Found a Major Faction</h2>
+        <p class="editorial-copy">Major Charter Slots are limited. You start stronger, with more points and a claim to the map.</p>
+    </div>
+    <form method="post" action="/account/ledger/factions/create" class="route-choice-card">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="charterType" value="major" />
+        <input type="hidden" name="publicName" value="Signal Forge Assembly" />
+        <input type="hidden" name="archetypeId" value="creator_press" />
+        <input type="hidden" name="startingDistrictId" value="emerald-core" />
+        <input type="hidden" name="perkIds" value="dispatch_desk" />
+        <input type="hidden" name="perkIds" value="public_trust" />
+        <input type="hidden" name="flawIds" value="overexposed" />
+        <input type="hidden" name="flawIds" value="thin_resources" />
+        <button class="button-like button-like--secondary" type="submit">Found Major Faction</button>
+    </form>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Challenger founder path</p>
+        <h2 class="editorial-title">Found a Challenger Faction</h2>
+        <p class="editorial-copy">You start weaker, with fewer points and more risk. You can still challenge larger factions and force your way onto the map.</p>
+        <p class="editorial-copy">It starts weaker, has fewer points, more flaws, and must challenge larger factions to grow.</p>
+        <p class="editorial-copy">@Model.ChallengerRules.MandatoryWarning</p>
+    </div>
+    <form method="post" action="/account/ledger/factions/create" class="route-choice-card">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="charterType" value="challenger" />
+        <input type="hidden" name="publicName" value="Undertow Signal Cell" />
+        <input type="hidden" name="archetypeId" value="matrix_cell" />
+        <input type="hidden" name="rivalFactionId" value="ashline_circle" />
+        <input type="hidden" name="perkIds" value="underdog_momentum" />
+        <input type="hidden" name="perkIds" value="dispatch_desk" />
+        <input type="hidden" name="flawIds" value="overexposed" />
+        <input type="hidden" name="flawIds" value="thin_resources" />
+        <input type="hidden" name="flawIds" value="rival_target" />
+        <button class="button-like button-like--secondary" type="submit">Found Challenger</button>
+    </form>
+</section>
+
+<section class="editorial-block">
+    <div class="route-choice-grid">
+        @foreach (var perk in Model.Perks.Take(6))
+        {
+            <article class="route-choice-card">
+                <span class="tag">Perk</span>
+                <h3>@perk.Name</h3>
+                <p>Cost: @perk.Cost@(perk.ChallengerOnly ? " · Challenger only" : string.Empty)</p>
+            </article>
+        }
+        @foreach (var flaw in Model.Flaws.Take(6))
+        {
+            <article class="route-choice-card">
+                <span class="tag">Flaw</span>
+                <h3>@flaw.Name</h3>
+                <p>Refund: @(-flaw.Cost)</p>
+            </article>
+        }
+    </div>
+</section>

@@ -427,8 +427,48 @@ public sealed record BlackLedgerFactionWorkspacePageViewModel(
     IReadOnlyList<BlackLedgerFactionWorkspaceTabViewModel> Tabs,
     string PublicProfileHref,
     string PrivacyNote,
+    BlackLedgerAccountFactionAllegianceDto? Allegiance = null,
+    IReadOnlyList<BlackLedgerFactionActionDefinitionDto>? AvailableActions = null,
+    IReadOnlyList<BlackLedgerFactionActionReceiptDto>? RecentActionReceipts = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record BlackLedgerFactionJoinOptionViewModel(
+    string FactionId,
+    string PublicName,
+    string Type,
+    string Summary,
+    string Href);
+
+public sealed record BlackLedgerFactionOnboardingViewModel(
+    string Heading,
+    string Intro,
+    bool HasActiveAllegiance,
+    BlackLedgerAccountFactionAllegianceDto? CurrentAllegiance,
+    string ExistingFactionSummary,
+    string MajorFounderSummary,
+    string ChallengerFounderSummary,
+    string? MajorSlotsWarning,
+    int MajorSlotsAvailable,
+    IReadOnlyList<BlackLedgerFactionJoinOptionViewModel> ExistingFactions);
+
+public sealed record BlackLedgerFactionHomeViewModel(
+    string Heading,
+    string Intro,
+    BlackLedgerAccountFactionAllegianceDto Allegiance,
+    BlackLedgerFactionDetailDto Faction,
+    IReadOnlyList<string> WelcomeKit,
+    IReadOnlyList<BlackLedgerFactionActionReceiptDto> RecentActionReceipts);
+
+public sealed record BlackLedgerFactionCreatePageViewModel(
+    string Heading,
+    string Intro,
+    int MajorSlotsAvailable,
+    BlackLedgerFactionCharterRulesDto MajorRules,
+    BlackLedgerFactionCharterRulesDto ChallengerRules,
+    IReadOnlyList<BlackLedgerFactionArchetypeDto> Archetypes,
+    IReadOnlyList<BlackLedgerFactionPerkDto> Perks,
+    IReadOnlyList<BlackLedgerFactionFlawDto> Flaws);
 
 public sealed record AnarchyRunnerProfileViewModel(
     string RunnerId,

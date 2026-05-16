@@ -1,0 +1,60 @@
+@model BlackLedgerFactionHomeViewModel
+@{
+    ViewData["Title"] = "My Black Ledger faction";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">Faction home</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>Faction: @Model.Faction.PublicName</span>
+            <span>Membership: @Model.Allegiance.MembershipType</span>
+            <span>Lock until: @Model.Allegiance.LockUntilUtc?.ToString("yyyy-MM-dd")</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')">Open my faction</a>
+        <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open command map</a>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Identity loop</p>
+        <h2 class="editorial-title">Welcome kit and first task</h2>
+        <p class="editorial-copy">Faction welcome kit, badge, runner passport stamp, rank posture, and weekly dispatch hooks all start here.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var item in Model.WelcomeKit)
+        {
+            <article class="route-choice-card">
+                <span class="tag">Faction identity</span>
+                <p>@item</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.RecentActionReceipts.Count > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Recent receipts</p>
+            <h2 class="editorial-title">Action trail</h2>
+            <p class="editorial-copy">Every action needs a receipt.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var receipt in Model.RecentActionReceipts)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.ActionLabel</span>
+                    <h3>@receipt.ReceiptId</h3>
+                    <p>@receipt.ResultSummary</p>
+                    <a class="editorial-strip__action" href="@receipt.Href">View receipt</a>
+                </article>
+            }
+        </div>
+    </section>
+}

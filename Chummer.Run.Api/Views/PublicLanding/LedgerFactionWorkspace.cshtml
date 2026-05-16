@@ -126,7 +126,7 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
         <div class="editorial-block__lead">
             <p class="eyebrow">Management</p>
             <h2 class="editorial-title">Faction management stays route-backed.</h2>
-            <p class="editorial-copy">This lane is for authenticated campaign posture only: district cover, package heat, and stewardship boundaries.</p>
+            <p class="editorial-copy">Spend action points, sponsor package pressure, challenge districts, or publish a clean dispatch. Every action needs a receipt.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -145,6 +145,41 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
                 <p>The faction overlay route is available through the authenticated API and remains non-projecting by contract.</p>
             </article>
         </div>
+        @if (Model.Allegiance is not null && Model.AvailableActions is not null)
+        {
+            <div class="route-choice-grid" style="margin-top:1.5rem;">
+                @foreach (var action in Model.AvailableActions)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@action.Cost AP</span>
+                        <h3>@action.Label</h3>
+                        <p>@action.Effect</p>
+                        <form method="post" action="/account/ledger/factions/@Model.Faction.Id.Replace('_', '-')/actions">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="actionId" value="@action.ActionId" />
+                            <input type="hidden" name="targetDistrictId" value="emerald-core" />
+                            <input type="hidden" name="targetFactionId" value="ashline_circle" />
+                            <input type="hidden" name="stake" value="influence" />
+                            <button class="button-like button-like--secondary" type="submit">@(action.ActionId == "sponsor-package" ? "Sponsor package" : action.ActionId == "challenge-faction" ? "Challenge faction" : "Spend action point")</button>
+                        </form>
+                    </article>
+                }
+            </div>
+        }
+        @if (Model.RecentActionReceipts is not null && Model.RecentActionReceipts.Count > 0)
+        {
+            <div class="route-choice-grid" style="margin-top:1.5rem;">
+                @foreach (var receipt in Model.RecentActionReceipts)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@receipt.ActionLabel</span>
+                        <h3>@receipt.ReceiptId</h3>
+                        <p>@receipt.ResultSummary</p>
+                        <a class="editorial-strip__action" href="@receipt.Href">View receipt</a>
+                    </article>
+                }
+            </div>
+        }
     </section>
 }
 

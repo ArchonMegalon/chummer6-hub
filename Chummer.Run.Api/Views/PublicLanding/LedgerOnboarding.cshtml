@@ -1,0 +1,84 @@
+@model BlackLedgerFactionOnboardingViewModel
+@{
+    ViewData["Title"] = "Black Ledger onboarding";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">Black Ledger onboarding</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <p class="page-copy">Choose your flag.</p>
+        <div class="trust-claim__microproof">
+            <span>All current runners join</span>
+            <span>All future runners join</span>
+            <span>No runner split in MVP</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        @if (Model.HasActiveAllegiance && Model.CurrentAllegiance is not null)
+        {
+            <a class="button-like button-like--primary" href="/account/ledger/factions/@Model.CurrentAllegiance.ActiveFactionId.Replace('_', '-')">Open my faction</a>
+        }
+        else
+        {
+            <a class="button-like button-like--primary" href="/account/ledger/factions/create">Found Major Faction</a>
+        }
+        <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open command map</a>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Model.MajorSlotsWarning))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Major slots</p>
+            <h2 class="editorial-title">Challenger route stays open.</h2>
+            <p class="editorial-copy">@Model.MajorSlotsWarning</p>
+        </div>
+    </section>
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Existing faction path</p>
+        <h2 class="editorial-title">Join a house that already has pressure, history, and enemies.</h2>
+        <p class="editorial-copy">@Model.ExistingFactionSummary</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var faction in Model.ExistingFactions)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@faction.Type</span>
+                <h3>@faction.PublicName</h3>
+                <p>@faction.Summary</p>
+                <div class="stacked-actions">
+                    <a class="editorial-strip__action" href="@faction.Href">Open faction file</a>
+                    <form method="post" action="/account/ledger/onboarding/join">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="factionId" value="@faction.FactionId" />
+                        <button class="button-like button-like--secondary" type="submit">Join this faction</button>
+                    </form>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Major founder path</span>
+            <h3>Found a Major Faction</h3>
+            <p>@Model.MajorFounderSummary</p>
+            <p>Major slots available: @Model.MajorSlotsAvailable</p>
+            <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=major">Found Major Faction</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Challenger founder path</span>
+            <h3>Found a Challenger Faction</h3>
+            <p>@Model.ChallengerFounderSummary</p>
+            <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=challenger">Found Challenger</a>
+        </article>
+    </div>
+</section>
