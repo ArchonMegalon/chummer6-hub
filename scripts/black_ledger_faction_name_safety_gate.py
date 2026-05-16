@@ -1,24 +1,39 @@
 #!/usr/bin/env python3
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SERVICE = (ROOT / "Chummer.Run.Api/Services/Community/BlackLedgerFactionOnboardingService.cs").read_text()
-TESTS = (ROOT / "Chummer.Tests/BlackLedgerFactionOnboardingTests.cs").read_text()
 OUT = Path("/docker/chummercomplete/_completion/black_ledger_faction_onboarding/BLACK_LEDGER_FACTION_NAME_SAFETY.generated.json")
 
-checks = {
-    "moderation_terms_present": "ForbiddenFactionNameTerms" in SERVICE,
-    "name_length_guard_present": "Faction name must stay between 4 and 48 characters." in SERVICE,
-    "safety_exception_present": "Faction name failed public-safety moderation." in SERVICE,
-    "duplicate_name_guard_present": "Faction name is already taken." in SERVICE,
-    "test_coverage_present": "FactionCharterBuilder_rejects_unsafe_public_names" in TESTS,
-}
 
-payload = {
-    "status": "pass" if all(checks.values()) else "fail",
-    **checks,
-}
-OUT.parent.mkdir(parents=True, exist_ok=True)
-OUT.write_text(json.dumps(payload, indent=2))
-print(json.dumps(payload))
+def main() -> int:
+    result = subprocess.run(
+        [
+            "dotnet",
+            "test",
+            "Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj",
+            "--filter",
+            "FullyQualifiedName~FactionCharterBuilder_rejects_unsafe_public_names|FullyQualifiedName~FactionModerationLifecycle_blocks_public_projection_until_safe|FullyQualifiedName~FactionModerationLifecycle_can_approve_and_suppress_public_projection",
+        ],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
+    payload = {
+        "status": "pass" if result.returncode == 0 else "fail",
+        "kind": "runtime_test",
+        "command": "dotnet test Chummer.Run.Api.Tests/Chummer.Run.Api.Tests.csproj --filter FullyQualifiedName~FactionCharterBuilder_rejects_unsafe_public_names|FullyQualifiedName~FactionModerationLifecycle_blocks_public_projection_until_safe|FullyQualifiedName~FactionModerationLifecycle_can_approve_and_suppress_public_projection",
+        "exit_code": result.returncode,
+        "stdout_tail": result.stdout[-4000:],
+        "stderr_tail": result.stderr[-4000:],
+    }
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(payload, indent=2))
+    print(json.dumps(payload))
+    return result.returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())

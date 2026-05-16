@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
@@ -29,22 +28,23 @@ public sealed class BlackLedgerFactionOnboardingService
         "nigger",
         "retard"
     ];
-    private readonly object _gate = new();
-    private readonly string _storagePath;
-    private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true
-    };
+    private readonly object _gate;
     private readonly BlackLedgerPublicStatsService _stats;
     private readonly CampaignSpineService _campaignSpine;
+    private readonly CommunityStore _store;
     private BlackLedgerFactionOnboardingState _state = new();
 
-    public BlackLedgerFactionOnboardingService(IConfiguration configuration, BlackLedgerPublicStatsService stats, CampaignSpineService campaignSpine)
+    public BlackLedgerFactionOnboardingService(
+        IConfiguration configuration,
+        BlackLedgerPublicStatsService stats,
+        CampaignSpineService campaignSpine,
+        CommunityStore store)
     {
+        _ = configuration;
         _stats = stats;
         _campaignSpine = campaignSpine;
-        _storagePath = configuration["CHUMMER_BLACK_LEDGER_FACTION_STORAGE"]
-            ?? Path.Combine(AppContext.BaseDirectory, "App_Data", "black-ledger-faction-onboarding.json");
+        _store = store;
+        _gate = store.Gate;
         Load();
     }
 
@@ -54,13 +54,13 @@ public sealed class BlackLedgerFactionOnboardingService
     public BlackLedgerAccountFactionAllegianceDto? GetAllegiance(HubUserDto user)
         => GetAllegianceByUserId(user.UserId);
 
-    public BlackLedgerFactionOnboardingViewModel BuildOnboardingModel(HubUserDto user)
+    public BlackLedgerFactionOnboardingViewModel BuildOnboardingModel(SiteChromeViewModel chrome, HubUserDto user, string? currentStep = null)
     {
         var world = _stats.LoadWorldPreview() ?? throw new InvalidOperationException("Black Ledger world preview is unavailable.");
         var allegiance = GetAllegiance(user);
-        var createdFactions = ListCreatedFactionSummaries();
+        var summary = _campaignSpine.GetAccountSummary(user);
+        var runnerIds = SelectRealRunnerIds(summary.Dossiers);
         var factionOptions = world.Factions
-            .Concat(createdFactions)
             .OrderBy(static faction => faction.PublicName, StringComparer.OrdinalIgnoreCase)
             .Select(faction => new BlackLedgerFactionJoinOptionViewModel(
                 faction.Id.Replace('_', '-'),
@@ -70,12 +70,18 @@ public sealed class BlackLedgerFactionOnboardingService
                 $"/ledger/factions/{faction.Id.Replace('_', '-')}"))
             .ToArray();
         var majorAvailability = BuildMajorSlotAvailability();
+        string step = string.IsNullOrWhiteSpace(currentStep) ? "welcome" : NormalizeToken(currentStep).ToLowerInvariant();
+        var steps = BuildWizardSteps(step);
 
         return new BlackLedgerFactionOnboardingViewModel(
+            Chrome: chrome,
             Heading: "Choose your flag.",
             Intro: "Black Ledger is a living campaign layer. Your account joins one faction, and all of your current and future runners carry that allegiance.",
             HasActiveAllegiance: allegiance is not null,
             CurrentAllegiance: allegiance,
+            CurrentStep: step,
+            CurrentRunnerCount: runnerIds.Count,
+            Steps: steps,
             ExistingFactionSummary: "Join a house that already has pressure, history, and enemies.",
             MajorFounderSummary: "Found a Major Faction. Major Charter Slots are limited. You start stronger, with more points and a claim to the map.",
             ChallengerFounderSummary: "Found a Challenger Faction. You start weaker, with fewer points and more risk. You can still challenge larger factions and force your way onto the map.",
@@ -86,10 +92,10 @@ public sealed class BlackLedgerFactionOnboardingService
             ExistingFactions: factionOptions);
     }
 
-    public BlackLedgerFactionHomeViewModel BuildFactionHome(HubUserDto user)
+    public BlackLedgerFactionHomeViewModel BuildFactionHome(SiteChromeViewModel chrome, HubUserDto user)
     {
         var allegiance = GetAllegiance(user) ?? throw new InvalidOperationException("No active faction allegiance.");
-        var detail = GetFactionDetail(allegiance.ActiveFactionId) ?? throw new InvalidOperationException("Faction detail missing.");
+        var detail = GetWorkspaceFactionDetail(allegiance.ActiveFactionId) ?? throw new InvalidOperationException("Faction detail missing.");
         var welcomeKit = new[]
         {
             $"{detail.PublicName} welcome kit",
@@ -99,6 +105,7 @@ public sealed class BlackLedgerFactionOnboardingService
         };
 
         return new BlackLedgerFactionHomeViewModel(
+            Chrome: chrome,
             Heading: "Your runners carry this banner.",
             Intro: "Your account allegiance applies to all current and future runners. Weekly dispatch hooks, badge posture, and the first task all start from this one route.",
             Allegiance: allegiance,
@@ -107,25 +114,40 @@ public sealed class BlackLedgerFactionOnboardingService
             RecentActionReceipts: GetActionReceipts(detail.FactionId).Take(5).ToArray());
     }
 
-    public BlackLedgerFactionCreatePageViewModel BuildCreatePage(HubUserDto user)
+    public BlackLedgerFactionCreatePageViewModel BuildCreatePage(SiteChromeViewModel chrome, HubUserDto user, string? preferredCharterType = null)
     {
         _ = user;
         var majorAvailability = BuildMajorSlotAvailability();
+        string charterType = NormalizeCharterType(preferredCharterType);
+        var world = _stats.LoadWorldPreview() ?? throw new InvalidOperationException("Black Ledger world preview is unavailable.");
+        var rivals = world.Factions
+            .OrderBy(static faction => faction.PublicName, StringComparer.OrdinalIgnoreCase)
+            .Select(faction => new BlackLedgerFactionJoinOptionViewModel(
+                faction.Id.Replace('_', '-'),
+                faction.PublicName,
+                faction.Type,
+                string.Join(" · ", faction.PublicSignals.Take(2)),
+                $"/ledger/factions/{faction.Id.Replace('_', '-')}"))
+            .ToArray();
         return new BlackLedgerFactionCreatePageViewModel(
+            Chrome: chrome,
             Heading: "Build a faction charter.",
             Intro: "Choose a charter type, spend the exact point budget, take the required flaws, and start from a bounded MVP rule set.",
+            PreferredCharterType: charterType,
             MajorSlotsAvailable: majorAvailability.MajorSlotsAvailable,
             MajorRules: BuildCharterRules("major"),
             ChallengerRules: BuildCharterRules("challenger"),
             Archetypes: Archetypes,
             Perks: Perks,
-            Flaws: Flaws);
+            Flaws: Flaws,
+            StartingDistrictIds: world.Districts.Select(static district => district.Id).ToArray(),
+            RivalFactions: rivals);
     }
 
     public BlackLedgerFactionJoinReceiptDto JoinFaction(HubUserDto user, string factionId)
     {
         string normalizedFactionId = NormalizeFactionId(factionId);
-        if (GetFactionDetail(normalizedFactionId) is null)
+        if (GetWorkspaceFactionDetail(normalizedFactionId) is null)
         {
             throw new InvalidOperationException("Unknown faction.");
         }
@@ -250,11 +272,11 @@ public sealed class BlackLedgerFactionOnboardingService
             StartingDistrictId: charterType == "major" ? NormalizeToken(request.StartingDistrictId) : null,
             RivalFactionId: NormalizeToken(request.RivalFactionId),
             CreatedAtUtc: DateTimeOffset.UtcNow,
-            Status: "active",
+            Status: "pending_review",
             PublicName: publicName,
             Summary: charterType == "major"
-                ? "Major charter starts stronger, holds a map claim, and gets 3 AP per tick."
-                : "Challenger starts weaker, has fewer points, more flaws, and must challenge larger factions to grow.");
+                ? "Major charter starts stronger, holds a map claim, and gets 3 AP per tick. Public projection waits for moderation review."
+                : "Challenger starts weaker, has fewer points, more flaws, and must challenge larger factions to grow. Public projection waits for moderation review.");
         var receipt = new BlackLedgerFactionJoinReceiptDto(
             ReceiptId: NewId("fmem"),
             AccountIdHash: Hash(user.UserId),
@@ -324,6 +346,31 @@ public sealed class BlackLedgerFactionOnboardingService
         if (seededFaction is not null)
         {
             return BuildDetail(seededFaction, charter: null);
+        }
+
+        lock (_gate)
+        {
+            if (_state.CreatedFactions.TryGetValue(normalized, out var createdFaction))
+            {
+                _state.Charters.TryGetValue(normalized, out var charter);
+                if (charter is not null
+                    && string.Equals(charter.Status, "public_safe_active", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BuildDetail(createdFaction, charter);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public BlackLedgerFactionDetailDto? GetWorkspaceFactionDetail(string factionId)
+    {
+        string normalized = NormalizeFactionId(factionId);
+        var publicDetail = GetFactionDetail(normalized);
+        if (publicDetail is not null)
+        {
+            return publicDetail;
         }
 
         lock (_gate)
@@ -412,6 +459,76 @@ public sealed class BlackLedgerFactionOnboardingService
         }
     }
 
+    public BlackLedgerFactionModerationReceiptDto ApproveFactionForPublicProjection(HubUserDto user, string factionId)
+    {
+        string normalizedFactionId = NormalizeFactionId(factionId);
+        var now = DateTimeOffset.UtcNow;
+
+        lock (_gate)
+        {
+            if (!_state.CreatedFactions.ContainsKey(normalizedFactionId) || !_state.Charters.TryGetValue(normalizedFactionId, out var charter))
+            {
+                throw new InvalidOperationException("Unknown faction.");
+            }
+
+            _state.Charters[normalizedFactionId] = charter with
+            {
+                Status = "public_safe_active",
+                Summary = "Moderation review approved the faction for bounded public projection on the Black Ledger."
+            };
+
+            var receipt = new BlackLedgerFactionModerationReceiptDto(
+                ReceiptId: NewId("fmod"),
+                FactionId: normalizedFactionId,
+                ReviewerAccountId: user.UserId,
+                Outcome: "approved",
+                ResultSummary: "Faction cleared for bounded public projection.",
+                CreatedAtUtc: now,
+                PublicProjectionAllowed: true);
+
+            _state.ModerationReceipts.Add(receipt);
+            PersistLocked();
+            return receipt;
+        }
+    }
+
+    public BlackLedgerFactionModerationReceiptDto SuppressFactionPublicProjection(HubUserDto user, string factionId, string? reason = null)
+    {
+        string normalizedFactionId = NormalizeFactionId(factionId);
+        var now = DateTimeOffset.UtcNow;
+
+        lock (_gate)
+        {
+            if (!_state.CreatedFactions.ContainsKey(normalizedFactionId) || !_state.Charters.TryGetValue(normalizedFactionId, out var charter))
+            {
+                throw new InvalidOperationException("Unknown faction.");
+            }
+
+            string summary = string.IsNullOrWhiteSpace(reason)
+                ? "Faction remains suppressed from public projection pending further review."
+                : $"Faction remains suppressed from public projection: {reason.Trim()}";
+
+            _state.Charters[normalizedFactionId] = charter with
+            {
+                Status = "suppressed",
+                Summary = summary
+            };
+
+            var receipt = new BlackLedgerFactionModerationReceiptDto(
+                ReceiptId: NewId("fmod"),
+                FactionId: normalizedFactionId,
+                ReviewerAccountId: user.UserId,
+                Outcome: "suppressed",
+                ResultSummary: summary,
+                CreatedAtUtc: now,
+                PublicProjectionAllowed: false);
+
+            _state.ModerationReceipts.Add(receipt);
+            PersistLocked();
+            return receipt;
+        }
+    }
+
     public BlackLedgerFactionSlotAvailabilityDto BuildMajorSlotAvailability()
     {
         lock (_gate)
@@ -427,7 +544,11 @@ public sealed class BlackLedgerFactionOnboardingService
     {
         lock (_gate)
         {
-            return _state.CreatedFactions.Values.OrderBy(static item => item.PublicName, StringComparer.OrdinalIgnoreCase).ToArray();
+            return _state.CreatedFactions.Values
+                .Where(item => _state.Charters.TryGetValue(item.Id, out var charter)
+                    && string.Equals(charter.Status, "public_safe_active", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static item => item.PublicName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
     }
 
@@ -568,21 +689,14 @@ public sealed class BlackLedgerFactionOnboardingService
     {
         lock (_gate)
         {
-            if (!File.Exists(_storagePath))
-            {
-                _state = new BlackLedgerFactionOnboardingState();
-                return;
-            }
-
-            _state = JsonSerializer.Deserialize<BlackLedgerFactionOnboardingState>(File.ReadAllText(_storagePath), _jsonOptions)
-                ?? new BlackLedgerFactionOnboardingState();
+            _state = _store.BlackLedgerFactionOnboardingState ?? new BlackLedgerFactionOnboardingState();
         }
     }
 
     private void PersistLocked()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(_storagePath)!);
-        File.WriteAllText(_storagePath, JsonSerializer.Serialize(_state, _jsonOptions));
+        _store.BlackLedgerFactionOnboardingState = _state;
+        _store.PersistLocked();
     }
 
     private static string NormalizeFactionId(string factionId)
@@ -670,19 +784,24 @@ public sealed class BlackLedgerFactionOnboardingService
     private RunnerMembershipSnapshot BuildRunnerMembershipSnapshot(HubUserDto user)
     {
         var summary = _campaignSpine.GetAccountSummary(user);
-        var runnerIds = summary.Dossiers
+        var runnerIds = SelectRealRunnerIds(summary.Dossiers);
+
+        return new RunnerMembershipSnapshot(runnerIds);
+    }
+
+    private static IReadOnlyList<string> SelectRealRunnerIds(IReadOnlyList<Chummer.Campaign.Contracts.RunnerDossierProjection> dossiers)
+        => dossiers
+            .Where(static dossier => !IsSyntheticPersonalShell(dossier))
             .Select(static dossier => dossier.DossierId)
             .Where(static dossierId => !string.IsNullOrWhiteSpace(dossierId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        if (runnerIds.Length == 0)
-        {
-            runnerIds = [$"dossier-{Hash(user.UserId)[..12]}"];
-        }
-
-        return new RunnerMembershipSnapshot(runnerIds);
-    }
+    private static bool IsSyntheticPersonalShell(Chummer.Campaign.Contracts.RunnerDossierProjection dossier)
+        => dossier.CampaignId is null
+           && dossier.CrewId is null
+           && dossier.CurrentRunId is null
+           && dossier.Projections.Any(static projection => string.Equals(projection.Label, "Living dossier", StringComparison.OrdinalIgnoreCase));
 
     private void EnsureAllegianceChangeAllowed(string userId, string factionId, DateTimeOffset now)
     {
@@ -711,10 +830,33 @@ public sealed class BlackLedgerFactionOnboardingService
             throw new InvalidOperationException("Faction name failed public-safety moderation.");
         }
 
-        if (GetFactionDetail(factionId) is not null)
+        if (GetWorkspaceFactionDetail(factionId) is not null)
         {
             throw new InvalidOperationException("Faction name is already taken.");
         }
+    }
+
+    private static IReadOnlyList<BlackLedgerWizardStepViewModel> BuildWizardSteps(string currentStep)
+    {
+        string[] order = ["welcome", "allegiance", "factions", "choose-path", "confirm", "builder", "welcome-kit"];
+        return order
+            .Select((step, index) => new BlackLedgerWizardStepViewModel(
+                step,
+                step switch
+                {
+                    "welcome" => "Welcome",
+                    "allegiance" => "Allegiance",
+                    "factions" => "Factions",
+                    "choose-path" => "Choose path",
+                    "confirm" => "Confirm",
+                    "builder" => "Builder",
+                    "welcome-kit" => "Welcome kit",
+                    _ => step
+                },
+                $"/account/ledger/onboarding?step={Uri.EscapeDataString(step)}",
+                string.Equals(step, currentStep, StringComparison.OrdinalIgnoreCase),
+                index < Array.IndexOf(order, currentStep)))
+            .ToArray();
     }
 
     private BlackLedgerFactionOperationalState GetOrCreateActionStateLocked(string factionId, DateTimeOffset now)
@@ -944,6 +1086,15 @@ public sealed record BlackLedgerFactionActionReceiptDto(
     int RemainingActionPoints,
     IReadOnlyList<string> Effects);
 
+public sealed record BlackLedgerFactionModerationReceiptDto(
+    string ReceiptId,
+    string FactionId,
+    string ReviewerAccountId,
+    string Outcome,
+    string ResultSummary,
+    DateTimeOffset CreatedAtUtc,
+    bool PublicProjectionAllowed);
+
 public sealed record BlackLedgerFactionSummaryDto(
     string FactionId,
     string PublicName,
@@ -1081,7 +1232,7 @@ public sealed class BlackLedgerFactionOperationalState
 
 internal sealed record RunnerMembershipSnapshot(IReadOnlyList<string> RunnerIds);
 
-internal sealed class BlackLedgerFactionOnboardingState
+public sealed class BlackLedgerFactionOnboardingState
 {
     public Dictionary<string, BlackLedgerAccountFactionAllegianceDto> Allegiances { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, BlackLedgerFactionViewModel> CreatedFactions { get; init; } = new(StringComparer.OrdinalIgnoreCase);
@@ -1090,4 +1241,5 @@ internal sealed class BlackLedgerFactionOnboardingState
     public Dictionary<string, BlackLedgerFactionOperationalState> FactionOperationalStates { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public Dictionary<string, BlackLedgerPrivateLoreOverlayDto> PrivateLoreOverlays { get; init; } = new(StringComparer.OrdinalIgnoreCase);
     public List<BlackLedgerFactionJoinReceiptDto> MembershipReceipts { get; init; } = new();
+    public List<BlackLedgerFactionModerationReceiptDto> ModerationReceipts { get; init; } = new();
 }

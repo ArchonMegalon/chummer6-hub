@@ -93,7 +93,7 @@ public sealed class BlackLedgerFactionAllegianceTests
         WorkspaceLifecyclePolicyService lifecycle = new(config);
         CampaignArtifactRegistryBridge artifactBridge = new(store);
         CampaignSpineService campaignSpine = new(store, lifecycle, artifactBridge);
-        return new BlackLedgerFactionOnboardingService(config, new BlackLedgerPublicStatsService(), campaignSpine);
+        return new BlackLedgerFactionOnboardingService(config, new BlackLedgerPublicStatsService(), campaignSpine, store);
     }
 }
 
@@ -270,10 +270,155 @@ public sealed class FactionCharterBuilderTests
         var ex = Assert.Throws<InvalidOperationException>(() => service.ExecuteAction(user, charter.FactionId, new BlackLedgerFactionActionRequest("recruit", "emerald-core", null, "trust")));
         Assert.Contains("action points are exhausted", ex.Message, StringComparison.OrdinalIgnoreCase);
 
-        var detail = service.GetFactionDetail(charter.FactionId);
+        var detail = service.GetWorkspaceFactionDetail(charter.FactionId);
         Assert.NotNull(detail?.OperationalState);
         Assert.Equal(2, detail!.OperationalState!.ActionPointsSpent);
         Assert.Contains("ashline_circle", detail.OperationalState.RivalsChallenged, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FactionRunnerInheritance_zero_runners_stay_zero()
+    {
+        var service = BlackLedgerFactionAllegianceTests.CreateService();
+        var user = new Chummer.Run.Contracts.Community.HubUserDto(
+            "usr_zero",
+            "subject.zero",
+            "Zero",
+            "zero",
+            "private",
+            "UTC",
+            "",
+            new[] { "subject.zero" },
+            Array.Empty<string>(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+
+        var receipt = service.JoinFaction(user, "ashline-circle");
+        Assert.Equal(0, receipt.RunnerCount);
+        Assert.Empty(service.GetAllegiance(user)!.CurrentRunnerIdsSnapshot);
+    }
+
+    [Fact]
+    public void FactionStorage_persists_to_community_store()
+    {
+        string root = Path.Combine(Path.GetTempPath(), $"bl-faction-storage-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        IConfiguration config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community-store.json")
+            })
+            .Build();
+        CommunityStore store = new(config, NullLogger<CommunityStore>.Instance);
+        WorkspaceLifecyclePolicyService lifecycle = new(config);
+        CampaignArtifactRegistryBridge artifactBridge = new(store);
+        CampaignSpineService campaignSpine = new(store, lifecycle, artifactBridge);
+        var service = new BlackLedgerFactionOnboardingService(config, new BlackLedgerPublicStatsService(), campaignSpine, store);
+        var user = new Chummer.Run.Contracts.Community.HubUserDto(
+            "usr_store",
+            "subject.store",
+            "Store",
+            "store",
+            "private",
+            "UTC",
+            "",
+            new[] { "subject.store" },
+            Array.Empty<string>(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+
+        service.CreateFaction(user, new BlackLedgerCreateFactionRequest(
+            "Signal Storage Board",
+            "major",
+            "creator_press",
+            new[] { "dispatch_desk", "public_trust" },
+            new[] { "overexposed", "thin_resources" },
+            "emerald-core",
+            null,
+            false));
+
+        CommunityStore restoredStore = new(config, NullLogger<CommunityStore>.Instance);
+        CampaignSpineService restoredSpine = new(restoredStore, lifecycle, new CampaignArtifactRegistryBridge(restoredStore));
+        var restoredService = new BlackLedgerFactionOnboardingService(config, new BlackLedgerPublicStatsService(), restoredSpine, restoredStore);
+        var allegiance = restoredService.GetAllegiance(user);
+
+        Assert.NotNull(restoredStore.BlackLedgerFactionOnboardingState);
+        Assert.NotNull(allegiance);
+        Assert.Equal("signal_storage_board", allegiance!.ActiveFactionId);
+    }
+
+    [Fact]
+    public void FactionModerationLifecycle_blocks_public_projection_until_safe()
+    {
+        var service = BlackLedgerFactionAllegianceTests.CreateService();
+        var user = new Chummer.Run.Contracts.Community.HubUserDto(
+            "usr_mod",
+            "subject.mod",
+            "Moderation",
+            "moderation",
+            "private",
+            "UTC",
+            "",
+            new[] { "subject.mod" },
+            Array.Empty<string>(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+
+        var charter = service.CreateFaction(user, new BlackLedgerCreateFactionRequest(
+            "Review Gate Board",
+            "major",
+            "creator_press",
+            new[] { "dispatch_desk", "public_trust" },
+            new[] { "overexposed", "thin_resources" },
+            "emerald-core",
+            null,
+            false));
+
+        Assert.Equal("pending_review", charter.Status);
+        Assert.DoesNotContain(service.ListFactionSummaries(), item => string.Equals(item.FactionId, charter.FactionId, StringComparison.OrdinalIgnoreCase));
+        Assert.Null(service.GetFactionDetail(charter.FactionId));
+        Assert.NotNull(service.GetWorkspaceFactionDetail(charter.FactionId));
+    }
+
+    [Fact]
+    public void FactionModerationLifecycle_can_approve_and_suppress_public_projection()
+    {
+        var service = BlackLedgerFactionAllegianceTests.CreateService();
+        var user = new Chummer.Run.Contracts.Community.HubUserDto(
+            "usr_mod2",
+            "subject.mod2",
+            "Moderation Two",
+            "moderation2",
+            "private",
+            "UTC",
+            "",
+            new[] { "subject.mod2" },
+            Array.Empty<string>(),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+
+        var charter = service.CreateFaction(user, new BlackLedgerCreateFactionRequest(
+            "Projection Gate Board",
+            "major",
+            "creator_press",
+            new[] { "dispatch_desk", "public_trust" },
+            new[] { "overexposed", "thin_resources" },
+            "emerald-core",
+            null,
+            false));
+
+        var approved = service.ApproveFactionForPublicProjection(user, charter.FactionId);
+        Assert.Equal("approved", approved.Outcome);
+        Assert.True(approved.PublicProjectionAllowed);
+        Assert.NotNull(service.GetFactionDetail(charter.FactionId));
+        Assert.Contains(service.ListFactionSummaries(), item => string.Equals(item.FactionId, charter.FactionId, StringComparison.OrdinalIgnoreCase));
+
+        var suppressed = service.SuppressFactionPublicProjection(user, charter.FactionId, "needs another pass");
+        Assert.Equal("suppressed", suppressed.Outcome);
+        Assert.False(suppressed.PublicProjectionAllowed);
+        Assert.Null(service.GetFactionDetail(charter.FactionId));
+        Assert.DoesNotContain(service.ListFactionSummaries(), item => string.Equals(item.FactionId, charter.FactionId, StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(service.GetWorkspaceFactionDetail(charter.FactionId));
     }
 
     [Fact]
