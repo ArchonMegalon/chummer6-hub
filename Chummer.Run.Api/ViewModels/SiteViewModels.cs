@@ -1328,8 +1328,12 @@ public sealed record PackageDetailPageViewModel(
     PackageReceiptCardViewModel? LatestVoteReceipt,
     PackageReceiptCardViewModel? LatestFollowReceipt,
     bool CanInteract,
+    bool CanRevokeVote,
+    bool CanRevokeFollow,
     string VoteActionHref,
     string FollowActionHref,
+    string? RevokeVoteActionHref,
+    string? RevokeFollowActionHref,
     string VoteActionLabel,
     string FollowActionLabel,
     TrustPageActionViewModel PrimaryAction,
@@ -1370,6 +1374,119 @@ public sealed record MobileProjectionPageViewModel(
     IReadOnlyList<MobileCapabilityCardViewModel> Capabilities,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record ReadyVerdictCardViewModel(
+    string RoleId,
+    string RoleLabel,
+    string Status,
+    string StatusLabel,
+    string Summary,
+    IReadOnlyList<string> BlockingReasons,
+    IReadOnlyList<string> ChangedSinceLastSession,
+    IReadOnlyList<TrustPageActionViewModel> Actions,
+    string NextBestScreen,
+    IReadOnlyList<string> ProofReceipts);
+
+public sealed record ReadyRoleKitViewModel(
+    string KitId,
+    string RoleLane,
+    string Label,
+    string Summary,
+    string DownloadHref,
+    IReadOnlyList<string> Highlights);
+
+public sealed record ReadyPacketAssetViewModel(
+    string RoleId,
+    string Label,
+    string Summary,
+    string MarkdownHref,
+    string JsonHref);
+
+public sealed record ReadyForTonightPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string VerdictSummary,
+    IReadOnlyList<string> SummaryPoints,
+    IReadOnlyList<ReadyVerdictCardViewModel> Verdicts,
+    IReadOnlyList<ReadyRoleKitViewModel> RoleKits,
+    IReadOnlyList<ReadyPacketAssetViewModel> Packets,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record KnowledgeFabricReceiptViewModel(
+    string ReceiptId,
+    string Topic,
+    string Summary,
+    string Provenance,
+    string Route,
+    string Status);
+
+public sealed record KnowledgeFabricPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    IReadOnlyList<string> SummaryPoints,
+    IReadOnlyList<KnowledgeFabricReceiptViewModel> Receipts,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record NexusPanReceiptViewModel(
+    string ReceiptId,
+    string Topic,
+    string Summary,
+    string Route,
+    string Status);
+
+public sealed record NexusPanContinuityPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string VerdictSummary,
+    string PlatformSummary,
+    IReadOnlyList<string> SummaryPoints,
+    int ActiveInstallationCount,
+    int ActiveGrantCount,
+    int PendingClaimCount,
+    int PendingBrowserCallbackCount,
+    IReadOnlyList<string> PlatformLabels,
+    IReadOnlyList<NexusPanReceiptViewModel> Receipts,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record MediaArtifactCardViewModel(
+    string Id,
+    string Label,
+    string Summary,
+    string MarkdownRoute,
+    string JsonRoute,
+    IReadOnlyList<string> Highlights);
+
+public sealed record MediaArtifactHorizonPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string BoundaryLine,
+    IReadOnlyList<string> SummaryPoints,
+    IReadOnlyList<MediaArtifactCardViewModel> Documents,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 

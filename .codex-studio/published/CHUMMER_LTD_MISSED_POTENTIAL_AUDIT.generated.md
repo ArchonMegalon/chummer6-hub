@@ -28,7 +28,7 @@ Current code-backed LTD lanes in this repo are concentrated in:
 - `ProductLift` as a first-party wrapped feedback, roadmap, changelog, operations, and closeout lane
 - `BrowserAct`, `MarkupGo`, and `PeekShot` as hosted AI gateway adapters
 - `1min.AI` and `AI Magicx` as routed provider identities in the gateway
-- `Teable` as an internal user-projection workbench
+- `Teable` as an internal user-projection, KARMA FORGE review-board, and BLACK LEDGER world-tick workbench
 - `ClickRank.ai` as a bounded public-site script injection on `chummer.run`
 - `FacePop`, `Deftform`, `ICanpreneur`, `MetaSurvey`, and `Lunacal` as bounded first-party projections inside KARMA FORGE and public concierge flows
 - `Blip AI` as a bounded design-mirrored helper for dictation, transcript cleanup, and operator draft capture on knowledge/help and runbook lanes only
@@ -62,8 +62,8 @@ That distinction matters. Several LTDs are intentionally integrated through firs
   Reality: these exist as routed provider identities, but only `1min.AI` and `AI Magicx` look like practical near-term lanes. `Prompting Systems` and `ChatPlayground` remain mostly scaffolding.
 
 - `Teable`
-  Evidence: `Chummer.Run.Api/Services/Community/TeableUserProjectionService.cs`, `TeableUserProjectionSyncWorker.cs`, `Controllers/InternalTeableUsersController.cs`
-  Reality: this is a real internal projection seam, not just design prose.
+  Evidence: `Chummer.Run.Api/Services/Community/TeableUserProjectionService.cs`, `TeableUserProjectionSyncWorker.cs`, `Controllers/InternalTeableUsersController.cs`, `Chummer.Run.Api/Services/KarmaForge/TeableKarmaForgeReviewBoardService.cs`, `TeableKarmaForgeReviewBoardSyncWorker.cs`, `Controllers/InternalTeableKarmaForgeController.cs`, `Chummer.Run.Api/Services/Community/TeableBlackLedgerWorldTickService.cs`, `TeableBlackLedgerWorldTickSyncWorker.cs`, `Controllers/InternalTeableBlackLedgerController.cs`
+  Reality: this is now a real internal projection seam for user projection, KARMA FORGE operator review-board projection, and BLACK LEDGER world-tick review projection, not just design prose.
 
 - `ClickRank.ai`
   Evidence: `Chummer.Run.Api/Views/Shared/_Layout.cshtml`
@@ -254,7 +254,7 @@ Best LTD combination:
 | `MarkupGo` | document rendering lane | real gateway adapter plus creative use | route-proof packet PDFs, artifact contact sheets, audit receipts | finish with proof packet outputs |
 | `1min.AI` | active credits, key rotation, fallback availability | routed provider identity exists | cheap internal synthesis for route summaries, packet drafts, and audit help | safe internal use now |
 | `AI Magicx` | active fallback lane | routed provider identity exists | short overflow generation and bounded internal synthesis | safe internal use now |
-| `Teable` | curated projection only, never truth | real internal projection service exists | admin workbench, feedback and ops projection boards | keep internal and bounded |
+| `Teable` | curated projection only, never truth | real internal projection services exist for user projection, KARMA FORGE review boards, and BLACK LEDGER world-tick review | admin workbench, feedback and ops projection boards | keep internal and bounded |
 | `ClickRank.ai` | live public domain IDs already exist | real layout injection exists | crawl-health, metadata, AI-search and search visibility remediation loop | finish the ops loop |
 
 ### Strong opportunities, but still mostly design intent

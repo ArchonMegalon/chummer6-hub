@@ -1,0 +1,22 @@
+{
+  "contract_name": "chummer.ruleset_readiness",
+  "generated_at_utc": "2026-05-13T19:42:14.894986Z",
+  "fleet_closeout_status": "pass",
+  "rulesets": {
+    "sr4": {
+      "readiness": "baseline",
+      "workflow_parity_status": "pass",
+      "frontier_status": "fail"
+    },
+    "sr5": {
+      "readiness": "full",
+      "flagship_ui_status": "pass"
+    },
+    "sr6": {
+      "readiness": "baseline",
+      "workflow_parity_status": "pass",
+      "frontier_status": "fail"
+    }
+  },
+  "status": "pass"
+}

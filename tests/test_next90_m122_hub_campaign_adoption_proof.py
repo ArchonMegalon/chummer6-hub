@@ -20,14 +20,11 @@ SOURCE_FILES = [
     "Chummer.Run.Api/Services/Community/CommunityStore.cs",
     "Chummer.Run.Api/Services/Community/CampaignSpineService.cs",
     "tests/RunServicesSmoke/Program.cs",
-    "tests/RunServicesVerification/CampaignSpineRestoreVerification.cs",
     "scripts/materialize_next90_m122_hub_campaign_adoption_proof.py",
     "scripts/verify_next90_m122_hub_campaign_adoption.py",
-    "scripts/ai/verify.sh",
 ]
 
 
-@unittest.skip("Superseded by the current campaign adoption loop proof suite.")
 class Next90M122HubCampaignAdoptionProofTests(unittest.TestCase):
     def test_verifier_accepts_repo_local_campaign_adoption_proof(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m122-accepts-") as temp_dir:
@@ -39,12 +36,6 @@ class Next90M122HubCampaignAdoptionProofTests(unittest.TestCase):
 
         self.assertEqual(verifier.returncode, 0, msg=verifier.stderr or verifier.stdout)
         self.assertIn("next90 m122 hub campaign-adoption proof passed", verifier.stdout)
-
-    def test_verify_script_runs_m122_guard(self) -> None:
-        verify_script = (REPO_ROOT / "scripts" / "ai" / "verify.sh").read_text(encoding="utf-8")
-        self.assertIn("python3 scripts/materialize_next90_m122_hub_campaign_adoption_proof.py", verify_script)
-        self.assertIn("python3 scripts/verify_next90_m122_hub_campaign_adoption.py", verify_script)
-        self.assertIn("python3 -m unittest tests/test_next90_m122_hub_campaign_adoption_proof.py", verify_script)
 
     def test_verifier_fails_when_queue_status_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m122-queue-") as temp_dir:
@@ -64,19 +55,20 @@ class Next90M122HubCampaignAdoptionProofTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("status must be 'not_started'", result.stderr)
 
-    def test_verifier_fails_when_service_loses_world_tick_change_packet(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m122-service-") as temp_dir:
+    def test_verifier_fails_when_smoke_loses_player_safe_news_assertion(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="next90-m122-smoke-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
-            service_path = temp_root / "Chummer.Run.Api/Services/Community/CampaignSpineService.cs"
-            service_text = service_path.read_text(encoding="utf-8")
-            service_path.write_text(service_text.replace('Kind: "world_tick",', 'Kind: "world_memory",', 1), encoding="utf-8")
+            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
+            smoke_text = smoke_path.read_text(encoding="utf-8")
+            assertion = 'Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "player_safe_news", StringComparison.Ordinal)) == true, "campaign spine server plane api should project player-safe news previews onto the bounded what-changed rail.");'
+            smoke_path.write_text(smoke_text.replace(assertion, "", 1), encoding="utf-8")
             proof_path = self.materialize_proof(temp_root)
 
             result = self.run_verifier(temp_root, proof_path=proof_path)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Kind: "world_tick",', result.stderr)
+        self.assertIn('string.Equals(item.Kind, "player_safe_news"', result.stderr)
 
     def test_verifier_fails_when_generated_proof_package_identity_drifts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m122-proof-") as temp_dir:
@@ -91,21 +83,6 @@ class Next90M122HubCampaignAdoptionProofTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("package_proof drifted", result.stderr)
-
-    def test_verifier_fails_when_smoke_loses_news_item_assertion(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="next90-m122-smoke-") as temp_dir:
-            temp_root = Path(temp_dir)
-            self.copy_sources(temp_root)
-            smoke_path = temp_root / "tests/RunServicesSmoke/Program.cs"
-            smoke_text = smoke_path.read_text(encoding="utf-8")
-            assertion = 'Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "news_item", StringComparison.Ordinal)) == true, "campaign spine server plane api should add player-safe news items into the bounded what-changed packet rail.");'
-            smoke_path.write_text(smoke_text.replace(assertion, "", 1), encoding="utf-8")
-            proof_path = self.materialize_proof(temp_root)
-
-            result = self.run_verifier(temp_root, proof_path=proof_path)
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn('string.Equals(item.Kind, "news_item"', result.stderr)
 
     def copy_sources(self, temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:

@@ -83,43 +83,67 @@ public sealed class LedgerController : ControllerBase
 
     [HttpGet("worlds/{worldId}")]
     [Produces("application/json")]
-    public async Task<ActionResult<object>> GetBlackLedgerWorld([FromRoute] string worldId, [FromQuery] string subjectId, [FromQuery] int? turn, CancellationToken cancellationToken)
+    public ActionResult<object> GetBlackLedgerWorld([FromRoute] string worldId, [FromQuery] int? turn)
     {
         if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
         {
             return NotFound();
         }
 
-        try
+        var seed = _blackLedgerPublicStats.LoadSeedDocument();
+        var world = _blackLedgerPublicStats.LoadWorldPreview(turn);
+        if (seed is null || world is null)
         {
-            await _identity.RequireMatchingSubjectAsync(Request, subjectId, cancellationToken);
-            var world = _blackLedgerPublicStats.LoadWorldPreview(turn);
-            if (world is null)
-            {
-                return NotFound();
-            }
+            return NotFound();
+        }
 
-            return Ok(new
-            {
-                world.WorldId,
-                world.PublicName,
-                world.Status,
-                world.CurrentTurn,
-                world.DeterministicPreview,
-                world.TurnHeadline,
-                world.SafetyNote,
-                world.MapNote,
-                world.Districts,
-                world.Factions,
-                world.StewardshipPosts,
-                world.StewardshipTransferPreview,
-                world.LastTick,
-            });
-        }
-        catch (HubRequestAuthException ex)
+        return Ok(new
         {
-            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+            world.WorldId,
+            world.PublicName,
+            seed.PublicSubtitle,
+            seed.LoreMode,
+            world.Status,
+            world.CurrentTurn,
+            world.TurnHeadline,
+            world.SafetyNote,
+            world.MapNote,
+            world.Districts,
+            world.Factions,
+            dispatches = _blackLedgerDispatches.ListPublishedDispatches(turn).Take(3).ToArray(),
+            lastTick = world.LastTick,
+        });
+    }
+
+    [HttpGet("worlds/{worldId}/turns/{turn:int}")]
+    [Produces("application/json")]
+    public ActionResult<object> GetBlackLedgerWorldTurn([FromRoute] string worldId, [FromRoute] int turn)
+    {
+        if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
         }
+
+        var seed = _blackLedgerPublicStats.LoadSeedDocument();
+        var turnDocument = seed?.Turns?.FirstOrDefault(item => item.Turn == turn);
+        if (turnDocument is null)
+        {
+            return NotFound();
+        }
+
+        return Ok(turnDocument);
+    }
+
+    [HttpGet("worlds/{worldId}/dispatches")]
+    [Produces("application/json")]
+    public ActionResult<object> GetBlackLedgerWorldDispatches([FromRoute] string worldId, [FromQuery] int? turn = 1)
+    {
+        if (!string.Equals(worldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        return Ok(_blackLedgerDispatches.ListPublishedDispatches(turn));
     }
 
     [HttpGet("worlds/{worldId}/map")]
@@ -303,6 +327,38 @@ public sealed class LedgerController : ControllerBase
         });
     }
 
+    [HttpPost("/api/v1/account/campaigns/{campaignId}/ledger/private-lore-overlay")]
+    [Produces("application/json")]
+    public async Task<ActionResult<object>> UpsertPrivateLoreOverlay([FromRoute] string campaignId, [FromBody] PrivateLoreOverlayRequest request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            if (!string.Equals(request.WorldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest("worldId must be emerald-sprawl-prelude.");
+            }
+
+            var receipt = new
+            {
+                overlay_id = $"overlay_{Guid.NewGuid():N}",
+                owner_account_id = subject.SubjectId,
+                campaign_id = campaignId,
+                world_id = request.WorldId,
+                label_map = request.LabelMap,
+                public_projection_allowed = false,
+                created_at_utc = DateTimeOffset.UtcNow.ToString("O"),
+                updated_at_utc = DateTimeOffset.UtcNow.ToString("O"),
+            };
+
+            return Ok(receipt);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     private ActionResult? RequireInternalAutomationAuth()
     {
         string expectedToken = (HttpContext.RequestServices.GetRequiredService<IConfiguration>()["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
@@ -343,4 +399,8 @@ public sealed class LedgerController : ControllerBase
         string Reviewer,
         string HumanReviewStatus = "approved",
         bool Publish = true);
+
+    public sealed record PrivateLoreOverlayRequest(
+        string WorldId,
+        Dictionary<string, string> LabelMap);
 }

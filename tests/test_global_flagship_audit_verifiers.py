@@ -22,6 +22,7 @@ def test_global_audit_verifier_scripts_exist() -> None:
     assert (REPO_ROOT / "scripts" / "classify_ruleset_readiness.py").is_file()
     assert (REPO_ROOT / "scripts" / "public_copy_truth_gate.py").is_file()
     assert (REPO_ROOT / "scripts" / "public_asset_quality_gate.py").is_file()
+    assert (REPO_ROOT / "scripts" / "final_chummer_run_ux_verdict.py").is_file()
     assert (REPO_ROOT / "scripts" / "ledger_stats_privacy_gate.py").is_file()
     assert (REPO_ROOT / "scripts" / "black_ledger_world_tick_e2e.py").is_file()
     assert (REPO_ROOT / "scripts" / "black_ledger_dispatch_e2e.py").is_file()

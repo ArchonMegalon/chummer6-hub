@@ -27,6 +27,12 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHostedService<PublicSignalRetryExpiryWorker>();
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
+        services.AddSingleton<ReadyForTonightService>();
+        services.AddSingleton<KnowledgeFabricService>();
+        services.AddSingleton<NexusPanContinuityService>();
+        services.AddSingleton<MediaArtifactHorizonsService>();
+        services.AddSingleton<CommunityCreatorHorizonsService>();
+        services.AddSingleton<WaveEightHorizonsService>();
         services.AddSingleton<KarmaForgeStore>();
         services.AddSingleton<KarmaForgeDiscoveryService>();
         services.AddSingleton<BlackLedgerPublicStatsService>();

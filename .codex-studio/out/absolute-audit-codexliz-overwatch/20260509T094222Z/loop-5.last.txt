@@ -1,1 +1,0 @@
-Trace: Reading QWEN35 bundle core files to understand full scope and required artifacts.

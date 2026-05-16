@@ -22,8 +22,8 @@
     var enterHubLabel = "Enter the hub";
     var forgeHref = "/karma-forge";
     var ledgerHref = "/ledger";
+    var replayTurnOneHref = "/ledger/map?replay=turn-1";
     var buildHref = "/downloads";
-    var packagesHref = "/packages";
     var heroStatusChips = new[]
     {
         "Preview build live",
@@ -76,12 +76,11 @@
     };
     var ledgerStats = (Model.BlackLedgerStats ?? Array.Empty<BlackLedgerPublicStatViewModel>()).ToArray();
     var ledgerWorld = Model.BlackLedgerWorld;
-    var latestDispatch = Model.LatestBlackLedgerDispatch;
     var previewHighlights = new[]
     {
-        new { Label = "World tick", Summary = "Every public story starts from a receipt-backed world tick." },
-        new { Label = "Dispatch", Summary = "Users can read the public-safe summary instead of decoding raw stats." },
-        new { Label = "Package pressure", Summary = "Karma Forge shows where recurring table pain is hardening into governed change demand." },
+        new { Label = "Rust Bazaar", Summary = "Debt Heat climbed after old favors came due." },
+        new { Label = "Ashline Ward", Summary = "MysAd density rose after a source-clarity dispute." },
+        new { Label = "Neon Docks", Summary = "Cargo pressure pushed drone package demand higher." },
     };
     var proofCards = new[]
     {
@@ -249,48 +248,29 @@
 
 <section class="product-proof product-proof--ledger" data-homepage-section="preview" id="world-preview">
     <div class="continuity-band__copy">
-        <p class="eyebrow">Black Ledger / Karma Forge preview</p>
-        <h2 class="editorial-title">Black Ledger tells you what happened. Karma Forge tells you what people keep needing fixed.</h2>
-        <p class="editorial-copy">These routes are live, navigable, and useful without forcing every visitor to read operational detail first.</p>
-        <p class="muted-copy">@((ledgerWorld?.TurnHeadline) ?? "Turn 1 already ran. The city is moving.")</p>
-        <p class="muted-copy">@((ledgerWorld?.SafetyNote) ?? "Seeded preview and opt-in aggregate only. The Ledger explains pressure, not people.")</p>
+        <p class="eyebrow">Black Ledger preview</p>
+        <h2 class="editorial-title">Turn 1 already ran. The city is moving.</h2>
+        <p class="editorial-copy">Emerald Sprawl is a fictional, public-safe seed world with six factions, visible pressure zones, and AI interim stewards. Follow Debt Heat, MysAd Density, package pressure, and closeout witnesses without exposing private tables.</p>
+        <p class="muted-copy">Seeded fictional preview and opt-in aggregate only. The Ledger explains pressure, not people.</p>
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@ledgerHref">Open Black Ledger</a>
-            <a class="button-like button-like--secondary" href="@forgeHref">Open Karma Forge</a>
-            <a class="button-like button-like--ghost" href="@packagesHref">Browse packages</a>
+            <a class="button-like button-like--secondary" href="@replayTurnOneHref">Replay Turn 1</a>
         </div>
-        @if (latestDispatch is not null)
-        {
-            <article class="trust-claim">
-                <span class="tag">Latest dispatch</span>
-                <h3>@latestDispatch.Title</h3>
-                <p>@latestDispatch.Summary</p>
-                <div class="trust-claim__microproof">
-                    <span>Receipt: @latestDispatch.SourceReceiptId</span>
-                    <span>Generated from world tick</span>
-                    <span>Public-safe only</span>
-                </div>
-                <a class="inline-link" href="@latestDispatch.Href">Read dispatch</a>
-            </article>
-        }
     </div>
     <div class="continuity-band__panel">
         @if (ledgerWorld is not null)
         {
             <article class="ledger-world-panel__map ledger-world-panel__map--teaser">
                 <div class="ledger-world-panel__legend">
-                    <span class="tag">Command preview</span>
+                    <span class="tag">Seed world</span>
                     <span class="muted-copy">Turn @ledgerWorld.CurrentTurn</span>
-                    <a class="inline-link" href="/ledger/map">Open full map</a>
                 </div>
                 <svg viewBox="0 0 1200 760" role="img" aria-label="@ledgerWorld.PublicName command preview">
                     @foreach (var district in ledgerWorld.Districts.Take(8))
                     {
-                        <a href="/ledger/map#district-@district.Id" aria-label="@district.Summary">
-                            <polygon class="ledger-world-panel__district" points="@district.PolygonPoints" tabindex="0">
-                                <title>@district.Name</title>
-                            </polygon>
-                        </a>
+                        <polygon class="ledger-world-panel__district" points="@district.PolygonPoints" tabindex="0">
+                            <title>@district.Name</title>
+                        </polygon>
                     }
                 </svg>
             </article>

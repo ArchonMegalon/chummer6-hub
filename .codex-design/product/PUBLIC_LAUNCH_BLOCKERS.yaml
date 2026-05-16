@@ -13,7 +13,7 @@ blockers:
   - id: BLK-003
     blocking_if_true: Public feedback copy implies a working closeout loop while the loop is still preview-only or missing bounded proof.
     verification:
-      - python3 scripts/public_operator_leak_scan.py --base-url https://chummer.run
+      - python3 scripts/public_copy_truth_gate.py --base-url https://chummer.run --route /feedback
   - id: BLK-004
     blocking_if_true: Hub public-surface docs claim package, mobile, PWA, play, or concierge routes that are absent from central canon.
     verification:

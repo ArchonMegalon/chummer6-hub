@@ -148,10 +148,11 @@
                         <span>Receipt: @(featuredEvent?.SourceReceiptId ?? Model.World.LastTick?.ReceiptId)</span>
                         <span>@((commandMap?.PublicSafetyNote) ?? Model.World.SafetyNote)</span>
                     </div>
-                    @if (featuredEvent?.DispatchHref is not null)
+                    @* "Open linked dispatch" link disabled: dispatch route not functioning correctly *@
+                    @* @if (featuredEvent?.DispatchHref is not null && Model.Dispatches.Any(d => string.Equals(d.Href, featuredEvent.DispatchHref, StringComparison.OrdinalIgnoreCase)))
                     {
                         <a class="inline-link" href="@featuredEvent.DispatchHref">Open linked dispatch</a>
-                    }
+                    } *@
                     <a class="inline-link" href="/ledger/closeouts">Open receipt lane</a>
                     <p class="muted-copy">@((commandMap?.PerformanceNote) ?? "SVG fallback stays first-party and bounded.")</p>
                 </aside>
