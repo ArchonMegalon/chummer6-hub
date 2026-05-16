@@ -9,10 +9,13 @@ required = [
     "BLACK_LEDGER_FACTION_CHARTER_BUILDER.generated.json",
     "BLACK_LEDGER_FACTION_PAGES.generated.json",
     "BLACK_LEDGER_FACTION_ACTIONS.generated.json",
-    "BLACK_LEDGER_FACTION_NO_NOISE.generated.json",
+    "BLACK_LEDGER_NO_NOISE_LINK_AUDIT.generated.json",
     "BLACK_LEDGER_PRIVATE_LORE_LEAK_SCAN.generated.json",
     "BLACK_LEDGER_FACTION_NAME_SAFETY.generated.json",
     "BLACK_LEDGER_FACTION_ACTION_REDUCER.generated.json",
+    "BLACK_LEDGER_COMMAND_MAP_MOTION.generated.json",
+    "BLACK_LEDGER_LIVE_ROOT_PROOF.generated.json",
+    "BLACK_LEDGER_FEEDBACK_SCRUB_PROOF.generated.json",
 ]
 
 status = "BLACK_LEDGER_FACTION_ONBOARDING_READY"

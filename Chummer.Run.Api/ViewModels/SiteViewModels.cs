@@ -441,6 +441,7 @@ public sealed record BlackLedgerFactionJoinOptionViewModel(
     string Href);
 
 public sealed record BlackLedgerFactionOnboardingViewModel(
+    SiteChromeViewModel Chrome,
     string Heading,
     string Intro,
     bool HasActiveAllegiance,
@@ -453,6 +454,7 @@ public sealed record BlackLedgerFactionOnboardingViewModel(
     IReadOnlyList<BlackLedgerFactionJoinOptionViewModel> ExistingFactions);
 
 public sealed record BlackLedgerFactionHomeViewModel(
+    SiteChromeViewModel Chrome,
     string Heading,
     string Intro,
     BlackLedgerAccountFactionAllegianceDto Allegiance,
@@ -461,6 +463,7 @@ public sealed record BlackLedgerFactionHomeViewModel(
     IReadOnlyList<BlackLedgerFactionActionReceiptDto> RecentActionReceipts);
 
 public sealed record BlackLedgerFactionCreatePageViewModel(
+    SiteChromeViewModel Chrome,
     string Heading,
     string Intro,
     int MajorSlotsAvailable,

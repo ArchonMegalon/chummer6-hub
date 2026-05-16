@@ -266,6 +266,51 @@ public sealed class LedgerController : ControllerBase
         }
     }
 
+    [HttpPost("/api/v1/account/ledger/factions/{factionId}/moderation/approve")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerFactionModerationReceiptDto>> ApproveLedgerFactionPublicProjection(
+        [FromRoute] string factionId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.ApproveFactionForPublicProjection(user, factionId));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("/api/v1/account/ledger/factions/{factionId}/moderation/suppress")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerFactionModerationReceiptDto>> SuppressLedgerFactionPublicProjection(
+        [FromRoute] string factionId,
+        [FromBody] SuppressFactionModerationRequest? body,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.SuppressFactionPublicProjection(user, factionId, body?.Reason));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
     [HttpGet("worlds/{worldId}/map")]
     [Produces("application/json")]
     public ActionResult<BlackLedgerMapApiDocument> GetBlackLedgerWorldMap([FromRoute] string worldId, [FromQuery] int? turn, [FromQuery] string? mode = null)
@@ -510,3 +555,5 @@ public sealed class LedgerController : ControllerBase
 
     public sealed record JoinFactionRequest(string? FactionId);
 }
+
+public sealed record SuppressFactionModerationRequest(string? Reason);
