@@ -9,6 +9,7 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   const hero = page.locator('[data-homepage-section="hero"]');
   await expect(hero).toContainText('The city is moving.');
+  await expect(hero.locator('[data-black-ledger-geoscape-root][data-ready="true"]')).toBeVisible();
   await expect(hero.getByRole('link')).toHaveCount(2);
   await expect(hero.getByRole('link', { name: 'Enter Black Ledger' })).toHaveAttribute('href', '/ledger');
   await expect(hero.getByRole('link', { name: 'Download Chummer' })).toHaveAttribute('href', '/downloads');
@@ -41,7 +42,7 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   );
   failures.push(...ledgerBadLinks.map((item) => `ledger bad link: ${item}`));
 
-  writeJsonArtifact('BLACK_LEDGER_NO_NOISE_LINK_AUDIT.generated.json', {
+  writeJsonArtifact('BLACK_LEDGER_GLOBE_NO_NOISE.generated.json', {
     generated_at_utc: new Date().toISOString(),
     status: failures.length === 0 ? 'pass' : 'fail',
     base_url: baseUrl,

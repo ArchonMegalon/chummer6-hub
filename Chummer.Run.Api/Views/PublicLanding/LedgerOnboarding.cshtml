@@ -75,10 +75,16 @@ else if (string.Equals(Model.CurrentStep, "factions", StringComparison.OrdinalIg
             <h2 class="editorial-title">Faction carousel</h2>
             <p class="editorial-copy">@Model.ExistingFactionSummary</p>
         </div>
+        <div
+            class="ledger-onboarding__geoscape"
+            data-black-ledger-geoscape-root
+            data-variant="onboarding"
+            data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map"
+            data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"></div>
         <div class="route-choice-grid">
             @foreach (var faction in Model.ExistingFactions)
             {
-                <article class="route-choice-card">
+                <article class="route-choice-card" id="faction-join-@faction.FactionId" data-onboarding-faction-card="@faction.FactionId">
                     <span class="tag">@faction.Type</span>
                     <h3>@faction.PublicName</h3>
                     <p>@faction.Summary</p>
@@ -165,3 +171,4 @@ else if (string.Equals(Model.CurrentStep, "welcome-kit", StringComparison.Ordina
         </div>
     </section>
 }
+<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>
