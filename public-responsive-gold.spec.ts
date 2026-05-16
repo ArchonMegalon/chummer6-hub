@@ -25,7 +25,7 @@ test('public homepage stays readable across flagship responsive viewports', asyn
     await page.goto(baseUrl, { waitUntil: 'networkidle' });
     await expect(page.locator('.launch-hero__title')).toContainText('Build the runner. Run the table. Keep the ledger honest.');
     await expect(page.locator('[data-homepage-section="preview"]')).toContainText('Black Ledger');
-    await expect(page.locator('[data-homepage-section="preview"]')).toContainText('Karma Forge');
+    await expect(page.locator('[data-homepage-section="preview"]')).toContainText('Turn 1 already ran. The city is moving.');
 
     const overflow = await page.evaluate(() => {
       const root = document.documentElement;

@@ -18,7 +18,7 @@ FORBIDDEN_PHRASES = (
 )
 
 REQUIRED_PHRASES = (
-    "fictional runner/campaign statistics only",
+    "fictional, public-safe seed world",
     "Opt-in aggregate only",
 )
 
