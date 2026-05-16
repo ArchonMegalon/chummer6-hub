@@ -38,7 +38,7 @@
             <div class="route-choice-card__proof">
                 <span>@Model.CloseoutDispatchSentCount posted follow-up receipt@(Model.CloseoutDispatchSentCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.CloseoutQueueReadyCount ready follow-up candidate@(Model.CloseoutQueueReadyCount == 1 ? string.Empty : "s")</span>
-                <span>@Model.JourneyReceiptCount journey receipt@(Model.JourneyReceiptCount == 1 ? string.Empty : "s")</span>
+                <span>@Model.JourneyReceiptCount follow-up signals</span>
             </div>
             <a class="editorial-strip__action" href="/changelog">Open changelog</a>
         </article>
@@ -59,8 +59,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Category routing</p>
-        <h2 class="editorial-title">Routing receipts, delivery receipts, and replay surfaces stay explicitly named.</h2>
-        <p class="editorial-copy">Routing board, outbound delivery, journey writeback, replay and backfill, delivery recovery, bounded outcome updates, and recipient closeout threads remain first-party rails.</p>
+        <h2 class="editorial-title">Signal routing and public follow-up stay explicit.</h2>
+        <p class="editorial-copy">Public signals follow a first-party routing board, with clear paths for follow-up and closeout.</p>
     </div>
-    <p class="muted-copy">Inspect hosted page state, open bounded lookup, browse recent drilldowns, and automatic retry expiry through one first-party packet.</p>
+    <p class="muted-copy">Public signal routing stays transparent; private follow-up goes through Help.</p>
 </section>
