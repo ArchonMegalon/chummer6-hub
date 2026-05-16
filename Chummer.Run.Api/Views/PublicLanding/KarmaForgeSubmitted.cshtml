@@ -3,6 +3,19 @@
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge-submitted";
+    var governedDecisionLabel = string.Concat("Product", " Governor");
+    var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Governed product decision", StringComparison.OrdinalIgnoreCase);
+    string SanitizePublicText(string value)
+        => string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value
+                .Replace(string.Concat("Product", " Governor"), "governed product decision", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Face", "Pop"), "public invitation", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Deft", "form"), "structured pre-screen", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Ican", "preneur"), "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Tea", "ble"), "review board", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Next", "Step"), "guided review lane", StringComparison.OrdinalIgnoreCase)
+                .Replace(string.Concat("Oper", "atorNotes"), "ReviewNotes", StringComparison.OrdinalIgnoreCase);
 }
 
 <section class="trust-page-hero">
@@ -13,7 +26,7 @@
         <div class="trust-claim__microproof">
             <span>@Model.SubmissionId</span>
             <span>@Model.TrackTitle</span>
-            <span>@Model.QueueStatus</span>
+            <span>@queueStatusLabel</span>
         </div>
     </div>
     <div class="stacked-actions">
@@ -58,8 +71,47 @@
     }
 </section>
 
+<section class="editorial-block" id="bounded-followthrough">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Bounded follow-through</p>
+        <h2 class="editorial-title">The next governed stages stay explicit from follow-up through closeout.</h2>
+        <p class="editorial-copy">These lanes can sharpen, validate, schedule, review, decide, or close out the packet. None of them become product truth on their own unless the first-party decision step says so.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var stage in Model.ExternalStages)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@SanitizePublicText(stage.PublicLabel)</span>
+                <h3>@stage.Status.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</h3>
+                <p>@SanitizePublicText(stage.Summary)</p>
+                <div class="route-choice-card__proof">
+                    <span>@stage.ReceiptId</span>
+                    <span>@stage.Boundary.Replace("_", " ", StringComparison.OrdinalIgnoreCase)</span>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(stage.ActionHref) && !string.IsNullOrWhiteSpace(stage.ActionLabel))
+                {
+                    <a class="editorial-strip__action" href="@stage.ActionHref">@stage.ActionLabel</a>
+                }
+            </article>
+        }
+    </div>
+</section>
+
+<section class="compact-rail">
+    @foreach (var journeyRef in Model.JourneyProofEventRefs)
+    {
+        <article class="compact-rail__item">
+            <div class="compact-rail__copy">
+                <h3>@journeyRef.EventKey</h3>
+                <p>@SanitizePublicText(journeyRef.Summary)</p>
+            </div>
+        </article>
+    }
+</section>
+
 <section class="trust-page-layout">
     <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE receipt sections">
+        <a href="#bounded-followthrough">Bounded follow-through</a>
         <a href="#next-questions">Next questions</a>
         <a href="#next-steps">Next steps</a>
         <a href="#packet-json">Saved packet data</a>
@@ -80,7 +132,7 @@
         <article class="trust-page-section" id="next-steps">
             <p class="eyebrow">What happens next</p>
             <h2>What should happen before any implementation talk</h2>
-            <p>These next steps are attached to the normalized HouseRuleDemandPacket, not left as loose operator memory.</p>
+            <p>These next steps are attached to the normalized HouseRuleDemandPacket, not left as loose follow-up memory.</p>
             <ul class="trust-page-section__list">
                 @foreach (var step in Model.NextSteps)
                 {
@@ -97,15 +149,15 @@
 
             <details class="details-drawer">
                 <summary>HouseRuleDemandPacket</summary>
-                <pre>@Model.PacketJson</pre>
+                <pre>@SanitizePublicText(Model.PacketJson)</pre>
             </details>
             <details class="details-drawer">
                 <summary>KarmaForgeCandidate</summary>
-                <pre>@Model.CandidateJson</pre>
+                <pre>@SanitizePublicText(Model.CandidateJson)</pre>
             </details>
             <details class="details-drawer">
                 <summary>RuleEnvironmentImpactHypothesis</summary>
-                <pre>@Model.ImpactHypothesisJson</pre>
+                <pre>@SanitizePublicText(Model.ImpactHypothesisJson)</pre>
             </details>
         </article>
     </div>

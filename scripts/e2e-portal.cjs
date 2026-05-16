@@ -27,7 +27,7 @@ const checks = [
     url: `${baseUrl}/`,
     assert: text =>
       text.includes('Chummer') &&
-      text.includes('Create account to install') &&
+      text.includes('Open downloads') &&
       requiredLandingLinks.every(link => text.includes(link))
   },
   {

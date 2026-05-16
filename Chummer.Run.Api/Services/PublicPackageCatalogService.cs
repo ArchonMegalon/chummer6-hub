@@ -126,6 +126,39 @@ public sealed class PublicPackageCatalogService
     public PublicPackageReceipt RecordFollow(string packageId, string subjectId, string actorLabel)
         => RecordReceipt(packageId, "follow", subjectId, actorLabel);
 
+    public PublicPackageReceipt RecordRevoke(string packageId, string actionKind, string subjectId, string actorLabel)
+    {
+        PublicPackageDefinition package = FindPackage(packageId)
+            ?? throw new KeyNotFoundException($"Unknown package id '{packageId}'.");
+        string normalizedActionKind = NormalizeActionKind(actionKind);
+        string normalizedSubjectId = NormalizeRequired(subjectId, nameof(subjectId));
+        string normalizedActorLabel = NormalizeRequired(actorLabel, nameof(actorLabel));
+        string actorActionKey = BuildActorActionKey(package.PackageId, normalizedActionKind, normalizedSubjectId);
+
+        lock (_gate)
+        {
+            if (!_receiptIdByActorAction.TryGetValue(actorActionKey, out string? existingReceiptId)
+                || !_receiptsById.TryGetValue(existingReceiptId, out PublicPackageReceipt? existingReceipt))
+            {
+                throw new InvalidOperationException($"No active {normalizedActionKind} receipt exists for package '{package.PackageId}'.");
+            }
+
+            _receiptIdByActorAction.Remove(actorActionKey);
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            string receiptId = $"pkg_revoke_{RandomHex(4)}";
+            PublicPackageReceipt created = new(
+                ReceiptId: receiptId,
+                PackageId: package.PackageId,
+                ActionKind: $"revoke_{normalizedActionKind}",
+                SubjectId: normalizedSubjectId,
+                ActorLabel: normalizedActorLabel,
+                RecordedAtUtc: now,
+                RouteSummary: $"Package {normalizedActionKind} revoked for {package.Title}.");
+            _receiptsById[receiptId] = created;
+            return created;
+        }
+    }
+
     public PublicPackageReceipt? FindReceipt(string receiptId)
     {
         if (string.IsNullOrWhiteSpace(receiptId))
@@ -210,11 +243,11 @@ public sealed class PublicPackageCatalogService
             return 0;
         }
 
+        string normalizedActionKind = NormalizeActionKind(actionKind);
         lock (_gate)
         {
-            return _receiptsById.Values.Count(receipt =>
-                string.Equals(receipt.PackageId, packageId, StringComparison.OrdinalIgnoreCase)
-                && string.Equals(receipt.ActionKind, actionKind, StringComparison.OrdinalIgnoreCase));
+            return _receiptIdByActorAction.Keys.Count(key =>
+                key.StartsWith($"{packageId.Trim().ToLowerInvariant()}::{normalizedActionKind}::", StringComparison.OrdinalIgnoreCase));
         }
     }
 
@@ -288,7 +321,7 @@ public sealed class PublicPackageCatalogService
                 "Desktop install package",
                 "Live now",
                 [
-                    "Matches the current preview channels on Downloads across Windows, macOS, and Linux.",
+                    "Matches the current release channels on Downloads across Windows, macOS, and Linux.",
                     "Guided claim, recovery, and install help stay tied to the same published build instead of a separate account-only binary.",
                     "The public package route explains the package class; Downloads still owns the actual acquisition decision."
                 ],

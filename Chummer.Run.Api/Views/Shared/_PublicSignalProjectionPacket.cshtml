@@ -24,21 +24,48 @@
         return System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(normalized.ToLowerInvariant());
     }
 
+    string SanitizeProjectionText(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        return value
+            .Replace("Product Governor", "governed product decision", StringComparison.OrdinalIgnoreCase)
+            .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
+            .Replace("EA synthesis", "product review", StringComparison.OrdinalIgnoreCase)
+            .Replace("productlift_idea_clustered", "public feedback signal", StringComparison.OrdinalIgnoreCase)
+            .Replace("Icanpreneur", "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
+            .Replace("Deftform", "structured pre-screen", StringComparison.OrdinalIgnoreCase)
+            .Replace("FacePop", "public invitation", StringComparison.OrdinalIgnoreCase)
+            .Replace("Lunacal", "scheduled follow-up", StringComparison.OrdinalIgnoreCase)
+            .Replace("Emailit", "delivery adapter", StringComparison.OrdinalIgnoreCase);
+    }
+
     var authorityFlow = Model.AuthorityFlow.Take(4).ToArray();
     var decisionRoutes = Model.DecisionRoutes.Take(4).ToArray();
     var forbidden = Model.Forbidden.Take(4).ToArray();
     var canonicalSources = Model.CanonicalSources
         .Select(FormatProjectionLabel)
+        .Select(SanitizeProjectionText)
         .Where(static item => !string.IsNullOrWhiteSpace(item))
         .Take(4)
         .ToArray();
-    var boardTargets = Model.BoardTargets.Take(6).ToArray();
+    var boardTargets = Model.BoardTargets
+        .Select(SanitizeProjectionText)
+        .Take(6)
+        .ToArray();
+    var journeyProofEvents = Model.JourneyProofEventRefs
+        .Take(4)
+        .ToArray();
     var sourceReceipts = new[]
     {
         FormatProjectionLabel(Model.PolicySource),
         FormatProjectionLabel(Model.PipelineSource),
         FormatProjectionLabel(Model.RegistrySource)
     }
+    .Select(SanitizeProjectionText)
     .Where(static item => !string.IsNullOrWhiteSpace(item))
     .Distinct(StringComparer.Ordinal)
     .ToArray();
@@ -52,9 +79,9 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">@Model.Vendor</span>
+            <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
             <h3>Public page and first-party fallback stay paired.</h3>
-            <p>@Model.PolicyStatus</p>
+            <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
             <div class="route-choice-card__proof">
                 <span>Role: @Model.Role</span>
                 <span>Public page: @Model.PublicPath</span>
@@ -75,7 +102,7 @@
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
                                 <h3>Stage @(i + 1)</h3>
-                                <p>@authorityFlow[i]</p>
+                                <p>@SanitizeProjectionText(authorityFlow[i])</p>
                             </div>
                         </article>
                     }
@@ -91,7 +118,7 @@
                 <div class="route-choice-card__proof">
                     @foreach (var route in decisionRoutes)
                     {
-                        <span>@route</span>
+                        <span>@SanitizeProjectionText(route)</span>
                     }
                 </div>
             }
@@ -101,7 +128,7 @@
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                             <h3>Forbidden on this page</h3>
-                            <p>@string.Join(" / ", forbidden)</p>
+                            <p>@string.Join(" / ", forbidden.Select(SanitizeProjectionText))</p>
                         </div>
                     </article>
                 </div>
@@ -110,13 +137,13 @@
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
                         <h3>Required public warning</h3>
-                        <p>@Model.PublicWarning</p>
+                        <p>@SanitizeProjectionText(Model.PublicWarning)</p>
                     </div>
                 </article>
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Source receipts</span>
+            <span class="tag">Source signals</span>
             <h3>Canonical sources and closeout gates still sit upstream of the hosted surface.</h3>
             <p>These Chummer-owned receipts keep the projection honest even while the hosted board handles visibility and voter follow-up.</p>
             @if (sourceReceipts.Length > 0)
@@ -152,7 +179,16 @@
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                             <h3>Shipped closeout gate</h3>
-                            <p>@string.Join(" / ", Model.CloseoutRequirements)</p>
+                            <p>@string.Join(" / ", Model.CloseoutRequirements.Select(SanitizeProjectionText))</p>
+                        </div>
+                    </article>
+                }
+                @if (journeyProofEvents.Length > 0)
+                {
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>Journey-proof refs</h3>
+                            <p>@string.Join(" / ", journeyProofEvents.Select(item => SanitizeProjectionText(item.EventKey)))</p>
                         </div>
                     </article>
                 }

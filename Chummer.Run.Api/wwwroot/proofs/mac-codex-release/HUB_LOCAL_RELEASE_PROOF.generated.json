@@ -5,7 +5,7 @@
   "desktop_client_readiness": {
     "status": "pass",
     "scoped_status": "pass",
-    "generated_at": "2026-05-10T07:47:36Z",
+    "generated_at": "2026-05-15T16:06:33Z",
     "missing_coverage_keys": [],
     "desktop_client_missing": false,
     "reason": "Flagship product readiness proof is green.",
@@ -825,8 +825,8 @@
     }
   },
   "base_url": "https://chummer.run",
-  "compose_file": "docker-compose.yml",
-  "playwright_timeout_seconds": 120,
+  "compose_file": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
+  "playwright_timeout_seconds": 180,
   "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
@@ -1429,6 +1429,93 @@
       ]
     },
     {
+      "receipt_id": "menu:translator",
+      "package_id": "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment",
+      "milestone_id": 141,
+      "frontier_id": 2354698282,
+      "active_flagship_frontier_id": 1922169755,
+      "summary": "Direct screenshot-backed and runtime-backed proof for the Translator dialog route is current and cited by parity audit rows instead of family-level prose alone.",
+      "routes": [
+        "translator",
+        "source:translator_route",
+        "family:custom_data_xml_and_translator_bridge"
+      ],
+      "surfaces": [
+        "menu:translator",
+        "dialog.translator",
+        "translatorLanePosture"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the direct translator route on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:translator as direct backing for the custom-data XML and translator workflow family."
+      ]
+    },
+    {
+      "receipt_id": "menu:xml_editor",
+      "package_id": "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment",
+      "milestone_id": 141,
+      "frontier_id": 2354698282,
+      "active_flagship_frontier_id": 1922169755,
+      "summary": "Direct screenshot-backed and runtime-backed proof for the XML amendment editor route is current and cited by parity audit rows instead of family-level prose alone.",
+      "routes": [
+        "xml_amendment_editor",
+        "source:xml_amendment_editor_route",
+        "family:custom_data_xml_and_translator_bridge"
+      ],
+      "surfaces": [
+        "menu:xml_editor",
+        "dialog.xml_editor",
+        "xmlEditorLanePosture"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the XML amendment editor route on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:xml_editor as direct backing for the custom-data XML and translator workflow family."
+      ]
+    },
+    {
+      "receipt_id": "menu:hero_lab_importer",
+      "package_id": "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment",
+      "milestone_id": 141,
+      "frontier_id": 2354698282,
+      "active_flagship_frontier_id": 1922169755,
+      "summary": "Direct screenshot-backed and runtime-backed proof for the Hero Lab importer route is current and cited by parity audit rows instead of family-level prose alone.",
+      "routes": [
+        "hero_lab_importer",
+        "source:hero_lab_importer_route",
+        "family:legacy_and_adjacent_import_oracles"
+      ],
+      "surfaces": [
+        "menu:hero_lab_importer",
+        "dialog.hero_lab_importer",
+        "heroLabImportOracleLanePosture"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the Hero Lab importer route on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:hero_lab_importer as direct backing for the legacy and adjacent import-oracle workflow family."
+      ]
+    },
+    {
+      "receipt_id": "workflow:import_oracle",
+      "package_id": "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment",
+      "milestone_id": 141,
+      "frontier_id": 2354698282,
+      "active_flagship_frontier_id": 1922169755,
+      "summary": "Direct screenshot-backed and runtime-backed proof for the adjacent import-oracle workflow is current and cited by parity audit rows instead of family-level prose alone.",
+      "routes": [
+        "import_oracle",
+        "family:legacy_and_adjacent_import_oracles"
+      ],
+      "surfaces": [
+        "workflow:import_oracle",
+        "heroLabImportOracleLanePosture",
+        "heroLabAdjacentSr6OracleReceipt"
+      ],
+      "evidence": [
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the adjacent import-oracle workflow on current screenshot-backed and runtime-backed proof.",
+        "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites workflow:import_oracle as direct backing for the legacy and adjacent import-oracle workflow family."
+      ]
+    },
+    {
       "receipt_id": "keep_route_support_and_publication_surfaces_from_claimin:hub",
       "package_id": "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the",
       "milestone_id": 141,
@@ -1494,6 +1581,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-10T07:51:06Z",
-  "generatedAt": "2026-05-10T07:51:06Z"
+  "generated_at": "2026-05-15T16:07:39Z",
+  "generatedAt": "2026-05-15T16:07:39Z"
 }

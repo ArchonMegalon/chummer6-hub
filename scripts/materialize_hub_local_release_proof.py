@@ -12,6 +12,9 @@ M102_SUCCESSOR_FRONTIER_ID = 2897065929
 M102_ACTIVE_FLAGSHIP_FRONTIER_ID = 2594403904
 M102_FRONTIER_IDS = [M102_SUCCESSOR_FRONTIER_ID, M102_ACTIVE_FLAGSHIP_FRONTIER_ID]
 DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+M141_UI_PACKAGE_ID = "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment"
+M141_UI_FRONTIER_ID = 2354698282
+M141_UI_FLAGSHIP_FRONTIER_ID = 1922169755
 
 
 def iso_now() -> str:
@@ -162,6 +165,98 @@ def _load_flagship_readiness_snapshot() -> dict:
         ),
         "source_path": str(readiness_path),
     }
+
+
+def _m141_direct_import_route_receipts() -> list[dict]:
+    return [
+        {
+            "receipt_id": "menu:translator",
+            "package_id": M141_UI_PACKAGE_ID,
+            "milestone_id": 141,
+            "frontier_id": M141_UI_FRONTIER_ID,
+            "active_flagship_frontier_id": M141_UI_FLAGSHIP_FRONTIER_ID,
+            "summary": "Direct screenshot-backed and runtime-backed proof for the Translator dialog route is current and cited by parity audit rows instead of family-level prose alone.",
+            "routes": [
+                "translator",
+                "source:translator_route",
+                "family:custom_data_xml_and_translator_bridge",
+            ],
+            "surfaces": [
+                "menu:translator",
+                "dialog.translator",
+                "translatorLanePosture",
+            ],
+            "evidence": [
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the direct translator route on current screenshot-backed and runtime-backed proof.",
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:translator as direct backing for the custom-data XML and translator workflow family.",
+            ],
+        },
+        {
+            "receipt_id": "menu:xml_editor",
+            "package_id": M141_UI_PACKAGE_ID,
+            "milestone_id": 141,
+            "frontier_id": M141_UI_FRONTIER_ID,
+            "active_flagship_frontier_id": M141_UI_FLAGSHIP_FRONTIER_ID,
+            "summary": "Direct screenshot-backed and runtime-backed proof for the XML amendment editor route is current and cited by parity audit rows instead of family-level prose alone.",
+            "routes": [
+                "xml_amendment_editor",
+                "source:xml_amendment_editor_route",
+                "family:custom_data_xml_and_translator_bridge",
+            ],
+            "surfaces": [
+                "menu:xml_editor",
+                "dialog.xml_editor",
+                "xmlEditorLanePosture",
+            ],
+            "evidence": [
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the XML amendment editor route on current screenshot-backed and runtime-backed proof.",
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:xml_editor as direct backing for the custom-data XML and translator workflow family.",
+            ],
+        },
+        {
+            "receipt_id": "menu:hero_lab_importer",
+            "package_id": M141_UI_PACKAGE_ID,
+            "milestone_id": 141,
+            "frontier_id": M141_UI_FRONTIER_ID,
+            "active_flagship_frontier_id": M141_UI_FLAGSHIP_FRONTIER_ID,
+            "summary": "Direct screenshot-backed and runtime-backed proof for the Hero Lab importer route is current and cited by parity audit rows instead of family-level prose alone.",
+            "routes": [
+                "hero_lab_importer",
+                "source:hero_lab_importer_route",
+                "family:legacy_and_adjacent_import_oracles",
+            ],
+            "surfaces": [
+                "menu:hero_lab_importer",
+                "dialog.hero_lab_importer",
+                "heroLabImportOracleLanePosture",
+            ],
+            "evidence": [
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the Hero Lab importer route on current screenshot-backed and runtime-backed proof.",
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites menu:hero_lab_importer as direct backing for the legacy and adjacent import-oracle workflow family.",
+            ],
+        },
+        {
+            "receipt_id": "workflow:import_oracle",
+            "package_id": M141_UI_PACKAGE_ID,
+            "milestone_id": 141,
+            "frontier_id": M141_UI_FRONTIER_ID,
+            "active_flagship_frontier_id": M141_UI_FLAGSHIP_FRONTIER_ID,
+            "summary": "Direct screenshot-backed and runtime-backed proof for the adjacent import-oracle workflow is current and cited by parity audit rows instead of family-level prose alone.",
+            "routes": [
+                "import_oracle",
+                "family:legacy_and_adjacent_import_oracles",
+            ],
+            "surfaces": [
+                "workflow:import_oracle",
+                "heroLabImportOracleLanePosture",
+                "heroLabAdjacentSr6OracleReceipt",
+            ],
+            "evidence": [
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json keeps the adjacent import-oracle workflow on current screenshot-backed and runtime-backed proof.",
+                "/docker/chummercomplete/chummer6-ui/.codex-studio/published/CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json cites workflow:import_oracle as direct backing for the legacy and adjacent import-oracle workflow family.",
+            ],
+        },
+    ]
 
 
 def main() -> int:
@@ -1212,6 +1307,7 @@ def main() -> int:
                     "/docker/chummercomplete/chummer6-hub/Chummer.Run.Api/Controllers/PublicLandingController.cs promotes the starter lane as the primary signed-in action when a linked install exists but shared campaign work has not been seeded yet.",
                 ],
             },
+            *_m141_direct_import_route_receipts(),
             {
                 "receipt_id": "keep_route_support_and_publication_surfaces_from_claimin:hub",
                 "package_id": "next90-m141-hub-keep-route-support-and-publication-surfaces-from-claiming-parity-for-the",

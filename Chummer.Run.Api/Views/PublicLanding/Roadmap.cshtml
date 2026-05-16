@@ -183,7 +183,7 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>M@milestone.Id · @milestone.Title</h3>
+                                <h3>@($"Milestone {milestone.Id}") · @milestone.Title</h3>
                                 <p>@milestone.CasualSummary</p>
                             </div>
                             <span class="tag">@milestone.StatusLabel</span>
@@ -252,7 +252,7 @@
                     <summary>
                         <span class="milestone-drawer__header">
                             <span class="milestone-drawer__title">
-                                <span class="tag">M@milestone.Id · @milestone.WaveLabel</span>
+                                <span class="tag">@($"Milestone {milestone.Id}") · @milestone.WaveLabel</span>
                                 <span class="milestone-drawer__heading">@milestone.Title</span>
                                 <span class="milestone-drawer__tease">@milestone.CasualSummary</span>
                             </span>
@@ -275,7 +275,7 @@
                                 @foreach (var dependency in milestone.Dependencies)
                                 {
                                     <li>
-                                        <strong>M@dependency.Id</strong>
+                                        <strong>@($"Milestone {dependency.Id}")</strong>
                                         <span>@dependency.Title</span>
                                         <span class="muted-copy">(@dependency.StatusLabel)</span>
                                     </li>

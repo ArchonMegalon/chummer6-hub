@@ -21,6 +21,7 @@ COPY chummercomplete/chummer.run-services/Chummer.World.Contracts/ chummercomple
 COPY chummercomplete/chummer-core-engine/Chummer.Contracts/ chummercomplete/chummer-core-engine/Chummer.Contracts/
 COPY chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/ chummercomplete/chummer-hub-registry/Chummer.Hub.Registry.Contracts/
 COPY chummercomplete/chummer-hub-registry/Chummer.Run.Registry/ chummercomplete/chummer-hub-registry/Chummer.Run.Registry/
+COPY chummercomplete/chummer-hub-registry/black-ledger/ chummercomplete/chummer-hub-registry/black-ledger/
 COPY fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/ fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/
 WORKDIR /src/chummercomplete/chummer.run-services/Chummer.Run.Api
 RUN dotnet build /src/chummercomplete/chummer.run-services/Chummer.Play.Contracts/Chummer.Play.Contracts.csproj -c Release --nologo \
@@ -35,6 +36,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 COPY --from=build /app/publish .
 COPY --from=build /src/chummercomplete/chummer.run-services/.codex-design /app/.codex-design
+COPY --from=build /src/chummercomplete/chummer-hub-registry/black-ledger /app/black-ledger
 COPY chummercomplete/chummer-design/products/chummer/ /app/.codex-design/product/
 ENV ASPNETCORE_URLS=http://+:8080
 ENTRYPOINT ["dotnet", "Chummer.Run.Api.dll"]

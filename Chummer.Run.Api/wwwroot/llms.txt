@@ -26,7 +26,10 @@ Direction and feedback routes
 - /feedback : public signal and safe public bugs
 - /feedback/operations : bounded public operations artifact for the feedback loop
 - /changelog : shipped closeout and release-backed proof
+- /ledger : public-safe Black Ledger hub for aggregate pressure and closeout motion
+- /black-ledger : short alias for the Black Ledger hub
 - /participate : broader participation entry
+- /karma-forge : short alias for governed discovery intake
 - /participate/karma-forge : governed discovery intake for table pain and house-rule demand
 
 Help and account routes

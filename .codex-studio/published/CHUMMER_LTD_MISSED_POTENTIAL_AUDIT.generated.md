@@ -1,6 +1,6 @@
 # Chummer.run LTD Missed-Potential Audit
 
-Date: 2026-05-07  
+Date: 2026-05-12  
 Scope: `chummer.run-services` against `/docker/EA/LTDs.md`
 
 ## Inputs reviewed
@@ -28,16 +28,18 @@ Current code-backed LTD lanes in this repo are concentrated in:
 - `ProductLift` as a first-party wrapped feedback, roadmap, changelog, operations, and closeout lane
 - `BrowserAct`, `MarkupGo`, and `PeekShot` as hosted AI gateway adapters
 - `1min.AI` and `AI Magicx` as routed provider identities in the gateway
-- `Teable` as an internal user-projection workbench
+- `Teable` as an internal user-projection, KARMA FORGE review-board, and BLACK LEDGER world-tick workbench
 - `ClickRank.ai` as a bounded public-site script injection on `chummer.run`
+- `FacePop`, `Deftform`, `ICanpreneur`, `MetaSurvey`, and `Lunacal` as bounded first-party projections inside KARMA FORGE and public concierge flows
+- `Blip AI` as a bounded design-mirrored helper for dictation, transcript cleanup, and operator draft capture on knowledge/help and runbook lanes only
 
 Everything else is mostly one of three things:
 
 - canon and backlog intent
-- queue-state naming
+- bounded first-party projection without a direct vendor API adapter
 - public-copy-safe placeholders for future bounded adapters
 
-That distinction matters. Several LTDs are already named in the product canon, but they are not live integrations yet.
+That distinction matters. Several LTDs are intentionally integrated through first-party packet truth and bounded workflow projection rather than direct third-party API calls.
 
 ## What is already materially real
 
@@ -60,8 +62,8 @@ That distinction matters. Several LTDs are already named in the product canon, b
   Reality: these exist as routed provider identities, but only `1min.AI` and `AI Magicx` look like practical near-term lanes. `Prompting Systems` and `ChatPlayground` remain mostly scaffolding.
 
 - `Teable`
-  Evidence: `Chummer.Run.Api/Services/Community/TeableUserProjectionService.cs`, `TeableUserProjectionSyncWorker.cs`, `Controllers/InternalTeableUsersController.cs`
-  Reality: this is a real internal projection seam, not just design prose.
+  Evidence: `Chummer.Run.Api/Services/Community/TeableUserProjectionService.cs`, `TeableUserProjectionSyncWorker.cs`, `Controllers/InternalTeableUsersController.cs`, `Chummer.Run.Api/Services/KarmaForge/TeableKarmaForgeReviewBoardService.cs`, `TeableKarmaForgeReviewBoardSyncWorker.cs`, `Controllers/InternalTeableKarmaForgeController.cs`, `Chummer.Run.Api/Services/Community/TeableBlackLedgerWorldTickService.cs`, `TeableBlackLedgerWorldTickSyncWorker.cs`, `Controllers/InternalTeableBlackLedgerController.cs`
+  Reality: this is now a real internal projection seam for user projection, KARMA FORGE operator review-board projection, and BLACK LEDGER world-tick review projection, not just design prose.
 
 - `ClickRank.ai`
   Evidence: `Chummer.Run.Api/Views/Shared/_Layout.cshtml`
@@ -74,7 +76,7 @@ That distinction matters. Several LTDs are already named in the product canon, b
 
 ## Where the repo is overstating completion
 
-These appear in code or tests, but only as labels, queue states, or bounded intent rather than external integrations:
+These appear in code or tests as bounded first-party projections, not as fully externalized direct adapters:
 
 - `FacePop`
 - `Deftform`
@@ -85,15 +87,31 @@ These appear in code or tests, but only as labels, queue states, or bounded inte
 Evidence:
 
 - `Chummer.Run.Api/Services/KarmaForge/KarmaForgeDiscoveryService.cs`
+- `Chummer.Run.Api/Services/PublicConciergeService.cs`
+- `Chummer.Run.Api/Services/PublicConciergeStore.cs`
+- `Chummer.Run.Api/Services/Support/PublicSignalToCanonPacketService.cs`
 - `Chummer.Run.Api/Services/PublicSignalOperationsService.cs`
+- `Chummer.Run.Api/Views/PublicLanding/KarmaForge.cshtml`
+- `Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml`
+- `Chummer.Run.Api/Views/PublicLanding/Concierge.cshtml`
+- `Chummer.Tests/KarmaForgeDiscoveryServiceTests.cs`
+- `Chummer.Tests/PublicConciergeServiceTests.cs`
+- `Chummer.Tests/PublicSignalToCanonPacketServiceTests.cs`
 
 Examples:
 
-- `FacePop -> Deftform -> Icanpreneur` is a canonical lane string, not an adapter stack
-- `queued_for_metasurvey_validation` is a queue state, not a MetaSurvey integration
-- `candidate_for_lunacal_followup` is routing language, not live scheduling
+- `FacePop`, `Deftform`, `ICanpreneur`, `MetaSurvey`, and `Lunacal` now project as bounded KARMA FORGE stages with explicit first-party status, labels, and receipt posture
+- concierge branch routing persists first-party handoff receipts and moderation-safe fallback state before any external redirect occurs
+- `productlift_signal`, `katteb_signal`, `clickrank_signal`, and `metasurvey_signal` now materialize as classified signal-to-canon packets instead of collapsing into one generic growth row
 
-This is not bad. It just means the repo already knows the intended workflow, and the missed potential is turning that workflow into a real bounded adapter with receipts.
+This is no longer just naming. The repo now carries a real bounded projection layer with tests. The remaining missed potential is deeper closure: more direct adapter depth, stronger cross-system receipts, and refreshed published proof.
+
+`Blip AI` now belongs in the same honest category:
+
+- present in local inventory and env wiring
+- present in the checked-in design mirror
+- intentionally bounded to helper posture only
+- not yet promoted into a runtime adapter or public-facing surface
 
 ## Highest-value missed potential
 
@@ -158,20 +176,18 @@ Best LTD combination:
 - `Documentation.AI`
 - `Katteb` only downstream of approved source packets
 
-### 4. Convert the KARMA FORGE discovery ladder from naming to real bounded tools
+### 4. Deepen the KARMA FORGE discovery ladder from bounded projection into fuller operational closure
 
 Why it matters:
 
-- The intended workflow is already present in code language.
-- This is one of the clearest places where LTD potential exists but is not actually operational.
+- The intended workflow is now present as a tested first-party projection.
+- The next step is no longer basic existence. It is stronger external closure, follow-through receipts, and operator-grade proof.
 
 What is missing:
 
-- real pre-screen form lane
-- real adaptive follow-up lane
-- real survey follow-up lane
-- real scheduling follow-up lane
-- receipts that flow back into first-party packet truth
+- stronger end-to-end proof that every bounded stage closes back into first-party packet truth
+- more explicit artifact receipts for external redirects and completed follow-up loops
+- operator-facing review and closeout surfaces that consume the discovery packet directly
 
 Best LTD combination:
 
@@ -238,7 +254,7 @@ Best LTD combination:
 | `MarkupGo` | document rendering lane | real gateway adapter plus creative use | route-proof packet PDFs, artifact contact sheets, audit receipts | finish with proof packet outputs |
 | `1min.AI` | active credits, key rotation, fallback availability | routed provider identity exists | cheap internal synthesis for route summaries, packet drafts, and audit help | safe internal use now |
 | `AI Magicx` | active fallback lane | routed provider identity exists | short overflow generation and bounded internal synthesis | safe internal use now |
-| `Teable` | curated projection only, never truth | real internal projection service exists | admin workbench, feedback and ops projection boards | keep internal and bounded |
+| `Teable` | curated projection only, never truth | real internal projection services exist for user projection, KARMA FORGE review boards, and BLACK LEDGER world-tick review | admin workbench, feedback and ops projection boards | keep internal and bounded |
 | `ClickRank.ai` | live public domain IDs already exist | real layout injection exists | crawl-health, metadata, AI-search and search visibility remediation loop | finish the ops loop |
 
 ### Strong opportunities, but still mostly design intent
@@ -247,12 +263,12 @@ Best LTD combination:
 |---|---|---|---|---|
 | `Prompting Systems` | bounded prompt/style helper | mock provider identity and canon references | tone guardrails, artifact prompt normalization, public-copy refinement packets | next |
 | `Documentation.AI` | intended for docs, cited answers, `llms.txt`, operator docs | public static `llms.txt` exists, but no real downstream automation lane here | AI-readable docs refresh, source-backed public help summaries, `llms.txt` stewardship | next |
-| `Katteb` | intended for public content optimization | almost entirely canon-only here | public guide/article optimization from approved source packets only | next after docs loop |
-| `FacePop` | bounded trust/concierge widget only | appears as workflow naming, not integration | later public trust/concierge entry, never first-line support | park until support proof is stronger |
-| `Deftform` | structured intake potential | present as “Deftform-style” concept only | KARMA FORGE pre-screen and bounded discovery forms | good next pilot |
-| `ICanpreneur` | discovery and validation lane | present as lane naming and queue language | adaptive follow-up interviews after signal clustering | good next pilot |
-| `MetaSurvey` | structured follow-up survey lane | present as queue-state language only | quantitative follow-up after ProductLift or KARMA FORGE intake | good next pilot |
-| `Lunacal` | scheduling follow-up lane | present as scheduling mode language only | public discovery follow-up or open-run scheduling after first-party receipts exist | later pilot |
+| `Katteb` | intended for public content optimization | signal classification is now real, but downstream content-improvement closure is still thin | public guide/article optimization from approved source packets only | next after docs loop |
+| `FacePop` | bounded trust/concierge widget only | bounded first-party concierge and discovery projection now exists with tests, but still not a direct adapter | public trust/concierge entry, never first-line support | active and bounded |
+| `Deftform` | structured intake potential | bounded KARMA FORGE stage projection and public discovery rendering now exists | KARMA FORGE pre-screen and bounded discovery forms | active bounded pilot |
+| `ICanpreneur` | discovery and validation lane | bounded KARMA FORGE adaptive interview stage now exists | adaptive follow-up interviews after signal clustering | active bounded pilot |
+| `MetaSurvey` | structured follow-up survey lane | bounded KARMA FORGE and signal-classification lane now exists | quantitative follow-up after ProductLift or KARMA FORGE intake | active bounded pilot |
+| `Lunacal` | scheduling follow-up lane | bounded KARMA FORGE follow-up scheduling stage now exists | public discovery follow-up or open-run scheduling after first-party receipts exist | active bounded pilot |
 | `ApproveThis` | external approval observation lane | canon-backed, no direct adapter in this repo | external sign-off observation for governed publication or review queues | later pilot |
 | `VidBoard.ai` | presenter-video lane | mostly canon-backed here | campaign primer or mission-brief preview videos on artifact shelf | media-factory next wave |
 | `Mootion` | scaffold-stage motion/video lane | canon-backed here | preview-only motion artifacts | media-factory next wave |
@@ -297,7 +313,7 @@ Best LTD combination:
 2. Add a `MarkupGo`-backed route-proof packet or contact sheet so public release proof is easier to review and archive.
 3. Finish the ProductLift closeout loop so public signal, shipped status, and follow-up receipts visibly connect.
 4. Promote the docs/search lane with explicit `llms.txt` stewardship, route-summary refresh, and ClickRank-fed remediation cadence.
-5. Convert the KARMA FORGE discovery ladder from labels into real bounded adapters: `Deftform` -> `ICanpreneur` -> `MetaSurvey` -> `Lunacal`.
+5. Keep closure proof current so the bounded KARMA FORGE, concierge, and growth-classification integrations stay reflected in published readiness truth.
 6. Turn RUNSITE into a real artifact lane using `Crezlo Tours`, `AvoMap`, and `PeekShot`.
 7. Build one real media-factory receipt path for campaign primer or mission brief artifacts before expanding the rest of the video/audio stack.
 
@@ -316,6 +332,6 @@ The repo already has enough LTD surface to ship a stronger product loop without 
 The best leverage is:
 
 - finish the already-real proof and closeout seams
-- turn design-only discovery ladders into bounded adapters with receipts
+- deepen the already-bounded discovery ladders into stronger end-to-end receipts and operator closure
 - resist calling queue labels “integrations”
 - keep public truth first-party even when the LTD stack gets richer

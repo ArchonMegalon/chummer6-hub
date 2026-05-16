@@ -124,13 +124,13 @@
 <section class="release-footnote route-anchor-target" id="public-feedback">
     <p class="eyebrow">Feedback</p>
     <h1 class="page-title">Share product ideas and safe public bugs in one place</h1>
-    <p class="page-copy">Use this page for public feedback, then move to roadmap for what is next, changelog for shipped updates, or help when the issue is private.</p>
+    <p class="page-copy">Use this page for public feedback, then move to roadmap for what is next, changelog for shipped updates, or help when the issue is private. Votes show demand; Chummer-owned proof decides what ships.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="#feedback-public-lanes">Review public pages</a>
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
     </div>
-    <p class="muted-copy">Crashes, install failures, account issues, private campaign details, and logs do not belong here.</p>
+    <p class="muted-copy">Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback.</p>
 </section>
 
 @if (signalProjection is not null || signalOperations is not null)
@@ -201,7 +201,7 @@
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Signal loop</p>
-        <h2 class="editorial-title">A public idea should enter one loop and leave with a clear answer.</h2>
+        <h2 class="editorial-title">A public signal should enter one loop and leave with an evidence-backed closeout.</h2>
         <p class="editorial-copy">This keeps product learning visible without pretending that comments are the same thing as release proof or private support.</p>
     </div>
     <div class="workflow-grid">
@@ -290,13 +290,13 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Operating loop</p>
         <h2 class="editorial-title">One public signal should map to actual milestone pressure, projected direction, and proof-backed closeout.</h2>
-        <p class="editorial-copy">Public feedback stays first-party. The follow-through can stay visible without turning this page into an operator console.</p>
+        <p class="editorial-copy">Public feedback stays first-party. The follow-through can stay visible without turning this page into a private work queue.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Milestone pressure</span>
-            <h3>What active delivery pressure looks like right now</h3>
-            <p>Signals that survive public intake should run into real delivery slices instead of vague roadmap prose or optimistic comment-thread promises.</p>
+            <h3>What active product movement looks like right now</h3>
+            <p>Signals that survive public intake should run into real product slices instead of vague roadmap prose or optimistic comment-thread promises.</p>
             @if (milestoneFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -304,7 +304,7 @@
                     {
                         <article class="compact-rail__item">
                             <div class="compact-rail__copy">
-                                <h3>M@milestone.Id · @milestone.Title</h3>
+                                <h3>@($"Milestone {milestone.Id}") · @milestone.Title</h3>
                                 <p>@milestone.CasualSummary</p>
                             </div>
                             <span class="tag">@milestone.StatusLabel · @milestone.DifficultyLabel</span>

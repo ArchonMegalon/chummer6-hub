@@ -79,7 +79,7 @@
     <article class="status-decision-strip__card">
         <span class="tag">Receipt spine</span>
         <h2>@recipientThreads.Length recipient thread@(recipientThreads.Length == 1 ? string.Empty : "s") currently sit under this drilldown.</h2>
-        <p>@dispatchReceipts.Length dispatch receipt@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length provider callback@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length journey receipt@(journeyReceipts.Length == 1 ? string.Empty : "s") are now joined here.</p>
+        <p>@dispatchReceipts.Length dispatch receipt@(dispatchReceipts.Length == 1 ? string.Empty : "s"), @deliveryOutcomes.Length delivery update@(deliveryOutcomes.Length == 1 ? string.Empty : "s"), and @journeyReceipts.Length journey receipt@(journeyReceipts.Length == 1 ? string.Empty : "s") are now joined here.</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Queue posture</span>
@@ -88,7 +88,7 @@
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Public-safe detail</span>
-        <h2>Raw provider payloads still stay out of first-party storage.</h2>
+        <h2>Raw delivery payloads still stay out of first-party storage.</h2>
         <p>This page only uses bounded receipt metadata, hashed recipient identity, and first-party closeout state.</p>
     </article>
 </section>
@@ -99,7 +99,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Current filter</p>
             <h2 class="editorial-title">@detail.FilterLabel are currently isolated on this drilldown.</h2>
-            <p class="editorial-copy">The thread, dispatch, callback, and journey sections below are narrowed from @totalThreadCount total recipient thread@(totalThreadCount == 1 ? string.Empty : "s") to the bounded pivot you selected.</p>
+            <p class="editorial-copy">The thread, dispatch, outcome, and journey sections below are narrowed from @totalThreadCount total recipient thread@(totalThreadCount == 1 ? string.Empty : "s") to the bounded pivot you selected.</p>
         </div>
     </section>
 }
@@ -110,7 +110,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Source receipt</p>
             <h2 class="editorial-title">The originating source receipt stays visible as the root of this drilldown.</h2>
-            <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, dispatch, callback, and journey state.</p>
+            <p class="editorial-copy">This keeps the public signal item, category, and closeout eligibility tied to the later queue, dispatch, outcome, and journey state.</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
@@ -163,8 +163,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Receipt spine</p>
-            <h2 class="editorial-title">Routing, closeout posture, and queue readiness stay inspectable before any provider callback lands.</h2>
-            <p class="editorial-copy">This keeps the support boundary, voter-follow-up posture, and outbox readiness explicit on the same page as the later delivery timeline.</p>
+            <h2 class="editorial-title">Routing, closeout posture, and queue readiness stay inspectable before any delivery update lands.</h2>
+            <p class="editorial-copy">This keeps the support boundary, voter-follow-up posture, and outbox readiness explicit on the same page as the later delivery timeline, including recipient threads, dispatch receipts, outcome updates, journey writeback, and saved pivots.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in routingReceipts)
@@ -274,8 +274,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Recipient threads</p>
-            <h2 class="editorial-title">The dispatch spine, latest callback, and journey proof now sit on one bounded recipient timeline.</h2>
-            <p class="editorial-copy">This is the compact operator view for one or more recipient threads that belong to the selected source or dispatch spine.</p>
+            <h2 class="editorial-title">The dispatch spine, latest outcome update, and journey proof now sit on one bounded recipient timeline.</h2>
+            <p class="editorial-copy">This is the compact activity view for one or more recipient threads that belong to the selected source or dispatch spine.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var thread in recipientThreads)
@@ -320,7 +320,7 @@
         <div class="editorial-block__lead">
             <p class="eyebrow">Dispatch receipts</p>
             <h2 class="editorial-title">Every first-party outbound attempt stays visible as a bounded dispatch receipt.</h2>
-            <p class="editorial-copy">This keeps send posture, suppression state, retry timing, and provider identity aligned to one dispatch spine.</p>
+            <p class="editorial-copy">This keeps send posture, suppression state, retry timing, and delivery identity aligned to one dispatch spine.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in dispatchReceipts)
@@ -379,9 +379,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Provider callbacks</p>
-            <h2 class="editorial-title">Provider callback receipts stay bounded but fully attributable to this drilldown spine.</h2>
-            <p class="editorial-copy">Identity match mode, hashed recipient proof, and provider state stay visible without storing raw payload bodies.</p>
+            <p class="eyebrow">Delivery updates</p>
+            <h2 class="editorial-title">Delivery update receipts stay bounded but fully attributable to this drilldown spine.</h2>
+            <p class="editorial-copy">Identity match mode, hashed recipient proof, and delivery state stay visible without storing raw payload bodies.</p>
         </div>
         <div class="route-choice-grid">
             @foreach (var receipt in deliveryOutcomes)

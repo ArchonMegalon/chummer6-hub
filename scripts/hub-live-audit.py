@@ -11881,7 +11881,7 @@ def main() -> int:
             "Build a runner, explain every ruling, and recover the campaign.",
             required_texts=(
                 "Downloads",
-                "Create account and install",
+                "Create account for guided install",
                 "Account-aware install handoff",
                 "Final pool 9",
                 "What works today",
@@ -11920,7 +11920,7 @@ def main() -> int:
         AuditRoute("/roadmap/black-ledger", "BLACK LEDGER", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Anyone evaluating the preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
         AuditRoute(
             "/participate",
-            "Public feedback, private support, and beta access each stay on their own page",
+            "Share feedback, report a problem, or join the beta waitlist",
             required_texts=(
                 "Public ideas and safe bug reports",
                 "Feedback, roadmap, and shipped updates stay visible without pretending to be the same thing.",

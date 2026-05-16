@@ -27,8 +27,19 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHostedService<PublicSignalRetryExpiryWorker>();
         services.AddSingleton<PublicNavigationService>();
         services.AddSingleton<HubPageChromeService>();
+        services.AddSingleton<ReadyForTonightService>();
+        services.AddSingleton<KnowledgeFabricService>();
+        services.AddSingleton<NexusPanContinuityService>();
+        services.AddSingleton<MediaArtifactHorizonsService>();
+        services.AddSingleton<CommunityCreatorHorizonsService>();
+        services.AddSingleton<WaveEightHorizonsService>();
         services.AddSingleton<KarmaForgeStore>();
         services.AddSingleton<KarmaForgeDiscoveryService>();
+        services.AddSingleton<BlackLedgerPublicStatsService>();
+        services.AddSingleton<BlackLedgerDispatchService>();
+        services.AddSingleton<AnarchyPreviewService>();
+        services.AddSingleton<TeableKarmaForgeReviewBoardService>();
+        services.AddHostedService<TeableKarmaForgeReviewBoardSyncWorker>();
         services.AddSingleton<WeeklyProductPulseArtifactService>();
         services.AddSingleton<PublicProgressService>();
         services.AddSingleton<PublicTrustPulseService>();
@@ -44,7 +55,9 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         services.AddSingleton<CommunityStore>();
         services.AddSingleton<TeableUserProjectionService>();
+        services.AddSingleton<TeableBlackLedgerWorldTickService>();
         services.AddHostedService<TeableUserProjectionSyncWorker>();
+        services.AddHostedService<TeableBlackLedgerWorldTickSyncWorker>();
         services.AddHttpClient();
         services.AddSingleton<AccountService>();
         services.AddSingleton<IdentityLinkService>();
@@ -55,6 +68,10 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<EntitlementService>();
         services.AddSingleton<LeaderboardService>();
         services.AddSingleton<LedgerService>();
+        services.AddHttpClient<ParticipationOperatorNotificationService>();
+        services.AddSingleton<BlackLedgerNewsRecipientResolver>();
+        services.AddHttpClient<BlackLedgerTickNewsNotificationService>();
+        services.AddHostedService<BlackLedgerTickNewsDispatchWorker>();
         services.AddScoped<BoostSessionService>();
         return services;
     }

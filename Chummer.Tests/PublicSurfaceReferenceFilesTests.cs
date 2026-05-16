@@ -13,6 +13,8 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/roadmap", doc, StringComparison.Ordinal);
         Assert.Contains("/feedback", doc, StringComparison.Ordinal);
         Assert.Contains("/changelog", doc, StringComparison.Ordinal);
+        Assert.Contains("/ledger", doc, StringComparison.Ordinal);
+        Assert.Contains("/karma-forge", doc, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge", doc, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", doc, StringComparison.Ordinal);
         Assert.Contains("milestone-backed public direction", doc, StringComparison.Ordinal);
@@ -32,6 +34,8 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/roadmap", llms, StringComparison.Ordinal);
         Assert.Contains("/feedback", llms, StringComparison.Ordinal);
         Assert.Contains("/changelog", llms, StringComparison.Ordinal);
+        Assert.Contains("/ledger", llms, StringComparison.Ordinal);
+        Assert.Contains("/karma-forge", llms, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge", llms, StringComparison.Ordinal);
         Assert.Contains("/llms.txt", ai, StringComparison.Ordinal);
         Assert.Contains("/roadmap", ai, StringComparison.Ordinal);
@@ -72,7 +76,6 @@ public sealed class PublicSurfaceReferenceFilesTests
     {
         string[] publicFiles =
         {
-            RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_FEATURE_REGISTRY.yaml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Changelog.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml"),
@@ -80,12 +83,15 @@ public sealed class PublicSurfaceReferenceFilesTests
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_PublicSignalOperationsPacket.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForge.cshtml"),
             RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForgeSubmitted.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Concierge.cshtml"),
+            RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "JoinPrimer.cshtml"),
         };
 
         string combined = string.Join("\n", publicFiles.Select(static path => File.ReadAllText(path)));
 
         Assert.DoesNotContain("ProductLift", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Emailit", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Blip AI", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Icanpreneur", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Lunacal", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Product Governor", combined, StringComparison.Ordinal);

@@ -1,0 +1,104 @@
+@model NexusPanContinuityPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-trust-page";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            @foreach (var point in Model.SummaryPoints)
+            {
+                <span>@point</span>
+            }
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@Model.TertiaryAction.Label</a>
+    </div>
+</section>
+
+@if (Model.SignedInStatus is not null)
+{
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    </section>
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Continuity posture</p>
+        <h2 class="editorial-title">Claimed installs and reconnect rails are visible without leaking private device history.</h2>
+        <p class="editorial-copy">@Model.VerdictSummary</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Claimed installs</span>
+            <h3>@Model.ActiveInstallationCount</h3>
+            <p>Active claimed installations currently tracked on first-party storage.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Active grants</span>
+            <h3>@Model.ActiveGrantCount</h3>
+            <p>Live continuity grants currently backing claimed installs.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Pending recovery rails</span>
+            <h3>@(Model.PendingClaimCount + Model.PendingBrowserCallbackCount)</h3>
+            <p>Pending claim and browser callback handoffs still in the recovery lane.</p>
+        </article>
+    </div>
+</section>
+
+<section class="continuity-band">
+    <div class="continuity-band__copy">
+        <p class="eyebrow">Platform spread</p>
+        <h2 class="editorial-title">Continuity stays cross-device, but the public rail only shows safe aggregate proof.</h2>
+        <p class="editorial-copy">@Model.PlatformSummary</p>
+    </div>
+    <div class="continuity-band__panel">
+        @foreach (var platform in Model.PlatformLabels)
+        {
+            <article class="continuity-band__fact">
+                <span>Observed platform</span>
+                <strong>@platform</strong>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Continuity receipts</p>
+        <h2 class="editorial-title">Download the receipt before trusting the continuity story.</h2>
+        <p class="editorial-copy">These receipts expose a bounded continuity contract: aggregate install posture, reconnect handoff, and the public/private boundary around deeper runboard state.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var receipt in Model.Receipts)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@receipt.Status</span>
+                <h3>@receipt.Topic</h3>
+                <p>@receipt.Summary</p>
+                <div class="route-choice-card__proof">
+                    <span>@receipt.ReceiptId</span>
+                    <span>@receipt.Route</span>
+                </div>
+                <a class="editorial-strip__action" href="@receipt.Route">Open receipt JSON</a>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.TrustPulse is not null)
+{
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+    </section>
+}

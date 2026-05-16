@@ -33,14 +33,22 @@ public sealed record HubUserExperienceDto(
     bool BetaInterest,
     bool OnboardingCompleted,
     DateTimeOffset? OnboardingCompletedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    bool ImpactCloseoutNotifications = false,
+    bool PublicContributionProfileOptIn = false,
+    bool BlackLedgerNewsEmail = false,
+    IReadOnlyList<string>? BlackLedgerWorldsFollowed = null);
 
 public sealed record UpsertHubUserExperienceRequest(
     [StringLength(128)] string? SubjectId,
     IReadOnlyList<string>? LaneInterests = null,
     bool? FollowHorizons = null,
     bool? BetaInterest = null,
-    bool? OnboardingCompleted = null);
+    bool? OnboardingCompleted = null,
+    bool? ImpactCloseoutNotifications = null,
+    bool? PublicContributionProfileOptIn = null,
+    bool? BlackLedgerNewsEmail = null,
+    IReadOnlyList<string>? BlackLedgerWorldsFollowed = null);
 
 public sealed record GroupRoleDto(
     string Role,

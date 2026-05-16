@@ -1,9 +1,12 @@
 using Chummer.Run.Api.Services;
+using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.KarmaForge;
 using Chummer.Run.Api.Contracts;
 using Chummer.Campaign.Contracts;
 using Chummer.Control.Contracts.Support;
+using Chummer.Run.Contracts.Boosters;
 using Chummer.Run.Contracts.Community;
+using Chummer.Run.Contracts.Ledger;
 using Chummer.Hub.Registry.Contracts;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.Leaderboards;
@@ -164,6 +167,203 @@ public sealed record FlagshipCoverageStripViewModel(
     string Intro,
     IReadOnlyList<FlagshipCoverageCardViewModel> Cards);
 
+public sealed record BlackLedgerPublicStatViewModel(
+    string Id,
+    string Title,
+    string Value,
+    string Scope,
+    string ScopeKey,
+    string Period,
+    string SampleSize,
+    int SampleCount,
+    string Confidence,
+    string ConfidenceKey,
+    string PrivacyNote,
+    string Source,
+    BlackLedgerPublicStatSourceViewModel SourceDetail,
+    string Status,
+    string Href);
+
+public sealed record BlackLedgerPublicStatSourceViewModel(
+    string Kind,
+    string Label,
+    string ProvenanceSummary,
+    bool PreviewOnly,
+    bool PublicSafe);
+
+public sealed record BlackLedgerModuleViewModel(
+    string Id,
+    string Title,
+    string Summary,
+    string Href,
+    string StatusLabel);
+
+public sealed record BlackLedgerCloseoutViewModel(
+    string Title,
+    string Summary,
+    string Href,
+    string StatusLabel);
+
+public sealed record BlackLedgerDistrictViewModel(
+    string Id,
+    string Name,
+    string PolygonPoints,
+    string DominantFaction,
+    int Influence,
+    int Heat,
+    string Summary,
+    int CenterX,
+    int CenterY,
+    int Confidence,
+    int Volatility,
+    string Trend,
+    int DeltaSinceLastTick);
+
+public sealed record BlackLedgerFactionViewModel(
+    string Id,
+    string PublicName,
+    string Type,
+    string FactionLeader,
+    string FieldGm,
+    string IntelProvider,
+    IReadOnlyList<string> PublicSignals,
+    string ColorPrimary,
+    string ColorSecondary,
+    string Icon);
+
+public sealed record BlackLedgerMapModeViewModel(
+    string Id,
+    string Label,
+    string Summary,
+    bool Active);
+
+public sealed record BlackLedgerMapEventViewModel(
+    string EventId,
+    string EventType,
+    string RegionId,
+    string Title,
+    string Summary,
+    int Severity,
+    int Confidence,
+    string Status,
+    int X,
+    int Y,
+    bool NewThisTurn,
+    string SourceReceiptId,
+    string SourceReceiptHref,
+    string? DispatchHref);
+
+public sealed record BlackLedgerMapArcViewModel(
+    string ArcId,
+    string SourceRegionId,
+    string TargetRegionId,
+    string ArcType,
+    int Intensity,
+    string Direction,
+    string Summary);
+
+public sealed record BlackLedgerMapReplayStepViewModel(
+    int Turn,
+    string Label,
+    string Summary,
+    bool Current);
+
+public sealed record BlackLedgerCommandMapViewModel(
+    string WorldId,
+    string RenderMode,
+    string CurrentMode,
+    IReadOnlyList<BlackLedgerMapModeViewModel> Modes,
+    IReadOnlyList<BlackLedgerMapEventViewModel> Events,
+    IReadOnlyList<BlackLedgerMapArcViewModel> Arcs,
+    IReadOnlyList<BlackLedgerMapReplayStepViewModel> ReplaySteps,
+    string AccessibilityNote,
+    string PerformanceNote,
+    string PublicSafetyNote);
+
+public sealed record BlackLedgerTickEffectViewModel(
+    string Target,
+    string Metric,
+    int Delta,
+    string PublicReason);
+
+public sealed record BlackLedgerTickReceiptViewModel(
+    string WorldId,
+    int Turn,
+    string ReceiptId,
+    string Mode,
+    string Summary,
+    string InputStateHash,
+    string DecisionPacketHash,
+    bool PrivacyPassed,
+    IReadOnlyList<string> BlockedFields,
+    string OutputStateHash,
+    string CreatedAtUtc,
+    IReadOnlyList<BlackLedgerTickEffectViewModel> Effects);
+
+public sealed record BlackLedgerTurnNavigationViewModel(
+    int Turn,
+    string Label,
+    string Href,
+    bool Current,
+    bool PreviewOnly);
+
+public sealed record BlackLedgerStewardshipPostViewModel(
+    string Id,
+    string PublicLabel,
+    string HolderType,
+    string FallbackPersonality,
+    string PublicSummary,
+    bool HumanOverrideAvailable);
+
+public sealed record BlackLedgerStewardshipTransferReceiptViewModel(
+    string ReceiptType,
+    string PostId,
+    string OldHolder,
+    string NewHolder,
+    string NewHolderType,
+    string OccurredAt,
+    string Reason,
+    string OperatorId,
+    string PublicVisibility);
+
+public sealed record BlackLedgerDispatchViewModel(
+    string DispatchId,
+    string WorldId,
+    int Turn,
+    string Type,
+    string Scope,
+    string SourceReceiptId,
+    string SourceReceiptHref,
+    string Title,
+    string Summary,
+    string Body,
+    IReadOnlyList<string> InvolvedFactions,
+    IReadOnlyList<string> InvolvedDistricts,
+    IReadOnlyList<string> PackagePressureLinks,
+    string PrivacyStatus,
+    string GeneratedBy,
+    string HumanReviewStatus,
+    string CreatedAtUtc,
+    bool PublicSafe,
+    bool AiGenerated,
+    string Href);
+
+public sealed record BlackLedgerWorldPreviewViewModel(
+    string WorldId,
+    string PublicName,
+    string Status,
+    int CurrentTurn,
+    string TurnHeadline,
+    string SafetyNote,
+    string MapNote,
+    bool DeterministicPreview,
+    IReadOnlyList<BlackLedgerTurnNavigationViewModel> TurnNavigation,
+    IReadOnlyList<BlackLedgerDistrictViewModel> Districts,
+    IReadOnlyList<BlackLedgerFactionViewModel> Factions,
+    IReadOnlyList<BlackLedgerStewardshipPostViewModel> StewardshipPosts,
+    BlackLedgerStewardshipTransferReceiptViewModel? StewardshipTransferPreview,
+    BlackLedgerTickReceiptViewModel? LastTick);
+
 public sealed record LandingPageViewModel(
     SiteChromeViewModel Chrome,
     PublicLandingSurfaceDto Surface,
@@ -182,8 +382,81 @@ public sealed record LandingPageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> ComingNext,
     IReadOnlyList<ResolvedPublicCardViewModel> Artifacts,
     FlagshipCoverageStripViewModel FlagshipCoverage,
+    IReadOnlyList<BlackLedgerPublicStatViewModel> BlackLedgerStats,
+    BlackLedgerWorldPreviewViewModel? BlackLedgerWorld = null,
+    BlackLedgerDispatchViewModel? LatestBlackLedgerDispatch = null,
     AccountCampaignSummary? CampaignSpine = null,
     PublicAccessPostureViewModel? AccessPosture = null);
+
+public sealed record BlackLedgerHubPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CurrentSection,
+    BlackLedgerWorldPreviewViewModel? World,
+    IReadOnlyList<BlackLedgerPublicStatViewModel> Stats,
+    IReadOnlyList<BlackLedgerModuleViewModel> Modules,
+    IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
+    IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
+    BlackLedgerDispatchViewModel? SelectedDispatch,
+    BlackLedgerCommandMapViewModel? CommandMap,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record AnarchyRunnerProfileViewModel(
+    string RunnerId,
+    string Handle,
+    string Concept,
+    string MetatypeOrIdentityTag,
+    IReadOnlyList<string> ArchetypeTags,
+    IReadOnlyList<string> NarrativeCues,
+    IReadOnlyList<string> Capabilities,
+    IReadOnlyList<string> ShadowAmps,
+    IReadOnlyList<string> GearTags,
+    IReadOnlyList<string> Contacts,
+    IReadOnlyList<string> Complications,
+    IReadOnlyList<string> FactionLinks,
+    string DebtHeat,
+    IReadOnlyList<string> LedgerFlags,
+    string Notes,
+    string RulesetId,
+    string VerdictLabel,
+    string PostureLabel);
+
+public sealed record AnarchyLedgerStatViewModel(
+    string Label,
+    string Value,
+    string Summary);
+
+public sealed record AnarchyExplainReceiptViewModel(
+    string ReceiptId,
+    string SourceReceiptId,
+    string RulesetId,
+    string Status,
+    IReadOnlyList<string> ProvenanceNotes,
+    string CreatedAtUtc);
+
+public sealed record AnarchyPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CurrentSection,
+    string RulesetId,
+    string VerdictLabel,
+    string ScopeLabel,
+    AnarchyRunnerProfileViewModel FeaturedProfile,
+    IReadOnlyList<AnarchyLedgerStatViewModel> LedgerStats,
+    IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
+    AnarchyExplainReceiptViewModel ExplainReceipt,
+    string ExportJson,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
 public sealed record StoryPageViewModel(
     SiteChromeViewModel Chrome,
@@ -280,6 +553,8 @@ public sealed record KarmaForgeIntakePageViewModel(
     string EntryLane,
     KarmaForgeDashboardSummary Dashboard,
     IReadOnlyList<string> DiscoverySteps,
+    IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages,
+    IReadOnlyList<JourneyProofEventRef> JourneyProofEventRefs,
     KarmaForgeIntakeFormViewModel Form,
     KarmaForgeTrackDefinition SelectedTrack,
     IReadOnlyList<KarmaForgeCandidateDecisionViewModel> CandidateDecisions,
@@ -295,6 +570,7 @@ public sealed record KarmaForgeIntakeFormViewModel(
     IReadOnlyList<string> ValidationErrors,
     IReadOnlyList<KarmaForgeOptionDefinition> TrackOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> RoleOptions,
+    IReadOnlyList<KarmaForgeOptionDefinition> EditionOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> TableTypeOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> RuleCategoryOptions,
     IReadOnlyList<KarmaForgeOptionDefinition> SeverityOptions,
@@ -341,6 +617,8 @@ public sealed record KarmaForgeSubmittedPageViewModel(
     string CandidateDecisionMeaning,
     string ReporterNextAction,
     string ConsentSummary,
+    IReadOnlyList<KarmaForgeExternalStageProjection> ExternalStages,
+    IReadOnlyList<JourneyProofEventRef> JourneyProofEventRefs,
     IReadOnlyList<string> Highlights,
     bool FollowUpAllowed,
     IReadOnlyList<string> NextQuestions,
@@ -650,6 +928,7 @@ public sealed record PublicSignalProjectionPacketViewModel(
     IReadOnlyList<string> CloseoutRequirements,
     string PublicWarning,
     IReadOnlyList<string> BoardTargets,
+    IReadOnlyList<JourneyProofEventRef> JourneyProofEventRefs,
     string PolicySource,
     string PipelineSource,
     string RegistrySource);
@@ -692,6 +971,7 @@ public sealed record PublicSignalWebhookReceiptViewModel(
     string HotFilterLabel,
     int HotFilterCount,
     string HotFilterSummary,
+    string PayloadSha256,
     DateTimeOffset ReceivedAtUtc,
     DateTimeOffset? ProviderOccurredAtUtc);
 
@@ -1048,8 +1328,12 @@ public sealed record PackageDetailPageViewModel(
     PackageReceiptCardViewModel? LatestVoteReceipt,
     PackageReceiptCardViewModel? LatestFollowReceipt,
     bool CanInteract,
+    bool CanRevokeVote,
+    bool CanRevokeFollow,
     string VoteActionHref,
     string FollowActionHref,
+    string? RevokeVoteActionHref,
+    string? RevokeFollowActionHref,
     string VoteActionLabel,
     string FollowActionLabel,
     TrustPageActionViewModel PrimaryAction,
@@ -1090,6 +1374,119 @@ public sealed record MobileProjectionPageViewModel(
     IReadOnlyList<MobileCapabilityCardViewModel> Capabilities,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record ReadyVerdictCardViewModel(
+    string RoleId,
+    string RoleLabel,
+    string Status,
+    string StatusLabel,
+    string Summary,
+    IReadOnlyList<string> BlockingReasons,
+    IReadOnlyList<string> ChangedSinceLastSession,
+    IReadOnlyList<TrustPageActionViewModel> Actions,
+    string NextBestScreen,
+    IReadOnlyList<string> ProofReceipts);
+
+public sealed record ReadyRoleKitViewModel(
+    string KitId,
+    string RoleLane,
+    string Label,
+    string Summary,
+    string DownloadHref,
+    IReadOnlyList<string> Highlights);
+
+public sealed record ReadyPacketAssetViewModel(
+    string RoleId,
+    string Label,
+    string Summary,
+    string MarkdownHref,
+    string JsonHref);
+
+public sealed record ReadyForTonightPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string VerdictSummary,
+    IReadOnlyList<string> SummaryPoints,
+    IReadOnlyList<ReadyVerdictCardViewModel> Verdicts,
+    IReadOnlyList<ReadyRoleKitViewModel> RoleKits,
+    IReadOnlyList<ReadyPacketAssetViewModel> Packets,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record KnowledgeFabricReceiptViewModel(
+    string ReceiptId,
+    string Topic,
+    string Summary,
+    string Provenance,
+    string Route,
+    string Status);
+
+public sealed record KnowledgeFabricPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    IReadOnlyList<string> SummaryPoints,
+    IReadOnlyList<KnowledgeFabricReceiptViewModel> Receipts,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record NexusPanReceiptViewModel(
+    string ReceiptId,
+    string Topic,
+    string Summary,
+    string Route,
+    string Status);
+
+public sealed record NexusPanContinuityPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string VerdictSummary,
+    string PlatformSummary,
+    IReadOnlyList<string> SummaryPoints,
+    int ActiveInstallationCount,
+    int ActiveGrantCount,
+    int PendingClaimCount,
+    int PendingBrowserCallbackCount,
+    IReadOnlyList<string> PlatformLabels,
+    IReadOnlyList<NexusPanReceiptViewModel> Receipts,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record MediaArtifactCardViewModel(
+    string Id,
+    string Label,
+    string Summary,
+    string MarkdownRoute,
+    string JsonRoute,
+    IReadOnlyList<string> Highlights);
+
+public sealed record MediaArtifactHorizonPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string BoundaryLine,
+    IReadOnlyList<string> SummaryPoints,
+    IReadOnlyList<MediaArtifactCardViewModel> Documents,
+    TrustPageActionViewModel PrimaryAction,
+    TrustPageActionViewModel SecondaryAction,
+    TrustPageActionViewModel TertiaryAction,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
@@ -1269,7 +1666,13 @@ public sealed record AccountPageViewModel(
     HubDraftDetailProjection? SelectedCreatorPublicationDraftDetail = null,
     HubPublicationReceipt? SelectedCreatorPublicationReceipt = null,
     SignedInTrustStatusPanelViewModel? SignedInTrustStatus = null,
-    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null);
+    PrivacyBoundaryPanelViewModel? PrivacyBoundary = null,
+    UserRecognitionSummaryDto? ParticipationRecognition = null,
+    SponsorSessionStatusDto? ParticipationSession = null,
+    IReadOnlyList<ContributionReceiptDto>? ParticipationReceipts = null,
+    IReadOnlyList<PublicPackageReceipt>? ParticipationPackageReceipts = null,
+    IReadOnlyList<KarmaForgeSubmissionProjection>? ParticipationKarmaSubmissions = null,
+    IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationActivityReceipts = null);
 
 public sealed record AuthPageViewModel(
     SiteChromeViewModel Chrome,

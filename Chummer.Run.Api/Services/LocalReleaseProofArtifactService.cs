@@ -110,6 +110,8 @@ public sealed class LocalReleaseProofArtifactService
         string relativePath = DefaultLocalProofRelativePath.Replace('/', Path.DirectorySeparatorChar);
         return new[]
             {
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "wwwroot", "proofs", "mac-codex-release", "HUB_LOCAL_RELEASE_PROOF.generated.json")),
+                Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "proofs", "mac-codex-release", "HUB_LOCAL_RELEASE_PROOF.generated.json")),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),

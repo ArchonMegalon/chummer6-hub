@@ -2,6 +2,7 @@
 @{
     var pageTitle = Model.CurrentSection switch
     {
+        "participation" => "Account · Participation",
         "support" => "Account · Support",
         "access" => "Account · Devices & access",
         "work" => "Account · Work",
@@ -11,6 +12,7 @@
     };
     var sectionTitle = Model.CurrentSection switch
     {
+        "participation" => "Participation",
         "support" => "Support",
         "access" => "Devices & access",
         "work" => "Work",
@@ -20,6 +22,7 @@
     };
     var sectionCopy = Model.CurrentSection switch
     {
+        "participation" => "Return to followed work, guided contribution receipts, and privacy-safe recognition from one calmer account rail.",
         "support" => "Open, track, and close support without leaving the account surface.",
         "access" => "Keep linked installs, access rights, and claim handoff in one calmer place.",
         "work" => "Campaign return, recent activity, and shared context stay here when you explicitly need them.",
@@ -79,12 +82,39 @@
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = telegramChannel is not null;
-    var showParticipationSection = Model.Experience.OnboardingCompleted || laneInterests.Count > 0 || Model.Experience.FollowHorizons || Model.Experience.BetaInterest;
+    var participationRecognition = Model.ParticipationRecognition;
+    var participationSession = Model.ParticipationSession;
+    var participationReceipts = (Model.ParticipationReceipts ?? Array.Empty<Chummer.Run.Contracts.Ledger.ContributionReceiptDto>()).Take(6).ToArray();
+    var participationPackageReceipts = (Model.ParticipationPackageReceipts ?? Array.Empty<Chummer.Run.Api.Services.PublicPackageReceipt>()).Take(6).ToArray();
+    var participationKarmaSubmissions = (Model.ParticipationKarmaSubmissions ?? Array.Empty<Chummer.Run.Api.Services.KarmaForge.KarmaForgeSubmissionProjection>()).Take(4).ToArray();
+    var participationActivityReceipts = (Model.ParticipationActivityReceipts ?? Array.Empty<Chummer.Run.Api.Services.Community.ParticipationOperatorNotificationReceipt>()).Take(6).ToArray();
+    var participationBadges = ((participationRecognition?.CurrentStatusBadges ?? Array.Empty<Chummer.Run.Contracts.Leaderboards.BadgeDto>())
+            .Concat(participationRecognition?.PersistentBadges ?? Array.Empty<Chummer.Run.Contracts.Leaderboards.BadgeDto>()))
+        .GroupBy(static badge => badge.Key, StringComparer.OrdinalIgnoreCase)
+        .Select(static group => group.First())
+        .Take(6)
+        .ToArray();
+    var packageFollowCount = participationPackageReceipts.Count(receipt => string.Equals(receipt.ActionKind, "follow", StringComparison.OrdinalIgnoreCase));
+    var packageVoteCount = participationPackageReceipts.Count(receipt => string.Equals(receipt.ActionKind, "vote", StringComparison.OrdinalIgnoreCase));
+    var showParticipationPage = string.Equals(Model.CurrentSection, "participation", StringComparison.OrdinalIgnoreCase);
+    var showParticipationSection = showParticipationPage
+        || Model.Experience.OnboardingCompleted
+        || laneInterests.Count > 0
+        || Model.Experience.FollowHorizons
+        || Model.Experience.BetaInterest
+        || Model.Experience.ImpactCloseoutNotifications
+        || Model.Experience.PublicContributionProfileOptIn
+        || participationPackageReceipts.Length > 0
+        || participationKarmaSubmissions.Length > 0
+        || participationReceipts.Length > 0
+        || participationActivityReceipts.Length > 0
+        || (participationRecognition?.LifetimePoints ?? 0) > 0;
     var showProfileSection = string.Equals(Model.CurrentSection, "profile", StringComparison.OrdinalIgnoreCase);
     var showSupportSection = string.Equals(Model.CurrentSection, "support", StringComparison.OrdinalIgnoreCase);
     var showAccessSection = string.Equals(Model.CurrentSection, "access", StringComparison.OrdinalIgnoreCase);
     var showWorkSection = string.Equals(Model.CurrentSection, "work", StringComparison.OrdinalIgnoreCase);
     var showSettingsSection = string.Equals(Model.CurrentSection, "settings", StringComparison.OrdinalIgnoreCase);
+    var showParticipationSettings = showParticipationPage || showSettingsSection;
     var showAdvancedSection = string.Equals(Model.CurrentSection, "advanced", StringComparison.OrdinalIgnoreCase);
     var showInlineAccountStatus = showAccessSection || showSupportSection;
     var showAccountStatusDrawer = Model.SignedInTrustStatus is not null && !showInlineAccountStatus;
@@ -4090,8 +4120,8 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Current release</span>
                                         <div class="app-rail__copy">
-                                            <h3>Current preview posture</h3>
-                                            <p>Point members to the live preview posture, current recommendation, and known caution state without translating repo status by hand.</p>
+                                            <h3>Current release posture</h3>
+                                            <p>Point members to the live release posture, current recommendation, and known caution state without translating repo status by hand.</p>
                                         </div>
                                         <a class="inline-link" href="/now">Open current release</a>
                                     </article>
@@ -4196,15 +4226,127 @@
             </details>
             }
 
-            @if (showSettingsSection && showParticipationSection)
+            @if (showParticipationSettings && showParticipationSection)
             {
-            <details class="details-drawer">
-            <summary>Participation</summary>
+            <details class="details-drawer" @(showParticipationPage ? "open" : null)>
+            <summary>@(showParticipationPage ? "Participation dashboard" : "Participation")</summary>
             <section id="participation" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Participation</h2>
-                    <p>Tell Chummer which parts of the product matter to you and which updates you actually want to hear about.</p>
+                    <p>Return to followed work, guided contribution receipts, and privacy-safe recognition without turning votes into product truth.</p>
                 </div>
+                <div class="settings-summary-list">
+                    <div class="settings-summary-row">
+                        <span>Participation state</span>
+                        <strong id="participationOverviewState">@(showParticipationSection ? "Configured" : "Available")</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Contribution cred</span>
+                        <strong>@((participationRecognition?.LifetimePoints ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture))</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Guided contribution</span>
+                        <strong>@(participationSession is null ? "Not started" : HumanizeStatus(participationSession.Status, "Active"))</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Public participation profile</span>
+                        <strong>@(Model.Experience.PublicContributionProfileOptIn ? "Opted in" : "Off")</strong>
+                    </div>
+                    <div class="settings-summary-row">
+                        <span>Impact closeout notifications</span>
+                        <strong>@(Model.Experience.ImpactCloseoutNotifications ? "Enabled" : "Off")</strong>
+                    </div>
+                </div>
+                @if (participationBadges.Length > 0)
+                {
+                    <div class="route-choice-card__proof">
+                        @foreach (var badge in participationBadges)
+                        {
+                            <span>@badge.Label</span>
+                        }
+                    </div>
+                }
+                <p class="muted-copy">Contribution cred follows proof, closeout, and useful follow-through. Votes show demand; Chummer-owned proof decides what ships. Public recognition stays off unless you opt in.</p>
+                <section class="compact-rail">
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>Followed work</h3>
+                            <p>@packageFollowCount package follow@(packageFollowCount == 1 ? string.Empty : "s"), @packageVoteCount package vote@(packageVoteCount == 1 ? string.Empty : "s"), and @(Model.Experience.FollowHorizons ? "roadmap updates enabled" : "roadmap updates off").</p>
+                        </div>
+                        <a class="editorial-strip__action" href="/packages">Open packages</a>
+                    </article>
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>KARMA FORGE</h3>
+                            <p>@participationKarmaSubmissions.Length recent submission@(participationKarmaSubmissions.Length == 1 ? string.Empty : "s"). Guided discovery stays separate from support and only moves after governed review.</p>
+                        </div>
+                        <a class="editorial-strip__action" href="/participate/karma-forge">Open KARMA FORGE</a>
+                    </article>
+                    <article class="compact-rail__item">
+                        <div class="compact-rail__copy">
+                            <h3>Guided contribution receipts</h3>
+                            <p>@participationReceipts.Length recent receipt@(participationReceipts.Length == 1 ? string.Empty : "s"), @(participationRecognition?.LandedSlices ?? 0) landed slice@(participationRecognition?.LandedSlices == 1 ? string.Empty : "s"), and @(participationRecognition?.ActiveSessionCount ?? 0) active session@(participationRecognition?.ActiveSessionCount == 1 ? string.Empty : "s").</p>
+                        </div>
+                        <a class="editorial-strip__action" href="/participate/codex">Open guided contribution</a>
+                    </article>
+                </section>
+                <section class="compact-rail">
+                    @if (participationPackageReceipts.Length == 0 && participationKarmaSubmissions.Length == 0 && participationReceipts.Length == 0 && participationActivityReceipts.Length == 0)
+                    {
+                        <article class="compact-rail__item">
+                            <div class="compact-rail__copy">
+                                <h3>Participation journal</h3>
+                                <p>Follow a package, join the beta waitlist, or start guided contribution to make this journal useful without exposing anything publicly by default.</p>
+                            </div>
+                        </article>
+                    }
+                    else
+                    {
+                        @foreach (var receipt in participationPackageReceipts)
+                        {
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Package @HumanizeStatus(receipt.ActionKind)</h3>
+                                    <p>@receipt.RouteSummary</p>
+                                    <p><strong>@receipt.PackageId</strong> · @receipt.RecordedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
+                                </div>
+                            </article>
+                        }
+                        @foreach (var submission in participationKarmaSubmissions)
+                        {
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>KARMA FORGE packet</h3>
+                                    <p>@submission.QueueSummary</p>
+                                    <p><strong>@submission.Packet.Title</strong> · @submission.SubmittedAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
+                                </div>
+                                <a class="editorial-strip__action" href="/participate/karma-forge/submitted/@submission.SubmissionId">Open receipt</a>
+                            </article>
+                        }
+                        @foreach (var receipt in participationReceipts)
+                        {
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Contribution receipt</h3>
+                                    <p>@HumanizeStatus(receipt.EventKind) · @receipt.ProjectId · @receipt.AuthorizationTierAtReceipt</p>
+                                    <p>@((receipt.EndedAtUtc ?? receipt.LandedAtUtc ?? receipt.StartedAtUtc) is DateTimeOffset occurredAtUtc
+                                        ? occurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)
+                                        : "Awaiting timestamp")</p>
+                                </div>
+                            </article>
+                        }
+                        @foreach (var activity in participationActivityReceipts)
+                        {
+                            <article class="compact-rail__item">
+                                <div class="compact-rail__copy">
+                                    <h3>Impact journal</h3>
+                                    <p>@(activity.Summary ?? "The internal follow-through bridge recorded a participation event receipt.")</p>
+                                    <p><strong>@HumanizeStatus(activity.EventType)</strong> · @activity.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
+                                </div>
+                            </article>
+                        }
+                    }
+                </section>
                 <form id="experienceForm" class="settings-form">
                     <div class="check-grid">
                         <label class="check-row"><input type="checkbox" value="player" @(laneInterests.Contains("player") ? "checked" : null) /> <span>Player</span></label>
@@ -4212,6 +4354,8 @@
                         <label class="check-row"><input type="checkbox" value="creator" @(laneInterests.Contains("creator") ? "checked" : null) /> <span>Creator</span></label>
                         <label class="check-row"><input id="followHorizons" type="checkbox" @(Model.Experience.FollowHorizons ? "checked" : null) /> <span>Follow roadmap updates</span></label>
                         <label class="check-row"><input id="betaInterest" type="checkbox" @(Model.Experience.BetaInterest ? "checked" : null) /> <span>Invite me when the right beta opens</span></label>
+                        <label class="check-row"><input id="impactCloseoutNotifications" type="checkbox" @(Model.Experience.ImpactCloseoutNotifications ? "checked" : null) /> <span>Send me closeout updates when something I followed actually changes</span></label>
+                        <label class="check-row"><input id="publicContributionProfileOptIn" type="checkbox" @(Model.Experience.PublicContributionProfileOptIn ? "checked" : null) /> <span>Allow public participation recognition if my account visibility is already public</span></label>
                     </div>
                     <button class="button-like button-like--primary" type="submit">Save participation settings</button>
                     <p id="experienceStatusNotice" class="muted-copy" hidden></p>
@@ -4749,6 +4893,8 @@
         laneInterests,
         followHorizons: document.getElementById("followHorizons").checked,
         betaInterest: document.getElementById("betaInterest").checked,
+        impactCloseoutNotifications: document.getElementById("impactCloseoutNotifications").checked,
+        publicContributionProfileOptIn: document.getElementById("publicContributionProfileOptIn").checked,
         onboardingCompleted: true
         }
       });

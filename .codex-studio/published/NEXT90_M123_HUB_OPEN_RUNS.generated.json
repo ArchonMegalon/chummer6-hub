@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer6-hub.next90_m123_hub_open_runs",
-  "status": "passed",
-  "proof_kind": "source_backed_local_smoke_contract",
+  "status": "superseded_by_open_run_loop",
+  "proof_kind": "compatibility_redirect",
   "package_proof": {
     "package_id": "next90-m123-hub-build-openrun-listing-join-request-roster-schedule-meeti",
     "work_task_id": "123.1",
@@ -22,24 +22,16 @@
     ]
   },
   "source_file": "tests/RunServicesSmoke/Program.cs",
-  "surfaces_passed": [
-    "build_openrun_listing_join_request:hub",
-    "meeting_handoff_closeout:hub"
-  ],
-  "missing_markers": {},
-  "required_markers": {
-    "build_openrun_listing_join_request:hub": [
-      "var openRunsResult = await campaignSpineController.GetMyOpenRuns(CancellationToken.None);",
-      "new OpenRunJoinRequestRequest(",
-      "var openRunRosterDecisionResult = await campaignSpineController.ReviewMyOpenRunJoinRequest(",
-      "var openRunScheduleResult = await campaignSpineController.ScheduleMyOpenRun("
-    ],
-    "meeting_handoff_closeout:hub": [
-      "var openRunMeetingHandoffResult = await campaignSpineController.PublishMyOpenRunMeetingHandoff(",
-      "new OpenRunMeetingHandoffRequest(",
-      "var openRunCloseoutResult = await campaignSpineController.CloseOutMyOpenRun(",
-      "Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"open_run\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should add open-run coordination packets into the bounded what-changed rail.\");"
-    ]
+  "superseded_by": {
+    "contract_name": "chummer6-hub.next90_m123_hub_open_run_loop",
+    "proof_file": ".codex-studio/published/NEXT90_M123_HUB_OPEN_RUN_LOOP.generated.json",
+    "materializer": "scripts/materialize_next90_m123_hub_open_run_loop_proof.py",
+    "verifier": "scripts/verify_next90_m123_hub_open_run_loop.py",
+    "test": "tests/test_next90_m123_hub_open_run_loop.py"
   },
-  "generated_at": "2026-05-05T21:16:55Z"
+  "delegated_contract": {
+    "contract_name": "chummer6-hub.next90_m123_hub_open_run_loop",
+    "status": "passed",
+    "proof_kind": "source_backed_local_smoke_contract"
+  }
 }

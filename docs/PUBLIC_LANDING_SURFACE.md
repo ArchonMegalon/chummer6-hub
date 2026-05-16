@@ -35,8 +35,6 @@ Front-door and proof rails:
 - `/artifacts`
 - `/join/concierge`
 - `/join/primer`
-- `/artifacts/publications/{publicationId}/concierge`
-- `/testimonials/concierge`
 
 Direction, signal, and shipped-closeout rails:
 
@@ -44,7 +42,10 @@ Direction, signal, and shipped-closeout rails:
 - `/roadmap` for milestone-backed public direction
 - `/feedback` for safe public signal and votes
 - `/changelog` for shipped closeout
+- `/ledger`
+- `/black-ledger`
 - `/participate`
+- `/karma-forge`
 - `/participate/karma-forge`
 - `/participate/karma-forge/submitted/{submissionId}`
 - `/feedback/operations`
@@ -64,6 +65,7 @@ Help, policy, and signed-in overlays:
 - `/logout`
 - `/home`
 - `/account`
+- `/account/participation`
 - `/account/packages`
 - `/account/packages/{packageId}`
 - `/admin/packages`
@@ -74,16 +76,24 @@ Package routes are intentionally split across public browser, account tracking, 
 `/mobile`, `/pwa`, `/play`, `/player`, `/gm`, `/observer`, and the legacy `/session` alias keep installability, reconnect posture, and role-aware mobile entry on first-party routes instead of leaving them implicit in docs.
 `/downloads/concierge`, `/now/concierge`, `/contact/concierge`, and `/join/concierge` are bounded wrapper routes: optional guided branching may appear there, but download truth, release truth, support truth, account truth, and governed invite follow-through remain first-party Hub rails.
 `/join/primer` keeps first-session invite orientation on a first-party page instead of hiding it behind support, booking, or publication surfaces.
-`/artifacts/publications/{publicationId}/concierge` and `/testimonials/concierge` extend that same posture into creator consult routing and moderated public-proof capture without turning publication pages, testimonials, or public media lanes into support or install truth.
+Discoverable publication pages may still open bounded creator or moderated public-proof follow-up wrappers without turning publication pages, testimonials, or public media lanes into support or install truth.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.
 `/horizons` and `/roadmap` are intentionally separate: horizons stay the deeper readiness shelf, while roadmap stays the public milestone and direction rail.
 `/feedback`, `/roadmap`, and `/changelog` are also intentionally separate so public signal, projected movement, and shipped proof do not collapse into one vague route family.
+
+## Route family posture
+
+- `packages`: launch-present public browser routes with live strict proof required before flagship claims.
+- `mobile_pwa_play`: preview-present public install and play projection routes with live strict proof required before flagship claims.
+- `account_packages`: registered-only package tracking routes that stay out of public launch claims.
+- `admin_packages`: operator-only package summary route that stays out of public manifest claims.
 
 ## Source of truth
 
 The hosted landing surface reads mirrored design canon from:
 
 - `.codex-design/product/PUBLIC_LANDING_MANIFEST.yaml`
+- `.codex-design/product/PUBLIC_ROUTE_FAMILY_RECONCILIATION.yaml`
 - `.codex-design/product/PUBLIC_FEATURE_REGISTRY.yaml`
 - `.codex-design/product/PUBLIC_LANDING_ASSET_REGISTRY.yaml`
 - `.codex-design/product/PUBLIC_PROGRESS_PARTS.yaml`
