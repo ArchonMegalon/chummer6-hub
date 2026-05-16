@@ -659,6 +659,7 @@ public sealed class PublicLandingDownloadDispatchTests
 	                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
 	                blackLedgerStats: blackLedgerStats,
                 blackLedgerDispatches: blackLedgerDispatches,
+                blackLedgerFactions: new BlackLedgerFactionOnboardingService(Configuration, blackLedgerStats),
                 anarchyPreview: anarchyPreview,
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: null!,

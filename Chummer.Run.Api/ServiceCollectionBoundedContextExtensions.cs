@@ -37,6 +37,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<KarmaForgeDiscoveryService>();
         services.AddSingleton<BlackLedgerPublicStatsService>();
         services.AddSingleton<BlackLedgerDispatchService>();
+        services.AddSingleton<BlackLedgerFactionOnboardingService>();
         services.AddSingleton<AnarchyPreviewService>();
         services.AddSingleton<TeableKarmaForgeReviewBoardService>();
         services.AddHostedService<TeableKarmaForgeReviewBoardSyncWorker>();
