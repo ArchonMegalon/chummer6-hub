@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Chummer6 Avalonia Desktop
+Exec=/usr/bin/chummer6-avalonia
+Terminal=false
+Categories=Game;
+StartupNotify=true
