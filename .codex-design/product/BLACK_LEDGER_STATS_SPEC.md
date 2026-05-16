@@ -30,6 +30,8 @@ Required preview-ready examples:
 - MysAd density
 - Debt Heat
 - Package pressure
-- Chaos index
+
+Current public homepage preview is intentionally capped at three stats to preserve the no-noise contract.
+`Chaos index` is not part of the current public homepage stat floor.
 
 The homepage and `/ledger` must read from the same governed model.

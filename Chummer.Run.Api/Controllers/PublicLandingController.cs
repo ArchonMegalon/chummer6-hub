@@ -1966,13 +1966,14 @@ public sealed class PublicLandingController : Controller
         [FromForm] string? rivalFactionId,
         [FromForm] string[] perkIds,
         [FromForm] string[] flawIds,
+        [FromForm] bool? warningAccepted,
         CancellationToken cancellationToken)
     {
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var charter = _blackLedgerFactions.CreateFaction(user, new BlackLedgerCreateFactionRequest(publicName, charterType, archetypeId, perkIds, flawIds, startingDistrictId, rivalFactionId));
+            var charter = _blackLedgerFactions.CreateFaction(user, new BlackLedgerCreateFactionRequest(publicName, charterType, archetypeId, perkIds, flawIds, startingDistrictId, rivalFactionId, warningAccepted));
             return Redirect($"/account/ledger/factions/{charter.FactionId.Replace('_', '-')}");
         }
         catch (Exception ex) when (ex is HubRequestAuthException or InvalidOperationException)
@@ -8735,18 +8736,24 @@ echo "Help: ${HELP_URL}"
             .Where(district => string.Equals(district.DominantFaction.Replace(' ', '-'), normalizedFactionId, StringComparison.OrdinalIgnoreCase))
             .Select(district => district.Name)
             .ToArray();
-        var privateLabels = new[]
-        {
-            $"{faction.PublicName} internal tag",
-            $"{faction.PublicName} district pressure lane",
-            $"{faction.PublicName} lore overlay alpha",
-        };
-        var privateLoreNotes = new[]
-        {
-            "Private labels can exist on authenticated campaign routes only.",
-            "Public Black Ledger pages never render these labels or account-linked overlays.",
-            "The private-lore API receipt stays non-projecting by contract.",
-        };
+        var workspaceSummary = _campaignSpine.GetAccountSummary(user);
+        string? campaignId = workspaceSummary.Workspaces.FirstOrDefault()?.CampaignId
+            ?? workspaceSummary.Campaigns.FirstOrDefault()?.CampaignId;
+        BlackLedgerPrivateLoreOverlayDto? overlay = string.IsNullOrWhiteSpace(campaignId)
+            ? null
+            : _blackLedgerFactions.GetPrivateLoreOverlay(campaignId, faction.Id);
+        var privateLabels = overlay?.LabelMap?.Values?.Where(static label => !string.IsNullOrWhiteSpace(label)).Take(6).ToArray()
+            ?? [$"{faction.PublicName} campaign alias", $"{faction.PublicName} safehouse codename", $"{faction.PublicName} pressure lane beta"];
+        var privateLoreNotes = (overlay?.Notes?.Count > 0
+                ? overlay.Notes
+                : new[]
+                {
+                    "Private labels can exist on authenticated campaign routes only.",
+                    "Public Black Ledger pages never render these labels or account-linked overlays.",
+                    "The private-lore API receipt stays non-projecting by contract.",
+                })
+            .Take(6)
+            .ToArray();
         var tabs = new[]
         {
             new BlackLedgerFactionWorkspaceTabViewModel("Overview", $"/account/ledger/factions/{normalizedFactionId}", string.Equals(currentSection, "overview", StringComparison.OrdinalIgnoreCase)),

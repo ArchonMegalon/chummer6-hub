@@ -10,23 +10,31 @@ required = [
     "BLACK_LEDGER_FACTION_PAGES.generated.json",
     "BLACK_LEDGER_FACTION_ACTIONS.generated.json",
     "BLACK_LEDGER_FACTION_NO_NOISE.generated.json",
+    "BLACK_LEDGER_PRIVATE_LORE_LEAK_SCAN.generated.json",
+    "BLACK_LEDGER_FACTION_NAME_SAFETY.generated.json",
+    "BLACK_LEDGER_FACTION_ACTION_REDUCER.generated.json",
 ]
 
 status = "BLACK_LEDGER_FACTION_ONBOARDING_READY"
+failures = []
 for path in required:
     file = base / path
     if not file.exists():
         status = "NOT_READY"
+        failures.append(f"missing:{path}")
         break
     try:
         data = json.loads(file.read_text())
         if data.get("status") != "pass":
             status = "NOT_READY"
+            failures.append(f"failed:{path}")
             break
     except Exception:
         status = "NOT_READY"
+        failures.append(f"invalid:{path}")
         break
 
 verdict = base / "FINAL_BLACK_LEDGER_FACTION_ONBOARDING_VERDICT.md"
-verdict.write_text(status + "\n")
+body = status if not failures else status + "\n" + "\n".join(failures) + "\n"
+verdict.write_text(body)
 print(status)
