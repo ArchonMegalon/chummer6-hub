@@ -39,25 +39,26 @@ OUT = Path(
 
 REQUIRED_MARKERS = {
     "implement_campaign_adoption_wizard_state:hub": [
-        "var adoptionResult = await campaignSpineController.RecordMyCampaignAdoption(",
-        "new CampaignAdoptionWizardRequest(",
-        'Assert(refreshedWorkspaceServerPlanePayload?.CampaignAdoption is not null, "campaign spine server plane api should project campaign-adoption receipts after adoption.");',
-        'Assert(string.Equals(refreshedWorkspaceServerPlanePayload?.CampaignAdoption?.Status, "playable_with_review", StringComparison.Ordinal), "campaign spine server plane api should keep the current adoption status on the shared server-plane rail.");',
+        "var campaignAdoptionResult = await campaignSpineController.UpsertMyCampaignWorkspaceCampaignAdoption(",
+        "new CampaignAdoptionUpdateRequest(",
+        'Assert(campaignAdoptionPayload is not null && campaignAdoptionPayload.SafeToPlay, "campaign spine campaign-adoption api should persist the adoption wizard posture for the governed workspace.");',
+        'Assert(m122WorkspaceServerPlanePayload?.CampaignAdoptionLoop is not null, "campaign spine server plane api should project the combined campaign adoption loop on the bounded workspace plane.");',
     ],
     "runner_goal_persistence:hub": [
-        "var runnerGoalResult = await campaignSpineController.UpsertMyRunnerGoal(",
-        "new RunnerGoalUpsertRequest(",
-        'Assert(string.Equals(runnerGoalPayload!.UpdateKind, "downtime_reward", StringComparison.Ordinal), "campaign spine runner-goal api should preserve the normalized update kind.");',
-        'Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)) == true, "campaign spine server plane api should add runner-goal receipts into the bounded what-changed packet rail.");',
+        "var runnerGoalResult = await campaignSpineController.UpsertMyCampaignWorkspaceRunnerGoal(",
+        "new RunnerGoalUpdateRequest(",
+        'Assert(runnerGoalPayload is not null && string.Equals(runnerGoalPayload.TargetReference, "wired_reflexes_delta", StringComparison.Ordinal), "campaign spine runner-goals api should persist the governed runner goal pin for the selected dossier.");',
+        'Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runner-goal pins onto the bounded what-changed rail.");',
     ],
     "resolution_report_approval_world_tick_news:hub": [
-        "var resolutionApprovalResult = await campaignSpineController.ApproveMyResolutionReport(",
+        "var resolutionReportApprovalResult = await campaignSpineController.ApproveMyCampaignWorkspaceResolutionReport(",
         "new ResolutionReportApprovalRequest(",
-        'Assert(resolutionApprovalPayload.EvidenceLines.Any(item => item.Contains("WorldTick receipt:", StringComparison.OrdinalIgnoreCase)), "campaign spine resolution-report approval api should persist the generated WorldTick receipt id.");',
-        'Assert(resolutionApprovalPayload.EvidenceLines.Any(item => item.Contains("Player-safe news item:", StringComparison.OrdinalIgnoreCase)), "campaign spine resolution-report approval api should persist the generated news-item receipt id.");',
-        'Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "resolution_report_approval", StringComparison.Ordinal)) == true, "campaign spine server plane api should add approved ResolutionReport receipts into the bounded what-changed packet rail.");',
-        'Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "world_tick", StringComparison.Ordinal)) == true, "campaign spine server plane api should add WorldTick receipts into the bounded what-changed packet rail.");',
-        'Assert(refreshedWorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "news_item", StringComparison.Ordinal)) == true, "campaign spine server plane api should add player-safe news items into the bounded what-changed packet rail.");',
+        'Assert(!string.IsNullOrWhiteSpace(resolutionReportApprovalPayload.WorldTickId), "campaign spine resolution-report-approvals api should project the first WorldTick receipt.");',
+        'Assert(!string.IsNullOrWhiteSpace(resolutionReportApprovalPayload.NewsId), "campaign spine resolution-report-approvals api should project the first player-safe news receipt.");',
+        'Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "resolution_report_approval", StringComparison.Ordinal)) == true, "campaign spine server plane api should project ResolutionReport approvals onto the bounded what-changed rail.");',
+        'Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "world_tick", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the first BLACK LEDGER WorldTick onto the bounded what-changed rail.");',
+        'Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "player_safe_news", StringComparison.Ordinal)) == true, "campaign spine server plane api should project player-safe news previews onto the bounded what-changed rail.");',
+        'Assert(reloadedAdoptionLoop.PlayerSafeNews.Any(item => item.Title.Contains("Tacoma grid rumor", StringComparison.Ordinal)), "campaign spine adoption loop should preserve the player-safe news preview across reload.");',
     ],
 }
 

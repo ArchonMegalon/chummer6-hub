@@ -89,6 +89,13 @@
                     @Html.AntiForgeryToken()
                     <button class="button-like button-like--primary" type="submit">@Model.VoteActionLabel</button>
                 </form>
+                @if (Model.CanRevokeVote && !string.IsNullOrWhiteSpace(Model.RevokeVoteActionHref))
+                {
+                    <form method="post" action="@Model.RevokeVoteActionHref">
+                        @Html.AntiForgeryToken()
+                        <button class="button-like button-like--ghost" type="submit">Revoke vote</button>
+                    </form>
+                }
             }
             else
             {
@@ -109,6 +116,13 @@
                     @Html.AntiForgeryToken()
                     <button class="button-like button-like--secondary" type="submit">@Model.FollowActionLabel</button>
                 </form>
+                @if (Model.CanRevokeFollow && !string.IsNullOrWhiteSpace(Model.RevokeFollowActionHref))
+                {
+                    <form method="post" action="@Model.RevokeFollowActionHref">
+                        @Html.AntiForgeryToken()
+                        <button class="button-like button-like--ghost" type="submit">Revoke follow</button>
+                    </form>
+                }
             }
             else
             {

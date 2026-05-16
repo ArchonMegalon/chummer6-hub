@@ -123,6 +123,7 @@ def run(base_url: str) -> int:
         "hits": hits,
     }
     write_json(completion_path("PUBLIC_PROVIDER_LEAK_SCAN.generated.json"), payload)
+    write_json(completion_path("PUBLIC_OPERATOR_LEAK_SCAN.generated.json"), payload)
 
     lines = [
         "# Janitor deployed HTML report",
@@ -149,7 +150,9 @@ def run(base_url: str) -> int:
             for hit in hits[:50]
         )
 
-    write_text(completion_path("JANITOR_DEPLOYED_HTML_REPORT.md"), "\n".join(lines))
+    report = "\n".join(lines)
+    write_text(completion_path("JANITOR_DEPLOYED_HTML_REPORT.md"), report)
+    write_text(completion_path("PUBLIC_OPERATOR_LEAK_SCAN.md"), report)
     return 0 if passed else 1
 
 

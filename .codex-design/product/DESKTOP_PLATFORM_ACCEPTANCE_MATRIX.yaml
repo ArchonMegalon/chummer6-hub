@@ -17,7 +17,7 @@ head_policies:
       - Avalonia is treated as primary but the public shelf silently routes users to another head without explicit bounded fallback wording.
 platforms:
   - id: windows
-    public_shelf_status: promoted_preview
+    public_shelf_status: promoted_release
     primary_package_kind: installer
     fallback_package_kinds:
       - portable_exe
@@ -26,7 +26,7 @@ platforms:
     updater_mode: in_app_apply_helper
     supportability: primary
   - id: linux
-    public_shelf_status: preview_support_directed
+    public_shelf_status: support_directed_release
     primary_package_kind: deb
     fallback_package_kinds:
       - archive
@@ -35,13 +35,13 @@ platforms:
     updater_mode: in_app_or_installer_handoff
     supportability: secondary
   - id: macOS
-    public_shelf_status: account_gated_setup_script_preview
+    public_shelf_status: account_gated_setup_script_release
     primary_package_kind: setup_script
     fallback_package_kinds:
       - none
     startup_smoke_gate: required
     signing_posture: codesign_and_notarization_required
     updater_mode: claimed_setup_script_then_dmg_handoff
-    supportability: account_gated_setup_script_preview
-    public_manifest_visibility: visible_as_account_gated_setup_script_preview
-    public_promotion_gate: account_gated_setup_script_with_bounded_preview_truth
+    supportability: account_gated_setup_script_release
+    public_manifest_visibility: visible_as_account_gated_setup_script_release
+    public_promotion_gate: account_gated_setup_script_with_bounded_release_truth

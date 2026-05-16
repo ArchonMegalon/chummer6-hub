@@ -239,6 +239,13 @@ WORK_QUEUE.md
 # Local agent and worker artifacts
 .agent-memory.md
 
+# Generated audit/browser payloads
+/.codex-studio/out/
+
+# Generated release shelf backups and startup-smoke artifacts
+/Chummer.Portal/downloads-backups/
+/Chummer.Portal/downloads/startup-smoke/
+
 # Generated installer payloads
 /Chummer.Portal/downloads/files/*.deb
 /Chummer.Portal/downloads/files/*.dmg

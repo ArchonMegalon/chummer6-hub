@@ -209,6 +209,15 @@ public_routes:
     must_exist: true
     placeholder_allowed: false
     placeholder_requirements: bounded role-aware play entry only
+  - path: /play/continuity
+    title: NEXUS-PAN continuity
+    audience: public
+    purpose: continuity_projection
+    requires_auth: false
+    guest_fallback: /play/continuity
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public-safe claimed install, reconnect, and receipt rail only
   - path: /player
     title: Player alias
     audience: public
@@ -248,6 +257,281 @@ public_routes:
     verification_mode: controller_contract
     verification_file: Chummer.Run.Api/Controllers/PublicLandingController.cs
     verification_pattern: '[HttpGet("/anarchy")]'
+  - path: /ready
+    title: Ready for Tonight
+    audience: public
+    purpose: session_start_mvp
+    requires_auth: false
+    guest_fallback: /ready
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: shipped first-party verdict, packet, and handoff rail
+  - path: /tonight
+    title: Tonight alias
+    audience: public
+    purpose: session_start_preview
+    requires_auth: false
+    guest_fallback: /tonight
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: alias into ready-for-tonight preview only
+  - path: /rules
+    title: Knowledge Fabric
+    audience: public
+    purpose: source_aware_explain_preview
+    requires_auth: false
+    guest_fallback: /rules
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: source-aware explain preview only
+  - path: /knowledge
+    title: Knowledge alias
+    audience: public
+    purpose: source_aware_explain_preview
+    requires_auth: false
+    guest_fallback: /knowledge
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: alias into knowledge fabric preview only
+  - path: /jackpoint
+    title: JACKPOINT
+    audience: public
+    purpose: dossier_packet_preview
+    requires_auth: false
+    guest_fallback: /jackpoint
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public-safe dossier and mission-brief packet rail only
+  - path: /briefings
+    title: Briefings alias
+    audience: public
+    purpose: dossier_packet_preview
+    requires_auth: false
+    guest_fallback: /briefings
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: alias into briefing preview only
+  - path: /jackpoint/briefings/{briefingId}.md
+    title: JACKPOINT briefing markdown
+    audience: public
+    purpose: dossier_packet_preview
+    requires_auth: false
+    guest_fallback: /jackpoint/briefings/{briefingId}.md
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: player-safe dossier markdown only
+    verification_path: /jackpoint/briefings/emerald-sprawl-briefing.md
+  - path: /jackpoint/briefings/{briefingId}.json
+    title: JACKPOINT briefing JSON
+    audience: public
+    purpose: dossier_packet_preview
+    requires_auth: false
+    guest_fallback: /jackpoint/briefings/{briefingId}.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: player-safe dossier json only
+    verification_path: /jackpoint/briefings/emerald-sprawl-briefing.json
+  - path: /runsites
+    title: RUNSITE
+    audience: public
+    purpose: runsite_packet_preview
+    requires_auth: false
+    guest_fallback: /runsites
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: runsite packet, pressure, and site-card rail only
+  - path: /runsites/packs/{packId}.md
+    title: RUNSITE pack markdown
+    audience: public
+    purpose: runsite_packet_preview
+    requires_auth: false
+    guest_fallback: /runsites/packs/{packId}.md
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: site packet markdown only
+    verification_path: /runsites/packs/redmond-dockyard-pack.md
+  - path: /runsites/packs/{packId}.json
+    title: RUNSITE pack JSON
+    audience: public
+    purpose: runsite_packet_preview
+    requires_auth: false
+    guest_fallback: /runsites/packs/{packId}.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: site packet json only
+    verification_path: /runsites/packs/redmond-dockyard-pack.json
+  - path: /runbook
+    title: RUNBOOK PRESS
+    audience: public
+    purpose: primer_packet_preview
+    requires_auth: false
+    guest_fallback: /runbook
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: printable primer and onboarding packet rail only
+  - path: /runbook/primers/{primerId}.md
+    title: RUNBOOK primer markdown
+    audience: public
+    purpose: primer_packet_preview
+    requires_auth: false
+    guest_fallback: /runbook/primers/{primerId}.md
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: printable primer markdown only
+    verification_path: /runbook/primers/new-runner-primer.md
+  - path: /runbook/primers/{primerId}.json
+    title: RUNBOOK primer JSON
+    audience: public
+    purpose: primer_packet_preview
+    requires_auth: false
+    guest_fallback: /runbook/primers/{primerId}.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: printable primer json only
+    verification_path: /runbook/primers/new-runner-primer.json
+  - path: /primers
+    title: Primers alias
+    audience: public
+    purpose: primer_packet_preview
+    requires_auth: false
+    guest_fallback: /primers
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: alias into primer preview only
+  - path: /community
+    title: Community Hub
+    audience: public
+    purpose: community_hub_mvp
+    requires_auth: false
+    guest_fallback: /community
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: open-run board and moderation packet hub only
+  - path: /community/open-runs/{packetId}.md
+    title: Community Hub packet markdown
+    audience: public
+    purpose: community_hub_mvp
+    requires_auth: false
+    guest_fallback: /community/open-runs/{packetId}.md
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party community packet markdown only
+    verification_path: /community/open-runs/open_run_board.md
+  - path: /community/open-runs/{packetId}.json
+    title: Community Hub packet JSON
+    audience: public
+    purpose: community_hub_mvp
+    requires_auth: false
+    guest_fallback: /community/open-runs/{packetId}.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party community packet json only
+    verification_path: /community/open-runs/open_run_board.json
+  - path: /runs
+    title: Open Run alias
+    audience: public
+    purpose: community_preview
+    requires_auth: false
+    guest_fallback: /runs
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: alias into community preview only
+  - path: /organizers
+    title: Organizers alias
+    audience: public
+    purpose: community_preview
+    requires_auth: false
+    guest_fallback: /organizers
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: alias into community preview only
+  - path: /creator
+    title: Creator OS
+    audience: public
+    purpose: creator_os_mvp
+    requires_auth: false
+    guest_fallback: /creator
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: governed creator publication hub only
+  - path: /creator/packets/{packetId}.md
+    title: Creator OS packet markdown
+    audience: public
+    purpose: creator_os_mvp
+    requires_auth: false
+    guest_fallback: /creator/packets/{packetId}.md
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: governed creator packet markdown only
+    verification_path: /creator/packets/publication_board.md
+  - path: /creator/packets/{packetId}.json
+    title: Creator OS packet JSON
+    audience: public
+    purpose: creator_os_mvp
+    requires_auth: false
+    guest_fallback: /creator/packets/{packetId}.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: governed creator packet json only
+    verification_path: /creator/packets/publication_board.json
+  - path: /ghostwire
+    title: GHOSTWIRE
+    audience: public
+    purpose: ghostwire_mvp
+    requires_auth: false
+    guest_fallback: /ghostwire
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public-safe after-action packet hub only
+  - path: /ghostwire/after-action/{packetId}.md
+    title: GHOSTWIRE packet markdown
+    audience: public
+    purpose: ghostwire_mvp
+    requires_auth: false
+    guest_fallback: /ghostwire/after-action/{packetId}.md
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party after-action markdown only
+    verification_path: /ghostwire/after-action/replay_timeline.md
+  - path: /ghostwire/after-action/{packetId}.json
+    title: GHOSTWIRE packet JSON
+    audience: public
+    purpose: ghostwire_mvp
+    requires_auth: false
+    guest_fallback: /ghostwire/after-action/{packetId}.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party after-action json only
+    verification_path: /ghostwire/after-action/replay_timeline.json
+  - path: /passport
+    title: Runner Passport
+    audience: public
+    purpose: runner_passport_mvp
+    requires_auth: false
+    guest_fallback: /passport
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: public-safe participation identity hub only
+  - path: /passport/receipts/{receiptId}.md
+    title: Runner Passport receipt markdown
+    audience: public
+    purpose: runner_passport_mvp
+    requires_auth: false
+    guest_fallback: /passport/receipts/{receiptId}.md
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: runner passport markdown receipt only
+    verification_path: /passport/receipts/runner_return_posture.md
+  - path: /passport/receipts/{receiptId}.json
+    title: Runner Passport receipt JSON
+    audience: public
+    purpose: runner_passport_mvp
+    requires_auth: false
+    guest_fallback: /passport/receipts/{receiptId}.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: runner passport json receipt only
+    verification_path: /passport/receipts/runner_return_posture.json
   - path: /play/anarchy
     title: Anarchy play shell
     audience: public
@@ -272,6 +556,35 @@ public_routes:
     verification_mode: controller_contract
     verification_file: Chummer.Run.Api/Controllers/PublicLandingController.cs
     verification_pattern: '[HttpGet("/ledger/anarchy")]'
+  - path: /anarchy/export/runner.json
+    title: Anarchy runner export
+    audience: public
+    purpose: dedicated_ruleset_export
+    requires_auth: false
+    guest_fallback: /anarchy/export/runner.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party anarchy export json only
+    verification_path: /anarchy/export/runner.json
+  - path: /anarchy/receipts/explain.json
+    title: Anarchy explain receipt
+    audience: public
+    purpose: dedicated_ruleset_export
+    requires_auth: false
+    guest_fallback: /anarchy/receipts/explain.json
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: first-party anarchy explain receipt only
+    verification_path: /anarchy/receipts/explain.json
+  - path: /exports/foundry
+    title: Foundry handoff
+    audience: public
+    purpose: honestly_parked_horizon
+    requires_auth: false
+    guest_fallback: /exports/foundry
+    must_exist: true
+    placeholder_allowed: false
+    placeholder_requirements: honestly parked Foundry boundary only
   - path: /session
     title: Legacy session alias
     audience: public

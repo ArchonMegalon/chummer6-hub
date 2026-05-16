@@ -189,7 +189,7 @@ public sealed class BlackLedgerPublicStatsService
     }
 
     public IReadOnlyList<BlackLedgerPublicStatViewModel> ListHomepageStats()
-        => ListPublicStats().Take(4).ToArray();
+        => ListPublicStats().Take(3).ToArray();
 
     public IReadOnlyList<BlackLedgerPublicStatViewModel> ListPublicStats(int? requestedTurn = null)
     {
@@ -342,6 +342,21 @@ public sealed class BlackLedgerPublicStatsService
 
     public IReadOnlyList<BlackLedgerDispatchViewModel> ListDispatches(int? requestedTurn = null, string? factionId = null)
     {
+        BlackLedgerWorldSeedDocument? seed = TryLoadSeed();
+        if (seed is not null && GetDispatchDocuments(seed, requestedTurn).Count > 0)
+        {
+            IEnumerable<BlackLedgerDispatchViewModel> projectedDispatches = GetDispatchDocuments(seed, requestedTurn)
+                .Select(ToViewModel);
+            if (!string.IsNullOrWhiteSpace(factionId))
+            {
+                string normalized = NormalizeSlug(factionId);
+                projectedDispatches = projectedDispatches.Where(item => item.InvolvedFactions.Any(faction =>
+                    NormalizeSlug(faction).Equals(normalized, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            return projectedDispatches.ToArray();
+        }
+
         BlackLedgerWorldPreviewViewModel? world = LoadWorldPreview(requestedTurn);
         if (world?.LastTick is null)
         {
@@ -638,6 +653,29 @@ public sealed class BlackLedgerPublicStatsService
             AiGenerated: dispatch.AiGenerated,
             Href: dispatch.Href);
 
+    private static BlackLedgerDispatchViewModel ToViewModel(BlackLedgerDispatchDocument dispatch)
+        => new(
+            DispatchId: dispatch.DispatchId,
+            WorldId: dispatch.WorldId,
+            Turn: dispatch.Turn,
+            Type: string.IsNullOrWhiteSpace(dispatch.DispatchType) ? "dispatch" : dispatch.DispatchType,
+            Scope: "public_safe_seed",
+            SourceReceiptId: dispatch.SourceReceiptIds?.FirstOrDefault() ?? $"turn_{dispatch.Turn:0000}",
+            SourceReceiptHref: "/ledger/turns/1",
+            Title: dispatch.Title,
+            Summary: dispatch.Summary,
+            Body: dispatch.BodyMarkdown,
+            InvolvedFactions: ResolveDispatchFactions(dispatch),
+            InvolvedDistricts: ResolveDispatchDistricts(dispatch),
+            PackagePressureLinks: ResolveDispatchPackageLinks(dispatch),
+            PrivacyStatus: dispatch.PrivacyStatus,
+            GeneratedBy: "seeded_public_projection",
+            HumanReviewStatus: "optional",
+            CreatedAtUtc: "2026-05-15T00:00:00Z",
+            PublicSafe: dispatch.PublicProjectionAllowed && !dispatch.OfficialIpNamesPresent && !dispatch.SourcebookTextPresent,
+            AiGenerated: true,
+            Href: $"/ledger/dispatches/{dispatch.DispatchId}");
+
     private static string NormalizeSlug(string value)
         => value.Trim().ToLowerInvariant().Replace("_", "-", StringComparison.Ordinal).Replace(" ", "-", StringComparison.Ordinal);
 
@@ -666,12 +704,15 @@ public sealed class BlackLedgerPublicStatsService
         var selectedTurn = SelectTurn(seed, requestedTurn);
         var currentTurn = selectedTurn.Turn;
         string period = currentTurn is null ? "Turn 0" : $"Turn {currentTurn.Turn}";
-        var factionById = (seed.Factions ?? [])
-            .Where(static faction => !string.IsNullOrWhiteSpace(faction.Id))
-            .ToDictionary(static faction => faction.Id, StringComparer.OrdinalIgnoreCase);
-        var districtById = (seed.Map?.Districts ?? [])
-            .Where(static district => !string.IsNullOrWhiteSpace(district.Id))
-            .ToDictionary(static district => district.Id, StringComparer.OrdinalIgnoreCase);
+        var factions = GetFactionDocuments(seed);
+        var districts = GetDistrictDocuments(seed);
+        var packagePressure = GetPackagePressureDocuments(seed, currentTurn);
+        var factionById = factions
+            .Where(static faction => !string.IsNullOrWhiteSpace(GetFactionId(faction)))
+            .ToDictionary(static faction => GetFactionId(faction), StringComparer.OrdinalIgnoreCase);
+        var districtById = districts
+            .Where(static district => !string.IsNullOrWhiteSpace(GetDistrictId(district)))
+            .ToDictionary(static district => GetDistrictId(district), StringComparer.OrdinalIgnoreCase);
         var effects = (currentTurn?.Effects ?? [])
             .GroupBy(static effect => $"{effect.Target}:{effect.Metric}", StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
@@ -694,7 +735,7 @@ public sealed class BlackLedgerPublicStatsService
 
         string TopDistrictHeat()
         {
-            var hottest = (seed.Map?.Districts ?? [])
+            var hottest = districts
                 .OrderByDescending(static district => district.Heat)
                 .FirstOrDefault();
             return hottest is null ? "Transit Spine heat 56" : $"{hottest.Name} heat {hottest.Heat}";
@@ -702,17 +743,17 @@ public sealed class BlackLedgerPublicStatsService
 
         string TopPackagePressure()
         {
-            int topPressure = (currentTurn?.PackagePressure ?? [])
+            int topPressure = packagePressure
                 .Select(static package => package.Pressure)
                 .DefaultIfEmpty(0)
                 .Max();
             return $"{topPressure} hot package candidates";
         }
 
-        string SeededFactionSample() => $"{(seed.Factions?.Count ?? 0)} seeded factions / {(seed.Map?.Districts?.Count ?? 0)} districts";
+        string SeededFactionSample() => $"{factions.Count} seeded factions / {districts.Count} districts";
 
-        int minimumLiveSampleSize = seed.PublicSafety?.MinSampleSizeForLivePublicStats ?? 10;
-        string packagePressureConfidenceKey = (currentTurn?.PackagePressure?.Count ?? 0) >= minimumLiveSampleSize
+        int minimumLiveSampleSize = 10;
+        string packagePressureConfidenceKey = packagePressure.Count >= minimumLiveSampleSize
             ? "enough_data"
             : "preview";
 
@@ -724,7 +765,7 @@ public sealed class BlackLedgerPublicStatsService
                 value: $"Ashline Circle {AdjustedStat("ashline_circle", "mysad_density")}%",
                 period: period,
                 sampleSize: SeededFactionSample(),
-                sampleCount: seed.Factions?.Count ?? 0,
+                sampleCount: factions.Count,
                 confidenceKey: "preview",
                 confidence: "Preview",
                 privacyNote: "Opt-in aggregate only",
@@ -753,8 +794,8 @@ public sealed class BlackLedgerPublicStatsService
                 title: "Package pressure",
                 value: TopPackagePressure(),
                 period: period,
-                sampleSize: $"{currentTurn?.PackagePressure?.Count ?? 0} candidate lanes",
-                sampleCount: currentTurn?.PackagePressure?.Count ?? 0,
+                sampleSize: $"{packagePressure.Count} candidate lanes",
+                sampleCount: packagePressure.Count,
                 confidenceKey: packagePressureConfidenceKey,
                 confidence: packagePressureConfidenceKey == "enough_data" ? "Enough data" : "Preview",
                 privacyNote: "Proof-backed demand, not roadmap truth",
@@ -791,40 +832,40 @@ public sealed class BlackLedgerPublicStatsService
             ? "Turn 0 is loaded."
             : selectedTurn.IsDeterministicPreview
                 ? $"Turn {currentTurn.Turn} deterministic preview is ready. {currentTurn.Summary}"
-                : $"Turn {currentTurn.Turn} already ran. {currentTurn.Summary}";
-        string safetyNote = "Seeded preview and opt-in aggregate only. The Ledger explains pressure, not people.";
-        string mapNote = "Influence spheres are preview geometry, not private campaign truth. Use the map to inspect public faction pressure, package heat, and closeout motion.";
-        var aiNames = (seed.AiPersonalities ?? [])
-            .Where(static personality => !string.IsNullOrWhiteSpace(personality.Id))
-            .ToDictionary(static personality => personality.Id, static personality => personality.Id.Replace('_', ' '), StringComparer.OrdinalIgnoreCase);
-        var districts = (seed.Map?.Districts ?? [])
+                : currentTurn.Headline;
+        string safetyNote = seed.SourcePolicy?.PublicCopyNote ?? "Seeded fictional preview and opt-in aggregate only. The Ledger explains pressure, not people.";
+        string mapNote = "Use the map to inspect seeded districts, visible pressure arcs, and public-safe dispatches without exposing private tables.";
+        var aiNames = GetAiPersonalities(seed)
+            .Where(static personality => !string.IsNullOrWhiteSpace(GetPersonalityId(personality)))
+            .ToDictionary(static personality => GetPersonalityId(personality), static personality => GetPersonalityLabel(personality), StringComparer.OrdinalIgnoreCase);
+        var districts = GetDistrictDocuments(seed)
             .Select(district => new BlackLedgerDistrictViewModel(
-                district.Id,
+                GetDistrictId(district),
                 district.Name,
                 string.Join(" ", (district.Polygon ?? []).Select(static point => point.Count >= 2 ? $"{point[0]},{point[1]}" : string.Empty).Where(static point => !string.IsNullOrWhiteSpace(point))),
-                district.DominantFaction.Replace('_', ' '),
+                GetDominantFactionId(district).Replace('_', ' '),
                 district.Influence,
                 district.Heat,
-                BuildDistrictSummary(district),
+                string.IsNullOrWhiteSpace(district.Summary) ? BuildDistrictSummary(district) : district.Summary,
                 ComputePolygonCenter(district.Polygon).x,
                 ComputePolygonCenter(district.Polygon).y,
-                ComputeDistrictConfidence(district),
-                ComputeDistrictVolatility(district),
-                ComputeDistrictTrend(district),
-                ComputeDistrictDelta(district)))
+                district.Confidence == 0 ? ComputeDistrictConfidence(district) : district.Confidence,
+                district.Volatility == 0 ? ComputeDistrictVolatility(district) : district.Volatility,
+                string.IsNullOrWhiteSpace(district.Trend) ? ComputeDistrictTrend(district) : district.Trend,
+                district.DeltaSinceLastTick == 0 ? ComputeDistrictDelta(district) : district.DeltaSinceLastTick))
             .ToArray();
-        var factions = (seed.Factions ?? [])
+        var factions = GetFactionDocuments(seed)
             .Select(faction => new BlackLedgerFactionViewModel(
-                faction.Id,
+                GetFactionId(faction),
                 faction.PublicName,
-                faction.Type,
+                string.IsNullOrWhiteSpace(faction.Archetype) ? faction.Type : faction.Archetype,
                 ResolveAiName(aiNames, faction.ManagementPosts?.FactionLeader),
                 ResolveAiName(aiNames, faction.ManagementPosts?.FieldGm),
                 ResolveAiName(aiNames, faction.ManagementPosts?.IntelProvider),
                 BuildFactionSignals(faction),
-                ResolveFactionVisual(faction.Id).primary,
-                ResolveFactionVisual(faction.Id).secondary,
-                ResolveFactionVisual(faction.Id).icon))
+                string.IsNullOrWhiteSpace(faction.ColorPrimary) ? ResolveFactionVisual(GetFactionId(faction)).primary : faction.ColorPrimary,
+                string.IsNullOrWhiteSpace(faction.ColorSecondary) ? ResolveFactionVisual(GetFactionId(faction)).secondary : faction.ColorSecondary,
+                string.IsNullOrWhiteSpace(faction.Icon) ? ResolveFactionVisual(GetFactionId(faction)).icon : faction.Icon))
             .ToArray();
         BlackLedgerTickReceiptViewModel? lastTick = currentTurn is null || string.IsNullOrWhiteSpace(currentTurn.ReceiptId)
             ? null
@@ -833,12 +874,12 @@ public sealed class BlackLedgerPublicStatsService
                 currentTurn.Turn,
                 currentTurn.ReceiptId,
                 selectedTurn.Mode,
-                currentTurn.Summary,
-                ComputeHash($"{seed.WorldId}:{currentTurn.Turn - 1}:{currentTurn.State}:input"),
-                ComputeHash($"{seed.WorldId}:{currentTurn.Turn}:{string.Join('|', (currentTurn.Effects ?? []).Select(effect => $"{effect.Target}:{effect.Metric}:{effect.Delta}:{effect.PublicReason}"))}:decision"),
-                true,
-                Array.Empty<string>(),
-                ComputeHash($"{seed.WorldId}:{currentTurn.Turn}:{currentTurn.State}:output"),
+                string.IsNullOrWhiteSpace(currentTurn.Headline) ? currentTurn.Summary : currentTurn.Headline,
+                string.IsNullOrWhiteSpace(currentTurn.InputStateHash) ? ComputeHash($"{seed.WorldId}:{currentTurn.Turn - 1}:{currentTurn.State}:input") : currentTurn.InputStateHash,
+                string.IsNullOrWhiteSpace(currentTurn.DecisionPacketHash) ? ComputeHash($"{seed.WorldId}:{currentTurn.Turn}:{string.Join('|', (currentTurn.Effects ?? []).Select(effect => $"{effect.Target}:{effect.Metric}:{effect.Delta}:{effect.PublicReason}"))}:decision") : currentTurn.DecisionPacketHash,
+                !string.Equals(currentTurn.PrivacyResult?.Status, "failed", StringComparison.OrdinalIgnoreCase),
+                currentTurn.PrivacyResult?.BlockedFields?.ToArray() ?? Array.Empty<string>(),
+                string.IsNullOrWhiteSpace(currentTurn.OutputStateHash) ? ComputeHash($"{seed.WorldId}:{currentTurn.Turn}:{currentTurn.State}:output") : currentTurn.OutputStateHash,
                 selectedTurn.CreatedAtUtc ?? "2026-05-14T12:00:00Z",
                 (currentTurn.Effects ?? [])
                 .Select(effect => new BlackLedgerTickEffectViewModel(
@@ -852,12 +893,12 @@ public sealed class BlackLedgerPublicStatsService
             seed.WorldId,
             seed.PublicName,
             seed.Status,
-            currentTurn?.Turn ?? 0,
+            currentTurn?.Turn ?? seed.CurrentTurn,
             turnHeadline,
             safetyNote,
             mapNote,
             selectedTurn.IsDeterministicPreview,
-            BuildTurnNavigation(seed, currentTurn?.Turn ?? 0),
+            BuildTurnNavigation(seed, currentTurn?.Turn ?? seed.CurrentTurn),
             districts,
             factions,
             BuildStewardshipPosts(seed),
@@ -867,9 +908,11 @@ public sealed class BlackLedgerPublicStatsService
 
     private static SelectedTurnContext SelectTurn(BlackLedgerWorldSeedDocument seed, int? requestedTurn)
     {
-        var publishedTurn = seed.Turns?
+        var publishedTurn = (seed.Turns ?? [])
+            .Where(turn => !requestedTurn.HasValue || turn.Turn == requestedTurn.Value)
             .OrderByDescending(static turn => turn.Turn)
-            .FirstOrDefault();
+            .FirstOrDefault()
+            ?? (seed.Turns ?? []).OrderByDescending(static turn => turn.Turn).FirstOrDefault();
         if (requestedTurn == 2)
         {
             var deterministicTurn = seed.DeterministicTestTicks?
@@ -900,38 +943,59 @@ public sealed class BlackLedgerPublicStatsService
     }
 
     private static IReadOnlyList<BlackLedgerTurnNavigationViewModel> BuildTurnNavigation(BlackLedgerWorldSeedDocument seed, int currentTurn)
-        => new[]
-        {
-            new BlackLedgerTurnNavigationViewModel(1, "Turn 1 live preview", "/ledger?turn=1", currentTurn == 1, false),
-            new BlackLedgerTurnNavigationViewModel(2, "Turn 2 deterministic preview", "/ledger?turn=2", currentTurn == 2, true),
-        };
+        => (seed.Turns ?? [])
+            .OrderBy(static turn => turn.Turn)
+            .Select(turn => new BlackLedgerTurnNavigationViewModel(
+                turn.Turn,
+                string.IsNullOrWhiteSpace(turn.Headline) ? $"Turn {turn.Turn}" : turn.Headline,
+                $"/ledger/turns/{turn.Turn}",
+                currentTurn == turn.Turn,
+                false))
+            .ToArray();
 
     private static IReadOnlyList<BlackLedgerStewardshipPostViewModel> BuildStewardshipPosts(BlackLedgerWorldSeedDocument seed)
     {
-        var personalities = (seed.AiPersonalities ?? [])
-            .Where(static personality => !string.IsNullOrWhiteSpace(personality.Id))
-            .ToDictionary(static personality => personality.Id, StringComparer.OrdinalIgnoreCase);
-        return (seed.GlobalPosts ?? [])
-            .Select(post =>
-            {
-                personalities.TryGetValue(post.FallbackPersonality ?? string.Empty, out var personality);
-                string fallback = string.IsNullOrWhiteSpace(post.FallbackPersonality)
-                    ? "unassigned"
-                    : post.FallbackPersonality.Replace('_', ' ');
-                string summary = post.PublicSummary;
-                if (personality?.Goals?.Any() == true)
+        if (seed.GlobalPosts?.Count > 0)
+        {
+            var personalities = GetAiPersonalities(seed)
+                .Where(static personality => !string.IsNullOrWhiteSpace(GetPersonalityId(personality)))
+                .ToDictionary(static personality => GetPersonalityId(personality), StringComparer.OrdinalIgnoreCase);
+            return seed.GlobalPosts
+                .Select(post =>
                 {
-                    summary = $"{summary} Current brief: {personality.Goals[0]}.";
-                }
+                    personalities.TryGetValue(post.FallbackPersonality ?? string.Empty, out var personality);
+                    string fallback = string.IsNullOrWhiteSpace(post.FallbackPersonality)
+                        ? "unassigned"
+                        : post.FallbackPersonality.Replace('_', ' ');
+                    string summary = post.PublicSummary;
+                    if (personality?.Goals?.Any() == true)
+                    {
+                        summary = $"{summary} Current brief: {personality.Goals[0]}.";
+                    }
 
-                return new BlackLedgerStewardshipPostViewModel(
-                    post.Id,
-                    post.PublicLabel,
-                    post.HolderType,
-                    fallback,
-                    summary,
-                    HumanOverrideAvailable: true);
-            })
+                    return new BlackLedgerStewardshipPostViewModel(
+                        post.Id,
+                        post.PublicLabel,
+                        post.HolderType,
+                        fallback,
+                        summary,
+                        HumanOverrideAvailable: true);
+                })
+                .ToArray();
+        }
+
+        return GetAiPersonalities(seed)
+            .Where(static personality => string.Equals(personality.Role, "global_ledger_gm", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(personality.Role, "global_privacy_gate", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(personality.Role, "global_closeout_materializer", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(personality.Role, "global_package_pressure", StringComparison.OrdinalIgnoreCase))
+            .Select(personality => new BlackLedgerStewardshipPostViewModel(
+                GetPersonalityId(personality),
+                GetPersonalityLabel(personality),
+                "ai",
+                GetPersonalityId(personality),
+                $"{GetPersonalityLabel(personality)} stays bounded to public-safe seeded world stewardship.",
+                true))
             .ToArray();
     }
 
@@ -967,7 +1031,7 @@ public sealed class BlackLedgerPublicStatsService
             .ToArray();
 
     private static string BuildDistrictSummary(BlackLedgerDistrictDocument district)
-        => $"{district.Name} is led by {district.DominantFaction.Replace('_', ' ')} with influence {district.Influence} and heat {district.Heat}.";
+        => $"{district.Name} is led by {GetDominantFactionId(district).Replace('_', ' ')} with influence {district.Influence} and heat {district.Heat}.";
 
     private static (string primary, string secondary, string icon) ResolveFactionVisual(string factionId)
         => NormalizeSlug(factionId) switch
@@ -1016,7 +1080,7 @@ public sealed class BlackLedgerPublicStatsService
         => district.Heat >= 70 ? "rising" : district.Influence <= 45 ? "volatile" : "stable";
 
     private static int ComputeDistrictDelta(BlackLedgerDistrictDocument district)
-        => NormalizeSlug(district.Id) switch
+        => NormalizeSlug(GetDistrictId(district)) switch
         {
             "rust-bazaar" => 8,
             "ashline-ward" => 5,
@@ -1053,6 +1117,35 @@ public sealed class BlackLedgerPublicStatsService
 
     private IReadOnlyList<BlackLedgerMapEventViewModel> BuildMapEvents(BlackLedgerWorldPreviewViewModel world)
     {
+        BlackLedgerWorldSeedDocument? seed = TryLoadSeed();
+        if (seed is not null && GetEventDocuments(seed).Count > 0)
+        {
+            var regionById = world.Districts.ToDictionary(static item => item.Id, StringComparer.OrdinalIgnoreCase);
+            var dispatchesById = ListDispatches(world.CurrentTurn).ToDictionary(static item => item.DispatchId, StringComparer.OrdinalIgnoreCase);
+            return GetEventDocuments(seed)
+                .Where(item => item.Turn == world.CurrentTurn)
+                .Select(item =>
+                {
+                    regionById.TryGetValue(item.RegionId, out BlackLedgerDistrictViewModel? region);
+                    return new BlackLedgerMapEventViewModel(
+                        item.EventId,
+                        item.EventType,
+                        region?.Id ?? item.RegionId,
+                        $"{region?.Name ?? item.RegionId} — {item.PublicSummary}",
+                        item.PublicSummary,
+                        item.Severity,
+                        item.Confidence,
+                        item.Status,
+                        region?.CenterX ?? 0,
+                        region?.CenterY ?? 0,
+                        item.Turn == world.CurrentTurn,
+                        item.SourceReceiptId,
+                        "/ledger/turns/1",
+                        !string.IsNullOrWhiteSpace(item.DispatchId) && dispatchesById.TryGetValue(item.DispatchId, out var dispatch) ? dispatch.Href : null);
+                })
+                .ToArray();
+        }
+
         BlackLedgerTickReceiptViewModel tick = world.LastTick ?? throw new InvalidOperationException("World preview is missing the last tick.");
         var regionByName = world.Districts.ToDictionary(static item => item.Name, StringComparer.OrdinalIgnoreCase);
         var dispatches = ListDispatches(world.CurrentTurn).ToDictionary(static item => item.DispatchId, StringComparer.OrdinalIgnoreCase);
@@ -1085,8 +1178,24 @@ public sealed class BlackLedgerPublicStatsService
         return events;
     }
 
-    private static IReadOnlyList<BlackLedgerMapArcViewModel> BuildMapArcs(BlackLedgerWorldPreviewViewModel world)
+    private IReadOnlyList<BlackLedgerMapArcViewModel> BuildMapArcs(BlackLedgerWorldPreviewViewModel world)
     {
+        BlackLedgerWorldSeedDocument? seed = LoadSeedDocument();
+        if (seed is not null && GetArcDocuments(seed).Count > 0)
+        {
+            return GetArcDocuments(seed)
+                .Where(item => item.Turn == world.CurrentTurn)
+                .Select(item => new BlackLedgerMapArcViewModel(
+                    item.ArcId,
+                    item.SourceRegionId,
+                    item.TargetRegionId,
+                    item.ArcType,
+                    item.Intensity,
+                    item.Direction,
+                    $"{item.ArcType} pressure from {item.SourceRegionId} to {item.TargetRegionId}."))
+                .ToArray();
+        }
+
         var arcs = new List<BlackLedgerMapArcViewModel>();
         void Add(string id, string source, string target, string type, int intensity, string summary)
             => arcs.Add(new BlackLedgerMapArcViewModel(id, source, target, type, intensity, "forward", summary));
@@ -1101,11 +1210,13 @@ public sealed class BlackLedgerPublicStatsService
     }
 
     private static IReadOnlyList<BlackLedgerMapReplayStepViewModel> BuildReplaySteps(BlackLedgerWorldPreviewViewModel world)
-        => [
-            new(0, "Turn 0 seed", "Seed geometry, districts, and bounded starter factions loaded.", world.CurrentTurn == 0),
-            new(1, "Turn 1 receipt", world.LastTick?.Summary ?? "Turn 1 receipt is public-safe and receipt-backed.", world.CurrentTurn == 1),
-            new(2, "Turn 2 preview", "Deterministic preview shows what the next pressure reveal would look like without claiming live truth.", world.DeterministicPreview),
-        ];
+        => world.TurnNavigation
+            .Select(turn => new BlackLedgerMapReplayStepViewModel(
+                turn.Turn,
+                turn.Label,
+                turn.Current && world.LastTick is not null ? world.LastTick.Summary : $"Replay Turn {turn.Turn}.",
+                turn.Current))
+            .ToArray();
 
     private static BlackLedgerDistrictViewModel ResolveEventRegion(BlackLedgerTickEffectViewModel effect, BlackLedgerWorldPreviewViewModel world)
     {
@@ -1150,22 +1261,22 @@ public sealed class BlackLedgerPublicStatsService
 
     private static bool IsWorldPublicSafe(BlackLedgerWorldSeedDocument world)
     {
-        if (!string.Equals(world.Status, "preseeded_preview", StringComparison.Ordinal)
-            || !string.Equals(world.Source, "chummer-owned seed", StringComparison.Ordinal)
-            || world.PublicSafety is null
-            || world.PublicSafety.OfficialLore
-            || world.PublicSafety.UsesSourcebookText
-            || world.PublicSafety.UsesPrivateUserData
-            || world.PublicSafety.RealUserIdentificationAllowed
-            || !string.Equals(world.PublicSafety.PublicStatsScope, "opt_in_aggregate_or_seeded_fictional_preview", StringComparison.Ordinal)
-            || (world.Map?.Districts?.Count ?? 0) < 8
-            || (world.Factions?.Count ?? 0) < 6)
+        if ((!string.Equals(world.Status, "preseeded_preview", StringComparison.Ordinal) && !string.Equals(world.Status, "seeded_preview", StringComparison.Ordinal))
+            || world.OfficialIpNamesPresent
+            || world.SourcebookTextPresent
+            || world.OfficialMapsPresent
+            || world.OfficialLogosPresent
+            || world.PrivateCampaignDataPresent
+            || !world.PublicProjectionAllowed
+            || !string.Equals(world.LoreMode, "public_seed", StringComparison.Ordinal)
+            || GetDistrictDocuments(world).Count < 8
+            || GetFactionDocuments(world).Count < 6)
         {
             return false;
         }
 
-        var aiIds = (world.AiPersonalities ?? [])
-            .Select(static personality => personality.Id)
+        var aiIds = GetAiPersonalities(world)
+            .Select(static personality => GetPersonalityId(personality))
             .Where(static id => !string.IsNullOrWhiteSpace(id))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -1174,7 +1285,7 @@ public sealed class BlackLedgerPublicStatsService
             return false;
         }
 
-        return (world.Factions ?? []).All(faction =>
+        return GetFactionDocuments(world).All(faction =>
             faction.ManagementPosts is not null
             && aiIds.Contains(faction.ManagementPosts.FactionLeader)
             && aiIds.Contains(faction.ManagementPosts.FieldGm)
@@ -1249,6 +1360,149 @@ public sealed class BlackLedgerPublicStatsService
     private static string ComputeHash(string value)
         => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 
+    private static IReadOnlyList<BlackLedgerDistrictDocument> GetDistrictDocuments(BlackLedgerWorldSeedDocument seed)
+        => seed.Districts?.Count > 0 ? seed.Districts : seed.Map?.Districts ?? [];
+
+    private static IReadOnlyList<BlackLedgerFactionDocument> GetFactionDocuments(BlackLedgerWorldSeedDocument seed)
+        => seed.Factions ?? [];
+
+    private static IReadOnlyList<BlackLedgerAiPersonalityDocument> GetAiPersonalities(BlackLedgerWorldSeedDocument seed)
+        => seed.AiPersonalities ?? [];
+
+    private static IReadOnlyList<BlackLedgerWorldEventDocument> GetEventDocuments(BlackLedgerWorldSeedDocument seed)
+        => seed.Events ?? [];
+
+    private static IReadOnlyList<BlackLedgerWorldArcDocument> GetArcDocuments(BlackLedgerWorldSeedDocument seed)
+        => seed.Arcs ?? [];
+
+    private static IReadOnlyList<BlackLedgerPackagePressureDocument> GetPackagePressureDocuments(BlackLedgerWorldSeedDocument seed, BlackLedgerTurnDocument? turn)
+    {
+        if (turn?.PackagePressureIds?.Count > 0)
+        {
+            return (seed.PackagePressure ?? [])
+                .Where(item => turn.PackagePressureIds.Contains(item.PackageId, StringComparer.OrdinalIgnoreCase))
+                .ToArray();
+        }
+
+        return seed.PackagePressure ?? turn?.PackagePressure ?? [];
+    }
+
+    private static IReadOnlyList<BlackLedgerDispatchDocument> GetDispatchDocuments(BlackLedgerWorldSeedDocument seed, int? requestedTurn = null)
+    {
+        IEnumerable<BlackLedgerDispatchDocument> dispatches = seed.Dispatches ?? [];
+        if (requestedTurn.HasValue)
+        {
+            dispatches = dispatches.Where(item => item.Turn == requestedTurn.Value);
+        }
+
+        return dispatches.ToArray();
+    }
+
+    private static string GetPersonalityId(BlackLedgerAiPersonalityDocument personality)
+        => string.IsNullOrWhiteSpace(personality.PersonalityId) ? personality.Id : personality.PersonalityId;
+
+    private static string GetPersonalityLabel(BlackLedgerAiPersonalityDocument personality)
+        => string.IsNullOrWhiteSpace(personality.PublicLabel)
+            ? GetPersonalityId(personality).Replace('_', ' ')
+            : personality.PublicLabel;
+
+    private static string GetDistrictId(BlackLedgerDistrictDocument district)
+        => string.IsNullOrWhiteSpace(district.Id) ? district.RegionId : district.Id;
+
+    private static string GetDominantFactionId(BlackLedgerDistrictDocument district)
+        => string.IsNullOrWhiteSpace(district.DominantFaction) ? district.DominantFactionId : district.DominantFaction;
+
+    private static string GetFactionId(BlackLedgerFactionDocument faction)
+        => string.IsNullOrWhiteSpace(faction.Id) ? faction.FactionId : faction.Id;
+
+    private static IReadOnlyList<string> ResolveDispatchFactions(BlackLedgerDispatchDocument dispatch)
+    {
+        string text = $"{dispatch.DispatchId} {dispatch.Title}".ToLowerInvariant();
+        List<string> factions = [];
+        if (text.Contains("glass"))
+        {
+            factions.Add("Glass Tower Compact");
+        }
+        if (text.Contains("rust"))
+        {
+            factions.Add("Rust Market Syndicate");
+        }
+        if (text.Contains("ashline"))
+        {
+            factions.Add("Ashline Circle");
+        }
+        if (text.Contains("neon"))
+        {
+            factions.Add("Neon Docks Union");
+        }
+        if (text.Contains("ghostline"))
+        {
+            factions.Add("Ghostline Network");
+        }
+        if (text.Contains("free_wardens") || text.Contains("free ward"))
+        {
+            factions.Add("Barrens Free Wardens");
+        }
+
+        return factions.Count == 0 ? ["Emerald Sprawl"] : factions;
+    }
+
+    private static IReadOnlyList<string> ResolveDispatchDistricts(BlackLedgerDispatchDocument dispatch)
+    {
+        string text = $"{dispatch.DispatchId} {dispatch.Title}".ToLowerInvariant();
+        List<string> districts = [];
+        if (text.Contains("glass"))
+        {
+            districts.Add("Glass Heights");
+        }
+        if (text.Contains("rust"))
+        {
+            districts.Add("Rust Bazaar");
+        }
+        if (text.Contains("ashline"))
+        {
+            districts.Add("Ashline Ward");
+        }
+        if (text.Contains("neon"))
+        {
+            districts.Add("Neon Docks");
+        }
+        if (text.Contains("ghostline"))
+        {
+            districts.Add("Ghostline East");
+        }
+        if (text.Contains("free_wardens") || text.Contains("free ward"))
+        {
+            districts.Add("Free Ward");
+        }
+
+        return districts;
+    }
+
+    private static IReadOnlyList<string> ResolveDispatchPackageLinks(BlackLedgerDispatchDocument dispatch)
+    {
+        string body = dispatch.BodyMarkdown.ToLowerInvariant();
+        List<string> links = [];
+        if (body.Contains("package"))
+        {
+            links.Add("/packages");
+        }
+        if (body.Contains("awakened"))
+        {
+            links.Add("/packages/awakened-build-explainers");
+        }
+        if (body.Contains("drone"))
+        {
+            links.Add("/packages/drone-logistics-overlay");
+        }
+        if (body.Contains("debt"))
+        {
+            links.Add("/packages/debt-ledger-visibility");
+        }
+
+        return links.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
+
     private sealed record SelectedTurnContext(
         BlackLedgerTurnDocument? Turn,
         bool IsDeterministicPreview,
@@ -1257,19 +1511,63 @@ public sealed class BlackLedgerPublicStatsService
 
     public sealed class BlackLedgerWorldSeedDocument
     {
-        public int SchemaVersion { get; set; }
+        public string SchemaVersion { get; set; } = string.Empty;
         public string WorldId { get; set; } = string.Empty;
         public string PublicName { get; set; } = string.Empty;
+        public string PublicSubtitle { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string Source { get; set; } = string.Empty;
+        public string LoreMode { get; set; } = string.Empty;
+        public bool PublicProjectionAllowed { get; set; }
+        public bool OfficialIpNamesPresent { get; set; }
+        public bool SourcebookTextPresent { get; set; }
+        public bool OfficialMapsPresent { get; set; }
+        public bool OfficialLogosPresent { get; set; }
+        public bool PrivateCampaignDataPresent { get; set; }
+        public int CurrentTurn { get; set; }
+        public BlackLedgerSourcePolicyDocument? SourcePolicy { get; set; }
+        public BlackLedgerPublicUiNoisePolicyDocument? PublicUiNoisePolicy { get; set; }
         public BlackLedgerPublicSafetyDocument? PublicSafety { get; set; }
         public BlackLedgerMapDocument? Map { get; set; }
+        public List<BlackLedgerDistrictDocument>? Districts { get; set; }
         public List<BlackLedgerFactionDocument>? Factions { get; set; }
         public List<BlackLedgerAiPersonalityDocument>? AiPersonalities { get; set; }
         public List<BlackLedgerGlobalPostDocument>? GlobalPosts { get; set; }
         public BlackLedgerStewardshipTransferDocument? StewardshipTransferPreview { get; set; }
+        public List<BlackLedgerWorldEventDocument>? Events { get; set; }
+        public List<BlackLedgerWorldArcDocument>? Arcs { get; set; }
+        public List<BlackLedgerPackagePressureDocument>? PackagePressure { get; set; }
         public List<BlackLedgerTurnDocument>? Turns { get; set; }
+        public List<BlackLedgerDispatchDocument>? Dispatches { get; set; }
         public List<BlackLedgerDeterministicTickDocument>? DeterministicTestTicks { get; set; }
+    }
+
+    public sealed class BlackLedgerSourcePolicyDocument
+    {
+        public bool OfficialShadowrunNamesAllowedOnPublicRoutes { get; set; }
+        public bool OfficialMegacorpNamesAllowedOnPublicRoutes { get; set; }
+        public bool OfficialLogosAllowed { get; set; }
+        public bool OfficialMapsAllowed { get; set; }
+        public bool SourcebookTextAllowed { get; set; }
+        public bool CanonEventsAllowed { get; set; }
+        public bool PrivateCampaignLoreLabelsAllowedOnPublicRoutes { get; set; }
+        public bool LicensedCanonPackEnabled { get; set; }
+        public bool LicenseReceiptRequiredForOfficialLore { get; set; }
+        public string PublicCopyNote { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerPublicUiNoisePolicyDocument
+    {
+        public bool NoDeadLinks { get; set; }
+        public bool NoPlaceholderButtons { get; set; }
+        public bool NoHrefHashPlaceholders { get; set; }
+        public bool NoJavascriptVoidLinks { get; set; }
+        public int MaxPrimaryCtasPerSurface { get; set; }
+        public int MaxTotalCtasHomepageLedgerTeaser { get; set; }
+        public int MaxMapTeaserStats { get; set; }
+        public int MaxMapTeaserHotspots { get; set; }
+        public bool ProofLinksOnlyInStatusOrReceipts { get; set; }
+        public bool ArtifactShelfNotOnHomepage { get; set; }
     }
 
     public sealed class BlackLedgerPublicSafetyDocument
@@ -1289,18 +1587,35 @@ public sealed class BlackLedgerPublicStatsService
 
     public sealed class BlackLedgerDistrictDocument
     {
+        public string RegionId { get; set; } = string.Empty;
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
+        public string Summary { get; set; } = string.Empty;
         public List<List<int>>? Polygon { get; set; }
+        public string DominantFactionId { get; set; } = string.Empty;
         public string DominantFaction { get; set; } = string.Empty;
         public int Influence { get; set; }
         public int Heat { get; set; }
+        public int Confidence { get; set; }
+        public int Volatility { get; set; }
+        public string Trend { get; set; } = string.Empty;
+        public int DeltaSinceLastTick { get; set; }
+        public string LatestDispatchId { get; set; } = string.Empty;
     }
 
     public sealed class BlackLedgerFactionDocument
     {
+        public string FactionId { get; set; } = string.Empty;
         public string Id { get; set; } = string.Empty;
         public string PublicName { get; set; } = string.Empty;
+        public string ShortName { get; set; } = string.Empty;
+        public string Archetype { get; set; } = string.Empty;
+        public string PublicSummary { get; set; } = string.Empty;
+        public string PublicRole { get; set; } = string.Empty;
+        public string Tone { get; set; } = string.Empty;
+        public string ColorPrimary { get; set; } = string.Empty;
+        public string ColorSecondary { get; set; } = string.Empty;
+        public string Icon { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
         public BlackLedgerManagementPostsDocument? ManagementPosts { get; set; }
         public Dictionary<string, int>? Stats { get; set; }
@@ -1315,8 +1630,12 @@ public sealed class BlackLedgerPublicStatsService
 
     public sealed class BlackLedgerAiPersonalityDocument
     {
+        public string PersonalityId { get; set; } = string.Empty;
         public string Id { get; set; } = string.Empty;
+        public string PublicLabel { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
+        public string? Authority { get; set; }
+        public string? FactionId { get; set; }
         public string? Faction { get; set; }
         public string? Tone { get; set; }
         public List<string>? Goals { get; set; }
@@ -1348,11 +1667,35 @@ public sealed class BlackLedgerPublicStatsService
     public sealed class BlackLedgerTurnDocument
     {
         public int Turn { get; set; }
+        public string TurnId { get; set; } = string.Empty;
         public string State { get; set; } = string.Empty;
+        public string Headline { get; set; } = string.Empty;
         public string Summary { get; set; } = string.Empty;
         public string? ReceiptId { get; set; }
         public List<BlackLedgerTurnEffectDocument>? Effects { get; set; }
+        public List<string>? EventIds { get; set; }
+        public List<string>? ArcIds { get; set; }
+        public List<string>? PackagePressureIds { get; set; }
+        public bool PublicSafe { get; set; }
+        public BlackLedgerTurnPrivacyResultDocument? PrivacyResult { get; set; }
+        public BlackLedgerTurnIpResultDocument? IpResult { get; set; }
+        public string InputStateHash { get; set; } = string.Empty;
+        public string DecisionPacketHash { get; set; } = string.Empty;
+        public string OutputStateHash { get; set; } = string.Empty;
         public List<BlackLedgerPackagePressureDocument>? PackagePressure { get; set; }
+    }
+
+    public sealed class BlackLedgerTurnPrivacyResultDocument
+    {
+        public string Status { get; set; } = string.Empty;
+        public List<string>? BlockedFields { get; set; }
+    }
+
+    public sealed class BlackLedgerTurnIpResultDocument
+    {
+        public string Status { get; set; } = string.Empty;
+        public bool OfficialIpNamesPresent { get; set; }
+        public bool SourcebookTextPresent { get; set; }
     }
 
     public sealed class BlackLedgerDeterministicTickDocument
@@ -1379,8 +1722,58 @@ public sealed class BlackLedgerPublicStatsService
     public sealed class BlackLedgerPackagePressureDocument
     {
         public string PackageId { get; set; } = string.Empty;
+        public string PublicName { get; set; } = string.Empty;
         public int Pressure { get; set; }
         public string Status { get; set; } = string.Empty;
+        public List<string>? SourceEventIds { get; set; }
+        public string PublicSummary { get; set; } = string.Empty;
+        public string Route { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerWorldEventDocument
+    {
+        public string EventId { get; set; } = string.Empty;
+        public int Turn { get; set; }
+        public string EventType { get; set; } = string.Empty;
+        public string RegionId { get; set; } = string.Empty;
+        public List<string>? FactionIds { get; set; }
+        public int Severity { get; set; }
+        public int Confidence { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string SourceReceiptId { get; set; } = string.Empty;
+        public string DispatchId { get; set; } = string.Empty;
+        public string PublicSummary { get; set; } = string.Empty;
+        public string Animation { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerWorldArcDocument
+    {
+        public string ArcId { get; set; } = string.Empty;
+        public int Turn { get; set; }
+        public string SourceRegionId { get; set; } = string.Empty;
+        public string TargetRegionId { get; set; } = string.Empty;
+        public string ArcType { get; set; } = string.Empty;
+        public int Intensity { get; set; }
+        public string Direction { get; set; } = string.Empty;
+        public string SourceReceiptId { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerDispatchDocument
+    {
+        public string DispatchId { get; set; } = string.Empty;
+        public string WorldId { get; set; } = string.Empty;
+        public int Turn { get; set; }
+        public string DispatchType { get; set; } = string.Empty;
+        public List<string>? SourceReceiptIds { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Summary { get; set; } = string.Empty;
+        public string BodyMarkdown { get; set; } = string.Empty;
+        public string PrivacyStatus { get; set; } = string.Empty;
+        public string IpStatus { get; set; } = string.Empty;
+        public string FactConsistencyStatus { get; set; } = string.Empty;
+        public bool PublicProjectionAllowed { get; set; }
+        public bool OfficialIpNamesPresent { get; set; }
+        public bool SourcebookTextPresent { get; set; }
     }
 }
 

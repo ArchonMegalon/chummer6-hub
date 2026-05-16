@@ -33,7 +33,7 @@
       "platformId": "windows-x64",
       "arch": "x64",
       "fileName": "chummer-avalonia-win-x64-installer.exe",
-      "installAccessClass": "account_required"
+      "installAccessClass": "open_public"
     }
   ],
   "source": "registry",

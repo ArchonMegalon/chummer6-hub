@@ -1,8 +1,9 @@
 {
   "contract_name": "chummer.run.public_claim_scan",
   "status": "pass",
-  "generated_at": "2026-05-10T09:52:50.863786Z",
+  "generated_at": "2026-05-15T11:40:23.548198Z",
   "scanned_files": [
+    "Chummer.Run.Api/Views/PublicLanding/Anarchy.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/Changelog.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/Concierge.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml",
@@ -18,6 +19,7 @@
     "Chummer.Run.Api/Views/PublicLanding/KarmaForge.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/KarmaForgeSubmitted.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/Landing.cshtml",
+    "Chummer.Run.Api/Views/PublicLanding/Ledger.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/MobileProjection.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/Now.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/PackageDetail.cshtml",

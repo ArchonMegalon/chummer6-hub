@@ -22,7 +22,7 @@ import yaml
 RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 WORKSPACE_ROOT = RUN_SERVICES_ROOT.parent
 CHUMMER6_ROOT = WORKSPACE_ROOT / "Chummer6"
-COMPLETION_ROOT = WORKSPACE_ROOT / "_completion" / "chummer6_absolute_completion"
+DEFAULT_COMPLETION_ROOT = WORKSPACE_ROOT / "_completion" / "chummer6_absolute_completion"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_COMPLETION_BASE_URL", "http://127.0.0.1:5099").rstrip("/")
 REQUEST_TIMEOUT_SECONDS = 30
 
@@ -32,8 +32,10 @@ def now_iso() -> str:
 
 
 def ensure_completion_root() -> Path:
-    COMPLETION_ROOT.mkdir(parents=True, exist_ok=True)
-    return COMPLETION_ROOT
+    raw = os.environ.get("CHUMMER_COMPLETION_DIR", "").strip()
+    root = Path(raw) if raw else DEFAULT_COMPLETION_ROOT
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 def completion_path(*parts: str) -> Path:

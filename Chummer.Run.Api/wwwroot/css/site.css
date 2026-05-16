@@ -3214,7 +3214,8 @@ td {
   border: 1px solid rgba(125, 188, 255, 0.25);
   background: rgba(7, 18, 29, 0.82);
   color: var(--ink-strong);
-  padding: 0.55rem 0.9rem;
+  padding: 0.75rem 1rem;
+  min-height: 44px;
   text-decoration: none;
   transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }

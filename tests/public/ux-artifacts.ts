@@ -2,7 +2,12 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = process.cwd();
-const completionDir = path.resolve(repoRoot, '..', '_completion', 'chummer_run_redesign_closure');
+const configuredCompletionDir = process.env.CHUMMER_COMPLETION_DIR?.trim();
+const completionDir = configuredCompletionDir
+  ? (path.isAbsolute(configuredCompletionDir)
+      ? configuredCompletionDir
+      : path.resolve(repoRoot, configuredCompletionDir))
+  : path.resolve(repoRoot, '..', '_completion', 'chummer_run_redesign_closure');
 
 export function ensureCompletionDir(): string {
   mkdirSync(completionDir, { recursive: true });

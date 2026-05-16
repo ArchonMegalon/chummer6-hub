@@ -195,18 +195,18 @@ cards:
   - id: real_mobile_projection
     bucket: whats_real_now
     title: Mobile and PWA projection
-    summary: The first-party mobile projection keeps installability, reconnect posture, and role-aware entry visible before native shells are complete.
+    summary: The first-party mobile projection now includes continuity receipt rails, PWA handoff JSON, and bounded claimed-install posture alongside role-aware entry.
     href: /mobile
-    badge: Inspectable
+    badge: Live now
     audience: public
     image_family: streetfront
     action_label: Open mobile projection
   - id: real_anarchy_preview
     bucket: whats_real_now
-    title: Shadowrun Anarchy preview
-    summary: A dedicated rules-light lane for Black Ledger, dispatches, and mobile continuity now exists as a first-party preview.
+    title: Shadowrun Anarchy
+    summary: A dedicated rules-light lane for Black Ledger, dispatches, mobile continuity, and portable Chummer-owned export is live as a first-party MVP.
     href: /anarchy
-    badge: Playable preview
+    badge: Live now
     audience: public
     image_family: streetfront
     action_label: Open Anarchy
@@ -228,17 +228,53 @@ cards:
     audience: public
     image_family: facility_exterior
     action_label: Open the installer shelf
+  - id: real_ready_for_tonight_preview
+    bucket: whats_real_now
+    title: Ready for Tonight
+    summary: Role verdicts, starter loadouts, packet exports, and mobile handoff now exist as a shipped first-party session-start rail.
+    href: /ready
+    badge: Live now
+    audience: public
+    image_family: solo_operator
+    action_label: Open Ready for Tonight
+  - id: real_knowledge_fabric_preview
+    bucket: whats_real_now
+    title: Knowledge Fabric
+    summary: Source-aware explain now ships with public-safe receipt downloads, provenance, and bounded answer posture on a first-party route.
+    href: /rules
+    badge: Live now
+    audience: public
+    image_family: simulation_bench
+    action_label: Open Knowledge Fabric
+  - id: real_horizon_packet_previews
+    bucket: whats_real_now
+    title: Briefings, runsites, and primers
+    summary: The packet horizons now ship first-party dossier, runsite pack, and printable primer routes with markdown and JSON rails.
+    href: /jackpoint
+    badge: Live now
+    audience: public
+    image_family: prop_cluster
+    action_label: Open packet previews
+  - id: real_community_creator_preview
+    bucket: whats_real_now
+    title: Community, creator, and passport
+    summary: Community Hub, Creator OS, and Runner Passport now ship first-party packet and receipt rails with explicit trust boundaries.
+    href: /community
+    badge: Live now
+    audience: public
+    image_family: archive_stair
+    action_label: Open community hub
   - id: horizon_nexus_pan
     bucket: coming_next
     title: NEXUS-PAN
-    summary: Shared state survives device churn without the table losing trust.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/nexus-pan.md
-    badge: Preparing
+    summary: Shared state, claimed installs, and reconnect posture now ship on first-party continuity rails without exposing private device history.
+    href: /play/continuity
+    badge: Live now
     audience: public
     image_family: streetfront
     detail_route: /roadmap/nexus-pan
-    render_mode: external_explainer
-    action_label: Compare with current continuity proof
+    render_mode: route
+    action_label: Open continuity
     detail_primary_href: /now#real-mobile-prep
     detail_primary_label: Compare with current continuity proof
     fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/nexus-pan.md
@@ -304,15 +340,15 @@ cards:
     bucket: coming_next
     title: JACKPOINT
     summary: Dossiers, recaps, and briefings that feel finished without severing provenance.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/jackpoint.md
-    badge: Preview lane
+    href: /jackpoint
+    badge: Live now
     audience: public
     image_family: dossier_desk
     detail_route: /roadmap/jackpoint
-    render_mode: external_explainer
-    action_label: See the related artifact preview
-    detail_primary_href: /artifacts/dossier-brief
-    detail_primary_label: See the related artifact preview
+    render_mode: route
+    action_label: Open JACKPOINT
+    detail_primary_href: /jackpoint
+    detail_primary_label: Open JACKPOINT
     fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/jackpoint.md
     fallback_label: Read the horizon brief
     external_ok: true
@@ -324,15 +360,15 @@ cards:
     bucket: coming_next
     title: RUNSITE
     summary: Walk the job before the team walks into it.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runsite.md
-    badge: Preview lane
+    href: /runsites
+    badge: Live now
     audience: public
     image_family: facility_exterior
     detail_route: /roadmap/runsite
-    render_mode: external_explainer
-    action_label: See the related artifact preview
-    detail_primary_href: /artifacts/runsite-pack
-    detail_primary_label: See the related artifact preview
+    render_mode: route
+    action_label: Open RUNSITE
+    detail_primary_href: /runsites
+    detail_primary_label: Open RUNSITE
     fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runsite.md
     fallback_label: Read the horizon brief
     external_ok: true
@@ -344,15 +380,15 @@ cards:
     bucket: coming_next
     title: RUNBOOK PRESS
     summary: Bring new players in without the two-hour lecture.
-    href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runbook-press.md
-    badge: Preview lane
+    href: /runbook
+    badge: Live now
     audience: public
     image_family: prop_cluster
     detail_route: /roadmap/runbook-press
-    render_mode: external_explainer
-    action_label: See the related artifact preview
-    detail_primary_href: /artifacts/campaign-primer
-    detail_primary_label: See the related artifact preview
+    render_mode: route
+    action_label: Open RUNBOOK
+    detail_primary_href: /runbook
+    detail_primary_label: Open RUNBOOK
     fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/runbook-press.md
     fallback_label: Read the horizon brief
     external_ok: true
@@ -544,15 +580,15 @@ cards:
   - id: artifact_after_action
     bucket: featured_artifacts
     title: Replay and after-action
-    summary: See what happened, not just what people remember.
-    href: /roadmap/ghostwire
-    badge: Preview
+    summary: See what happened, not just what people remember, through first-party replay and after-action packets.
+    href: /ghostwire
+    badge: Live now
     audience: public
     image_family: boulevard_of_futures
     detail_route: /artifacts/replay-after-action
-    action_label: Inspect the after-action preview
-    detail_primary_href: /roadmap/ghostwire
-    detail_primary_label: See related roadmap item
+    action_label: Open GHOSTWIRE
+    detail_primary_href: /ghostwire
+    detail_primary_label: Open the after-action lane
   - id: public_feedback
     bucket: participate
     title: Public feedback board

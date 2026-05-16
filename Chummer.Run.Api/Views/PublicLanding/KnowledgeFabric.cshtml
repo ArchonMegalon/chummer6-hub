@@ -1,0 +1,62 @@
+@model KnowledgeFabricPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-trust-page";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">@Model.Eyebrow</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            @foreach (var point in Model.SummaryPoints)
+            {
+                <span>@point</span>
+            }
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+        <a class="button-like button-like--@Model.TertiaryAction.Tone" href="@Model.TertiaryAction.Href">@Model.TertiaryAction.Label</a>
+    </div>
+</section>
+
+@if (Model.SignedInStatus is not null)
+{
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    </section>
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Explain receipts</p>
+        <h2 class="editorial-title">Download the receipt before trusting the summary.</h2>
+        <p class="editorial-copy">This route proves a bounded answer shape: public-safe summary, provenance, and a downloadable receipt. It does not dump book text or pretend to be a total rules oracle.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var receipt in Model.Receipts)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@receipt.Status</span>
+                <h3>@receipt.Topic</h3>
+                <p>@receipt.Summary</p>
+                <div class="route-choice-card__proof">
+                    <span>@receipt.ReceiptId</span>
+                    <span>@receipt.Provenance</span>
+                </div>
+                <a class="editorial-strip__action" href="@receipt.Route">Open receipt JSON</a>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.TrustPulse is not null)
+{
+    <section class="release-footnote">
+        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+    </section>
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from html import unescape
@@ -11,7 +12,12 @@ from pathlib import Path
 import requests
 
 
-COMPLETION_DIR = Path("/docker/chummercomplete/_completion/chummer_run_redesign_closure")
+COMPLETION_DIR = Path(
+    os.environ.get(
+        "CHUMMER_COMPLETION_DIR",
+        "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
+    )
+)
 
 
 def strip_tags(html_text: str) -> str:

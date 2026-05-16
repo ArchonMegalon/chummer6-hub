@@ -1,0 +1,17 @@
+{
+  "contract_name": "fleet.flagship_product_readiness",
+  "generated_at": "2026-05-11T13:48:30Z",
+  "status": "pass",
+  "scoped_status": "pass",
+  "missing_keys": [],
+  "scoped_missing_keys": [],
+  "completion_audit": {
+    "status": "pass",
+    "reason": "Flagship product readiness proof is green."
+  },
+  "flagship_readiness_audit": {
+    "reason": "Flagship product readiness proof is green.",
+    "missing_coverage_keys": [],
+    "scoped_missing_coverage_keys": []
+  }
+}
