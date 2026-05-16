@@ -10,11 +10,11 @@
         <p class="eyebrow">Black Ledger onboarding</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="page-copy">Choose your flag.</p>
-        <div class="trust-claim__microproof">
-            <span>All current runners join</span>
-            <span>All future runners join</span>
-            <span>No runner split in MVP</span>
+        <div class="trust-claim__microproof" aria-label="Onboarding steps">
+            @foreach (var step in Model.Steps)
+            {
+                <a class="inline-link" href="@step.Href">@(step.Current ? $"{step.Label} (current)" : step.Complete ? $"{step.Label} (complete)" : step.Label)</a>
+            }
         </div>
     </div>
     <div class="stacked-actions">
@@ -24,11 +24,136 @@
         }
         else
         {
-            <a class="button-like button-like--primary" href="/account/ledger/factions/create">Found Major Faction</a>
+            <a class="button-like button-like--primary" href="/account/ledger/onboarding?step=allegiance">Start onboarding</a>
         }
         <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open command map</a>
     </div>
 </section>
+
+@if (string.Equals(Model.CurrentStep, "welcome", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Step 1</p>
+            <h2 class="editorial-title">Welcome</h2>
+            <p class="editorial-copy">Choose your flag. Black Ledger binds faction allegiance at the account level. No runner split in MVP. Every current runner inherits immediately, and future runners inherit automatically.</p>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">Runner scope</span>
+                <h3>Current runner count</h3>
+                <p>@Model.CurrentRunnerCount runner@(Model.CurrentRunnerCount == 1 ? "" : "s") currently inherit when you commit.</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Policy</span>
+                <h3>Account-wide allegiance</h3>
+                <p>Future runners inherit automatically. Defection is cooldown-bound and receipt-backed.</p>
+            </article>
+        </div>
+    </section>
+}
+else if (string.Equals(Model.CurrentStep, "allegiance", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Step 2</p>
+            <h2 class="editorial-title">Account allegiance</h2>
+            <p class="editorial-copy">Your choice applies to all current runners and all future runners. If your account currently has zero runners, the receipt stays at zero and only the future inheritance policy is stored.</p>
+        </div>
+        <div class="trust-claim__microproof">
+            <span>Current runners: @Model.CurrentRunnerCount</span>
+            <span>Future runners: inherit</span>
+            <span>Cooldown: 30 days</span>
+        </div>
+    </section>
+}
+else if (string.Equals(Model.CurrentStep, "factions", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Step 3</p>
+            <h2 class="editorial-title">Faction carousel</h2>
+            <p class="editorial-copy">@Model.ExistingFactionSummary</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var faction in Model.ExistingFactions)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@faction.Type</span>
+                    <h3>@faction.PublicName</h3>
+                    <p>@faction.Summary</p>
+                    <div class="stacked-actions">
+                        <a class="editorial-strip__action" href="@faction.Href">Open faction file</a>
+                        <a class="editorial-strip__action" href="@faction.PromoHref">Open promo brief</a>
+                        <form method="post" action="/account/ledger/onboarding/join">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="factionId" value="@faction.FactionId" />
+                            <button class="button-like button-like--secondary" type="submit">Join this faction</button>
+                        </form>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+else if (string.Equals(Model.CurrentStep, "choose-path", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="editorial-block">
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">Major founder path</span>
+                <h3>Found a Major Faction</h3>
+                <p>@Model.MajorFounderSummary</p>
+                <p>Major slots available: @Model.MajorSlotsAvailable</p>
+                <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=major">Found Major Faction</a>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Challenger founder path</span>
+                <h3>Found a Challenger Faction</h3>
+                <p>@Model.ChallengerFounderSummary</p>
+                <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=challenger">Found Challenger</a>
+            </article>
+        </div>
+    </section>
+}
+else if (string.Equals(Model.CurrentStep, "confirm", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Step 5</p>
+            <h2 class="editorial-title">Confirmation</h2>
+            <p class="editorial-copy">Pick an existing faction or move to the builder. Every path ends in a receipt, faction home handoff, and welcome kit.</p>
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="/account/ledger/onboarding?step=factions">Join existing faction</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/onboarding?step=choose-path">Found a faction</a>
+        </div>
+    </section>
+}
+else if (string.Equals(Model.CurrentStep, "builder", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Step 6</p>
+            <h2 class="editorial-title">Builder handoff</h2>
+            <p class="editorial-copy">Use the route-backed charter builder to choose public name, charter type, archetype, perks, flaws, and warning acknowledgement.</p>
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="/account/ledger/factions/create?charterType=major">Open major builder</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=challenger">Open challenger builder</a>
+        </div>
+    </section>
+}
+else if (string.Equals(Model.CurrentStep, "welcome-kit", StringComparison.OrdinalIgnoreCase))
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Step 7</p>
+            <h2 class="editorial-title">Welcome kit</h2>
+            <p class="editorial-copy">After join or founding, the account lands in faction home with badge posture, dispatch lane, and first-task receipts.</p>
+        </div>
+    </section>
+}
 
 @if (!string.IsNullOrWhiteSpace(Model.MajorSlotsWarning))
 {
@@ -40,47 +165,3 @@
         </div>
     </section>
 }
-
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Existing faction path</p>
-        <h2 class="editorial-title">Join a house that already has pressure, history, and enemies.</h2>
-        <p class="editorial-copy">@Model.ExistingFactionSummary</p>
-    </div>
-    <div class="route-choice-grid">
-        @foreach (var faction in Model.ExistingFactions)
-        {
-            <article class="route-choice-card">
-                <span class="tag">@faction.Type</span>
-                <h3>@faction.PublicName</h3>
-                <p>@faction.Summary</p>
-                <div class="stacked-actions">
-                    <a class="editorial-strip__action" href="@faction.Href">Open faction file</a>
-                    <form method="post" action="/account/ledger/onboarding/join">
-                        @Html.AntiForgeryToken()
-                        <input type="hidden" name="factionId" value="@faction.FactionId" />
-                        <button class="button-like button-like--secondary" type="submit">Join this faction</button>
-                    </form>
-                </div>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="editorial-block">
-    <div class="route-choice-grid">
-        <article class="route-choice-card">
-            <span class="tag">Major founder path</span>
-            <h3>Found a Major Faction</h3>
-            <p>@Model.MajorFounderSummary</p>
-            <p>Major slots available: @Model.MajorSlotsAvailable</p>
-            <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=major">Found Major Faction</a>
-        </article>
-        <article class="route-choice-card">
-            <span class="tag">Challenger founder path</span>
-            <h3>Found a Challenger Faction</h3>
-            <p>@Model.ChallengerFounderSummary</p>
-            <a class="button-like button-like--secondary" href="/account/ledger/factions/create?charterType=challenger">Found Challenger</a>
-        </article>
-    </div>
-</section>

@@ -18,9 +18,30 @@
     </div>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')">Open my faction</a>
+        <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open notifications</a>
         <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open command map</a>
     </div>
 </section>
+
+@if (Model.NewsreelStatus is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Turn 1 newsreel</p>
+            <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
+            <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
+        </div>
+        <div class="trust-claim__microproof">
+            <span>Policy: @Model.NewsreelStatus.Policy</span>
+            <span>Receipts: @Model.NewsreelStatus.ReceiptCount</span>
+            <span>Recipients sent: @Model.NewsreelStatus.RecipientCount</span>
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification receipts</a>
+            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.TurnHref">Open Turn 1</a>
+        </div>
+    </section>
+}
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
@@ -38,6 +59,35 @@
         }
     </div>
 </section>
+
+@if (Model.PromoArtifact is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Faction promo artifact</p>
+            <h2 class="editorial-title">Provider-verified fallback</h2>
+            <p class="editorial-copy">This onboarding lane stays honest: provider verification is still required, so the faction promo ships as first-party storyboard, static card, and captions.</p>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">@Model.PromoArtifact.ProviderStatus</span>
+                <h3>@Model.PromoArtifact.PublicName</h3>
+                <p>Render mode: @Model.PromoArtifact.RenderMode</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var format in Model.PromoArtifact.FormatLabels)
+                    {
+                        <span>@format</span>
+                    }
+                </div>
+                <div class="stacked-actions">
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.HtmlHref">Open promo brief</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.JsonHref">Open JSON brief</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.CaptionsHref">Open captions</a>
+                </div>
+            </article>
+        </div>
+    </section>
+}
 
 @if (Model.RecentActionReceipts.Count > 0)
 {

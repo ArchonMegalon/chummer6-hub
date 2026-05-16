@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Chummer.Run.Api.Services.Community;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,6 +11,20 @@ namespace Chummer.Tests;
 
 public sealed class BlackLedgerTickNewsTests
 {
+    [Fact]
+    public void BlackLedgerTickNews_routes_and_views_exist()
+    {
+        string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string accountView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerAccountHome.cshtml"));
+        string notificationsView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerNotifications.cshtml"));
+        string ledgerView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
+
+        Assert.Contains("[HttpGet(\"/account/ledger/notifications\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("Open notifications", accountView, StringComparison.Ordinal);
+        Assert.Contains("Signed-in notification rail", notificationsView, StringComparison.Ordinal);
+        Assert.Contains("Open notification status", ledgerView, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void BlackLedgerNewsRecipientResolver_only_user_preview_fallback_resolves_exactly_one_user()
     {
@@ -296,6 +311,63 @@ public sealed class BlackLedgerTickNewsTests
             Assert.Equal("sent", batch.Status);
             Assert.Single(batch.Receipts);
             Assert.Equal("ea-delivery-output-json", batch.Receipts[0].DeliveryRef);
+        }
+        finally
+        {
+            DeleteTempRoot(tempRoot);
+        }
+    }
+
+    [Fact]
+    public void BlackLedgerTickNews_status_view_model_explains_operator_preview_to_non_recipient()
+    {
+        string tempRoot = CreateTempRoot();
+        try
+        {
+            using var http = new HttpClient(new CapturingHandler(new List<CapturedRequest>(), HttpStatusCode.OK, """{"target_ref":"ea-delivery-2"}"""));
+            IConfiguration configuration = BuildConfiguration(tempRoot, new Dictionary<string, string?>
+            {
+                ["CHUMMER_BLACK_LEDGER_NEWS_EMAIL_ENABLED"] = "true",
+                ["CHUMMER_BLACK_LEDGER_NEWS_EMAIL_POLICY"] = BlackLedgerNewsRecipientResolver.OperatorOnlyPolicy,
+                ["CHUMMER_BLACK_LEDGER_NEWS_OPERATOR_TO"] = "operator@chummer.run",
+            });
+            CommunityStore store = new(configuration, NullLogger<CommunityStore>.Instance);
+            BlackLedgerTickNewsNotificationService service = new(
+                http,
+                store,
+                configuration,
+                new BlackLedgerNewsRecipientResolver(store, configuration),
+                NullLogger<BlackLedgerTickNewsNotificationService>.Instance);
+
+            store.BlackLedgerNewsDeliveryReceipts.Add(new BlackLedgerNewsDeliveryReceipt(
+                "blnews_demo",
+                "black_ledger_tick_news_generated",
+                "black-ledger-news|emerald-sprawl-prelude|1|ledger_tick_0001_preseeded|operator",
+                "emerald-sprawl-prelude",
+                0,
+                1,
+                "ledger_tick_0001_preseeded",
+                "news_emerald_turn_1",
+                "operator",
+                "o***@chummer.run",
+                "hash",
+                "sent",
+                "ea-delivery-1",
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow));
+
+            BlackLedgerNewsStatusViewModel status = service.BuildStatusViewModel(
+                "emerald-sprawl-prelude",
+                1,
+                "Signed-in account lane",
+                "/account/ledger/notifications",
+                "/ledger/turns/1",
+                "/ledger/turns/1/dispatches",
+                recipientUserId: "usr_regular");
+
+            Assert.Equal("suppressed_not_current_recipient", status.Status);
+            Assert.Contains("not an email recipient on this runtime", status.Summary, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

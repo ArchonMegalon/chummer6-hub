@@ -348,6 +348,43 @@ public sealed record BlackLedgerDispatchViewModel(
     bool AiGenerated,
     string Href);
 
+public sealed record BlackLedgerNewsReceiptEntryViewModel(
+    string ReceiptId,
+    string Status,
+    string Summary,
+    string? FailureReason,
+    string RecipientLabel,
+    string? DeliveryRef,
+    string AttemptedAtUtc);
+
+public sealed record BlackLedgerNewsStatusViewModel(
+    string WorldId,
+    int Turn,
+    string Status,
+    string StatusLabel,
+    string Summary,
+    string? FailureReason,
+    string Policy,
+    int ReceiptCount,
+    int RecipientCount,
+    string ScopeLabel,
+    string NotificationsHref,
+    string TurnHref,
+    string DispatchHref,
+    IReadOnlyList<BlackLedgerNewsReceiptEntryViewModel> Receipts);
+
+public sealed record BlackLedgerFactionPromoArtifactViewModel(
+    string FactionId,
+    string PublicName,
+    string ProviderStatus,
+    string RenderMode,
+    string HtmlHref,
+    string JsonHref,
+    string CaptionsHref,
+    string StaticCardLabel,
+    IReadOnlyList<string> FormatLabels,
+    IReadOnlyList<string> CaptionLines);
+
 public sealed record BlackLedgerWorldPreviewViewModel(
     string WorldId,
     string PublicName,
@@ -401,6 +438,8 @@ public sealed record BlackLedgerHubPageViewModel(
     IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
     IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
     BlackLedgerDispatchViewModel? SelectedDispatch,
+    BlackLedgerNewsStatusViewModel? NewsreelStatus,
+    BlackLedgerFactionPromoArtifactViewModel? SelectedFactionPromo,
     BlackLedgerCommandMapViewModel? CommandMap,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
@@ -438,7 +477,8 @@ public sealed record BlackLedgerFactionJoinOptionViewModel(
     string PublicName,
     string Type,
     string Summary,
-    string Href);
+    string Href,
+    string PromoHref);
 
 public sealed record BlackLedgerFactionOnboardingViewModel(
     SiteChromeViewModel Chrome,
@@ -460,7 +500,23 @@ public sealed record BlackLedgerFactionHomeViewModel(
     BlackLedgerAccountFactionAllegianceDto Allegiance,
     BlackLedgerFactionDetailDto Faction,
     IReadOnlyList<string> WelcomeKit,
-    IReadOnlyList<BlackLedgerFactionActionReceiptDto> RecentActionReceipts);
+    IReadOnlyList<BlackLedgerFactionActionReceiptDto> RecentActionReceipts,
+    BlackLedgerNewsStatusViewModel? NewsreelStatus = null,
+    BlackLedgerFactionPromoArtifactViewModel? PromoArtifact = null);
+
+public sealed record BlackLedgerNotificationsPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerNewsStatusViewModel Status,
+    IReadOnlyList<string> DeliveryNotes);
+
+public sealed record BlackLedgerFactionPromoPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerFactionPromoArtifactViewModel Promo,
+    IReadOnlyList<string> DeliveryNotes);
 
 public sealed record BlackLedgerFactionCreatePageViewModel(
     SiteChromeViewModel Chrome,

@@ -33,6 +33,26 @@
     </div>
 </section>
 
+@if (Model.NewsreelStatus is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Turn @Model.NewsreelStatus.Turn newsreel</p>
+            <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
+            <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
+        </div>
+        <div class="trust-claim__microproof">
+            <span>Scope: @Model.NewsreelStatus.ScopeLabel</span>
+            <span>Policy: @Model.NewsreelStatus.Policy</span>
+            <span>Receipts: @Model.NewsreelStatus.ReceiptCount</span>
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.DispatchHref">Open dispatch lane</a>
+            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification status</a>
+        </div>
+    </section>
+}
+
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Modules</p>
@@ -247,6 +267,25 @@
                         <a class="inline-link" href="/ledger/turns/1">Open Turn 1</a>
                     </div>
                 </article>
+                @if (Model.SelectedFactionPromo is not null)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@Model.SelectedFactionPromo.ProviderStatus</span>
+                        <h3>Onboarding promo fallback</h3>
+                        <p>This faction ships a route-backed fallback artifact instead of an unverified external render claim.</p>
+                        <div class="route-choice-card__proof">
+                            @foreach (var format in Model.SelectedFactionPromo.FormatLabels)
+                            {
+                                <span>@format</span>
+                            }
+                        </div>
+                        <div class="trust-claim__microproof">
+                            <a class="inline-link" href="@Model.SelectedFactionPromo.HtmlHref">Open promo brief</a>
+                            <a class="inline-link" href="@Model.SelectedFactionPromo.JsonHref">Open JSON brief</a>
+                            <a class="inline-link" href="@Model.SelectedFactionPromo.CaptionsHref">Open captions</a>
+                        </div>
+                    </article>
+                }
             </div>
             @if (factionDistricts.Length > 0)
             {

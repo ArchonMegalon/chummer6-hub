@@ -67,7 +67,8 @@ public sealed class BlackLedgerFactionOnboardingService
                 faction.PublicName,
                 faction.Type,
                 string.Join(" · ", faction.PublicSignals.Take(3)),
-                $"/ledger/factions/{faction.Id.Replace('_', '-')}"))
+                $"/ledger/factions/{faction.Id.Replace('_', '-')}",
+                $"/ledger/factions/{faction.Id.Replace('_', '-')}/promo"))
             .ToArray();
         var majorAvailability = BuildMajorSlotAvailability();
         string step = string.IsNullOrWhiteSpace(currentStep) ? "welcome" : NormalizeToken(currentStep).ToLowerInvariant();
@@ -111,7 +112,8 @@ public sealed class BlackLedgerFactionOnboardingService
             Allegiance: allegiance,
             Faction: detail,
             WelcomeKit: welcomeKit,
-            RecentActionReceipts: GetActionReceipts(detail.FactionId).Take(5).ToArray());
+            RecentActionReceipts: GetActionReceipts(detail.FactionId).Take(5).ToArray(),
+            PromoArtifact: GetPromoArtifact(detail.FactionId));
     }
 
     public BlackLedgerFactionCreatePageViewModel BuildCreatePage(SiteChromeViewModel chrome, HubUserDto user, string? preferredCharterType = null)
@@ -127,7 +129,8 @@ public sealed class BlackLedgerFactionOnboardingService
                 faction.PublicName,
                 faction.Type,
                 string.Join(" · ", faction.PublicSignals.Take(2)),
-                $"/ledger/factions/{faction.Id.Replace('_', '-')}"))
+                $"/ledger/factions/{faction.Id.Replace('_', '-')}",
+                $"/ledger/factions/{faction.Id.Replace('_', '-')}/promo"))
             .ToArray();
         return new BlackLedgerFactionCreatePageViewModel(
             Chrome: chrome,
@@ -383,6 +386,67 @@ public sealed class BlackLedgerFactionOnboardingService
         }
 
         return null;
+    }
+
+    public BlackLedgerFactionPromoArtifactViewModel? GetPromoArtifact(string factionId)
+    {
+        BlackLedgerFactionDetailDto? detail = GetWorkspaceFactionDetail(factionId);
+        if (detail is null)
+        {
+            return null;
+        }
+
+        string normalizedFactionId = NormalizeFactionId(detail.FactionId).Replace('_', '-');
+        IReadOnlyList<string> captions = normalizedFactionId switch
+        {
+            "glass-tower-compact" => [
+                "Welcome to calm. If you can afford it.",
+                "Glass towers, floating contracts, and legal disclaimers in a blue-white wash.",
+                "Static fallback and captions stay public-safe while provider verification remains bounded."
+            ],
+            "rust-market-syndicate" => [
+                "Everything is available. Nothing is free.",
+                "Orange debt pulses chase stacked crates through the night market.",
+                "Public-safe storyboard fallback replaces any unverified provider lane."
+            ],
+            "ashline-circle" => [
+                "Power is easy. Proof is hard.",
+                "Candles argue about source clarity while sigils refuse to stay calm.",
+                "Captions and static fallback remain first-party and provider-agnostic."
+            ],
+            "neon-docks-union" => [
+                "Routes move. Drones complain. We keep the city breathing.",
+                "Container stacks, cyan trails, and safety signs all talk back.",
+                "This onboarding promo is storyboard-first until a verified renderer is present."
+            ],
+            "ghostline-network" => [
+                "If you heard it, verify it. If you verified it, redact it.",
+                "Half the reel deletes itself before the lie can settle.",
+                "No provider branding and no private labels escape this fallback lane."
+            ],
+            "barrens-free-wardens" => [
+                "This starts as a safety briefing and ends as a promise.",
+                "Street-worn signals and stubborn mutual aid carry the pitch.",
+                "Static card, captions, and JSON brief are first-party fallback artifacts."
+            ],
+            _ => [
+                $"{detail.PublicName} onboarding promo stays in first-party fallback mode.",
+                "Provider verification remains required before any external render lane is claimed.",
+                "Static card, captions, and route-backed JSON brief are available now."
+            ]
+        };
+
+        return new BlackLedgerFactionPromoArtifactViewModel(
+            FactionId: normalizedFactionId,
+            PublicName: detail.PublicName,
+            ProviderStatus: "NEEDS_PROVIDER_VERIFICATION",
+            RenderMode: "fallback_static_storyboard",
+            HtmlHref: $"/ledger/factions/{normalizedFactionId}/promo",
+            JsonHref: $"/ledger/factions/{normalizedFactionId}/promo.json",
+            CaptionsHref: $"/ledger/factions/{normalizedFactionId}/promo.vtt",
+            StaticCardLabel: "Static fallback card",
+            FormatLabels: ["16:9 storyboard", "9:16 mobile storyboard", "Static fallback card", "Captions required"],
+            CaptionLines: captions);
     }
 
     public IReadOnlyList<BlackLedgerFactionActionDefinitionDto> GetActionDefinitions(string factionId)
