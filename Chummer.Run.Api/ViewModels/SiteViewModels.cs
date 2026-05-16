@@ -395,6 +395,7 @@ public sealed record BlackLedgerHubPageViewModel(
     string Intro,
     string CurrentSection,
     BlackLedgerWorldPreviewViewModel? World,
+    BlackLedgerFactionViewModel? SelectedFaction,
     IReadOnlyList<BlackLedgerPublicStatViewModel> Stats,
     IReadOnlyList<BlackLedgerModuleViewModel> Modules,
     IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
@@ -403,6 +404,29 @@ public sealed record BlackLedgerHubPageViewModel(
     BlackLedgerCommandMapViewModel? CommandMap,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record BlackLedgerFactionWorkspaceTabViewModel(
+    string Label,
+    string Href,
+    bool Current);
+
+public sealed record BlackLedgerFactionWorkspacePageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CurrentSection,
+    BlackLedgerWorldPreviewViewModel? World,
+    BlackLedgerFactionViewModel Faction,
+    IReadOnlyList<string> CoveredDistricts,
+    IReadOnlyList<string> PrivateLabels,
+    IReadOnlyList<string> PrivateLoreNotes,
+    IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
+    IReadOnlyList<BlackLedgerFactionWorkspaceTabViewModel> Tabs,
+    string PublicProfileHref,
+    string PrivacyNote,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 

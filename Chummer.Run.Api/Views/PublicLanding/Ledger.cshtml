@@ -6,6 +6,7 @@
     var commandMap = Model.CommandMap;
     var featuredEvent = commandMap?.Events.FirstOrDefault();
     var mapFocused = string.Equals(Model.CurrentSection, "map", StringComparison.OrdinalIgnoreCase);
+    var selectedFaction = Model.SelectedFaction;
 }
 
 <section class="trust-page-hero">
@@ -190,10 +191,79 @@
                             <span>@signal</span>
                         }
                     </div>
+                    <a class="editorial-strip__action" href="/ledger/factions/@faction.Id.Replace('_', '-')">Open faction file</a>
                 </article>
             }
         </div>
     </section>
+
+    @if (selectedFaction is not null)
+    {
+        var factionDistricts = Model.World.Districts
+            .Where(district => string.Equals(district.DominantFaction.Replace(' ', '-'), selectedFaction.Id.Replace('_', '-'), StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        <section class="editorial-block" id="ledger-faction-file">
+            <div class="editorial-block__lead">
+                <p class="eyebrow">Faction file</p>
+                <h2 class="editorial-title">@selectedFaction.PublicName</h2>
+                <p class="editorial-copy">@selectedFaction.PublicName stays public-safe here: identity, visible district pressure, AI steward posture, package heat, latest dispatches, and turn-backed links only.</p>
+                <div class="trust-claim__microproof">
+                    <span>Faction type: @selectedFaction.Type</span>
+                    <span>Map focus: @(factionDistricts.FirstOrDefault()?.Name ?? "Cross-district pressure")</span>
+                    <span>Current turn: @Model.World.CurrentTurn</span>
+                </div>
+            </div>
+            <div class="route-choice-grid">
+                <article class="route-choice-card">
+                    <span class="tag">Identity</span>
+                    <h3>Visible operating posture</h3>
+                    <p>@selectedFaction.PublicName is tracked as @selectedFaction.Type with bounded public-safe signals only.</p>
+                    <div class="route-choice-card__proof">
+                        @foreach (var signal in selectedFaction.PublicSignals)
+                        {
+                            <span>@signal</span>
+                        }
+                    </div>
+                </article>
+                <article class="route-choice-card">
+                    <span class="tag">AI stewards</span>
+                    <h3>Named interim roles</h3>
+                    <p>Leader: @selectedFaction.FactionLeader · GM: @selectedFaction.FieldGm · Intel: @selectedFaction.IntelProvider</p>
+                    <p class="muted-copy">Interim AI stewards may summarize or redact. Verified humans outrank them.</p>
+                </article>
+                <article class="route-choice-card">
+                    <span class="tag">Package pressure</span>
+                    <h3>Governed package demand</h3>
+                    <p>Faction-linked package pressure stays visible as demand and closeout heat, not shipped truth.</p>
+                    <a class="editorial-strip__action" href="/ledger/packages">Open package pressure</a>
+                </article>
+                <article class="route-choice-card">
+                    <span class="tag">Turn history</span>
+                    <h3>Replay and dispatch trail</h3>
+                    <p>Jump from this faction file into the turn replay, the district map, or the filtered dispatch archive.</p>
+                    <div class="trust-claim__microproof">
+                        <a class="inline-link" href="/ledger/map#ledger-map">Open map focus</a>
+                        <a class="inline-link" href="/ledger/factions/@selectedFaction.Id.Replace('_', '-')/dispatches">Open faction dispatches</a>
+                        <a class="inline-link" href="/ledger/turns/1">Open Turn 1</a>
+                    </div>
+                </article>
+            </div>
+            @if (factionDistricts.Length > 0)
+            {
+                <div class="ledger-world-shell__districts">
+                    @foreach (var district in factionDistricts)
+                    {
+                        <article class="route-choice-card">
+                            <span class="tag">Map focus</span>
+                            <h3>@district.Name</h3>
+                            <p>@district.Summary</p>
+                            <p class="muted-copy">Influence @district.Influence · Heat @district.Heat · Trend @district.Trend</p>
+                        </article>
+                    }
+                </div>
+            }
+        </section>
+    }
 
     @if (Model.World.StewardshipPosts.Count > 0)
     {
