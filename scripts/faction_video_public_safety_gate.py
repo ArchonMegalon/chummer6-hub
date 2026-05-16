@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -9,6 +10,13 @@ ROOT = Path("/docker/chummercomplete/chummer-design/_completion/full_product_eve
 
 
 def main() -> int:
+    subprocess.run(
+        [
+            "python3",
+            str(Path(__file__).with_name("render_faction_promo_videos.py")),
+        ],
+        check=True,
+    )
     receipts = sorted(ROOT.glob("*_VIDEO_RECEIPT.generated.json"))
     payload = {
         "generated_at_utc": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat().replace("+00:00", "Z"),
