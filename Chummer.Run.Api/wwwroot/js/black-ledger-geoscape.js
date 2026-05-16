@@ -471,7 +471,9 @@ class BlackLedgerGeoscapeRoot {
       ? '/account/ledger/onboarding?step=choose-path'
       : promoHref;
     const secondaryLabel = this.variant === 'onboarding' ? 'Found my own' : 'Open storyboard';
-    this.panelActions.innerHTML = `
+    this.panelActions.innerHTML = this.variant === 'teaser'
+      ? '<span class="muted-copy">Turn 1 replay, faction pressure, and dispatch trails continue inside Black Ledger.</span>'
+      : `
       <a class="button-like button-like--primary" href="${primaryHref}">${primaryLabel}</a>
       <a class="button-like button-like--secondary" href="${secondaryHref}">${secondaryLabel}</a>
       <a class="inline-link" href="${dispatchHref}">Latest dispatch</a>
