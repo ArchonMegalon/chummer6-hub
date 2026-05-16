@@ -34,6 +34,8 @@
         return value
             .Replace("Product Governor", "governed product decision", StringComparison.OrdinalIgnoreCase)
             .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
+            .Replace("EA synthesis", "product review", StringComparison.OrdinalIgnoreCase)
+            .Replace("productlift_idea_clustered", "public feedback signal", StringComparison.OrdinalIgnoreCase)
             .Replace("Icanpreneur", "guided synthesis lane", StringComparison.OrdinalIgnoreCase)
             .Replace("Deftform", "structured pre-screen", StringComparison.OrdinalIgnoreCase)
             .Replace("FacePop", "public invitation", StringComparison.OrdinalIgnoreCase)
@@ -141,7 +143,7 @@
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Source receipts</span>
+            <span class="tag">Source signals</span>
             <h3>Canonical sources and closeout gates still sit upstream of the hosted surface.</h3>
             <p>These Chummer-owned receipts keep the projection honest even while the hosted board handles visibility and voter follow-up.</p>
             @if (sourceReceipts.Length > 0)
@@ -186,7 +188,7 @@
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
                             <h3>Journey-proof refs</h3>
-                            <p>@string.Join(" / ", journeyProofEvents.Select(item => item.EventKey))</p>
+                            <p>@string.Join(" / ", journeyProofEvents.Select(item => SanitizeProjectionText(item.EventKey)))</p>
                         </div>
                     </article>
                 }
