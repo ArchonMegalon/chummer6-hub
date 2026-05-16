@@ -21,8 +21,9 @@ public sealed class LedgerController : ControllerBase
     private readonly BlackLedgerPublicStatsService _blackLedgerPublicStats;
     private readonly BlackLedgerDispatchService _blackLedgerDispatches;
     private readonly BlackLedgerTickNewsNotificationService _blackLedgerTickNews;
+    private readonly BlackLedgerFactionOnboardingService _blackLedgerFactions;
 
-    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats, BlackLedgerDispatchService blackLedgerDispatches, BlackLedgerTickNewsNotificationService blackLedgerTickNews)
+    public LedgerController(AccountService accounts, HubIdentityClient identity, LedgerService ledger, FleetReceiptVerifier receiptVerifier, RewardService rewards, BlackLedgerPublicStatsService blackLedgerPublicStats, BlackLedgerDispatchService blackLedgerDispatches, BlackLedgerTickNewsNotificationService blackLedgerTickNews, BlackLedgerFactionOnboardingService blackLedgerFactions)
     {
         _accounts = accounts;
         _identity = identity;
@@ -32,6 +33,7 @@ public sealed class LedgerController : ControllerBase
         _blackLedgerPublicStats = blackLedgerPublicStats;
         _blackLedgerDispatches = blackLedgerDispatches;
         _blackLedgerTickNews = blackLedgerTickNews;
+        _blackLedgerFactions = blackLedgerFactions;
     }
 
     [HttpPost("receipts")]
@@ -144,6 +146,169 @@ public sealed class LedgerController : ControllerBase
         }
 
         return Ok(_blackLedgerDispatches.ListPublishedDispatches(turn));
+    }
+
+    [HttpGet("factions")]
+    [Produces("application/json")]
+    public ActionResult<IReadOnlyList<BlackLedgerFactionSummaryDto>> GetBlackLedgerFactions()
+        => Ok(_blackLedgerFactions.ListFactionSummaries());
+
+    [HttpGet("factions/{factionId}")]
+    [Produces("application/json")]
+    public ActionResult<BlackLedgerFactionDetailDto> GetBlackLedgerFaction([FromRoute] string factionId)
+    {
+        var detail = _blackLedgerFactions.GetFactionDetail(factionId);
+        return detail is null ? NotFound() : Ok(detail);
+    }
+
+    [HttpGet("factions/{factionId}/actions")]
+    [Produces("application/json")]
+    public ActionResult<IReadOnlyList<BlackLedgerFactionActionDefinitionDto>> GetBlackLedgerFactionActions([FromRoute] string factionId)
+        => Ok(_blackLedgerFactions.GetActionDefinitions(factionId));
+
+    [HttpGet("/api/v1/account/ledger/allegiance")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerAccountFactionAllegianceDto>> GetAccountFactionAllegiance(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var allegiance = _blackLedgerFactions.GetAllegiance(user);
+            return allegiance is null ? NotFound() : Ok(allegiance);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpPost("/api/v1/account/ledger/allegiance/join")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerFactionJoinReceiptDto>> JoinLedgerFaction(
+        [FromBody] JoinFactionRequest? body,
+        [FromForm] string? factionId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var receipt = _blackLedgerFactions.JoinFaction(user, body?.FactionId ?? factionId ?? string.Empty);
+            return Ok(receipt);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("/api/v1/account/ledger/factions")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerFactionCharterDto>> CreateLedgerFaction(
+        [FromBody] BlackLedgerCreateFactionRequest? body,
+        [FromForm] string? publicName,
+        [FromForm] string? charterType,
+        [FromForm] string? archetypeId,
+        [FromForm] string[]? perkIds,
+        [FromForm] string[]? flawIds,
+        [FromForm] string? startingDistrictId,
+        [FromForm] string? rivalFactionId,
+        [FromForm] bool? warningAccepted,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var charter = _blackLedgerFactions.CreateFaction(user, body ?? new BlackLedgerCreateFactionRequest(publicName, charterType, archetypeId, perkIds, flawIds, startingDistrictId, rivalFactionId, warningAccepted));
+            return Ok(charter);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("/api/v1/account/ledger/factions/{factionId}/actions")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerFactionActionReceiptDto>> ExecuteLedgerFactionAction(
+        [FromRoute] string factionId,
+        [FromBody] BlackLedgerFactionActionRequest? body,
+        [FromForm] string? actionId,
+        [FromForm] string? targetDistrictId,
+        [FromForm] string? targetFactionId,
+        [FromForm] string? stake,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var receipt = _blackLedgerFactions.ExecuteAction(user, factionId, body ?? new BlackLedgerFactionActionRequest(actionId, targetDistrictId, targetFactionId, stake));
+            return Ok(receipt);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("/api/v1/account/ledger/factions/{factionId}/moderation/approve")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerFactionModerationReceiptDto>> ApproveLedgerFactionPublicProjection(
+        [FromRoute] string factionId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.ApproveFactionForPublicProjection(user, factionId));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpPost("/api/v1/account/ledger/factions/{factionId}/moderation/suppress")]
+    [Produces("application/json")]
+    public async Task<ActionResult<BlackLedgerFactionModerationReceiptDto>> SuppressLedgerFactionPublicProjection(
+        [FromRoute] string factionId,
+        [FromBody] SuppressFactionModerationRequest? body,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.SuppressFactionPublicProjection(user, factionId, body?.Reason));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpGet("worlds/{worldId}/map")]
@@ -334,28 +499,16 @@ public sealed class LedgerController : ControllerBase
         try
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
-            if (!string.Equals(request.WorldId, "emerald-sprawl-prelude", StringComparison.OrdinalIgnoreCase))
-            {
-                return BadRequest("worldId must be emerald-sprawl-prelude.");
-            }
-
-            var receipt = new
-            {
-                overlay_id = $"overlay_{Guid.NewGuid():N}",
-                owner_account_id = subject.SubjectId,
-                campaign_id = campaignId,
-                world_id = request.WorldId,
-                label_map = request.LabelMap,
-                public_projection_allowed = false,
-                created_at_utc = DateTimeOffset.UtcNow.ToString("O"),
-                updated_at_utc = DateTimeOffset.UtcNow.ToString("O"),
-            };
-
-            return Ok(receipt);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerFactions.UpsertPrivateLoreOverlay(user, campaignId, request));
         }
         catch (HubRequestAuthException ex)
         {
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
         }
     }
 
@@ -400,7 +553,7 @@ public sealed class LedgerController : ControllerBase
         string HumanReviewStatus = "approved",
         bool Publish = true);
 
-    public sealed record PrivateLoreOverlayRequest(
-        string WorldId,
-        Dictionary<string, string> LabelMap);
+    public sealed record JoinFactionRequest(string? FactionId);
 }
+
+public sealed record SuppressFactionModerationRequest(string? Reason);

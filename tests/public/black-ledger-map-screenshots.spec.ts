@@ -1,5 +1,5 @@
 import { test, expect } from 'playwright/test';
-import { writeMapMarkdownArtifact, mapCompletionPath } from './black-ledger-map-artifacts';
+import { completionPath, writeMarkdownArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const viewports = [
@@ -15,16 +15,16 @@ for (const viewport of viewports) {
   test(`black ledger map screenshot ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto(`${baseUrl}/ledger/map`, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('.ledger-command-map')).toBeVisible();
-    await page.screenshot({ path: mapCompletionPath(`black-ledger-map-${viewport.width}x${viewport.height}.png`), fullPage: true });
+    await expect(page.locator('[data-black-ledger-geoscape-root][data-ready="true"]')).toBeVisible();
+    await page.screenshot({ path: completionPath(`black-ledger-globe-${viewport.width}x${viewport.height}.png`), fullPage: true });
   });
 }
 
 test.afterAll(async () => {
-  writeMapMarkdownArtifact(
-    'BLACK_LEDGER_COMMAND_MAP_SCREENSHOT_REPORT.md',
+  writeMarkdownArtifact(
+    'BLACK_LEDGER_GLOBE_SCREENSHOT_REPORT.md',
     [
-      '# Black Ledger Command Map Screenshots',
+      '# Black Ledger Globe Screenshots',
       '',
       ...viewports.map((viewport) => `- ${viewport.width}x${viewport.height}: captured`),
     ].join('\n'));

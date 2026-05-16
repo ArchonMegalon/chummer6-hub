@@ -53,6 +53,8 @@ public sealed class PublicLandingController : Controller
     private readonly KarmaForgeDiscoveryService _karmaForge;
     private readonly BlackLedgerPublicStatsService _blackLedgerStats;
     private readonly BlackLedgerDispatchService _blackLedgerDispatches;
+    private readonly BlackLedgerTickNewsNotificationService _blackLedgerTickNews;
+    private readonly BlackLedgerFactionOnboardingService _blackLedgerFactions;
     private readonly AnarchyPreviewService _anarchyPreview;
     private readonly PublicPackageCatalogService _packageCatalog;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
@@ -100,6 +102,8 @@ public sealed class PublicLandingController : Controller
         KarmaForgeDiscoveryService karmaForge,
         BlackLedgerPublicStatsService blackLedgerStats,
         BlackLedgerDispatchService blackLedgerDispatches,
+        BlackLedgerTickNewsNotificationService blackLedgerTickNews,
+        BlackLedgerFactionOnboardingService blackLedgerFactions,
         AnarchyPreviewService anarchyPreview,
         PublicPackageCatalogService packageCatalog,
         PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
@@ -143,6 +147,8 @@ public sealed class PublicLandingController : Controller
         _karmaForge = karmaForge;
         _blackLedgerStats = blackLedgerStats;
         _blackLedgerDispatches = blackLedgerDispatches;
+        _blackLedgerTickNews = blackLedgerTickNews;
+        _blackLedgerFactions = blackLedgerFactions;
         _anarchyPreview = anarchyPreview;
         _packageCatalog = packageCatalog;
         _publicCreatorDiscovery = publicCreatorDiscovery;
@@ -1733,6 +1739,16 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> LedgerPage([FromQuery] int? turn, CancellationToken cancellationToken)
     {
+        if (await TryIsAuthenticatedAsync(cancellationToken))
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            if (!_blackLedgerFactions.HasActiveAllegiance(user.UserId))
+            {
+                return Redirect("/account/ledger/onboarding");
+            }
+        }
+
         var model = await BuildBlackLedgerPageModel("/ledger", "hub", turn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
@@ -1855,6 +1871,234 @@ public sealed class PublicLandingController : Controller
         }
 
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/packages")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerFactionPackagesPage([FromRoute] string factionId, [FromQuery] int? turn, CancellationToken cancellationToken)
+    {
+        var model = await BuildBlackLedgerPageModel($"/ledger/factions/{factionId}/packages", "packages", turn, cancellationToken, selectedFactionId: factionId);
+        bool knownFaction = model.World?.Factions.Any(faction =>
+            string.Equals(faction.Id, factionId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(faction.Id.Replace('_', '-'), factionId, StringComparison.OrdinalIgnoreCase)) == true;
+        return knownFaction
+            ? View("~/Views/PublicLanding/Ledger.cshtml", model)
+            : NotFound();
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/promo")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerFactionPromoPage([FromRoute] string factionId, CancellationToken cancellationToken)
+    {
+        BlackLedgerFactionPromoPageViewModel? model = await BuildLedgerFactionPromoPageModel(factionId, cancellationToken);
+        return model is null
+            ? NotFound()
+            : View("~/Views/PublicLanding/LedgerFactionPromo.cshtml", model);
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/promo.json")]
+    [Produces("application/json")]
+    public IActionResult LedgerFactionPromoJson([FromRoute] string factionId)
+    {
+        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
+        return promo is null
+            ? NotFound()
+            : Ok(new
+            {
+                promo.FactionId,
+                promo.PublicName,
+                provider_status = promo.ProviderStatus,
+                render_mode = promo.RenderMode,
+                formats = promo.FormatLabels,
+                static_card_label = promo.StaticCardLabel,
+                captions = promo.CaptionLines,
+                html_href = promo.HtmlHref,
+                captions_href = promo.CaptionsHref,
+            });
+    }
+
+    [HttpGet("/ledger/factions/{factionId}/promo.vtt")]
+    [Produces("text/vtt")]
+    public IActionResult LedgerFactionPromoCaptions([FromRoute] string factionId)
+    {
+        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
+        if (promo is null)
+        {
+            return NotFound();
+        }
+
+        var lines = new List<string> { "WEBVTT", string.Empty };
+        for (int index = 0; index < promo.CaptionLines.Count; index += 1)
+        {
+            int start = index * 6;
+            int end = start + 5;
+            lines.Add($"{index + 1}");
+            lines.Add($"00:00:{start:00}.000 --> 00:00:{end:00}.000");
+            lines.Add(promo.CaptionLines[index]);
+            lines.Add(string.Empty);
+        }
+
+        return Content(string.Join('\n', lines), "text/vtt");
+    }
+
+    [HttpGet("/account/ledger")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerHomePage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            if (!_blackLedgerFactions.HasActiveAllegiance(user.UserId))
+            {
+                return Redirect("/account/ledger/onboarding");
+            }
+
+            var model = await BuildLedgerFactionHomePageModel(user, cancellationToken);
+            return View("~/Views/PublicLanding/LedgerAccountHome.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect("/login?next=%2Faccount%2Fledger");
+        }
+    }
+
+    [HttpGet("/account/ledger/notifications")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerNotificationsPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/account/ledger/notifications";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildLedgerNotificationsPageModel(user, cancellationToken);
+            return View("~/Views/PublicLanding/LedgerNotifications.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+    }
+
+    [HttpGet("/account/ledger/onboarding")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerOnboardingPage([FromQuery] string? step, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildLedgerOnboardingPageModel(user, step, cancellationToken);
+            return View("~/Views/PublicLanding/LedgerOnboarding.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect("/login?next=%2Faccount%2Fledger%2Fonboarding");
+        }
+    }
+
+    [HttpPost("/account/ledger/onboarding/join")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AccountLedgerOnboardingJoin([FromForm] string factionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var receipt = _blackLedgerFactions.JoinFaction(user, factionId);
+            return Redirect($"/account/ledger/factions/{receipt.FactionId.Replace('_', '-')}");
+        }
+        catch (Exception ex) when (ex is HubRequestAuthException or InvalidOperationException)
+        {
+            return Redirect("/account/ledger/onboarding");
+        }
+    }
+
+    [HttpGet("/account/ledger/factions/create")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerFactionCreatePage([FromQuery] string? charterType, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildLedgerFactionCreatePageModel(user, charterType, cancellationToken);
+            return View("~/Views/PublicLanding/LedgerFactionCreate.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect("/login?next=%2Faccount%2Fledger%2Ffactions%2Fcreate");
+        }
+    }
+
+    [HttpPost("/account/ledger/factions/create")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AccountLedgerFactionCreatePost(
+        [FromForm] string publicName,
+        [FromForm] string charterType,
+        [FromForm] string archetypeId,
+        [FromForm] string? startingDistrictId,
+        [FromForm] string? rivalFactionId,
+        [FromForm] string[] perkIds,
+        [FromForm] string[] flawIds,
+        [FromForm] bool? warningAccepted,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var charter = _blackLedgerFactions.CreateFaction(user, new BlackLedgerCreateFactionRequest(publicName, charterType, archetypeId, perkIds, flawIds, startingDistrictId, rivalFactionId, warningAccepted));
+            return Redirect($"/account/ledger/factions/{charter.FactionId.Replace('_', '-')}");
+        }
+        catch (Exception ex) when (ex is HubRequestAuthException or InvalidOperationException)
+        {
+            return Redirect("/account/ledger/factions/create");
+        }
+    }
+
+    [HttpGet("/account/ledger/factions/{factionId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerFactionPage([FromRoute] string factionId, [FromQuery] string? campaignId, CancellationToken cancellationToken)
+        => await BuildLedgerFactionWorkspacePage($"/account/ledger/factions/{factionId}", factionId, "overview", campaignId, cancellationToken);
+
+    [HttpGet("/account/ledger/factions/{factionId}/manage")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerFactionManagePage([FromRoute] string factionId, [FromQuery] string? campaignId, CancellationToken cancellationToken)
+        => await BuildLedgerFactionWorkspacePage($"/account/ledger/factions/{factionId}/manage", factionId, "manage", campaignId, cancellationToken);
+
+    [HttpGet("/account/ledger/factions/{factionId}/stewards")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerFactionStewardsPage([FromRoute] string factionId, [FromQuery] string? campaignId, CancellationToken cancellationToken)
+        => await BuildLedgerFactionWorkspacePage($"/account/ledger/factions/{factionId}/stewards", factionId, "stewards", campaignId, cancellationToken);
+
+    [HttpGet("/account/ledger/factions/{factionId}/private-lore")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerFactionPrivateLorePage([FromRoute] string factionId, [FromQuery] string? campaignId, CancellationToken cancellationToken)
+        => await BuildLedgerFactionWorkspacePage($"/account/ledger/factions/{factionId}/private-lore", factionId, "private-lore", campaignId, cancellationToken);
+
+    [HttpPost("/account/ledger/factions/{factionId}/actions")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AccountLedgerFactionActionPost(
+        [FromRoute] string factionId,
+        [FromForm] string actionId,
+        [FromForm] string? targetDistrictId,
+        [FromForm] string? targetFactionId,
+        [FromForm] string? stake,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            _blackLedgerFactions.ExecuteAction(user, factionId, new BlackLedgerFactionActionRequest(actionId, targetDistrictId, targetFactionId, stake));
+            return Redirect($"/account/ledger/factions/{factionId}/manage");
+        }
+        catch (Exception ex) when (ex is HubRequestAuthException or InvalidOperationException)
+        {
+            return Redirect($"/account/ledger/factions/{factionId}/manage");
+        }
     }
 
     [HttpGet("/ledger/anarchy")]
@@ -8414,18 +8658,49 @@ echo "Help: ${HELP_URL}"
         var authenticated = await TryIsAuthenticatedAsync(cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated);
         var world = _blackLedgerStats.LoadWorldPreview(requestedTurn);
+        if (world is not null)
+        {
+            var createdFactions = _blackLedgerFactions.ListFactionSummaries()
+                .Select(summary => _blackLedgerFactions.GetFactionDetail(summary.FactionId))
+                .Where(static detail => detail is not null)
+                .Select(static detail => new BlackLedgerFactionViewModel(
+                    detail!.FactionId,
+                    detail.PublicName,
+                    detail.Type,
+                    detail.FactionLeader,
+                    detail.FieldGm,
+                    detail.IntelProvider,
+                    detail.PublicSignals,
+                    detail.ColorPrimary,
+                    detail.ColorSecondary,
+                    detail.Icon));
+            world = world with
+            {
+                Factions = world.Factions
+                    .Concat(createdFactions)
+                    .GroupBy(static item => item.Id, StringComparer.OrdinalIgnoreCase)
+                    .Select(static group => group.First())
+                    .OrderBy(static item => item.PublicName, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            };
+        }
         var dispatches = _blackLedgerDispatches.ListPublishedDispatches(requestedTurn, selectedFactionId);
         var selectedDispatch = string.IsNullOrWhiteSpace(selectedDispatchId)
             ? dispatches.FirstOrDefault()
             : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase));
         var commandMap = _blackLedgerStats.LoadCommandMap(requestedTurn, selectedMapMode ?? "influence");
         var mapFocused = string.Equals(currentSection, "map", StringComparison.OrdinalIgnoreCase);
+        var selectedFaction = string.IsNullOrWhiteSpace(selectedFactionId) || world is null
+            ? null
+            : world.Factions.FirstOrDefault(faction =>
+                string.Equals(faction.Id, selectedFactionId, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(faction.Id.Replace('_', '-'), selectedFactionId, StringComparison.OrdinalIgnoreCase));
         var intro = world?.DeterministicPreview == true
             ? "This deterministic turn-two preview shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
             : "A fictional, public-safe seed world with six factions, visible pressure zones, and bounded dispatches.";
-        if (!string.IsNullOrWhiteSpace(selectedFactionId))
+        if (selectedFaction is not null)
         {
-            intro = $"Receipt-backed faction dispatches for {selectedFactionId}. This lane stays public-safe and never publishes free-floating lore.";
+            intro = $"Receipt-backed faction page for {selectedFaction.PublicName}. This lane stays public-safe, route-backed, and never publishes private labels or free-floating lore.";
         }
         else if (string.Equals(selectedRulesetId, "anarchy", StringComparison.OrdinalIgnoreCase)
             || string.Equals(selectedRulesetId, AnarchyPreviewService.RulesetId, StringComparison.OrdinalIgnoreCase))
@@ -8437,24 +8712,38 @@ echo "Help: ${HELP_URL}"
             intro = "Focused command-map view for the seeded Emerald Sprawl world. District pressure, event arcs, and replay controls stay public-safe, route-backed, and visibly distinct from the broader ledger overview.";
         }
 
+        int newsTurn = requestedTurn ?? world?.CurrentTurn ?? 1;
+        BlackLedgerNewsStatusViewModel newsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
+            worldId: "emerald-sprawl-prelude",
+            turn: newsTurn,
+            scopeLabel: "Public Black Ledger lane",
+            notificationsHref: "/account/ledger/notifications",
+            turnHref: $"/ledger/turns/{newsTurn}",
+            dispatchHref: string.IsNullOrWhiteSpace(selectedFactionId) ? $"/ledger/turns/{newsTurn}/dispatches" : $"/ledger/factions/{selectedFactionId}/dispatches");
+
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
-                "Black Ledger",
+                selectedFaction?.PublicName ?? "Black Ledger",
                 "Public-safe campaign pressure, package heat, and proof-backed closeout movement.",
                 currentPath,
                 cancellationToken),
-            Eyebrow: mapFocused ? "Black Ledger command map" : "Black Ledger preview",
-            Heading: mapFocused
+            Eyebrow: mapFocused ? "Black Ledger command map" : selectedFaction is null ? "Black Ledger preview" : "Black Ledger faction file",
+            Heading: selectedFaction is not null
+                ? $"{selectedFaction.PublicName} faction file"
+                : mapFocused
                 ? $"{world?.PublicName ?? "Emerald Sprawl: First Pressure"} command map"
                 : world?.PublicName ?? "Emerald Sprawl: First Pressure",
             Intro: intro,
             CurrentSection: currentSection,
             World: world,
+            SelectedFaction: selectedFaction,
             Stats: _blackLedgerStats.ListPublicStats(requestedTurn),
             Modules: _blackLedgerStats.ListModules(),
             Closeouts: _blackLedgerStats.ListCloseouts(),
             Dispatches: dispatches,
             SelectedDispatch: selectedDispatch,
+            NewsreelStatus: newsreelStatus,
+            SelectedFactionPromo: selectedFaction is null ? null : _blackLedgerFactions.GetPromoArtifact(selectedFaction.Id),
             CommandMap: commandMap,
             PrimaryAction: mapFocused
                 ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
@@ -8462,6 +8751,241 @@ echo "Help: ${HELP_URL}"
             SecondaryAction: new TrustPageActionViewModel("Read dispatches", "/ledger/dispatches", "secondary"),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private async Task<IActionResult> BuildLedgerFactionWorkspacePage(
+        string currentPath,
+        string factionId,
+        string currentSection,
+        string? campaignId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            BlackLedgerFactionWorkspacePageViewModel? model = await BuildLedgerFactionWorkspacePageModel(currentPath, factionId, currentSection, campaignId, user, cancellationToken);
+            return model is null
+                ? NotFound()
+                : View("~/Views/PublicLanding/LedgerFactionWorkspace.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+    }
+
+    private async Task<BlackLedgerFactionWorkspacePageViewModel?> BuildLedgerFactionWorkspacePageModel(
+        string currentPath,
+        string factionId,
+        string currentSection,
+        string? campaignId,
+        HubUserDto user,
+        CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+        var world = _blackLedgerStats.LoadWorldPreview();
+        var workspaceFaction = _blackLedgerFactions.GetWorkspaceFactionDetail(factionId);
+        if (world is not null)
+        {
+            var createdFactions = _blackLedgerFactions.ListFactionSummaries()
+                .Select(summary => _blackLedgerFactions.GetFactionDetail(summary.FactionId))
+                .Where(static detail => detail is not null)
+                .Select(static detail => new BlackLedgerFactionViewModel(
+                    detail!.FactionId,
+                    detail.PublicName,
+                    detail.Type,
+                    detail.FactionLeader,
+                    detail.FieldGm,
+                    detail.IntelProvider,
+                    detail.PublicSignals,
+                    detail.ColorPrimary,
+                    detail.ColorSecondary,
+                    detail.Icon));
+            world = world with
+            {
+                Factions = world.Factions
+                    .Concat(createdFactions)
+                    .GroupBy(static item => item.Id, StringComparer.OrdinalIgnoreCase)
+                    .Select(static group => group.First())
+                    .OrderBy(static item => item.PublicName, StringComparer.OrdinalIgnoreCase)
+                    .ToArray()
+            };
+        }
+        BlackLedgerFactionViewModel? faction = world?.Factions.FirstOrDefault(item =>
+            string.Equals(item.Id, factionId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(item.Id.Replace('_', '-'), factionId, StringComparison.OrdinalIgnoreCase));
+        if (faction is null && workspaceFaction is not null)
+        {
+            faction = new BlackLedgerFactionViewModel(
+                workspaceFaction.FactionId,
+                workspaceFaction.PublicName,
+                workspaceFaction.Type,
+                workspaceFaction.FactionLeader,
+                workspaceFaction.FieldGm,
+                workspaceFaction.IntelProvider,
+                workspaceFaction.PublicSignals,
+                workspaceFaction.ColorPrimary,
+                workspaceFaction.ColorSecondary,
+                workspaceFaction.Icon);
+        }
+        if (world is null || faction is null)
+        {
+            return null;
+        }
+
+        string normalizedFactionId = faction.Id.Replace('_', '-');
+        var coveredDistricts = world.Districts
+            .Where(district => string.Equals(district.DominantFaction.Replace(' ', '-'), normalizedFactionId, StringComparison.OrdinalIgnoreCase))
+            .Select(district => district.Name)
+            .ToArray();
+        var workspaceSummary = _campaignSpine.GetAccountSummary(user);
+        string? resolvedCampaignId = string.IsNullOrWhiteSpace(campaignId)
+            ? workspaceSummary.Workspaces.FirstOrDefault()?.CampaignId ?? workspaceSummary.Campaigns.FirstOrDefault()?.CampaignId
+            : campaignId.Trim();
+        BlackLedgerPrivateLoreOverlayDto? overlay = string.IsNullOrWhiteSpace(resolvedCampaignId)
+            ? null
+            : _blackLedgerFactions.GetPrivateLoreOverlay(resolvedCampaignId, faction.Id);
+        var privateLabels = overlay?.LabelMap?.Values?.Where(static label => !string.IsNullOrWhiteSpace(label)).Take(6).ToArray()
+            ?? [$"{faction.PublicName} campaign alias", $"{faction.PublicName} safehouse codename", $"{faction.PublicName} pressure lane beta"];
+        var privateLoreNotes = (overlay?.Notes?.Count > 0
+                ? overlay.Notes
+                : new[]
+                {
+                    "Private labels can exist on authenticated campaign routes only.",
+                    "Public Black Ledger pages never render these labels or account-linked overlays.",
+                    "The private-lore API receipt stays non-projecting by contract.",
+                })
+            .Take(6)
+            .ToArray();
+        string campaignQuery = string.IsNullOrWhiteSpace(resolvedCampaignId)
+            ? string.Empty
+            : $"?campaignId={Uri.EscapeDataString(resolvedCampaignId)}";
+        var tabs = new[]
+        {
+            new BlackLedgerFactionWorkspaceTabViewModel("Overview", $"/account/ledger/factions/{normalizedFactionId}{campaignQuery}", string.Equals(currentSection, "overview", StringComparison.OrdinalIgnoreCase)),
+            new BlackLedgerFactionWorkspaceTabViewModel("Manage", $"/account/ledger/factions/{normalizedFactionId}/manage{campaignQuery}", string.Equals(currentSection, "manage", StringComparison.OrdinalIgnoreCase)),
+            new BlackLedgerFactionWorkspaceTabViewModel("Stewards", $"/account/ledger/factions/{normalizedFactionId}/stewards{campaignQuery}", string.Equals(currentSection, "stewards", StringComparison.OrdinalIgnoreCase)),
+            new BlackLedgerFactionWorkspaceTabViewModel("Private lore", $"/account/ledger/factions/{normalizedFactionId}/private-lore{campaignQuery}", string.Equals(currentSection, "private-lore", StringComparison.OrdinalIgnoreCase)),
+        };
+        string intro = currentSection switch
+        {
+            "manage" => "Authenticated faction management posture for route-backed campaign stewardship, bounded package pressure, and district coverage.",
+            "stewards" => "Human and AI stewardship posts stay explicit here so public summary roles never get confused with private campaign authority.",
+            "private-lore" => "Private lore overlays can exist here for campaign context, but public Ledger routes must never render them.",
+            _ => "Authenticated faction workspace for the same Black Ledger seed world, with private labels and management posture kept off public routes.",
+        };
+
+        return new BlackLedgerFactionWorkspacePageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome($"{faction.PublicName} workspace", "Authenticated Black Ledger faction management and private-lore posture.", currentPath, user.DisplayName, user.Email),
+            Eyebrow: "Authenticated faction workspace",
+            Heading: $"{faction.PublicName} workspace",
+            Intro: intro,
+            CurrentSection: currentSection,
+            World: world,
+            Faction: faction,
+            CoveredDistricts: coveredDistricts,
+            PrivateLabels: privateLabels,
+            PrivateLoreNotes: privateLoreNotes,
+            Dispatches: _blackLedgerDispatches.ListPublishedDispatches(world.CurrentTurn, faction.Id),
+            Tabs: tabs,
+            PublicProfileHref: $"/ledger/factions/{normalizedFactionId}",
+            PrivacyNote: "Authenticated faction workspaces may render private labels and campaign-scoped overlays. Public Ledger routes never do.",
+            Allegiance: _blackLedgerFactions.GetAllegiance(user),
+            AvailableActions: string.Equals(currentSection, "manage", StringComparison.OrdinalIgnoreCase) ? _blackLedgerFactions.GetActionDefinitions(faction.Id) : Array.Empty<BlackLedgerFactionActionDefinitionDto>(),
+            RecentActionReceipts: _blackLedgerFactions.GetActionReceipts(faction.Id).Take(6).ToArray(),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private async Task<BlackLedgerFactionHomeViewModel> BuildLedgerFactionHomePageModel(HubUserDto user, CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+        _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
+        var chrome = _chrome.BuildAuthenticatedChrome("My Black Ledger faction", "Signed-in Black Ledger faction home, welcome kit, and action trail.", "/account/ledger", user.DisplayName, user.Email);
+        BlackLedgerFactionHomeViewModel model = _blackLedgerFactions.BuildFactionHome(chrome, user);
+        return model with
+        {
+            NewsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
+                worldId: "emerald-sprawl-prelude",
+                turn: 1,
+                scopeLabel: "Signed-in account lane",
+                notificationsHref: "/account/ledger/notifications",
+                turnHref: "/ledger/turns/1",
+                dispatchHref: "/ledger/turns/1/dispatches",
+                recipientUserId: user.UserId)
+        };
+    }
+
+    private async Task<BlackLedgerNotificationsPageViewModel> BuildLedgerNotificationsPageModel(HubUserDto user, CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+        _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
+        var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger notifications", "Signed-in Black Ledger newsreel delivery posture and receipts.", "/account/ledger/notifications", user.DisplayName, user.Email);
+        return new BlackLedgerNotificationsPageViewModel(
+            Chrome: chrome,
+            Heading: "Turn 1 newsreel delivery",
+            Intro: "This route shows whether the seeded Black Ledger Turn 1 newsreel was sent, suppressed, dry-run only, or blocked by configuration for this account.",
+            Status: _blackLedgerTickNews.BuildStatusViewModel(
+                worldId: "emerald-sprawl-prelude",
+                turn: 1,
+                scopeLabel: "Signed-in account lane",
+                notificationsHref: "/account/ledger/notifications",
+                turnHref: "/ledger/turns/1",
+                dispatchHref: "/ledger/turns/1/dispatches",
+                recipientUserId: user.UserId),
+            DeliveryNotes:
+            [
+                "Newsreel email stays public-safe and never includes private campaign labels.",
+                "Operator preview policy can suppress delivery to regular accounts without hiding the reason.",
+                "Duplicate sends are blocked by the stored event key."
+            ]);
+    }
+
+    private async Task<BlackLedgerFactionOnboardingViewModel> BuildLedgerOnboardingPageModel(HubUserDto user, string? step, CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+        _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
+        var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger onboarding", "Signed-in faction allegiance and founder path onboarding.", "/account/ledger/onboarding", user.DisplayName, user.Email);
+        return _blackLedgerFactions.BuildOnboardingModel(chrome, user, step);
+    }
+
+    private async Task<BlackLedgerFactionCreatePageViewModel> BuildLedgerFactionCreatePageModel(HubUserDto user, string? charterType, CancellationToken cancellationToken)
+    {
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
+        _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
+        var chrome = _chrome.BuildAuthenticatedChrome("Create Black Ledger faction", "Signed-in faction charter builder with route-backed major and challenger flows.", "/account/ledger/factions/create", user.DisplayName, user.Email);
+        return _blackLedgerFactions.BuildCreatePage(chrome, user, charterType);
+    }
+
+    private async Task<BlackLedgerFactionPromoPageViewModel?> BuildLedgerFactionPromoPageModel(string factionId, CancellationToken cancellationToken)
+    {
+        BlackLedgerFactionPromoArtifactViewModel? promo = _blackLedgerFactions.GetPromoArtifact(factionId);
+        if (promo is null)
+        {
+            return null;
+        }
+
+        return new BlackLedgerFactionPromoPageViewModel(
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync(
+                $"{promo.PublicName} promo",
+                "Public-safe faction onboarding promo artifacts with verified provider posture.",
+                $"/ledger/factions/{promo.FactionId}/promo",
+                cancellationToken),
+            Heading: $"{promo.PublicName} onboarding promo",
+            Intro: "This route ships the honest first-party fallback: storyboard formats, static card, captions, and explicit provider-verification posture instead of an unverified external render claim.",
+            Promo: promo,
+            DeliveryNotes:
+            [
+                "Provider status stays explicit until a verified media adapter exists.",
+                "No official lore text and no provider branding appear here.",
+                "These links are route-backed fallback artifacts, not placeholder buttons."
+            ]);
     }
 
     private async Task<AnarchyPageViewModel> BuildAnarchyPageModel(

@@ -630,6 +630,9 @@ public sealed class PublicLandingDownloadDispatchTests
                 communityStore,
                 Configuration,
                 NullLogger<ParticipationOperatorNotificationService>.Instance);
+            WorkspaceLifecyclePolicyService workspaceLifecycle = new(Configuration);
+            CampaignArtifactRegistryBridge artifactRegistry = new(communityStore);
+            CampaignSpineService campaignSpine = new(communityStore, workspaceLifecycle, artifactRegistry);
             InstallLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinking = new InstallLinkingService(InstallLinkingStore, Configuration);
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
@@ -648,7 +651,7 @@ public sealed class PublicLandingDownloadDispatchTests
                 experience: null!,
                 participationNotifications: participationNotifications,
 	                installLinking: InstallLinking,
-	                campaignSpine: null!,
+	                campaignSpine: campaignSpine,
 	                workspaceServerPlane: null!,
 	                readyForTonight: null!,
 	                knowledgeFabric: null!,
@@ -659,6 +662,7 @@ public sealed class PublicLandingDownloadDispatchTests
 	                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
 	                blackLedgerStats: blackLedgerStats,
                 blackLedgerDispatches: blackLedgerDispatches,
+	                blackLedgerFactions: new BlackLedgerFactionOnboardingService(Configuration, blackLedgerStats, campaignSpine),
                 anarchyPreview: anarchyPreview,
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: null!,

@@ -348,6 +348,43 @@ public sealed record BlackLedgerDispatchViewModel(
     bool AiGenerated,
     string Href);
 
+public sealed record BlackLedgerNewsReceiptEntryViewModel(
+    string ReceiptId,
+    string Status,
+    string Summary,
+    string? FailureReason,
+    string RecipientLabel,
+    string? DeliveryRef,
+    string AttemptedAtUtc);
+
+public sealed record BlackLedgerNewsStatusViewModel(
+    string WorldId,
+    int Turn,
+    string Status,
+    string StatusLabel,
+    string Summary,
+    string? FailureReason,
+    string Policy,
+    int ReceiptCount,
+    int RecipientCount,
+    string ScopeLabel,
+    string NotificationsHref,
+    string TurnHref,
+    string DispatchHref,
+    IReadOnlyList<BlackLedgerNewsReceiptEntryViewModel> Receipts);
+
+public sealed record BlackLedgerFactionPromoArtifactViewModel(
+    string FactionId,
+    string PublicName,
+    string ProviderStatus,
+    string RenderMode,
+    string HtmlHref,
+    string JsonHref,
+    string CaptionsHref,
+    string StaticCardLabel,
+    IReadOnlyList<string> FormatLabels,
+    IReadOnlyList<string> CaptionLines);
+
 public sealed record BlackLedgerWorldPreviewViewModel(
     string WorldId,
     string PublicName,
@@ -395,16 +432,115 @@ public sealed record BlackLedgerHubPageViewModel(
     string Intro,
     string CurrentSection,
     BlackLedgerWorldPreviewViewModel? World,
+    BlackLedgerFactionViewModel? SelectedFaction,
     IReadOnlyList<BlackLedgerPublicStatViewModel> Stats,
     IReadOnlyList<BlackLedgerModuleViewModel> Modules,
     IReadOnlyList<BlackLedgerCloseoutViewModel> Closeouts,
     IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
     BlackLedgerDispatchViewModel? SelectedDispatch,
+    BlackLedgerNewsStatusViewModel? NewsreelStatus,
+    BlackLedgerFactionPromoArtifactViewModel? SelectedFactionPromo,
     BlackLedgerCommandMapViewModel? CommandMap,
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record BlackLedgerFactionWorkspaceTabViewModel(
+    string Label,
+    string Href,
+    bool Current);
+
+public sealed record BlackLedgerFactionWorkspacePageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    string CurrentSection,
+    BlackLedgerWorldPreviewViewModel? World,
+    BlackLedgerFactionViewModel Faction,
+    IReadOnlyList<string> CoveredDistricts,
+    IReadOnlyList<string> PrivateLabels,
+    IReadOnlyList<string> PrivateLoreNotes,
+    IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
+    IReadOnlyList<BlackLedgerFactionWorkspaceTabViewModel> Tabs,
+    string PublicProfileHref,
+    string PrivacyNote,
+    BlackLedgerAccountFactionAllegianceDto? Allegiance = null,
+    IReadOnlyList<BlackLedgerFactionActionDefinitionDto>? AvailableActions = null,
+    IReadOnlyList<BlackLedgerFactionActionReceiptDto>? RecentActionReceipts = null,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record BlackLedgerFactionJoinOptionViewModel(
+    string FactionId,
+    string PublicName,
+    string Type,
+    string Summary,
+    string Href,
+    string PromoHref);
+
+public sealed record BlackLedgerWizardStepViewModel(
+    string Id,
+    string Label,
+    string Href,
+    bool Current,
+    bool Complete);
+
+public sealed record BlackLedgerFactionOnboardingViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    bool HasActiveAllegiance,
+    BlackLedgerAccountFactionAllegianceDto? CurrentAllegiance,
+    string CurrentStep,
+    int CurrentRunnerCount,
+    IReadOnlyList<BlackLedgerWizardStepViewModel> Steps,
+    string ExistingFactionSummary,
+    string MajorFounderSummary,
+    string ChallengerFounderSummary,
+    string? MajorSlotsWarning,
+    int MajorSlotsAvailable,
+    IReadOnlyList<BlackLedgerFactionJoinOptionViewModel> ExistingFactions);
+
+public sealed record BlackLedgerFactionHomeViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerAccountFactionAllegianceDto Allegiance,
+    BlackLedgerFactionDetailDto Faction,
+    IReadOnlyList<string> WelcomeKit,
+    IReadOnlyList<BlackLedgerFactionActionReceiptDto> RecentActionReceipts,
+    BlackLedgerNewsStatusViewModel? NewsreelStatus = null,
+    BlackLedgerFactionPromoArtifactViewModel? PromoArtifact = null);
+
+public sealed record BlackLedgerNotificationsPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerNewsStatusViewModel Status,
+    IReadOnlyList<string> DeliveryNotes);
+
+public sealed record BlackLedgerFactionPromoPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerFactionPromoArtifactViewModel Promo,
+    IReadOnlyList<string> DeliveryNotes);
+
+public sealed record BlackLedgerFactionCreatePageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    string PreferredCharterType,
+    int MajorSlotsAvailable,
+    BlackLedgerFactionCharterRulesDto MajorRules,
+    BlackLedgerFactionCharterRulesDto ChallengerRules,
+    IReadOnlyList<BlackLedgerFactionArchetypeDto> Archetypes,
+    IReadOnlyList<BlackLedgerFactionPerkDto> Perks,
+    IReadOnlyList<BlackLedgerFactionFlawDto> Flaws,
+    IReadOnlyList<string> StartingDistrictIds,
+    IReadOnlyList<BlackLedgerFactionJoinOptionViewModel> RivalFactions);
 
 public sealed record AnarchyRunnerProfileViewModel(
     string RunnerId,

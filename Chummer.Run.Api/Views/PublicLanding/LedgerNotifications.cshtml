@@ -1,0 +1,73 @@
+@model BlackLedgerNotificationsPageViewModel
+@{
+    ViewData["Title"] = "Black Ledger notifications";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-ledger";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">Signed-in notification rail</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>Status: @Model.Status.StatusLabel</span>
+            <span>Policy: @Model.Status.Policy</span>
+            <span>Receipts: @Model.Status.ReceiptCount</span>
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@Model.Status.TurnHref">Open Turn 1</a>
+        <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Delivery truth</p>
+        <h2 class="editorial-title">@Model.Status.StatusLabel</h2>
+        <p class="editorial-copy">@Model.Status.Summary</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var note in Model.DeliveryNotes)
+        {
+            <article class="route-choice-card">
+                <span class="tag">Policy note</span>
+                <p>@note</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.Status.Receipts.Count > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Stored receipts</p>
+            <h2 class="editorial-title">Recent delivery attempts</h2>
+            <p class="editorial-copy">Receipt-backed delivery or suppression posture for the seeded Turn 1 newsreel.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var receipt in Model.Status.Receipts)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@receipt.Status</span>
+                    <h3>@receipt.ReceiptId</h3>
+                    <p>@receipt.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <span>Recipient: @receipt.RecipientLabel</span>
+                        <span>Attempted: @receipt.AttemptedAtUtc</span>
+                        @if (!string.IsNullOrWhiteSpace(receipt.DeliveryRef))
+                        {
+                            <span>Delivery: @receipt.DeliveryRef</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(receipt.FailureReason))
+                        {
+                            <span>Reason: @receipt.FailureReason</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}

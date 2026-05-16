@@ -87,7 +87,8 @@ public sealed class HubGoogleAuthService
 
     public void ValidateProductionReadiness()
     {
-        if (_environment.IsProduction() && !IsConfigured())
+        bool requireGoogleOidc = string.Equals(_configuration["CHUMMER_GOOGLE_OIDC_REQUIRED"], "true", StringComparison.OrdinalIgnoreCase);
+        if (_environment.IsProduction() && requireGoogleOidc && !IsConfigured())
         {
             throw new InvalidOperationException("Google OIDC must be configured before starting Hub in Production.");
         }

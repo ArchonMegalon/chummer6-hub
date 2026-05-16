@@ -1,0 +1,114 @@
+@model BlackLedgerFactionCreatePageViewModel
+@{
+    ViewData["Title"] = "Create Black Ledger faction";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-ledger";
+    bool challenger = string.Equals(Model.PreferredCharterType, "challenger", StringComparison.OrdinalIgnoreCase);
+    var selectedRules = challenger ? Model.ChallengerRules : Model.MajorRules;
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">Faction charter builder</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>Major slots available: @Model.MajorSlotsAvailable</span>
+            <span>Major: 100 points / 3 AP</span>
+            <span>Challenger: 65 points / 2 AP</span>
+        </div>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Builder</p>
+        <h2 class="editorial-title">Interactive faction builder</h2>
+        <p class="editorial-copy">Found a Challenger Faction if you want the weaker, riskier route that starts weaker and grows through pressure. This page is route-backed and configurable. Choose charter type, public name, archetype, perks, flaws, and warning acknowledgement directly here.</p>
+    </div>
+
+    <form method="post" action="/account/ledger/factions/create" class="route-choice-card">
+        @Html.AntiForgeryToken()
+
+        <label>
+            <strong>Public name</strong>
+            <input type="text" name="publicName" value="@(challenger ? "Undertow Signal Cell" : "Signal Forge Assembly")" minlength="4" maxlength="48" required />
+        </label>
+
+        <fieldset>
+            <legend><strong>Charter type</strong></legend>
+            <label><input type="radio" name="charterType" value="major" @(challenger ? null : "checked") /> Major</label>
+            <label><input type="radio" name="charterType" value="challenger" @(challenger ? "checked" : null) /> Challenger</label>
+        </fieldset>
+
+        <label>
+            <strong>Archetype</strong>
+            <select name="archetypeId">
+                @foreach (var archetype in Model.Archetypes)
+                {
+                    <option value="@archetype.Id" selected="@(challenger ? archetype.Id == "matrix_cell" : archetype.Id == "creator_press")">@archetype.Name</option>
+                }
+            </select>
+        </label>
+
+        <label>
+            <strong>Starting district</strong>
+            <select name="startingDistrictId">
+                <option value="">No district claim</option>
+                @foreach (var districtId in Model.StartingDistrictIds)
+                {
+                    <option value="@districtId" selected="@(districtId == "emerald-core" ? "selected" : null)">@districtId</option>
+                }
+            </select>
+        </label>
+
+        <label>
+            <strong>Rival faction</strong>
+            <select name="rivalFactionId">
+                <option value="">No named rival</option>
+                @foreach (var rival in Model.RivalFactions)
+                {
+                    <option value="@rival.FactionId.Replace('-', '_')" selected="@(rival.FactionId == "ashline-circle" ? "selected" : null)">@rival.PublicName</option>
+                }
+            </select>
+        </label>
+
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">Perks</span>
+                <h3>Spend your budget</h3>
+                @foreach (var perk in Model.Perks)
+                {
+                    <label>
+                        <input type="checkbox" name="perkIds" value="@perk.Id" @(challenger ? (perk.Id is "underdog_momentum" or "dispatch_desk" ? "checked" : null) : (perk.Id is "dispatch_desk" or "public_trust" ? "checked" : null)) />
+                        @perk.Name (@perk.Cost)@(perk.ChallengerOnly ? " · Challenger only" : string.Empty)
+                    </label>
+                }
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Flaws</span>
+                <h3>Meet the required floor</h3>
+                @foreach (var flaw in Model.Flaws)
+                {
+                    <label>
+                        <input type="checkbox" name="flawIds" value="@flaw.Id" @(challenger ? (flaw.Id is "overexposed" or "thin_resources" or "rival_target" ? "checked" : null) : (flaw.Id is "overexposed" or "thin_resources" ? "checked" : null)) />
+                        @flaw.Name (@(-flaw.Cost))
+                    </label>
+                }
+            </article>
+        </div>
+
+        <div class="trust-claim__microproof">
+            <span>Target budget: @selectedRules.CharterPoints</span>
+            <span>Required flaws: @selectedRules.RequiredFlaws</span>
+            <span>Max perks: @selectedRules.MaxPerks</span>
+        </div>
+
+        <label>
+            <input type="checkbox" name="warningAccepted" value="true" @(challenger ? "checked" : null) />
+            Challenger warning acknowledged. I understand challenger factions start weaker, enter cooldown after commitment, and do not auto-project publicly before moderation review.
+        </label>
+
+        <button class="button-like button-like--primary" type="submit">Create faction charter</button>
+    </form>
+</section>

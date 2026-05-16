@@ -6,31 +6,10 @@
     var heroProofTrail = Model.Surface.ProductProofTrail.Take(2).ToArray();
     var release = Model.ReleaseExperience;
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
-    var guestReadableHeroPrimaryHref = Model.PrimaryHeroAction.Href;
-    var accountAwareInstallPrimaryHref = guestNeedsInstallGate
-        ? release.GuestGatePrimaryHref ?? guestReadableHeroPrimaryHref
-        : guestReadableHeroPrimaryHref;
-    var installRailPrimaryLabel = Model.Chrome.Authenticated
-        ? "Open home"
-        : guestNeedsInstallGate
-            ? release.GuestGatePrimaryLabel
-            : Model.PrimaryHeroAction.Label;
-    var installRailPrimaryHref = Model.Chrome.Authenticated ? "/home" : accountAwareInstallPrimaryHref;
-    var installRailSecondaryLabel = Model.Chrome.Authenticated ? "Open devices and access" : "Already have an account? Sign in";
-    var installRailSecondaryHref = Model.Chrome.Authenticated ? "/account/access" : "/login?next=/home";
-    var enterHubHref = Model.Chrome.Authenticated ? "/home" : "/login?next=/home";
-    var enterHubLabel = "Enter the hub";
-    var forgeHref = "/karma-forge";
     var ledgerHref = "/ledger";
     var replayTurnOneHref = "/ledger/map?replay=turn-1";
     var buildHref = "/downloads";
-    var heroStatusChips = new[]
-    {
-        "Preview build live",
-        "Rules proof visible",
-        "Mobile play preview",
-        "Public signal open",
-    };
+    var forgeHref = "/karma-forge";
     var pathCards = new[]
     {
         new
@@ -46,12 +25,12 @@
         new
         {
             Id = "hub",
-            Title = "Enter the hub",
-            Summary = "Use the signed-in hub for installs, account recovery, package follows, and the routes that should stay attached to your account.",
+            Title = "Download Chummer",
+            Summary = "Get the current desktop build when you want a usable runner sheet first and the world lane second.",
             Status = "Use when continuity matters",
-            Href = enterHubHref,
-            Action = enterHubLabel,
-            Pills = new[] { "Account-aware", "Recovery", "Support context" },
+            Href = buildHref,
+            Action = "Open downloads",
+            Pills = new[] { "Desktop client", "Current preview", "Install rail" },
         },
         new
         {
@@ -114,90 +93,27 @@
 <section class="launch-hero" data-homepage-section="hero">
     <div class="launch-hero__shell">
         <div class="launch-hero__copy">
-            <p class="eyebrow">Explainable Shadowrun campaign OS</p>
-            <h1 class="launch-hero__title">Build the runner. Run the table. Keep the ledger honest.</h1>
-            <p class="launch-hero__support">Start with the current build, use the hub when continuity matters, and follow world-state or rules pain only when you actually need them.</p>
+            <p class="eyebrow">Black Ledger frontdoor</p>
+            <h1 class="launch-hero__title">The city is moving.</h1>
+            <p class="launch-hero__support">Join a faction, watch pressure shift, and carry your runners into the Black Ledger.</p>
             <div class="launch-hero__actions">
-                <a class="button-like button-like--primary" href="@buildHref">Open downloads</a>
-                <a class="button-like button-like--secondary" href="@enterHubHref">@enterHubLabel</a>
-                <a class="button-like button-like--ghost" href="@forgeHref">Explore Karma Forge</a>
+                <a class="button-like button-like--primary" href="@ledgerHref">Enter Black Ledger</a>
+                <a class="button-like button-like--secondary" href="@buildHref">Download Chummer</a>
             </div>
-            <div class="proof-chip-row" aria-label="Flagship status">
-                @foreach (var chip in heroStatusChips)
-                {
-                    <span class="proof-chip">@chip</span>
-                }
-            </div>
-            <div class="hero-installrail" aria-label="Recommended install path">
-                <div class="hero-installrail__lead">
-                    <span class="tag tag--amber">Recommended path</span>
-                    <strong>@(guestNeedsInstallGate ? "Account-aware install handoff" : "Current preview install")</strong>
-                    <p>Open the current build, then return to the same hub for packages, mobile play, and governed closeouts.</p>
-                </div>
-                <div class="hero-installrail__facts">
-                    <div class="hero-installrail__fact">
-                        <span>Platform</span>
-                        <strong>@(release.Recommended?.PlatformLabel ?? "Current preview build")</strong>
-                    </div>
-                    <div class="hero-installrail__fact">
-                        <span>Channel</span>
-                        <strong>@release.Display.ChannelLabel</strong>
-                    </div>
-                    <div class="hero-installrail__fact">
-                        <span>Build</span>
-                        <strong>@release.Display.BuildLabel</strong>
-                    </div>
-                    <div class="hero-installrail__fact">
-                        <span>First launch</span>
-                        <strong>@(guestNeedsInstallGate ? "Signed-in handoff first" : "Use as guest or link this copy later")</strong>
-                    </div>
-                </div>
-                <div class="hero-installrail__actions">
-                    <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
-                    <a class="button-like button-like--ghost" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
-                </div>
-            </div>
-            <p class="launch-hero__trustline">Votes show demand. Proof decides what ships.</p>
+            <p class="launch-hero__trustline">Fictional public-safe seed world. No sourcebook names. No private campaign data.</p>
         </div>
         <div class="launch-hero__stage" aria-label="Black Ledger gate">
-            <figure class="launch-hero__scene">
-                <img class="launch-hero__scene-image" src="~/media/campaign/hero-shadowrun-assistant-nightdesk.webp" alt="Shadowrun campaign desk showing Chummer as a session operating surface." />
-            </figure>
-            <div class="launch-hero__prooffloat">
-                <div class="launch-hero__proof-topline">
-                    <span>What users need to know first</span>
-                    <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
-                </div>
-                <div class="launch-hero__proof-summary">
-                    <strong>Downloads first. Hub second. Ledger and Forge when you need context.</strong>
-                    <p>Chummer is usable today as a build-and-continuity product. Black Ledger and Karma Forge are public-facing world and rules lanes, not required reading before someone installs.</p>
-                </div>
-                <div class="launch-hero__proof-trail">
-                    <span>Current build posted</span>
-                    <span>Turn 1 receipt posted</span>
-                    <span>Opt-in aggregate only</span>
-                </div>
-            </div>
-            <div class="ledger-console" aria-label="Quick orientation">
-                <article class="ledger-console__panel">
-                    <span>Install</span>
-                    <strong>Open downloads for the current preview build.</strong>
-                    <p>That is still the fastest path to a working desktop client.</p>
-                </article>
-                <article class="ledger-console__panel">
-                    <span>World lane</span>
-                    <strong>Black Ledger explains what happened in the world and why it matters.</strong>
-                    <p>Dispatches turn receipts into readable public-safe summaries.</p>
-                </article>
-                <article class="ledger-console__panel">
-                    <span>Rules lane</span>
-                    <strong>Karma Forge turns repeated rules pain into governed package work.</strong>
-                    <p>Use it when a table problem needs evidence and follow-through.</p>
-                </article>
-            </div>
+            <div
+                class="launch-hero__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="teaser"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-auto-replay="true"></div>
         </div>
     </div>
 </section>
+<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>
 
 <section class="workflow-band workflow-band--flagship" data-homepage-section="choose-your-path" id="choose-your-path">
     <div class="workflow-band__lead">
