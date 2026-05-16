@@ -252,7 +252,6 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
             "--project",
             "Chummer.Run.Api/Chummer.Run.Api.csproj",
             "-nologo",
-            "--no-build",
             "--no-launch-profile",
         ]
         log_handle = self._log_path.open("w", encoding="utf-8")

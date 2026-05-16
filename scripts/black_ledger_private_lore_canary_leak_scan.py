@@ -38,17 +38,24 @@ def main() -> int:
                 f"{app.base_url}/api/v1/account/ledger/factions",
                 json={
                     "publicName": f"Private Lore {uuid.uuid4().hex[:10]}",
-                    "charterType": "major",
-                    "archetypeId": "creator_press",
-                    "perkIds": ["dispatch_desk", "public_trust"],
-                    "flawIds": ["overexposed", "thin_resources"],
-                    "startingDistrictId": "emerald-core",
-                    "warningAccepted": False,
+                    "charterType": "challenger",
+                    "archetypeId": "matrix_cell",
+                    "perkIds": ["underdog_momentum", "dispatch_desk"],
+                    "flawIds": ["overexposed", "thin_resources", "rival_target"],
+                    "rivalFactionId": "ashline_circle",
+                    "warningAccepted": True,
                 },
                 timeout=30,
             )
             created.raise_for_status()
             faction_id = created.json()["factionId"]
+            route_faction_id = faction_id.replace("_", "-")
+
+            approve = session.post(
+                f"{app.base_url}/api/v1/account/ledger/factions/{faction_id}/moderation/approve",
+                timeout=30,
+            )
+            approve.raise_for_status()
 
             overlay = session.post(
                 f"{app.base_url}/api/v1/account/campaigns/cmp-proof/ledger/private-lore-overlay",
@@ -64,7 +71,7 @@ def main() -> int:
             overlay_payload = overlay.json()
 
             private_page = session.get(
-                f"{app.base_url}/account/ledger/factions/{faction_id.replace('_', '-')}/private-lore?campaignId=cmp-proof",
+                f"{app.base_url}/account/ledger/factions/{route_faction_id}/private-lore?campaignId=cmp-proof",
                 timeout=30,
             )
             private_page.raise_for_status()
@@ -75,8 +82,8 @@ def main() -> int:
                 "/feedback",
                 "/ledger",
                 "/ledger/factions",
-                f"/ledger/factions/{faction_id.replace('_', '-')}",
-                f"/ledger/factions/{faction_id.replace('_', '-')}/packages",
+                f"/ledger/factions/{route_faction_id}",
+                f"/ledger/factions/{route_faction_id}/packages",
                 "/ledger/map",
                 "/api/v1/ledger/factions",
                 f"/api/v1/ledger/factions/{faction_id}",
