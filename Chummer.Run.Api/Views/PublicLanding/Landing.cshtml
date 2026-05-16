@@ -10,13 +10,6 @@
     var replayTurnOneHref = "/ledger/map?replay=turn-1";
     var buildHref = "/downloads";
     var forgeHref = "/karma-forge";
-    var heroStatusChips = new[]
-    {
-        "Turn 1 replay live",
-        "Six factions seeded",
-        "Public-safe dispatches",
-        "No private table data",
-    };
     var pathCards = new[]
     {
         new
@@ -102,58 +95,25 @@
         <div class="launch-hero__copy">
             <p class="eyebrow">Black Ledger frontdoor</p>
             <h1 class="launch-hero__title">The city is moving.</h1>
-            <p class="launch-hero__support">Track faction pressure, package heat, dispatches, and closeouts from the Black Ledger.</p>
+            <p class="launch-hero__support">Join a faction, watch pressure shift, and carry your runners into the Black Ledger.</p>
             <div class="launch-hero__actions">
                 <a class="button-like button-like--primary" href="@ledgerHref">Enter Black Ledger</a>
                 <a class="button-like button-like--secondary" href="@buildHref">Download Chummer</a>
             </div>
-            <div class="proof-chip-row" aria-label="Flagship status">
-                @foreach (var chip in heroStatusChips)
-                {
-                    <span class="proof-chip">@chip</span>
-                }
-            </div>
             <p class="launch-hero__trustline">Fictional public-safe seed world. No sourcebook names. No private campaign data.</p>
         </div>
         <div class="launch-hero__stage" aria-label="Black Ledger gate">
-            <figure class="launch-hero__scene">
-                <img class="launch-hero__scene-image" src="~/media/campaign/hero-shadowrun-assistant-nightdesk.webp" alt="Shadowrun campaign desk showing Chummer as a session operating surface." />
-            </figure>
-            <div class="launch-hero__prooffloat">
-                <div class="launch-hero__proof-topline">
-                    <span>What users need to know first</span>
-                    <span>@release.Display.ChannelLabel · @release.Display.BuildLabel</span>
-                </div>
-                <div class="launch-hero__proof-summary">
-                    <strong>Turn 1 already ran. The city is moving.</strong>
-                    <p>Black Ledger is the first public-safe world lane: faction pressure, package heat, dispatches, and closeouts on one route-backed surface.</p>
-                </div>
-                <div class="launch-hero__proof-trail">
-                    <span>Replay Turn 1</span>
-                    <span>Turn 1 receipt posted</span>
-                    <span>Opt-in aggregate only</span>
-                </div>
-            </div>
-            <div class="ledger-console" aria-label="Quick orientation">
-                <article class="ledger-console__panel">
-                    <span>World lane</span>
-                    <strong>Open Black Ledger to read the city before you read the proof shelf.</strong>
-                    <p>Command map, dispatches, faction pages, and closeout pressure stay on first-party routes.</p>
-                </article>
-                <article class="ledger-console__panel">
-                    <span>Install</span>
-                    <strong>Download Chummer when you want the current build.</strong>
-                    <p>The desktop route stays real, but it no longer owns the first emotional screen.</p>
-                </article>
-                <article class="ledger-console__panel">
-                    <span>Rules lane</span>
-                    <strong>Karma Forge turns repeated rules pain into governed package work.</strong>
-                    <p>Use it when a table problem needs evidence and follow-through.</p>
-                </article>
-            </div>
+            <div
+                class="launch-hero__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="teaser"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-auto-replay="true"></div>
         </div>
     </div>
 </section>
+<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>
 
 <section class="workflow-band workflow-band--flagship" data-homepage-section="choose-your-path" id="choose-your-path">
     <div class="workflow-band__lead">

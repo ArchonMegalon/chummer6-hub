@@ -26,7 +26,7 @@ test('black ledger faction promo routes stay public-safe and fallback-backed', a
     results.push({ faction, page: page.status(), json: json.status(), vtt: vtt.status(), provider_status: payload.provider_status, render_mode: payload.render_mode });
   }
 
-  writeJsonArtifact('BLACK_LEDGER_FACTION_VIDEO_UI.generated.json', {
+  writeJsonArtifact('BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json', {
     generated_at_utc: new Date().toISOString(),
     status: 'pass',
     base_url: baseUrl,

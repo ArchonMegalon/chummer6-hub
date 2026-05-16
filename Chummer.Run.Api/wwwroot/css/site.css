@@ -6086,3 +6086,277 @@ body.nav-sheet-open {
     padding-bottom: 0;
   }
 }
+
+.launch-hero__geoscape,
+.ledger-command-map__globe,
+.ledger-onboarding__geoscape {
+  min-height: 100%;
+}
+
+.launch-hero__stage > .black-ledger-geoscape,
+.ledger-command-map__globe > .black-ledger-geoscape,
+.ledger-onboarding__geoscape > .black-ledger-geoscape {
+  min-height: inherit;
+}
+
+.black-ledger-geoscape {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  min-height: 560px;
+  padding: 1.1rem;
+  border-radius: 28px;
+  border: 1px solid rgba(146, 176, 217, 0.18);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(57, 198, 255, 0.12), transparent 22%),
+    radial-gradient(circle at 82% 16%, rgba(255, 177, 92, 0.08), transparent 18%),
+    linear-gradient(180deg, rgba(9, 15, 24, 0.96), rgba(5, 10, 17, 0.98));
+  box-shadow: var(--shadow-hero);
+  outline: none;
+}
+
+.black-ledger-geoscape__shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+  gap: 1rem;
+  min-height: 0;
+}
+
+.black-ledger-geoscape__stage,
+.black-ledger-geoscape__panel,
+.black-ledger-geoscape__controls,
+.black-ledger-geoscape__fallback-list {
+  border-radius: 24px;
+  border: 1px solid rgba(146, 176, 217, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(57, 198, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(10, 17, 27, 0.92), rgba(5, 10, 17, 0.98));
+}
+
+.black-ledger-geoscape__stage {
+  position: relative;
+  overflow: hidden;
+  min-height: 380px;
+}
+
+.black-ledger-geoscape__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 380px;
+}
+
+.black-ledger-geoscape__overlay {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  display: grid;
+  gap: 0.35rem;
+  pointer-events: none;
+}
+
+.black-ledger-geoscape__eyebrow {
+  color: var(--ink-muted);
+  font-family: var(--font-family-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.black-ledger-geoscape__headline {
+  color: var(--ink-strong);
+  font-family: var(--font-family-display);
+  font-size: clamp(1.3rem, 2vw, 1.8rem);
+  line-height: 1;
+}
+
+.black-ledger-geoscape__status {
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  max-width: 32ch;
+}
+
+.black-ledger-geoscape__panel {
+  display: grid;
+  align-content: start;
+  gap: 0.8rem;
+  padding: 1rem;
+}
+
+.black-ledger-geoscape__panel-title {
+  margin: 0;
+  color: var(--ink-strong);
+  font-family: var(--font-family-display);
+  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  line-height: 0.94;
+}
+
+.black-ledger-geoscape__panel-summary {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.black-ledger-geoscape__panel-metrics,
+.black-ledger-geoscape__panel-actions,
+.black-ledger-geoscape__controls,
+.black-ledger-geoscape__list-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.black-ledger-geoscape__panel-metrics span,
+.black-ledger-geoscape__list-button span,
+.black-ledger-geoscape__list--static li span {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.black-ledger-geoscape__controls {
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem;
+}
+
+.black-ledger-geoscape__controls.is-teaser {
+  display: none;
+}
+
+.black-ledger-geoscape__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.black-ledger-geoscape__mode-button,
+.black-ledger-geoscape__list-button {
+  border: 1px solid rgba(146, 176, 217, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 0.6rem 0.85rem;
+  cursor: pointer;
+}
+
+.black-ledger-geoscape__mode-button.is-active,
+.black-ledger-geoscape__mode-button:focus-visible,
+.black-ledger-geoscape__list-button:focus-visible {
+  border-color: rgba(92, 226, 255, 0.56);
+  box-shadow: 0 0 0 2px rgba(92, 226, 255, 0.14);
+  color: var(--ink-strong);
+  outline: none;
+}
+
+.black-ledger-geoscape__fallback-list {
+  padding: 1rem;
+}
+
+.black-ledger-geoscape__list-grid {
+  align-items: start;
+}
+
+.black-ledger-geoscape__list-grid section {
+  min-width: 240px;
+  flex: 1 1 280px;
+}
+
+.black-ledger-geoscape__list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.black-ledger-geoscape__list-button {
+  width: 100%;
+  display: grid;
+  gap: 0.2rem;
+  text-align: left;
+  border-radius: 18px;
+}
+
+.black-ledger-geoscape__list-button strong,
+.black-ledger-geoscape__list--static li strong {
+  color: var(--ink-strong);
+}
+
+.black-ledger-geoscape__list--static li {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 18px;
+  border: 1px solid rgba(146, 176, 217, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ledger-command-map__shell--fallback {
+  margin-top: 1rem;
+}
+
+.black-ledger-geoscape[data-ready="true"] + .ledger-command-map__shell--fallback {
+  display: none;
+}
+
+.black-ledger-geoscape.is-fallback + .ledger-command-map__shell--fallback,
+.black-ledger-geoscape[data-ready="false"] + .ledger-command-map__shell--fallback {
+  display: block;
+}
+
+.launch-hero__stage > .black-ledger-geoscape {
+  min-height: 640px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.launch-hero__stage > .black-ledger-geoscape .black-ledger-geoscape__shell {
+  grid-template-columns: 1fr;
+  min-height: 100%;
+}
+
+.launch-hero__stage > .black-ledger-geoscape .black-ledger-geoscape__panel {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: min(340px, calc(100% - 36px));
+  z-index: 2;
+}
+
+.launch-hero__stage > .black-ledger-geoscape .black-ledger-geoscape__fallback-list {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .black-ledger-geoscape,
+  .launch-hero__stage > .black-ledger-geoscape {
+    min-height: 520px;
+  }
+
+  .black-ledger-geoscape__shell {
+    grid-template-columns: 1fr;
+  }
+
+  .launch-hero__stage > .black-ledger-geoscape .black-ledger-geoscape__panel {
+    position: static;
+    width: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .black-ledger-geoscape {
+    padding: 0.8rem;
+    min-height: 460px;
+  }
+
+  .black-ledger-geoscape__controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .black-ledger-geoscape__panel-actions .button-like,
+  .black-ledger-geoscape__panel-actions .inline-link {
+    width: 100%;
+    text-align: center;
+  }
+}
