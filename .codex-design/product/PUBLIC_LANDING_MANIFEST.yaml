@@ -1,17 +1,17 @@
 product: chummer
 surface: chummer.run
 version: 1
-headline: Build a runner, explain every ruling, and recover the campaign.
-subhead: Start with the current preview, inspect the modifier trail, and keep the next session moving with explainable math, durable state, and visible recovery paths.
-proof_line: Public preview, honest status, and a visible walkthrough of the files, named flows, and recent checks posted today.
+headline: The city is moving.
+subhead: Join a faction, watch pressure shift, and carry your runners into the Black Ledger.
+proof_line: Status owns proof, release posture, and current verification notes.
 no_provider_names: true
 no_ltd_names: true
 hero_ctas:
-  - label: Open downloads
-    href: /downloads
+  - label: Enter Black Ledger
+    href: /ledger
     emphasis: primary
-  - label: See what works today
-    href: /now
+  - label: Download Chummer
+    href: /downloads
     emphasis: secondary
 guest_shell_actions:
   - label: Sign in
@@ -22,11 +22,11 @@ guest_shell_actions:
     emphasis: primary
 account_aware_install_cta_label: Create account to install
 secondary_highlights:
-  - Deterministic engine
-  - Rules explanations
-  - Local-first continuity
-  - Black Ledger turn 1 ran
-  - Public signal board stays first-party
+  - Turn 1 already ran
+  - Six factions seeded
+  - Public-safe dispatches
+  - Mobile play shell preview
+  - Status holds proof
 product_proof_eyebrow: Preview snapshot
 product_proof_intro: Open downloads for the current preview, inspect one visible explanation trail, and see what the posted files, named flows, and seeded Black Ledger world already show today without reading that snapshot as a finished-product claim, a fallback recommendation, or a substitute for the install shelf.
 product_proof_primary_label: Open downloads

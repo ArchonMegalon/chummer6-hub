@@ -5,9 +5,10 @@
 Phase 1 ships as:
 
 - ASP.NET Razor view
-- first-party SVG tactical renderer
-- CSS animation for event pulse and arc motion
-- light inline interaction script
+- first-party canvas geoscape globe
+- requestAnimationFrame motion state machine
+- first-party SVG tactical shell as fallback only
+- route-backed onboarding and faction promo integration
 
 ## Why
 
@@ -15,14 +16,15 @@ Phase 1 ships as:
 - no provider branding
 - works inside the current Hub runtime
 - public-safe fallback is first-class instead of an afterthought
+- the primary object is now a large globe instead of a flat shell
 
 ## Upgrade path
 
 If the command map needs heavier rendering later, upgrade behind the same contracts:
 
-- MapLibre GL JS
+- Three.js
 - deck.gl
-- PixiJS
+- CesiumJS
 - GSAP
 
 Those dependencies may render. They must not own truth.

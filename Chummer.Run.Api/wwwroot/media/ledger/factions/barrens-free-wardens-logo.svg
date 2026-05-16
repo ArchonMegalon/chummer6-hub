@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Barrens Free Wardens logo">
+  <rect width="128" height="128" rx="28" fill="#21160f"/>
+  <path d="M64 24l26 15v24c0 23-10 39-26 50-16-11-26-27-26-50V39l26-15z" fill="none" stroke="#ffd58d" stroke-width="8"/>
+  <path d="M64 44v34" stroke="#fff0ce" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="64" cy="84" r="9" fill="#ffbd4a"/>
+</svg>

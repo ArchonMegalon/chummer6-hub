@@ -13,15 +13,11 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   await expect(hero.getByRole('link')).toHaveCount(2);
   await expect(hero.getByRole('link', { name: 'Enter Black Ledger' })).toHaveAttribute('href', '/ledger');
   await expect(hero.getByRole('link', { name: 'Download Chummer' })).toHaveAttribute('href', '/downloads');
+  await expect(page.locator('[data-homepage-section]')).toHaveCount(5);
 
-  const teaser = page.locator('[data-homepage-section="preview"]');
-  await expect(teaser).toContainText('Turn 1 already ran. The city is moving.');
-  await expect(teaser).toContainText('Emerald Sprawl is a fictional, public-safe seed world');
-
-  const teaserLinks = teaser.locator('a');
-  await expect(teaserLinks).toHaveCount(2);
-  await expect(teaser.getByRole('link', { name: 'Open Black Ledger' })).toHaveAttribute('href', '/ledger');
-  await expect(teaser.getByRole('link', { name: 'Replay Turn 1' })).toHaveAttribute('href', '/ledger/map?replay=turn-1');
+  const playDownloads = page.locator('[data-homepage-section="play-downloads"]');
+  await expect(playDownloads).toContainText('Mobile play shell preview');
+  await expect(playDownloads).toContainText('Proof, route health, and verification notes stay on Status');
 
   const badLinks = await page.locator('a[href="#"], a[href=""], a[href^="javascript:void"]').evaluateAll((items) =>
     items.map((item) => (item as HTMLAnchorElement).outerHTML),
@@ -34,8 +30,8 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
 
   await page.goto(`${baseUrl}/ledger/factions/ashline-circle`, { waitUntil: 'networkidle' });
   await expect(page.locator('#ledger-faction-file')).toContainText('Ashline Circle');
-  await expect(page.locator('#ledger-faction-file').getByRole('link', { name: 'Open package pressure' })).toHaveAttribute('href', '/ledger/packages');
-  await expect(page.locator('#ledger-faction-file').getByRole('link', { name: 'Open Turn 1' })).toHaveAttribute('href', '/ledger/turns/1');
+  await expect(page.locator('#ledger-faction-file').getByRole('link', { name: 'Open faction video' })).toHaveAttribute('href', '/ledger/factions/ashline-circle/promo');
+  await expect(page.locator('#ledger-faction-file').getByRole('link', { name: /Join a faction|Open onboarding/ })).toBeVisible();
 
   const ledgerBadLinks = await page.locator('a[href="#"], a[href=""], a[href^="javascript:void"]').evaluateAll((items) =>
     items.map((item) => (item as HTMLAnchorElement).outerHTML),

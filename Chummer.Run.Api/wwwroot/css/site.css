@@ -6360,3 +6360,319 @@ body.nav-sheet-open {
     text-align: center;
   }
 }
+
+body {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.route-landing .site-nav a,
+.route-ledger .site-nav a,
+.route-play .site-nav a,
+.route-mobile .site-nav a,
+.route-downloads .site-nav a {
+  font-size: 0.9rem;
+}
+
+.launch-hero--pregold {
+  padding-top: clamp(4.5rem, 7vw, 5.8rem);
+  padding-bottom: 1.8rem;
+}
+
+.launch-hero--pregold .launch-hero__shell {
+  grid-template-columns: minmax(0, 0.84fr) minmax(480px, 1.16fr);
+  gap: 1rem;
+}
+
+.launch-hero--pregold .launch-hero__copy,
+.launch-hero--pregold .launch-hero__stage {
+  min-height: clamp(480px, 78vh, 820px);
+}
+
+.launch-hero--pregold .launch-hero__copy {
+  gap: 0.8rem;
+  padding: clamp(1.35rem, 2vw, 2rem);
+}
+
+.launch-hero--pregold .launch-hero__title {
+  font-size: clamp(2.7rem, 5vw, 4.7rem);
+}
+
+.launch-hero--pregold .launch-hero__support {
+  max-width: 28rem;
+  font-size: 0.98rem;
+}
+
+.launch-hero__metric-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.launch-hero__metric {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.launch-hero__metric span {
+  font-family: var(--font-family-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(237, 244, 255, 0.72);
+}
+
+.launch-hero__metric strong {
+  font-size: 1.15rem;
+  color: #fff;
+}
+
+.workflow-band--compact,
+.access-band--compact,
+.surface-ledger .editorial-block {
+  margin-top: 1.2rem;
+}
+
+.workflow-band--compact .workflow-band__lead,
+.surface-ledger .editorial-block__lead {
+  gap: 0.35rem;
+  margin-bottom: 0.8rem;
+}
+
+.workflow-band--compact .editorial-title,
+.surface-ledger .editorial-title,
+.access-band--compact .editorial-title {
+  font-size: clamp(1.2rem, 1.8vw, 1.7rem);
+  line-height: 1.06;
+}
+
+.workflow-band--compact .editorial-copy,
+.surface-ledger .editorial-copy,
+.access-band--compact .editorial-copy,
+.route-choice-card p,
+.gateway-card p {
+  font-size: 0.91rem;
+}
+
+.ledger-stats-grid--hero {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ledger-stat-card--compact {
+  padding: 0.95rem 1rem;
+}
+
+.flagship-gateway-grid--compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.faction-identity-strip,
+.faction-profile-grid {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.faction-identity-card,
+.faction-profile-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(15, 39, 74, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow-soft);
+}
+
+.faction-identity-card__backdrop,
+.faction-profile-card__hero {
+  min-height: 168px;
+  background-size: cover;
+  background-position: center;
+}
+
+.faction-identity-card__body,
+.faction-profile-card__hero,
+.faction-detail-hero {
+  display: grid;
+  gap: 0.9rem;
+  align-content: end;
+  padding: 1rem;
+  position: relative;
+}
+
+.faction-identity-card__body::before,
+.faction-profile-card__hero::before,
+.faction-detail-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 23, 45, 0.16), rgba(7, 23, 45, 0.88));
+}
+
+.faction-identity-card__body > *,
+.faction-profile-card__hero > *,
+.faction-detail-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.faction-identity-card__logo,
+.faction-profile-card__logo,
+.faction-detail-hero__logo {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.45rem;
+}
+
+.faction-identity-card__copy h3,
+.faction-profile-card__hero-copy h3,
+.faction-detail-hero__copy h2 {
+  margin: 0;
+  color: #fff;
+}
+
+.faction-identity-card__copy p,
+.faction-profile-card__hero-copy p,
+.faction-detail-hero__copy .editorial-copy {
+  margin: 0;
+  color: rgba(237, 244, 255, 0.82);
+}
+
+.faction-profile-card__ledgers,
+.score-ledger-grid,
+.faction-storyboard-strip {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.faction-profile-card__ledgers {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0.95rem 1rem 0;
+}
+
+.score-ledger-grid,
+.faction-storyboard-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.score-ledger {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.75rem;
+  border-radius: 16px;
+  background: rgba(15, 39, 74, 0.05);
+}
+
+.score-ledger__label {
+  font-family: var(--font-family-mono);
+  font-size: 0.69rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-muted);
+}
+
+.score-ledger strong {
+  color: var(--ink-strong);
+}
+
+.score-ledger small {
+  color: var(--ink-muted);
+}
+
+.faction-profile-card .trust-claim__microproof,
+.faction-profile-card .stacked-actions,
+.faction-profile-card .muted-copy {
+  padding-inline: 1rem;
+}
+
+.faction-profile-card .stacked-actions,
+.faction-detail-hero .stacked-actions {
+  gap: 0.55rem;
+}
+
+.faction-detail-hero {
+  min-height: 260px;
+  border-radius: 28px;
+  margin-bottom: 1rem;
+  background-size: cover;
+  background-position: center;
+}
+
+.faction-detail-hero__copy {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.trust-page-hero--compact,
+.surface-ledger .trust-page-hero {
+  gap: 0.8rem;
+  padding: 1.15rem;
+}
+
+.trust-page-hero--compact .page-title,
+.surface-ledger .page-title {
+  font-size: clamp(1.9rem, 4vw, 3rem);
+}
+
+.surface-ledger .page-copy,
+.trust-page-hero--compact .page-copy {
+  font-size: 0.93rem;
+}
+
+.route-choice-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.route-choice-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ledger-command-map--pregold .black-ledger-geoscape__stage {
+  min-height: clamp(440px, 68vh, 760px);
+}
+
+.access-band--compact {
+  padding-bottom: 2rem;
+}
+
+.access-band--compact .access-band__actions {
+  gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+  .launch-hero--pregold .launch-hero__shell,
+  .faction-identity-strip,
+  .faction-profile-grid,
+  .score-ledger-grid,
+  .faction-storyboard-strip,
+  .flagship-gateway-grid--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .launch-hero--pregold .launch-hero__shell,
+  .launch-hero__metric-strip,
+  .ledger-stats-grid--hero,
+  .faction-identity-strip,
+  .faction-profile-grid,
+  .flagship-gateway-grid--compact,
+  .route-choice-grid--three,
+  .route-choice-grid--two,
+  .score-ledger-grid,
+  .faction-storyboard-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .launch-hero--pregold .launch-hero__copy,
+  .launch-hero--pregold .launch-hero__stage {
+    min-height: auto;
+  }
+}

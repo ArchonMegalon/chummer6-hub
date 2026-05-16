@@ -140,7 +140,7 @@ public sealed class BlackLedgerPublicStatsService
             new("rust_market_syndicate", "Rust Market Syndicate", "gear/debt logistics", "ai rust broker", "ai debt clock", "ai receipt hawk", ["debt heat 99", "favor load 86", "package pressure 83"], "#ff8a3d", "#ff5d73", "credit-chip-broken"),
             new("ashline_circle", "Ashline Circle", "mystic-adjacent street coalition", "ai ashline seer", "ai drain keeper", "ai ritual scribe", ["drain magnet index 72", "source clarity 48", "mysad density 39"], "#9c6cff", "#ffb84d", "ritual-eye"),
             new("neon_docks_union", "Neon Docks Union", "riggers and logistics crews", "ai dock boss", "ai route dispatcher", "ai container oracle", ["route control 76", "vehicle package demand 75", "drone herd size 64"], "#63f2b6", "#5ce2ff", "cargo-node"),
-            new("ghostline_network", "Ghostline Network", "intel and matrix rumor verification", "ai ghost handler", "ai signal referee", "ai redaction spider", ["intel volume 82", "false signal suppression 80", "proof trail strength 67"], "#a9b8cf", "#5ce2ff", "signal-mask"),
+            new("ghostline_network", "Ghostline Network", "intel and matrix rumor verification", "ai ghost handler", "ai signal referee", "ai redaction spider", ["intel volume 82", "false signal suppression 80", "signal confidence 67"], "#a9b8cf", "#5ce2ff", "signal-mask"),
             new("barrens_free_wardens", "Barrens Free Wardens", "street-level mutual protection", "ai warden marshal", "ai survival clock", "ai closeout witness", ["survival pressure 81", "attrition risk 63", "closeout witnesses 36"], "#ffb84d", "#63f2b6", "ward-shield"),
         ],
         StewardshipPosts:

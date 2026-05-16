@@ -23,6 +23,8 @@ test('black ledger faction promo routes stay public-safe and fallback-backed', a
     expect(vtt.status()).toBe(200);
     expect(payload.provider_status).toBe('NEEDS_PROVIDER_VERIFICATION');
     expect(payload.render_mode).toBe('fallback_static_storyboard');
+    const html = await page.text();
+    expect(html).not.toContain('Advertisemind');
     results.push({ faction, page: page.status(), json: json.status(), vtt: vtt.status(), provider_status: payload.provider_status, render_mode: payload.render_mode });
   }
 

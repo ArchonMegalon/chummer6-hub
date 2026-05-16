@@ -284,7 +284,7 @@ class BlackLedgerGeoscapeRoot {
       <li>
         <button type="button" class="black-ledger-geoscape__list-button" data-faction-select="${faction.slug}">
           <strong>${faction.name}</strong>
-          <span>${faction.type} · ${faction.publicSummary}</span>
+          <span>${this.variant === 'teaser' ? faction.type : `${faction.type} · ${faction.publicSummary}`}</span>
         </button>
       </li>`).join('');
     const eventItems = this.events.slice(0, 4).map((event) => `<li><strong>${event.title}</strong><span>${event.summary}</span></li>`).join('');
@@ -452,7 +452,9 @@ class BlackLedgerGeoscapeRoot {
     } else {
       this.panelTag.textContent = activeFaction.type || 'Faction pressure';
       this.panelTitle.textContent = activeFaction.name;
-      this.panelSummary.textContent = activeFaction.publicSummary;
+      this.panelSummary.textContent = this.variant === 'teaser'
+        ? 'Turn 1 replay, faction pressure, and dispatch trails continue inside Black Ledger.'
+        : activeFaction.publicSummary;
     }
 
     const metrics = [

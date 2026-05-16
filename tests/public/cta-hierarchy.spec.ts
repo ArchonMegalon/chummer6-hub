@@ -3,7 +3,7 @@ import { writeJsonArtifact, writeMarkdownArtifact } from './ux-artifacts';
 
 const baseUrl = 'https://chummer.run';
 
-test('homepage keeps the intended live CTA hierarchy on desktop and mobile', async ({ browser }) => {
+test('homepage keeps the intended compact CTA hierarchy on desktop and mobile', async ({ browser }) => {
   test.setTimeout(120000);
   const viewports = [
     { name: 'desktop', width: 1366, height: 768 },
@@ -19,16 +19,16 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     const heroActions = page.locator('.launch-hero__actions a.button-like');
     const texts = await heroActions.allTextContents();
     const normalized = texts.map((text) => text.replace(/\s+/g, ' ').trim());
-    const expected = ['Open downloads', 'Enter the hub', 'Explore Karma Forge'];
-    expect(normalized.slice(0, 3), `${viewport.name} hero CTA order`).toEqual(expected);
+    const expected = ['Enter Black Ledger', 'Download Chummer'];
+    expect(normalized.slice(0, 2), `${viewport.name} hero CTA order`).toEqual(expected);
 
     const heroBoxes = [];
-    for (let index = 0; index < Math.min(await heroActions.count(), 3); index += 1) {
+    for (let index = 0; index < Math.min(await heroActions.count(), 2); index += 1) {
       heroBoxes.push(await heroActions.nth(index).boundingBox());
     }
 
-    const accountSection = page.locator('[data-homepage-section="account-value"]');
-    const accountPrimary = accountSection.locator('.button-like--primary');
+    const accountSection = page.locator('[data-homepage-section="play-downloads"]');
+    const accountPrimary = accountSection.locator('.editorial-strip__action').first();
     const accountPrimaryTop = (await accountPrimary.boundingBox())?.y ?? 0;
     const heroPrimaryTop = heroBoxes[0]?.y ?? 0;
     if (accountPrimaryTop <= heroPrimaryTop) {
@@ -37,7 +37,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
 
     results.push({
       viewport: viewport.name,
-      hero_ctas: normalized.slice(0, 3),
+      hero_ctas: normalized.slice(0, 2),
       hero_boxes: heroBoxes,
       account_primary_top: accountPrimaryTop,
     });
@@ -58,10 +58,10 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     [
       '# Homepage Simplification Changelog',
       '',
-      '- Hero keeps three ranked CTAs: `Open downloads`, `Enter the hub`, `Explore Karma Forge`.',
-      '- Homepage remains on the six-section model: hero, choose-your-path, what-works-today, preview, account-value, trust-footer.',
-      '- Black Ledger and Karma Forge stay in the preview lane instead of overwhelming the hero with extra proof panels.',
-      '- Account CTAs remain lower on the page instead of competing with the install-first hero path.',
+      '- Hero keeps two ranked CTAs: `Enter Black Ledger` and `Download Chummer`.',
+      '- Homepage now stays on the five-section model: hero, score-strip, factions, play-downloads, footer.',
+      '- Globe, score chips, and faction identity own the front door instead of proof panels.',
+      '- Play shell and status remain lower on the page instead of competing with the globe hero.',
     ].join('\n'),
   );
 
