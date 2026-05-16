@@ -300,11 +300,17 @@ public sealed class PublicLandingMacBootstrapScriptTests
 
         string command = (string)(buildMethod.Invoke(
             obj: null,
-            parameters: ["https://chummer.run/downloads/release-upload/bootstrap.sh", "abc123", "CHUMMER_RELEASE_UPLOAD_TICKET", "ticket-xyz"]) ?? throw new InvalidOperationException("command build returned null"));
+            parameters: [
+                "https://chummer.run/downloads/release-upload/bootstrap.sh",
+                "abc123",
+                "https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json",
+                "CHUMMER_RELEASE_UPLOAD_TICKET",
+                "ticket-xyz"]) ?? throw new InvalidOperationException("command build returned null"));
 
         Assert.Contains("CHUMMER_BOOTSTRAP_EXPECTED_SHA256='abc123'", command, StringComparison.Ordinal);
         Assert.Contains("ACTUAL_BOOTSTRAP_SHA256", command, StringComparison.Ordinal);
-        Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0'", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='1'", command, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL='https://chummer.run/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0'", command, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_UPLOAD_TICKET='ticket-xyz'", command, StringComparison.Ordinal);
