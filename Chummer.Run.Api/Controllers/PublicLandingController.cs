@@ -5325,7 +5325,7 @@ public sealed class PublicLandingController : Controller
             new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
             new("Adoption health", pulse is null
-                ? BuildReleaseProofSummary(manifest)
+                ? BuildManifestAdoptionSummary(manifest)
                 : BuildTrustPulseAdoptionSummary(pulse))
         ];
     }
@@ -5344,6 +5344,29 @@ public sealed class PublicLandingController : Controller
         }
 
         return proof;
+    }
+
+    private static string BuildManifestAdoptionSummary(PublicReleaseManifestDto manifest)
+    {
+        if (manifest.PublicTrustMetrics is JsonElement metrics
+            && metrics.ValueKind == JsonValueKind.Object
+            && metrics.TryGetProperty("adoptionHealth", out JsonElement adoptionHealth)
+            && adoptionHealth.ValueKind == JsonValueKind.Object)
+        {
+            string? summary = TryGetJsonString(adoptionHealth, "summary");
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                return summary!;
+            }
+
+            string? status = TryGetJsonString(adoptionHealth, "status");
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                return $"Adoption health is {HumanizeToken(status, "unknown").ToLowerInvariant()}.";
+            }
+        }
+
+        return BuildReleaseProofSummary(manifest);
     }
 
     private static string BuildLiveLaunchSummary(PublicReleaseManifestDto manifest)

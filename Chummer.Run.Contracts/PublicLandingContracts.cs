@@ -120,6 +120,10 @@ public sealed record PublicReleaseManifestDto(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? DesktopTupleCoverage { get; init; }
 
+    [JsonPropertyName("publicTrustMetrics")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? PublicTrustMetrics { get; init; }
+
     [JsonIgnore]
     public JsonElement? ProofUiLocalizationReleaseGate { get; init; }
 }

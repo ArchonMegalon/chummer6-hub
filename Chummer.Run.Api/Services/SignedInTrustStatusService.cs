@@ -4,6 +4,7 @@ using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
+using System.Text.Json;
 
 namespace Chummer.Run.Api.Services;
 
@@ -74,7 +75,7 @@ public sealed class SignedInTrustStatusService
             new(
                 "Adoption health",
                 pulse is null
-                    ? BuildReleaseProofSummary(manifest)
+                    ? BuildManifestAdoptionSummary(manifest)
                     : BuildTrustPulseAdoptionSummary(pulse)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new(
@@ -207,6 +208,29 @@ public sealed class SignedInTrustStatusService
         }
 
         return proof;
+    }
+
+    private static string BuildManifestAdoptionSummary(PublicReleaseManifestDto manifest)
+    {
+        if (manifest.PublicTrustMetrics is JsonElement metrics
+            && metrics.ValueKind == JsonValueKind.Object
+            && metrics.TryGetProperty("adoptionHealth", out JsonElement adoptionHealth)
+            && adoptionHealth.ValueKind == JsonValueKind.Object)
+        {
+            string? summary = TryGetJsonString(adoptionHealth, "summary");
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                return summary!;
+            }
+
+            string? status = TryGetJsonString(adoptionHealth, "status");
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                return $"Adoption health is {HumanizeToken(status, "unknown").ToLowerInvariant()}.";
+            }
+        }
+
+        return BuildReleaseProofSummary(manifest);
     }
 
     private static string BuildSignedInInstallRecommendationSummary(
