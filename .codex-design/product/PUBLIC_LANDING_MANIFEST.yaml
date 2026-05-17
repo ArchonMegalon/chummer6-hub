@@ -2,8 +2,8 @@ product: chummer
 surface: chummer.run
 version: 1
 headline: Build a runner, explain every ruling, and recover the campaign.
-subhead: Start with the current preview, inspect the modifier trail, and keep the next session moving with explainable math, durable state, and visible recovery paths.
-proof_line: Public preview, honest status, and a visible walkthrough of the files, named flows, and recent checks posted today.
+subhead: Start with the current public release, inspect the modifier trail, and keep the next session moving with explainable math, durable state, and visible recovery paths.
+proof_line: Public release, honest status, and a visible walkthrough of the files, named flows, and recent checks posted today.
 no_provider_names: true
 no_ltd_names: true
 hero_ctas:
@@ -27,15 +27,15 @@ secondary_highlights:
   - Local-first continuity
   - Black Ledger turn 1 ran
   - Public signal board stays first-party
-product_proof_eyebrow: Preview snapshot
-product_proof_intro: Open downloads for the current preview, inspect one visible explanation trail, and see what the posted files, named flows, and seeded Black Ledger world already show today without reading that snapshot as a finished-product claim, a fallback recommendation, or a substitute for the install shelf.
+product_proof_eyebrow: Release snapshot
+product_proof_intro: Open downloads for the current public release, inspect one visible explanation trail, and see what the posted files, named flows, and seeded Black Ledger world already show today without reading that snapshot as a blanket finished-product claim, a fallback recommendation, or a substitute for the install shelf.
 product_proof_primary_label: Open downloads
 product_proof_primary_href: /downloads
 product_proof_secondary_label: Inspect the explanation trail
 product_proof_secondary_href: /now#real-rules-truth
-product_proof_topline_label: Posted preview snapshot
+product_proof_topline_label: Posted release snapshot
 product_proof_scope_line: What you see on the public shelf is scoped to the posted files, named flows, and recent checks visible today; it is not a blanket finished-product claim and it does not outrank the recommended install route.
-product_flagship_boundary_line: Preview pages, fallback routes, artifact explainers, and packet-detail artifacts can show real progress, but they are still preview surfaces rather than finished-product claims.
+product_flagship_boundary_line: Public pages, fallback routes, artifact explainers, and packet-detail artifacts can show real progress, but they still have explicit scope boundaries rather than pretending to be blanket finished-product claims.
 product_proof_result_title: Final pool 9
 product_proof_result_summary: Same inputs, same answer, with the explanation trail, posted-shelf posture, and current boundary still attached.
 product_proof_trail:

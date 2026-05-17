@@ -4344,6 +4344,15 @@ milestones:
     - id: '143.4'
       owner: chummer6-hub-registry
       title: Keep public or signed-in release and exchange surfaces from overstating output readiness when proof receipts are stale or incomplete.
+      status: complete
+      completion_action: verify_closed_package_only
+      do_not_reopen_reason: M143 chummer6-hub-registry output-readiness posture is complete; future shards must verify the repo-local proof note, focused guard tests, canonical registry row, queue row, and published release-channel projection instead of reopening this slice.
+      evidence:
+      - /docker/chummercomplete/chummer-hub-registry/scripts/materialize_public_release_channel.py and /docker/chummercomplete/chummer-hub-registry/scripts/verify_public_release_channel.py now downgrade artifact identity, publication-binding, exchange-lineage, and top-level supportability posture whenever release proof, localization proof, or flagship desktop readiness receipts are stale or missing.
+      - /docker/chummercomplete/chummer-hub-registry/scripts/test_materialize_public_release_channel.py and /docker/chummercomplete/chummer-hub-registry/scripts/test_verify_public_release_channel.py pin the stale-proof downgrade semantics so published or retained output-readiness states fail closed across registry-owned release and exchange projections.
+      - /docker/chummercomplete/chummer-hub-registry/scripts/verify_next90_m143_registry_output_readiness.py, /docker/chummercomplete/chummer-hub-registry/scripts/test_verify_next90_m143_registry_output_readiness.py, /docker/chummercomplete/chummer-hub-registry/docs/next90-m143-registry-output-readiness.closeout.md, and /docker/chummercomplete/chummer-hub-registry/scripts/ai/verify.sh keep the queue mirror, canonical registry mirror, closeout note, verify wiring, and stale-proof guard executable for this completed package.
+      - /docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json records the current fresh-proof release and exchange output-readiness posture while preserving the downgrade contract when proof freshness slips.
+      - python3 scripts/verify_next90_m143_registry_output_readiness.py and python3 -m unittest scripts/test_verify_next90_m143_registry_output_readiness.py exit 0.
     - id: '143.5'
       owner: executive-assistant
       title: Compile route-specific compare packs and artifact proofs for print, export, exchange, SR6 supplement, and house-rule workflows.
