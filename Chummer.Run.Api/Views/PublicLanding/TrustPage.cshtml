@@ -185,7 +185,7 @@
             <h2 class="editorial-title">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase) ? "Read the trust boundary first, then the full policy." : "Read the rule boundary first, then the full terms."))</h2>
             <p class="editorial-copy">@((string.Equals(Model.PageId, "privacy", StringComparison.OrdinalIgnoreCase)
                 ? "Start with the short version: the binary stays the same for everyone, account truth is bounded, and telemetry or diagnostics stay explicit about what they capture."
-                : "Start with the short version: this is honest early access, support starts with Chummer, and the normal download path stays clearer than the edge-case fallback."))</p>
+                : "Start with the short version: Windows and Linux are on a real public release, support starts with Chummer, and the normal download path stays clearer than the edge-case fallback."))</p>
         </div>
         <div class="continuity-band__panel">
             @foreach (var fact in policyFacts)
@@ -351,7 +351,7 @@ else if (!contactPage)
                 </div>
                 <div class="field">
                     <label for="supportSummary">One-line summary</label>
-                    <input id="supportSummary" name="summary" maxlength="280" placeholder="The Linux preview installed successfully, but the post-install guidance was unclear." value="@Model.SupportIntake.DefaultSummary" required />
+                    <input id="supportSummary" name="summary" maxlength="280" placeholder="The Linux release installed successfully, but the post-install guidance was unclear." value="@Model.SupportIntake.DefaultSummary" required />
                 </div>
                 <div class="field">
                     <label for="supportDetail">What happened</label>
@@ -376,11 +376,11 @@ else if (!contactPage)
                     </div>
                     <div class="field">
                         <label for="supportVersion">Version</label>
-                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Current preview build or version number" value="@Model.SupportIntake.DefaultApplicationVersion" />
+                        <input id="supportVersion" name="applicationVersion" maxlength="64" placeholder="Current public build or version number" value="@Model.SupportIntake.DefaultApplicationVersion" />
                     </div>
                     <div class="field">
                         <label for="supportReleaseChannel">Release channel</label>
-                        <input id="supportReleaseChannel" name="releaseChannel" maxlength="64" placeholder="preview, beta, or stable" value="@Model.SupportIntake.DefaultReleaseChannel" />
+                        <input id="supportReleaseChannel" name="releaseChannel" maxlength="64" placeholder="public release, beta, or stable" value="@Model.SupportIntake.DefaultReleaseChannel" />
                     </div>
                     <div class="field">
                         <label for="supportHeadId">Desktop head</label>

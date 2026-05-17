@@ -6549,7 +6549,16 @@ public sealed class PublicLandingController : Controller
                 {
                     Entries = section.Entries
                         .Select(entry => string.Equals(entry.Question, "Do I need an account to download the current preview?", StringComparison.Ordinal)
-                            ? entry with { Answer = accessPosture.DownloadFaqAnswer }
+                            ? entry with
+                            {
+                                Question = "Do I need an account to download the current release?",
+                                Answer = accessPosture.DownloadFaqAnswer
+                            }
+                            : string.Equals(entry.Question, "Can I actually use Chummer right now?", StringComparison.Ordinal)
+                                ? entry with
+                                {
+                                    Answer = "Yes. Chummer is publicly available now on Windows and Linux, with live downloads, current pages, and clear labels for what is still rough or still missing."
+                                }
                             : string.Equals(entry.Question, "What does account creation give me right away?", StringComparison.Ordinal)
                                 ? entry with { Answer = accessPosture.AccountFaqAnswer }
                                 : entry)
