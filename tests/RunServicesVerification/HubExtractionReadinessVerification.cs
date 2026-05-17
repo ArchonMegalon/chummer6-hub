@@ -1288,17 +1288,32 @@ internal static class HubExtractionReadinessVerification
 
     private static string ResolveRepoRoot()
     {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
+        foreach (string seed in EnumerateRepoRootSeeds())
         {
-            if (File.Exists(Path.Combine(current.FullName, "Chummer.Run.sln")))
+            var current = new DirectoryInfo(seed);
+            while (current is not null)
             {
-                return current.FullName;
-            }
+                if (File.Exists(Path.Combine(current.FullName, "Chummer.Run.sln")))
+                {
+                    return current.FullName;
+                }
 
-            current = current.Parent;
+                current = current.Parent;
+            }
         }
 
         throw new InvalidOperationException("Unable to locate repository root from test host.");
+    }
+
+    private static IEnumerable<string> EnumerateRepoRootSeeds()
+    {
+        string? explicitRoot = Environment.GetEnvironmentVariable("CHUMMER_HUB_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(explicitRoot))
+        {
+            yield return explicitRoot;
+        }
+
+        yield return Directory.GetCurrentDirectory();
+        yield return AppContext.BaseDirectory;
     }
 }
