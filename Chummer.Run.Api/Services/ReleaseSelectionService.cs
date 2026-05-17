@@ -186,11 +186,11 @@ public sealed class ReleaseSelectionService
         if (guestInstallAvailable && accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still use a signed-in install handoff.";
-            createAccountSummary = "Some preview downloads are public now. Create an account when you want the signed-in install handoff, recovery, tracked support, or linked install history on the same return path.";
+            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still use an account-backed install path.";
+            createAccountSummary = "Public downloads are available now on some platforms. Create an account when you want the account-backed install path, recovery, tracked support, or linked install history on the same return path.";
             signInSummary = "Sign in to reopen the same account-backed install handoff, recovery path, and support history.";
             downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to any route that still uses a signed-in install handoff.";
+            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to any route that still uses an account-backed install path.";
         }
         else if (guestInstallAvailable)
         {
@@ -204,19 +204,19 @@ public sealed class ReleaseSelectionService
         else if (accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
-            accountValueSummary = "The account does not change the published file. It is part of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
-            createAccountSummary = "Create the account first. The current install path uses a signed-in handoff so recovery, support, and install return stay attached from the first launch.";
+            accountValueSummary = "The account does not change the published file. It is part of the current install path, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            createAccountSummary = "Create the account first. The current install path uses an account-backed handoff so recovery, support, and install return stay attached from the first launch.";
             signInSummary = "Sign in to continue the current install handoff and reopen the same recovery and support path.";
             downloadFaqAnswer = $"Yes for the current route. {GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
-            accountFaqAnswer = "Account creation is the start of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            accountFaqAnswer = "Account creation is the start of the current install path, and it keeps recovery, tracked support, and linked install history on the same return path.";
         }
         else
         {
-            availabilitySummary = "No public preview is on the shelf right now. Create an account if you want release follow-through and support when the next build lands.";
+            availabilitySummary = "No public download is on the shelf right now. Create an account if you want release follow-through and support when the next build lands.";
             accountValueSummary = "The account keeps recovery, tracked support, and release follow-through together when the next build lands.";
             createAccountSummary = "Create an account if you want release follow-through, tracked support, and a calmer return path when the next build lands.";
             signInSummary = "Sign in to reopen your account-backed release follow-through and support history.";
-            downloadFaqAnswer = "Not right now. No public preview is on the shelf yet.";
+            downloadFaqAnswer = "Not right now. No public download is on the shelf yet.";
             accountFaqAnswer = "Account creation gives you recovery, tracked support, and release follow-through when the next build lands.";
         }
 
@@ -853,13 +853,13 @@ public sealed class ReleaseSelectionService
     {
         if (platforms.Count == 0)
         {
-            return "The current preview still uses a signed-in install handoff.";
+            return "The current route still uses an account-backed install path.";
         }
 
         var labels = FormatPlatformList(platforms);
         return platforms.Count == 1
-            ? $"{labels} still uses a signed-in install handoff so recovery and support stay attached from the first launch."
-            : $"{labels} still use a signed-in install handoff so recovery and support stay attached from the first launch.";
+            ? $"{labels} still uses an account-backed install path so recovery and support stay attached from the first launch."
+            : $"{labels} still use an account-backed install path so recovery and support stay attached from the first launch.";
     }
 
     private static string FormatPlatformList(IReadOnlyList<string> platforms)

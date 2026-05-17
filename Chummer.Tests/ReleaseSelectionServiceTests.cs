@@ -208,7 +208,7 @@ platforms:
         Assert.True(posture.GuestInstallAvailable);
         Assert.True(posture.AccountRequiredInstallAvailable);
         Assert.Contains("It depends on the platform", posture.DownloadFaqAnswer, StringComparison.Ordinal);
-        Assert.Contains("signed-in install handoff", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("account-backed install path", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

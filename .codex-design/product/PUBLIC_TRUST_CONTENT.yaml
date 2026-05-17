@@ -51,9 +51,9 @@ trust_pages:
       - id: product-question
         eyebrow: "Product question or UX confusion"
         heading: "Product questions in plain language"
-        body: "Normal preview questions should be answerable from inside the product. Support and FAQ exist so you do not have to dig through project details just to get a clear answer."
+        body: "Normal product questions should be answerable from inside the product. Support and FAQ exist so you do not have to dig through project details just to get a clear answer."
         bullets:
-          - "FAQ answers the normal preview and product questions in plain language."
+          - "FAQ answers the normal product questions in plain language."
           - "Support cases stay separate from optional participation."
           - "You do not need a GitHub account to ask for help."
   - id: privacy
@@ -81,7 +81,7 @@ trust_pages:
       - id: hosted-account
         eyebrow: "Account record"
         heading: "Your account keeps sign-in, preferences, and support together"
-        body: "Your Chummer account keeps your basic profile, linked sign-in methods, device access, support cases, and preview preferences together so you do not have to rebuild that history by hand."
+        body: "Your Chummer account keeps your basic profile, linked sign-in methods, device access, support cases, and account preferences together so you do not have to rebuild that history by hand."
       - id: install-linking
         eyebrow: "Install linking"
         heading: "The download file is the same for everyone"
@@ -104,12 +104,12 @@ trust_pages:
           - "Critical support workflows and explicit crash diagnostics stay explicit opt-in."
   - id: terms
     eyebrow: "Terms"
-    heading: "Preview terms in plain language"
-    intro: "These are the plain rules for the current preview: early access, honest labels, real downloads, and straightforward support."
+    heading: "Public release terms in plain language"
+    intro: "These are the plain rules for the current public release: honest labels, real downloads, and straightforward support."
     effective_date: "2026-03-25"
     updated_date: "2026-05-03"
     summary_points:
-      - "Early access, not finished breadth"
+      - "Public release, with explicit boundaries"
       - "Current downloads when available"
       - "Support starts with Chummer"
     actions:
@@ -124,9 +124,9 @@ trust_pages:
         tone: ghost
     sections:
       - id: preview-posture
-        eyebrow: "Preview status"
-        heading: "The product is real, but still early access"
-        body: "Expect real pages, current downloads, visible proof, and explicit preview labels when support, compatibility, or breadth are still moving."
+        eyebrow: "Release status"
+        heading: "The product is real, with explicit public-release boundaries"
+        body: "Expect real pages, current downloads, visible proof, and explicit labels whenever support, compatibility, or breadth are still moving."
       - id: account-support
         eyebrow: "Account and support"
         heading: "Sign-in is simple, and support starts with Chummer"
@@ -134,7 +134,7 @@ trust_pages:
       - id: delivery
         eyebrow: "Delivery"
         heading: "Use the current public download first; advanced packages only when necessary"
-        body: "Public downloads should match what is honestly available right now. Public-copy remains explicitly labeled with explicit preview labels, and these terms stay consistent across help, release, and trust surfaces. If a regular installer exists later, it becomes the normal path, while manual packages stay as fallback for edge cases or support-directed setup."
+        body: "Public downloads should match what is honestly available right now. Public copy stays explicitly labeled when a platform, package type, or support path still has boundaries, and these terms stay consistent across help, release, and trust surfaces. If a regular installer exists later, it becomes the normal path, while manual packages stay as fallback for edge cases or support-directed setup."
   - id: contact
     eyebrow: "Contact"
     heading: "Open the right support case"
@@ -172,7 +172,7 @@ faq_pages:
   - id: faq
     eyebrow: "FAQ"
     heading: "Plain answers before you spend more time"
-    intro: "The public front door should answer the normal questions directly: what is real now, what preview access means, and how to get help without reverse-engineering the repos."
+    intro: "The public front door should answer the normal questions directly: what is real now, what release access means, and how to get help without reverse-engineering the repos."
     actions:
       - label: "See what works today"
         href: "/now"
@@ -187,15 +187,15 @@ faq_pages:
       - title: "Using Chummer"
         entries:
           - question: "Can I actually use Chummer right now?"
-            answer: "Yes, as an honest early-access preview. There is a current public download, a real proof trail, and explicit labels for what is live, inspectable, or still opening next."
+            answer: "Yes. There is a current public release on Windows and Linux, a real proof trail, and explicit labels for what is live, inspectable, or still opening next."
           - question: "Why would I trust it more than an opaque assistant?"
             answer: "Because the product is trying to keep the result, the trail, and the current release picture visible together instead of asking you to trust mystery math."
           - question: "What does account creation give me right away?"
-            answer: "Account creation gives you recovery, support history in Account, and a cleaner return path when linked downloads or account-aware preview features are available."
+            answer: "Account creation gives you recovery, support history in Account, and a cleaner return path when linked downloads or account-aware account features are available."
       - title: "Downloads and installs"
         entries:
-          - question: "Do I need an account to download the current preview?"
-            answer: "No. The current public preview download is Windows desktop. Linux and macOS are not public yet. Create an account when you want recovery, tracked support, and a cleaner return path when linked downloads are available."
+          - question: "Do I need an account to download the current release?"
+            answer: "It depends on the platform. Windows and Linux public downloads are available now. Create an account when you want recovery, tracked support, linked install history, or any route that still uses an account-backed install path."
           - question: "Do I get a personalized download?"
             answer: "No. The published package stays the same for everyone. Any account-aware handoff is separate from the file itself."
           - question: "Where do I go if install or update goes sideways?"
