@@ -5306,7 +5306,7 @@ public sealed class PublicLandingController : Controller
             return releaseExperience.Display.ChannelLabel;
         }
 
-        return HumanizeToken(channel, "Current preview");
+        return HumanizeToken(channel, "Current release");
     }
 
     private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows(
@@ -5340,7 +5340,7 @@ public sealed class PublicLandingController : Controller
 
         if (!string.IsNullOrWhiteSpace(manifest.SupportabilityState))
         {
-            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current preview")}";
+            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current release")}";
         }
 
         return proof;
@@ -5416,7 +5416,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildPreviewLaunchSummary(
         PublicReleaseManifestDto manifest,
         ReleaseExperienceViewModel releaseExperience)
-        => $"{HumanizeToken(manifest.RolloutState, "Current preview")} on {releaseExperience.Display.ChannelLabel} {manifest.Version}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+        => $"{HumanizeToken(manifest.RolloutState, "Current release")} on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
     {

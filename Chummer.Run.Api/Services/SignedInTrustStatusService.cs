@@ -191,7 +191,7 @@ public sealed class SignedInTrustStatusService
             return releaseExperience.Display.ChannelLabel;
         }
 
-        return HumanizeToken(channel, "Current preview");
+        return HumanizeToken(channel, "Current release");
     }
 
     private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
@@ -204,7 +204,7 @@ public sealed class SignedInTrustStatusService
 
         if (!string.IsNullOrWhiteSpace(manifest.SupportabilityState))
         {
-            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current preview")}";
+            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current release")}";
         }
 
         return proof;

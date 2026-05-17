@@ -318,7 +318,7 @@ public sealed class ReleaseSelectionService
     private static ReleaseDisplayViewModel BuildDisplay(PublicReleaseManifestDto manifest, PublicReleaseExperienceDocument experience)
     {
         var channelLabel = ResolveChannelLabel(manifest.Channel, experience);
-        var buildLabel = ResolveBuildLabel(manifest.Version, experience);
+        var buildLabel = ResolveBuildLabel(manifest.Version, manifest.Channel, manifest.RolloutState, experience);
         var publishedLabel = $"Published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd}";
         return new ReleaseDisplayViewModel(channelLabel, buildLabel, publishedLabel);
     }
@@ -333,8 +333,14 @@ public sealed class ReleaseSelectionService
             : experience.DefaultPublicChannelLabel;
     }
 
-    private static string ResolveBuildLabel(string? version, PublicReleaseExperienceDocument experience)
+    private static string ResolveBuildLabel(string? version, string? channel, string? rolloutState, PublicReleaseExperienceDocument experience)
     {
+        if (string.Equals((channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
+            && string.Equals((rolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase))
+        {
+            return experience.UnpublishedBuildLabel;
+        }
+
         var normalized = (version ?? string.Empty).Trim();
         if (string.IsNullOrWhiteSpace(normalized) || string.Equals(normalized, "unpublished", StringComparison.OrdinalIgnoreCase))
         {
