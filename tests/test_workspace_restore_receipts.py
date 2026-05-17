@@ -1648,8 +1648,8 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
                 "  - /docker/chummercomplete/chummer6-hub commit 4d4b3856 emits workspace_restore provenance receipts, entitlement_sync conflict\n"
-                "    receipts, stale claimed-install receipts, artifact drift receipts, authority planes, recovery hints, and block-continue\n"
-                "    posture.\n",
+                "      receipts, stale claimed-install receipts, artifact drift receipts, authority planes, recovery hints, and block-continue\n"
+                "      posture.\n",
                 "",
                 1,
             )
@@ -1855,7 +1855,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
                 '  - dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "CampaignSpineRestoreReceiptTests|CampaignWorkspaceServerPlaneServiceTests|CampaignOsLocalProofMaterializerTests"\n'
-                '    --no-restore\n',
+                '      --no-restore\n',
                 "",
                 1,
             )
@@ -2091,7 +2091,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
                 "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
-                "    longer resolve locally.\n",
+                "      longer resolve locally.\n",
                 "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
                 "    longer resolve locally.\n"
                 "  - TASK_LOCAL_TELEMETRY.generated.json active-run helper output\n",
@@ -2128,7 +2128,7 @@ class WorkspaceRestoreReceiptProofTests(unittest.TestCase):
             )
             queue_text = source_queue_path.read_text(encoding="utf-8").replace(
                 "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
-                "    longer resolve locally.\n",
+                "      longer resolve locally.\n",
                 "  - /docker/chummercomplete/chummer6-hub commit 80454b41 fail-closes workspace restore proof if landed verifier commits no\n"
                 "    longer resolve locally.\n"
                 "  - /docker/chummercomplete/chummer6-hub commit 00000000 is unresolved closure proof and must fail.\n",
