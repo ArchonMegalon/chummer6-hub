@@ -50,9 +50,9 @@
     };
     var groups = new[]
     {
-        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current preview and the next release-adjacent work." },
+        new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current public release and the next release-adjacent work." },
         new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need more implementation before they belong on the live shelf." },
-        new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research track", Intro = "These are worth following early, but they are not current-preview promises yet." }
+        new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research track", Intro = "These are worth following early, but they are not current public-release promises yet." }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 }
@@ -97,7 +97,7 @@
 <section class="status-decision-strip" aria-label="Horizon posture snapshot">
     <article class="status-decision-strip__card">
         <span class="tag">Preparing next</span>
-        <h2>@preparingCount horizon@(preparingCount == 1 ? string.Empty : "s") sit closest to the current preview.</h2>
+        <h2>@preparingCount horizon@(preparingCount == 1 ? string.Empty : "s") sit closest to the current public release.</h2>
         <p>These are the ideas that should compare directly against current proof and the active downloads page before any broader flagship claim tightens.</p>
         <a class="button-like button-like--ghost" href="#preparing">Open preparing next</a>
     </article>
