@@ -5350,8 +5350,12 @@ public sealed class PublicLandingController : Controller
     {
         int openPublicCount = manifest.Downloads.Count(static artifact =>
             !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
+        int accountRequiredCount = manifest.Downloads.Count(static artifact =>
+            string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
         string shelfSummary = openPublicCount switch
         {
+            <= 0 when accountRequiredCount > 0
+                => $"No open-public artifacts are live on the shelf right now. {accountRequiredCount} signed-in guided install route(s) remain available on the shelf right now.",
             <= 0 => "No open-public artifacts are live on the shelf right now.",
             1 => "1 open-public artifact is live on the shelf right now.",
             _ => $"{openPublicCount} open-public artifacts are live on the shelf right now."
