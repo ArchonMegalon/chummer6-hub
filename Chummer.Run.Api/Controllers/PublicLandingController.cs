@@ -2480,7 +2480,7 @@ public sealed class PublicLandingController : Controller
                 signedInArtifactView);
         }
         var model = new ShelfPageViewModel(
-            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Proof surfaces, briefs, and grounded outputs connected to the current preview.", "/artifacts", cancellationToken),
+            Chrome: await BuildPublicOrAuthenticatedChromeAsync("Artifacts", "Proof surfaces, briefs, and grounded outputs connected to the current public release.", "/artifacts", cancellationToken),
             Surface: surface,
             Assets: assetCatalog,
             Eyebrow: "Artifacts",

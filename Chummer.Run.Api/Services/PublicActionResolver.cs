@@ -131,7 +131,7 @@ public sealed class PublicActionResolver
             "featured_artifacts" => "Inspect the preview concept",
             "coming_next" => "Read the concept page",
             "whats_real_now" when string.Equals(card.Badge, "Live now", StringComparison.OrdinalIgnoreCase) => "See what works now",
-            "whats_real_now" => "See current preview",
+            "whats_real_now" => "See current release",
             "choose_your_lane" => "See the lane fit",
             "participate" when href.Contains("/participate/codex", StringComparison.OrdinalIgnoreCase) => "Authorize Codex access",
             "participate" when href.Contains("/account/participation", StringComparison.OrdinalIgnoreCase) || href.Contains("/account/settings", StringComparison.OrdinalIgnoreCase) || href.Contains("#beta-interest", StringComparison.OrdinalIgnoreCase) => "Join beta waitlist",
