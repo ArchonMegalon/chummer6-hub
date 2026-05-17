@@ -56,17 +56,17 @@ def run(base_url: str) -> int:
     faction_archive = requests.get(f"{base_url}/ledger/factions/ashline-circle/dispatches", timeout=30)
     faction_archive.raise_for_status()
 
-    require_phrase(root.text, "Latest Black Ledger dispatch", failures, "/")
-    require_phrase(root.text, "Read dispatch", failures, "/")
+    require_phrase(root.text, "Turn 1 newsreel", failures, "/")
+    require_phrase(root.text, "Enter Black Ledger", failures, "/")
 
-    require_phrase(archive.text, "Latest dispatches", failures, "/ledger/dispatches")
-    require_phrase(archive.text, "Receipt-backed narrative, not free-floating lore.", failures, "/ledger/dispatches")
+    require_phrase(archive.text, "Read dispatches", failures, "/ledger/dispatches")
+    require_phrase(archive.text, "A fictional, public-safe seed world with six factions, visible pressure zones, and bounded dispatches.", failures, "/ledger/dispatches")
     require_phrase(archive.text, "ledger_tick_0001_preseeded", failures, "/ledger/dispatches")
 
-    require_phrase(detail.text, "Dispatch detail", failures, f"/ledger/dispatches/{DISPATCH_ID}")
-    require_phrase(detail.text, "Generated from ledger_tick_0001_preseeded", failures, f"/ledger/dispatches/{DISPATCH_ID}")
-    require_phrase(detail.text, "public_safe_seeded_preview", failures, f"/ledger/dispatches/{DISPATCH_ID}")
-    require_phrase(detail.text, "The Ledger marked the movement, not the people", failures, f"/ledger/dispatches/{DISPATCH_ID}")
+    require_phrase(detail.text, "The city is moving.", failures, f"/ledger/dispatches/{DISPATCH_ID}")
+    require_phrase(detail.text, "Use the map to inspect seeded districts, visible pressure arcs, and public-safe dispatches without exposing private tables.", failures, f"/ledger/dispatches/{DISPATCH_ID}")
+    require_phrase(detail.text, "ledger_tick_0001_preseeded", failures, f"/ledger/dispatches/{DISPATCH_ID}")
+    require_phrase(detail.text, "Safety: public-safe", failures, f"/ledger/dispatches/{DISPATCH_ID}")
     require_phrase(turn_archive.text, "Turn 1", failures, "/ledger/turns/1/dispatches")
     require_phrase(faction_archive.text, "Ashline Circle", failures, "/ledger/factions/ashline-circle/dispatches")
 
