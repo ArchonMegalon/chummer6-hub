@@ -1,17 +1,29 @@
 {
   "contract_name": "fleet.flagship_product_readiness",
-  "generated_at": "2026-05-11T13:48:30Z",
-  "status": "pass",
-  "scoped_status": "pass",
-  "missing_keys": [],
-  "scoped_missing_keys": [],
+  "generated_at": "2026-05-17T19:40:03Z",
+  "status": "fail",
+  "scoped_status": "fail",
+  "missing_keys": [
+    "ui_kit_and_flagship_polish",
+    "fleet_and_operator_loop"
+  ],
+  "scoped_missing_keys": [
+    "ui_kit_and_flagship_polish",
+    "fleet_and_operator_loop"
+  ],
   "completion_audit": {
-    "status": "pass",
-    "reason": "Flagship product readiness proof is green."
+    "status": "fail",
+    "reason": "Flagship product readiness planes are not green: structural_ready, flagship_ready."
   },
   "flagship_readiness_audit": {
-    "reason": "Flagship product readiness proof is green.",
-    "missing_coverage_keys": [],
-    "scoped_missing_coverage_keys": []
+    "reason": "flagship product readiness proof is not green: fail; warning coverage: ui_kit_and_flagship_polish, fleet_and_operator_loop; readiness plane gaps: structural_ready, flagship_ready",
+    "missing_coverage_keys": [
+      "ui_kit_and_flagship_polish",
+      "fleet_and_operator_loop"
+    ],
+    "scoped_missing_coverage_keys": [
+      "ui_kit_and_flagship_polish",
+      "fleet_and_operator_loop"
+    ]
   }
 }
