@@ -77,8 +77,8 @@
     var migrationReceiptCount = Model.CampaignSpine.MigrationReceipts.Count;
     var creatorPublicationCount = Model.CampaignSpine.CreatorPublications.Count;
     var organizerGuidanceSummary = openSupportCases == 0
-        ? "Current preview, member downloads, and help stay in one calmer operator view."
-        : $"{openSupportCases} tracked support case(s), current preview truth, and member downloads stay in one calmer operator view.";
+        ? "Current public release, member downloads, and help stay in one calmer operator view."
+        : $"{openSupportCases} tracked support case(s), current public release truth, and member downloads stay in one calmer operator view.";
     var showCampaignSection = dossierCount > 0 || campaignCount > 0 || runCount > 0 || workspaceCount > 0 || restoreConflicts > 0;
     var showTeamsSection = communityOpsCount > 0;
     var showChannelsSection = telegramChannel is not null;
@@ -984,7 +984,7 @@
             <section id="devices-access" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Devices &amp; access</h2>
-                    <p>Keep linked installs, preview access, and download handoff in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
+                    <p>Keep linked installs, release access, and download handoff in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
                 </div>
                 <article class="app-action-card app-action-card--primary">
                         <span class="tag">Current install path</span>

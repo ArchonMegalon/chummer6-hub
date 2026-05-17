@@ -624,6 +624,12 @@ public sealed class PublicLandingDownloadDispatchTests
             Accounts = new AccountService(communityStore);
             BlackLedgerPublicStatsService blackLedgerStats = new(Configuration);
             BlackLedgerDispatchService blackLedgerDispatches = new(communityStore, blackLedgerStats, NullLogger<BlackLedgerDispatchService>.Instance);
+            BlackLedgerTickNewsNotificationService blackLedgerTickNews = new(
+                new HttpClient(new StaticJsonHandler("""{"ok":true}""")),
+                communityStore,
+                Configuration,
+                new BlackLedgerNewsRecipientResolver(communityStore, Configuration),
+                NullLogger<BlackLedgerTickNewsNotificationService>.Instance);
             AnarchyPreviewService anarchyPreview = new(blackLedgerDispatches);
             ParticipationOperatorNotificationService participationNotifications = new(
                 new HttpClient(new StaticJsonHandler("""{"target_ref":"delivery-test"}""")),
@@ -658,12 +664,13 @@ public sealed class PublicLandingDownloadDispatchTests
 	                nexusPan: null!,
 	                mediaHorizons: null!,
 	                communityCreatorHorizons: null!,
-	                waveEightHorizons: null!,
-	                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
-	                blackLedgerStats: blackLedgerStats,
-                blackLedgerDispatches: blackLedgerDispatches,
-	                blackLedgerFactions: new BlackLedgerFactionOnboardingService(Configuration, blackLedgerStats, campaignSpine),
-                anarchyPreview: anarchyPreview,
+		                waveEightHorizons: null!,
+		                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
+		                blackLedgerStats: blackLedgerStats,
+		                blackLedgerDispatches: blackLedgerDispatches,
+                        blackLedgerTickNews: blackLedgerTickNews,
+		                blackLedgerFactions: new BlackLedgerFactionOnboardingService(Configuration, blackLedgerStats, campaignSpine, communityStore),
+	                anarchyPreview: anarchyPreview,
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: null!,
                 chrome: null!,
