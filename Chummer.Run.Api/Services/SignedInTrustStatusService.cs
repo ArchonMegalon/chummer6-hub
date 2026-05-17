@@ -74,9 +74,9 @@ public sealed class SignedInTrustStatusService
                 BuildSignedInInstallCautionSummary(manifest, latestInstallation, followThrough)),
             new(
                 "Adoption health",
-                pulse is null
+                ShouldUseManifestAdoptionSummary(pulse)
                     ? BuildManifestAdoptionSummary(manifest)
-                    : BuildTrustPulseAdoptionSummary(pulse)),
+                    : BuildTrustPulseAdoptionSummary(pulse!)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new(
                 "Support follow-through",
@@ -231,6 +231,20 @@ public sealed class SignedInTrustStatusService
         }
 
         return BuildReleaseProofSummary(manifest);
+    }
+
+    private static bool ShouldUseManifestAdoptionSummary(PublicTrustPulseSnapshot? pulse)
+    {
+        if (pulse is null)
+        {
+            return true;
+        }
+
+        bool proofUnknown = string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus)
+            || string.Equals(pulse.LocalReleaseProofStatus, "unknown", StringComparison.OrdinalIgnoreCase);
+        bool noEvidence = (!pulse.ProvenJourneyCount.HasValue || pulse.ProvenJourneyCount.Value <= 0)
+            && (!pulse.ProvenRouteCount.HasValue || pulse.ProvenRouteCount.Value <= 0);
+        return proofUnknown && noEvidence;
     }
 
     private static string? TryGetJsonString(JsonElement element, string propertyName)

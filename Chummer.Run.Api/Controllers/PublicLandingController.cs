@@ -5324,9 +5324,9 @@ public sealed class PublicLandingController : Controller
             new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
             new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
-            new("Adoption health", pulse is null
+            new("Adoption health", ShouldUseManifestAdoptionSummary(pulse)
                 ? BuildManifestAdoptionSummary(manifest)
-                : BuildTrustPulseAdoptionSummary(pulse))
+                : BuildTrustPulseAdoptionSummary(pulse!))
         ];
     }
 
@@ -5367,6 +5367,20 @@ public sealed class PublicLandingController : Controller
         }
 
         return BuildReleaseProofSummary(manifest);
+    }
+
+    private static bool ShouldUseManifestAdoptionSummary(PublicTrustPulseSnapshot? pulse)
+    {
+        if (pulse is null)
+        {
+            return true;
+        }
+
+        bool proofUnknown = string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus)
+            || string.Equals(pulse.LocalReleaseProofStatus, "unknown", StringComparison.OrdinalIgnoreCase);
+        bool noEvidence = (!pulse.ProvenJourneyCount.HasValue || pulse.ProvenJourneyCount.Value <= 0)
+            && (!pulse.ProvenRouteCount.HasValue || pulse.ProvenRouteCount.Value <= 0);
+        return proofUnknown && noEvidence;
     }
 
     private static string BuildLiveLaunchSummary(PublicReleaseManifestDto manifest)
