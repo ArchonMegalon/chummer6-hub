@@ -4,6 +4,7 @@ version: 1
 guest_readable_channels:
   - stable
   - preview
+  - docker
 release_notes_summary: The current preview centers one clear public download, a visible proof trail, and help that matches the posted shelf you can actually use today without letting artifact explainers or fallback routes masquerade as the main route. Public launch-health claims now distinguish live, preview, fallback, fixed, revoked, and blocked posture explicitly.
 download_authority_summary: chummer.run is the only official client download source. GitHub is source and development evidence only, never a public binary release shelf for installers, archives, update payloads, or preview clients.
 proof_scope_summary: Public proof language is scoped to the files, named flows, and recent checks posted on the current shelf that a person can inspect today; it is not a blanket flagship-grade claim.
