@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Glass Tower Compact logo">
+  <rect width="128" height="128" rx="28" fill="#0f1d33"/>
+  <path d="M64 18l28 16v25c0 23-10 38-28 51C46 97 36 82 36 59V34l28-16z" fill="#dff5ff" opacity=".16"/>
+  <path d="M64 28l18 10v19c0 16-7 28-18 39-11-11-18-23-18-39V38l18-10z" fill="none" stroke="#dff5ff" stroke-width="6"/>
+  <path d="M64 38v44M52 58h24" stroke="#8fd8ff" stroke-width="6" stroke-linecap="round"/>
+</svg>

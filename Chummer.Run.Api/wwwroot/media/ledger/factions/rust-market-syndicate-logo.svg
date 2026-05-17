@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Rust Market Syndicate logo">
+  <rect width="128" height="128" rx="28" fill="#2b140d"/>
+  <circle cx="56" cy="56" r="25" fill="none" stroke="#ff9f59" stroke-width="10" stroke-dasharray="24 9"/>
+  <path d="M74 74l18 18" stroke="#ffe1c1" stroke-width="10" stroke-linecap="round"/>
+  <path d="M41 86c12-8 24-8 36 0" stroke="#ffcc9a" stroke-width="8" stroke-linecap="round"/>
+</svg>

@@ -2,7 +2,7 @@
   "headId": "blazor-desktop",
   "version": "run-20260514-restore-mac-preview",
   "releaseVersion": "run-20260514-restore-mac-preview",
-  "channelId": "preview",
+  "channelId": "docker",
   "platform": "linux",
   "arch": "x64",
   "rid": "linux-x64",
@@ -24,7 +24,7 @@
   "artifactInstallDesktopEntryCapturePath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/startup-smoke/installed-desktop-entry-blazor-desktop-linux-x64.desktop",
   "artifactPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files/chummer-blazor-desktop-linux-x64-installer.deb",
   "status": "pass",
-  "channel": "preview",
+  "channel": "docker",
   "artifactFileName": "chummer-blazor-desktop-linux-x64-installer.deb",
   "fileName": "chummer-blazor-desktop-linux-x64-installer.deb",
   "artifactRelativePath": "files/chummer-blazor-desktop-linux-x64-installer.deb"

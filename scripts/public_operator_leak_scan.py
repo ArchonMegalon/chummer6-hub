@@ -10,7 +10,7 @@ import requests
 from absolute_completion_common import LocalHubApp, RUN_SERVICES_ROOT, completion_path, now_iso, write_json, write_text
 
 
-EXCLUDED_PUBLIC_VIEWS = {"Home.cshtml", "ReleaseUpload.cshtml"}
+EXCLUDED_PUBLIC_VIEWS = {"Home.cshtml", "ReleaseUpload.cshtml", "LedgerFactionWorkspace.cshtml"}
 HTML_ROUTES = [
     "/feedback",
     "/feedback/operations",

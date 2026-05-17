@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Ghostline Network logo">
+  <rect width="128" height="128" rx="28" fill="#081610"/>
+  <path d="M35 42c8-10 18-16 29-16s21 6 29 16v35c0 13-13 25-29 25S35 90 35 77V42z" fill="none" stroke="#74ff9b" stroke-width="8"/>
+  <circle cx="52" cy="62" r="6" fill="#dfffe9"/>
+  <circle cx="76" cy="62" r="6" fill="#dfffe9"/>
+  <path d="M45 84l14-10 10 8 14-10" fill="none" stroke="#74ff9b" stroke-width="6" stroke-linecap="round"/>
+</svg>

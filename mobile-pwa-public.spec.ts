@@ -14,9 +14,9 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   const manifest = readFileSync(manifestPath, 'utf8');
   const serviceWorker = readFileSync(swPath, 'utf8');
 
-  expect(mobileView).toContain('Installable PWA posture');
-  expect(mobileView).toContain('Player, GM, and observer aliases all converge on the same play shell.');
-  expect(mobileView).toContain('The mobile route should explain play posture and reconnect expectations.');
+  expect(mobileView).toContain('Mobile play shell preview; installability proof pending.');
+  expect(mobileView).toContain('Manifest and service worker live');
+  expect(mobileView).toContain('Player, GM, and observer routes converge on one shell.');
 
   expect(controller).toContain('[HttpGet("/mobile")]');
   expect(controller).toContain('[HttpGet("/pwa")]');

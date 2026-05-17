@@ -3,106 +3,43 @@
     ViewData["Title"] = "Chummer — Shadowrun Campaign OS";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-landing";
-    var heroProofTrail = Model.Surface.ProductProofTrail.Take(2).ToArray();
-    var release = Model.ReleaseExperience;
-    var guestNeedsInstallGate = !Model.Chrome.Authenticated && release.Recommended?.RequiresAccount == true;
     var ledgerHref = "/ledger";
-    var replayTurnOneHref = "/ledger/map?replay=turn-1";
     var buildHref = "/downloads";
-    var forgeHref = "/karma-forge";
-    var pathCards = new[]
-    {
-        new
-        {
-            Id = "build",
-            Title = "Start with downloads",
-            Summary = "Install the current preview build first. That is still the shortest route to a usable runner sheet and explainable math.",
-            Status = "Do this first",
-            Href = buildHref,
-            Action = "Open downloads",
-            Pills = new[] { "Current preview", "Desktop client", "Install rail" },
-        },
-        new
-        {
-            Id = "hub",
-            Title = "Download Chummer",
-            Summary = "Get the current desktop build when you want a usable runner sheet first and the world lane second.",
-            Status = "Use when continuity matters",
-            Href = buildHref,
-            Action = "Open downloads",
-            Pills = new[] { "Desktop client", "Current preview", "Install rail" },
-        },
-        new
-        {
-            Id = "forge",
-            Title = "Karma Forge",
-            Summary = "Use Karma Forge when your problem is rules pain, package demand, or a change request that needs evidence instead of chat noise.",
-            Status = "Governed preview",
-            Href = forgeHref,
-            Action = "Open Karma Forge",
-            Pills = new[] { "Signal intake", "Package candidates", "Closeout proof" },
-        },
-        new
-        {
-            Id = "ledger",
-            Title = "Black Ledger",
-            Summary = "Use Black Ledger when you want to know what happened in the world, why package pressure moved, and which dispatch came out of the last world tick.",
-            Status = "World lane live",
-            Href = ledgerHref,
-            Action = "Open Black Ledger",
-            Pills = new[] { "Faction pressure", "Dispatches", "Debt heat" },
-        },
-    };
-    var ledgerStats = (Model.BlackLedgerStats ?? Array.Empty<BlackLedgerPublicStatViewModel>()).ToArray();
+    var playHref = "/play";
+    var statusHref = "/status";
+    var replayTurnOneHref = "/ledger/map?replay=turn-1";
+    var ledgerStats = (Model.BlackLedgerStats ?? Array.Empty<BlackLedgerPublicStatViewModel>()).Take(3).ToArray();
     var ledgerWorld = Model.BlackLedgerWorld;
-    var previewHighlights = new[]
-    {
-        new { Label = "Rust Bazaar", Summary = "Debt Heat climbed after old favors came due." },
-        new { Label = "Ashline Ward", Summary = "MysAd density rose after a source-clarity dispute." },
-        new { Label = "Neon Docks", Summary = "Cargo pressure pushed drone package demand higher." },
-    };
-    var proofCards = new[]
-    {
-        new
-        {
-            Title = "Current preview build",
-            Value = $"{release.Display.ChannelLabel} · {release.Display.BuildLabel}",
-            Summary = "Open the current download rail, install the same build everyone gets, and keep account-aware handoff optional.",
-            Href = buildHref,
-            Action = "See what works today",
-        },
-        new
-        {
-            Title = "Rules explanation trail",
-            Value = heroProofTrail.Length > 0 ? heroProofTrail[0] : "Rules proof visible",
-            Summary = "The proof trail stays visible, but it no longer owns the first impression ahead of the product itself.",
-            Href = "/what-is-chummer",
-            Action = "Read the product story",
-        },
-        new
-        {
-            Title = "Packages and mobile routes",
-            Value = "Route proof shelf live",
-            Summary = "Packages, mobile/PWA, and governed follow-up stay on real public routes instead of hidden internal rails.",
-            Href = "/status",
-            Action = "Open status",
-        },
-    };
+    var factions = (ledgerWorld?.Factions ?? Array.Empty<BlackLedgerFactionViewModel>()).Take(6).ToArray();
+    var latestDispatch = Model.LatestBlackLedgerDispatch;
+    var newsreelStatus = latestDispatch is null ? "pending" : "sent";
+    Func<string, string> factionSlug = id => id.Replace('_', '-');
+    Func<string, string> logoHref = id => $"/media/ledger/factions/{factionSlug(id)}-logo.svg";
+    Func<string, string> backgroundHref = id => $"/media/ledger/factions/{factionSlug(id)}-bg.svg";
 }
 
-<section class="launch-hero" data-homepage-section="hero">
+<section class="launch-hero launch-hero--pregold" data-homepage-section="hero">
     <div class="launch-hero__shell">
         <div class="launch-hero__copy">
-            <p class="eyebrow">Black Ledger frontdoor</p>
+            <p class="eyebrow">Black Ledger front door</p>
             <h1 class="launch-hero__title">The city is moving.</h1>
             <p class="launch-hero__support">Join a faction, watch pressure shift, and carry your runners into the Black Ledger.</p>
             <div class="launch-hero__actions">
                 <a class="button-like button-like--primary" href="@ledgerHref">Enter Black Ledger</a>
                 <a class="button-like button-like--secondary" href="@buildHref">Download Chummer</a>
             </div>
-            <p class="launch-hero__trustline">Fictional public-safe seed world. No sourcebook names. No private campaign data.</p>
+            <div class="launch-hero__metric-strip" aria-label="Ledger score strip">
+                @foreach (var stat in ledgerStats)
+                {
+                    <article class="launch-hero__metric">
+                        <span>@stat.Title</span>
+                        <strong>@stat.Value</strong>
+                    </article>
+                }
+            </div>
+            <p class="launch-hero__trustline">Turn 1 newsreel: @newsreelStatus. Fictional public-safe seed only. No private campaign data.</p>
         </div>
-        <div class="launch-hero__stage" aria-label="Black Ledger gate">
+        <div class="launch-hero__stage" aria-label="Black Ledger geoscape teaser">
             <div
                 class="launch-hero__geoscape"
                 data-black-ledger-geoscape-root
@@ -115,146 +52,97 @@
 </section>
 <script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>
 
-<section class="workflow-band workflow-band--flagship" data-homepage-section="choose-your-path" id="choose-your-path">
+<section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="score-strip" id="score-strip">
     <div class="workflow-band__lead">
-        <p class="eyebrow">Choose your path</p>
-        <h2 class="editorial-title">Open the route that matches the job in front of you.</h2>
-        <p class="editorial-copy">Most users need four things: downloads, the account-aware hub, Black Ledger, and Karma Forge.</p>
+        <p class="eyebrow">Pressure strip</p>
+        <h2 class="editorial-title">Three signals, one moving city.</h2>
     </div>
-    <div class="flagship-gateway-grid">
-        @foreach (var tile in pathCards)
+    <div class="ledger-stats-grid ledger-stats-grid--hero">
+        @foreach (var stat in ledgerStats)
         {
-            <article class="gateway-card" id="gateway-@tile.Id">
-                <div class="gateway-card__header">
-                    <span class="tag">@tile.Status</span>
-                    <h3>@tile.Title</h3>
-                </div>
-                <p>@tile.Summary</p>
-                <div class="route-choice-card__proof">
-                    @foreach (var pill in tile.Pills)
-                    {
-                        <span>@pill</span>
-                    }
-                </div>
-                <a class="editorial-strip__action" href="@tile.Href">@tile.Action</a>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="flagship-coverage flagship-coverage--public" data-homepage-section="what-works-today" id="what-works-today">
-    <div class="flagship-coverage__lead">
-        <p class="eyebrow">What works today</p>
-        <h2 class="editorial-title">The proof shelf is still visible. It just no longer blocks the front door.</h2>
-        <p class="editorial-copy">Use these routes when you want the current build, release posture, or artifact-level detail.</p>
-    </div>
-    <div class="flagship-coverage__grid">
-        @foreach (var card in proofCards)
-        {
-            <article class="flagship-coverage__card">
-                <span class="tag">Today</span>
-                <h3>@card.Title</h3>
-                <p class="flagship-coverage__phase"><strong>@card.Value</strong></p>
-                <p>@card.Summary</p>
-                <a class="inline-link" href="@card.Href">@card.Action</a>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="product-proof product-proof--ledger" data-homepage-section="preview" id="world-preview">
-    <div class="continuity-band__copy">
-        <p class="eyebrow">Black Ledger preview</p>
-        <h2 class="editorial-title">Turn 1 already ran. The city is moving.</h2>
-        <p class="editorial-copy">Emerald Sprawl is a fictional, public-safe seed world with six factions, visible pressure zones, and AI interim stewards. Follow Debt Heat, MysAd Density, package pressure, and closeout witnesses without exposing private tables.</p>
-        <p class="muted-copy">Seeded fictional preview and opt-in aggregate only. The Ledger explains pressure, not people.</p>
-        <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@ledgerHref">Open Black Ledger</a>
-            <a class="button-like button-like--secondary" href="@replayTurnOneHref">Replay Turn 1</a>
-        </div>
-    </div>
-    <div class="continuity-band__panel">
-        @if (ledgerWorld is not null)
-        {
-            <article class="ledger-world-panel__map ledger-world-panel__map--teaser">
-                <div class="ledger-world-panel__legend">
-                    <span class="tag">Seed world</span>
-                    <span class="muted-copy">Turn @ledgerWorld.CurrentTurn</span>
-                </div>
-                <svg viewBox="0 0 1200 760" role="img" aria-label="@ledgerWorld.PublicName command preview">
-                    @foreach (var district in ledgerWorld.Districts.Take(8))
-                    {
-                        <polygon class="ledger-world-panel__district" points="@district.PolygonPoints" tabindex="0">
-                            <title>@district.Name</title>
-                        </polygon>
-                    }
-                </svg>
-            </article>
-        }
-        @foreach (var highlight in previewHighlights)
-        {
-            <article class="continuity-band__fact">
-                <span>@highlight.Label</span>
-                <strong>@highlight.Summary</strong>
-            </article>
-        }
-        @foreach (var stat in ledgerStats.Take(3))
-        {
-            <article class="continuity-band__fact">
+            <article class="ledger-stat-card ledger-stat-card--compact">
                 <span>@stat.Title</span>
                 <strong>@stat.Value</strong>
-                <p>@stat.PrivacyNote</p>
+                <p>@stat.SourceDetail.ProvenanceSummary</p>
             </article>
         }
     </div>
 </section>
 
-<section class="continuity-band" data-homepage-section="account-value" id="account-value">
-    <div class="continuity-band__copy">
-        <p class="eyebrow">Account value</p>
-        <h2 class="editorial-title">Create an account only when you want continuity, recovery, and tracked follow-through.</h2>
-        <p class="editorial-copy">The product should stay readable as a guest. Accounts matter when you want installs, follows, support, and history to stay attached.</p>
-        <div class="stacked-actions">
-            @if (Model.Chrome.Authenticated)
-            {
-                <a class="button-like button-like--primary" href="/home">Open home</a>
-                <a class="button-like button-like--secondary" href="/account/access">Open devices and access</a>
-            }
-            else
-            {
-                <a class="button-like button-like--primary" href="/signup?next=/home">Create account</a>
-                <a class="button-like button-like--secondary" href="/login?next=/home">Sign in</a>
-            }
-        </div>
+<section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="factions" id="factions">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Faction identity</p>
+        <h2 class="editorial-title">Six seeded houses are already pushing on the same city.</h2>
+        <p class="editorial-copy">Open a file, read the pressure, or replay Turn 1 without touching private table state.</p>
     </div>
-    <div class="continuity-band__panel">
-        <article class="continuity-band__fact">
-            <span>Claim installs</span>
-            <strong>Keep restore and update history attached</strong>
-            <p>Useful if the same build needs to follow you across devices or a later support case.</p>
+    <div class="faction-identity-strip">
+        @foreach (var faction in factions)
+        {
+            <article class="faction-identity-card">
+                <div class="faction-identity-card__backdrop" style="background-image:url('@backgroundHref(faction.Id)')"></div>
+                <div class="faction-identity-card__body">
+                    <img class="faction-identity-card__logo" src="@logoHref(faction.Id)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
+                    <div class="faction-identity-card__copy">
+                        <span class="tag">@faction.Type</span>
+                        <h3>@faction.PublicName</h3>
+                        <p>@string.Join(" · ", faction.PublicSignals.Take(2))</p>
+                    </div>
+                    <a class="editorial-strip__action" href="/ledger/factions/@factionSlug(faction.Id)">Open faction file</a>
+                </div>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="play-downloads" id="play-downloads">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Play and install</p>
+        <h2 class="editorial-title">One compact rail for build, play shell, and public status.</h2>
+    </div>
+    <div class="flagship-gateway-grid flagship-gateway-grid--compact">
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Downloads</span>
+                <h3>Desktop build</h3>
+            </div>
+            <p>Short, practical install shelf for the current build and platform notes.</p>
+            <a class="editorial-strip__action" href="@buildHref">Open downloads</a>
         </article>
-        <article class="continuity-band__fact">
-            <span>Follow packages</span>
-            <strong>See motion without watching every page manually</strong>
-            <p>Package and closeout updates become attached to the same account context.</p>
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Play</span>
+                <h3>Mobile play shell preview</h3>
+            </div>
+            <p>Installability proof is explicit and lives on the play shell instead of being implied by homepage copy.</p>
+            <a class="editorial-strip__action" href="@playHref">Open play shell</a>
         </article>
-        <article class="continuity-band__fact">
-            <span>Support</span>
-            <strong>Keep problem reports tied to the install context</strong>
-            <p>That makes later recovery and closeout proof more useful than an unbound email thread.</p>
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Status</span>
+                <h3>Proof and release posture</h3>
+            </div>
+            <p>Proof, route health, and verification notes stay on Status, not in the hero.</p>
+            <a class="editorial-strip__action" href="@statusHref">Open status</a>
+        </article>
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Replay</span>
+                <h3>Turn 1</h3>
+            </div>
+            <p>Replay the first public tick and watch pressure shifts on the geoscape.</p>
+            <a class="editorial-strip__action" href="@replayTurnOneHref">Replay Turn 1</a>
         </article>
     </div>
 </section>
 
-<section class="access-band" data-homepage-section="trust-footer" id="trust-footer">
+<section class="access-band access-band--compact" data-homepage-section="footer" id="footer">
     <div class="access-band__copy">
-        <p class="eyebrow">Final trust footer</p>
-        <h2 class="editorial-title">Take the route that matches your job, then verify the proof behind it.</h2>
-        <p class="editorial-copy">Status, privacy, help, and source stay short here instead of fighting the homepage for attention.</p>
+        <p class="eyebrow">Keep it simple</p>
+        <h2 class="editorial-title">Ledger for the city. Downloads for the build. Play for the shell. Status for proof.</h2>
+        <p class="editorial-copy">Help, privacy, and feedback stay available without turning the homepage into a repo tour.</p>
     </div>
     <div class="access-band__actions">
-        <a class="button-like button-like--primary" href="/status">Open status</a>
-        <p class="muted-copy"><a class="inline-link" href="/privacy">Privacy</a> · <a class="inline-link" href="/terms">Terms</a> · <a class="inline-link" href="/help">Help</a> · <a class="inline-link" href="https://github.com/ArchonMegalon/chummer6" rel="noopener noreferrer">GitHub</a></p>
-        <p class="muted-copy">Still evaluating? <a class="quiet-link" href="/now">Open what works today</a> or <a class="quiet-link" href="/what-is-chummer">read the product story</a>.</p>
+        <a class="button-like button-like--primary" href="/help">Open help</a>
+        <p class="muted-copy"><a class="inline-link" href="/status">Status</a> · <a class="inline-link" href="/feedback">Feedback</a> · <a class="inline-link" href="/privacy">Privacy</a> · <a class="inline-link" href="/roadmap">Roadmap</a></p>
     </div>
 </section>

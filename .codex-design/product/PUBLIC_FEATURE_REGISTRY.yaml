@@ -462,7 +462,7 @@ cards:
     render_mode: external_explainer
     action_label: Open the horizon page
     detail_primary_href: /downloads
-    detail_primary_label: Install the current preview
+    detail_primary_label: Install the current release
     fallback_route: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/README.md
     fallback_label: Read the horizon brief
     external_ok: true
@@ -470,7 +470,7 @@ cards:
     payoff: Local acceleration stays optional and bounded instead of becoming a mystery dependency.
   - id: artifact_preview_build
     bucket: featured_artifacts
-    title: Current preview build
+    title: Current public build
     summary: The installer shelf, release channel, and integrity trail are live right now.
     href: /downloads
     badge: Available today
@@ -478,13 +478,13 @@ cards:
     image_family: facility_exterior
     asset_slot: release_current_build
     detail_route: /artifacts/current-preview-build
-    action_label: Inspect the preview build
+    action_label: Inspect the current public build
     detail_primary_href: /downloads
     detail_primary_label: Open downloads
     pain: Early-access products stop feeling real when the current build is vague or hard to verify.
-    payoff: One visible build, one truthful channel label, and one clean install path make the preview feel dependable instead of improvised.
-    proof_note: "Proof: the current preview has a real installer shelf, explicit release posture, a first-party download path, and a seeded Black Ledger world already visible on public routes."
-    microproof: Installer shelf|Preview channel|Account-aware handoff
+    payoff: One visible build, one truthful channel label, and one clean install path make the public release feel dependable instead of improvised.
+    proof_note: "Proof: the current public release has a real installer shelf, explicit release posture, a first-party download path, and a seeded Black Ledger world already visible on public routes."
+    microproof: Installer shelf|Public release|Account-aware handoff
   - id: artifact_mac_codex_release_pipeline
     bucket: featured_artifacts
     title: Mac Codex release pipeline
@@ -507,7 +507,7 @@ cards:
   - id: artifact_rules_explanation
     bucket: featured_artifacts
     title: Explanation trail
-    summary: The preview shelf already shows how Chummer explains a result instead of hiding the path.
+    summary: The public release shelf already shows how Chummer explains a result instead of hiding the path.
     href: /now#real-rules-truth
     badge: Available today
     audience: public

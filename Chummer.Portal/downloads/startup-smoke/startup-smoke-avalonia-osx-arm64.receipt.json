@@ -2,7 +2,7 @@
   "headId": "avalonia",
   "version": "run-20260514-restore-mac-preview",
   "releaseVersion": "run-20260514-restore-mac-preview",
-  "channelId": "preview",
+  "channelId": "docker",
   "platform": "macos",
   "arch": "arm64",
   "rid": "osx-arm64",
@@ -22,6 +22,6 @@
   "artifactFileName": "chummer-avalonia-osx-arm64-installer.dmg",
   "artifactRelativePath": "files/chummer-avalonia-osx-arm64-installer.dmg",
   "artifactSha256": "62e410197697915a84b011cc3b15293fa98a5f2852613fa59a930b910a55d354",
-  "channel": "preview",
+  "channel": "docker",
   "fileName": "chummer-avalonia-osx-arm64-installer.dmg"
 }

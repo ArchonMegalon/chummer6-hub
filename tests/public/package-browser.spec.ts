@@ -1,1 +1,1 @@
-export * from '../package-browser.spec';
+export * from '../../package-browser.spec';

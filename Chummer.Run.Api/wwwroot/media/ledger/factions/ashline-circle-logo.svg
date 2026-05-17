@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Ashline Circle logo">
+  <rect width="128" height="128" rx="28" fill="#1c1028"/>
+  <circle cx="64" cy="64" r="30" fill="none" stroke="#c58dff" stroke-width="8"/>
+  <circle cx="64" cy="64" r="18" fill="none" stroke="#f6e7ff" stroke-width="6" stroke-dasharray="3 7"/>
+  <path d="M64 24v20M64 84v20M24 64h20M84 64h20" stroke="#9f6cff" stroke-width="6" stroke-linecap="round"/>
+</svg>
