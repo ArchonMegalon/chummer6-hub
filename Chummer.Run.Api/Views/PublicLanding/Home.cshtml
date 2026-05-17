@@ -139,7 +139,7 @@
         "access" => "Keep install return, release posture, and support follow-up in one calmer place instead of searching the whole account surface.",
         "work" => "Pick up dossiers, active runs, and the next useful path without turning Home into a deeper work page.",
         "setup" => "Finish the short setup flow first, then come back to access and work with a steadier account.",
-        _ => "Pick up where you left off: finish the basics, install the current preview, and keep track of what is opening next."
+        _ => "Pick up where you left off: finish the basics, install the current release, and keep track of what is opening next."
     };
 
     string ContextualPreviewHref(string? href)
@@ -404,7 +404,7 @@ else
                 </article>
                 <article class="app-action-card">
                     <span class="tag">Current release</span>
-                    <h2>Use the current preview</h2>
+                    <h2>Use the current release</h2>
                     <p>See what changed, what is working today, and whether now is the right moment to install or update.</p>
                     <a class="button-like button-like--secondary" href="/now">Open what works today</a>
                 </article>
@@ -490,7 +490,7 @@ else
                                             <article class="app-rail__item">
                                                 <span class="tag">Current release</span>
                                                 <div class="app-rail__copy">
-                                                    <h3>Use the current preview</h3>
+                                                    <h3>Use the current release</h3>
                                                     <p>Review what changed, what is working today, and whether this is the right moment to install or update.</p>
                                                 </div>
                                                 <a class="inline-link" href="/now">Open what works today</a>
@@ -499,7 +499,7 @@ else
                                                 <span class="tag">Device state</span>
                                                 <div class="app-rail__copy">
                                                     <h3>@(activeAccessRights > 0 ? $"{activeAccessRights} access right(s) active" : claimedInstallations > 0 ? $"{claimedInstallations} linked install(s)" : "No linked install yet")</h3>
-                                                    <p>Claim tickets, linked installs, preview access, and device access state stay in one place instead of being rediscovered during the next install.</p>
+                                                    <p>Claim tickets, linked installs, release access, and device access state stay in one place instead of being rediscovered during the next install.</p>
                                                 </div>
                                                 <a class="inline-link" href="/account/access">Open Devices &amp; access</a>
                                             </article>
