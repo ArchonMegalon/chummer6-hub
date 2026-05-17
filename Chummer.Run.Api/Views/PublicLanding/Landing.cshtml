@@ -13,6 +13,11 @@
     var factions = (ledgerWorld?.Factions ?? Array.Empty<BlackLedgerFactionViewModel>()).Take(6).ToArray();
     var latestDispatch = Model.LatestBlackLedgerDispatch;
     var newsreelStatus = latestDispatch is null ? "pending" : "sent";
+    var starterWorkspace = Model.CampaignSpine?.Workspaces.FirstOrDefault();
+    var starterFirstPlayableSession = starterWorkspace?.FirstPlayableSession;
+    var starterFirstPlayableSessionHref = starterWorkspace is null
+        ? "/home/work"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}#selected-first-playable-session";
     Func<string, string> factionSlug = id => id.Replace('_', '-');
     Func<string, string> logoHref = id => $"/media/ledger/factions/{factionSlug(id)}-logo.svg";
     Func<string, string> backgroundHref = id => $"/media/ledger/factions/{factionSlug(id)}-bg.svg";
@@ -134,6 +139,47 @@
         </article>
     </div>
 </section>
+
+@if (starterWorkspace is not null)
+{
+    <section class="workflow-band workflow-band--flagship workflow-band--compact" data-homepage-section="starter-lane" id="starter-lane">
+        <div class="workflow-band__lead">
+            <p class="eyebrow">Signed-in starter lane</p>
+            <h2 class="editorial-title">Keep the first playable session and install follow-through on the front door.</h2>
+            <p class="editorial-copy">
+                @(starterFirstPlayableSession is null
+                    ? "Your starter workspace is ready to open on Home."
+                    : starterFirstPlayableSession.CampaignStartSummary)
+            </p>
+        </div>
+        <div class="flagship-gateway-grid flagship-gateway-grid--compact">
+            <article class="gateway-card">
+                <div class="gateway-card__header">
+                    <span class="tag">Home</span>
+                    <h3>Starter lane</h3>
+                </div>
+                <p>Open the guided signed-in starter lane instead of hunting for the first workspace route.</p>
+                <a class="editorial-strip__action" href="/home/work">Open starter lane on Home</a>
+            </article>
+            <article class="gateway-card">
+                <div class="gateway-card__header">
+                    <span class="tag">Proof</span>
+                    <h3>First session</h3>
+                </div>
+                <p>Jump directly into the bounded first playable session proof drawer for the starter workspace.</p>
+                <a class="editorial-strip__action" href="@starterFirstPlayableSessionHref">Open first playable session proof</a>
+            </article>
+            <article class="gateway-card">
+                <div class="gateway-card__header">
+                    <span class="tag">Support</span>
+                    <h3>Install help</h3>
+                </div>
+                <p>Keep install-support follow-through on the same governed public rail as the starter workspace.</p>
+                <a class="editorial-strip__action" href="/contact?kind=install_help">Open install support</a>
+            </article>
+        </div>
+    </section>
+}
 
 <section class="access-band access-band--compact" data-homepage-section="footer" id="footer">
     <div class="access-band__copy">

@@ -5324,9 +5324,9 @@ public sealed class PublicLandingController : Controller
             new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
             new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
-            new("Adoption health", ShouldUseManifestAdoptionSummary(pulse)
+            new("Adoption health", pulse is null
                 ? BuildManifestAdoptionSummary(manifest)
-                : BuildTrustPulseAdoptionSummary(pulse!))
+                : BuildTrustPulseAdoptionSummary(pulse))
         ];
     }
 
