@@ -3,7 +3,7 @@ import { writeJsonArtifact, writeMarkdownArtifact } from './ux-artifacts';
 
 const baseUrl = 'https://chummer.run';
 
-test('homepage keeps the intended compact CTA hierarchy on desktop and mobile', async ({ browser }) => {
+test('homepage keeps the intended live CTA hierarchy on desktop and mobile', async ({ browser }) => {
   test.setTimeout(120000);
   const viewports = [
     { name: 'desktop', width: 1366, height: 768 },
@@ -27,19 +27,19 @@ test('homepage keeps the intended compact CTA hierarchy on desktop and mobile', 
       heroBoxes.push(await heroActions.nth(index).boundingBox());
     }
 
-    const accountSection = page.locator('[data-homepage-section="play-downloads"]');
-    const accountPrimary = accountSection.locator('.editorial-strip__action').first();
-    const accountPrimaryTop = (await accountPrimary.boundingBox())?.y ?? 0;
+    const supportSection = page.locator('[data-homepage-section="footer"]');
+    const supportPrimary = supportSection.locator('.button-like--primary');
+    const supportPrimaryTop = (await supportPrimary.boundingBox())?.y ?? 0;
     const heroPrimaryTop = heroBoxes[0]?.y ?? 0;
-    if (accountPrimaryTop <= heroPrimaryTop) {
-      failures.push(`${viewport.name}: account CTA surfaced above hero CTA`);
+    if (supportPrimaryTop <= heroPrimaryTop) {
+      failures.push(`${viewport.name}: support CTA surfaced above hero CTA`);
     }
 
     results.push({
       viewport: viewport.name,
       hero_ctas: normalized.slice(0, 2),
       hero_boxes: heroBoxes,
-      account_primary_top: accountPrimaryTop,
+      support_primary_top: supportPrimaryTop,
     });
 
     await page.close();
@@ -58,10 +58,10 @@ test('homepage keeps the intended compact CTA hierarchy on desktop and mobile', 
     [
       '# Homepage Simplification Changelog',
       '',
-      '- Hero keeps two ranked CTAs: `Enter Black Ledger` and `Download Chummer`.',
-      '- Homepage now stays on the five-section model: hero, score-strip, factions, play-downloads, footer.',
-      '- Globe, score chips, and faction identity own the front door instead of proof panels.',
-      '- Play shell and status remain lower on the page instead of competing with the globe hero.',
+      '- Hero keeps two ranked CTAs: `Enter Black Ledger`, `Download Chummer`.',
+      '- Homepage remains on the five-section model: hero, score-strip, factions, play-downloads, footer.',
+      '- Proof and release posture stay off the first screen and live on Status instead.',
+      '- Support/help CTAs remain lower on the page instead of competing with the hero path.',
     ].join('\n'),
   );
 

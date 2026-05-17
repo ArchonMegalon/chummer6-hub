@@ -1,1 +1,1 @@
-export * from '../mobile-pwa-public.spec';
+export * from '../../mobile-pwa-public.spec';

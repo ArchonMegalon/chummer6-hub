@@ -150,7 +150,7 @@ def main() -> int:
                 "Why:",
                 "- Live link audit passed.",
                 "- Contrast audit passed.",
-                "- CTA hierarchy and six-section homepage model passed.",
+                "- CTA hierarchy and five-section homepage model passed.",
                 "- Screenshot QA passed across all required viewports.",
                 "- Homepage noise budget passed.",
                 "- Asset quality gate passed.",
