@@ -22,7 +22,8 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("[HttpGet(\"/account/ledger/notifications\")]", controller, StringComparison.Ordinal);
         Assert.Contains("Open notifications", accountView, StringComparison.Ordinal);
         Assert.Contains("Signed-in notification rail", notificationsView, StringComparison.Ordinal);
-        Assert.Contains("Open notification status", ledgerView, StringComparison.Ordinal);
+        Assert.Contains("Open notification receipts", accountView, StringComparison.Ordinal);
+        Assert.Contains("pressure, not people", ledgerView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -387,7 +388,7 @@ public sealed class BlackLedgerTickNewsTests
             PublicSummary: publicSummary,
             PublicHighlights: ["Rust Bazaar pressure rose."],
             LedgerUrl: "https://chummer.run/ledger?turn=1",
-            DispatchUrl: "https://chummer.run/ledger/dispatches/ledger_dispatch_emerald-sprawl-prelude_turn_0001",
+            DispatchUrl: "https://chummer.run/ledger/dispatches/dispatch_turn_0001_main",
             TickReceiptUrl: "https://chummer.run/ledger/closeouts",
             OccurredAtUtc: DateTimeOffset.UtcNow);
 

@@ -87,6 +87,7 @@ product_systems:
       - AI Magicx
       - 1min.AI
       - BrowserAct
+      - Blip AI
       - Paperguide
     contract: horizons/knowledge-fabric.md
   public_growth_system:
@@ -181,6 +182,7 @@ product_systems:
       - 1min.AI
       - AI Magicx
       - BrowserAct
+      - Blip AI
       - Documentation.AI
     contract: horizons/local-co-processor.md
   trust_closure_system:

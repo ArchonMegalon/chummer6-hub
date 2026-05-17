@@ -21,11 +21,16 @@ def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _stable_payload(payload: dict) -> dict:
-    stable = dict(payload)
-    stable.pop("generated_at", None)
-    stable.pop("generatedAt", None)
-    return stable
+def _stable_payload(payload):
+    if isinstance(payload, dict):
+        return {
+            key: _stable_payload(value)
+            for key, value in payload.items()
+            if key not in {"generated_at", "generatedAt"}
+        }
+    if isinstance(payload, list):
+        return [_stable_payload(item) for item in payload]
+    return payload
 
 
 def _load_existing_payload(path: Path) -> dict | None:
