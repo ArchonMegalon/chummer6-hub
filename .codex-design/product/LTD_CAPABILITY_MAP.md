@@ -46,7 +46,6 @@ It does not imply that every owned tool must be integrated.
 * `Vizologi` - product strategy and ideation support only
 * `ApiX-Drive` - low-risk automation glue only, never truth
 * `Browserly` - bounded browser capture and reference-pack helper
-* `Blip AI` - bounded dictation, transcript cleanup, and operator draft-capture helper
 * `FacePop` - bounded public trust / concierge widget and moderated testimonial capture lane
 * `hedy.ai` - bounded post-session transcript structure, highlight digest, and GM debrief helper for `TABLE PULSE`
 * `Nonverbia` - post-session coaching and social-dynamics analysis lane
@@ -117,7 +116,6 @@ Working rule:
 * `Emailit` - `chummer6-hub` for outbound template selection, suppression, delivery receipts, and lifecycle notification closeout
 * `ApiX-Drive` - `chummer6-hub` for low-risk automation glue
 * `Browserly` - `chummer6-hub` for bounded capture/reference packets
-* `Blip AI` - `chummer6-hub` for bounded dictation, transcript cleanup, and operator draft capture
 * `Icanpreneur` - `chummer6-design` for discovery-interview posture and validation policy, `executive-assistant` for synthesis and packet normalization
 * `ProductLift` - `chummer6-hub` for public routes and fallback behavior, `chummer6-design` for taxonomy and truth boundaries, `fleet` for digest and closeout evidence synthesis
 * `Katteb` - `chummer6-hub` for public content destinations, `executive-assistant` for source briefs and synthesis, `chummer6-design` for allowed claims and upstream source truth
