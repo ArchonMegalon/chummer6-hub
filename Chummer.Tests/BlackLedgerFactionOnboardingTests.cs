@@ -25,9 +25,9 @@ public sealed class BlackLedgerFactionAllegianceTests
         Assert.Contains("[HttpPost(\"/account/ledger/onboarding/join\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/api/v1/account/ledger/allegiance\")]", ledgerController, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/api/v1/account/ledger/allegiance/join\")]", ledgerController, StringComparison.Ordinal);
-        Assert.Contains("Choose your flag.", onboardingView, StringComparison.Ordinal);
+        Assert.Contains("Choose a faction", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Join this faction", onboardingView, StringComparison.Ordinal);
-        Assert.Contains("Open promo brief", onboardingView, StringComparison.Ordinal);
+        Assert.Contains("Open faction video", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Major Faction", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Challenger", onboardingView, StringComparison.Ordinal);
     }

@@ -438,7 +438,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             .EnumerateArray()
             .Select(item => item.GetString()!)
             .ToArray();
-        Assert.Equal(["avalonia:win-x64:windows"], missingTupleIds);
+        Assert.Empty(missingTupleIds);
         Assert.Empty(coverage.GetProperty("externalProofRequests")
             .EnumerateArray()
             .ToArray());

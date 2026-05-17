@@ -17,7 +17,7 @@ public sealed class DesignMirrorExecutionPlanTests
         Assert.Contains("CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md", readme, StringComparison.Ordinal);
         Assert.Contains("PRIVACY_AND_RETENTION_BOUNDARIES.md", readme, StringComparison.Ordinal);
         Assert.Contains("PUBLIC_TRUST_CONTENT.yaml", readme, StringComparison.Ordinal);
-        Assert.Contains("NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_GUIDE.md", startHere, StringComparison.Ordinal);
+        Assert.Contains("NEXT_12_BIGGEST_WINS_GUIDE.md", startHere, StringComparison.Ordinal);
         Assert.Contains("CAMPAIGN_OS_GAP_AND_CHANGE_GUIDE.md", startHere, StringComparison.Ordinal);
         Assert.Contains("PRIVACY_AND_RETENTION_BOUNDARIES.md", startHere, StringComparison.Ordinal);
         Assert.DoesNotContain("NINE_MONTH_EXECUTION_PLAN.md", readme, StringComparison.Ordinal);
@@ -35,12 +35,11 @@ public sealed class DesignMirrorExecutionPlanTests
         string[] requiredTokens =
         [
             "\"contract_name\": \"chummer.weekly_product_pulse\"",
-            "\"active_wave\": \"Next 20 Big Wins After Post-Audit Closeout\"",
-            "\"active_wave_registry\": \"products/chummer/NEXT_20_BIG_WINS_AFTER_POST_AUDIT_CLOSEOUT_REGISTRY.yaml\"",
+            "\"active_wave\": \"Next 12 Biggest Wins\"",
+            "\"active_wave_status\": \"complete\"",
             "\"journey_gate_health\"",
-            "\"closure_health\"",
-            "\"adoption_health\"",
-            "\"progress_trend\"",
+            "\"release_health\"",
+            "\"flagship_readiness\"",
             "\"next_checkpoint_question\""
         ];
 

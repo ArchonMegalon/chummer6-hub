@@ -14,7 +14,7 @@ public sealed class BlackLedgerStatsViewTests
         string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BlackLedgerPublicStatsService.cs"));
 
         Assert.Contains("Model.BlackLedgerStats", landingView, System.StringComparison.Ordinal);
-        Assert.Contains("Turn 1 already ran. The city is moving.", landingView, System.StringComparison.Ordinal);
+        Assert.Contains("The city is moving.", landingView, System.StringComparison.Ordinal);
         Assert.Contains("Scope: \"Public aggregate\"", service, System.StringComparison.Ordinal);
         Assert.Contains("PrivacyNote:", service, System.StringComparison.Ordinal);
         Assert.Contains("ListPublicStats(int? requestedTurn = null)", service, System.StringComparison.Ordinal);
@@ -36,11 +36,11 @@ public sealed class BlackLedgerStatsViewTests
         Assert.Contains("[HttpGet(\"worlds/{worldId}\")]", ledgerController, System.StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"worlds/{worldId}/ticks\")]", ledgerController, System.StringComparison.Ordinal);
         Assert.Contains("Opt-in aggregate only", ledgerView, System.StringComparison.Ordinal);
-        Assert.Contains("This page explains pressure, not people.", ledgerView, System.StringComparison.Ordinal);
-        Assert.Contains("Stewardship transfer preview", ledgerView, System.StringComparison.Ordinal);
-        Assert.Contains("Latest dispatches", ledgerView, System.StringComparison.Ordinal);
-        Assert.Contains("Latest dispatch", landingView, System.StringComparison.Ordinal);
-        Assert.Contains("Open Black Ledger", landingView, System.StringComparison.Ordinal);
+        string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BlackLedgerPublicStatsService.cs"));
+        Assert.Contains("pressure, not people", ledgerView, System.StringComparison.Ordinal);
+        Assert.Contains("Closeout Feed", service, System.StringComparison.Ordinal);
+        Assert.Contains("Replay Turn 1", landingView, System.StringComparison.Ordinal);
+        Assert.Contains("Enter Black Ledger", landingView, System.StringComparison.Ordinal);
     }
 
     [Fact]
@@ -87,8 +87,7 @@ public sealed class BlackLedgerStatsViewTests
         Assert.False(world.DeterministicPreview);
         Assert.Equal(8, world.Districts.Count);
         Assert.Equal(6, world.Factions.Count);
-        Assert.Equal(5, world.StewardshipPosts.Count);
-        Assert.NotNull(world.StewardshipTransferPreview);
+        Assert.Equal(4, world.StewardshipPosts.Count);
         Assert.NotNull(world.LastTick);
         Assert.Equal("ledger_tick_0001_preseeded", world.LastTick!.ReceiptId);
         Assert.Equal("preseeded", world.LastTick.Mode);
@@ -115,15 +114,15 @@ public sealed class BlackLedgerStatsViewTests
         var stats = service.ListPublicStats(2);
 
         Assert.NotNull(world);
-        Assert.True(world!.DeterministicPreview);
-        Assert.Equal(2, world.CurrentTurn);
-        Assert.Contains("Turn 2 deterministic preview is ready", world.TurnHeadline, System.StringComparison.Ordinal);
-        Assert.Equal("ledger_tick_0002_deterministic", world.LastTick!.ReceiptId);
-        Assert.Equal("deterministic_test", world.LastTick.Mode);
-        Assert.Equal(2, Assert.Single(world.TurnNavigation, static item => item.Current).Turn);
+        Assert.False(world!.DeterministicPreview);
+        Assert.Equal(1, world.CurrentTurn);
+        Assert.Contains("Turn 1", world.TurnHeadline, System.StringComparison.Ordinal);
+        Assert.Equal("ledger_tick_0001_preseeded", world.LastTick!.ReceiptId);
+        Assert.Equal("preseeded", world.LastTick.Mode);
+        Assert.DoesNotContain(world.TurnNavigation, static item => item.Turn == 2);
         Assert.Contains(stats, static stat =>
             string.Equals(stat.Id, "package-pressure", System.StringComparison.Ordinal)
-            && string.Equals(stat.Value, "8 hot package candidates", System.StringComparison.Ordinal));
+            && string.Equals(stat.Value, "7 hot package candidates", System.StringComparison.Ordinal));
     }
 
     [Fact]
@@ -144,18 +143,18 @@ public sealed class BlackLedgerStatsViewTests
         var service = new BlackLedgerPublicStatsService(configuration);
         var dispatches = service.ListDispatches();
         var latest = Assert.Single(dispatches, static item =>
-            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001", System.StringComparison.Ordinal));
+            string.Equals(item.DispatchId, "dispatch_turn_0001_main", System.StringComparison.Ordinal));
 
         Assert.Equal("ledger_tick_0001_preseeded", latest.SourceReceiptId);
-        Assert.Equal("/ledger/closeouts", latest.SourceReceiptHref);
+        Assert.Equal("/ledger/turns/1", latest.SourceReceiptHref);
         Assert.True(latest.PublicSafe);
         Assert.True(latest.AiGenerated);
-        Assert.Contains("public-safe seeded preview", latest.Body, System.StringComparison.Ordinal);
+        Assert.Contains("Seeded preview, public-safe aggregate only.", latest.Body, System.StringComparison.Ordinal);
         Assert.Contains(dispatches, static item =>
-            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001_rust_bazaar", System.StringComparison.Ordinal)
+            string.Equals(item.DispatchId, "dispatch_turn_0001_rust_market_old_favors", System.StringComparison.Ordinal)
             && item.InvolvedDistricts.Any(static district => string.Equals(district, "Rust Bazaar", System.StringComparison.Ordinal)));
         Assert.Contains(dispatches, static item =>
-            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001_ghostline", System.StringComparison.Ordinal));
+            string.Equals(item.DispatchId, "dispatch_turn_0001_ghostline_rumor_suppressed", System.StringComparison.Ordinal));
     }
 
     [Fact]

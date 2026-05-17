@@ -22,23 +22,19 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Section(\"start_here\")", view, StringComparison.Ordinal);
-        Assert.Contains("Section(\"choose_your_lane\")", view, StringComparison.Ordinal);
-        Assert.Contains("Model.Lanes", view, StringComparison.Ordinal);
+        Assert.Contains("launch-hero", view, StringComparison.Ordinal);
+        Assert.Contains("Black Ledger front door", view, StringComparison.Ordinal);
+        Assert.Contains("The city is moving.", view, StringComparison.Ordinal);
         Assert.Contains("workflow-band", view, StringComparison.Ordinal);
-        Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
-        Assert.Contains("hero-installrail", view, StringComparison.Ordinal);
-        Assert.Contains("continuity-band", view, StringComparison.Ordinal);
-        Assert.Contains("Need the full picture?", view, StringComparison.Ordinal);
-        Assert.Contains("Account-aware install handoff", view, StringComparison.Ordinal);
-        Assert.Contains("href=\"@guestReadableHeroPrimaryHref\"", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("href=\"@contextualHeroPrimaryHref\"", view, StringComparison.Ordinal);
-        Assert.Contains("Devices and access", view, StringComparison.Ordinal);
-        Assert.Contains("Signed-in return", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("trust-claims", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("future-strip", view, StringComparison.Ordinal);
+        Assert.Contains("flagship-gateway-grid", view, StringComparison.Ordinal);
+        Assert.Contains("Enter Black Ledger", view, StringComparison.Ordinal);
+        Assert.Contains("Download Chummer", view, StringComparison.Ordinal);
+        Assert.Contains("Open downloads", view, StringComparison.Ordinal);
+        Assert.Contains("Open play shell", view, StringComparison.Ordinal);
+        Assert.Contains("Open status", view, StringComparison.Ordinal);
+        Assert.Contains("Replay Turn 1", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("guestReadableHeroPrimaryHref", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.FlagshipCoverage", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("_PublicTrustPulseBody.cshtml", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -157,9 +153,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("story-pain-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Mystery math is expensive", view, StringComparison.Ordinal);
-        Assert.Contains("Campaign return should not depend on memory", view, StringComparison.Ordinal);
-        Assert.Contains("Account value starts small and useful", view, StringComparison.Ordinal);
+        Assert.Contains("A character and campaign companion.", view, StringComparison.Ordinal);
+        Assert.Contains("Players, GMs, and returning groups.", view, StringComparison.Ordinal);
+        Assert.Contains("Check what works now before you assume.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -199,13 +195,13 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForge.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep discovery intake, roadmap context, packet continuity, and support on separate pages.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep intake, roadmap, continuity, and support on separate pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Stay on this page when the job is turning table pain into a Chummer-owned packet", view, StringComparison.Ordinal);
         Assert.Contains("Return to participate when the question is broader public discovery, not this intake packet", view, StringComparison.Ordinal);
         Assert.Contains("Create the account only when you want packet history and follow-through in one place", view, StringComparison.Ordinal);
         Assert.Contains("Leave KARMA FORGE for normal support as soon as the issue is no longer discovery work", view, StringComparison.Ordinal);
-        Assert.Contains("Use KARMA FORGE to capture one discovery packet, then move to the page that owns the next job.", view, StringComparison.Ordinal);
+        Assert.Contains("The loop is visible before any rules work starts.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -276,12 +272,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         string css = File.ReadAllText(cssPath);
 
         Assert.Contains("data-nav-toggle", layout, StringComparison.Ordinal);
-        Assert.Contains("data-nav-sheet", layout, StringComparison.Ordinal);
-        Assert.Contains("Compact navigation", layout, StringComparison.Ordinal);
+        Assert.Contains("data-nav-panel", layout, StringComparison.Ordinal);
+        Assert.Contains("site-nav-panel", layout, StringComparison.Ordinal);
         Assert.Contains("chrome.PublicSignalNavigation", layout, StringComparison.Ordinal);
         Assert.Contains("Help", layout, StringComparison.Ordinal);
         Assert.Contains("Account", layout, StringComparison.Ordinal);
-        Assert.Contains("closeNavSheet", script, StringComparison.Ordinal);
+        Assert.Contains("closeNavPanel", script, StringComparison.Ordinal);
         Assert.Contains("nav-sheet-open", script, StringComparison.Ordinal);
         Assert.Contains("event.key === \"Escape\"", script, StringComparison.Ordinal);
         Assert.Contains("body.nav-sheet-open", css, StringComparison.Ordinal);
@@ -296,7 +292,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.DoesNotContain("bottomQuickAction", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("site-bottom-cta", layout, StringComparison.Ordinal);
-        Assert.Contains("Preview product. Honest install and support guidance.", layout, StringComparison.Ordinal);
+        Assert.Contains("Shadowrun character and campaign companion", layout, StringComparison.Ordinal);
     }
 
     [Fact]

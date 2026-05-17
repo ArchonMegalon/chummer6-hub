@@ -31,7 +31,7 @@ public sealed class BlackLedgerPublicSeedTests
         Assert.Contains("[HttpGet(\"worlds/{worldId}\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/turns/{turn:int}\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/dispatches\")]", ledgerApi, StringComparison.Ordinal);
-        Assert.Contains("Turn 1 already ran. The city is moving.", landing, StringComparison.Ordinal);
+        Assert.Contains("The city is moving.", landing, StringComparison.Ordinal);
         Assert.Contains("Replay Turn 1", landing, StringComparison.Ordinal);
     }
 

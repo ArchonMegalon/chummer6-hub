@@ -3534,11 +3534,12 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Request.Headers.UserAgent.ToString()", controller, StringComparison.Ordinal);
         Assert.Contains("release.Recommended.ActionLabel", service, StringComparison.Ordinal);
         Assert.Contains("release.Recommended.DispatchHref", service, StringComparison.Ordinal);
-        Assert.Contains("guestNeedsInstallGate", landingView, StringComparison.Ordinal);
-        Assert.Contains("guestReadableHeroPrimaryHref", landingView, StringComparison.Ordinal);
-        Assert.Contains("accountAwareInstallPrimaryHref", landingView, StringComparison.Ordinal);
-        Assert.Contains("ContextualPreviewHref", landingView, StringComparison.Ordinal);
-        Assert.Contains("release.GuestGatePrimaryHref", landingView, StringComparison.Ordinal);
+        Assert.Contains("Enter Black Ledger", landingView, StringComparison.Ordinal);
+        Assert.Contains("Download Chummer", landingView, StringComparison.Ordinal);
+        Assert.Contains("Open downloads", landingView, StringComparison.Ordinal);
+        Assert.Contains("Open play shell", landingView, StringComparison.Ordinal);
+        Assert.Contains("Open status", landingView, StringComparison.Ordinal);
+        Assert.DoesNotContain("guestReadableHeroPrimaryHref", landingView, StringComparison.Ordinal);
     }
 
     [Fact]
