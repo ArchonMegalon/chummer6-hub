@@ -81,6 +81,7 @@ resolve_ui_downloads_path() {
 RUNSERVICES_SOURCE_FILES_ROOT="${CHUMMER_RUNSERVICES_SOURCE_FILES_ROOT:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/files}"
 PRESENTATION_FILES_ROOT="${CHUMMER_PRESENTATION_FILES_ROOT:-$(resolve_ui_downloads_path "files")}"
 PRESENTATION_STARTUP_SMOKE_ROOT="${CHUMMER_PRESENTATION_STARTUP_SMOKE_ROOT:-$(resolve_ui_downloads_path "startup-smoke")}"
+RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT="${CHUMMER_RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT:-$REPO_ROOT/Chummer.Portal/downloads/startup-smoke}"
 PRESENTATION_RELEASE_CHANNEL_PATH="${CHUMMER_PRESENTATION_RELEASE_CHANNEL_PATH:-$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")}"
 PRESENTATION_RELEASE_EVIDENCE_SOURCE="${CHUMMER_PRESENTATION_RELEASE_EVIDENCE_SOURCE:-$PRESENTATION_ROOT/Docker/Downloads/release-evidence/public-promotion.json}"
 RELEASE_PROOF_SOURCE="${CHUMMER_RUN_LOCAL_RELEASE_PROOF_SOURCE:-$REPO_ROOT/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json}"
@@ -267,7 +268,6 @@ mkdir -p "$combined_files_root" "$combined_startup_smoke_root" "$generated_root"
 
 copy_public_artifacts "$RUNSERVICES_SOURCE_FILES_ROOT" "$combined_files_root"
 copy_public_artifacts "$PRESENTATION_FILES_ROOT" "$combined_files_root"
-filter_files_to_manifest_truth "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH"
 
 AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH" | paste -sd, -)"
 if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then
@@ -281,6 +281,13 @@ fi
 
 if [[ -d "$PRESENTATION_STARTUP_SMOKE_ROOT" ]]; then
   find "$PRESENTATION_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \
+    | while IFS= read -r -d '' receipt_path; do
+        cp "$receipt_path" "$combined_startup_smoke_root"/
+      done
+fi
+
+if [[ -d "$RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT" ]]; then
+  find "$RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT" -maxdepth 1 -type f -name 'startup-smoke-*.receipt.json' -print0 \
     | while IFS= read -r -d '' receipt_path; do
         cp "$receipt_path" "$combined_startup_smoke_root"/
       done
