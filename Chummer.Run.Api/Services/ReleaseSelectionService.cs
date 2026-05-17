@@ -514,7 +514,7 @@ public sealed class ReleaseSelectionService
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
         {
-            return "The current preview starts with account creation so Chummer can keep the download handoff and recovery path attached from the first launch.";
+            return "This route starts with account creation so Chummer can keep the download handoff and recovery path attached from the first launch.";
         }
 
         if (string.Equals(accessClass, InstallAccessClasses.AccountRecommended, StringComparison.OrdinalIgnoreCase))
@@ -589,7 +589,7 @@ public sealed class ReleaseSelectionService
             return $"{HeadLabel(download)} for {PlatformLabel(download)}";
         }
 
-        return $"Preview package for {PlatformLabel(download)}";
+        return $"Public package for {PlatformLabel(download)}";
     }
 
     private static string HeadLabel(PublicReleaseArtifactDto download)
