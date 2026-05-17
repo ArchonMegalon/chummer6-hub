@@ -233,6 +233,13 @@ public sealed class SignedInTrustStatusService
         return BuildReleaseProofSummary(manifest);
     }
 
+    private static string? TryGetJsonString(JsonElement element, string propertyName)
+        => element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out JsonElement value)
+            && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
     private static string BuildSignedInInstallRecommendationSummary(
         PublicReleaseManifestDto manifest,
         ReleaseExperienceViewModel releaseExperience,
