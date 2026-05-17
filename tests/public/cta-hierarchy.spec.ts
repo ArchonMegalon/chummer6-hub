@@ -19,27 +19,27 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     const heroActions = page.locator('.launch-hero__actions a.button-like');
     const texts = await heroActions.allTextContents();
     const normalized = texts.map((text) => text.replace(/\s+/g, ' ').trim());
-    const expected = ['Open downloads', 'Enter the hub', 'Explore Karma Forge'];
-    expect(normalized.slice(0, 3), `${viewport.name} hero CTA order`).toEqual(expected);
+    const expected = ['Enter Black Ledger', 'Download Chummer'];
+    expect(normalized.slice(0, 2), `${viewport.name} hero CTA order`).toEqual(expected);
 
     const heroBoxes = [];
-    for (let index = 0; index < Math.min(await heroActions.count(), 3); index += 1) {
+    for (let index = 0; index < Math.min(await heroActions.count(), 2); index += 1) {
       heroBoxes.push(await heroActions.nth(index).boundingBox());
     }
 
-    const accountSection = page.locator('[data-homepage-section="account-value"]');
-    const accountPrimary = accountSection.locator('.button-like--primary');
-    const accountPrimaryTop = (await accountPrimary.boundingBox())?.y ?? 0;
+    const supportSection = page.locator('[data-homepage-section="footer"]');
+    const supportPrimary = supportSection.locator('.button-like--primary');
+    const supportPrimaryTop = (await supportPrimary.boundingBox())?.y ?? 0;
     const heroPrimaryTop = heroBoxes[0]?.y ?? 0;
-    if (accountPrimaryTop <= heroPrimaryTop) {
-      failures.push(`${viewport.name}: account CTA surfaced above hero CTA`);
+    if (supportPrimaryTop <= heroPrimaryTop) {
+      failures.push(`${viewport.name}: support CTA surfaced above hero CTA`);
     }
 
     results.push({
       viewport: viewport.name,
-      hero_ctas: normalized.slice(0, 3),
+      hero_ctas: normalized.slice(0, 2),
       hero_boxes: heroBoxes,
-      account_primary_top: accountPrimaryTop,
+      support_primary_top: supportPrimaryTop,
     });
 
     await page.close();
@@ -58,10 +58,10 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     [
       '# Homepage Simplification Changelog',
       '',
-      '- Hero keeps three ranked CTAs: `Open downloads`, `Enter the hub`, `Explore Karma Forge`.',
-      '- Homepage remains on the six-section model: hero, choose-your-path, what-works-today, preview, account-value, trust-footer.',
-      '- Black Ledger and Karma Forge stay in the preview lane instead of overwhelming the hero with extra proof panels.',
-      '- Account CTAs remain lower on the page instead of competing with the install-first hero path.',
+      '- Hero keeps two ranked CTAs: `Enter Black Ledger`, `Download Chummer`.',
+      '- Homepage remains on the five-section model: hero, score-strip, factions, play-downloads, footer.',
+      '- Proof and release posture stay off the first screen and live on Status instead.',
+      '- Support/help CTAs remain lower on the page instead of competing with the hero path.',
     ].join('\n'),
   );
 

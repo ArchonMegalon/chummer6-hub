@@ -5,70 +5,63 @@
     ViewData["SurfaceClass"] = "surface-mobile-projection";
 }
 
-<section class="trust-page-hero">
+<section class="trust-page-hero trust-page-hero--compact">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+        <p class="page-copy">Mobile play shell preview; installability proof pending.</p>
         <div class="trust-claim__microproof">
             <span>@Model.CurrentRoleLabel</span>
-            <span>Installable PWA posture</span>
-            <span>First-party role entry</span>
+            <span>Manifest and service worker live</span>
+            <span>Offline depth still proving</span>
         </div>
     </div>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--secondary" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
-        <a class="button-like button-like--ghost" href="/help">Open help</a>
+        <a class="button-like button-like--secondary" href="/status">Read install status</a>
     </div>
 </section>
 
-<section class="continuity-band">
-    <div class="continuity-band__copy">
-        <p class="eyebrow">Install and reconnect posture</p>
-        <h2 class="editorial-title">Mobile routes keep installability, continuity, and role entry on one rail.</h2>
-        <p class="editorial-copy">@Model.InstallabilitySummary</p>
+<section class="workflow-band workflow-band--compact">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Installability state</p>
+        <h2 class="editorial-title">Compact public truth for the play shell.</h2>
+        <p class="editorial-copy">The shell is real, the manifest is real, and the service worker is real. Public install prompts and offline depth still need explicit proof.</p>
     </div>
-    <div class="continuity-band__panel">
-        @foreach (var capability in Model.Capabilities.Take(2))
-        {
-            <article class="continuity-band__fact">
-                <span>@capability.Label</span>
-                <strong>@capability.Summary</strong>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Continuity receipts</p>
-        <h2 class="editorial-title">Inspect the continuity rail before you trust it.</h2>
-        <p class="editorial-copy">Mobile and PWA posture now has first-party receipt rails. Use the continuity index for aggregate install/reconnect proof, and use the PWA JSON for the bounded mobile handoff contract.</p>
-    </div>
-    <div class="route-choice-grid">
-        <article class="route-choice-card">
-            <span class="tag">Receipt index</span>
-            <h3>NEXUS-PAN continuity receipts</h3>
-            <p>Aggregate continuity proof without leaking private device history.</p>
-            <a class="editorial-strip__action" href="/play/continuity/receipts">Open continuity receipts</a>
+    <div class="flagship-gateway-grid flagship-gateway-grid--compact">
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Live</span>
+                <h3>Web app manifest</h3>
+            </div>
+            <p>Standalone display, icons, scope, and start route are shipped from the live shell.</p>
+            <a class="editorial-strip__action" href="/manifest.json">Open manifest</a>
         </article>
-        <article class="route-choice-card">
-            <span class="tag">Mobile handoff</span>
-            <h3>PWA handoff JSON</h3>
-            <p>Bounded mobile/PWA continuity contract for install, reconnect, and route ownership.</p>
-            <a class="editorial-strip__action" href="/mobile/pwa.json">Open PWA JSON</a>
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Live</span>
+                <h3>Service worker</h3>
+            </div>
+            <p>First-party route caching exists and can be inspected directly.</p>
+            <a class="editorial-strip__action" href="/service-worker.js">Open service worker</a>
+        </article>
+        <article class="gateway-card">
+            <div class="gateway-card__header">
+                <span class="tag">Pending proof</span>
+                <h3>Install prompts and offline depth</h3>
+            </div>
+            <p>Prompt timing, platform install UX, and offline cache depth stay demoted until proven live.</p>
+            <a class="editorial-strip__action" href="/status">Open status</a>
         </article>
     </div>
 </section>
 
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Role entry map</p>
-        <h2 class="editorial-title">Player, GM, and observer aliases all converge on the same play shell.</h2>
-        <p class="editorial-copy">Role-specific aliases help people arrive on the right entry point without splitting product truth across disconnected mobile pages.</p>
+<section class="workflow-band workflow-band--compact">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Role entry</p>
+        <h2 class="editorial-title">Player, GM, and observer routes converge on one shell.</h2>
     </div>
-    <div class="route-choice-grid">
+    <div class="route-choice-grid route-choice-grid--three">
         @foreach (var role in Model.Roles)
         {
             <article class="route-choice-card">
@@ -79,23 +72,4 @@
             </article>
         }
     </div>
-</section>
-
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Capability pack</p>
-        <h2 class="editorial-title">Keep the mobile rail honest about what it owns.</h2>
-        <p class="editorial-copy">The mobile route should explain play posture and reconnect expectations. Downloads still owns build choice, and Help still owns private support.</p>
-    </div>
-    <section class="compact-rail">
-        @foreach (var capability in Model.Capabilities)
-        {
-            <article class="compact-rail__item">
-                <div class="compact-rail__copy">
-                    <h3>@capability.Label</h3>
-                    <p>@capability.Summary</p>
-                </div>
-            </article>
-        }
-    </section>
 </section>

@@ -3,32 +3,54 @@
     ViewData["Title"] = $"{Model.Promo.PublicName} promo";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
+    var slug = Model.Promo.FactionId.Replace('_', '-');
+    var logoHref = $"/media/ledger/factions/{slug}-logo.svg";
+    var backgroundHref = $"/media/ledger/factions/{slug}-bg.svg";
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
-        <p class="eyebrow">Faction onboarding promo</p>
-        <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">@Model.Intro</p>
+<section class="faction-detail-hero faction-detail-hero--promo" style="background-image:url('@backgroundHref')">
+    <img class="faction-detail-hero__logo" src="@logoHref" alt="@($"{Model.Promo.PublicName} logo")" loading="lazy" />
+    <div class="faction-detail-hero__copy">
+        <p class="eyebrow">Faction onboarding video</p>
+        <h1 class="editorial-title">@Model.Heading</h1>
+        <p class="editorial-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
             <span>Provider: @Model.Promo.ProviderStatus</span>
             <span>Render mode: @Model.Promo.RenderMode</span>
-            <span>No provider branding</span>
+            <span>Safety: public-safe</span>
         </div>
-    </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.Promo.JsonHref">Open JSON brief</a>
-        <a class="button-like button-like--secondary" href="@Model.Promo.CaptionsHref">Open captions</a>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@Model.Promo.JsonHref">Open JSON brief</a>
+            <a class="button-like button-like--secondary" href="@Model.Promo.CaptionsHref">Open captions</a>
+        </div>
     </div>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Fallback artifact</p>
+        <p class="eyebrow">Storyboard fallback</p>
         <h2 class="editorial-title">@Model.Promo.StaticCardLabel</h2>
-        <p class="editorial-copy">This route is the honest first-party fallback while external provider verification remains unresolved.</p>
+        <p class="editorial-copy">No external media provider is claimed here. This lane stays first-party and storyboard-backed until a provider is verified.</p>
     </div>
-    <div class="route-choice-grid">
+    <div class="faction-storyboard-strip">
+        @foreach (var line in Model.Promo.CaptionLines)
+        {
+            <article class="route-choice-card">
+                <span class="tag">Frame</span>
+                <h3>@Model.Promo.PublicName</h3>
+                <p>@line</p>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Formats</p>
+        <h2 class="editorial-title">Public-safe deliverables</h2>
+        <p class="editorial-copy">Every faction video route includes a JSON brief, caption file, and fallback storyboard-safe visual treatment.</p>
+    </div>
+    <div class="route-choice-grid route-choice-grid--three">
         @foreach (var format in Model.Promo.FormatLabels)
         {
             <article class="route-choice-card">
@@ -41,32 +63,14 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Caption brief</p>
-        <h2 class="editorial-title">@Model.Promo.PublicName</h2>
-        <p class="editorial-copy">Funny, weird, faction-identifying, and public-safe.</p>
+        <p class="eyebrow">Safety notes</p>
+        <h2 class="editorial-title">Provider and lore boundaries</h2>
     </div>
-    <div class="route-choice-grid">
-        @foreach (var line in Model.Promo.CaptionLines)
-        {
-            <article class="route-choice-card">
-                <span class="tag">Caption</span>
-                <p>@line</p>
-            </article>
-        }
-    </div>
-</section>
-
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Compliance notes</p>
-        <h2 class="editorial-title">Provider and lore safety</h2>
-        <p class="editorial-copy">The onboarding promo lane stays explicit about provider verification and public-safety boundaries.</p>
-    </div>
-    <div class="route-choice-grid">
+    <div class="route-choice-grid route-choice-grid--three">
         @foreach (var note in Model.DeliveryNotes)
         {
             <article class="route-choice-card">
-                <span class="tag">Proof</span>
+                <span class="tag">Boundary</span>
                 <p>@note</p>
             </article>
         }

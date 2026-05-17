@@ -512,7 +512,7 @@ public sealed class BlackLedgerTickNewsNotificationService
             PublicSummary: news.Summary,
             PublicHighlights: (news.EvidenceLines ?? Array.Empty<string>()).Take(3).ToArray(),
             LedgerUrl: $"{trimmedBase}/ledger",
-            DispatchUrl: $"{trimmedBase}/ledger/dispatches/ledger_dispatch_emerald-sprawl-prelude_turn_{ExtractCurrentTurn(worldTick):0000}",
+            DispatchUrl: $"{trimmedBase}/ledger/dispatches/dispatch_turn_{ExtractCurrentTurn(worldTick):0000}_main",
             TickReceiptUrl: $"{trimmedBase}/ledger/closeouts",
             OccurredAtUtc: worldTick.UpdatedAtUtc);
     }
@@ -532,7 +532,7 @@ public sealed class BlackLedgerTickNewsNotificationService
             PublicSummary: tick.Summary,
             PublicHighlights: tick.Effects.Select(effect => $"{effect.Target}: {effect.PublicReason}").Take(4).ToArray(),
             LedgerUrl: $"{trimmedBase}/ledger?turn={tick.Turn}",
-            DispatchUrl: $"{trimmedBase}/ledger/dispatches/ledger_dispatch_{world.WorldId}_turn_{tick.Turn:0000}",
+            DispatchUrl: $"{trimmedBase}/ledger/dispatches/dispatch_turn_{tick.Turn:0000}_main",
             TickReceiptUrl: $"{trimmedBase}/ledger/closeouts",
             OccurredAtUtc: DateTimeOffset.TryParse(tick.CreatedAtUtc, out DateTimeOffset createdAtUtc) ? createdAtUtc : DateTimeOffset.UtcNow);
     }

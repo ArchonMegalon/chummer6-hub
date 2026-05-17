@@ -1,32 +1,112 @@
 @model BlackLedgerHubPageViewModel
+@using System.Globalization
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-ledger";
     var commandMap = Model.CommandMap;
-    var featuredEvent = commandMap?.Events.FirstOrDefault();
     var mapFocused = string.Equals(Model.CurrentSection, "map", StringComparison.OrdinalIgnoreCase);
     var selectedFaction = Model.SelectedFaction;
     var selectedFactionSlug = selectedFaction is null ? string.Empty : selectedFaction.Id.Replace('_', '-');
     var selectedTurn = Model.World?.CurrentTurn ?? 1;
+    var selectedDispatch = Model.SelectedDispatch;
+    var accountCtaHref = Model.Chrome.Authenticated ? "/account/ledger/onboarding" : "/login?next=%2Faccount%2Fledger%2Fonboarding";
+    var accountCtaLabel = Model.Chrome.Authenticated ? "Open onboarding" : "Join a faction";
+
+    Func<string, string> factionSlug = id => id.Replace('_', '-');
+    Func<string, string> logoHref = id => $"/media/ledger/factions/{factionSlug(id)}-logo.svg";
+    Func<string, string> backgroundHref = id => $"/media/ledger/factions/{factionSlug(id)}-bg.svg";
+    Func<string, string> introLine = id => factionSlug(id) switch
+    {
+        "glass-tower-compact" => "Welcome to calm. If you can afford it.",
+        "rust-market-syndicate" => "Everything is available. Nothing is free.",
+        "ashline-circle" => "Power is easy. Proof is hard.",
+        "neon-docks-union" => "Routes move. Drones complain. We keep the city breathing.",
+        "ghostline-network" => "If you heard it, verify it. If you verified it, redact it.",
+        "barrens-free-wardens" => "Less nuyen. More backbone.",
+        _ => "Pressure moves faster than certainty."
+    };
+    Func<string, string[]> ledgerLabels = id => factionSlug(id) switch
+    {
+        "glass-tower-compact" => ["License Polish", "Public Trust", "Contract Capture", "Debt Shield"],
+        "rust-market-syndicate" => ["Debt Heat", "Gear Flow", "Favor Load", "Recovery Work"],
+        "ashline-circle" => ["MysAd Density", "Magic Pressure", "Source Clarity", "Drain Risk"],
+        "neon-docks-union" => ["Route Control", "Drone Load", "Cargo Pressure", "Maintenance Debt"],
+        "ghostline-network" => ["Intel Confidence", "Rumor Noise", "Proof Trail", "Exposure Risk"],
+        "barrens-free-wardens" => ["Closeout Witnesses", "Survival Pressure", "Public Trust", "Attrition Risk"],
+        _ => ["Influence", "Heat", "Confidence", "Pressure"]
+    };
+    Func<string, string> ledgerReason = label => label switch
+    {
+        "License Polish" => "Contract wins, district calm, and public-facing cleanups raise it.",
+        "Public Trust" => "Receipts, low heat, and successful dispatches push it upward.",
+        "Contract Capture" => "District control and package pressure wins move it.",
+        "Debt Shield" => "Low debt heat and stable holdings improve it.",
+        "Debt Heat" => "Favors, pressure spikes, and visible scarcity raise it.",
+        "Gear Flow" => "Cargo continuity and safer routes improve it.",
+        "Favor Load" => "Debt calls and emergency bargains raise it.",
+        "Recovery Work" => "Closeouts and rebuild actions lift it.",
+        "MysAd Density" => "Arcana incidents and source turbulence move it.",
+        "Magic Pressure" => "Ritual noise and conflict arcs raise it.",
+        "Source Clarity" => "Verified receipts and calm districts improve it.",
+        "Drain Risk" => "Escalation and volatility increase it.",
+        "Route Control" => "District influence and low disruption improve it.",
+        "Drone Load" => "Cargo demand and route churn raise it.",
+        "Cargo Pressure" => "Package traffic and event spikes move it.",
+        "Maintenance Debt" => "Heat and accumulated strain raise it.",
+        "Intel Confidence" => "Low rumor noise and verified dispatches improve it.",
+        "Rumor Noise" => "Volatility and conflicting signals raise it.",
+        "Proof Trail" => "More receipts and safer dispatches improve it.",
+        "Exposure Risk" => "Public heat and conflict arcs raise it.",
+        "Closeout Witnesses" => "Visible community actions and safer outcomes improve it.",
+        "Survival Pressure" => "Heat and scarcity move it upward.",
+        "Attrition Risk" => "Heat and volatility increase it.",
+        _ => "District control, heat, and verified receipts move it."
+    };
+    Func<string, IReadOnlyList<BlackLedgerDistrictViewModel>> factionDistrictsFor = id =>
+        (IReadOnlyList<BlackLedgerDistrictViewModel>)(Model.World?.Districts
+            .Where(district => string.Equals(district.DominantFaction.Replace(' ', '-'), factionSlug(id), StringComparison.OrdinalIgnoreCase))
+            .ToArray() ?? Array.Empty<BlackLedgerDistrictViewModel>());
+    Func<string, IEnumerable<(string Label, string CurrentValue, string Delta, string Trend, string SourceReceipt, string WhatChangesIt, string LatestAction)>> buildLedgers = id =>
+    {
+        var districts = factionDistrictsFor(id);
+        int heat = districts.Sum(static district => district.Heat);
+        int influence = districts.Sum(static district => district.Influence);
+        int confidence = districts.Count == 0 ? 0 : (int)Math.Round(districts.Average(static district => district.Confidence), MidpointRounding.AwayFromZero);
+        int delta = districts.Sum(static district => district.DeltaSinceLastTick);
+        string trend = districts.GroupBy(static district => district.Trend)
+            .OrderByDescending(static group => group.Count())
+            .Select(static group => group.Key)
+            .FirstOrDefault() ?? "steady";
+        string receipt = selectedDispatch?.SourceReceiptId ?? Model.World?.LastTick?.ReceiptId ?? "turn-1";
+        string latestAction = selectedDispatch?.Title ?? Model.NewsreelStatus?.StatusLabel ?? "Turn 1 replay live";
+        var values = new[]
+        {
+            Math.Max(1, influence),
+            Math.Max(1, heat),
+            Math.Max(1, confidence / 10),
+            Math.Max(1, Math.Abs(delta) + Math.Max(1, districts.Count))
+        };
+        return ledgerLabels(id).Select((label, index) => (
+            Label: label,
+            CurrentValue: values[index].ToString(CultureInfo.InvariantCulture),
+            Delta: $"{(delta >= 0 ? "+" : string.Empty)}{delta.ToString(CultureInfo.InvariantCulture)}",
+            Trend: trend,
+            SourceReceipt: receipt,
+            WhatChangesIt: ledgerReason(label),
+            LatestAction: latestAction));
+    };
 }
 
-<section class="trust-page-hero">
+<section class="trust-page-hero trust-page-hero--compact">
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        @if (mapFocused)
-        {
-            <div class="trust-claim__microproof" aria-label="Map route focus">
-                <span>Focused route: /ledger/map</span>
-                <span>Command map section pinned below</span>
-            </div>
-        }
         <div class="trust-claim__microproof">
+            <span>Turn @(Model.World?.CurrentTurn ?? 1)</span>
             <span>Opt-in aggregate only</span>
             <span>No player identities</span>
-            <span>No support or internal-staff leakage</span>
         </div>
     </div>
     <div class="stacked-actions">
@@ -35,64 +115,16 @@
     </div>
 </section>
 
-@if (Model.NewsreelStatus is not null)
-{
-    <section class="editorial-block">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">Turn @Model.NewsreelStatus.Turn newsreel</p>
-            <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
-            <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
-        </div>
-        <div class="trust-claim__microproof">
-            <span>Scope: @Model.NewsreelStatus.ScopeLabel</span>
-            <span>Policy: @Model.NewsreelStatus.Policy</span>
-            <span>Receipts: @Model.NewsreelStatus.ReceiptCount</span>
-        </div>
-        <div class="stacked-actions">
-            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.DispatchHref">Open dispatch lane</a>
-            <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification status</a>
-        </div>
-    </section>
-}
-
-<section class="editorial-block">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Modules</p>
-        <h2 class="editorial-title">One hub, bounded public modules.</h2>
-        <p class="editorial-copy">Turn 1 already ran. Each lane stays explicit about what is preview, what is aggregate, and what cannot be shown on a public route.</p>
-    </div>
-    @if (Model.World?.TurnNavigation?.Count > 0)
-    {
-        <div class="trust-claim__microproof" aria-label="Turn navigation">
-            @foreach (var turn in Model.World.TurnNavigation)
-            {
-                <a class="inline-link" href="@turn.Href">@(turn.Current ? $"{turn.Label} (current)" : turn.Label)</a>
-            }
-        </div>
-    }
-    <div class="route-choice-grid">
-        @foreach (var module in Model.Modules)
-        {
-            <article class="route-choice-card">
-                <span class="tag">@module.StatusLabel</span>
-                <h3>@module.Title</h3>
-                <p>@module.Summary</p>
-                <a class="editorial-strip__action" href="@module.Href">Open module</a>
-            </article>
-        }
-    </div>
-</section>
-
 @if (Model.World is not null)
 {
-    <section class="editorial-block@(mapFocused ? " editorial-block--focused" : string.Empty)" id="ledger-map" tabindex="-1">
+    <section class="editorial-block editorial-block--focused" id="ledger-map" tabindex="-1">
         <div class="editorial-block__lead">
-            <p class="eyebrow">World map</p>
+            <p class="eyebrow">Geoscape</p>
             <h2 class="editorial-title">@Model.World.PublicName</h2>
             <p class="editorial-copy">@Model.World.TurnHeadline</p>
             <p class="muted-copy">@Model.World.MapNote</p>
         </div>
-        <div class="ledger-command-map" data-current-mode="@(commandMap?.CurrentMode ?? "influence")">
+        <div class="ledger-command-map ledger-command-map--pregold">
             @if (commandMap is not null)
             {
                 <div
@@ -120,9 +152,8 @@
                         @foreach (var district in Model.World.Districts)
                         {
                             <a href="#district-@district.Id" aria-label="@district.Summary" data-region-link="@district.Id">
-                                <polygon class="ledger-world-shell__district ledger-command-map__district" data-region-id="@district.Id" data-dominant-faction="@district.DominantFaction" data-region-heat="@district.Heat" data-region-influence="@district.Influence" data-region-summary="@district.Summary" points="@district.PolygonPoints" tabindex="0">
+                                <polygon class="ledger-world-shell__district ledger-command-map__district" points="@district.PolygonPoints" tabindex="0">
                                     <title>@district.Name</title>
-                                    <desc>@district.Summary</desc>
                                 </polygon>
                             </a>
                         }
@@ -130,43 +161,61 @@
                     <p class="muted-copy">Fallback only. If canvas is unavailable, the bounded tactical shell stays readable and keyboard-safe.</p>
                 </div>
             </div>
-            <div class="ledger-world-shell__districts">
-                @foreach (var district in Model.World.Districts)
-                {
-                    <article class="route-choice-card" id="district-@district.Id">
-                        <span class="tag">@district.DominantFaction</span>
-                        <h3>@district.Name</h3>
-                        <p>@district.Summary</p>
-                        <p class="muted-copy">Influence @district.Influence · Heat @district.Heat · Confidence @district.Confidence · Trend @district.Trend</p>
-                    </article>
-                }
-            </div>
         </div>
     </section>
 
+    @if (Model.NewsreelStatus is not null)
+    {
+        <section class="workflow-band workflow-band--compact">
+            <div class="workflow-band__lead">
+                <p class="eyebrow">Turn @Model.NewsreelStatus.Turn newsreel</p>
+                <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
+                <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
+            </div>
+            <div class="trust-claim__microproof">
+                <span>Scope: @Model.NewsreelStatus.ScopeLabel</span>
+                <span>Delivery: first-party email rail</span>
+                <span>Receipts: @Model.NewsreelStatus.ReceiptCount</span>
+            </div>
+        </section>
+    }
+
     <section class="editorial-block" id="ledger-factions">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Faction intel</p>
-            <h2 class="editorial-title">Six starter factions, bounded public signals.</h2>
-            <p class="editorial-copy">AI interim stewards can summarize pressure, but every public lane stays privacy-bounded and receipt-backed.</p>
+            <p class="eyebrow">Faction files</p>
+            <h2 class="editorial-title">Logos, backdrops, score ledgers, and storyboard-safe intros.</h2>
+            <p class="editorial-copy">Every public faction lane shows pressure, not people, with one clear CTA and no fake provider claim.</p>
         </div>
-        <div class="route-choice-grid">
+        <div class="faction-profile-grid">
             @foreach (var faction in Model.World.Factions)
             {
-                <article class="route-choice-card">
-                    <span class="tag">@faction.Type</span>
-                    <h3>@faction.PublicName</h3>
-                    <p>Leader: @faction.FactionLeader · GM: @faction.FieldGm · Intel: @faction.IntelProvider</p>
-                    <div class="route-choice-card__proof">
-                        @foreach (var signal in faction.PublicSignals)
+                var slug = factionSlug(faction.Id);
+                var ledgers = buildLedgers(faction.Id).Take(4).ToArray();
+                <article class="faction-profile-card">
+                    <div class="faction-profile-card__hero" style="background-image:url('@backgroundHref(faction.Id)')">
+                        <img class="faction-profile-card__logo" src="@logoHref(faction.Id)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
+                        <div class="faction-profile-card__hero-copy">
+                            <span class="tag">@faction.Type</span>
+                            <h3>@faction.PublicName</h3>
+                            <p>@introLine(faction.Id)</p>
+                        </div>
+                    </div>
+                    <div class="faction-profile-card__ledgers">
+                        @foreach (var ledger in ledgers)
                         {
-                            <span>@signal</span>
+                            <article class="score-ledger">
+                                <span class="score-ledger__label">@ledger.Label</span>
+                                <strong>@ledger.CurrentValue</strong>
+                                <small>@ledger.Delta · @ledger.Trend</small>
+                            </article>
                         }
                     </div>
                     <div class="trust-claim__microproof">
-                        <a class="inline-link" href="/ledger/factions/@faction.Id.Replace('_', '-')">Open faction file</a>
-                        <a class="inline-link" href="/ledger/factions/@faction.Id.Replace('_', '-')/promo">Open storyboard</a>
+                        <span>Safety: public-safe</span>
+                        <span>Video: fallback storyboard</span>
+                        <span>Receipt: @(Model.World.LastTick?.ReceiptId ?? "turn-1")</span>
                     </div>
+                    <a class="editorial-strip__action" href="/ledger/factions/@slug">Open faction file</a>
                 </article>
             }
         </div>
@@ -174,286 +223,82 @@
 
     @if (selectedFaction is not null)
     {
-        var factionDistricts = Model.World.Districts
-            .Where(district => string.Equals(district.DominantFaction.Replace(' ', '-'), selectedFaction.Id.Replace('_', '-'), StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        var slug = factionSlug(selectedFaction.Id);
+        var ledgers = buildLedgers(selectedFaction.Id).Take(4).ToArray();
+        var districts = factionDistrictsFor(selectedFaction.Id);
         <section class="editorial-block" id="ledger-faction-file">
-            <div class="editorial-block__lead">
-                <p class="eyebrow">Faction file</p>
-                <h2 class="editorial-title">@selectedFaction.PublicName</h2>
-                <p class="editorial-copy">@selectedFaction.PublicName stays public-safe here: identity, visible district pressure, AI steward posture, package heat, latest dispatches, and turn-backed links only.</p>
-                <div class="trust-claim__microproof">
-                    <span>Faction type: @selectedFaction.Type</span>
-                    <span>Map focus: @(factionDistricts.FirstOrDefault()?.Name ?? "Cross-district pressure")</span>
-                    <span>Current turn: @Model.World.CurrentTurn</span>
+            <div class="faction-detail-hero" style="background-image:url('@backgroundHref(selectedFaction.Id)')">
+                <img class="faction-detail-hero__logo" src="@logoHref(selectedFaction.Id)" alt="@($"{selectedFaction.PublicName} logo")" loading="lazy" />
+                <div class="faction-detail-hero__copy">
+                    <p class="eyebrow">Faction profile</p>
+                    <h2 class="editorial-title">@selectedFaction.PublicName</h2>
+                    <p class="editorial-copy">@introLine(selectedFaction.Id)</p>
+                    <div class="trust-claim__microproof">
+                        <span>Safety: public-safe</span>
+                        <span>Video: storyboard fallback</span>
+                        <span>Package pressure visible</span>
+                    </div>
+                    <div class="stacked-actions">
+                        <a class="button-like button-like--primary" href="@accountCtaHref">@accountCtaLabel</a>
+                        <a class="button-like button-like--secondary" href="/ledger/factions/@slug/promo">Open faction video</a>
+                    </div>
                 </div>
             </div>
-            <div class="route-choice-grid">
-                <article class="route-choice-card">
-                    <span class="tag">Identity</span>
-                    <h3>Visible operating posture</h3>
-                    <p>@selectedFaction.PublicName is tracked as @selectedFaction.Type with bounded public-safe signals only.</p>
-                    <div class="route-choice-card__proof">
-                        @foreach (var signal in selectedFaction.PublicSignals)
-                        {
-                            <span>@signal</span>
-                        }
-                    </div>
-                </article>
-                <article class="route-choice-card">
-                    <span class="tag">AI stewards</span>
-                    <h3>Named interim roles</h3>
-                    <p>Leader: @selectedFaction.FactionLeader · GM: @selectedFaction.FieldGm · Intel: @selectedFaction.IntelProvider</p>
-                    <p class="muted-copy">Interim AI stewards may summarize or redact. Verified humans outrank them.</p>
-                </article>
-                <article class="route-choice-card">
-                    <span class="tag">Package pressure</span>
-                    <h3>Governed package demand</h3>
-                    <p>Faction-linked package pressure stays visible as demand and closeout heat, not shipped truth.</p>
-                    <a class="editorial-strip__action" href="/ledger/packages">Open package pressure</a>
-                </article>
-                <article class="route-choice-card">
-                    <span class="tag">Turn history</span>
-                    <h3>Replay and dispatch trail</h3>
-                    <p>Jump from this faction file into the turn replay, the district map, or the filtered dispatch archive.</p>
-                    <div class="trust-claim__microproof">
-                        <a class="inline-link" href="/ledger/map#ledger-map">Open map focus</a>
-                        <a class="inline-link" href="/ledger/factions/@selectedFaction.Id.Replace('_', '-')/dispatches">Open faction dispatches</a>
-                        <a class="inline-link" href="/ledger/turns/1">Open Turn 1</a>
-                    </div>
-                </article>
-                @if (Model.SelectedFactionPromo is not null)
+
+            <div class="score-ledger-grid">
+                @foreach (var ledger in ledgers)
                 {
                     <article class="route-choice-card">
-                        <span class="tag">@Model.SelectedFactionPromo.ProviderStatus</span>
-                        <h3>Onboarding promo fallback</h3>
-                        <p>This faction ships a route-backed fallback artifact instead of an unverified external render claim.</p>
-                        <div class="route-choice-card__proof">
-                            @foreach (var format in Model.SelectedFactionPromo.FormatLabels)
-                            {
-                                <span>@format</span>
-                            }
-                        </div>
-                        <div class="trust-claim__microproof">
-                            <a class="inline-link" href="@Model.SelectedFactionPromo.HtmlHref">Open promo brief</a>
-                            <a class="inline-link" href="@Model.SelectedFactionPromo.JsonHref">Open JSON brief</a>
-                            <a class="inline-link" href="@Model.SelectedFactionPromo.CaptionsHref">Open captions</a>
-                        </div>
+                        <span class="tag">@ledger.Label</span>
+                        <h3>@ledger.CurrentValue</h3>
+                        <p>Delta since last turn: @ledger.Delta</p>
+                        <p>Trend: @ledger.Trend</p>
+                        <p>Source receipt: @ledger.SourceReceipt</p>
+                        <p>What changes it: @ledger.WhatChangesIt</p>
+                        <p>Latest action: @ledger.LatestAction</p>
                     </article>
                 }
             </div>
-            @if (factionDistricts.Length > 0)
+
+            <div class="route-choice-grid route-choice-grid--three">
+                <article class="route-choice-card">
+                    <span class="tag">AI stewards</span>
+                    <h3>Named bounded roles</h3>
+                    <p>Leader: @selectedFaction.FactionLeader · GM: @selectedFaction.FieldGm · Intel: @selectedFaction.IntelProvider</p>
+                </article>
+                <article class="route-choice-card">
+                    <span class="tag">District pressure</span>
+                    <h3>Map focus</h3>
+                    <p>@(districts.Count == 0 ? "Cross-district pressure" : string.Join(", ", districts.Select(static district => district.Name)))</p>
+                </article>
+                <article class="route-choice-card">
+                    <span class="tag">Storyboard</span>
+                    <h3>Faction intro video</h3>
+                    <p>Provider verification is still pending, so this lane stays first-party and fallback-backed.</p>
+                    <div class="trust-claim__microproof">
+                        <a class="inline-link" href="/ledger/factions/@slug/promo">Promo page</a>
+                        <a class="inline-link" href="/ledger/factions/@slug/promo.json">JSON brief</a>
+                        <a class="inline-link" href="/ledger/factions/@slug/promo.vtt">Captions</a>
+                    </div>
+                </article>
+            </div>
+
+            @if (Model.Dispatches.Count > 0)
             {
-                <div class="ledger-world-shell__districts">
-                    @foreach (var district in factionDistricts)
+                <div class="route-choice-grid route-choice-grid--three">
+                    @foreach (var dispatch in Model.Dispatches.Take(3))
                     {
                         <article class="route-choice-card">
-                            <span class="tag">Map focus</span>
-                            <h3>@district.Name</h3>
-                            <p>@district.Summary</p>
-                            <p class="muted-copy">Influence @district.Influence · Heat @district.Heat · Trend @district.Trend</p>
+                            <span class="tag">@dispatch.Type</span>
+                            <h3>@dispatch.Title</h3>
+                            <p>@dispatch.Summary</p>
+                            <a class="editorial-strip__action" href="@dispatch.Href">Open dispatch</a>
                         </article>
                     }
                 </div>
             }
         </section>
     }
-
-    @if (Model.World.StewardshipPosts.Count > 0)
-    {
-        <section class="editorial-block" id="ledger-stewardship">
-            <div class="editorial-block__lead">
-                <p class="eyebrow">AI stewardship</p>
-                <h2 class="editorial-title">Interim bots run bounded posts until verified humans take over.</h2>
-                <p class="editorial-copy">These posts may propose, summarize, and redact. They do not outrank human stewards, and they do not become release truth by themselves.</p>
-            </div>
-            <div class="route-choice-grid">
-                @foreach (var post in Model.World.StewardshipPosts)
-                {
-                    <article class="route-choice-card">
-                        <span class="tag">@post.HolderType</span>
-                        <h3>@post.PublicLabel</h3>
-                        <p>@post.PublicSummary</p>
-                        <p class="muted-copy">Fallback personality: @post.FallbackPersonality</p>
-                    </article>
-                }
-            </div>
-            @if (Model.World.StewardshipTransferPreview is not null)
-            {
-                <article class="trust-claim">
-                    <span class="tag">Stewardship transfer preview</span>
-                    <h3>@Model.World.StewardshipTransferPreview.ReceiptType</h3>
-                    <p>@Model.World.StewardshipTransferPreview.Reason</p>
-                    <div class="trust-claim__microproof">
-                        <span>Post: @Model.World.StewardshipTransferPreview.PostId</span>
-                        <span>Old holder: @Model.World.StewardshipTransferPreview.OldHolder</span>
-                        <span>New holder: @Model.World.StewardshipTransferPreview.NewHolderType</span>
-                        <span>Visibility: @Model.World.StewardshipTransferPreview.PublicVisibility</span>
-                    </div>
-                </article>
-            }
-        </section>
-    }
 }
 
-<section class="trust-claims" id="ledger-stats">
-    <div class="trust-claims__lead">
-        <p class="eyebrow">Public-safe stats</p>
-        <h2 class="editorial-title">Aggregate only. Opt-in only. Proof-bounded.</h2>
-        <p class="editorial-copy">These preview stats are derived from the seeded Emerald Sprawl world model, not hardcoded in the page. If a stat is not public-safe, it does not render here. fictional runner/campaign statistics only.</p>
-    </div>
-    <div class="trust-claims__grid">
-        @foreach (var stat in Model.Stats)
-        {
-            <article class="trust-claim" id="@stat.Id">
-                <span class="tag">@stat.Confidence</span>
-                <h3>@stat.Title</h3>
-                <p class="trust-claim__value"><strong>@stat.Value</strong></p>
-                <p>@stat.Scope · @stat.Period</p>
-                <div class="trust-claim__microproof">
-                    <span>@stat.SampleSize</span>
-                    <span>@stat.PrivacyNote</span>
-                </div>
-                <p class="muted-copy">@stat.SourceDetail.Label · @stat.SourceDetail.ProvenanceSummary</p>
-                <a class="inline-link" href="@stat.Href">Inspect lane</a>
-            </article>
-        }
-    </div>
-</section>
-
-@if (Model.World?.LastTick is not null)
-{
-    <section class="editorial-block" id="ledger-last-tick">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">Last tick receipt</p>
-            <h2 class="editorial-title">@Model.World.LastTick.ReceiptId</h2>
-            <p class="editorial-copy">@Model.World.LastTick.Summary</p>
-            <p class="muted-copy">World: @Model.World.LastTick.WorldId · Turn: @Model.World.LastTick.Turn · Mode: @Model.World.LastTick.Mode</p>
-            <div class="trust-claim__microproof">
-                <span>Input hash: @Model.World.LastTick.InputStateHash[..12]</span>
-                <span>Decision hash: @Model.World.LastTick.DecisionPacketHash[..12]</span>
-                <span>Output hash: @Model.World.LastTick.OutputStateHash[..12]</span>
-                <span>Created: @Model.World.LastTick.CreatedAtUtc</span>
-            </div>
-        </div>
-        <div class="route-choice-grid">
-            @foreach (var effect in Model.World.LastTick.Effects)
-            {
-                <article class="route-choice-card">
-                    <span class="tag">@effect.Target</span>
-                    <h3>@effect.Metric</h3>
-                    <p>Delta: @effect.Delta</p>
-                    <p>@effect.PublicReason</p>
-                </article>
-            }
-        </div>
-    </section>
-}
-
-@if (Model.Dispatches.Count > 0)
-{
-    <section class="editorial-block" id="ledger-dispatches">
-        <div class="editorial-block__lead">
-            <p class="eyebrow">Latest dispatches</p>
-            <h2 class="editorial-title">Receipt-backed narrative, not free-floating lore.</h2>
-            <p class="editorial-copy">Every dispatch is generated from a world tick, public-safe pressure change, or closeout-facing movement. No private table data, no sourcebook text, and no internal pipeline details.</p>
-        </div>
-        <div class="route-choice-grid">
-            @foreach (var dispatch in Model.Dispatches)
-            {
-                <article class="route-choice-card">
-                    <span class="tag">@dispatch.Type</span>
-                    <h3>@dispatch.Title</h3>
-                    <p>@dispatch.Summary</p>
-                    <div class="route-choice-card__proof">
-                        <span>Receipt @dispatch.SourceReceiptId</span>
-                        <span>Turn @dispatch.Turn</span>
-                        <span>@dispatch.PrivacyStatus</span>
-                    </div>
-                    <a class="editorial-strip__action" href="@dispatch.Href">Read dispatch</a>
-                </article>
-            }
-        </div>
-        @if (Model.SelectedDispatch is not null)
-        {
-            <article class="trust-claim" id="dispatch-@Model.SelectedDispatch.DispatchId">
-                <span class="tag">Dispatch detail</span>
-                <h3>@Model.SelectedDispatch.Title</h3>
-                @foreach (var paragraph in Model.SelectedDispatch.Body.Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
-                {
-                    <p>@paragraph</p>
-                }
-                <div class="trust-claim__microproof">
-                    <span>Generated from @Model.SelectedDispatch.SourceReceiptId</span>
-                    <span>@Model.SelectedDispatch.Scope</span>
-                    <span>Human review: @Model.SelectedDispatch.HumanReviewStatus</span>
-                </div>
-                @if (Model.SelectedDispatch.InvolvedFactions.Count > 0)
-                {
-                    <p class="muted-copy">Factions: @string.Join(", ", Model.SelectedDispatch.InvolvedFactions)</p>
-                }
-                @if (Model.SelectedDispatch.InvolvedDistricts.Count > 0)
-                {
-                    <p class="muted-copy">Districts: @string.Join(", ", Model.SelectedDispatch.InvolvedDistricts)</p>
-                }
-                <div class="trust-claim__microproof">
-                    <a class="inline-link" href="@Model.SelectedDispatch.SourceReceiptHref">Open receipt lane</a>
-                    @foreach (var link in Model.SelectedDispatch.PackagePressureLinks.Distinct())
-                    {
-                        <a class="inline-link" href="@link">Open linked lane</a>
-                    }
-                </div>
-            </article>
-        }
-    </section>
-}
-
-<section class="editorial-block" id="ledger-privacy">
-    <div class="editorial-block__lead">
-        <p class="eyebrow">Privacy boundary</p>
-        <h2 class="editorial-title">This page explains pressure, not people.</h2>
-        <p class="editorial-copy">Seeded preview and opt-in aggregate only. No runner names, no support cases, no internal-staff addresses, no sourcebook text, and no campaign-private state are allowed on the public Ledger routes.</p>
-    </div>
-    <div class="route-choice-grid">
-        <article class="route-choice-card">
-            <span class="tag">Allowed</span>
-            <h3>Opt-in aggregate pressure</h3>
-            <p>Season snapshots, package heat, and closeout motion can render when the data is aggregated and privacy-safe.</p>
-        </article>
-        <article class="route-choice-card">
-            <span class="tag">Blocked</span>
-            <h3>Private or identifying detail</h3>
-            <p>Individual runners, support traffic, private missions, account state, and hidden campaign levers fail closed instead of leaking into the public hub.</p>
-        </article>
-    </div>
-</section>
-
-<section class="compact-rail" id="ledger-closeouts">
-    @foreach (var item in Model.Closeouts)
-    {
-        <article class="compact-rail__item">
-            <div class="compact-rail__copy">
-                <h3>@item.Title</h3>
-                <p>@item.Summary</p>
-                <p class="muted-copy">@item.StatusLabel</p>
-                <a class="inline-link" href="@item.Href">Open lane</a>
-            </div>
-        </article>
-    }
-</section>
-
-<script>
-(() => {
-  const mapFocused = @Html.Raw(mapFocused ? "true" : "false");
-  if (mapFocused) {
-    const mapSection = document.getElementById('ledger-map');
-    if (mapSection) {
-      queueMicrotask(() => {
-        mapSection.scrollIntoView({ behavior: 'auto', block: 'start' });
-        mapSection.focus({ preventScroll: true });
-      });
-    }
-  }
-})();
-</script>
 <script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>

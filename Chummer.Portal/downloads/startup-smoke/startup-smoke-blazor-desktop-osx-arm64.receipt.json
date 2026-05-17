@@ -2,7 +2,7 @@
   "headId": "blazor-desktop",
   "version": "run-20260514-restore-mac-preview",
   "releaseVersion": "run-20260514-restore-mac-preview",
-  "channelId": "preview",
+  "channelId": "docker",
   "platform": "macos",
   "arch": "arm64",
   "rid": "osx-arm64",
@@ -22,6 +22,6 @@
   "artifactFileName": "chummer-blazor-desktop-osx-arm64-installer.dmg",
   "artifactRelativePath": "files/chummer-blazor-desktop-osx-arm64-installer.dmg",
   "artifactSha256": "f8a9f3647a9859c2810c7980d917cf7241ee685105c67df53ea99d4dfcabb2f9",
-  "channel": "preview",
+  "channel": "docker",
   "fileName": "chummer-blazor-desktop-osx-arm64-installer.dmg"
 }
