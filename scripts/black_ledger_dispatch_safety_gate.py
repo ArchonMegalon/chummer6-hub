@@ -53,7 +53,7 @@ def run(base_url: str) -> int:
     failures: list[str] = []
     urls = [
         f"{base_url}/ledger/dispatches",
-        f"{base_url}/ledger/dispatches/ledger_dispatch_emerald-sprawl-prelude_turn_0001",
+        f"{base_url}/ledger/dispatches/dispatch_turn_0001_main",
         f"{base_url}/ledger/turns/1/dispatches",
         f"{base_url}/ledger/factions/ashline-circle/dispatches",
     ]

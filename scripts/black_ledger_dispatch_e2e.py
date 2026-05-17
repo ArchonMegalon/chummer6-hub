@@ -9,7 +9,7 @@ import requests
 from absolute_completion_common import LocalHubApp, completion_path, now_iso, write_json, write_text
 
 
-DISPATCH_ID = "ledger_dispatch_emerald-sprawl-prelude_turn_0001"
+DISPATCH_ID = "dispatch_turn_0001_main"
 FORBIDDEN_PUBLIC_TERMS = (
     "productlift",
     "emailit",

@@ -144,7 +144,7 @@ public sealed class BlackLedgerStatsViewTests
         var service = new BlackLedgerPublicStatsService(configuration);
         var dispatches = service.ListDispatches();
         var latest = Assert.Single(dispatches, static item =>
-            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001", System.StringComparison.Ordinal));
+            string.Equals(item.DispatchId, "dispatch_turn_0001_main", System.StringComparison.Ordinal));
 
         Assert.Equal("ledger_tick_0001_preseeded", latest.SourceReceiptId);
         Assert.Equal("/ledger/closeouts", latest.SourceReceiptHref);
@@ -152,10 +152,10 @@ public sealed class BlackLedgerStatsViewTests
         Assert.True(latest.AiGenerated);
         Assert.Contains("public-safe seeded preview", latest.Body, System.StringComparison.Ordinal);
         Assert.Contains(dispatches, static item =>
-            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001_rust_bazaar", System.StringComparison.Ordinal)
+            string.Equals(item.DispatchId, "dispatch_turn_0001_rust_market_old_favors", System.StringComparison.Ordinal)
             && item.InvolvedDistricts.Any(static district => string.Equals(district, "Rust Bazaar", System.StringComparison.Ordinal)));
         Assert.Contains(dispatches, static item =>
-            string.Equals(item.DispatchId, "ledger_dispatch_emerald-sprawl-prelude_turn_0001_ghostline", System.StringComparison.Ordinal));
+            string.Equals(item.DispatchId, "dispatch_turn_0001_ghostline_rumor_suppressed", System.StringComparison.Ordinal));
     }
 
     [Fact]

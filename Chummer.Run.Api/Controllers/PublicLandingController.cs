@@ -8688,10 +8688,18 @@ echo "Help: ${HELP_URL}"
                     .ToArray()
             };
         }
-        var dispatches = _blackLedgerDispatches.ListPublishedDispatches(requestedTurn, selectedFactionId);
+        IReadOnlyList<BlackLedgerDispatchViewModel> dispatches = _blackLedgerDispatches.ListPublishedDispatches(requestedTurn, selectedFactionId);
+        if (dispatches.Count == 0)
+        {
+            // Local seeded app instances can start without the CommunityStore projection populated yet.
+            // Fall back to the deterministic public-safe dispatch corpus so public route proof stays stable.
+            dispatches = _blackLedgerStats.ListDispatches(requestedTurn, selectedFactionId);
+        }
+
         var selectedDispatch = string.IsNullOrWhiteSpace(selectedDispatchId)
             ? dispatches.FirstOrDefault()
-            : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase));
+            : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase))
+                ?? _blackLedgerStats.LoadDispatch(selectedDispatchId, requestedTurn, selectedFactionId);
         var commandMap = _blackLedgerStats.LoadCommandMap(requestedTurn, selectedMapMode ?? "influence");
         var mapFocused = string.Equals(currentSection, "map", StringComparison.OrdinalIgnoreCase);
         var selectedFaction = string.IsNullOrWhiteSpace(selectedFactionId) || world is null

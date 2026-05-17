@@ -40,11 +40,11 @@ public sealed class BlackLedgerDispatchTests
         var service = new BlackLedgerPublicStatsService(BuildSeedConfiguration());
         var dispatches = service.ListDispatches(1);
 
-        Assert.Contains(dispatches, item => item.DispatchId == "ledger_dispatch_emerald-sprawl-prelude_turn_0001");
-        Assert.Contains(dispatches, item => item.DispatchId == "ledger_dispatch_emerald-sprawl-prelude_turn_0001_rust_bazaar");
-        Assert.Contains(dispatches, item => item.DispatchId == "ledger_dispatch_emerald-sprawl-prelude_turn_0001_ashline_circle");
-        Assert.Contains(dispatches, item => item.DispatchId == "ledger_dispatch_emerald-sprawl-prelude_turn_0001_ghostline");
-        Assert.Contains(dispatches, item => item.DispatchId == "ledger_dispatch_emerald-sprawl-prelude_turn_0001_drone_logistics_overlay");
+        Assert.Contains(dispatches, item => item.DispatchId == "dispatch_turn_0001_main");
+        Assert.Contains(dispatches, item => item.DispatchId == "dispatch_turn_0001_rust_market_old_favors");
+        Assert.Contains(dispatches, item => item.DispatchId == "dispatch_turn_0001_ashline_source_clarity");
+        Assert.Contains(dispatches, item => item.DispatchId == "dispatch_turn_0001_ghostline_rumor_suppressed");
+        Assert.Contains(dispatches, item => item.DispatchId == "dispatch_turn_0001_neon_docks_drone_pressure");
         Assert.All(dispatches, item => Assert.Equal("ledger_tick_0001_preseeded", item.SourceReceiptId));
     }
 
@@ -88,7 +88,7 @@ public sealed class BlackLedgerDispatchTests
         BlackLedgerDispatchMutationResult draftResult = service.CreateDraft(new CreateBlackLedgerDispatchRequest(
             WorldId: "emerald-sprawl-prelude",
             Turn: 1,
-            DispatchId: "ledger_dispatch_emerald-sprawl-prelude_turn_0001",
+            DispatchId: "dispatch_turn_0001_main",
             Adapter: "deterministic_template",
             AutoApproveSeededPreview: false,
             Reviewer: "operator"));
@@ -98,13 +98,13 @@ public sealed class BlackLedgerDispatchTests
         Assert.Null(draftResult.PublicationReceipt);
 
         BlackLedgerDispatchMutationResult approvalResult = service.ApproveDispatch(
-            "ledger_dispatch_emerald-sprawl-prelude_turn_0001",
+            "dispatch_turn_0001_main",
             new ApproveBlackLedgerDispatchRequest("operator"));
 
         Assert.NotNull(approvalResult.ApprovalReceipt);
         Assert.Equal("approved", approvalResult.ApprovalReceipt!.Status);
         Assert.NotNull(approvalResult.PublicationReceipt);
         Assert.NotNull(approvalResult.PublishedDispatch);
-        Assert.Equal("ledger_dispatch_emerald-sprawl-prelude_turn_0001", approvalResult.PublishedDispatch!.DispatchId);
+        Assert.Equal("dispatch_turn_0001_main", approvalResult.PublishedDispatch!.DispatchId);
     }
 }
