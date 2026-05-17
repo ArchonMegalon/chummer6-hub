@@ -65,7 +65,9 @@ if [[ -z "$PYTHON_BIN" ]]; then
 fi
 
 TMP_ROOT="${ROOT_DIR}/.tmp"
-mkdir -p "$TMP_ROOT"
+if ! mkdir -p "$TMP_ROOT" 2>/dev/null || [[ ! -w "$TMP_ROOT" ]]; then
+  TMP_ROOT="${TMPDIR:-/tmp}"
+fi
 TMP_DIR="$(mktemp -d "${TMP_ROOT}/run-services-verification.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 

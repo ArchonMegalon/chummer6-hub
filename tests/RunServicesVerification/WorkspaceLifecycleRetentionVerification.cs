@@ -363,23 +363,38 @@ internal static class WorkspaceLifecycleRetentionVerification
 
     private static string ResolveRepoRoot()
     {
-        string current = AppContext.BaseDirectory;
-        while (!string.IsNullOrWhiteSpace(current))
+        foreach (string seed in EnumerateRepoRootSeeds())
         {
-            if (File.Exists(Path.Combine(current, "WORKLIST.md")) && Directory.Exists(Path.Combine(current, "Chummer.Run.Api")))
+            string current = seed;
+            while (!string.IsNullOrWhiteSpace(current))
             {
-                return current;
-            }
+                if (File.Exists(Path.Combine(current, "WORKLIST.md")) && Directory.Exists(Path.Combine(current, "Chummer.Run.Api")))
+                {
+                    return current;
+                }
 
-            string? parent = Directory.GetParent(current)?.FullName;
-            if (string.Equals(parent, current, StringComparison.Ordinal))
-            {
-                break;
-            }
+                string? parent = Directory.GetParent(current)?.FullName;
+                if (string.Equals(parent, current, StringComparison.Ordinal))
+                {
+                    break;
+                }
 
-            current = parent ?? string.Empty;
+                current = parent ?? string.Empty;
+            }
         }
 
         throw new InvalidOperationException("Unable to resolve the chummer6-hub repo root for retention verification.");
+    }
+
+    private static IEnumerable<string> EnumerateRepoRootSeeds()
+    {
+        string? explicitRoot = Environment.GetEnvironmentVariable("CHUMMER_HUB_REPO_ROOT");
+        if (!string.IsNullOrWhiteSpace(explicitRoot))
+        {
+            yield return explicitRoot;
+        }
+
+        yield return Directory.GetCurrentDirectory();
+        yield return AppContext.BaseDirectory;
     }
 }
