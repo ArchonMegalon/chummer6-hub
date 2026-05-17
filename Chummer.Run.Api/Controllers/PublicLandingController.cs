@@ -8986,7 +8986,7 @@ echo "Help: ${HELP_URL}"
         return new BlackLedgerFactionPromoPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 $"{promo.PublicName} promo",
-                "Public-safe faction onboarding promo artifacts with verified provider posture.",
+                "Public-safe faction onboarding promo artifacts with explicit provider-verification posture.",
                 $"/ledger/factions/{promo.FactionId}/promo",
                 cancellationToken),
             Heading: $"{promo.PublicName} onboarding promo",
