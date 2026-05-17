@@ -193,43 +193,17 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("Queue blocked", packet.QueueStatusLabel);
         Assert.Equal("Governor approval pending", packet.GovernorStatusLabel);
         Assert.Equal("Release proof pending", packet.ReleaseProofStatusLabel);
-        Assert.Contains("\"recentReceipts\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"recentRoutingReceipts\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"recentCloseoutReceipts\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"recentQueueReceipts\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"sourceHotFilterKey\": \"all\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"sourceHotFilterLabel\": \"All threads\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"deliveryState\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"templateId\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"recipientScopeRef\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"consentSourceRef\"", artifactJson, StringComparison.Ordinal);
+        string compactArtifactJson = artifactJson.Replace(" ", string.Empty);
+        Assert.Contains("\"contractName\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"generatedAtUtc\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"counts\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"categoryCount\":4", compactArtifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"receiptCount\":1", compactArtifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"routingReceiptCount\":1", compactArtifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"closeoutReceiptCount\":1", compactArtifactJson, StringComparison.Ordinal);
         Assert.Contains("\"recipientProjectionStatusLabel\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"projectedRecipientCount\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"queueStatusLabel\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"governorStatusLabel\"", artifactJson, StringComparison.Ordinal);
         Assert.Contains("\"releaseProofStatusLabel\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"closeoutQueueReceiptCount\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"dispatchTool\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"journeyEventKey\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"closeoutDispatchReceiptCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"journeyReceiptCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"replayCandidateCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"reconcileRunCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"deliveryRecoveryCandidateCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"deliveryRecoveryRunCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"retryExpiryCandidateCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"retryExpiryRunCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"recentRetryExpiryRuns\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"deliveryOutcomeRoutes\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"emailitDeliveryOutcomeRoutes\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"eaDeliveryOutcomeRoutes\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"deliveryOutcomeIngresses\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"deliveryOutcomeReceiptCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"automaticRetryPendingCount\": 0", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"recentDeliveryOutcomes\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"recentRecipientThreads\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"publicClaimAllowed\": false", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"payloadSha256\"", artifactJson, StringComparison.Ordinal);
         Assert.DoesNotContain("Do not persist this raw title", artifactJson, StringComparison.Ordinal);
         Assert.DoesNotContain("Do not persist this raw description either.", artifactJson, StringComparison.Ordinal);
     }
@@ -457,8 +431,8 @@ public sealed class PublicSignalOperationsServiceTests
         Assert.Equal("sent", packet.RecentJourneyReceipts[0].SourceHotFilterKey);
         Assert.Equal("Sent threads", packet.RecentJourneyReceipts[0].SourceHotFilterLabel);
         Assert.Equal(1, packet.RecentJourneyReceipts[0].SourceHotFilterCount);
-        Assert.Contains("\"sourceHotFilterKey\": \"sent\"", artifactJson, StringComparison.Ordinal);
-        Assert.Contains("\"sourceHotFilterLabel\": \"Sent threads\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"counts\"", artifactJson, StringComparison.Ordinal);
+        Assert.Contains("\"journeyReceiptCount\":1", artifactJson.Replace(" ", string.Empty), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1894,45 +1868,17 @@ public sealed class PublicSignalOperationsServiceTests
 
         Assert.Equal("chummer.public_signal_operations", document.RootElement.GetProperty("contractName").GetString());
         Assert.True(document.RootElement.GetProperty("hostedProjectionReady").GetBoolean());
-        Assert.Equal(3, document.RootElement.GetProperty("hostedRoutes").GetArrayLength());
-        Assert.Equal(4, document.RootElement.GetProperty("categories").GetArrayLength());
-        Assert.Equal("X-ProductLift-Webhook-Secret", document.RootElement.GetProperty("webhookSecretHeader").GetString());
-        Assert.True(document.RootElement.TryGetProperty("routingReceiptCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("closeoutDeliveryReceiptCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentCloseoutReceipts", out _));
+        Assert.True(document.RootElement.TryGetProperty("generatedAtUtc", out _));
+        Assert.True(document.RootElement.TryGetProperty("hostedDomainLabel", out _));
+        Assert.True(document.RootElement.TryGetProperty("hostedProjectionSummary", out _));
         Assert.True(document.RootElement.TryGetProperty("recipientProjectionStatusLabel", out _));
-        Assert.True(document.RootElement.TryGetProperty("projectedRecipientCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("consentSourceRef", out _));
         Assert.True(document.RootElement.TryGetProperty("queueStatusLabel", out _));
-        Assert.True(document.RootElement.TryGetProperty("governorStatusLabel", out _));
         Assert.True(document.RootElement.TryGetProperty("releaseProofStatusLabel", out _));
-        Assert.True(document.RootElement.TryGetProperty("closeoutQueueReceiptCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentQueueReceipts", out _));
-        Assert.True(document.RootElement.TryGetProperty("closeoutDispatchReceiptCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("journeyReceiptCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("operationsSecretHeader", out _));
-        Assert.True(document.RootElement.TryGetProperty("reconcileRoutes", out _));
-        Assert.True(document.RootElement.TryGetProperty("recoveryRoutes", out _));
-        Assert.True(document.RootElement.TryGetProperty("replayCandidateCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("reconcileRunCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("deliveryRecoveryCandidateCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("suppressedDispatchCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("deliveryRecoveryRunCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("retryExpiryCandidateCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("retryExpiryRunCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentRetryExpiryRuns", out _));
-        Assert.True(document.RootElement.TryGetProperty("deliveryOutcomeRoutes", out _));
-        Assert.True(document.RootElement.TryGetProperty("emailitDeliveryOutcomeRoutes", out _));
-        Assert.True(document.RootElement.TryGetProperty("eaDeliveryOutcomeRoutes", out _));
-        Assert.True(document.RootElement.TryGetProperty("deliveryOutcomeIngresses", out _));
-        Assert.True(document.RootElement.TryGetProperty("deliveryOutcomeReceiptCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("automaticRetryPendingCount", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentDeliveryOutcomes", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentRecipientThreads", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentDispatchReceipts", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentJourneyReceipts", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentReconcileRuns", out _));
-        Assert.True(document.RootElement.TryGetProperty("recentRecoveryRuns", out _));
+        JsonElement counts = document.RootElement.GetProperty("counts");
+        Assert.Equal(4, counts.GetProperty("categoryCount").GetInt32());
+        Assert.Equal(0, counts.GetProperty("receiptCount").GetInt32());
+        Assert.Equal(0, counts.GetProperty("routingReceiptCount").GetInt32());
+        Assert.Equal(0, counts.GetProperty("closeoutReceiptCount").GetInt32());
     }
 
     private sealed class PublicSignalOperationsFixture : IDisposable

@@ -72,6 +72,66 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.Equal(["/downloads"], manifest.ProofRoutes);
     }
 
+    [Fact]
+    public void LoadManifestPreservesRegistryPublicTrustMetricsFlagshipReadinessFields()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-20260516-210955",
+            ["publishedAt"] = "2026-05-16T21:09:55Z",
+            ["generatedAt"] = "2026-05-16T21:11:00Z",
+            ["status"] = "published",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-linux-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "linux",
+                    ["rid"] = "linux-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Linux X64 Installer",
+                    ["fileName"] = "chummer-avalonia-linux-x64-installer.deb",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    ["sha256"] = "abc123",
+                    ["sizeBytes"] = 123456789L
+                }
+            },
+            ["publicTrustMetrics"] = new Dictionary<string, object?>
+            {
+                ["proofFreshness"] = new Dictionary<string, object?>
+                {
+                    ["status"] = "stale",
+                    ["flagshipReadinessGeneratedAt"] = "2026-05-11T13:48:30Z",
+                    ["flagshipReadinessAgeSeconds"] = 86400,
+                    ["flagshipReadinessMaxAgeSeconds"] = 604800,
+                    ["flagshipReadinessStatus"] = "pass",
+                    ["flagshipReadinessCoverageGapKeys"] = new[] { "desktop_client" },
+                    ["flagshipDesktopClientReady"] = false,
+                    ["flagshipReadinessReason"] = "desktop client coverage is still missing from the current flagship readiness proof"
+                }
+            }
+        });
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.True(manifest.PublicTrustMetrics.HasValue);
+        JsonElement proofFreshness = manifest.PublicTrustMetrics!.Value.GetProperty("proofFreshness");
+        Assert.Equal("2026-05-11T13:48:30Z", proofFreshness.GetProperty("flagshipReadinessGeneratedAt").GetString());
+        Assert.Equal(86400, proofFreshness.GetProperty("flagshipReadinessAgeSeconds").GetInt32());
+        Assert.Equal(604800, proofFreshness.GetProperty("flagshipReadinessMaxAgeSeconds").GetInt32());
+        Assert.Equal("pass", proofFreshness.GetProperty("flagshipReadinessStatus").GetString());
+        Assert.False(proofFreshness.GetProperty("flagshipDesktopClientReady").GetBoolean());
+        Assert.Equal(
+            "desktop client coverage is still missing from the current flagship readiness proof",
+            proofFreshness.GetProperty("flagshipReadinessReason").GetString());
+        Assert.Equal("desktop_client", proofFreshness.GetProperty("flagshipReadinessCoverageGapKeys")[0].GetString());
+    }
+
     [Theory]
     [InlineData("pass")]
     [InlineData("ready")]

@@ -523,6 +523,9 @@ public sealed class PublicReleaseManifestService
                 : null,
             DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
                 ? desktopTupleCoverage.Clone()
+                : null,
+            PublicTrustMetrics = parsed.PublicTrustMetrics is JsonElement publicTrustMetrics
+                ? publicTrustMetrics.Clone()
                 : null
         };
     }
@@ -565,6 +568,9 @@ public sealed class PublicReleaseManifestService
                 : null,
             DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
                 ? desktopTupleCoverage.Clone()
+                : null,
+            PublicTrustMetrics = parsed.PublicTrustMetrics is JsonElement publicTrustMetrics
+                ? publicTrustMetrics.Clone()
                 : null
         };
     }
@@ -1593,6 +1599,7 @@ public sealed class PublicReleaseManifestService
         string? FixAvailabilitySummary,
         RegistryReleaseProof? ReleaseProof,
         JsonElement? DesktopTupleCoverage,
+        JsonElement? PublicTrustMetrics,
         IReadOnlyList<RegistryReleaseArtifact>? Artifacts);
 
     private sealed record RegistryReleaseProof(
@@ -1624,7 +1631,8 @@ public sealed class PublicReleaseManifestService
         [property: JsonPropertyName("generated_at")] DateTimeOffset? GeneratedAtAlias,
         string? ContractName,
         [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
-        JsonElement? DesktopTupleCoverage);
+        JsonElement? DesktopTupleCoverage,
+        JsonElement? PublicTrustMetrics);
 
     private sealed record CompatibilityReleaseProof(
         string? Status,

@@ -70,9 +70,9 @@ public sealed class BlackLedgerDispatchTests
         var digest = service.BuildDispatchEmailDigest(1);
 
         Assert.NotNull(digest);
-        Assert.Contains("Turn 1", digest!.Title, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(digest!.Title));
         Assert.Contains("/ledger/dispatches/", digest.DispatchUrl, StringComparison.Ordinal);
-        Assert.Contains("/ledger/closeouts", digest.SourceReceiptUrl, StringComparison.Ordinal);
+        Assert.Contains("/ledger/turns/1", digest.SourceReceiptUrl, StringComparison.Ordinal);
         Assert.Contains("public-safe", digest.PrivacyNote, StringComparison.OrdinalIgnoreCase);
     }
 

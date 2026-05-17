@@ -22,7 +22,8 @@ public sealed class BlackLedgerTickNewsTests
         Assert.Contains("[HttpGet(\"/account/ledger/notifications\")]", controller, StringComparison.Ordinal);
         Assert.Contains("Open notifications", accountView, StringComparison.Ordinal);
         Assert.Contains("Signed-in notification rail", notificationsView, StringComparison.Ordinal);
-        Assert.Contains("Open notification status", ledgerView, StringComparison.Ordinal);
+        Assert.Contains("Open notification receipts", accountView, StringComparison.Ordinal);
+        Assert.Contains("pressure, not people", ledgerView, StringComparison.Ordinal);
     }
 
     [Fact]

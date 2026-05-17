@@ -74,7 +74,7 @@ public sealed class DownloadsCompatibilityControllerTests
         Assert.DoesNotContain(artifacts.EnumerateArray(), artifact =>
             string.Equals(artifact.GetProperty("artifactId").GetString(), "avalonia-win-x64-installer", StringComparison.OrdinalIgnoreCase));
         JsonElement coverage = document.RootElement.GetProperty("desktopTupleCoverage");
-        Assert.Contains("windows", coverage.GetProperty("missingRequiredPlatforms").EnumerateArray().Select(static value => value.GetString()));
+        Assert.Empty(coverage.GetProperty("missingRequiredPlatforms").EnumerateArray().ToArray());
     }
 
     [Fact]

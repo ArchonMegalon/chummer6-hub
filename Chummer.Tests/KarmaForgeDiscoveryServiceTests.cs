@@ -44,7 +44,7 @@ public sealed class KarmaForgeDiscoveryServiceTests
             Assert.Equal("packet_normalized", submission.IntakeStatus);
             Assert.Equal("candidate_for_lunacal_followup", submission.QueueStatus);
             Assert.Equal("campaign_overlay_candidate", submission.Candidate.CandidateDecision);
-            Assert.Equal("FacePop -> Deftform -> Icanpreneur", submission.Packet.Source.CanonicalLane);
+            Assert.Equal("Public invitation -> structured pre-screen -> guided synthesis", submission.Packet.Source.CanonicalLane);
             Assert.Contains("availability", submission.Packet.AffectedDomains, StringComparer.Ordinal);
             Assert.Contains("CampaignOverlayPackage", submission.Packet.LikelyChummerObjects, StringComparer.Ordinal);
             Assert.True(submission.Packet.TrustRequirements.PlayerVisibleBeforeJoin);
