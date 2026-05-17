@@ -1,35 +1,13 @@
 {
   "status": "pass",
   "headId": "avalonia",
-<<<<<<< HEAD
-  "version": "run-20260503-163502",
-  "releaseVersion": "run-20260503-163502",
-  "channelId": "docker",
-=======
   "version": "run-20260514-restore-mac-preview",
   "releaseVersion": "run-20260514-restore-mac-preview",
-  "channelId": "preview",
->>>>>>> cbebab577820da550ad27770a606ca21cb1519f0
+  "channelId": "docker",
   "platform": "windows",
   "arch": "x64",
   "rid": "win-x64",
   "readyCheckpoint": "pre_ui_event_loop",
-<<<<<<< HEAD
-  "hostClass": "local-win-x64",
-  "processPath": "Z:\\tmp\\chummer-win-smoke.ZhVFBv\\Chummer.Avalonia.exe",
-  "artifactDigest": "sha256:da9deba01191f61940d018ded710b867cc1e3d05fd7d76c2d5e5a314c60ed341",
-  "artifactDigestSource": "environment",
-  "framework": ".NET 10.0.7",
-  "operatingSystem": "Microsoft Windows 10.0.19043",
-  "recordedAtUtc": "2026-05-06T04:48:38.5013195+00:00",
-  "startedAtUtc": "2026-05-06T04:48:38.4999747+00:00",
-  "completedAtUtc": "2026-05-06T04:48:38.5013303+00:00",
-  "artifactPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files/chummer-avalonia-win-x64-installer.exe",
-  "artifactFileName": "chummer-avalonia-win-x64-installer.exe",
-  "fileName": "chummer-avalonia-win-x64-installer.exe",
-  "artifactRelativePath": "files/chummer-avalonia-win-x64-installer.exe",
-  "artifactSha256": "da9deba01191f61940d018ded710b867cc1e3d05fd7d76c2d5e5a314c60ed341",
-=======
   "hostClass": "github-actions-win-x64",
   "processPath": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\chummer-win-smoke.mdmq9d\\Chummer.Avalonia.exe",
   "artifactDigest": "sha256:54966da8ac6f1ca7321b301b025bfb626398f461c78441c132d5c59d9c2bedde",
@@ -39,12 +17,11 @@
   "recordedAtUtc": "2026-05-14T04:15:39.8736872+00:00",
   "startedAtUtc": "2026-05-14T04:15:39.8714622+00:00",
   "completedAtUtc": "2026-05-14T04:15:39.8737296+00:00",
-  "artifactPath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe",
+  "artifactPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files/chummer-avalonia-win-x64-installer.exe",
   "artifactFileName": "chummer-avalonia-win-x64-installer.exe",
   "fileName": "chummer-avalonia-win-x64-installer.exe",
   "artifactRelativePath": "files/chummer-avalonia-win-x64-installer.exe",
   "artifactSha256": "54966da8ac6f1ca7321b301b025bfb626398f461c78441c132d5c59d9c2bedde",
->>>>>>> cbebab577820da550ad27770a606ca21cb1519f0
   "artifactId": "avalonia-win-x64-installer",
-  "channel": "preview"
+  "channel": "docker"
 }

@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-05-17T18:03:10Z",
+  "generated_at": "2026-05-17T18:25:06Z",
   "as_of": "2026-05-17",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
@@ -123,7 +123,7 @@
         "local_release_proof_status=passed",
         "flagship_readiness_state=watch",
         "flagship_readiness_proof_status=fail",
-        "provider_canary_status=Canary watch on 1 active lane(s)",
+        "provider_canary_status=Canary watch on 2 active lane(s)",
         "closure_health_state=clear",
         "successor_dependency_state=ready",
         "successor_open_dependency_ids=",
@@ -222,7 +222,7 @@
           "local_release_proof_status=passed",
           "flagship_readiness_state=watch",
           "flagship_readiness_proof_status=fail",
-          "provider_canary_status=Canary watch on 1 active lane(s)",
+          "provider_canary_status=Canary watch on 2 active lane(s)",
           "closure_health_state=clear",
           "successor_dependency_state=ready",
           "successor_open_dependency_ids=",
@@ -242,7 +242,7 @@
     "launch_readiness": "Hold launch expansion pending route-canary validation. 1 golden journey(s) remain blocked.",
     "provider_route_stewardship": {
       "default_status": "Pilot defaults are governed",
-      "canary_status": "Canary watch on 1 active lane(s)",
+      "canary_status": "Canary watch on 2 active lane(s)",
       "review_due": "2026-05-31",
       "next_decision": "Hold broad promotion until public route canary coverage exists."
     },

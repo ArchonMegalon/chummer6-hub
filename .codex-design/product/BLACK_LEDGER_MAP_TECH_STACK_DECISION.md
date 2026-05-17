@@ -2,29 +2,29 @@
 
 ## Current shipped decision
 
-Phase 1 ships as:
+Current public shipping posture:
 
-- ASP.NET Razor view
-- first-party canvas geoscape globe
-- requestAnimationFrame motion state machine
-- first-party SVG tactical shell as fallback only
-- route-backed onboarding and faction promo integration
+- ASP.NET Razor integration
+- first-party canvas geoscape renderer
+- API-backed faction/event/arc/replay data binding
+- bounded SVG tactical shell retained as fallback only
+- reduced-motion and list fallback built into the same surface
 
 ## Why
 
 - low dependency risk
 - no provider branding
 - works inside the current Hub runtime
-- public-safe fallback is first-class instead of an afterthought
-- the primary object is now a large globe instead of a flat shell
+- keeps globe rendering first-class while preserving a bounded fallback
 
 ## Upgrade path
 
-If the command map needs heavier rendering later, upgrade behind the same contracts:
+If the geoscape needs heavier rendering later, upgrade behind the same contracts:
 
 - Three.js
 - deck.gl
-- CesiumJS
+- PixiJS
 - GSAP
+- custom WebGL layers
 
 Those dependencies may render. They must not own truth.
