@@ -98,6 +98,18 @@ public sealed record PublicReleaseManifestDto(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ContractNameAlias => ContractName;
 
+    [JsonPropertyName("versionRole")]
+    public string VersionRole => "artifact_identity";
+
+    [JsonPropertyName("displayVersion")]
+    public string DisplayVersion => ResolveDisplayVersion(Version, Channel, RolloutState);
+
+    [JsonPropertyName("displayBuildLabel")]
+    public string DisplayBuildLabel => ResolveDisplayBuildLabel(Version, Channel, RolloutState);
+
+    [JsonPropertyName("displayChannelLabel")]
+    public string DisplayChannelLabel => ResolveDisplayChannelLabel(Channel, RolloutState);
+
     [JsonPropertyName("releaseProof")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public PublicReleaseProofDto? ReleaseProof =>
@@ -126,6 +138,33 @@ public sealed record PublicReleaseManifestDto(
 
     [JsonIgnore]
     public JsonElement? ProofUiLocalizationReleaseGate { get; init; }
+
+    private static string ResolveDisplayVersion(string? version, string? channel, string? rolloutState)
+        => IsPublicStable(channel, rolloutState)
+            ? "current-public-build"
+            : string.IsNullOrWhiteSpace(version)
+                ? "unpublished"
+                : version.Trim();
+
+    private static string ResolveDisplayBuildLabel(string? version, string? channel, string? rolloutState)
+        => IsPublicStable(channel, rolloutState)
+            ? "Current public build"
+            : string.IsNullOrWhiteSpace(version)
+                ? "Unpublished build"
+                : $"Build {version.Trim()}";
+
+    private static string ResolveDisplayChannelLabel(string? channel, string? rolloutState)
+        => IsPublicStable(channel, rolloutState)
+            ? "Public release"
+            : string.Equals((channel ?? string.Empty).Trim(), "preview", StringComparison.OrdinalIgnoreCase)
+                ? "Preview channel"
+                : string.IsNullOrWhiteSpace(channel)
+                    ? "Release channel"
+                    : channel.Trim();
+
+    private static bool IsPublicStable(string? channel, string? rolloutState)
+        => string.Equals((channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
+           && string.Equals((rolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed record PublicReleaseProofDto(
