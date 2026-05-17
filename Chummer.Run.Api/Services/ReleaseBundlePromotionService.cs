@@ -1381,7 +1381,12 @@ public sealed class ReleaseBundlePromotionService
         string normalizedChannel = NormalizeToken(channel);
         if (proofPassed)
         {
-            return normalizedChannel is "preview" or "docker"
+            if (normalizedChannel is "stable" or "public_stable" or "docker")
+            {
+                return "public_stable";
+            }
+
+            return normalizedChannel == "preview"
                 ? "promoted_preview"
                 : normalizedChannel;
         }
@@ -1435,9 +1440,13 @@ public sealed class ReleaseBundlePromotionService
         }
 
         return proofPassed
-            ? string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal)
-                ? "gold_supported"
-                : "preview_supported"
+            ? NormalizeToken(channel) switch
+            {
+                "public_stable" => "gold_supported",
+                "stable" => "gold_supported",
+                "docker" => "gold_supported",
+                _ => "preview_supported",
+            }
             : "review_required";
     }
 
@@ -1474,7 +1483,7 @@ public sealed class ReleaseBundlePromotionService
             ?? [];
         if (journeys.Count == 0)
         {
-            return string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal)
+            return NormalizeToken(channel) is "public_stable" or "stable" or "docker"
                 ? "Gold release proof passed for the current shelf."
                 : "Local release proof passed for the current shelf.";
         }
@@ -1498,7 +1507,7 @@ public sealed class ReleaseBundlePromotionService
         string noteSuffix = proofNotes.Count > 0
             ? " " + string.Join(" ", proofNotes)
             : string.Empty;
-        return $"{(string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal) ? "Gold release proof passed" : "Local release proof passed")} for: {string.Join(", ", journeys)}.{noteSuffix}";
+        return $"{(NormalizeToken(channel) is "public_stable" or "stable" or "docker" ? "Gold release proof passed" : "Local release proof passed")} for: {string.Join(", ", journeys)}.{noteSuffix}";
     }
 
     private static string DeriveKnownIssueSummary(
@@ -1549,7 +1558,7 @@ public sealed class ReleaseBundlePromotionService
         string proofNoteClause = proofNotes.Count > 0
             ? ", " + string.Join(", ", proofNotes)
             : string.Empty;
-        if (string.Equals(NormalizeToken(channel), "public_stable", StringComparison.Ordinal))
+        if (NormalizeToken(channel) is "public_stable" or "stable" or "docker")
         {
             return "No blocking release caveat is mirrored for the current public shelf. The promoted routes have recent install"
                 + proofNoteClause

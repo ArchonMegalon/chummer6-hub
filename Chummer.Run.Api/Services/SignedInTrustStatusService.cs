@@ -4,6 +4,7 @@ using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
+using System.Text.Json;
 
 namespace Chummer.Run.Api.Services;
 
@@ -73,9 +74,9 @@ public sealed class SignedInTrustStatusService
                 BuildSignedInInstallCautionSummary(manifest, latestInstallation, followThrough)),
             new(
                 "Adoption health",
-                pulse is null
-                    ? BuildReleaseProofSummary(manifest)
-                    : BuildTrustPulseAdoptionSummary(pulse)),
+                ShouldUseManifestAdoptionSummary(pulse)
+                    ? BuildManifestAdoptionSummary(manifest)
+                    : BuildTrustPulseAdoptionSummary(pulse!)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new(
                 "Support follow-through",
@@ -190,7 +191,7 @@ public sealed class SignedInTrustStatusService
             return releaseExperience.Display.ChannelLabel;
         }
 
-        return HumanizeToken(channel, "Current preview");
+        return HumanizeToken(channel, "Current release");
     }
 
     private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
@@ -203,11 +204,55 @@ public sealed class SignedInTrustStatusService
 
         if (!string.IsNullOrWhiteSpace(manifest.SupportabilityState))
         {
-            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current preview")}";
+            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current release")}";
         }
 
         return proof;
     }
+
+    private static string BuildManifestAdoptionSummary(PublicReleaseManifestDto manifest)
+    {
+        if (manifest.PublicTrustMetrics is JsonElement metrics
+            && metrics.ValueKind == JsonValueKind.Object
+            && metrics.TryGetProperty("adoptionHealth", out JsonElement adoptionHealth)
+            && adoptionHealth.ValueKind == JsonValueKind.Object)
+        {
+            string? summary = TryGetJsonString(adoptionHealth, "summary");
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                return summary!;
+            }
+
+            string? status = TryGetJsonString(adoptionHealth, "status");
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                return $"Adoption health is {HumanizeToken(status, "unknown").ToLowerInvariant()}.";
+            }
+        }
+
+        return BuildReleaseProofSummary(manifest);
+    }
+
+    private static bool ShouldUseManifestAdoptionSummary(PublicTrustPulseSnapshot? pulse)
+    {
+        if (pulse is null)
+        {
+            return true;
+        }
+
+        bool proofUnknown = string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus)
+            || string.Equals(pulse.LocalReleaseProofStatus, "unknown", StringComparison.OrdinalIgnoreCase);
+        bool noEvidence = (!pulse.ProvenJourneyCount.HasValue || pulse.ProvenJourneyCount.Value <= 0)
+            && (!pulse.ProvenRouteCount.HasValue || pulse.ProvenRouteCount.Value <= 0);
+        return proofUnknown && noEvidence;
+    }
+
+    private static string? TryGetJsonString(JsonElement element, string propertyName)
+        => element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out JsonElement value)
+            && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
 
     private static string BuildSignedInInstallRecommendationSummary(
         PublicReleaseManifestDto manifest,

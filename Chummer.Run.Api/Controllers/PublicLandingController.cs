@@ -694,10 +694,12 @@ public sealed class PublicLandingController : Controller
             }
 
             string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
+            string hubLocalReleaseProofUrl = BuildAbsoluteUrl("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json");
             string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
             string command = BuildReleaseUploadBootstrapCommand(
                 bootstrapUrl,
                 ComputeSha256Hex(bootstrapTemplate),
+                hubLocalReleaseProofUrl,
                 ReleaseUploadTicketEnvironmentVariable,
                 ticket.Ticket);
             var model = new ReleaseUploadPageViewModel(
@@ -815,10 +817,12 @@ public sealed class PublicLandingController : Controller
         }
 
         string bootstrapUrl = BuildAbsoluteUrl("/downloads/release-upload/bootstrap.sh");
+        string hubLocalReleaseProofUrl = BuildAbsoluteUrl("/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json");
         string bootstrapTemplate = System.IO.File.ReadAllText(templatePath);
         string command = BuildReleaseUploadBootstrapCommand(
             bootstrapUrl,
             ComputeSha256Hex(bootstrapTemplate),
+            hubLocalReleaseProofUrl,
             releaseUploadAuthEnvironmentVariable,
             releaseUploadAuth);
 
@@ -5302,7 +5306,7 @@ public sealed class PublicLandingController : Controller
             return releaseExperience.Display.ChannelLabel;
         }
 
-        return HumanizeToken(channel, "Current preview");
+        return HumanizeToken(channel, "Current release");
     }
 
     private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows(
@@ -5320,9 +5324,9 @@ public sealed class PublicLandingController : Controller
             new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
             new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
-            new("Adoption health", pulse is null
-                ? BuildReleaseProofSummary(manifest)
-                : BuildTrustPulseAdoptionSummary(pulse))
+            new("Adoption health", ShouldUseManifestAdoptionSummary(pulse)
+                ? BuildManifestAdoptionSummary(manifest)
+                : BuildTrustPulseAdoptionSummary(pulse!))
         ];
     }
 
@@ -5336,18 +5340,59 @@ public sealed class PublicLandingController : Controller
 
         if (!string.IsNullOrWhiteSpace(manifest.SupportabilityState))
         {
-            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current preview")}";
+            return $"{proof} · {HumanizeToken(manifest.SupportabilityState, "Current release")}";
         }
 
         return proof;
+    }
+
+    private static string BuildManifestAdoptionSummary(PublicReleaseManifestDto manifest)
+    {
+        if (manifest.PublicTrustMetrics is JsonElement metrics
+            && metrics.ValueKind == JsonValueKind.Object
+            && metrics.TryGetProperty("adoptionHealth", out JsonElement adoptionHealth)
+            && adoptionHealth.ValueKind == JsonValueKind.Object)
+        {
+            string? summary = TryGetJsonString(adoptionHealth, "summary");
+            if (!string.IsNullOrWhiteSpace(summary))
+            {
+                return summary!;
+            }
+
+            string? status = TryGetJsonString(adoptionHealth, "status");
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                return $"Adoption health is {HumanizeToken(status, "unknown").ToLowerInvariant()}.";
+            }
+        }
+
+        return BuildReleaseProofSummary(manifest);
+    }
+
+    private static bool ShouldUseManifestAdoptionSummary(PublicTrustPulseSnapshot? pulse)
+    {
+        if (pulse is null)
+        {
+            return true;
+        }
+
+        bool proofUnknown = string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus)
+            || string.Equals(pulse.LocalReleaseProofStatus, "unknown", StringComparison.OrdinalIgnoreCase);
+        bool noEvidence = (!pulse.ProvenJourneyCount.HasValue || pulse.ProvenJourneyCount.Value <= 0)
+            && (!pulse.ProvenRouteCount.HasValue || pulse.ProvenRouteCount.Value <= 0);
+        return proofUnknown && noEvidence;
     }
 
     private static string BuildLiveLaunchSummary(PublicReleaseManifestDto manifest)
     {
         int openPublicCount = manifest.Downloads.Count(static artifact =>
             !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
+        int accountRequiredCount = manifest.Downloads.Count(static artifact =>
+            string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
         string shelfSummary = openPublicCount switch
         {
+            <= 0 when accountRequiredCount > 0
+                => $"No open-public artifacts are live on the shelf right now. {accountRequiredCount} signed-in guided install route(s) remain available on the shelf right now.",
             <= 0 => "No open-public artifacts are live on the shelf right now.",
             1 => "1 open-public artifact is live on the shelf right now.",
             _ => $"{openPublicCount} open-public artifacts are live on the shelf right now."
@@ -5371,7 +5416,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildPreviewLaunchSummary(
         PublicReleaseManifestDto manifest,
         ReleaseExperienceViewModel releaseExperience)
-        => $"{HumanizeToken(manifest.RolloutState, "Current preview")} on {releaseExperience.Display.ChannelLabel} {manifest.Version}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+        => $"{HumanizeToken(manifest.RolloutState, "Current release")} on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
     {
@@ -8684,10 +8729,18 @@ echo "Help: ${HELP_URL}"
                     .ToArray()
             };
         }
-        var dispatches = _blackLedgerDispatches.ListPublishedDispatches(requestedTurn, selectedFactionId);
+        IReadOnlyList<BlackLedgerDispatchViewModel> dispatches = _blackLedgerDispatches.ListPublishedDispatches(requestedTurn, selectedFactionId);
+        if (dispatches.Count == 0)
+        {
+            // Local seeded app instances can start without the CommunityStore projection populated yet.
+            // Fall back to the deterministic public-safe dispatch corpus so public route proof stays stable.
+            dispatches = _blackLedgerStats.ListDispatches(requestedTurn, selectedFactionId);
+        }
+
         var selectedDispatch = string.IsNullOrWhiteSpace(selectedDispatchId)
             ? dispatches.FirstOrDefault()
-            : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase));
+            : dispatches.FirstOrDefault(item => string.Equals(item.DispatchId, selectedDispatchId, StringComparison.OrdinalIgnoreCase))
+                ?? _blackLedgerStats.LoadDispatch(selectedDispatchId, requestedTurn, selectedFactionId);
         var commandMap = _blackLedgerStats.LoadCommandMap(requestedTurn, selectedMapMode ?? "influence");
         var mapFocused = string.Equals(currentSection, "map", StringComparison.OrdinalIgnoreCase);
         var selectedFaction = string.IsNullOrWhiteSpace(selectedFactionId) || world is null
@@ -8974,7 +9027,7 @@ echo "Help: ${HELP_URL}"
         return new BlackLedgerFactionPromoPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 $"{promo.PublicName} promo",
-                "Public-safe faction onboarding promo artifacts with verified provider posture.",
+                "Public-safe faction onboarding promo artifacts with explicit provider-verification posture.",
                 $"/ledger/factions/{promo.FactionId}/promo",
                 cancellationToken),
             Heading: $"{promo.PublicName} onboarding promo",
@@ -9028,6 +9081,7 @@ echo "Help: ${HELP_URL}"
     private static string BuildReleaseUploadBootstrapCommand(
         string bootstrapUrl,
         string bootstrapSha256,
+        string hubLocalReleaseProofUrl,
         string releaseUploadAuthEnvironmentVariable,
         string releaseUploadAuth)
     {
@@ -9039,7 +9093,8 @@ echo "Help: ${HELP_URL}"
             "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
             "CHUMMER_RELEASE_CHANNEL='preview' " +
             "CHUMMER_ALLOW_UNSIGNED_PREVIEW='1' " +
-            "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='0' " +
+            "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='1' " +
+            "CHUMMER_HUB_LOCAL_RELEASE_PROOF_URL=" + SingleQuoteShellValue(hubLocalReleaseProofUrl) + " " +
             "CHUMMER_RELEASE_UPLOAD_ALLOW_DIRECT_FALLBACK='0' " +
             "CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE='0' " +
             "CHUMMER_RELEASE_UPLOAD_MAX_ATTEMPTS='4' " +
