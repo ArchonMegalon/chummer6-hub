@@ -278,8 +278,8 @@ internal sealed class PublicReleaseExperienceDocument
     public string InstallHelpLabel { get; init; } = string.Empty;
     public string InstallHelpHref { get; init; } = string.Empty;
     public string UpdatePostureSummary { get; init; } = string.Empty;
-    public string DefaultPublicChannelLabel { get; init; } = "Preview channel";
-    public string UnpublishedBuildLabel { get; init; } = "Current preview build";
+    public string DefaultPublicChannelLabel { get; init; } = "Public release";
+    public string UnpublishedBuildLabel { get; init; } = "Current public build";
     public string BuildLabelPrefix { get; init; } = "Build";
     public List<PublicReleaseChannelLabelDocument>? PublicChannelLabels { get; init; }
     public string GuestGateHeading { get; init; } = string.Empty;

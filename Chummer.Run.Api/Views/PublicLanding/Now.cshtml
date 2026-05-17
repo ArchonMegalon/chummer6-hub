@@ -136,7 +136,7 @@
         <div class="evidence-row-list">
             <article class="evidence-row">
                 <div class="evidence-row__copy">
-                    <h3>Current preview</h3>
+                    <h3>Current release</h3>
                     <p>@Model.ReleaseExperience.ReleaseNotesSummary</p>
                 </div>
                 <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
@@ -144,7 +144,7 @@
             <article class="evidence-row">
                 <div class="evidence-row__copy">
                     <h3>Known issues and install help</h3>
-                    <p>Check download help and known issues before you commit a fresh device to the preview.</p>
+                    <p>Check download help and known issues before you commit a fresh device to the current shelf.</p>
                 </div>
                 <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
             </article>
@@ -153,12 +153,12 @@
                     <h3>Update path</h3>
                     <p>@Model.ReleaseExperience.UpdatePostureSummary</p>
                 </div>
-                <span class="readiness-tag">Preview channel</span>
+                <span class="readiness-tag">@Model.ReleaseExperience.Display.ChannelLabel</span>
             </article>
             <article class="evidence-row">
                 <div class="evidence-row__copy">
                     <h3>First launch should show a finished runner fast</h3>
-                    <p>The current desktop preview bundles <code class="mono-receipt">Soma-Career.chum5</code>. Open Chummer, click <code class="mono-receipt">Load Demo Runner</code>, and use that completed character to inspect the workbench before you build from scratch.</p>
+                    <p>The current desktop release bundles <code class="mono-receipt">Soma-Career.chum5</code>. Open Chummer, click <code class="mono-receipt">Load Demo Runner</code>, and use that completed character to inspect the workbench before you build from scratch.</p>
                 </div>
                 <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
             </article>
@@ -169,7 +169,7 @@
 <section class="workflow-band" id="now-proof">
     <div class="workflow-band__lead">
         <p class="eyebrow">What you can verify now</p>
-        <h2 class="editorial-title">Three proof cards that show the preview is more than a landing page story</h2>
+        <h2 class="editorial-title">Three proof cards that show the release is more than a landing page story</h2>
         <p class="editorial-copy">These cards stay focused on real product behavior: builder truth, explanation trail, and continuity under drift.</p>
     </div>
     <div class="workflow-grid">
