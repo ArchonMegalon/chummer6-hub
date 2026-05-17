@@ -291,7 +291,7 @@ public sealed class PublicLandingController : Controller
             .ToArray();
         var windowsProofInstallers = _windowsProofInstallers.LoadCatalog(
             surfacedWindowsArtifactIds);
-        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current preview, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync("Downloads", "Install the current public release, compare package types, and keep release integrity in view.", "/downloads", cancellationToken);
         chrome = RebindDownloadsHeaderActions(chrome, releaseExperience);
         var accessPosture = _releaseSelection.BuildPublicAccessPosture(manifest, releaseExperience);
         var model = new DownloadsPageViewModel(
@@ -3936,7 +3936,7 @@ public sealed class PublicLandingController : Controller
             return new HomePrimaryActionViewModel(
                 "Devices & access",
                 "Link this copy",
-                "You already have a signed-in download handoff. Open Devices and access to claim the install instead of starting over.",
+                "You already have an account-backed install path. Open Devices and access to claim the install instead of starting over.",
                 "Open Devices and access",
                 "/account/access",
                 "primary");
@@ -3944,7 +3944,7 @@ public sealed class PublicLandingController : Controller
 
         return new HomePrimaryActionViewModel(
             "Current release",
-            "Stay on the current preview",
+            "Stay on the current release",
             "Check the current release posture, your linked devices, and what changed before you spend attention on optional contribution work.",
             "See what works today",
             "/now",
