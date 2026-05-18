@@ -36,8 +36,16 @@ def _stable_payload(payload):
     return payload
 
 
-def _sorted_unique_strings(values: list[str]) -> list[str]:
-    return sorted({str(value).strip() for value in values if str(value).strip()})
+def _unique_strings_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        normalized = str(value).strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return ordered
 
 
 def _load_existing_payload(path: Path) -> dict | None:
@@ -771,7 +779,7 @@ def main() -> int:
             "report_cluster_release_notify",
             "organize_community_and_close_loop",
         ],
-        "proof_routes": _sorted_unique_strings([
+        "proof_routes": _unique_strings_preserve_order([
             "/downloads/install/avalonia-linux-x64-installer",
             "/home/access",
             "/home/work",
