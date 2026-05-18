@@ -36,6 +36,10 @@ def _stable_payload(payload):
     return payload
 
 
+def _sorted_unique_strings(values: list[str]) -> list[str]:
+    return sorted({str(value).strip() for value in values if str(value).strip()})
+
+
 def _load_existing_payload(path: Path) -> dict | None:
     if not path.is_file():
         return None
@@ -767,7 +771,7 @@ def main() -> int:
             "report_cluster_release_notify",
             "organize_community_and_close_loop",
         ],
-        "proof_routes": [
+        "proof_routes": _sorted_unique_strings([
             "/downloads/install/avalonia-linux-x64-installer",
             "/home/access",
             "/home/work",
@@ -778,7 +782,7 @@ def main() -> int:
             "/downloads",
             "/downloads/install/avalonia-osx-arm64-installer",
             "/downloads/install/avalonia-win-x64-installer",
-        ],
+        ]),
         "proof_receipts": [
             {
                 "receipt_id": "desktop_native_claim_and_recovery",

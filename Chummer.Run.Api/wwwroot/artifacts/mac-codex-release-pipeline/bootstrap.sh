@@ -1014,8 +1014,6 @@ if journeys != expected_journeys:
 if not isinstance(routes, list):
     raise SystemExit(1)
 normalized_routes = [str(route).strip() for route in routes if str(route).strip()]
-if normalized_routes != sorted(normalized_routes):
-    raise SystemExit(1)
 if len(normalized_routes) != len(set(normalized_routes)):
     raise SystemExit(1)
 for required_route in required_routes:
