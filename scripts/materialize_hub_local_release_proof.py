@@ -11,7 +11,10 @@ from pathlib import Path
 M102_SUCCESSOR_FRONTIER_ID = 2897065929
 M102_ACTIVE_FLAGSHIP_FRONTIER_ID = 2594403904
 M102_FRONTIER_IDS = [M102_SUCCESSOR_FRONTIER_ID, M102_ACTIVE_FLAGSHIP_FRONTIER_ID]
-DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+FALLBACK_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+CANONICAL_COMPOSE_FILE = "docker-compose.yml"
+CANONICAL_PLAYWRIGHT_TIMEOUT_SECONDS = 120
 M141_UI_PACKAGE_ID = "next90-m141-ui-capture-direct-screenshot-and-runtime-proof-for-translator-xml-amendment"
 M141_UI_FRONTIER_ID = 2354698282
 M141_UI_FLAGSHIP_FRONTIER_ID = 1922169755
@@ -46,6 +49,15 @@ def _load_existing_payload(path: Path) -> dict | None:
 def _configured_path(name: str, default: Path) -> Path:
     raw = str(os.environ.get(name) or "").strip()
     return Path(raw) if raw else default
+
+
+def _flagship_readiness_path() -> Path:
+    raw = str(os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH") or "").strip()
+    if raw:
+        return Path(raw)
+    if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
+        return DEFAULT_FLAGSHIP_READINESS_PATH
+    return FALLBACK_FLAGSHIP_READINESS_PATH
 
 
 def _parse_int_env(*names: str, default: int) -> int:
@@ -92,7 +104,7 @@ def _payload_is_fresh(payload: dict, *, max_age_seconds: int, max_future_skew_se
 
 
 def _load_flagship_readiness_snapshot() -> dict:
-    readiness_path = _configured_path("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH", DEFAULT_FLAGSHIP_READINESS_PATH)
+    readiness_path = _flagship_readiness_path()
     default_reason = "flagship product readiness proof did not publish a desktop-client reason."
     snapshot = {
         "status": "unknown",
@@ -745,8 +757,8 @@ def main() -> int:
             for package in successor_queue_packages
         },
         "base_url": base_url,
-        "compose_file": compose_file,
-        "playwright_timeout_seconds": int(timeout_seconds),
+        "compose_file": CANONICAL_COMPOSE_FILE,
+        "playwright_timeout_seconds": CANONICAL_PLAYWRIGHT_TIMEOUT_SECONDS,
         "edge_rebuild_skipped": skip_rebuild.lower() in {"1", "true"},
         "journeys_passed": [
             "install_claim_restore_continue",
