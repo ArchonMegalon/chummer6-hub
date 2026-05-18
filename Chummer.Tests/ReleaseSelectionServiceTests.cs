@@ -419,10 +419,9 @@ platforms:
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
         Assert.Equal("Install on Mac", recommended.ActionLabel);
-        Assert.Equal("/downloads/install/avalonia-osx-arm64-installer", recommended.DispatchHref);
+        Assert.Equal("/downloads/file/avalonia-osx-arm64-installer", recommended.DispatchHref);
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
-        Assert.Contains("one Terminal command", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("verifies the published DMG digest", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("published Mac DMG immediately", recommended.SupportLine, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
         Assert.True(service.UsesMacBootstrapScript(recommended.Artifact));
     }
@@ -694,12 +693,12 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4)", authenticated: false);
 
         var recommended = Assert.IsType<ReleaseOptionViewModel>(experience.Recommended);
-        Assert.Equal("Open guided Mac install", recommended.ActionLabel);
+        Assert.Equal("Sign in to install on Mac", recommended.ActionLabel);
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
         Assert.StartsWith("/signup?next=", recommended.DispatchHref, StringComparison.Ordinal);
-        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);
+        Assert.Contains("%2Fdownloads%2Ffile%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);
         Assert.Equal("Continue with Google", experience.GuestGateSecondaryLabel);
-        Assert.Equal("/auth/google/start?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", experience.GuestGateSecondaryHref);
+        Assert.Equal("/auth/google/start?next=%2Fdownloads%2Ffile%2Favalonia-osx-arm64-installer", experience.GuestGateSecondaryHref);
         Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
     }
 

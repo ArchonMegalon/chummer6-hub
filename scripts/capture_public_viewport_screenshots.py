@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import tempfile
 import textwrap
@@ -14,9 +15,10 @@ import requests
 
 from absolute_completion_common import LocalHubApp, completion_path, now_iso, write_text
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 ROUTES = [
-    {"path": "/", "label": "landing", "needle": "Open downloads"},
+    {"path": "/", "label": "landing", "needle": "Download Chummer"},
     {"path": "/packages", "label": "packages", "needle": "Packages"},
     {"path": "/mobile", "label": "mobile", "needle": "Mobile"},
     {"path": "/play", "label": "play", "needle": "Play"},
@@ -124,7 +126,17 @@ def run(base_url: str) -> int:
                 encoding="utf-8",
             )
             node_path.write_text(NODE_SCRIPT, encoding="utf-8")
-            subprocess.run(["node", str(node_path), str(config_path), str(json_path)], check=True, cwd=Path(temp_dir))
+            env = os.environ.copy()
+            node_path_entries = [str(REPO_ROOT / "node_modules")]
+            if env.get("NODE_PATH"):
+                node_path_entries.append(env["NODE_PATH"])
+            env["NODE_PATH"] = os.pathsep.join(node_path_entries)
+            subprocess.run(
+                ["node", str(node_path), str(config_path), str(json_path)],
+                check=True,
+                cwd=REPO_ROOT,
+                env=env,
+            )
             payload = json.loads(json_path.read_text(encoding="utf-8"))
         manifest_payload = {
             "contract_name": "chummer.public_screenshot_manifest",

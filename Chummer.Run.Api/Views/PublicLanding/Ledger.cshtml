@@ -63,6 +63,7 @@
         "Attrition Risk" => "Heat and volatility increase it.",
         _ => "District control, heat, and verified receipts move it."
     };
+    Func<string, string> districtAnchorId = id => $"district-{id}";
     Func<string, IReadOnlyList<BlackLedgerDistrictViewModel>> factionDistrictsFor = id =>
         (IReadOnlyList<BlackLedgerDistrictViewModel>)(Model.World?.Districts
             .Where(district => string.Equals(district.DominantFaction.Replace(' ', '-'), factionSlug(id), StringComparison.OrdinalIgnoreCase))
@@ -151,8 +152,8 @@
                         </g>
                         @foreach (var district in Model.World.Districts)
                         {
-                            <a href="#district-@district.Id" aria-label="@district.Summary" data-region-link="@district.Id">
-                                <polygon class="ledger-world-shell__district ledger-command-map__district" points="@district.PolygonPoints" tabindex="0">
+                            <a href="#@districtAnchorId(district.Id)" aria-label="@district.Summary" data-region-link="@district.Id" id="map-@districtAnchorId(district.Id)">
+                                <polygon id="@districtAnchorId(district.Id)-shape" class="ledger-world-shell__district ledger-command-map__district" points="@district.PolygonPoints" tabindex="0" data-region-id="@district.Id">
                                     <title>@district.Name</title>
                                 </polygon>
                             </a>
@@ -161,6 +162,21 @@
                     <p class="muted-copy">Fallback only. If canvas is unavailable, the bounded tactical shell stays readable and keyboard-safe.</p>
                 </div>
             </div>
+        </div>
+        <div class="ledger-world-shell__districts route-choice-grid route-choice-grid--three" aria-label="District fallback cards">
+            @foreach (var district in Model.World.Districts.Take(6))
+            {
+                <article class="route-choice-card" id="@districtAnchorId(district.Id)" data-map-district-card="@district.Id">
+                    <span class="tag">@district.DominantFaction</span>
+                    <h3>@district.Name</h3>
+                    <p>@district.Summary</p>
+                    <div class="trust-claim__microproof">
+                        <span>Heat: @district.Heat</span>
+                        <span>Influence: @district.Influence</span>
+                        <span>Confidence: @district.Confidence</span>
+                    </div>
+                </article>
+            }
         </div>
     </section>
 
@@ -191,7 +207,7 @@
             {
                 var slug = factionSlug(faction.Id);
                 var ledgers = buildLedgers(faction.Id).Take(4).ToArray();
-                <article class="faction-profile-card">
+                <article class="faction-profile-card" data-faction-card="@slug">
                     <div class="faction-profile-card__hero" style="background-image:url('@backgroundHref(faction.Id)')">
                         <img class="faction-profile-card__logo" src="@logoHref(faction.Id)" alt="@($"{faction.PublicName} logo")" loading="lazy" />
                         <div class="faction-profile-card__hero-copy">
@@ -215,7 +231,7 @@
                         <span>Video: fallback storyboard</span>
                         <span>Receipt: @(Model.World.LastTick?.ReceiptId ?? "turn-1")</span>
                     </div>
-                    <a class="editorial-strip__action" href="/ledger/factions/@slug">Open faction file</a>
+                    <a class="editorial-strip__action" href="/ledger/factions/@slug" data-faction-file-link="@slug">Open faction file</a>
                 </article>
             }
         </div>

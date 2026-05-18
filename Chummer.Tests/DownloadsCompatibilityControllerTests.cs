@@ -176,7 +176,7 @@ public sealed class DownloadsCompatibilityControllerTests
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("%2Fdownloads%2Ffile%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 
     [Fact]

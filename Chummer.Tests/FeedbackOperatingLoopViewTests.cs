@@ -17,6 +17,10 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.Contains("Open milestone ledger", view, StringComparison.Ordinal);
         Assert.Contains("Browse roadmap", view, StringComparison.Ordinal);
         Assert.Contains("Open changelog", view, StringComparison.Ordinal);
+        Assert.Contains("This page stays public-facing on purpose.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("_PublicSignalOperationsPacket", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("_PublicSignalProjectionPacket", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("How this board is handled", view, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -16,7 +16,7 @@ test('black ledger faction index and dedicated pages exist for the seeded six', 
   await page.goto(`${baseUrl}/ledger/factions`, { waitUntil: 'networkidle' });
 
   for (const faction of factions) {
-    await expect(page.locator(`a[href="/ledger/factions/${faction.slug}"]`)).toHaveCount(1);
+    await expect(page.locator(`[data-faction-card="${faction.slug}"] [data-faction-file-link="${faction.slug}"]`)).toHaveCount(1);
     await expect(page.locator('#ledger-factions')).toContainText(faction.name);
   }
 
@@ -25,7 +25,8 @@ test('black ledger faction index and dedicated pages exist for the seeded six', 
     await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'networkidle' });
     await expect(page.locator('#ledger-faction-file')).toContainText(faction.name);
     await expect(page.locator('#ledger-faction-file')).toContainText('Package pressure');
-    await expect(page.locator('#ledger-privacy')).toContainText('This page explains pressure, not people.');
+    await expect(page.locator('#ledger-faction-file')).toContainText('Safety: public-safe');
+    await expect(page.locator('#ledger-faction-file')).toContainText('Video: storyboard fallback');
     visited.push(`/ledger/factions/${faction.slug}`);
   }
 

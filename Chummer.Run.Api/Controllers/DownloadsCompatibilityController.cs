@@ -186,7 +186,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         if (_releaseSelection.RequiresAccount(artifact))
         {
-            return Redirect(BuildInstallLoginHref(encodedArtifactId));
+            return Redirect(BuildInstallLoginHref(artifact));
         }
 
         var dispatch = _installLinking.IssueDownload(manifest, artifact, null, null);
@@ -265,7 +265,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         var subject = await TryGetOptionalSubjectAsync(cancellationToken);
         if (subject is null && _releaseSelection.RequiresAccount(artifact))
         {
-            return Redirect(BuildInstallLoginHref(Uri.EscapeDataString(artifact.Id)));
+            return Redirect(BuildInstallLoginHref(artifact));
         }
 
         ApplyRouteProofHeaders(
@@ -339,7 +339,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         if (_releaseSelection.RequiresAccount(artifact))
         {
-            return Redirect(BuildInstallLoginHref(encodedArtifactId));
+            return Redirect(BuildInstallLoginHref(artifact));
         }
 
         ApplyRouteProofHeaders(
@@ -492,8 +492,19 @@ public sealed class DownloadsCompatibilityController : ControllerBase
         string State,
         string? BoundedFailureReason);
 
-    private static string BuildInstallLoginHref(string encodedArtifactId)
-        => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{encodedArtifactId}")}";
+    private static string BuildInstallLoginHref(PublicReleaseArtifactDto artifact)
+    {
+        string encodedArtifactId = Uri.EscapeDataString(artifact.Id);
+        bool macInstaller = string.Equals((artifact.PlatformId ?? string.Empty).Trim(), "osx-arm64", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((artifact.PlatformId ?? string.Empty).Trim(), "osx-x64", StringComparison.OrdinalIgnoreCase)
+            || string.Equals((artifact.Arch ?? string.Empty).Trim(), "arm64", StringComparison.OrdinalIgnoreCase)
+               && (artifact.FileName ?? artifact.Url ?? string.Empty).EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
+            || (artifact.FileName ?? artifact.Url ?? string.Empty).EndsWith(".dmg", StringComparison.OrdinalIgnoreCase);
+        string nextPath = macInstaller
+            ? $"/downloads/file/{encodedArtifactId}"
+            : $"/downloads/install/{encodedArtifactId}";
+        return $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}";
+    }
 
     private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveManifestArtifact(string artifactId)
     {
