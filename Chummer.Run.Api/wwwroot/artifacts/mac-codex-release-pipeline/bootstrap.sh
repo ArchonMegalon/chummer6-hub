@@ -994,20 +994,34 @@ expected_journeys = [
     "report_cluster_release_notify",
     "organize_community_and_close_loop",
 ]
-expected_routes = [
+required_routes = [
     "/downloads/install/avalonia-linux-x64-installer",
     "/home/access",
     "/home/work",
+    "/account/access",
     "/account/work",
     "/account/support",
     "/contact",
+    "/downloads",
+    "/downloads/install/avalonia-osx-arm64-installer",
+    "/downloads/install/avalonia-win-x64-installer",
 ]
 
 if status not in {"pass", "passed", "ready"}:
     raise SystemExit(1)
 if journeys != expected_journeys:
     raise SystemExit(1)
-if routes != expected_routes:
+if not isinstance(routes, list):
+    raise SystemExit(1)
+normalized_routes = [str(route).strip() for route in routes if str(route).strip()]
+if normalized_routes != sorted(normalized_routes):
+    raise SystemExit(1)
+if len(normalized_routes) != len(set(normalized_routes)):
+    raise SystemExit(1)
+for required_route in required_routes:
+    if required_route not in normalized_routes:
+        raise SystemExit(1)
+if "/account/access" not in normalized_routes or "/account/work" not in normalized_routes:
     raise SystemExit(1)
 PY
 }
