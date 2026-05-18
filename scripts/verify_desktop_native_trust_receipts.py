@@ -20,7 +20,8 @@ LANDED_COMMIT = "160af58f"
 FRONTIER_ID = 2897065929
 CURRENT_LOCAL_PROOF_FLOOR_COMMIT = "94dd7d42"
 CURRENT_LOCAL_PROOF_FLOOR_SUBJECT = "Tighten M102 compressed base32/base85 helper proof guard"
-DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+DEFAULT_FLAGSHIP_READINESS_PATH = Path("/docker/chummercomplete/chummer.run-services/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
+FALLBACK_FLAGSHIP_READINESS_PATH = Path("/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json")
 
 REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Controllers/InstallLinkingController.cs"): [
@@ -1235,8 +1236,13 @@ def _served_proof_path(repo_root: Path) -> Path:
 
 
 def _flagship_readiness_path() -> Path:
-    configured = _configured_path("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH", DEFAULT_FLAGSHIP_READINESS_PATH)
-    return configured if configured.is_absolute() else configured.resolve()
+    raw = str(os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH") or "").strip()
+    if raw:
+        configured = Path(raw)
+        return configured if configured.is_absolute() else configured.resolve()
+    if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
+        return DEFAULT_FLAGSHIP_READINESS_PATH
+    return FALLBACK_FLAGSHIP_READINESS_PATH
 
 
 def _should_verify_served_proof_matches_published() -> bool:
