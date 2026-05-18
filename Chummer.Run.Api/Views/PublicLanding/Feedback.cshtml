@@ -7,8 +7,6 @@
         ? "/participate/codex"
         : "/auth/google/start?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
-    var signalProjection = Model.SignalProjection;
-    var signalOperations = Model.SignalOperations;
     var followSettingsHref = signalLoop.FollowSettingsHref;
     var followSettingsLabel = signalLoop.FollowSettingsLabel;
     var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
@@ -133,24 +131,13 @@
     <p class="muted-copy">Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback.</p>
 </section>
 
-@if (signalProjection is not null || signalOperations is not null)
-{
-    <section class="editorial-block">
-        <details class="details-drawer">
-            <summary>How this board is handled</summary>
-            <div class="stacked-copy">
-                @if (signalProjection is not null)
-                {
-                    @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
-                }
-                @if (signalOperations is not null)
-                {
-                    @await Html.PartialAsync("~/Views/Shared/_PublicSignalOperationsPacket.cshtml", signalOperations)
-                }
-            </div>
-        </details>
-    </section>
-}
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Public-safe boundary</p>
+        <h2 class="editorial-title">This page stays public-facing on purpose.</h2>
+        <p class="editorial-copy">Use the public board for safe ideas and safe bugs. If the issue needs logs, account history, recovery, or operator follow-up, leave this page and use Help.</p>
+    </div>
+</section>
 
 <section class="status-decision-strip" aria-label="Signal loop snapshot">
     <article class="status-decision-strip__card">
