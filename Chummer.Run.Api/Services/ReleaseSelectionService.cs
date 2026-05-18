@@ -270,12 +270,15 @@ public sealed class ReleaseSelectionService
         var guestDownloadAllowed = !requiresAccount;
         var artifactId = Uri.EscapeDataString(download.Id);
         var usesMacBootstrap = UsesMacBootstrapFlow(download);
+        var directFileHref = $"/downloads/file/{artifactId}";
         var dispatchHref = authenticated
-            ? $"/downloads/install/{artifactId}"
+            ? usesMacBootstrap
+                ? directFileHref
+                : $"/downloads/install/{artifactId}"
             : usesMacBootstrap
                 ? requiresAccount
                     ? BuildSignupDispatchHref(download)
-                    : BuildLoginDispatchHref(download)
+                    : directFileHref
                 : requiresAccount
                     ? BuildSignupDispatchHref(download)
                     : $"/downloads/get/{artifactId}";
@@ -284,7 +287,7 @@ public sealed class ReleaseSelectionService
             Artifact: download with { InstallAccessClass = accessClass },
             Title: OptionTitle(download, recommended),
             DispatchHref: dispatchHref,
-            DirectFileHref: $"/downloads/file/{artifactId}",
+            DirectFileHref: directFileHref,
             PlatformLabel: PlatformLabel(download),
             HeadLabel: HeadLabel(download),
             SizeLabel: SizeLabel(download.SizeBytes),
@@ -351,13 +354,18 @@ public sealed class ReleaseSelectionService
     }
 
     private static string BuildSignupDispatchHref(PublicReleaseArtifactDto artifact)
-        => $"/signup?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
+        => $"/signup?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
 
     private static string BuildLoginDispatchHref(PublicReleaseArtifactDto artifact)
-        => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
+        => $"/auth/google/start?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
 
     private static string BuildGoogleDispatchHref(PublicReleaseArtifactDto artifact)
-        => $"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{Uri.EscapeDataString(artifact.Id)}")}";
+        => $"/auth/google/start?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
+
+    private static string BuildSignedInDispatchTarget(PublicReleaseArtifactDto artifact)
+        => UsesMacBootstrapFlow(artifact)
+            ? $"/downloads/file/{Uri.EscapeDataString(artifact.Id)}"
+            : $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}";
 
     private static string ResolveInstallAccessClass(string channel, string? rawAccessClass, PublicReleaseExperienceDocument experience)
     {
@@ -501,10 +509,10 @@ public sealed class ReleaseSelectionService
         if (UsesMacBootstrapFlow(download))
         {
             return authenticated
-                ? "Open the Mac install handoff. It gives you one Terminal command, verifies the published DMG digest, and confirms the selected apps wrote a linked install receipt successfully."
+                ? "Download the published Mac DMG immediately. If you want the guided Terminal flow or install-link follow-through, you can still open that route separately."
                 : string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Create an account for the Mac guided installer. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps."
-                    : "Sign in for the Mac guided installer. The signed-in handoff gives you a short-lived Terminal command that verifies the DMG and installs the selected Chummer apps.";
+                ? "Create an account to download the Mac DMG immediately and keep recovery or install follow-through attached if you need it later."
+                    : "Download the Mac DMG immediately, or sign in if you want recovery and install follow-through tied back to your account.";
         }
 
         if (authenticated)
@@ -545,8 +553,8 @@ public sealed class ReleaseSelectionService
             }
 
             return string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Open guided Mac install"
-                : "Sign in for Mac install";
+                ? "Sign in to install on Mac"
+                : "Install on Mac";
         }
 
         if (authenticated)

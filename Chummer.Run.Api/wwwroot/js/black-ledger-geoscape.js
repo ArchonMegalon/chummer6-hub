@@ -107,6 +107,14 @@ class BlackLedgerGeoscapeRoot {
     this.lastTimestamp = 0;
   }
 
+  syncModeState() {
+    this.root.dataset.currentMode = this.state.mode;
+    const mapShell = this.root.closest('.ledger-command-map');
+    if (mapShell) {
+      mapShell.dataset.currentMode = this.state.mode;
+    }
+  }
+
   async init() {
     this.mount();
     try {
@@ -117,7 +125,7 @@ class BlackLedgerGeoscapeRoot {
       this.currentData = mapDocument;
       this.deltaData = deltaDocument;
       this.state.mode = this.resolveMode(this.state.mode, mapDocument.modes);
-      this.root.dataset.currentMode = this.state.mode;
+      this.syncModeState();
       this.root.dataset.replayState = 'idle';
       this.buildModel();
       this.renderControls();
@@ -252,6 +260,10 @@ class BlackLedgerGeoscapeRoot {
       source: regionById.get(arc.sourceRegionId),
       target: regionById.get(arc.targetRegionId),
     })).filter((arc) => arc.source && arc.target);
+    this.root.dataset.factionCount = String(this.factionNodes.length);
+    this.root.dataset.eventCount = String(this.events.length);
+    this.root.dataset.arcCount = String(this.arcs.length);
+    this.root.dataset.districtCount = String(data.regions.length);
   }
 
   renderControls() {
@@ -282,12 +294,12 @@ class BlackLedgerGeoscapeRoot {
       : '<p class="muted-copy">Accessible fallback list for faction focus, hotspots, and replay state.</p>';
     const factionItems = this.factionNodes.map((faction) => `
       <li>
-        <button type="button" class="black-ledger-geoscape__list-button" data-faction-select="${faction.slug}">
+        <button type="button" class="black-ledger-geoscape__list-button" data-faction-select="${faction.slug}" data-faction-id="${faction.slug}">
           <strong>${faction.name}</strong>
           <span>${this.variant === 'teaser' ? faction.type : `${faction.type} · ${faction.publicSummary}`}</span>
         </button>
       </li>`).join('');
-    const eventItems = this.events.slice(0, 4).map((event) => `<li><strong>${event.title}</strong><span>${event.summary}</span></li>`).join('');
+    const eventItems = this.events.slice(0, 4).map((event) => `<li data-event-id="${slugify(event.eventId || event.title)}"><strong>${event.title}</strong><span>${event.summary}</span></li>`).join('');
     this.fallbackList.innerHTML = `
       ${intro}
       <div class="black-ledger-geoscape__list-grid">
@@ -393,7 +405,7 @@ class BlackLedgerGeoscapeRoot {
 
   setMode(mode) {
     this.state.mode = mode;
-    this.root.dataset.currentMode = mode;
+    this.syncModeState();
     this.modeButtons.forEach((button) => {
       const active = button.getAttribute('data-mode') === mode;
       button.classList.toggle('is-active', active);

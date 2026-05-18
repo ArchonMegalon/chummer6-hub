@@ -7,7 +7,7 @@ namespace Chummer.Tests;
 public sealed class PublicationWorkflowSurfaceProjectionTests
 {
     [Fact]
-    public void PublishedPublicationProjectsFirstPartyRoutesAndModeratedProofRefs()
+    public void PublishedPublicationProjectsTrustAndModerationProjections()
     {
         PublicationWorkflowService workflow = new();
 
@@ -26,20 +26,26 @@ public sealed class PublicationWorkflowSurfaceProjectionTests
             Notes: "live"), reviewed.Publication!.ConcurrencyToken).Publication
             ?? throw new InvalidOperationException("Expected a published projection.");
 
-        Assert.NotNull(published.SurfaceRoutes);
-        Assert.Equal($"/artifacts/publications/{published.PublicationId}", published.SurfaceRoutes!.PublicShelfRoute);
-        Assert.Equal($"/artifacts/publications/{published.PublicationId}/concierge", published.SurfaceRoutes.CreatorConciergeRoute);
-        Assert.Equal($"/testimonials/concierge?publicationId={published.PublicationId}", published.SurfaceRoutes.TestimonialConciergeRoute);
-        Assert.Equal($"/account/work/publications/{published.PublicationId}", published.SurfaceRoutes.SignedInShelfRoute);
+        Assert.NotNull(published.TrustProjection);
+        Assert.True(published.TrustProjection!.Discoverable);
+        Assert.Equal("curated-live", published.TrustProjection.RankingBand);
+        Assert.Contains("shared visibility", published.TrustProjection.TrustSummary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("discovery", published.TrustProjection.DiscoverySummary, StringComparison.OrdinalIgnoreCase);
 
-        Assert.NotNull(published.MediaAssetRefs);
-        Assert.Equal("published", published.MediaAssetRefs!.ModerationState);
-        Assert.NotNull(published.MediaAssetRefs.ModeratedAtUtc);
-        Assert.Equal($"/artifacts/publications/{published.PublicationId}", published.MediaAssetRefs.CreatorAssetRefs!["public-shelf"]);
-        Assert.Equal($"/artifacts/publications/{published.PublicationId}/concierge", published.MediaAssetRefs.CreatorAssetRefs["creator-concierge"]);
-        Assert.Equal($"/account/work/publications/{published.PublicationId}", published.MediaAssetRefs.CreatorAssetRefs["signed-in-shelf"]);
-        Assert.Equal($"public-shelf:/artifacts/publications/{published.PublicationId}", published.MediaAssetRefs.ModeratedPublicProofAssetRefs!["route-receipt"]);
-        Assert.Equal($"registry://publications/{published.PublicationId}/trust", published.MediaAssetRefs.ModeratedPublicProofAssetRefs["trust-projection"]);
-        Assert.Equal($"/testimonials/concierge?publicationId={published.PublicationId}", published.MediaAssetRefs.ModeratedPublicProofAssetRefs["testimonial-concierge"]);
+        Assert.Equal("published", published.ModerationTimeline.CurrentStage);
+        Assert.Equal("moderation-watch", published.ModerationTimeline.PendingDecision);
+        Assert.False(published.ModerationTimeline.OperatorAttentionRequired);
+        Assert.Contains("Published artifacts remain visible", published.ModerationTimeline.ProjectionReason, StringComparison.Ordinal);
+
+        Assert.Equal(3, published.ApprovalAuditTrail.Count);
+        Assert.Collection(
+            published.ApprovalAuditTrail,
+            submitted => Assert.Equal("submitted", submitted.Outcome),
+            reviewed => Assert.Equal("approved", reviewed.Outcome),
+            publishedEntry =>
+            {
+                Assert.Equal("published", publishedEntry.Outcome);
+                Assert.True(publishedEntry.ApprovalBacked);
+            });
     }
 }

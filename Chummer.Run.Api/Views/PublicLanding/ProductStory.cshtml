@@ -4,21 +4,6 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-story";
     var leadAsset = Model.Assets.BySlot("scene_archive_stair");
-    var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-
-    string ContextualPreviewHref(string? href)
-    {
-        var resolvedHref = string.IsNullOrWhiteSpace(href) ? "/downloads" : href;
-        if (
-            guestNeedsInstallGate
-            && string.Equals(resolvedHref, "/downloads", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            return Model.ReleaseExperience.GuestGatePrimaryHref ?? resolvedHref;
-        }
-
-        return resolvedHref;
-    }
 }
 
 <section class="story-cinematic">
