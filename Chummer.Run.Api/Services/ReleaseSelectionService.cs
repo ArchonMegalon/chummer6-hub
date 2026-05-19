@@ -137,7 +137,7 @@ public sealed class ReleaseSelectionService
             .Where(IsInstaller)
             .Select(download => download with
             {
-                InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, download, experience)
+                InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, manifest.RolloutState, download, experience)
             })
             .OrderBy(HeadPriority)
             .ThenBy(static download => string.Equals((download.Arch ?? string.Empty).Trim(), "x64", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
@@ -171,6 +171,7 @@ public sealed class ReleaseSelectionService
 
     public PublicAccessPostureViewModel BuildPublicAccessPosture(PublicReleaseManifestDto manifest, ReleaseExperienceViewModel releaseExperience)
     {
+        manifest = ApplyAccessPolicy(manifest);
         var guestPlatforms = DistinctPlatformFamilies(manifest.Downloads.Where(download => !RequiresAccount(download)));
         var accountPlatforms = DistinctPlatformFamilies(manifest.Downloads.Where(download => RequiresAccount(download)));
         var guestInstallAvailable = releaseExperience.GuestDownloadAvailable || guestPlatforms.Count > 0;
@@ -186,11 +187,11 @@ public sealed class ReleaseSelectionService
         if (guestInstallAvailable && accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still use an account-backed install path.";
-            createAccountSummary = "Public downloads are available now on some platforms. Create an account when you want the account-backed install path, recovery, tracked support, or linked install history on the same return path.";
+            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach install continuity from the first handoff.";
+            createAccountSummary = "Public downloads are available now on some platforms. Create an account when you want guided recovery, tracked support, or linked install history on the same return path.";
             signInSummary = "Sign in to reopen the same account-backed install handoff, recovery path, and support history.";
             downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to any route that still uses an account-backed install path.";
+            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to any route that still uses a signed-in handoff.";
         }
         else if (guestInstallAvailable)
         {
@@ -204,11 +205,11 @@ public sealed class ReleaseSelectionService
         else if (accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
-            accountValueSummary = "The account does not change the published file. It is part of the current install path, and it keeps recovery, tracked support, and linked install history on the same return path.";
-            createAccountSummary = "Create the account first. The current install path uses an account-backed handoff so recovery, support, and install return stay attached from the first launch.";
+            accountValueSummary = "The account does not change the published file. It is part of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            createAccountSummary = "Create the account first. The current install handoff keeps recovery, support, and install return attached from the first launch.";
             signInSummary = "Sign in to continue the current install handoff and reopen the same recovery and support path.";
             downloadFaqAnswer = $"Yes for the current route. {GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
-            accountFaqAnswer = "Account creation is the start of the current install path, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            accountFaqAnswer = "Account creation is the start of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
         }
         else
         {
@@ -237,7 +238,7 @@ public sealed class ReleaseSelectionService
         var normalized = manifest.Downloads.FirstOrDefault(item => string.Equals(item.Id, download.Id, StringComparison.OrdinalIgnoreCase))
             ?? download with
             {
-                InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, download, LoadExperience())
+                InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, manifest.RolloutState, download, LoadExperience())
             };
         return BuildNormalizedOption(normalized, authenticated, recommended);
     }
@@ -258,7 +259,7 @@ public sealed class ReleaseSelectionService
                 .Where(download => IsPublicShelfVisible(download, manifest, experience, platformAcceptance))
                 .Select(download => download with
                 {
-                    InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, download, experience)
+                    InstallAccessClass = ResolveEffectiveInstallAccessClass(manifest.Channel, manifest.RolloutState, download, experience)
                 })
                 .ToArray()
         };
@@ -272,13 +273,11 @@ public sealed class ReleaseSelectionService
         var usesMacBootstrap = UsesMacBootstrapFlow(download);
         var directFileHref = $"/downloads/file/{artifactId}";
         var dispatchHref = authenticated
-            ? usesMacBootstrap
-                ? directFileHref
-                : $"/downloads/install/{artifactId}"
+            ? $"/downloads/install/{artifactId}"
             : usesMacBootstrap
                 ? requiresAccount
                     ? BuildSignupDispatchHref(download)
-                    : directFileHref
+                    : $"/downloads/install/{artifactId}"
                 : requiresAccount
                     ? BuildSignupDispatchHref(download)
                     : $"/downloads/get/{artifactId}";
@@ -363,12 +362,19 @@ public sealed class ReleaseSelectionService
         => $"/auth/google/start?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
 
     private static string BuildSignedInDispatchTarget(PublicReleaseArtifactDto artifact)
-        => UsesMacBootstrapFlow(artifact)
-            ? $"/downloads/file/{Uri.EscapeDataString(artifact.Id)}"
-            : $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}";
+        => $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}";
 
-    private static string ResolveInstallAccessClass(string channel, string? rawAccessClass, PublicReleaseExperienceDocument experience)
+    private static string ResolveInstallAccessClass(
+        string channel,
+        string? rolloutState,
+        string? rawAccessClass,
+        PublicReleaseExperienceDocument experience)
     {
+        if (string.Equals((rolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase))
+        {
+            return InstallAccessClasses.OpenPublic;
+        }
+
         var guestReadableChannels = ResolveGuestReadableChannels(experience);
         var guestReadableChannel = guestReadableChannels.Contains(channel);
         var normalized = NormalizeInstallAccessClass(rawAccessClass);
@@ -386,11 +392,10 @@ public sealed class ReleaseSelectionService
 
     private static string ResolveEffectiveInstallAccessClass(
         string channel,
+        string? rolloutState,
         PublicReleaseArtifactDto download,
         PublicReleaseExperienceDocument experience)
-        => UsesMacBootstrapFlow(download)
-            ? InstallAccessClasses.AccountRequired
-            : ResolveInstallAccessClass(channel, download.InstallAccessClass, experience);
+        => ResolveInstallAccessClass(channel, rolloutState, download.InstallAccessClass, experience);
 
     private static HashSet<string> ResolveGuestReadableChannels(PublicReleaseExperienceDocument experience)
         => (experience.GuestReadableChannels ?? new List<string> { DefaultGuestReadableChannel })
@@ -720,6 +725,14 @@ public sealed class ReleaseSelectionService
             return true;
         }
 
+        if (UsesMacBootstrapFlow(download)
+            && string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+            && HasExplicitArtifactProof(manifest, download))
+        {
+            return true;
+        }
+
         if (string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
         {
             return false;
@@ -730,10 +743,11 @@ public sealed class ReleaseSelectionService
         {
             return string.Equals(manifest.Status, "published", StringComparison.OrdinalIgnoreCase)
                    && UsesMacBootstrapFlow(download)
-                   && string.Equals(
-                       ResolveEffectiveInstallAccessClass(manifest.Channel, download, experience),
-                       InstallAccessClasses.AccountRequired,
-                       StringComparison.OrdinalIgnoreCase)
+                   && (string.Equals((manifest.RolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase)
+                       || string.Equals(
+                           ResolveEffectiveInstallAccessClass(manifest.Channel, manifest.RolloutState, download, experience),
+                           InstallAccessClasses.AccountRequired,
+                           StringComparison.OrdinalIgnoreCase))
                    && HasExplicitArtifactProof(manifest, download);
         }
 
@@ -861,13 +875,13 @@ public sealed class ReleaseSelectionService
     {
         if (platforms.Count == 0)
         {
-            return "The current route still uses an account-backed install path.";
+            return "The current route still uses a guided install handoff so linking, recovery, and support stay attached from the first launch.";
         }
 
         var labels = FormatPlatformList(platforms);
         return platforms.Count == 1
-            ? $"{labels} still uses an account-backed install path so recovery and support stay attached from the first launch."
-            : $"{labels} still use an account-backed install path so recovery and support stay attached from the first launch.";
+            ? $"{labels} still uses a guided install handoff so linking, recovery, and support stay attached from the first launch."
+            : $"{labels} still use a guided install handoff so linking, recovery, and support stay attached from the first launch.";
     }
 
     private static string FormatPlatformList(IReadOnlyList<string> platforms)
@@ -933,9 +947,9 @@ public sealed class ReleaseSelectionService
         PublicReleaseArtifactDto promotedDownload,
         DesktopPlatformAcceptancePlatformDocument? platform)
     {
-        if (UsesMacBootstrapFlow(promotedDownload) && string.Equals(NormalizeInstallAccessClass(promotedDownload.InstallAccessClass), InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase))
+        if (UsesMacBootstrapFlow(promotedDownload))
         {
-            return "The current public shelf uses the signed-in Mac install handoff as the live install path. It gives you one Terminal command for your personalized install.";
+            return "The current public shelf publishes the Mac DMG directly and keeps the guided install handoff available when you want linking, recovery, and support to stay attached from the first launch.";
         }
 
         var packageKind = PackageKindLabel(promotedDownload.Kind);
