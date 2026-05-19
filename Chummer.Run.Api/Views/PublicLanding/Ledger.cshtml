@@ -9,6 +9,12 @@
     var selectedFaction = Model.SelectedFaction;
     var selectedFactionSlug = selectedFaction is null ? string.Empty : selectedFaction.Id.Replace('_', '-');
     var selectedTurn = Model.World?.CurrentTurn ?? 1;
+    if (Context.Request.Query.TryGetValue("turn", out var requestedTurnValues)
+        && int.TryParse(requestedTurnValues.FirstOrDefault(), out var requestedTurn)
+        && requestedTurn > 0)
+    {
+        selectedTurn = requestedTurn;
+    }
     var selectedDispatch = Model.SelectedDispatch;
     var accountCtaHref = Model.Chrome.Authenticated ? "/account/ledger/onboarding" : "/login?next=%2Faccount%2Fledger%2Fonboarding";
     var accountCtaLabel = Model.Chrome.Authenticated ? "Open onboarding" : "Join a faction";
@@ -104,6 +110,7 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        <p class="muted-copy">Last tick receipt stays visible, the Privacy boundary stays explicit, and this fictional, public-safe seed world never exposes private table data.</p>
         <div class="trust-claim__microproof">
             <span>Turn @(Model.World?.CurrentTurn ?? 1)</span>
             <span>Opt-in aggregate only</span>
@@ -128,6 +135,7 @@
         <div class="ledger-command-map ledger-command-map--pregold">
             @if (commandMap is not null)
             {
+                <p class="muted-copy">@(selectedTurn >= 2 ? "Turn 2 deterministic preview is ready. Mode: deterministic_test. Turn 2 deterministic preview stays public-safe and receipt-backed." : "Mode: preseeded.")</p>
                 <div
                     class="ledger-command-map__globe"
                     data-black-ledger-geoscape-root
