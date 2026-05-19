@@ -332,10 +332,15 @@ canonicalize_release_channel_registries() {
   fi
 
   python3 - "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$manifest_path" <<'PY'
+from __future__ import annotations
+
 import importlib.util
 import json
 import sys
 from pathlib import Path
+
+def normalized_token(value) -> str:
+    return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 verifier_path = Path(sys.argv[1])
 manifest_path = Path(sys.argv[2])
@@ -346,9 +351,40 @@ assert spec.loader is not None
 spec.loader.exec_module(module)
 
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
+
+coverage = payload.get("desktopTupleCoverage")
+if isinstance(coverage, dict):
+    coverage["externalProofRequests"] = module.expected_external_proof_request_rows(payload)
+    coverage["desktopRouteTruth"] = module.expected_desktop_route_truth_rows(payload)
+payload["installAwareArtifactRegistry"] = module.expected_install_aware_artifact_registry_rows(payload)
 payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+payload["artifactIdentityRegistry"] = module.expected_artifact_identity_registry_rows(payload)
+payload["artifactPublicationBindings"] = module.expected_artifact_publication_binding_rows(payload)
 payload["publicTrustMetrics"] = module.expected_public_trust_metrics(payload)
+
+trust_release_channel = payload.get("publicTrustMetrics", {}).get("releaseChannel", {})
+trust_supportability_state = normalized_token(trust_release_channel.get("supportabilityState"))
+if normalized_token(payload.get("status")) == "published" and trust_supportability_state:
+    payload["supportabilityState"] = trust_supportability_state
+    if trust_supportability_state == "review_required":
+        payload["supportabilitySummary"] = (
+            "Proof freshness is missing or stale on this shelf, so review is still required before this release can be treated as supportable."
+        )
+        payload["knownIssueSummary"] = (
+            "Proof freshness is missing or stale on this shelf, so preview publication is visible but not yet gold-ready."
+        )
+
+# Recompute verifier-owned registry surfaces once more after supportability/trust normalization
+# so carried-forward manifests cannot keep stale dependent rows such as desktopSurfaceRefs.
+coverage = payload.get("desktopTupleCoverage")
+if isinstance(coverage, dict):
+    coverage["externalProofRequests"] = module.expected_external_proof_request_rows(payload)
+    coverage["desktopRouteTruth"] = module.expected_desktop_route_truth_rows(payload)
+payload["installAwareArtifactRegistry"] = module.expected_install_aware_artifact_registry_rows(payload)
+payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+payload["artifactIdentityRegistry"] = module.expected_artifact_identity_registry_rows(payload)
+payload["artifactPublicationBindings"] = module.expected_artifact_publication_binding_rows(payload)
+payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
 manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
 }

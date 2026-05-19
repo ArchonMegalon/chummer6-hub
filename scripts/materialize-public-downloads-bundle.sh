@@ -78,6 +78,28 @@ resolve_ui_downloads_path() {
   echo "$PRESENTATION_ROOT/Docker/Downloads/$relative_path"
 }
 
+resolve_public_release_channel_source() {
+  local explicit_path="${CHUMMER_PUBLIC_RELEASE_CHANNEL_SOURCE:-}"
+  if [[ -n "$explicit_path" ]]; then
+    echo "$explicit_path"
+    return 0
+  fi
+
+  local candidate
+  for candidate in \
+    "$REGISTRY_ROOT/.codex-studio/published/RELEASE_CHANNEL.generated.json" \
+    "$REPO_ROOT/Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json" \
+    "$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")"
+  do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+
+  echo "$(resolve_ui_downloads_path "RELEASE_CHANNEL.generated.json")"
+}
+
 RUNSERVICES_SOURCE_FILES_ROOT="${CHUMMER_RUNSERVICES_SOURCE_FILES_ROOT:-$REPO_ROOT/legacy/tooling/docker/Docker/Downloads/files}"
 PRESENTATION_FILES_ROOT="${CHUMMER_PRESENTATION_FILES_ROOT:-$(resolve_ui_downloads_path "files")}"
 PRESENTATION_STARTUP_SMOKE_ROOT="${CHUMMER_PRESENTATION_STARTUP_SMOKE_ROOT:-$(resolve_ui_downloads_path "startup-smoke")}"
@@ -92,6 +114,7 @@ PUBLIC_RELEASE_PROOF_BASE_URL="${CHUMMER_PUBLIC_RELEASE_PROOF_BASE_URL:-https://
 DISABLED_ARTIFACT_IDS="${CHUMMER_PUBLIC_DISABLED_ARTIFACT_IDS:-${CHUMMER_RELEASE_DISABLED_ARTIFACT_IDS:-}}"
 FORCE_ACCOUNT_REQUIRED_DOWNLOADS="${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-false}"
 REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-$REPO_ROOT/../chummer-hub-registry}"
+PUBLIC_RELEASE_CHANNEL_SOURCE_PATH="$(resolve_public_release_channel_source)"
 
 detect_auto_disabled_artifact_ids() {
   local files_root="$1"
@@ -180,10 +203,15 @@ canonicalize_release_channel_registries() {
   fi
 
   python3 - "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$manifest_path" <<'PY'
+from __future__ import annotations
+
 import importlib.util
 import json
 import sys
 from pathlib import Path
+
+def normalized_token(value) -> str:
+    return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 verifier_path = Path(sys.argv[1])
 manifest_path = Path(sys.argv[2])
@@ -194,9 +222,38 @@ assert spec.loader is not None
 spec.loader.exec_module(module)
 
 payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
+
+coverage = payload.get("desktopTupleCoverage")
+if isinstance(coverage, dict):
+    coverage["externalProofRequests"] = module.expected_external_proof_request_rows(payload)
+    coverage["desktopRouteTruth"] = module.expected_desktop_route_truth_rows(payload)
+payload["installAwareArtifactRegistry"] = module.expected_install_aware_artifact_registry_rows(payload)
 payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+payload["artifactIdentityRegistry"] = module.expected_artifact_identity_registry_rows(payload)
+payload["artifactPublicationBindings"] = module.expected_artifact_publication_binding_rows(payload)
 payload["publicTrustMetrics"] = module.expected_public_trust_metrics(payload)
+
+trust_release_channel = payload.get("publicTrustMetrics", {}).get("releaseChannel", {})
+trust_supportability_state = normalized_token(trust_release_channel.get("supportabilityState"))
+if normalized_token(payload.get("status")) == "published" and trust_supportability_state:
+    payload["supportabilityState"] = trust_supportability_state
+    if trust_supportability_state == "review_required":
+        payload["supportabilitySummary"] = (
+            "Proof freshness is missing or stale on this shelf, so review is still required before this release can be treated as supportable."
+        )
+        payload["knownIssueSummary"] = (
+            "Proof freshness is missing or stale on this shelf, so preview publication is visible but not yet gold-ready."
+        )
+
+coverage = payload.get("desktopTupleCoverage")
+if isinstance(coverage, dict):
+    coverage["externalProofRequests"] = module.expected_external_proof_request_rows(payload)
+    coverage["desktopRouteTruth"] = module.expected_desktop_route_truth_rows(payload)
+payload["installAwareArtifactRegistry"] = module.expected_install_aware_artifact_registry_rows(payload)
+payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+payload["artifactIdentityRegistry"] = module.expected_artifact_identity_registry_rows(payload)
+payload["artifactPublicationBindings"] = module.expected_artifact_publication_binding_rows(payload)
+payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
 manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
 }
@@ -269,7 +326,7 @@ mkdir -p "$combined_files_root" "$combined_startup_smoke_root" "$generated_root"
 copy_public_artifacts "$RUNSERVICES_SOURCE_FILES_ROOT" "$combined_files_root"
 copy_public_artifacts "$PRESENTATION_FILES_ROOT" "$combined_files_root"
 
-AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PRESENTATION_RELEASE_CHANNEL_PATH" | paste -sd, -)"
+AUTO_DISABLED_ARTIFACT_IDS="$(detect_auto_disabled_artifact_ids "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" | paste -sd, -)"
 if [[ -n "$AUTO_DISABLED_ARTIFACT_IDS" ]]; then
   if [[ -n "$DISABLED_ARTIFACT_IDS" ]]; then
     DISABLED_ARTIFACT_IDS="$DISABLED_ARTIFACT_IDS,$AUTO_DISABLED_ARTIFACT_IDS"
@@ -330,10 +387,10 @@ release_channel="preview"
 release_version="run-20260411-201805"
 release_published_at="2026-04-11T20:19:24Z"
 
-if [[ -f "$PRESENTATION_RELEASE_CHANNEL_PATH" ]]; then
+if [[ -f "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" ]]; then
   while IFS= read -r value; do
     release_meta+=("$value")
-  done < <(python3 - "$PRESENTATION_RELEASE_CHANNEL_PATH" <<'PY'
+  done < <(python3 - "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" <<'PY'
 import json
 import sys
 from pathlib import Path

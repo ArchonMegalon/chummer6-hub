@@ -1323,6 +1323,53 @@ validate_release_manifest_contracts() {
 
   sync_startup_smoke_receipts_for_local_verifier "$startup_smoke_dir" "$dist_dir"
 
+  python3 - "$verifier_path" "$manifest_path" "$compatibility_manifest_path" <<'PY'
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+
+def recanonicalize_manifest(module, manifest_path: Path) -> None:
+    if not manifest_path.is_file():
+        return
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    coverage = payload.get("desktopTupleCoverage")
+    if isinstance(coverage, dict):
+        coverage["externalProofRequests"] = module.expected_external_proof_request_rows(payload)
+        coverage["desktopRouteTruth"] = module.expected_desktop_route_truth_rows(payload)
+    payload["installAwareArtifactRegistry"] = module.expected_install_aware_artifact_registry_rows(payload)
+    payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+    payload["artifactIdentityRegistry"] = module.expected_artifact_identity_registry_rows(payload)
+    payload["artifactPublicationBindings"] = module.expected_artifact_publication_binding_rows(payload)
+    payload["publicTrustMetrics"] = module.expected_public_trust_metrics(payload)
+
+    coverage = payload.get("desktopTupleCoverage")
+    if isinstance(coverage, dict):
+        coverage["externalProofRequests"] = module.expected_external_proof_request_rows(payload)
+        coverage["desktopRouteTruth"] = module.expected_desktop_route_truth_rows(payload)
+    payload["installAwareArtifactRegistry"] = module.expected_install_aware_artifact_registry_rows(payload)
+    payload["desktopSurfaceRefs"] = module.expected_desktop_surface_ref_rows(payload)
+    payload["artifactIdentityRegistry"] = module.expected_artifact_identity_registry_rows(payload)
+    payload["artifactPublicationBindings"] = module.expected_artifact_publication_binding_rows(payload)
+    payload["registryBoundaryCoverage"] = module.expected_registry_boundary_coverage(payload)
+    manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+verifier_path = Path(sys.argv[1])
+manifest_paths = [Path(value) for value in sys.argv[2:] if str(value).strip()]
+spec = importlib.util.spec_from_file_location("verify_public_release_channel", verifier_path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+for manifest_path in manifest_paths:
+    recanonicalize_manifest(module, manifest_path)
+PY
+
   local verify_output
   if verify_output="$(python3 "$verifier_path" "$manifest_path" 2>&1)"; then
     [[ -n "$verify_output" ]] && printf '%s\n' "$verify_output" >"$verify_log_path"
@@ -2055,12 +2102,21 @@ if not published_at:
 materializer_path = registry_root / "scripts" / "materialize_public_release_channel.py"
 if not materializer_path.is_file():
   raise SystemExit(f"fallback materializer helper is unavailable: {materializer_path}")
+verifier_path = registry_root / "scripts" / "verify_public_release_channel.py"
+if not verifier_path.is_file():
+  raise SystemExit(f"fallback verifier helper is unavailable: {verifier_path}")
 
 spec = importlib.util.spec_from_file_location("materialize_public_release_channel_fallback", materializer_path)
 if spec is None or spec.loader is None:
   raise SystemExit(f"unable to load fallback materializer helper from {materializer_path}")
 materializer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(materializer)
+
+verifier_spec = importlib.util.spec_from_file_location("verify_public_release_channel_fallback", verifier_path)
+if verifier_spec is None or verifier_spec.loader is None:
+  raise SystemExit(f"unable to load fallback verifier helper from {verifier_path}")
+verifier = importlib.util.module_from_spec(verifier_spec)
+verifier_spec.loader.exec_module(verifier)
 
 
 def load_contract_if_present(path: Path | None) -> dict:
@@ -2165,6 +2221,13 @@ canonical_payload = {
   "artifacts": artifacts,
   "desktopTupleCoverage": tuple_coverage,
 }
+
+canonical_payload["installAwareArtifactRegistry"] = verifier.expected_install_aware_artifact_registry_rows(canonical_payload)
+canonical_payload["desktopSurfaceRefs"] = verifier.expected_desktop_surface_ref_rows(canonical_payload)
+canonical_payload["artifactIdentityRegistry"] = verifier.expected_artifact_identity_registry_rows(canonical_payload)
+canonical_payload["artifactPublicationBindings"] = verifier.expected_artifact_publication_binding_rows(canonical_payload)
+canonical_payload["publicTrustMetrics"] = verifier.expected_public_trust_metrics(canonical_payload)
+canonical_payload["registryBoundaryCoverage"] = verifier.expected_registry_boundary_coverage(canonical_payload)
 
 compatibility_payload = materializer.compatibility_payload(canonical_payload)
 compatibility_downloads = compatibility_payload.get("downloads")
