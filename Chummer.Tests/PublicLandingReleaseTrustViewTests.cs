@@ -23,11 +23,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("launch-hero", view, StringComparison.Ordinal);
-        Assert.Contains("Black Ledger front door", view, StringComparison.Ordinal);
+        Assert.Contains("Black Ledger preview", view, StringComparison.Ordinal);
         Assert.Contains("The city is moving.", view, StringComparison.Ordinal);
         Assert.Contains("workflow-band", view, StringComparison.Ordinal);
         Assert.Contains("flagship-gateway-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Enter Black Ledger", view, StringComparison.Ordinal);
+        Assert.Contains("Open Black Ledger", view, StringComparison.Ordinal);
         Assert.Contains("Download Chummer", view, StringComparison.Ordinal);
         Assert.Contains("Open downloads", view, StringComparison.Ordinal);
         Assert.Contains("Open play shell", view, StringComparison.Ordinal);
@@ -62,7 +62,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("recommended-download__trustrail", view, StringComparison.Ordinal);
         Assert.Contains("The same build for everyone", view, StringComparison.Ordinal);
-        Assert.Contains("Guest or link this copy", view, StringComparison.Ordinal);
+        Assert.Contains("Link this copy on first launch", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access stay calm", view, StringComparison.Ordinal);
         Assert.Contains("Release notes, known issues, and requirements", view, StringComparison.Ordinal);
         Assert.Contains("Open current release", view, StringComparison.Ordinal);
@@ -113,6 +113,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
         Assert.Contains("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.Contains("authorize with your OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
+        Assert.Contains("Public Codex contribution code", consoleView, StringComparison.Ordinal);
+        Assert.Contains("counts the tokens used through it", consoleView, StringComparison.Ordinal);
     }
 
     [Fact]

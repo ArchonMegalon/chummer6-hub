@@ -61,6 +61,7 @@ Public guide/landing copy must be able to answer these questions plainly:
 
 Public recognition is opt-in at the user level.
 Groups may be publicly visible even when a user keeps personal recognition private.
+Participants may also submit a public `Codex contribution code` as a voluntary handle that appears on contribution rankings when the user has opted into public visibility.
 
 ### `review_safety_notes`
 
@@ -189,6 +190,7 @@ Rules:
 * participant lanes may claim only premium-eligible work
 * receipt-backed value, not raw time or auth completion, drives rewards and recognition
 * raw Codex/OpenAI auth material stays lane-local on Fleet
+* participant Codex contribution codes are public attribution handles, not auth credentials
 * public recognition is opt-in at the user level and may be group-public while user-private
 * protected-preview access is acceptable while the participate surface is still bounded or access-gated
 * not every horizon or feature should nudge users toward a guided contribution lane
@@ -214,6 +216,13 @@ Semantic ownership rules:
 * Fleet owns execution-side state transitions, lane identifiers, and receipt signing
 * EA may project ownership or provider telemetry, but it must not redefine product workflow semantics
 
+Canonical participation contract extensions:
+
+* sponsor intent and sponsor-session requests may carry `participant_codex_code`
+* participant-lane state may carry `participant_codex_code` as attribution metadata
+* contribution receipts may carry verified participant token totals and the attributed `participant_codex_code`
+* recognition projections may expose contribution count, badges, verified slices, and token-backed usage standing
+
 ## Recognition rules
 
 Recognition is downstream projection, not system-of-record truth.
@@ -226,6 +235,7 @@ Good scoring inputs:
 * first-pass review or `jury` acceptance
 * review-clean streaks
 * docs/help/bugfix/canon work weight when design explicitly allows it
+* verified token-backed Codex lane usage when projected only as visibility or ranking context
 
 Bad scoring inputs:
 
@@ -240,6 +250,17 @@ Recognition should stay:
 * review-safe
 * derived from signed receipts
 * reversible by moderators/operators
+
+Additional participation-gamification rules:
+
+* supporters may submit a `Codex contribution code` as a public contribution handle
+* Fleet must carry that code as attribution metadata on the participant lane and on signed contribution receipts
+* signed contribution receipts may carry `participant_input_tokens`, `participant_cached_input_tokens`, `participant_output_tokens`, and `participant_total_tokens`
+* public leaderboards may rank by verified `participant_total_tokens` and contribution count when the user has opted into public visibility
+* raw token totals must not mint direct reward points by themselves
+* badges may be awarded for verified Codex contribution participation, but points remain review-backed
+* the public participation lane should show badges, contribution count, token usage, and relative standing as a gamified recognition surface
+* a top-list of public users by verified Codex usage is an allowed recognition projection
 
 ## Rollout posture
 

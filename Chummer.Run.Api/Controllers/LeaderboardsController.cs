@@ -38,6 +38,7 @@ public sealed class LeaderboardsController : Controller
             Chrome: await BuildChromeAsync("Leaderboards", "Optional community standings and quests, kept out of the main product path.", "/leaderboards", cancellationToken),
             Individuals: _leaderboards.IndividualLeaderboard(publicOnly: true),
             SponsorRank: _leaderboards.SponsorRankLeaderboard(publicOnly: true),
+            CodexUsage: _leaderboards.CodexUsageLeaderboard(publicOnly: true),
             Groups: _leaderboards.GroupLeaderboard(publicOnly: true),
             Quests: _leaderboards.Quests());
         return View("~/Views/Leaderboards/Index.cshtml", model);
@@ -50,6 +51,7 @@ public sealed class LeaderboardsController : Controller
         {
             individuals = _leaderboards.IndividualLeaderboard(publicOnly: true),
             sponsorRank = _leaderboards.SponsorRankLeaderboard(publicOnly: true),
+            codexUsage = _leaderboards.CodexUsageLeaderboard(publicOnly: true),
             groups = _leaderboards.GroupLeaderboard(publicOnly: true),
             quests = _leaderboards.Quests(),
         });

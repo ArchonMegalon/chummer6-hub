@@ -37,12 +37,12 @@
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">What Chummer stores</p>
             <h3>Consent, lane status, and receipts</h3>
-            <p>Chummer keeps the participation record, badge state, and receipt history. The temporary auth material stays on the execution host and does not belong in the account surface.</p>
+            <p>Chummer keeps the participation record, your public Codex handle if you submit one, badge state, and receipt history. The temporary auth material stays on the execution host and does not belong in the account surface.</p>
         </article>
         <article class="participation-answer">
             <p class="participation-answer__eyebrow">When credit appears</p>
             <h3>After validated work lands</h3>
-            <p>Authorization gets you ready to contribute, but it is not scored as contribution credit. Recognition only appears after signed, validated work receipts arrive.</p>
+            <p>Authorization gets you ready to contribute, but it is not scored as contribution credit. Recognition, badges, and token-backed leaderboard visibility only appear after signed, validated work receipts arrive.</p>
         </article>
     </section>
 
@@ -138,6 +138,11 @@
                 <h3>Generate a fresh code</h3>
                 <p>When you continue, Chummer will request a new one-time OpenAI/ChatGPT code for this session. If you do not use it in time, ask for another one here.</p>
             </div>
+            <label class="field-shell" for="participantCodexCodeInput">
+                <span class="field-label">Public Codex contribution code</span>
+                <input id="participantCodexCodeInput" class="field-input" type="text" maxlength="48" autocomplete="off" placeholder="shadowrunner-archon" />
+                <span class="muted-copy">Optional public handle. If you opt into public visibility, Fleet attaches this code to your contribution lane, counts the tokens used through it, and can show it on badges and leaderboards.</span>
+            </label>
             <div class="stacked-actions">
                 <button id="startContributionButton" class="button-like button-like--primary" type="button">Generate fresh code</button>
                 <button id="closeStartStateButton" class="inline-link inline-link--button" type="button">Not now</button>
@@ -221,6 +226,10 @@
                     <dd id="detailAuthorizationTier">Unknown</dd>
                 </div>
                 <div>
+                    <dt>Codex code</dt>
+                    <dd id="detailParticipantCodexCode">Not set</dd>
+                </div>
+                <div>
                     <dt>Role</dt>
                     <dd id="detailLaneRole">Coding</dd>
                 </div>
@@ -252,6 +261,7 @@ const nodes = {
   copyCodeButton: document.getElementById("copyCodeButton"),
   authorizationLink: document.getElementById("openAuthorizationLink"),
   authorizationCode: document.getElementById("authorizationCode"),
+  participantCodexCodeInput: document.getElementById("participantCodexCodeInput"),
   technicalDetails: document.getElementById("technicalDetails"),
   badgeReveal: document.getElementById("badgeReveal"),
   stateTag: document.getElementById("stateTag"),
@@ -278,6 +288,7 @@ const nodes = {
     authStatus: document.getElementById("detailAuthStatus"),
     authReadyAt: document.getElementById("detailAuthReadyAt"),
     authorizationTier: document.getElementById("detailAuthorizationTier"),
+    participantCodexCode: document.getElementById("detailParticipantCodexCode"),
     laneRole: document.getElementById("detailLaneRole")
   },
   steps: {
@@ -463,6 +474,7 @@ function syncTechnicalDetails(contribution, details) {
   ui.setText(nodes.details.authStatus, details?.authStatus || "Not started");
   ui.setText(nodes.details.authReadyAt, formatDate(details?.authReadyAtUtc));
   ui.setText(nodes.details.authorizationTier, details?.authorizationTier || "Unknown");
+  ui.setText(nodes.details.participantCodexCode, details?.participantCodexCode || "Not set");
   ui.setText(nodes.details.laneRole, details?.requestedLaneRole || "coding");
 }
 
@@ -590,7 +602,10 @@ async function startContribution() {
   setDialogOpen(true);
   showPreparingState();
   await ui.withBusyState([nodes.startContributionButton, nodes.refreshAuthorizationButton], "Preparing...", async () => {
-    const data = await ui.requestJson("/api/v1/participation/contributions/start", { method: "POST" });
+    const data = await ui.requestJson("/api/v1/participation/contributions/start", {
+      method: "POST",
+      body: JSON.stringify({ codexCode: (nodes.participantCodexCodeInput?.value || "").trim() })
+    });
     render(data);
   });
 }

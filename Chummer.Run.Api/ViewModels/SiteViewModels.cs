@@ -1678,6 +1678,7 @@ public sealed record LeaderboardsPageViewModel(
     SiteChromeViewModel Chrome,
     IReadOnlyList<LeaderboardRowDto> Individuals,
     IReadOnlyList<SponsorRankLeaderboardRowDto> SponsorRank,
+    IReadOnlyList<CodexUsageLeaderboardRowDto> CodexUsage,
     IReadOnlyList<GroupLeaderboardRowDto> Groups,
     IReadOnlyList<QuestDto> Quests);
 

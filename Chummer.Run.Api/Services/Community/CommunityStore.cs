@@ -337,6 +337,7 @@ internal sealed class SponsorSessionState
     public string UserId { get; set; } = "";
     public string GroupId { get; set; } = "";
     public string ProjectId { get; set; } = "";
+    public string? ParticipantCodexCode { get; set; }
     public string RequestedLaneType { get; set; } = "participant_burst";
     public string RequestedLaneRole { get; set; } = "coding";
     public string Visibility { get; set; } = "group";
@@ -364,6 +365,7 @@ internal sealed class SponsorSessionState
             UserId,
             GroupId,
             ProjectId,
+            ParticipantCodexCode,
             RequestedLaneType,
             RequestedLaneRole,
             Visibility,
@@ -436,6 +438,7 @@ internal sealed record SponsorSessionStateSnapshot(
     string UserId,
     string GroupId,
     string ProjectId,
+    string? ParticipantCodexCode,
     string RequestedLaneType,
     string RequestedLaneRole,
     string Visibility,
@@ -461,6 +464,7 @@ internal sealed record SponsorSessionStateSnapshot(
             state.UserId,
             state.GroupId,
             state.ProjectId,
+            state.ParticipantCodexCode,
             state.RequestedLaneType,
             state.RequestedLaneRole,
             state.Visibility,
@@ -488,6 +492,7 @@ internal sealed record SponsorSessionStateSnapshot(
             UserId = UserId,
             GroupId = GroupId,
             ProjectId = ProjectId,
+            ParticipantCodexCode = AccountService.NormalizeOptional(ParticipantCodexCode),
             RequestedLaneType = RequestedLaneType,
             RequestedLaneRole = RequestedLaneRole,
             Visibility = Visibility,
