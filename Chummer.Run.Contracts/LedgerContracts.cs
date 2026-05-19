@@ -10,6 +10,7 @@ public sealed record ContributionReceiptDto(
     string? UserId,
     string? GroupId,
     string? SponsorSessionId,
+    string? ParticipantCodexCode,
     string AuthClass,
     string LaneType,
     string LaneRole = "coding",
@@ -32,6 +33,10 @@ public sealed record ContributionReceiptDto(
     int DiffSize = 0,
     IReadOnlyList<string>? IssueFingerprints = null,
     decimal CreditBurnEstimate = 0,
+    int ParticipantInputTokens = 0,
+    int ParticipantCachedInputTokens = 0,
+    int ParticipantOutputTokens = 0,
+    int ParticipantTotalTokens = 0,
     string? SignedByFleet = null,
     string AuthorizationTierAtReceipt = "unknown",
     string? TierSource = null);
@@ -55,7 +60,9 @@ public sealed record RewardJournalEntryDto(
     int Points,
     string SourceReceiptId,
     string Description,
-    DateTimeOffset GrantedAtUtc);
+    DateTimeOffset GrantedAtUtc,
+    int ParticipantTotalTokens = 0,
+    string? ParticipantCodexCode = null);
 
 public sealed record ReceiptIngestResultDto(
     string ReceiptId,

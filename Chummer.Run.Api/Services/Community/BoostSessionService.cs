@@ -53,6 +53,7 @@ public sealed class BoostSessionService
             UserId = user.UserId,
             GroupId = group.GroupId,
             ProjectId = AccountService.NormalizeRequired(request.ProjectId, nameof(request.ProjectId)),
+            ParticipantCodexCode = NormalizeParticipantCodexCode(request.ParticipantCodexCode),
             RequestedLaneType = AccountService.NormalizeOptional(request.RequestedLaneType) ?? "participant_burst",
             RequestedLaneRole = SponsorLaneRolePolicy.Normalize(request.RequestedLaneRole),
             Visibility = AccountService.NormalizeOptional(request.Visibility) ?? "group",
@@ -233,6 +234,7 @@ public sealed class BoostSessionService
                     state.GroupId,
                     state.BoostCampaignId ?? "",
                     state.SponsorSessionId,
+                    state.ParticipantCodexCode ?? "",
                     state.Visibility,
                     state.RequestedLaneRole,
                     state.AuthorizationTier,
@@ -415,6 +417,7 @@ public sealed class BoostSessionService
         var subjectId = AccountService.NormalizeRequired(request.SubjectId ?? string.Empty, nameof(request.SubjectId));
         var projectId = AccountService.NormalizeRequired(request.ProjectId, nameof(request.ProjectId));
         var laneRole = SponsorLaneRolePolicy.Normalize(request.RequestedLaneRole);
+        var participantCodexCode = NormalizeParticipantCodexCode(request.ParticipantCodexCode);
         var user = _accounts.EnsureUser(subjectId, subjectId);
         lock (_store.Gate)
         {
@@ -423,6 +426,7 @@ public sealed class BoostSessionService
                 .Where(session => !IsTerminalContributionStatus(session.Status))
                 .Where(session => string.Equals(session.ProjectId, projectId, StringComparison.OrdinalIgnoreCase))
                 .Where(session => string.Equals(session.RequestedLaneRole, laneRole, StringComparison.OrdinalIgnoreCase))
+                .Where(session => participantCodexCode is null || string.Equals(session.ParticipantCodexCode, participantCodexCode, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(SessionPriority)
                 .ThenByDescending(session => session.AuthorizedAtUtc ?? session.UpdatedAtUtc)
                 .ThenByDescending(session => session.CreatedAtUtc)
@@ -492,6 +496,8 @@ public sealed class BoostSessionService
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["tier_source"]?.GetValue<string>());
         var credentialHandle = AccountService.NormalizeOptional(lane["credential_handle"]?.GetValue<string>())
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["credential_handle"]?.GetValue<string>());
+        var participantCodexCode = AccountService.NormalizeOptional(lane["participant_codex_code"]?.GetValue<string>())
+            ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["participant_codex_code"]?.GetValue<string>());
         var laneRole = AccountService.NormalizeOptional(lane["lane_role"]?.GetValue<string>())
             ?? AccountService.NormalizeOptional((lane["telemetry"] as JsonObject)?["lane_role"]?.GetValue<string>());
         if (!string.IsNullOrWhiteSpace(credentialHandle))
@@ -509,6 +515,10 @@ public sealed class BoostSessionService
         if (!string.IsNullOrWhiteSpace(laneRole))
         {
             state.RequestedLaneRole = SponsorLaneRolePolicy.Normalize(laneRole);
+        }
+        if (!string.IsNullOrWhiteSpace(participantCodexCode))
+        {
+            state.ParticipantCodexCode = NormalizeParticipantCodexCode(participantCodexCode);
         }
         var fleetStatus = AccountService.NormalizeOptional(lane["status"]?.GetValue<string>()) ?? state.Status;
         state.Status = MapFleetLaneStatusToSessionStatus(fleetStatus, authReady, verificationUri is not null || userCode is not null);
@@ -732,6 +742,7 @@ public sealed class BoostSessionService
         {
             ["status"] = "waiting_for_slot",
             ["lane_role"] = state.RequestedLaneRole,
+            ["participant_codex_code"] = state.ParticipantCodexCode,
         };
         if (includeLaneId && !string.IsNullOrWhiteSpace(state.FleetLaneId))
         {
@@ -745,4 +756,20 @@ public sealed class BoostSessionService
     }
 
     private sealed record HubUserSubject(string SubjectId, string DisplayName);
+
+    private static string? NormalizeParticipantCodexCode(string? value)
+    {
+        var raw = AccountService.NormalizeOptional(value);
+        if (raw is null)
+        {
+            return null;
+        }
+
+        var filtered = new string(raw
+            .Trim()
+            .Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.')
+            .Take(48)
+            .ToArray());
+        return string.IsNullOrWhiteSpace(filtered) ? null : filtered;
+    }
 }

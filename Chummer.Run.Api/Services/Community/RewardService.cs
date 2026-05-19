@@ -40,7 +40,9 @@ public sealed class RewardService
                     Points: points,
                     SourceReceiptId: receipt.ReceiptId,
                     Description: RewardDescription(receipt, points),
-                    GrantedAtUtc: DateTimeOffset.UtcNow));
+                    GrantedAtUtc: DateTimeOffset.UtcNow,
+                    ParticipantTotalTokens: Math.Max(0, receipt.ParticipantTotalTokens),
+                    ParticipantCodexCode: AccountService.NormalizeOptional(receipt.ParticipantCodexCode)));
 
             MaybeAddBadgeLocked(receipt);
             return points;
@@ -233,6 +235,21 @@ public sealed class RewardService
         }
 
         var userId = receipt.UserId!;
+        if (!string.IsNullOrWhiteSpace(receipt.ParticipantCodexCode)
+            && receipt.ParticipantTotalTokens > 0
+            && TryFindActiveBadgeLocked(userId, "codex-contributor", null) is null)
+        {
+            _store.Badges.Add(new BadgeDto(
+                BadgeId: $"badge-codex-contributor-{Guid.NewGuid():N}",
+                UserId: userId,
+                Key: "codex-contributor",
+                Label: "Codex Contributor",
+                AwardedAtUtc: DateTimeOffset.UtcNow,
+                BadgeScope: "user",
+                BadgeKind: "persistent",
+                Status: "active"));
+        }
+
         if (string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase)
             && receipt.Verified
             && TryFindActiveBadgeLocked(userId, "jury-finisher", null) is null)

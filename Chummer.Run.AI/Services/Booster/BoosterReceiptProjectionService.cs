@@ -91,8 +91,12 @@ public sealed class BoosterReceiptProjectionService
                     UserId: group.Key,
                     DisplayName: group.Key,
                     Points: group.Sum(Score),
+                    ContributionCount: group.Count(),
                     LandedSlices: group.Count(receipt => string.Equals(receipt.EventKind, "slice_landed", StringComparison.OrdinalIgnoreCase)),
                     VerifiedSlices: group.Count(receipt => receipt.Verified),
+                    ParticipantTotalTokens: group.Sum(receipt => Math.Max(0, receipt.ParticipantTotalTokens)),
+                    ParticipantCodexCode: group.Where(receipt => !string.IsNullOrWhiteSpace(receipt.ParticipantCodexCode)).Select(receipt => receipt.ParticipantCodexCode).LastOrDefault(),
+                    BadgeCount: 0,
                     ActiveSessions: group.Select(receipt => receipt.SponsorSessionId).Distinct(StringComparer.OrdinalIgnoreCase).Count(static value => !string.IsNullOrWhiteSpace(value)),
                     Visibility: "group"))
                 .OrderByDescending(row => row.Points)

@@ -21,7 +21,10 @@
                             <th scope="col">Rank</th>
                             <th scope="col">Runner</th>
                             <th scope="col">Points</th>
+                            <th scope="col">Contributions</th>
                             <th scope="col">Landed</th>
+                            <th scope="col">Tokens</th>
+                            <th scope="col">Badges</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -31,7 +34,10 @@
                             <td>@row.Rank</td>
                             <td>@row.DisplayName</td>
                             <td>@row.Points</td>
+                            <td>@row.ContributionCount</td>
                             <td>@row.LandedSlices</td>
+                            <td>@row.ParticipantTotalTokens</td>
+                            <td>@row.BadgeCount</td>
                         </tr>
                     }
                     </tbody>
@@ -50,6 +56,8 @@
                             <th scope="col">Lane tier</th>
                             <th scope="col">Current score</th>
                             <th scope="col">Lifetime points</th>
+                            <th scope="col">Verified</th>
+                            <th scope="col">Tokens</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -61,6 +69,40 @@
                             <td>@row.CurrentAuthorizationTier</td>
                             <td>@row.CurrentRankScore</td>
                             <td>@row.LifetimePoints</td>
+                            <td>@row.VerifiedSlices</td>
+                            <td>@row.ParticipantTotalTokens</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="settings-block">
+            <h2>Codex usage</h2>
+            <p class="muted-copy">Public contribution handles show how much verified product work each volunteered Codex lane actually carried.</p>
+            <div class="table-shell">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Rank</th>
+                            <th scope="col">Runner</th>
+                            <th scope="col">Codex code</th>
+                            <th scope="col">Tokens</th>
+                            <th scope="col">Receipts</th>
+                            <th scope="col">Landed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var row in Model.CodexUsage)
+                    {
+                        <tr>
+                            <td>@row.Rank</td>
+                            <td>@row.DisplayName</td>
+                            <td>@(row.ParticipantCodexCode ?? "Private")</td>
+                            <td>@row.ParticipantTotalTokens</td>
+                            <td>@row.ReceiptCount</td>
+                            <td>@row.LandedSlices</td>
                         </tr>
                     }
                     </tbody>

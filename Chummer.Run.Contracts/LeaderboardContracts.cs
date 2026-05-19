@@ -5,8 +5,12 @@ public sealed record LeaderboardRowDto(
     string UserId,
     string DisplayName,
     int Points,
+    int ContributionCount,
     int LandedSlices,
     int VerifiedSlices,
+    int ParticipantTotalTokens,
+    string? ParticipantCodexCode,
+    int BadgeCount,
     int ActiveSessions,
     string Visibility);
 
@@ -15,13 +19,27 @@ public sealed record SponsorRankLeaderboardRowDto(
     string UserId,
     string DisplayName,
     int LifetimePoints,
+    int ContributionCount,
     string CurrentAuthorizationTier,
     int CurrentSponsorBonus,
     int CurrentRankScore,
     int ActiveSponsorSessions,
     int LandedSlices,
+    int VerifiedSlices,
+    int ParticipantTotalTokens,
+    string? ParticipantCodexCode,
     IReadOnlyList<string> CurrentStatusBadges,
     IReadOnlyList<string> PersistentBadges,
+    string Visibility);
+
+public sealed record CodexUsageLeaderboardRowDto(
+    int Rank,
+    string UserId,
+    string DisplayName,
+    string? ParticipantCodexCode,
+    int ParticipantTotalTokens,
+    int ReceiptCount,
+    int LandedSlices,
     string Visibility);
 
 public sealed record GroupLeaderboardRowDto(
@@ -56,11 +74,15 @@ public sealed record BadgeDto(
 public sealed record UserRecognitionSummaryDto(
     string UserId,
     int LifetimePoints,
+    int ContributionCount,
     int CurrentSponsorRankScore,
     string CurrentAuthorizationTier,
     string CurrentTierSource,
     int CurrentSponsorBonus,
     int LandedSlices,
+    int VerifiedSlices,
+    int ParticipantTotalTokens,
+    string? ParticipantCodexCode,
     int ActiveSessionCount,
     IReadOnlyList<BadgeDto> CurrentStatusBadges,
     IReadOnlyList<BadgeDto> PersistentBadges,
