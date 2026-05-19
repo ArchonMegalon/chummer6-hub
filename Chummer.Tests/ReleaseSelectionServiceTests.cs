@@ -208,6 +208,7 @@ platforms:
 
         Assert.True(posture.GuestInstallAvailable);
         Assert.False(posture.AccountRequiredInstallAvailable);
+        Assert.Equal("Public release", experience.Display.ChannelLabel);
         Assert.Contains("public download", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("account-backed install path", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
         var macDownload = Assert.Single(manifest.Downloads, item => item.Id == "avalonia-osx-arm64-installer");

@@ -188,8 +188,8 @@ public sealed class ReleaseSelectionService
         {
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
             accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach install continuity from the first handoff.";
-            createAccountSummary = "Public downloads are available now on some platforms. Create an account when you want guided recovery, tracked support, or linked install history on the same return path.";
-            signInSummary = "Sign in to reopen the same account-backed install handoff, recovery path, and support history.";
+            createAccountSummary = "Some platforms are published directly now. Create an account only when you want guided recovery, tracked support, or linked install history on the same return path.";
+            signInSummary = "Sign in to reopen the same guided install handoff, recovery path, and support history.";
             downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
             accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to any route that still uses a signed-in handoff.";
         }
@@ -198,7 +198,7 @@ public sealed class ReleaseSelectionService
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} Create an account when you want recovery, tracked support, or linked install history on the same return path.";
             accountValueSummary = "The account does not change the published file. It adds recovery, tracked support, and linked install history when you want a calmer return path.";
             createAccountSummary = "Create an account when you want recovery, tracked support, and linked install history on the same return path. The download file stays the same for everyone.";
-            signInSummary = "Sign in to reopen your account-backed recovery, support history, and any linked-install follow-through.";
+            signInSummary = "Sign in to reopen your recovery, support history, and any linked-install follow-through.";
             downloadFaqAnswer = availabilitySummary;
             accountFaqAnswer = "Account creation gives you recovery, tracked support, and linked install history. It does not change the published file.";
         }
