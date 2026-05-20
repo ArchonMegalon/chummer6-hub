@@ -9,10 +9,14 @@ test('black ledger map keeps the tactical shell interactive', async ({ page }) =
   await expect(page.locator('.ledger-command-map')).toBeVisible();
   const elapsedMs = Date.now() - started;
 
-  writeMapJsonArtifact('BLACK_LEDGER_COMMAND_MAP_PERFORMANCE.generated.json', {
+  const payload = {
     status: elapsedMs < 8000 ? 'pass' : 'fail',
     base_url: baseUrl,
     route: '/ledger/map',
     domcontentloaded_ms: elapsedMs,
-  });
+  };
+
+  // Keep the older command-map receipt and the newer globe receipt in sync.
+  writeMapJsonArtifact('BLACK_LEDGER_COMMAND_MAP_PERFORMANCE.generated.json', payload);
+  writeMapJsonArtifact('BLACK_LEDGER_GLOBE_PERFORMANCE.generated.json', payload);
 });
