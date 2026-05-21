@@ -14,7 +14,7 @@ public sealed class BlackLedgerFactionTests
 
         Assert.Contains("The city is moving.", landing, StringComparison.Ordinal);
         Assert.Contains("Open a file, read the pressure, or replay Turn 1 without touching private table state.", landing, StringComparison.Ordinal);
-        Assert.Contains("Enter Black Ledger", landing, StringComparison.Ordinal);
+        Assert.Contains("Open Black Ledger", landing, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions/{factionId}\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("Open faction file", ledgerView, StringComparison.Ordinal);

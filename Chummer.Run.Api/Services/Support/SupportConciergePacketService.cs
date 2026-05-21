@@ -277,7 +277,7 @@ public sealed class SupportConciergePacketService
         }
 
         return artifact is null
-            ? "Release artifact truth is not published for this install yet; keep support-directed recovery as the fallback."
+            ? "Release artifact truth is not published for this install yet; keep support-directed recovery as the backup path."
             : "Use the same linked install and published artifact; public help is a wrapper, not the source of closure truth.";
     }
 

@@ -22,7 +22,7 @@ public sealed class SupportCasesController : ControllerBase
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
     private readonly SupportConciergePacketService _supportConciergePackets;
-    private readonly SupportAssistantService _assistant;
+    private readonly IChummerAssistantAdapter _assistant;
     private readonly SupportAttachmentStorageService _attachments;
     private readonly IConfiguration _configuration;
     private readonly InstallLinkingService _installLinking;
@@ -34,7 +34,7 @@ public sealed class SupportCasesController : ControllerBase
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
         SupportConciergePacketService supportConciergePackets,
-        SupportAssistantService assistant,
+        IChummerAssistantAdapter assistant,
         SupportAttachmentStorageService attachments,
         InstallLinkingService installLinking,
         IConfiguration configuration)
@@ -284,7 +284,7 @@ public sealed class SupportCasesController : ControllerBase
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            return Ok(_assistant.Answer(user.UserId, subject.SubjectId, request));
+            return Ok(_assistant.AskSupport(user.UserId, subject.SubjectId, request));
         }
         catch (HubRequestAuthException ex)
         {

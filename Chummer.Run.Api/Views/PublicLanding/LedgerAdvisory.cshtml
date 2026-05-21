@@ -1,0 +1,181 @@
+@model BlackLedgerAdvisoryPageViewModel
+@{
+    ViewData["Title"] = "Black Ledger advisory voting";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-ledger";
+}
+
+<section class="ledger-flagship ledger-flagship--notifications">
+    <div class="ledger-flagship__copy">
+        <p class="eyebrow">Controlled signal lane</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <p class="ledger-flagship__support">@Model.Summary.NoDemocracyNote</p>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="/account/ledger/notifications">Open inbox</a>
+            <a class="button-like button-like--secondary" href="/account/ledger">Back to command</a>
+            <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open public globe</a>
+        </div>
+    </div>
+    <div class="ledger-flagship__stage">
+        <div class="ledger-flagship__map-frame">
+            <div
+                class="ledger-flagship__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="notifications"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=1&amp;mode=pressure"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-initial-mode="pressure"
+                data-tick-headline="Advisory pressure live."
+                data-primary-label="Open inbox"
+                data-primary-href="/account/ledger/notifications"
+                data-secondary-label="Open command"
+                data-secondary-href="/account/ledger"></div>
+        </div>
+        <div class="ledger-flagship__nav" aria-label="Advisory command lanes">
+            <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/account/ledger/notifications">
+                <span class="tag">Inbox</span>
+                <strong>World-turn inbox</strong>
+                <p>Read the turn package and delivery lane before pushing advice up the chain.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
+                <span class="tag">Validation</span>
+                <strong>World-tick packet</strong>
+                <p>Keep the advisory loop grounded in the same receipt-backed world state.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="@Model.Summary.OpenMailHref">
+                <span class="tag">Mail</span>
+                <strong>Open advisory mail lane</strong>
+                <p>Use the same signed-in route that mails and inbox items point back to.</p>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Command doctrine</p>
+        <h2 class="editorial-title">@Model.Summary.Heading</h2>
+        <p class="editorial-copy">@Model.Summary.Intro</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Governance</span>
+            <p>@Model.Summary.NoDemocracyNote</p>
+        </article>
+    </div>
+</section>
+
+@if (Model.Summary.PlayerBallots.Count > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Player signal</p>
+            <h2 class="editorial-title">What players want the GMs to notice</h2>
+            <p class="editorial-copy">These votes influence the GM desk. They do not auto-approve runs, hardware, or research.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var ballot in Model.Summary.PlayerBallots)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@ballot.AudienceLabel</span>
+                    <h3>@ballot.Heading</h3>
+                    <p>@ballot.Summary</p>
+                    <p><strong>Posture:</strong> @ballot.AdvisoryPosture</p>
+                    <p><strong>Destination:</strong> @ballot.ResultDestination</p>
+                    @if (ballot.UserMayVote)
+                    {
+                        <form method="post" action="/account/ledger/advisory/vote" class="stacked-actions">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ballotId" value="@ballot.BallotId" />
+                            @foreach (var option in ballot.Options)
+                            {
+                                <button class="button-like @(option.Selected ? "button-like--primary" : "button-like--secondary")" type="submit" name="optionId" value="@option.OptionId">
+                                    @option.Label · @option.VoteShareLabel
+                                </button>
+                            }
+                        </form>
+                    }
+                    <div class="route-choice-card__proof">
+                        @foreach (var option in ballot.Options)
+                        {
+                            <span>@option.Label: @option.VoteCount vote(s)</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (Model.Summary.GmBallots.Count > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">GM recommendation</p>
+            <h2 class="editorial-title">What the GM desk wants leadership to hear</h2>
+            <p class="editorial-copy">GMs recommend strategy upward. The faction leader keeps final discretion.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var ballot in Model.Summary.GmBallots)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@ballot.AudienceLabel</span>
+                    <h3>@ballot.Heading</h3>
+                    <p>@ballot.Summary</p>
+                    <p><strong>Posture:</strong> @ballot.AdvisoryPosture</p>
+                    <p><strong>Destination:</strong> @ballot.ResultDestination</p>
+                    @if (ballot.UserMayVote)
+                    {
+                        <form method="post" action="/account/ledger/advisory/vote" class="stacked-actions">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="ballotId" value="@ballot.BallotId" />
+                            @foreach (var option in ballot.Options)
+                            {
+                                <button class="button-like @(option.Selected ? "button-like--primary" : "button-like--secondary")" type="submit" name="optionId" value="@option.OptionId">
+                                    @option.Label · @option.VoteShareLabel
+                                </button>
+                            }
+                        </form>
+                    }
+                    <div class="route-choice-card__proof">
+                        @foreach (var option in ballot.Options)
+                        {
+                            <span>@option.Label: @option.VoteCount vote(s)</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (Model.Summary.ExecutiveSummaries.Count > 0)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Executive intake</p>
+            <h2 class="editorial-title">What reaches the faction leader</h2>
+            <p class="editorial-copy">The leader receives the GM stack as signal, not as chain-of-command replacement.</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var summary in Model.Summary.ExecutiveSummaries)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Leader brief</span>
+                    <h3>@summary.Heading</h3>
+                    <p>@summary.Summary</p>
+                    <p><strong>Executive posture:</strong> @summary.ExecutivePosture</p>
+                    <div class="route-choice-card__proof">
+                        @foreach (var item in summary.Highlights)
+                        {
+                            <span>@item</span>
+                        }
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>

@@ -46,6 +46,9 @@ public sealed class CommunityStore
     public Dictionary<string, HubUserExperienceDto> UserExperienceByUserId { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<ParticipationOperatorNotificationReceipt> ParticipationNotificationReceipts { get; } = new();
     public List<BlackLedgerNewsDeliveryReceipt> BlackLedgerNewsDeliveryReceipts { get; } = new();
+    public List<BlackLedgerInboxEntry> BlackLedgerInboxEntries { get; } = new();
+    public List<BlackLedgerAdvisoryVoteReceipt> BlackLedgerAdvisoryVoteReceipts { get; } = new();
+    public List<BlackLedgerAdvisoryMailReceipt> BlackLedgerAdvisoryMailReceipts { get; } = new();
     public List<BlackLedgerDispatch> BlackLedgerDispatches { get; } = new();
     public List<DispatchDraft> BlackLedgerDispatchDrafts { get; } = new();
     public List<DispatchGateReceipt> BlackLedgerDispatchGateReceipts { get; } = new();
@@ -100,6 +103,15 @@ public sealed class CommunityStore
                 .OrderByDescending(static item => item.OccurredAtUtc)
                 .ToArray(),
             BlackLedgerNewsDeliveryReceipts: BlackLedgerNewsDeliveryReceipts
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray(),
+            BlackLedgerInboxEntries: BlackLedgerInboxEntries
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray(),
+            BlackLedgerAdvisoryVoteReceipts: BlackLedgerAdvisoryVoteReceipts
+                .OrderByDescending(static item => item.VotedAtUtc)
+                .ToArray(),
+            BlackLedgerAdvisoryMailReceipts: BlackLedgerAdvisoryMailReceipts
                 .OrderByDescending(static item => item.CreatedAtUtc)
                 .ToArray(),
             BlackLedgerDispatches: BlackLedgerDispatches
@@ -188,6 +200,9 @@ public sealed class CommunityStore
         UserExperienceByUserId.Clear();
         ParticipationNotificationReceipts.Clear();
         BlackLedgerNewsDeliveryReceipts.Clear();
+        BlackLedgerInboxEntries.Clear();
+        BlackLedgerAdvisoryVoteReceipts.Clear();
+        BlackLedgerAdvisoryMailReceipts.Clear();
         BlackLedgerDispatches.Clear();
         BlackLedgerDispatchDrafts.Clear();
         BlackLedgerDispatchGateReceipts.Clear();
@@ -268,6 +283,9 @@ public sealed class CommunityStore
         }
         ParticipationNotificationReceipts.AddRange(snapshot.ParticipationNotificationReceipts ?? Array.Empty<ParticipationOperatorNotificationReceipt>());
         BlackLedgerNewsDeliveryReceipts.AddRange(snapshot.BlackLedgerNewsDeliveryReceipts ?? Array.Empty<BlackLedgerNewsDeliveryReceipt>());
+        BlackLedgerInboxEntries.AddRange(snapshot.BlackLedgerInboxEntries ?? Array.Empty<BlackLedgerInboxEntry>());
+        BlackLedgerAdvisoryVoteReceipts.AddRange(snapshot.BlackLedgerAdvisoryVoteReceipts ?? Array.Empty<BlackLedgerAdvisoryVoteReceipt>());
+        BlackLedgerAdvisoryMailReceipts.AddRange(snapshot.BlackLedgerAdvisoryMailReceipts ?? Array.Empty<BlackLedgerAdvisoryMailReceipt>());
         BlackLedgerDispatches.AddRange(snapshot.BlackLedgerDispatches ?? Array.Empty<BlackLedgerDispatch>());
         BlackLedgerDispatchDrafts.AddRange(snapshot.BlackLedgerDispatchDrafts ?? Array.Empty<DispatchDraft>());
         BlackLedgerDispatchGateReceipts.AddRange(snapshot.BlackLedgerDispatchGateReceipts ?? Array.Empty<DispatchGateReceipt>());
@@ -405,6 +423,9 @@ internal sealed record CommunityStoreSnapshot(
     IReadOnlyList<HubUserExperienceDto>? UserExperience = null,
     IReadOnlyList<ParticipationOperatorNotificationReceipt>? ParticipationNotificationReceipts = null,
     IReadOnlyList<BlackLedgerNewsDeliveryReceipt>? BlackLedgerNewsDeliveryReceipts = null,
+    IReadOnlyList<BlackLedgerInboxEntry>? BlackLedgerInboxEntries = null,
+    IReadOnlyList<BlackLedgerAdvisoryVoteReceipt>? BlackLedgerAdvisoryVoteReceipts = null,
+    IReadOnlyList<BlackLedgerAdvisoryMailReceipt>? BlackLedgerAdvisoryMailReceipts = null,
     IReadOnlyList<BlackLedgerDispatch>? BlackLedgerDispatches = null,
     IReadOnlyList<DispatchDraft>? BlackLedgerDispatchDrafts = null,
     IReadOnlyList<DispatchGateReceipt>? BlackLedgerDispatchGateReceipts = null,

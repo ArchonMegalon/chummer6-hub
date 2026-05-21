@@ -1,0 +1,131 @@
+@model GmSessionVenuePageViewModel
+@{
+    ViewData["Title"] = "Session venue";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-session-venue";
+    var isManage = string.Equals(Model.Section, "manage", StringComparison.OrdinalIgnoreCase);
+    var isCloseout = string.Equals(Model.Section, "closeout", StringComparison.OrdinalIgnoreCase);
+}
+
+<section class="release-footnote">
+    <p class="eyebrow">Session venue</p>
+    <h1 class="page-title">@Model.SessionTitle</h1>
+    <p class="page-copy">@Model.CampaignName keeps the campaign truth. This page only manages the live-room handoff and the return path after the session.</p>
+    <div class="stacked-actions">
+        @if (!string.IsNullOrWhiteSpace(Model.ProviderRoomUrl))
+        {
+            <a class="button-like button-like--primary" href="@Model.ProviderRoomUrl" rel="noreferrer noopener">Join live room</a>
+        }
+        else
+        {
+            <span class="button-like button-like--primary disabled" aria-disabled="true">Join live room unavailable</span>
+        }
+        <a class="button-like button-like--secondary" href="@Model.InvitePageUrl">Copy invite link</a>
+        <a class="button-like button-like--ghost" href="/account/campaigns/@Model.CampaignId/sessions/@Model.SessionId/venue/closeout">Closeout</a>
+    </div>
+    <p class="muted-copy">@Model.FallbackMessage</p>
+</section>
+
+<section class="status-decision-strip" aria-label="Session venue status">
+    <article class="status-decision-strip__card">
+        <span class="tag">Venue status</span>
+        <h2>@Model.VenueStatus</h2>
+        <p>Provider: @Model.Provider. Mode: @Model.Mode. Visibility: @Model.Visibility.</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Scheduled time</span>
+        <h2>@Model.ScheduledTimeSummary</h2>
+        <p>Keep scheduling visible here without moving campaign or roster truth to the provider.</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Privacy and consent</span>
+        <h2>@Model.PrivacyStatus / @Model.ConsentStatus</h2>
+        <p>Attendance sync: @Model.AttendeeSyncStatus.</p>
+    </article>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">What this page must show</p>
+        <h2 class="editorial-title">Session title, campaign name, venue posture, invite continuity, and closeout stay attached.</h2>
+        <p class="editorial-copy">The page is useful only if the GM and players can see the live-room state without letting the provider become the system of record.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Campaign</span>
+            <h3>@Model.CampaignName</h3>
+            <p>Session id: <code class="mono-receipt">@Model.SessionId</code></p>
+            <div class="route-choice-card__proof">
+                <span>Campaign truth stays in Chummer</span>
+                <span>Runner sheets stay out of provider payloads</span>
+                <span>GM secrets stay private</span>
+            </div>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Provider link</span>
+            <h3>@(string.IsNullOrWhiteSpace(Model.ProviderRoomUrl) ? "Manual room link not configured yet" : "Provider room available to signed-in participants")</h3>
+            <p>@Model.FallbackMessage</p>
+            <div class="route-choice-card__proof">
+                <span>Private by default</span>
+                <span>No public room disclosure</span>
+                <span>Manual fallback required</span>
+            </div>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Closeout</span>
+            <h3>@(Model.LatestRecapStatus ?? "No closeout recap yet")</h3>
+            <p>Attendance sync remains consent-gated and optional.</p>
+            <div class="route-choice-card__proof">
+                <span>Attendee sync status: @Model.AttendeeSyncStatus</span>
+                <span>Consent status: @Model.ConsentStatus</span>
+                <span>Black Ledger follow-through stays first-party</span>
+            </div>
+        </article>
+    </div>
+</section>
+
+@if (isManage)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Manage</p>
+            <h2 class="editorial-title">Create mode stays hidden or unavailable until provider verification and transport are both real.</h2>
+            <p class="editorial-copy">Manual link mode is the required baseline. Provider automation may appear only when the verified adapter boundary is actually ready.</p>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">Manual link</span>
+                <h3>Paste BeHuman room URL</h3>
+                <p>Validate the URL, keep the link member-visible only, and log a receipt.</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Create mode</span>
+                <h3>@(Model.ProviderCreateAvailable ? "Provider create available" : "Create BeHuman room unavailable")</h3>
+                <p>@Model.ProviderCreateDisabledReason</p>
+            </article>
+        </div>
+    </section>
+}
+
+@if (isCloseout)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Closeout</p>
+            <h2 class="editorial-title">The room can close without inventing attendance truth.</h2>
+            <p class="editorial-copy">If provider sync is unavailable or not consented, manual closeout remains valid and the campaign can still continue on Chummer-owned rails.</p>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">Attendance</span>
+                <h3>@Model.AttendeeSyncStatus</h3>
+                <p>Sync requires consent before provider attendance can come back into Chummer.</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Recap</span>
+                <h3>@(Model.LatestRecapStatus ?? "private_only")</h3>
+                <p>Public-safe recap and Black Ledger follow-through stay bounded and optional.</p>
+            </article>
+        </div>
+    </section>
+}

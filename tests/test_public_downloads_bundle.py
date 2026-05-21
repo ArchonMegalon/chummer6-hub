@@ -41,8 +41,8 @@ class PublicDownloadsBundleTests(unittest.TestCase):
             if linux_installer is not None:
                 self.assertEqual(
                     linux_installer.get("installAccessClass"),
-                    "account_required",
-                    "materialized Linux installer rows must match the public-edge account-required install posture",
+                    "open_public",
+                    "materialized Linux installer rows must match the current public-edge guest-readable install posture",
                 )
 
             windows_installer = next(
@@ -52,8 +52,8 @@ class PublicDownloadsBundleTests(unittest.TestCase):
             if windows_installer is not None:
                 self.assertEqual(
                     windows_installer.get("installAccessClass"),
-                    "account_required",
-                    "materialized Windows installer rows must match the public-edge account-required install posture",
+                    "open_public",
+                    "materialized Windows installer rows must match the current public-edge guest-readable install posture",
                 )
 
             startup_root = output_root / "startup-smoke"
@@ -119,6 +119,47 @@ class PublicDownloadsBundleTests(unittest.TestCase):
                 "blazor-desktop-linux-x64-installer",
                 artifact_ids,
                 "materializer must drop stale source artifacts that are not present in the active release-channel truth",
+            )
+            self.assertFalse(
+                (output_root / "files" / "chummer-blazor-desktop-linux-x64-installer.deb").exists(),
+                "materializer must not leak stale Linux installer bytes into the published files shelf",
+            )
+
+    def test_materializer_drops_stale_mac_installer_bytes_not_present_in_manifest_truth(self):
+        if not MATERIALIZER.exists():
+            self.skipTest(f"missing public downloads materializer: {MATERIALIZER}")
+
+        with tempfile.TemporaryDirectory(prefix="chummer-public-downloads-bundle-stale-macos-") as temp_root:
+            output_root = Path(temp_root) / "downloads"
+            stale_root = Path(temp_root) / "stale-files"
+            stale_root.mkdir(parents=True, exist_ok=True)
+            stale_file = stale_root / "chummer-blazor-desktop-osx-arm64-installer.dmg"
+            stale_file.write_bytes(b"stale-extra-macos-installer")
+
+            env = os.environ.copy()
+            env.setdefault("CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER", "true")
+            env["CHUMMER_RUNSERVICES_SOURCE_FILES_ROOT"] = str(stale_root)
+
+            completed = subprocess.run(
+                ["bash", str(MATERIALIZER), str(output_root)],
+                cwd=REPO_ROOT,
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+
+            canonical_payload = json.loads((output_root / "RELEASE_CHANNEL.generated.json").read_text(encoding="utf-8"))
+            artifact_names = {str(artifact.get("fileName") or "") for artifact in canonical_payload.get("artifacts") or []}
+            self.assertNotIn(
+                "chummer-blazor-desktop-osx-arm64-installer.dmg",
+                artifact_names,
+                "materializer must not resurrect stale macOS installer bytes that are no longer present in release-channel truth",
+            )
+            self.assertFalse(
+                (output_root / "files" / stale_file.name).exists(),
+                "materializer must not leak stale macOS installer bytes into the published files shelf",
             )
 
     def test_materializer_can_force_account_required_downloads(self):

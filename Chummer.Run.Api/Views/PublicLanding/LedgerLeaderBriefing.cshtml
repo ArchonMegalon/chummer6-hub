@@ -1,0 +1,80 @@
+@model BlackLedgerLeaderBriefingPageViewModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-ledger";
+}
+
+<section class="trust-page-hero">
+    <div class="trust-page-hero__copy">
+        <p class="eyebrow">Faction leader briefing</p>
+        <h1 class="page-title">@Model.Heading</h1>
+        <p class="page-copy">@Model.Intro</p>
+        <div class="trust-claim__microproof">
+            <span>Leader: @Model.Digest.LeaderHandle</span>
+            <span>Faction: @Model.Digest.PublicName</span>
+            @if (Model.WorldTurnBriefing is not null)
+            {
+                <span>@Model.WorldTurnBriefing.TransitionLabel</span>
+            }
+        </div>
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--primary" href="@Model.Digest.ValidationHref">Open JSON brief</a>
+        <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open validation packet</a>
+        <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Pressure calls</p>
+        <h2 class="editorial-title">@Model.Digest.PublicName right now</h2>
+        <p class="editorial-copy">@Model.Digest.Summary</p>
+    </div>
+    <div class="route-choice-grid route-choice-grid--three">
+        @foreach (var item in Model.Digest.PressureCalls)
+        {
+            <article class="route-choice-card">
+                <span class="tag">Pressure</span>
+                <p>@item</p>
+            </article>
+        }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Recommended actions</p>
+        <h2 class="editorial-title">What the leader should do next</h2>
+    </div>
+    <div class="route-choice-grid route-choice-grid--three">
+        @foreach (var item in Model.Digest.RecommendedActions)
+        {
+            <article class="route-choice-card">
+                <span class="tag">Next move</span>
+                <p>@item</p>
+            </article>
+        }
+    </div>
+</section>
+
+@if (Model.ValidationPacket is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Validation</p>
+            <h2 class="editorial-title">Receipts behind this briefing</h2>
+            <p class="editorial-copy">@Model.ValidationPacket.Summary</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var item in Model.ValidationPacket.Checks.Take(3))
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Check</span>
+                    <p>@item</p>
+                </article>
+            }
+        </div>
+    </section>
+}

@@ -6235,6 +6235,7 @@ body.nav-sheet-open {
   color: var(--ink-soft);
   border-radius: 999px;
   padding: 0.6rem 0.85rem;
+  min-height: 44px;
   cursor: pointer;
 }
 
@@ -6562,6 +6563,61 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.faction-promo-video {
+  width: 100%;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(3, 8, 18, 0.9), rgba(8, 17, 33, 0.94));
+  box-shadow: 0 24px 70px rgba(4, 12, 24, 0.34);
+  overflow: hidden;
+}
+
+.ledger-newsreel-broadcast {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(255, 95, 86, 0.16), transparent 28%),
+    radial-gradient(circle at left center, rgba(46, 141, 255, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(4, 10, 18, 0.98), rgba(7, 16, 30, 0.96));
+}
+
+.ledger-newsreel-broadcast::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(transparent 0, rgba(255, 255, 255, 0.03) 48%, transparent 50%, transparent 100%);
+  background-size: 100% 8px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.ledger-newsreel-broadcast__shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.9fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.ledger-newsreel-broadcast__player,
+.ledger-newsreel-broadcast__sidebar {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ledger-newsreel-broadcast__video {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.ledger-newsreel-broadcast__list {
+  margin: 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.42rem;
+  color: var(--ink);
+}
+
 .score-ledger {
   display: grid;
   gap: 0.15rem;
@@ -6674,5 +6730,295 @@ body {
   .launch-hero--pregold .launch-hero__copy,
   .launch-hero--pregold .launch-hero__stage {
     min-height: auto;
+  }
+}
+
+.ledger-flagship {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: 1.4rem;
+  align-items: start;
+  padding: clamp(1.2rem, 2vw, 1.7rem);
+  border-radius: 36px;
+  border: 1px solid rgba(146, 176, 217, 0.18);
+  background:
+    radial-gradient(circle at 12% 14%, rgba(92, 226, 255, 0.13), transparent 24%),
+    radial-gradient(circle at 88% 18%, rgba(255, 167, 82, 0.1), transparent 22%),
+    linear-gradient(180deg, rgba(6, 12, 21, 0.98), rgba(3, 8, 14, 1));
+  box-shadow: 0 38px 90px rgba(0, 0, 0, 0.36);
+  margin-bottom: 1.6rem;
+}
+
+.ledger-flagship__copy,
+.ledger-flagship__stage {
+  min-width: 0;
+}
+
+.ledger-flagship__support {
+  margin: 0 0 1rem;
+  max-width: 52ch;
+  color: rgba(214, 227, 239, 0.78);
+  font-size: 1rem;
+}
+
+.ledger-flagship__stage {
+  display: grid;
+  gap: 1rem;
+}
+
+.ledger-flagship__map-frame {
+  padding: 0.45rem;
+  border-radius: 28px;
+  border: 1px solid rgba(146, 176, 217, 0.12);
+  background: linear-gradient(180deg, rgba(8, 15, 26, 0.94), rgba(3, 8, 14, 0.98));
+}
+
+.ledger-flagship__geoscape,
+.ledger-flagship__map-frame > .black-ledger-geoscape {
+  min-height: 700px;
+}
+
+.ledger-flagship__nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.ledger-flagship__nav-card {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+  padding: 1rem 1.05rem;
+  min-height: 150px;
+  border-radius: 24px;
+  border: 1px solid rgba(146, 176, 217, 0.14);
+  background: linear-gradient(180deg, rgba(16, 28, 45, 0.86), rgba(6, 12, 20, 0.96));
+  text-decoration: none;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.ledger-flagship__nav-card strong {
+  color: var(--ink-strong);
+  font-family: var(--font-family-display);
+  font-size: 1.02rem;
+}
+
+.ledger-flagship__nav-card p {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.ledger-flagship__nav-card:hover,
+.ledger-flagship__nav-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(92, 226, 255, 0.44);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.28);
+  outline: none;
+}
+
+.ledger-flagship__nav-card--primary,
+.ledger-flagship__nav-card--current {
+  border-color: rgba(92, 226, 255, 0.3);
+  background:
+    radial-gradient(circle at top right, rgba(92, 226, 255, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(18, 35, 58, 0.94), rgba(6, 13, 22, 0.98));
+}
+
+.black-ledger-geoscape {
+  gap: 1.15rem;
+  min-height: 640px;
+  padding: 1.15rem;
+  border-radius: 30px;
+  border: 1px solid rgba(146, 176, 217, 0.16);
+  background:
+    radial-gradient(circle at 15% 18%, rgba(54, 193, 255, 0.12), transparent 24%),
+    radial-gradient(circle at 84% 12%, rgba(255, 173, 81, 0.08), transparent 19%),
+    linear-gradient(180deg, rgba(7, 13, 22, 0.98), rgba(2, 7, 12, 1));
+}
+
+.black-ledger-geoscape__shell {
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.72fr);
+  gap: 1.05rem;
+}
+
+.black-ledger-geoscape__stage,
+.black-ledger-geoscape__panel,
+.black-ledger-geoscape__controls,
+.black-ledger-geoscape__fallback-list {
+  border-radius: 26px;
+  border: 1px solid rgba(146, 176, 217, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(57, 198, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(8, 15, 25, 0.96), rgba(3, 7, 12, 0.99));
+}
+
+.black-ledger-geoscape__stage {
+  min-height: 470px;
+}
+
+.black-ledger-geoscape__canvas {
+  min-height: 470px;
+}
+
+.black-ledger-geoscape__overlay {
+  left: 22px;
+  top: 20px;
+  gap: 0.42rem;
+}
+
+.black-ledger-geoscape__eyebrow {
+  color: rgba(205, 223, 242, 0.6);
+}
+
+.black-ledger-geoscape__headline {
+  font-size: clamp(1.5rem, 2.6vw, 2.35rem);
+  letter-spacing: -0.03em;
+}
+
+.black-ledger-geoscape__status {
+  max-width: 34ch;
+  color: rgba(214, 227, 239, 0.78);
+}
+
+.black-ledger-geoscape__tooltip {
+  position: absolute;
+  left: var(--tooltip-x, 50%);
+  top: var(--tooltip-y, 50%);
+  width: min(320px, calc(100% - 28px));
+  transform: translate(-50%, -120%) scale(0.94);
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(92, 226, 255, 0.22);
+  background:
+    radial-gradient(circle at top left, rgba(92, 226, 255, 0.1), transparent 32%),
+    linear-gradient(180deg, rgba(8, 17, 29, 0.96), rgba(4, 9, 15, 0.98));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.32);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  z-index: 4;
+}
+
+.black-ledger-geoscape__tooltip.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -118%) scale(1);
+}
+
+.black-ledger-geoscape__tooltip-title {
+  display: block;
+  margin: 0.3rem 0 0.25rem;
+  color: var(--ink-strong);
+  font-family: var(--font-family-display);
+  font-size: 1.04rem;
+}
+
+.black-ledger-geoscape__tooltip-body {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.black-ledger-geoscape__panel {
+  gap: 0.95rem;
+  padding: 1.05rem;
+}
+
+.black-ledger-geoscape__panel-title {
+  font-size: clamp(1.6rem, 2.6vw, 2.25rem);
+  letter-spacing: -0.035em;
+}
+
+.black-ledger-geoscape__panel-metrics span {
+  padding: 0.46rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(146, 176, 217, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.black-ledger-geoscape__controls {
+  padding: 0.95rem 1.05rem;
+}
+
+.black-ledger-geoscape__mode-button,
+.black-ledger-geoscape__list-button {
+  transition: transform 160ms ease, border-color 160ms ease, color 160ms ease, background-color 160ms ease;
+}
+
+.black-ledger-geoscape__mode-button:hover,
+.black-ledger-geoscape__list-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(92, 226, 255, 0.34);
+  color: var(--ink-strong);
+}
+
+.black-ledger-geoscape__mode-button.is-active,
+.black-ledger-geoscape__mode-button:focus-visible,
+.black-ledger-geoscape__list-button:focus-visible {
+  border-color: rgba(92, 226, 255, 0.56);
+  background: rgba(92, 226, 255, 0.08);
+}
+
+.black-ledger-geoscape__fallback-list {
+  padding: 1rem 1.05rem;
+}
+
+.launch-hero__stage > .black-ledger-geoscape {
+  min-height: 700px;
+}
+
+.launch-hero__stage > .black-ledger-geoscape .black-ledger-geoscape__panel {
+  width: min(360px, calc(100% - 36px));
+}
+
+@media (max-width: 1180px) {
+  .ledger-flagship {
+    grid-template-columns: 1fr;
+  }
+
+  .ledger-flagship__nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ledger-newsreel-broadcast__shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1024px) {
+  .black-ledger-geoscape,
+  .ledger-flagship__geoscape,
+  .launch-hero__stage > .black-ledger-geoscape {
+    min-height: 560px;
+  }
+
+  .black-ledger-geoscape__shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ledger-flagship {
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .ledger-flagship__nav {
+    grid-template-columns: 1fr;
+  }
+
+  .ledger-flagship__geoscape,
+  .launch-hero__stage > .black-ledger-geoscape,
+  .black-ledger-geoscape {
+    min-height: 500px;
+  }
+
+  .black-ledger-geoscape__tooltip {
+    width: min(280px, calc(100% - 24px));
+  }
+
+  .ledger-newsreel-broadcast__shell {
+    grid-template-columns: 1fr;
   }
 }

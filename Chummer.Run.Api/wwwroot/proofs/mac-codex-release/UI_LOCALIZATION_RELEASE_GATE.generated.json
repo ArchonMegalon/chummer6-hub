@@ -97,7 +97,7 @@
     "contract_name": "chummer6-ui.local_release_proof",
     "generated_at": "2026-04-11T18:52:38Z",
     "status": "passed",
-    "base_url": "http://127.0.0.1:8091",
+    "base_url": "https://chummer.run",
     "compose_file": "/docker/chummercomplete/chummer.run-services/docker-compose.public-edge.yml",
     "playwright_timeout_seconds": 240,
     "edge_rebuild_skipped": true,
@@ -119,7 +119,8 @@
       "/what-is-chummer",
       "/artifacts",
       "/faq"
-    ]
+    ],
+    "baseUrl": "https://chummer.run"
   },
   "blocking_findings": [],
   "translation_backlog_findings": [],

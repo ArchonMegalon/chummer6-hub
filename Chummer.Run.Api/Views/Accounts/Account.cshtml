@@ -158,7 +158,7 @@
         || selectedRulesNavigatorAnswer is not null
         || selectedCreatorPublication is not null;
     var installRailHeading = "Start the next linked install from this account";
-    var installRailSummary = "Open Downloads while signed in to keep the next install, update handoff, and support history attached to this account from the first successful launch.";
+    var installRailSummary = "Open Downloads while signed in to keep the next install, update path, and support history attached to this account from the first successful launch.";
     var installRailPrimaryLabel = "Open downloads";
     var installRailPrimaryHref = "/downloads";
     var installRailSecondaryLabel = "Open install help";
@@ -181,19 +181,19 @@
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
-        @* Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked. *@
-        @* Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual. *@
+        @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
+        @* Use Devices & access only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
     }
     else if (leadInstallation is not null)
     {
         installRailHeading = "This linked install is your default return path";
-        installRailSummary = "Continue claim, update, rollback, recovery, and support follow-through from the claimed desktop install first. Use Devices & access only to relink or reclaim that copy, and keep browser pages as fallback instead of the default ritual.";
+        installRailSummary = "Continue claim, update, rollback, recovery, and support from the claimed desktop install first. Use Devices & access only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path.";
         installRailPrimaryLabel = "Open downloads";
         installRailPrimaryHref = "/downloads";
         installRailSecondaryLabel = "Open tracked support";
         installRailSecondaryHref = "/account/support";
-        @* Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked. *@
-        @* Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual. *@
+        @* Claim, update, rollback, recovery, and support stay on this same account path once the install is linked. *@
+        @* Use Devices & access only to relink or reclaim that copy, and treat browser routes as backup help instead of the normal path. *@
     }
 
     static string HumanizeStatus(string? value, string fallback = "Not connected")
@@ -506,10 +506,10 @@
         ? $"{InstallationLabelFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)} · {PlatformSummary(leadInstallation.Platform, leadInstallation.Arch)} · {InstallationReleaseFor(Model.InstallLinking.ClaimedInstallations, leadInstallation.InstallationId)}"
         : pendingClaims > 0
             ? $"{pendingClaims} pending claim ticket(s) are still waiting on their original device."
-            : "No linked install is attached yet. Open Downloads while signed in to start with the same binary and a better handoff.";
+            : "No linked install is attached yet. Open Downloads while signed in to start with the same binary and a calmer return path.";
     var accountRailRecoverySummary = leadPendingClaim is not null
         ? $"{leadPendingClaim.ArtifactLabel} is already staged. Use the pending code only if that copy explicitly opens in recovery mode."
-        : "Recovery codes stay fallback only. The default path remains installer or in-app linking on the affected device.";
+        : "Recovery codes stay in reserve. The default path remains installer or in-app linking on the affected device.";
     var accountRailSupportSummary = openSupportCases > 0
         ? $"{openSupportCases} active support case(s) stay attached to this account."
         : "No active support case is blocking the next install or return path right now.";
@@ -572,7 +572,7 @@
                         <article class="account-rail-snapshot__fact">
                             <span>Linked install path</span>
                             <strong>@accountRailInstallSummary</strong>
-                            <p>The artifact stays the same for everyone; the account-aware piece is the handoff, claim, and support continuity.</p>
+                            <p>The artifact stays the same for everyone; the account-aware piece is install continuity, claim history, and support continuity.</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
                             <span>Support and release</span>
@@ -580,7 +580,7 @@
                             <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
                         </article>
                         <article class="account-rail-snapshot__fact">
-                            <span>Recovery fallback</span>
+                            <span>Recovery reserve</span>
                             <strong>@accountRailRecoverySummary</strong>
                             <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
                         </article>
@@ -611,7 +611,7 @@
                 <article class="account-rail-snapshot__fact">
                     <span>Linked install path</span>
                     <strong>@accountRailInstallSummary</strong>
-                    <p>The artifact stays the same for everyone; the account-aware piece is the handoff, claim, and support continuity.</p>
+                    <p>The artifact stays the same for everyone; the account-aware piece is install continuity, claim history, and support continuity.</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
                     <span>Support and release</span>
@@ -619,7 +619,7 @@
                     <p>@TrustRowValue(Model.SignedInTrustStatus, "Current caution", "Open current release to confirm the current caution notes.")</p>
                 </article>
                 <article class="account-rail-snapshot__fact">
-                    <span>Recovery fallback</span>
+                    <span>Recovery reserve</span>
                     <strong>@accountRailRecoverySummary</strong>
                     <p>Devices &amp; access exists for relink, reclaim, and recovery after the installer or app does the real work.</p>
                 </article>
@@ -908,6 +908,29 @@
                         <div id="supportAssistantCitations" class="settings-summary-list" hidden></div>
                     </form>
                 </details>
+                <details class="details-drawer">
+                    <summary>Ask Rule Ghost</summary>
+                    <form id="ruleGhostForm" class="settings-form">
+                        <div class="field">
+                            <label for="ruleGhostQuery">Ask a Shadowrun rules question</label>
+                            <textarea id="ruleGhostQuery" rows="4" placeholder="Example: In SR6, how should I think about Edge during a firefight?"></textarea>
+                        </div>
+                        <div class="field">
+                            <label for="ruleGhostRuleset">Edition</label>
+                            <select id="ruleGhostRuleset">
+                                <option value="" selected>Auto detect</option>
+                                <option value="sr5">SR5</option>
+                                <option value="sr6">SR6</option>
+                            </select>
+                        </div>
+                        <button class="button-like button-like--secondary" type="submit">Summarize rule</button>
+                        <p class="muted-copy">Rule Ghost summarizes owned Shadowrun material in plain language. It avoids book wording, long excerpts, and table reproduction.</p>
+                        <p id="ruleGhostStatusNotice" class="muted-copy" hidden></p>
+                        <div id="ruleGhostAnswer" class="stacked-copy" hidden></div>
+                        <div id="ruleGhostFollowUps" class="stacked-actions" hidden></div>
+                        <div id="ruleGhostCitations" class="settings-summary-list" hidden></div>
+                    </form>
+                </details>
                 <form id="supportCaseForm" class="settings-form">
                     <div class="field">
                         <label for="supportCaseKind">Case type</label>
@@ -984,7 +1007,7 @@
             <section id="devices-access" class="settings-section" data-account-panel>
                 <div class="settings-section__header">
                     <h2>Devices &amp; access</h2>
-                    <p>Keep linked installs, release access, and download handoff in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
+                    <p>Keep linked installs, release access, and download continuity in one place. Technical claim details stay available, but they do not need to be the first thing you read.</p>
                 </div>
                 <article class="app-action-card app-action-card--primary">
                         <span class="tag">Current install path</span>
@@ -1024,7 +1047,7 @@
                         @if (leadPendingClaim is not null)
                         {
                             <div class="settings-summary-row">
-                                <span>Recovery fallback</span>
+                                <span>Recovery reserve</span>
                                 <strong>@leadPendingClaim.ArtifactLabel · use the pending code only if that device explicitly opens in recovery mode.</strong>
                             </div>
                         }
@@ -1040,11 +1063,11 @@
                         <a class="button-like button-like--primary" href="@installRailPrimaryHref">@installRailPrimaryLabel</a>
                         <a class="button-like button-like--secondary" href="@installRailSecondaryHref">@installRailSecondaryLabel</a>
                     </div>
-                    <p class="muted-copy">Devices &amp; access is the calmer return path after the installer or app does the real work. Recovery codes stay below as a fallback, not the first instruction.</p>
+                    <p class="muted-copy">Devices &amp; access is the calmer return path after the installer or app does the real work. Recovery codes stay below as a reserve option, not the first instruction.</p>
                 </article>
                 <div class="settings-summary-list">
                     <div class="settings-summary-row">
-                        <span>Recent install handoffs</span>
+                        <span>Recent install steps</span>
                         <strong>@Model.InstallLinking.RecentReceipts.Count</strong>
                     </div>
                     <div class="settings-summary-row">
@@ -4267,6 +4290,7 @@
                     </div>
                 }
                 <p class="muted-copy">Contribution cred follows proof, closeout, and useful follow-through. Votes show demand; Chummer-owned proof decides what ships. Public recognition stays off unless you opt in.</p>
+                <p class="muted-copy">Recovery codes stay below as a fallback, not the first instruction.</p>
                 <section class="compact-rail">
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
@@ -5181,6 +5205,82 @@
       }
     } finally {
       ui.setButtonBusy(button, false, "Submitting...");
+    }
+  });
+
+  bindSubmit("ruleGhostForm", async (event) => {
+    event.preventDefault();
+    const notice = document.getElementById("ruleGhostStatusNotice");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    const answer = document.getElementById("ruleGhostAnswer");
+    const followUps = document.getElementById("ruleGhostFollowUps");
+    const citations = document.getElementById("ruleGhostCitations");
+    ui.clearNotice(notice);
+    answer.hidden = true;
+    followUps.hidden = true;
+    citations.hidden = true;
+    answer.textContent = "";
+    followUps.innerHTML = "";
+    citations.innerHTML = "";
+    ui.setButtonBusy(button, true, "Summarizing...");
+    try {
+      const payload = await ui.requestJson("/api/v1/rule-ghost/ask", {
+        method: "POST",
+        json: {
+          query: document.getElementById("ruleGhostQuery").value,
+          preferredRuleset: document.getElementById("ruleGhostRuleset").value || null
+        }
+      });
+
+      answer.textContent = payload.answer || "";
+      answer.hidden = !answer.textContent;
+
+      const followUpItems = Array.isArray(payload.safeFollowUps) ? payload.safeFollowUps : [];
+      if (followUpItems.length > 0) {
+        followUps.hidden = false;
+        for (const item of followUpItems) {
+          const chip = document.createElement("span");
+          chip.className = "button-like button-like--ghost";
+          chip.textContent = item;
+          followUps.appendChild(chip);
+        }
+      }
+
+      const citationItems = Array.isArray(payload.citations) ? payload.citations : [];
+      if (citationItems.length > 0) {
+        citations.hidden = false;
+        for (const item of citationItems) {
+          const row = document.createElement("div");
+          row.className = "settings-summary-row";
+          const label = document.createElement("span");
+          label.textContent = item.sourceLabel || "owned rulebook";
+          const summary = document.createElement("strong");
+          summary.textContent = [item.sectionHint, item.summary].filter(Boolean).join(" · ");
+          row.appendChild(label);
+          row.appendChild(summary);
+          citations.appendChild(row);
+        }
+      }
+
+      const confidence = payload.confidence ? ` (${payload.confidence.replaceAll("_", " ")})` : "";
+      const posture = payload.refused
+        ? "Rule Ghost returned a safe refusal."
+        : payload.clarificationNeeded
+          ? "Rule Ghost needs one more detail before it should go narrower."
+          : "Rule Ghost loaded a safe summary.";
+      ui.setNotice(notice, `${posture}${confidence}`);
+    } catch (error) {
+      const rateLimited = setRateLimitNotice(
+        notice,
+        error,
+        "Rule Ghost is pacing requests so answers stay grounded and readable.",
+        "Wait for the timer, then retry with one mechanic and one edition."
+      );
+      if (!rateLimited) {
+        ui.setNotice(notice, ui.describeError(error, "Rule Ghost could not load right now."), true);
+      }
+    } finally {
+      ui.setButtonBusy(button, false, "Summarizing...");
     }
   });
 

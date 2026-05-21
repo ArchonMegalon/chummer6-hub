@@ -59,6 +59,9 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("[HttpGet(\"/ledger/map\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions/{factionId}\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/turns/{turn}\")]", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/ledger/turns/{turn}/newsreel.json\")]", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/ledger/worldtick/validation\")]", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/ledger/factions/{factionId}/leader-briefing\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/map\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/map/turns/{turn:int}\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/map/tick-delta/{fromTurn:int}/{toTurn:int}\")]", ledgerApi, StringComparison.Ordinal);

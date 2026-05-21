@@ -3289,7 +3289,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     markers = [
                         marker
                         for marker in markers
-                        if marker != "Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual."
+                        if marker != "Use Devices & access only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path."
                     ]
                 path.write_text("\n".join(markers) + "\n", encoding="utf-8")
 
@@ -3298,7 +3298,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertIn(
                 "Chummer.Run.Api/Views/Accounts/Account.cshtml missing marker: "
-                "Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual.",
+                "Use Devices & access only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path.",
                 errors,
             )
 

@@ -6,6 +6,7 @@ using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddHubApiRuntimeGuardrails();
@@ -152,8 +153,12 @@ app.Use(async (context, next) =>
 
     await next();
 });
+FileExtensionContentTypeProvider contentTypeProvider = new();
+contentTypeProvider.Mappings[".vtt"] = "text/vtt";
+
 app.UseStaticFiles(new StaticFileOptions
 {
+    ContentTypeProvider = contentTypeProvider,
     OnPrepareResponse = fileContext =>
     {
         fileContext.Context.Response.Headers["X-Robots-Tag"] = SearchRobotsPolicy;

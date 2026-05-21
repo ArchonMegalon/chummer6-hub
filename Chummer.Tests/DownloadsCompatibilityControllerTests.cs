@@ -176,7 +176,7 @@ public sealed class DownloadsCompatibilityControllerTests
 
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("%2Fdownloads%2Ffile%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -193,6 +193,22 @@ public sealed class DownloadsCompatibilityControllerTests
         var redirect = Assert.IsType<RedirectResult>(result);
         Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", redirect.Url, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AccountRequiredMacFilePathRouteStillRedirectsToInstallHandoffLogin()
+    {
+        using Fixture fixture = new();
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+
+        IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-osx-x64-installer.dmg", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 
     [Fact]

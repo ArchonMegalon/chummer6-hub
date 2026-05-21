@@ -10,22 +10,26 @@ test('black ledger globe mode switching and replay produce visible state changes
   await expect(root).toBeVisible();
   await expect(page.locator('#ledger-map')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Influence' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Conflict' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Recent changes' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Replay Turn 1' })).toBeVisible();
+  const modeButtons = page.locator('.black-ledger-geoscape__modes button');
+  await expect(modeButtons).toHaveCount(7);
+  await expect(page.getByRole('button', { name: 'Replay pressure' })).toBeVisible();
 
   const initialSignature = await root.getAttribute('data-render-signature');
-  await page.getByRole('button', { name: 'Conflict' }).click();
-  await expect(root).toHaveAttribute('data-current-mode', 'conflict');
-  const conflictSignature = await root.getAttribute('data-render-signature');
-  expect(conflictSignature).not.toEqual(initialSignature);
+  const alternateMode = modeButtons.nth(1);
+  const alternateLabel = (await alternateMode.textContent())?.trim() || '';
+  await alternateMode.click();
+  const currentMode = await root.getAttribute('data-current-mode');
+  expect(currentMode).toBeTruthy();
+  expect(currentMode).not.toEqual('influence');
+  const alternateSignature = await root.getAttribute('data-render-signature');
+  expect(alternateSignature).not.toEqual(initialSignature);
 
-  await page.getByRole('button', { name: 'Replay Turn 1' }).click();
+  await page.getByRole('button', { name: 'Replay pressure' }).click();
   await page.waitForTimeout(900);
   const replayState = await root.getAttribute('data-replay-state');
   expect(replayState).not.toEqual('idle');
   const replaySignature = await root.getAttribute('data-render-signature');
-  expect(replaySignature).not.toEqual(conflictSignature);
+  expect(replaySignature).not.toEqual(alternateSignature);
 
   writeJsonArtifact('BLACK_LEDGER_GLOBE_MOTION.generated.json', {
     generated_at_utc: new Date().toISOString(),
@@ -33,7 +37,8 @@ test('black ledger globe mode switching and replay produce visible state changes
     base_url: baseUrl,
     route: '/ledger/map#ledger-map',
     initial_signature: initialSignature,
-    conflict_signature: conflictSignature,
+    alternate_mode_label: alternateLabel,
+    alternate_signature: alternateSignature,
     replay_signature: replaySignature,
     replay_state: replayState,
   });
@@ -48,7 +53,7 @@ test('black ledger globe honors reduced motion with step replay', async ({ page 
 
   const states: string[] = [];
   for (let index = 0; index < 3; index += 1) {
-    await page.getByRole('button', { name: 'Replay Turn 1' }).click();
+    await page.getByRole('button', { name: 'Replay pressure' }).click();
     states.push((await root.getAttribute('data-replay-state')) ?? '');
   }
 
