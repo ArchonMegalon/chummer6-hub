@@ -7,6 +7,7 @@ using System.Net;
 
 namespace Chummer.Run.AI.Services.Creative;
 
+#pragma warning disable CS0618
 public interface IPacketFactoryService
 {
     Task<PacketFactoryResult> CreateAsync(PacketFactoryRequest request, CancellationToken cancellationToken = default);
@@ -305,3 +306,4 @@ public sealed class PacketFactoryService : IPacketFactoryService
         return $"<packet-thumbnail source=\"peekshot\"><title>{WebUtility.HtmlEncode(title)}</title><subject>{WebUtility.HtmlEncode(subject)}</subject></packet-thumbnail>";
     }
 }
+#pragma warning restore CS0618

@@ -6,6 +6,7 @@ using System.Text.Json;
 
 namespace Chummer.Run.AI.Services.Creative;
 
+#pragma warning disable CS0618
 public interface IRouteCinemaService
 {
     Task<RouteCinemaResult> GenerateAsync(
@@ -324,3 +325,4 @@ public sealed class RouteCinemaService : IRouteCinemaService
         return $"WayPoint-{seed & 0x7FFF:X4}";
     }
 }
+#pragma warning restore CS0618
