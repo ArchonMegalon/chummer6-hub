@@ -7,6 +7,7 @@ using System.Collections.Generic;
 
 namespace Chummer.Run.AI.Controllers;
 
+#pragma warning disable CS0618
 [ApiController]
 [Route("api/v1/ai/creative")]
 public sealed class CreativeAssetsController : ControllerBase
@@ -341,3 +342,4 @@ public sealed class CreativeAssetsController : ControllerBase
         };
     }
 }
+#pragma warning restore CS0618
