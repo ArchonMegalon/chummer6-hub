@@ -34,6 +34,19 @@ public sealed class BlackLedgerFactionOnboardingService
     private readonly CommunityStore _store;
     private BlackLedgerFactionOnboardingState _state = new();
 
+    private static string BuildVersionedMediaHref(string relativePath)
+    {
+        var normalized = relativePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        var absolute = Path.Combine(AppContext.BaseDirectory, "wwwroot", normalized);
+        if (!File.Exists(absolute))
+        {
+            return relativePath;
+        }
+
+        var version = new DateTimeOffset(File.GetLastWriteTimeUtc(absolute)).ToUnixTimeSeconds();
+        return $"{relativePath}?v={version}";
+    }
+
     public BlackLedgerFactionOnboardingService(
         IConfiguration configuration,
         BlackLedgerPublicStatsService stats,
@@ -388,6 +401,15 @@ public sealed class BlackLedgerFactionOnboardingService
         return null;
     }
 
+    public BlackLedgerFactionCharterDto? GetCharter(string factionId)
+    {
+        string normalized = NormalizeFactionId(factionId);
+        lock (_gate)
+        {
+            return _state.Charters.TryGetValue(normalized, out var charter) ? charter : null;
+        }
+    }
+
     public BlackLedgerFactionPromoArtifactViewModel? GetPromoArtifact(string factionId)
     {
         BlackLedgerFactionDetailDto? detail = GetWorkspaceFactionDetail(factionId);
@@ -400,53 +422,67 @@ public sealed class BlackLedgerFactionOnboardingService
         IReadOnlyList<string> captions = normalizedFactionId switch
         {
             "glass-tower-compact" => [
-                "Welcome to calm. If you can afford it.",
-                "Glass towers, floating contracts, and legal disclaimers in a blue-white wash.",
-                "Static fallback and captions stay public-safe while provider verification remains bounded."
+                "Security this polished is a recruitment weapon.",
+                "Sky-bridges, white-glove retainers, and airborne contracts sell authority before the words land.",
+                "Prestige is only real if the next turn can measure the panic you prevented."
             ],
             "rust-market-syndicate" => [
-                "Everything is available. Nothing is free.",
-                "Orange debt pulses chase stacked crates through the night market.",
-                "Public-safe storyboard fallback replaces any unverified provider lane."
+                "Every crate is inventory. Every witness is a customer in waiting.",
+                "Debt-orange light, stacked freight, and market thunder make the whole block feel purchasable.",
+                "Even this bravado still answers to the turn packet. That is how you know it is real."
             ],
             "ashline-circle" => [
-                "Power is easy. Proof is hard.",
-                "Candles argue about source clarity while sigils refuse to stay calm.",
-                "Captions and static fallback remain first-party and provider-agnostic."
+                "Power is ordinary. Certified supremacy is the offer.",
+                "Ritual fire, gold seal, and disciplined witnesses make the district kneel on cue.",
+                "Your oath still answers to the public world tick. That is the flex."
             ],
             "neon-docks-union" => [
-                "Routes move. Drones complain. We keep the city breathing.",
-                "Container stacks, cyan trails, and safety signs all talk back.",
-                "This onboarding promo is storyboard-first until a verified renderer is present."
+                "The port is the heartbeat. We decide who gets oxygen.",
+                "Cargo towers, cyan beacons, and steel gantries turn logistics into a parade of dominance.",
+                "Throughput is not a slogan when the board can watch the pressure move in real time."
             ],
             "ghostline-network" => [
-                "If you heard it, verify it. If you verified it, redact it.",
-                "Half the reel deletes itself before the lie can settle.",
-                "No provider branding and no private labels escape this fallback lane."
+                "Rumor is for civilians. Verified narrative is for operators.",
+                "The screen glitches, the lie evaporates, and the faction keeps the broadcast crown.",
+                "Pressure is public. Secrets remain buried. Control both and you win the city."
             ],
             "barrens-free-wardens" => [
-                "This starts as a safety briefing and ends as a promise.",
-                "Street-worn signals and stubborn mutual aid carry the pitch.",
-                "Static card, captions, and JSON brief are first-party fallback artifacts."
+                "This is not a briefing. It is the order that keeps the district alive.",
+                "Floodlights, convoy steel, and stubborn mutual defense turn panic into allegiance.",
+                "Protection only counts when the ledger can prove who stood their ground."
             ],
             _ => [
-                $"{detail.PublicName} onboarding promo stays in first-party fallback mode.",
-                "Provider verification remains required before any external render lane is claimed.",
-                "Static card, captions, and route-backed JSON brief are available now."
+                $"{detail.PublicName} ships a first-party recruitment signal with theatrical pressure and public proof.",
+                "The public lane is allowed to roar, but it is not allowed to lie.",
+                "Motion video, captions, and route-backed validation are available now."
             ]
         };
 
         return new BlackLedgerFactionPromoArtifactViewModel(
             FactionId: normalizedFactionId,
             PublicName: detail.PublicName,
-            ProviderStatus: "NEEDS_PROVIDER_VERIFICATION",
-            RenderMode: "fallback_static_storyboard",
+            ProviderStatus: "FIRST_PARTY_VIDEO",
+            RenderMode: "first_party_motion_video",
+            FallbackRenderMode: "first_party_storyboard",
             HtmlHref: $"/ledger/factions/{normalizedFactionId}/promo",
             JsonHref: $"/ledger/factions/{normalizedFactionId}/promo.json",
             CaptionsHref: $"/ledger/factions/{normalizedFactionId}/promo.vtt",
-            StaticCardLabel: "Static fallback card",
-            FormatLabels: ["16:9 storyboard", "9:16 mobile storyboard", "Static fallback card", "Captions required"],
-            CaptionLines: captions);
+            PosterHref: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo-poster.png"),
+            VideoMp4Href: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo-mobile.mp4"),
+            VideoWebmHref: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo.webm"),
+            StaticCardLabel: "Megacorp recruitment signal player",
+            PlaybackLabel: "Playable first-party recruitment video",
+            FormatLabels: ["16:9 MP4", "16:9 WebM", "Storyboard fallback", "Captions required"],
+            CaptionLines: captions,
+            CampaignHook: $"{detail.PublicName} storms the district with theatrical pressure, hard-edged certainty, and one measurable promise the next turn must justify.",
+            AudiencePromise: "The lane is allowed to feel like megacorp propaganda, but it still loses the argument if the world tick, dispatch receipts, and faction file disagree.",
+            ValidationHref: $"/account/ledger/factions/{normalizedFactionId}/leader-briefing",
+            StoryboardShots:
+            [
+                "Cold open like a recruitment reel: oversized emblem, district under lights, pressure already moving in formation.",
+                "Middle beat on spectacle and dominance: what this banner protects, sells, commands, or extracts from the city.",
+                "Close on the measurable promise: a public-safe claim the audience can verify in the ledger and dispatch lanes next turn."
+            ]);
     }
 
     public IReadOnlyList<BlackLedgerFactionActionDefinitionDto> GetActionDefinitions(string factionId)

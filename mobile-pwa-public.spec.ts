@@ -14,9 +14,12 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   const manifest = readFileSync(manifestPath, 'utf8');
   const serviceWorker = readFileSync(swPath, 'utf8');
 
-  expect(mobileView).toContain('Mobile play shell preview; installability proof pending.');
-  expect(mobileView).toContain('Manifest and service worker live');
+  expect(mobileView).toContain('Install this app');
+  expect(mobileView).toContain('beforeinstallprompt');
+  expect(mobileView).toContain('One bounded shell, five explicit promises.');
   expect(mobileView).toContain('Player, GM, and observer routes converge on one shell.');
+  expect(mobileView).toContain('_SignedInTrustStatusPanel');
+  expect(mobileView).toContain('_PublicTrustPulsePanel');
 
   expect(controller).toContain('[HttpGet("/mobile")]');
   expect(controller).toContain('[HttpGet("/pwa")]');
@@ -25,8 +28,15 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(controller).toContain('[HttpGet("/gm")]');
   expect(controller).toContain('[HttpGet("/observer")]');
 
+  expect(manifest).toContain('"id": "/mobile"');
+  expect(manifest).toContain('"display_override"');
+  expect(manifest).toContain('"screenshots"');
   expect(manifest).toContain('"start_url": "/mobile"');
   expect(manifest).toContain('"url": "/play"');
+  expect(manifest).toContain('"url": "/play/continuity"');
   expect(serviceWorker).toContain('"/mobile"');
   expect(serviceWorker).toContain('"/play"');
+  expect(serviceWorker).toContain('"/play/continuity"');
+  expect(serviceWorker).toContain('navigationPreload');
+  expect(serviceWorker).toContain('RUNTIME_CACHE');
 });

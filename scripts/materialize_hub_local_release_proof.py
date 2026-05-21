@@ -24,27 +24,22 @@ def iso_now() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _stable_payload(payload):
-    if isinstance(payload, dict):
-        return {
-            key: _stable_payload(value)
-            for key, value in payload.items()
-            if key not in {"generated_at", "generatedAt"}
-        }
-    if isinstance(payload, list):
-        return [_stable_payload(item) for item in payload]
-    return payload
+def _stable_payload(payload: dict) -> dict:
+    stable = dict(payload)
+    stable.pop("generated_at", None)
+    stable.pop("generatedAt", None)
+    return stable
 
 
-def _unique_strings_preserve_order(values: list[str]) -> list[str]:
+def _sorted_unique_strings(values: list[str]) -> list[str]:
     seen: set[str] = set()
     ordered: list[str] = []
     for value in values:
-        normalized = str(value).strip()
-        if not normalized or normalized in seen:
+        candidate = str(value).strip()
+        if not candidate or candidate in seen:
             continue
-        seen.add(normalized)
-        ordered.append(normalized)
+        seen.add(candidate)
+        ordered.append(candidate)
     return ordered
 
 
@@ -67,6 +62,8 @@ def _flagship_readiness_path() -> Path:
     raw = str(os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH") or "").strip()
     if raw:
         return Path(raw)
+    if FALLBACK_FLAGSHIP_READINESS_PATH.is_file():
+        return FALLBACK_FLAGSHIP_READINESS_PATH
     if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
         return DEFAULT_FLAGSHIP_READINESS_PATH
     return FALLBACK_FLAGSHIP_READINESS_PATH
@@ -142,25 +139,25 @@ def _load_flagship_readiness_snapshot() -> dict:
         return snapshot
 
     coverage_gap_keys = readiness_payload.get("scoped_warning_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("warning_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("scoped_missing_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("missing_keys")
 
     readiness_audit = readiness_payload.get("flagship_readiness_audit")
-    if not isinstance(coverage_gap_keys, list) and isinstance(readiness_audit, dict):
+    if (not isinstance(coverage_gap_keys, list) or not coverage_gap_keys) and isinstance(readiness_audit, dict):
         coverage_gap_keys = readiness_audit.get("scoped_coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("scoped_warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("scoped_missing_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("missing_coverage_keys")
 
     normalized_coverage_gap_keys = [
@@ -779,7 +776,7 @@ def main() -> int:
             "report_cluster_release_notify",
             "organize_community_and_close_loop",
         ],
-        "proof_routes": _unique_strings_preserve_order([
+        "proof_routes": _sorted_unique_strings([
             "/downloads/install/avalonia-linux-x64-installer",
             "/home/access",
             "/home/work",

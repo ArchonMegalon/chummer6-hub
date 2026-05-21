@@ -46,6 +46,7 @@ It does not imply that every owned tool must be integrated.
 * `Vizologi` - product strategy and ideation support only
 * `ApiX-Drive` - low-risk automation glue only, never truth
 * `Browserly` - bounded browser capture and reference-pack helper
+* `Blip AI` - bounded dictation, transcript cleanup, and operator draft-capture helper
 * `FacePop` - bounded public trust / concierge widget and moderated testimonial capture lane
 * `hedy.ai` - bounded post-session transcript structure, highlight digest, and GM debrief helper for `TABLE PULSE`
 * `Nonverbia` - post-session coaching and social-dynamics analysis lane
@@ -112,6 +113,7 @@ Working rule:
 ## Bounded owner assignments
 
 * `Paperguide` - `chummer6-design` for design research, `chummer6-hub` for operator help/research assist
+* `Blip AI` - `chummer6-hub` for bounded dictation, transcript cleanup, and operator draft capture
 * `Teable` - `chummer6-hub` for admin projections, curation queues, review boards, and AdminIntent receipt routing
 * `Emailit` - `chummer6-hub` for outbound template selection, suppression, delivery receipts, and lifecycle notification closeout
 * `ApiX-Drive` - `chummer6-hub` for low-risk automation glue

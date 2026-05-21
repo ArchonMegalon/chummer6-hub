@@ -23,11 +23,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("launch-hero", view, StringComparison.Ordinal);
-        Assert.Contains("Black Ledger front door", view, StringComparison.Ordinal);
+        Assert.Contains("Black Ledger preview", view, StringComparison.Ordinal);
         Assert.Contains("The city is moving.", view, StringComparison.Ordinal);
         Assert.Contains("workflow-band", view, StringComparison.Ordinal);
         Assert.Contains("flagship-gateway-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Enter Black Ledger", view, StringComparison.Ordinal);
+        Assert.Contains("Open Black Ledger", view, StringComparison.Ordinal);
         Assert.Contains("Download Chummer", view, StringComparison.Ordinal);
         Assert.Contains("Open downloads", view, StringComparison.Ordinal);
         Assert.Contains("Open play shell", view, StringComparison.Ordinal);
@@ -62,7 +62,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("recommended-download__trustrail", view, StringComparison.Ordinal);
         Assert.Contains("The same build for everyone", view, StringComparison.Ordinal);
-        Assert.Contains("Guest or link this copy", view, StringComparison.Ordinal);
+        Assert.Contains("Link this copy on first launch", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access stay calm", view, StringComparison.Ordinal);
         Assert.Contains("Release notes, known issues, and requirements", view, StringComparison.Ordinal);
         Assert.Contains("Open current release", view, StringComparison.Ordinal);
@@ -113,6 +113,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("OpenAI account in ChatGPT", view, StringComparison.Ordinal);
         Assert.Contains("OpenAI account in ChatGPT", consoleView, StringComparison.Ordinal);
         Assert.Contains("authorize with your OpenAI account in ChatGPT", controller, StringComparison.Ordinal);
+        Assert.Contains("Public Codex contribution code", consoleView, StringComparison.Ordinal);
+        Assert.Contains("counts the tokens used through it", consoleView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -219,6 +221,45 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpPost(\"/participate/karma-forge\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("KarmaForgeSubmitted.cshtml", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildGhostConciergeViewUsesTheSharedParticipationDecisionShell()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "BuildGhostConcierge.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("Build Ghost operating split", view, StringComparison.Ordinal);
+        Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
+        Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
+        Assert.Contains("The experiment should leave behind receipts, not vibes.", view, StringComparison.Ordinal);
+        Assert.Contains("Use the public tools to guide the experiment, not to own it.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParticipateViewLinksToTheBuildGhostConciergeWithoutClaimingToolTruth()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("ALICE build ghosts", view, StringComparison.Ordinal);
+        Assert.Contains("Open Build Ghost concierge", view, StringComparison.Ordinal);
+        Assert.Contains("The actual Build Ghost compare and apply truth still stays inside first-party Chummer runtime and receipts.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildGhostConciergeControllerAndServicesWireTheBoundedRoute()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string servicesPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string services = File.ReadAllText(servicesPath);
+
+        Assert.Contains("BuildGhostConciergeService", services, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/build-ghosts\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/build-ghosts.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildGhostConcierge.cshtml", controller, StringComparison.Ordinal);
     }
 
     [Fact]

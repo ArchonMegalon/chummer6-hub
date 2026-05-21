@@ -227,6 +227,15 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn("If another Codex or operator is assisting, give them this directory or tarball first.", bootstrap_text)
         self.assertIn("write_manifest_validation_audit_bundle \\", bootstrap_text)
         self.assertIn("Audit bundle: ${dist_dir}/manifest-validation-audit", bootstrap_text)
+        self.assertIn('python3 - "$verifier_path" "$manifest_path" "$compatibility_manifest_path" <<\'PY\'', bootstrap_text)
+        self.assertIn('def derive_verifier_owned_value(name: str, current_value):', bootstrap_text)
+        self.assertIn('materializer_path = verifier_path.with_name("materialize_public_release_channel.py")', bootstrap_text)
+        self.assertIn("def required_heads_and_platforms(payload: dict)", bootstrap_text)
+        self.assertIn('materializer.desktop_tuple_coverage(', bootstrap_text)
+        self.assertIn('materializer.desktop_surface_refs(', bootstrap_text)
+        self.assertIn('"expected_desktop_surface_ref_rows"', bootstrap_text)
+        self.assertIn('"expected_artifact_publication_binding_rows"', bootstrap_text)
+        self.assertIn('"expected_registry_boundary_coverage"', bootstrap_text)
         self.assertIn('sync_startup_smoke_receipts_for_local_verifier "$startup_smoke_dir" "$audit_dir"', bootstrap_text)
         self.assertIn("startup-smoke/startup-smoke-*.receipt.json copies in verifier-compatible layout", bootstrap_text)
         self.assertIn("exposes desktop files that are not present in manifest truth", bootstrap_text)
@@ -237,6 +246,10 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertNotIn('[[ -f "$canonical_output" ]]', bootstrap_text)
         self.assertIn("materializer.desktop_tuple_coverage(", bootstrap_text)
         self.assertIn("materializer.compatibility_payload(canonical_payload)", bootstrap_text)
+        self.assertIn('def derive_verifier_owned_value(payload: dict, name: str, current_value):', bootstrap_text)
+        self.assertIn('"expected_desktop_surface_ref_rows"', bootstrap_text)
+        self.assertIn('"expected_artifact_publication_binding_rows"', bootstrap_text)
+        self.assertIn('"expected_registry_boundary_coverage"', bootstrap_text)
         self.assertIn('compatibility_downloads = compatibility_payload.get("downloads")', bootstrap_text)
         self.assertIn('"compatibility_count": len(compatibility_downloads)', bootstrap_text)
         self.assertNotIn('"compatibility_count": len(downloads)', bootstrap_text)
@@ -314,6 +327,48 @@ class StackConfigSmokeTests(unittest.TestCase):
             script_text = script_path.read_text(encoding="utf-8")
             self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"', script_text)
             self.assertIn('CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}"', script_text)
+
+    def test_run_services_manifest_generator_recanonicalizes_verifier_owned_release_channel_surfaces(self):
+        script_path = REPO_ROOT / "scripts" / "generate-releases-manifest.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('def derive_verifier_owned_value(name: str, current_value):', script_text)
+        self.assertIn('materializer_path = verifier_path.with_name("materialize_public_release_channel.py")', script_text)
+        self.assertIn("def fallback_tuple_coverage(local_payload: dict)", script_text)
+        self.assertIn('materializer.desktop_surface_refs(', script_text)
+        self.assertIn('"expected_external_proof_request_rows"', script_text)
+        self.assertIn('"expected_desktop_route_truth_rows"', script_text)
+        self.assertIn('"expected_install_aware_artifact_registry_rows"', script_text)
+        self.assertIn('"expected_desktop_surface_ref_rows"', script_text)
+        self.assertIn('"expected_artifact_identity_registry_rows"', script_text)
+        self.assertIn('"expected_artifact_publication_binding_rows"', script_text)
+        self.assertIn('"expected_registry_boundary_coverage"', script_text)
+
+    def test_run_services_public_bundle_materializer_recanonicalizes_verifier_owned_release_channel_surfaces(self):
+        script_path = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('def derive_verifier_owned_value(name: str, current_value):', script_text)
+        self.assertIn('materializer_path = verifier_path.with_name("materialize_public_release_channel.py")', script_text)
+        self.assertIn("def fallback_tuple_coverage(local_payload: dict)", script_text)
+        self.assertIn('materializer.desktop_surface_refs(', script_text)
+        self.assertIn('"expected_external_proof_request_rows"', script_text)
+        self.assertIn('"expected_desktop_route_truth_rows"', script_text)
+        self.assertIn('"expected_install_aware_artifact_registry_rows"', script_text)
+        self.assertIn('"expected_desktop_surface_ref_rows"', script_text)
+        self.assertIn('"expected_artifact_identity_registry_rows"', script_text)
+        self.assertIn('"expected_artifact_publication_binding_rows"', script_text)
+        self.assertIn('"expected_registry_boundary_coverage"', script_text)
+
+    def test_run_services_public_bundle_materializer_prefers_canonical_release_channel_source(self):
+        script_path = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('resolve_public_release_channel_source()', script_text)
+        self.assertIn('"$REGISTRY_ROOT/.codex-studio/published/RELEASE_CHANNEL.generated.json"', script_text)
+        self.assertIn('PUBLIC_RELEASE_CHANNEL_SOURCE_PATH="$(resolve_public_release_channel_source)"', script_text)
+        self.assertIn('detect_auto_disabled_artifact_ids "$combined_files_root" "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH"', script_text)
+        self.assertIn('python3 - "$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" <<\'PY\'', script_text)
 
     def test_run_services_release_upload_scripts_avoid_bash4_array_builtins(self):
         script_paths = [

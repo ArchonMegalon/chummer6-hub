@@ -9,7 +9,15 @@
     var selectedFaction = Model.SelectedFaction;
     var selectedFactionSlug = selectedFaction is null ? string.Empty : selectedFaction.Id.Replace('_', '-');
     var selectedTurn = Model.World?.CurrentTurn ?? 1;
+    if (Context.Request.Query.TryGetValue("turn", out var requestedTurnValues)
+        && int.TryParse(requestedTurnValues.FirstOrDefault(), out var requestedTurn)
+        && requestedTurn > 0)
+    {
+        selectedTurn = requestedTurn;
+    }
     var selectedDispatch = Model.SelectedDispatch;
+    var worldTurnBriefing = Model.WorldTurnBriefing;
+    var newsreelBroadcast = worldTurnBriefing?.Broadcast;
     var accountCtaHref = Model.Chrome.Authenticated ? "/account/ledger/onboarding" : "/login?next=%2Faccount%2Fledger%2Fonboarding";
     var accountCtaLabel = Model.Chrome.Authenticated ? "Open onboarding" : "Join a faction";
 
@@ -99,20 +107,64 @@
     };
 }
 
-<section class="trust-page-hero trust-page-hero--compact">
-    <div class="trust-page-hero__copy">
+<section class="ledger-flagship ledger-flagship--public">
+    <div class="ledger-flagship__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        <p class="ledger-flagship__support">Black Ledger should open like a command deck, not a brochure. Start on the globe, read the countries, follow the arrows, then drill into files and dispatches.</p>
         <div class="trust-claim__microproof">
             <span>Turn @(Model.World?.CurrentTurn ?? 1)</span>
             <span>Opt-in aggregate only</span>
             <span>No player identities</span>
         </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
+            <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+        </div>
     </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+    <div class="ledger-flagship__stage">
+        @if (commandMap is not null)
+        {
+            <div class="ledger-flagship__map-frame">
+                <div
+                    class="ledger-flagship__geoscape"
+                    data-black-ledger-geoscape-root
+                    data-variant="full"
+                    data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=@selectedTurn&amp;mode=@(commandMap.CurrentMode)"
+                    data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                    data-initial-mode="@(commandMap.CurrentMode)"
+                    data-selected-faction="@selectedFactionSlug"
+                    data-tick-headline="@Model.World?.TurnHeadline"
+                    data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"
+                    data-primary-label="@Model.PrimaryAction.Label"
+                    data-primary-href="@Model.PrimaryAction.Href"
+                    data-secondary-label="@Model.SecondaryAction.Label"
+                    data-secondary-href="@Model.SecondaryAction.Href"></div>
+            </div>
+        }
+        <div class="ledger-flagship__nav" aria-label="Black Ledger navigation">
+            <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/ledger/map#ledger-map">
+                <span class="tag">Map</span>
+                <strong>Command globe</strong>
+                <p>Read pressure on the big board first, then inspect the controlled country-sized faction territories.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/ledger/factions/@(selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle")">
+                <span class="tag">Faction</span>
+                <strong>Faction file</strong>
+                <p>Open the dominant file and track what that country is doing to the city this turn.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/ledger/dispatches">
+                <span class="tag">Dispatch</span>
+                <strong>Dispatch lane</strong>
+                <p>Pressure arrows are backed by dispatches and receipts, not fake cinematic noise.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="@accountCtaHref">
+                <span class="tag">Internal</span>
+                <strong>@accountCtaLabel</strong>
+                <p>Move from the public board into the internal faction command surfaces when you need full context.</p>
+            </a>
+        </div>
     </div>
 </section>
 
@@ -128,16 +180,10 @@
         <div class="ledger-command-map ledger-command-map--pregold">
             @if (commandMap is not null)
             {
-                <div
-                    class="ledger-command-map__globe"
-                    data-black-ledger-geoscape-root
-                    data-variant="full"
-                    data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=@selectedTurn&mode=@(commandMap.CurrentMode)"
-                    data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
-                    data-initial-mode="@(commandMap.CurrentMode)"
-                    data-selected-faction="@selectedFactionSlug"
-                    data-tick-headline="@Model.World.TurnHeadline"
-                    data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"></div>
+                <p class="muted-copy">@(selectedTurn >= 2 ? "Turn 2 deterministic preview is ready. Mode: deterministic_test. Turn 2 deterministic preview stays public-safe and receipt-backed." : "Mode: preseeded.")</p>
+                <div class="ledger-command-map__globe ledger-command-map__globe--mirrored">
+                    <div class="muted-copy">The flagship globe above is the primary surface. This section keeps the command-map anchor and tactical fallback lane intact.</div>
+                </div>
             }
             <div class="ledger-command-map__shell ledger-command-map__shell--fallback" data-geoscape-fallback>
                 <div class="ledger-world-shell__map ledger-command-map__map">
@@ -164,7 +210,7 @@
             </div>
         </div>
         <div class="ledger-world-shell__districts route-choice-grid route-choice-grid--three" aria-label="District fallback cards">
-            @foreach (var district in Model.World.Districts.Take(6))
+            @foreach (var district in Model.World.Districts)
             {
                 <article class="route-choice-card" id="@districtAnchorId(district.Id)" data-map-district-card="@district.Id">
                     <span class="tag">@district.DominantFaction</span>
@@ -182,6 +228,69 @@
 
     @if (Model.NewsreelStatus is not null)
     {
+        if (newsreelBroadcast is not null)
+        {
+            <section class="editorial-block ledger-newsreel-broadcast" id="newsreel-player">
+                <div class="editorial-block__lead">
+                    <p class="eyebrow">Command newsreel</p>
+                    <h2 class="editorial-title">Anchor package for @worldTurnBriefing!.TransitionLabel</h2>
+                    <p class="editorial-copy">@worldTurnBriefing.NewsreelLead</p>
+                </div>
+                <div class="ledger-newsreel-broadcast__shell">
+                    <div class="ledger-newsreel-broadcast__player">
+                        <video class="ledger-newsreel-broadcast__video faction-promo-video"
+                               controls
+                               playsinline
+                               preload="metadata"
+                               poster="@newsreelBroadcast.PosterHref">
+                            <source src="@newsreelBroadcast.VideoMp4Href" type="video/mp4" />
+                            <source src="@newsreelBroadcast.VideoWebmHref" type="video/webm" />
+                            <track kind="captions" src="@newsreelBroadcast.CaptionsHref" srclang="en" label="English" default />
+                            Your browser does not support HTML5 video playback for this route.
+                        </video>
+                        <div class="trust-claim__microproof">
+                            <span>Anchor: @newsreelBroadcast.AnchorName</span>
+                            <span>Desk: @newsreelBroadcast.DeskLabel</span>
+                            <span>Duration: @newsreelBroadcast.DurationLabel</span>
+                        </div>
+                    </div>
+                    <aside class="ledger-newsreel-broadcast__sidebar">
+                        <article class="route-choice-card">
+                            <span class="tag">@newsreelBroadcast.PackageLabel</span>
+                            <h3>Broadcast posture</h3>
+                            <p>@newsreelBroadcast.AudioPosture</p>
+                            <p>@newsreelBroadcast.MusicPosture</p>
+                            <div class="route-choice-card__proof">
+                                <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
+                                <a href="@newsreelBroadcast.CaptionsHref">Captions</a>
+                                <a href="@worldTurnBriefing.ValidationJsonHref">JSON brief</a>
+                            </div>
+                        </article>
+                        <article class="route-choice-card">
+                            <span class="tag">Rundown</span>
+                            <h3>Producer sheet</h3>
+                            <ul class="ledger-newsreel-broadcast__list">
+                                @foreach (var line in newsreelBroadcast.Rundown)
+                                {
+                                    <li>@line</li>
+                                }
+                            </ul>
+                        </article>
+                        <article class="route-choice-card">
+                            <span class="tag">Ticker</span>
+                            <h3>Lower-third crawl</h3>
+                            <ul class="ledger-newsreel-broadcast__list">
+                                @foreach (var line in newsreelBroadcast.TickerItems)
+                                {
+                                    <li>@line</li>
+                                }
+                            </ul>
+                        </article>
+                    </aside>
+                </div>
+            </section>
+        }
+
         <section class="workflow-band workflow-band--compact">
             <div class="workflow-band__lead">
                 <p class="eyebrow">Turn @Model.NewsreelStatus.Turn newsreel</p>
@@ -199,7 +308,7 @@
     <section class="editorial-block" id="ledger-factions">
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction files</p>
-            <h2 class="editorial-title">Logos, backdrops, score ledgers, and storyboard-safe intros.</h2>
+            <h2 class="editorial-title">Logos, backdrops, score ledgers, and first-party motion intros.</h2>
             <p class="editorial-copy">Every public faction lane shows pressure, not people, with one clear CTA and no fake provider claim.</p>
         </div>
         <div class="faction-profile-grid">
@@ -228,7 +337,7 @@
                     </div>
                     <div class="trust-claim__microproof">
                         <span>Safety: public-safe</span>
-                        <span>Video: fallback storyboard</span>
+                        <span>Video: first-party motion</span>
                         <span>Receipt: @(Model.World.LastTick?.ReceiptId ?? "turn-1")</span>
                     </div>
                     <a class="editorial-strip__action" href="/ledger/factions/@slug" data-faction-file-link="@slug">Open faction file</a>
@@ -251,7 +360,7 @@
                     <p class="editorial-copy">@introLine(selectedFaction.Id)</p>
                     <div class="trust-claim__microproof">
                         <span>Safety: public-safe</span>
-                        <span>Video: storyboard fallback</span>
+                        <span>Video: first-party motion</span>
                         <span>Package pressure visible</span>
                     </div>
                     <div class="stacked-actions">
@@ -318,3 +427,21 @@
 }
 
 <script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>
+<script>
+(() => {
+    const video = document.querySelector('#newsreel-player video');
+    if (!(video instanceof HTMLVideoElement)) {
+        return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('autoplay') !== '1') {
+        return;
+    }
+
+    video.muted = true;
+    video.play().catch(() => {
+        video.muted = false;
+    });
+})();
+</script>

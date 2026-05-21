@@ -89,6 +89,15 @@ cards:
     proof_note: "Shows: support, feedback, and release truth are meant to close the loop back to users rather than disappear into a private inbox."
     pain: Reporting a problem is useless if the product cannot route, close, and explain the outcome honestly.
     payoff: Improvement becomes a visible loop instead of a one-way complaint box.
+  - id: support_assistant
+    bucket: supporting_reads
+    title: Support assistant
+    summary: First-party support help may use a bounded assistant without giving away rules truth, sourcebook text, or private state.
+    href: /help
+    badge: Bounded
+    audience: public
+    image_family: archive_stair
+    action_label: Open help
   - id: deterministic_truth
     bucket: why_trust_it
     title: Deterministic rules truth
@@ -399,7 +408,7 @@ cards:
   - id: horizon_community_hub
     bucket: coming_next
     title: COMMUNITY HUB
-    summary: Find a run, see the rules, get scheduled cleanly, and let the world remember the outcome.
+    summary: Find a run, see the rules, get scheduled cleanly, and keep live-room handoff bounded when an external venue hosts the session.
     href: https://github.com/ArchonMegalon/Chummer6/blob/main/HORIZONS/community-hub.md
     badge: Research
     audience: public
@@ -414,6 +423,8 @@ cards:
     external_ok: true
     pain: Finding a table still means juggling community rules, approvals, chats, calendars, and follow-up by hand.
     payoff: Chummer becomes the structured layer above community chats, calendars, and play surfaces instead of another disconnected app.
+    proof_note: "Proof: signed-in session venue pages and a public-safe run venue route now exist while keeping private room truth out of public surfaces."
+    microproof: Signed-in venue page|Public-safe route|Private-by-default handoff
   - id: horizon_black_ledger
     bucket: coming_next
     title: BLACK LEDGER

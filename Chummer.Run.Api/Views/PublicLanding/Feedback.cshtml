@@ -7,6 +7,8 @@
         ? "/participate/codex"
         : "/auth/google/start?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
+    var signalProjection = Model.SignalProjection;
+    var signalOperations = Model.SignalOperations;
     var followSettingsHref = signalLoop.FollowSettingsHref;
     var followSettingsLabel = signalLoop.FollowSettingsLabel;
     var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
@@ -119,6 +121,34 @@
     };
 }
 
+@if (signalProjection is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Projection boundary</p>
+            <h2 class="editorial-title">Public feedback can show direction without pretending to be release truth.</h2>
+            <p class="editorial-copy">This packet keeps the public board subordinate to first-party truth, fallback, and shipped closeout before feature demand becomes public celebration.</p>
+        </div>
+        <div class="support-operations-panel">
+            @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
+        </div>
+    </section>
+}
+
+@if (signalOperations is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Operations packet</p>
+            <h2 class="editorial-title">Hosted signal promotion still needs ingress, routing, and closeout discipline.</h2>
+            <p class="editorial-copy">The public board earns trust only when promotion, taxonomy, webhook ingress, and closeout routes remain inspectable instead of becoming vibes.</p>
+        </div>
+        <div class="support-operations-panel">
+            @await Html.PartialAsync("~/Views/Shared/_PublicSignalOperationsPacket.cshtml", signalOperations)
+        </div>
+    </section>
+}
+
 <section class="release-footnote route-anchor-target" id="public-feedback">
     <p class="eyebrow">Feedback</p>
     <h1 class="page-title">Share product ideas and safe public bugs in one place</h1>
@@ -128,14 +158,14 @@
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
     </div>
-    <p class="muted-copy">Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback.</p>
+    <p class="muted-copy">Votes show demand; Chummer-owned proof decides what ships. Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback.</p>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Public-safe boundary</p>
         <h2 class="editorial-title">This page stays public-facing on purpose.</h2>
-        <p class="editorial-copy">Use the public board for safe ideas and safe bugs. If the issue needs logs, account history, recovery, or operator follow-up, leave this page and use Help.</p>
+        <p class="editorial-copy">Use the public board for safe ideas and safe bugs. This page stays preview-only on this host until proof-backed closeout is real here. If the issue needs logs, account history, recovery, or private support follow-up, leave this page and use Help.</p>
     </div>
 </section>
 
@@ -189,7 +219,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Signal loop</p>
         <h2 class="editorial-title">A public signal should start in one place and end on a page people can actually use.</h2>
-        <p class="editorial-copy">This keeps public feedback visible without pretending that comments are the same thing as roadmap commitments, shipped proof, or private support.</p>
+        <p class="editorial-copy">This keeps public feedback visible without pretending that comments are the same thing as roadmap commitments, shipped proof, or private support. Public feedback can still show demand, but account-backed follow-up stays off until shipped proof and first-party closeout receipts are both real on this host.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var stage in signalStages)
@@ -204,6 +234,14 @@
                 </div>
             </article>
         }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Closeout posture</p>
+        <h2 class="editorial-title">Shipped follow-through stays upstream of public celebration.</h2>
+        <p class="editorial-copy">First-party follow-up is still preview-only on this host. The public board can show demand now, but shipped follow-through only lands after shipped proof and first-party receipts agree.</p>
     </div>
 </section>
 

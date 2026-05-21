@@ -6,7 +6,7 @@ using Chummer.Run.Contracts.Community;
 
 namespace Chummer.Run.Api.Services.Support;
 
-public sealed class SupportAssistantService
+public sealed class SupportAssistantService : IFirstPartySupportAssistant
 {
     private static readonly char[] TokenSeparators =
     [

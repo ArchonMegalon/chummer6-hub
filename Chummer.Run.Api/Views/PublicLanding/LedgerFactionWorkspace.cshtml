@@ -5,20 +5,48 @@
     ViewData["SurfaceClass"] = "surface-ledger";
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
+<section class="ledger-flagship ledger-flagship--workspace">
+    <div class="ledger-flagship__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        <p class="ledger-flagship__support">The internal Black Ledger view starts with the globe, not a list. Hover factions, read pressure, then drop into the exact command lane.</p>
         <div class="trust-claim__microproof">
             <span>Authenticated route</span>
             <span>Faction: @Model.Faction.PublicName</span>
             <span>Public route stays separate</span>
         </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@Model.PublicProfileHref">Open public faction file</a>
+            <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open public globe</a>
+        </div>
     </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.PublicProfileHref">Open public faction file</a>
-        <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open command map</a>
+    <div class="ledger-flagship__stage">
+        <div class="ledger-flagship__map-frame">
+            <div
+                class="ledger-flagship__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="workspace"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=1&amp;mode=influence"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-initial-mode="influence"
+                data-selected-faction="@Model.Faction.Id.Replace('_', '-')"
+                data-tick-headline="Turn 1 pressure live."
+                data-primary-label="Open public file"
+                data-primary-href="@Model.PublicProfileHref"
+                data-secondary-label="Open manage"
+                data-secondary-href="/account/ledger/factions/@Model.Faction.Id.Replace('_', '-')?section=manage"></div>
+        </div>
+        <div class="ledger-flagship__nav" aria-label="Faction workspace lanes">
+            @foreach (var tab in Model.Tabs)
+            {
+                <a class="ledger-flagship__nav-card @(tab.Current ? "ledger-flagship__nav-card--current" : string.Empty)" href="@tab.Href">
+                    <span class="tag">Tab</span>
+                    <strong>@tab.Label</strong>
+                    <p>@(tab.Current ? "Current authenticated workspace lane." : "Open this faction lane on the internal board.")</p>
+                </a>
+            }
+        </div>
     </div>
 </section>
 
@@ -204,3 +232,5 @@ else if (string.Equals(Model.CurrentSection, "manage", StringComparison.OrdinalI
         </div>
     </section>
 }
+
+<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>

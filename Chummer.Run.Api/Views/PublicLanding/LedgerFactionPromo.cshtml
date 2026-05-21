@@ -17,28 +17,74 @@
         <div class="trust-claim__microproof">
             <span>Provider: @Model.Promo.ProviderStatus</span>
             <span>Render mode: @Model.Promo.RenderMode</span>
+            <span>Fallback: @Model.Promo.FallbackRenderMode</span>
             <span>Safety: public-safe</span>
         </div>
         <div class="stacked-actions">
-            <a class="button-like button-like--primary" href="@Model.Promo.JsonHref">Open JSON brief</a>
+            <a class="button-like button-like--primary" href="@($"{Model.Promo.HtmlHref}?autoplay=1#promo-player")">Open watch page</a>
+            <a class="button-like button-like--secondary" href="#promo-player">Play inline here</a>
             <a class="button-like button-like--secondary" href="@Model.Promo.CaptionsHref">Open captions</a>
+            <a class="button-like button-like--secondary" href="@Model.Promo.JsonHref">Open JSON brief</a>
         </div>
     </div>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Storyboard fallback</p>
+        <p class="eyebrow">First-party motion video</p>
         <h2 class="editorial-title">@Model.Promo.StaticCardLabel</h2>
-        <p class="editorial-copy">No external media provider is claimed here. This lane stays first-party and storyboard-backed until a provider is verified.</p>
+        <p class="editorial-copy">@Model.Promo.CampaignHook</p>
     </div>
-    <div class="faction-storyboard-strip">
-        @foreach (var line in Model.Promo.CaptionLines)
+    <div id="promo-player" class="route-choice-card" data-storyboard-player>
+        <div class="trust-claim__microproof">
+            <span>Mode: @Model.Promo.PlaybackLabel</span>
+            <span>Captions: included</span>
+            <span>Formats: MP4 + WebM</span>
+        </div>
+        <video class="faction-promo-video"
+               controls
+               playsinline
+               preload="metadata"
+               poster="@Model.Promo.PosterHref">
+            <source src="@Model.Promo.VideoMp4Href" type="video/mp4" />
+            <source src="@Model.Promo.VideoWebmHref" type="video/webm" />
+            <track kind="captions" src="@Model.Promo.CaptionsHref" srclang="en" label="English" default />
+            Your browser does not support HTML5 video playback for this route.
+        </video>
+        <div class="trust-claim__microproof">
+            <span>Fallback mode: storyboard</span>
+            <span>Captions: included</span>
+        </div>
+        <div class="stacked-actions">
+            <button type="button" class="button-like button-like--secondary" data-storyboard-prev>Previous frame</button>
+            <button type="button" class="button-like button-like--primary" data-storyboard-toggle>Auto-play storyboard</button>
+            <button type="button" class="button-like button-like--secondary" data-storyboard-next>Next frame</button>
+        </div>
+        <div class="faction-storyboard-strip">
+            @for (int index = 0; index < Model.Promo.CaptionLines.Count; index += 1)
+            {
+                <article class="route-choice-card" data-storyboard-frame="@(index)" hidden="@(index == 0 ? null : "hidden")">
+                    <span class="tag">Frame @(index + 1)</span>
+                    <h3>@Model.Promo.PublicName</h3>
+                    <p>@Model.Promo.CaptionLines[index]</p>
+                </article>
+            }
+        </div>
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Ad promise</p>
+        <h2 class="editorial-title">What this promo may and may not claim</h2>
+        <p class="editorial-copy">@Model.Promo.AudiencePromise</p>
+    </div>
+    <div class="route-choice-grid route-choice-grid--three">
+        @foreach (var shot in Model.Promo.StoryboardShots)
         {
             <article class="route-choice-card">
-                <span class="tag">Frame</span>
-                <h3>@Model.Promo.PublicName</h3>
-                <p>@line</p>
+                <span class="tag">Shot plan</span>
+                <p>@shot</p>
             </article>
         }
     </div>
@@ -48,7 +94,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Formats</p>
         <h2 class="editorial-title">Public-safe deliverables</h2>
-        <p class="editorial-copy">Every faction video route includes a JSON brief, caption file, and fallback storyboard-safe visual treatment.</p>
+        <p class="editorial-copy">Every faction video route now includes real motion-video files, a JSON brief, a caption file, and a storyboard fallback.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var format in Model.Promo.FormatLabels)
@@ -61,12 +107,80 @@
     </div>
 </section>
 
+<script>
+(() => {
+    const player = document.querySelector('[data-storyboard-player]');
+    if (!player) {
+        return;
+    }
+    const frames = Array.from(player.querySelectorAll('[data-storyboard-frame]'));
+    const video = player.querySelector('video');
+    const previous = player.querySelector('[data-storyboard-prev]');
+    const next = player.querySelector('[data-storyboard-next]');
+    const toggle = player.querySelector('[data-storyboard-toggle]');
+    if (frames.length === 0 || !(previous instanceof HTMLButtonElement) || !(next instanceof HTMLButtonElement) || !(toggle instanceof HTMLButtonElement)) {
+        return;
+    }
+
+    let activeIndex = 0;
+    let autoplayId = null;
+
+    const showFrame = (index) => {
+        activeIndex = (index + frames.length) % frames.length;
+        frames.forEach((frame, frameIndex) => {
+            frame.hidden = frameIndex !== activeIndex;
+        });
+    };
+
+    const stopAutoplay = () => {
+        if (autoplayId !== null) {
+            window.clearInterval(autoplayId);
+            autoplayId = null;
+        }
+        toggle.textContent = 'Auto-play storyboard';
+    };
+
+    const startAutoplay = () => {
+        stopAutoplay();
+        autoplayId = window.setInterval(() => showFrame(activeIndex + 1), 3200);
+        toggle.textContent = 'Pause storyboard';
+    };
+
+    previous.addEventListener('click', () => {
+        stopAutoplay();
+        showFrame(activeIndex - 1);
+    });
+    next.addEventListener('click', () => {
+        stopAutoplay();
+        showFrame(activeIndex + 1);
+    });
+    toggle.addEventListener('click', () => {
+        if (autoplayId === null) {
+            startAutoplay();
+            return;
+        }
+        stopAutoplay();
+    });
+
+    if (video instanceof HTMLVideoElement) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('autoplay') === '1') {
+            video.muted = true;
+            video.play().catch(() => {
+                video.muted = false;
+            });
+        }
+    }
+    showFrame(0);
+})();
+</script>
+
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Safety notes</p>
         <h2 class="editorial-title">Provider and lore boundaries</h2>
     </div>
-    <div class="route-choice-grid route-choice-grid--three">
+        <div class="route-choice-grid route-choice-grid--three">
         @foreach (var note in Model.DeliveryNotes)
         {
             <article class="route-choice-card">
@@ -74,5 +188,8 @@
                 <p>@note</p>
             </article>
         }
+    </div>
+    <div class="stacked-actions">
+        <a class="button-like button-like--secondary" href="@Model.Promo.ValidationHref">Open validation</a>
     </div>
 </section>

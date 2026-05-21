@@ -133,6 +133,7 @@ public sealed class CodexParticipationController : Controller
                     SubjectId: subject.SubjectId,
                     ProjectId: _configuration["CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID"] ?? DefaultProjectId,
                     SubjectLabel: subject.DisplayName,
+                    ParticipantCodexCode: Request.HasJsonContentType() ? ExtractStartCodexCode() : null,
                     GroupId: null,
                     Visibility: "group",
                     RequestedLaneType: "participant_burst",
@@ -311,6 +312,7 @@ public sealed class CodexParticipationController : Controller
                 ProjectId: request.ProjectId,
                 GroupId: request.GroupId,
                 SubjectLabel: request.SubjectLabel,
+                ParticipantCodexCode: request.ParticipantCodexCode,
                 BoostCode: request.BoostCode,
                 CampaignId: request.CampaignId,
                 Visibility: request.Visibility ?? "group",
@@ -615,6 +617,7 @@ public sealed class CodexParticipationController : Controller
                 userId = session.UserId,
                 groupId = session.GroupId,
                 projectId = session.ProjectId,
+                participantCodexCode = session.ParticipantCodexCode,
                 requestedLaneType = session.RequestedLaneType,
                 requestedLaneRole = session.RequestedLaneRole,
                 visibility = session.Visibility,
@@ -762,6 +765,7 @@ public sealed class CodexParticipationController : Controller
                 authReadyAtUtc = session.AuthorizedAtUtc,
                 authorizationTier = session.AuthorizationTier,
                 requestedLaneRole = session.RequestedLaneRole,
+                participantCodexCode = session.ParticipantCodexCode,
                 projectId = session.ProjectId
             };
 
@@ -1012,12 +1016,45 @@ public sealed class CodexParticipationController : Controller
 
         return session;
     }
+
+    private string? ExtractStartCodexCode()
+    {
+        try
+        {
+            Request.EnableBuffering();
+            if (Request.Body.CanSeek)
+            {
+                Request.Body.Position = 0;
+            }
+
+            using var document = System.Text.Json.JsonDocument.Parse(Request.Body);
+            if (Request.Body.CanSeek)
+            {
+                Request.Body.Position = 0;
+            }
+
+            return document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object
+                && document.RootElement.TryGetProperty("codexCode", out var codexCode)
+                ? codexCode.GetString()
+                : null;
+        }
+        catch
+        {
+            if (Request.Body.CanSeek)
+            {
+                Request.Body.Position = 0;
+            }
+
+            return null;
+        }
+    }
 }
 
 public sealed record CreateCodexParticipationIntentRequest(
     string? SubjectId,
     string? SubjectLabel,
     string ProjectId,
+    string? ParticipantCodexCode = null,
     string? GroupId = null,
     string? BoostCode = null,
     string? CampaignId = null,

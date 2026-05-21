@@ -142,7 +142,7 @@ public sealed class RegistryTruthBindingService
             : $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}";
         string summary = installation is not null
             ? $"Account-aware guidance keeps claimed install {installation.Platform ?? "desktop"} {installation.Version} on registry-backed release truth without changing the published bytes."
-            : $"Receipt {receipt!.ReceiptId} keeps the public shelf guest-readable while account-aware follow-through stays linked to first-party install truth.";
+            : $"Receipt {receipt!.ReceiptId} keeps the public shelf open while linked install follow-through stays attached to first-party install truth.";
 
         return new RegistryTruthBindingProjection(
             BindingId: StableId("registry-truth-account-aware", sourceId),
@@ -160,15 +160,15 @@ public sealed class RegistryTruthBindingService
             [
                 "The published packages stay the same for every user; only the short-lived setup assistant and install claims become account-aware.",
                 installation is null
-                    ? $"Download receipt {receipt!.ReceiptId} is the first-party handoff anchor."
+                    ? $"Download receipt {receipt!.ReceiptId} is the first-party install anchor."
                     : $"Claimed installation {installation.InstallationId} keeps follow-through on /account/access.",
                 $"{ResolveProofStatus(manifest)} proof and {ResolveSupportabilityState(manifest)} supportability still come from the registry shelf."
             ],
             Actions:
             [
                 new RegistryTruthBindingActionProjection("open_account_access", "Open Devices & access", "/account/access", "Review the signed-in install continuity rail."),
-                new RegistryTruthBindingActionProjection("open_install_handoff", "Open install handoff", comparisonRoute, "Compare account-aware follow-through with the same published installer shelf."),
-                new RegistryTruthBindingActionProjection("open_downloads", "Open downloads", "/downloads", "Return to the guest-readable shelf that still points at the same bytes.")
+                new RegistryTruthBindingActionProjection("open_install_handoff", "Open install route", comparisonRoute, "Compare linked install follow-through with the same published installer shelf."),
+                new RegistryTruthBindingActionProjection("open_downloads", "Open downloads", "/downloads", "Return to the open public shelf that still points at the same bytes.")
             ],
             EmittedAtUtc: now,
             Locale: locale,

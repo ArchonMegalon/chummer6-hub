@@ -585,21 +585,21 @@ public sealed class SignedInTrustStatusService
             || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
-                ? "Signed-in handoff stays preferred while desktop proof receipts are still review-required."
-                : "Guest and signed-in handoffs are both visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
+                ? "The linked install route stays preferred while desktop proof receipts are still review-required."
+                : "Public downloads are visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
         {
-            return "Signed-in handoff is the live path now, so the install stays linked and support can follow the exact device.";
+            return "The linked install route is the live path now, so the install stays attached and support can follow the exact device.";
         }
 
         if (releaseExperience.GuestDownloadAvailable)
         {
-            return "Guest-readable handoff is visible now, and Signed-in handoff adds linked-install follow-through once you want the install attached to your account.";
+            return "The public download is visible now, and signing in adds linked-install follow-through once you want the install attached to your account.";
         }
 
-        return "Signed-in handoff is available now for linked-install follow-through.";
+        return "Linked-install follow-through is available now when you sign in.";
     }
 
     private static string BuildTrustPulseAdoptionSummary(PublicTrustPulseSnapshot pulse)

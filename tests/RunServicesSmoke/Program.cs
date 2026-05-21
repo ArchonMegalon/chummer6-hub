@@ -2566,8 +2566,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "participate_beta", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Join beta waitlist", StringComparison.Ordinal)), "beta waitlist should keep an explicit signed-in action label in canon.");
     Assert(surface.FeatureCards.Any(static card => string.Equals(card.Id, "horizon_local_co_processor", StringComparison.Ordinal) && string.Equals(card.ActionLabel, "Open the horizon page", StringComparison.Ordinal)), "local co-processor should route through its roadmap detail page instead of pretending the overview card is an install action.");
     var releaseExperienceSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", ".codex-design", "product", "PUBLIC_RELEASE_EXPERIENCE.yaml"));
-    Assert(!releaseExperienceSource.Contains("canonical installer", StringComparison.OrdinalIgnoreCase), "release-experience canon should not leak canonical-installer wording into the signed-in handoff copy.");
-    Assert(releaseExperienceSource.Contains("same published download", StringComparison.Ordinal), "release-experience canon should describe the signed-in handoff in customer-facing download language.");
+    Assert(!releaseExperienceSource.Contains("canonical installer", StringComparison.OrdinalIgnoreCase), "release-experience canon should not leak canonical-installer wording into the public release copy.");
+    Assert(releaseExperienceSource.Contains("same published download", StringComparison.Ordinal), "release-experience canon should describe the release route in customer-facing download language.");
     var downloadsSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Downloads.cshtml"));
     var publicLandingControllerSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
     var statusSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml"));
@@ -2656,9 +2656,37 @@ async Task VerifyPublicLandingProjectionAsync()
         store,
         configuration,
         loggerFactory.CreateLogger<ParticipationOperatorNotificationService>());
+    var readyForTonight = new ReadyForTonightService();
+    var knowledgeFabric = new KnowledgeFabricService();
+    var blackLedgerStats = new BlackLedgerPublicStatsService(configuration);
+    var blackLedgerDispatches = new BlackLedgerDispatchService(store, blackLedgerStats, loggerFactory.CreateLogger<BlackLedgerDispatchService>());
+    var blackLedgerFactions = new BlackLedgerFactionOnboardingService(configuration, blackLedgerStats, campaignSpine, store);
+    var blackLedgerAdvisories = new BlackLedgerAdvisoryService(
+        new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { target_ref = "ea-delivery-advisory-smoke" }, HttpStatusCode.OK))),
+        store,
+        configuration,
+        blackLedgerFactions,
+        loggerFactory.CreateLogger<BlackLedgerAdvisoryService>());
+    var blackLedgerBriefings = new BlackLedgerWorldTickBriefingService(blackLedgerStats, blackLedgerFactions);
+    var blackLedgerTickNews = new BlackLedgerTickNewsNotificationService(
+        new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { target_ref = "ea-delivery-news-smoke" }, HttpStatusCode.OK))),
+        store,
+        configuration,
+        new BlackLedgerNewsRecipientResolver(store, configuration),
+        blackLedgerBriefings,
+        blackLedgerFactions,
+        loggerFactory.CreateLogger<BlackLedgerTickNewsNotificationService>());
+    var anarchyPreview = new AnarchyPreviewService(blackLedgerDispatches);
+    var nexusPan = new NexusPanContinuityService(installLinkingStore);
+    var mediaHorizons = new MediaArtifactHorizonsService();
+    var waveEightHorizons = new WaveEightHorizonsService(store, anarchyPreview);
+    var beHumanEventAdapterPosture = new BeHumanEventAdapterPostureService(configuration);
+    var gmVenueAdapter = new BeHumanGmSessionVenueAdapter(new StubHttpClientFactory(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { ok = true }, HttpStatusCode.OK)))), configuration, beHumanEventAdapterPosture);
+    var gmSessionVenues = new GmSessionVenueService(new GmSessionVenueStore(configuration), beHumanEventAdapterPosture, gmVenueAdapter, configuration, store);
     var karmaForge = new KarmaForgeDiscoveryService(new KarmaForgeStore(configuration, loggerFactory.CreateLogger<KarmaForgeStore>()), configuration);
     var packageCatalog = new PublicPackageCatalogService();
     var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
+    var communityCreatorHorizons = new CommunityCreatorHorizonsService(store, installLinkingStore, publicCreatorDiscovery);
     var accountParticipationBridge = new FleetBridgeService(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { detail = "unused" }, HttpStatusCode.OK))), configuration);
     var accountParticipationSessions = new BoostSessionService(store, accounts, groups, accountParticipationBridge, rewards);
     var installBootstrapTickets = new InstallBootstrapTicketService(
@@ -2676,14 +2704,14 @@ async Task VerifyPublicLandingProjectionAsync()
         WebRootPath = Path.Combine(tempRoot, "wwwroot")
     };
     var windowsProofInstallers = new WindowsProofInstallerService(configuration);
-    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, karmaForge, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, karmaForge, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2710,6 +2738,7 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
+    var answerlyPolicy = new AnswerlyRuntimePolicy(configuration);
     var supportCasesController = new SupportCasesController(
         linkedIdentityClient,
         accounts,
@@ -2717,7 +2746,11 @@ async Task VerifyPublicLandingProjectionAsync()
         supportCases,
         supportPresentation,
         supportConciergePackets,
-        new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new AnswerlySupportAssistantAdapter(
+            new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
+            answerlyPolicy,
+            new RulesCoachRouter(),
+            new AnswerlyHumanizerAdapter(answerlyPolicy, new RuleSafeOutputGate())),
         supportAttachments,
         installLinking,
         configuration)
@@ -2731,7 +2764,11 @@ async Task VerifyPublicLandingProjectionAsync()
         supportCases,
         supportPresentation,
         supportConciergePackets,
-        new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
+        new AnswerlySupportAssistantAdapter(
+            new SupportAssistantService(supportCases, canon, campaignSpine, installLinking, supportPresentation, loggerFactory.CreateLogger<SupportAssistantService>()),
+            answerlyPolicy,
+            new RulesCoachRouter(),
+            new AnswerlyHumanizerAdapter(answerlyPolicy, new RuleSafeOutputGate())),
         supportAttachments,
         installLinking,
         configuration)
@@ -3091,7 +3128,7 @@ async Task VerifyPublicLandingProjectionAsync()
         new SupportCaseSubmitRequest(
             Kind: SupportCaseKinds.BugReport,
             Title: "Restart guidance was unclear",
-            Summary: "The signed-in handoff did not explain whether the update was already staged.",
+            Summary: "The linked install route did not explain whether the update was already staged.",
             Detail: "Please make the restart/apply wording clearer on the account-aware update path.",
             InstallationId: "install-smoke-001",
             ApplicationVersion: "0.6.2-smoke",
@@ -3296,7 +3333,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel is not null && accountModel.SupportCases.Any(item => string.Equals(item.CaseId, supportCase.CaseId, StringComparison.Ordinal)), "account page should surface support-case history beside installs and access.");
     Assert(accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary)), "account page should project support lifecycle and closure summaries instead of only raw case rows.");
     Assert(accountModel.SignedInTrustStatus is not null, "account page should project install-specific trust status directly on the signed-in account surface.");
-    Assert(accountModel.SignedInTrustStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "account page should surface who-can-get-it-now posture inside the signed-in trust panel.");
+    Assert(accountModel.SignedInTrustStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "account page should surface who-can-get-it-now posture inside the signed-in trust panel.");
     Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "account page should surface adoption health inside the signed-in trust panel.");
     Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "account page should surface the install-specific caution lane inside the signed-in trust panel.");
     Assert(accountModel.PrivacyBoundary is not null, "account page should surface the signed-in privacy boundary next to visibility and recovery posture.");
@@ -3936,7 +3973,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var m122WorkspaceServerPlanePayload = (m122WorkspaceServerPlaneResult.Result as OkObjectResult)?.Value as CampaignWorkspaceServerPlaneProjection ?? m122WorkspaceServerPlaneResult.Value;
     Assert(m122WorkspaceServerPlanePayload?.CampaignAdoptionLoop is not null, "campaign spine server plane api should project the combined campaign adoption loop on the bounded workspace plane.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "campaign_adoption", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the campaign adoption wizard onto the bounded what-changed rail.");
-    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runner goal pins onto the bounded what-changed rail.");
+    Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "runner_goal", StringComparison.Ordinal)) == true, "campaign spine server plane api should project runner-goal pins onto the bounded what-changed rail.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "resolution_report_approval", StringComparison.Ordinal)) == true, "campaign spine server plane api should project ResolutionReport approvals onto the bounded what-changed rail.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "world_tick", StringComparison.Ordinal)) == true, "campaign spine server plane api should project the first BLACK LEDGER WorldTick onto the bounded what-changed rail.");
     Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, "player_safe_news", StringComparison.Ordinal)) == true, "campaign spine server plane api should project player-safe news previews onto the bounded what-changed rail.");
@@ -4124,7 +4161,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && row.Value.Contains("preview 0.6.3-smoke", StringComparison.Ordinal)), "signed-in downloads should surface fix availability for the linked install instead of leaving it implicit in prose.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in downloads should surface the install-specific caution lane beside the fix target.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "signed-in downloads should surface adoption health directly inside the install-specific trust panel.");
-    Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "downloads should explain the current access posture beside the release shelf.");
+    Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "downloads should explain the current access posture beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "downloads should surface current adoption evidence beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "downloads should surface launch-readiness posture beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "downloads should surface the weekly caution lane from the trust pulse.");
@@ -4149,7 +4186,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedNowModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && row.Value.Contains("preview 0.6.3-smoke", StringComparison.Ordinal)), "signed-in current-release page should surface install-specific fix availability.");
     Assert(authenticatedNowModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in current-release page should surface install-specific caution.");
     Assert(authenticatedNowModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("trust routes", StringComparison.OrdinalIgnoreCase)), "signed-in current-release page should surface adoption health next to the install-specific trust rows.");
-    Assert(authenticatedNowModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "current-release should explain who can get the recommended build now.");
+    Assert(authenticatedNowModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Recommended now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "current-release should explain who can get the recommended build now.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Closure health", StringComparison.Ordinal) && row.Value.Contains("waiting closure", StringComparison.OrdinalIgnoreCase)), "current-release should surface closure-health follow-through in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Progress trend", StringComparison.Ordinal) && row.Value.Contains("Trend window", StringComparison.OrdinalIgnoreCase)), "current-release should surface trend window movement in the weekly trust pulse.");
     Assert(authenticatedNowModel.TrustPulse.TrendSamples.Count > 1, "current-release should surface measured progress points alongside the weekly pulse summary.");
@@ -4310,7 +4347,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(accountAccessModel?.CurrentSection, "access", StringComparison.Ordinal), "account access route should render the devices-and-access section.");
     Assert(string.Equals(accountAccessModel?.Chrome.Title, "Account · Devices & access", StringComparison.Ordinal), "account access route should project its own chrome title.");
     Assert(accountAccessModel?.SignedInTrustStatus is not null, "account access route should keep the install-specific trust panel visible on the device surface.");
-    Assert(accountAccessModel?.SignedInTrustStatus?.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)) == true, "account access route should keep the current access posture visible next to linked-install details.");
+    Assert(accountAccessModel?.SignedInTrustStatus?.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))) == true, "account access route should keep the current access posture visible next to linked-install details.");
     Assert(accountAccessModel?.EntitlementSyncReceipts is not null, "account access route should project standalone entitlement-sync receipts next to devices and access posture.");
     Assert(accountAccessModel?.EntitlementSyncReceipts?.ProvenanceRecoveryReceipts.Count >= 1, "account access route should keep entitlement-sync provenance recovery cues visible.");
     Assert(accountAccessModel?.EntitlementSyncReceipts?.ConflictReceipts.Any(item => item.BlocksContinue && string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)) == true, "account access route should keep blocking entitlement-sync conflicts explicit and scoped.");
@@ -4636,13 +4673,13 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(string.Equals(authenticatedHomeModel!.CurrentSection, "overview", StringComparison.Ordinal), "default home route should land on the overview section.");
     Assert(authenticatedHomeModel.Sections.Any(static section => string.Equals(section.Href, "/home/access", StringComparison.Ordinal)), "home should expose the dedicated access section link.");
     Assert(authenticatedHomeModel.SignedInStatus is not null, "signed-in home should project the shared signed-in trust status.");
-    Assert(authenticatedHomeModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "signed-in home should surface who-can-get-it-now posture directly in the shared trust panel.");
+    Assert(authenticatedHomeModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "signed-in home should surface who-can-get-it-now posture directly in the shared trust panel.");
     Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty fix-availability row directly in the shared trust panel.");
     Assert(authenticatedHomeModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "signed-in home should surface a non-empty install-specific caution row directly in the shared trust panel.");
     var authenticatedLandingView = await authenticatedLandingController.LandingPage(CancellationToken.None) as ViewResult;
     var authenticatedLandingModel = authenticatedLandingView?.Model as LandingPageViewModel;
     Assert(authenticatedLandingModel?.SignedInStatus is not null, "authenticated landing should project the shared signed-in trust status on the front door.");
-    Assert(authenticatedLandingModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "authenticated landing should surface who-can-get-it-now posture directly in the shared trust panel.");
+    Assert(authenticatedLandingModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "authenticated landing should surface who-can-get-it-now posture directly in the shared trust panel.");
     Assert(authenticatedLandingModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(row.Value)), "authenticated landing should surface a non-empty fix-availability row directly in the shared trust panel.");
     var authenticatedFaqPage = await authenticatedLandingController.FaqPage(CancellationToken.None) as ViewResult;
     var authenticatedFaqModel = authenticatedFaqPage?.Model as FaqPageViewModel;
@@ -4715,7 +4752,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedContactModel?.SupportIntake is not null, "authenticated contact page should project the first-party support intake.");
     Assert(authenticatedContactModel?.SignedInStatus is not null, "authenticated contact page should project the shared signed-in trust status.");
     Assert(authenticatedContactModel?.TrustPulse is not null, "authenticated contact page should surface the weekly public trust pulse.");
-    Assert(authenticatedContactModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "authenticated contact page should surface who-can-get-it-now posture next to support intake.");
+    Assert(authenticatedContactModel!.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "authenticated contact page should surface who-can-get-it-now posture next to support intake.");
     Assert(!string.IsNullOrWhiteSpace(authenticatedContactModel!.SupportIntake!.DefaultInstallationId), "authenticated contact page should prefill install-aware support context when a linked install exists.");
     Assert(authenticatedContactModel.SupportIntake.ContextHint?.Contains("linked install", StringComparison.OrdinalIgnoreCase) == true, "authenticated contact page should explain where the prefilled install context came from.");
     Assert(string.Equals(authenticatedContactModel.SupportIntake.DefaultReleaseChannel, "preview", StringComparison.Ordinal), "authenticated contact page should prefill the install release channel.");
@@ -4742,7 +4779,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(contactSubmittedModel.TrackedCaseSummary.AffectedInstallSummary?.Contains("install-smoke-001", StringComparison.Ordinal) == true, "contact confirmation should keep the affected install attached to the tracked case.");
     Assert(contactSubmittedModel.TrustPulse is not null, "contact confirmation should keep the weekly public trust pulse visible after support intake.");
     Assert(contactSubmittedModel.SignedInStatus is not null, "contact confirmation should keep the shared signed-in trust status visible after support intake.");
-    Assert(contactSubmittedModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && row.Value.Contains("Signed-in handoff", StringComparison.Ordinal)), "contact confirmation should keep the signed-in access posture attached to the submitted case.");
+    Assert(contactSubmittedModel.SignedInStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "contact confirmation should keep the signed-in access posture attached to the submitted case.");
     Assert(authenticatedHomeModel.CampaignSpine.RulesNavigator.Count >= 1, "signed-in home should surface grounded rules navigator answers.");
     Assert(authenticatedHomeModel.CampaignSpine.CreatorPublications.Count >= 1, "signed-in home should surface creator publication posture.");
     Assert(!string.IsNullOrWhiteSpace(publishedHomePublication?.TrustSummary), "signed-in home should keep creator-publication trust reasoning attached.");
@@ -5399,7 +5436,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, karmaForge, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

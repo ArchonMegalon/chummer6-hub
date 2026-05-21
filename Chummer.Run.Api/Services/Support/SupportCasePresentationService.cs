@@ -463,12 +463,12 @@ public sealed class SupportCasePresentationService
         {
             return verificationAvailable
                 ? new InstallVerificationReadiness(
-                    Summary: "No linked install is available yet. Link or reclaim the affected copy in Devices and access before you verify the fix here.",
+                    Summary: "No linked install is attached yet. Link or reclaim the affected copy in Devices and access before you verify the fix here.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true)
                 : new InstallVerificationReadiness(
-                    Summary: "No linked install is attached yet, so this case is still waiting on the first claimed device context.",
+                    Summary: "No linked install is attached yet, so this case is still waiting for the first claimed device.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true);
@@ -479,12 +479,12 @@ public sealed class SupportCasePresentationService
         {
             return verificationAvailable
                 ? new InstallVerificationReadiness(
-                    Summary: "The affected install is not currently linked here. Reclaim the affected copy in Devices and access before you verify the fix.",
+                    Summary: "The affected install is not linked to this account right now. Reclaim that copy in Devices and access before you verify the fix.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true)
                 : new InstallVerificationReadiness(
-                    Summary: "The current linked devices do not include the install this case was filed against yet.",
+                    Summary: "The current linked devices do not include the install this case was filed against.",
                     FixReadyOnLinkedInstall: false,
                     NeedsInstallUpdate: false,
                     NeedsLinkedInstall: true);

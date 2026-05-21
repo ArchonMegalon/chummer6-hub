@@ -40,4 +40,22 @@ public sealed class ParticipationDashboardViewTests
         Assert.Contains("registered_href: /account/participation", featureRegistry, StringComparison.Ordinal);
         Assert.Contains("/account/participation", surfaceDoc, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ParticipationConsoleAndLeaderboardsPublishCodexContributionRecognition()
+    {
+        string consoleViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "CodexParticipation", "Console.cshtml");
+        string leaderboardViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Leaderboards", "Index.cshtml");
+        string workflowCanonPath = RepoPaths.FromRoot(".codex-design", "product", "PARTICIPATION_AND_BOOSTER_WORKFLOW.md");
+
+        string consoleView = File.ReadAllText(consoleViewPath);
+        string leaderboardView = File.ReadAllText(leaderboardViewPath);
+        string workflowCanon = File.ReadAllText(workflowCanonPath);
+
+        Assert.Contains("Public Codex contribution code", consoleView, StringComparison.Ordinal);
+        Assert.Contains("counts the tokens used through it", consoleView, StringComparison.Ordinal);
+        Assert.Contains("Codex usage", leaderboardView, StringComparison.Ordinal);
+        Assert.Contains("Codex contribution code", workflowCanon, StringComparison.Ordinal);
+        Assert.Contains("participant_total_tokens", workflowCanon, StringComparison.Ordinal);
+    }
 }

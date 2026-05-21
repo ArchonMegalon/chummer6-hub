@@ -51,10 +51,15 @@ public sealed class PublicLandingController : Controller
     private readonly CommunityCreatorHorizonsService _communityCreatorHorizons;
     private readonly WaveEightHorizonsService _waveEightHorizons;
     private readonly KarmaForgeDiscoveryService _karmaForge;
+    private readonly BuildGhostConciergeService _buildGhostConcierge;
     private readonly BlackLedgerPublicStatsService _blackLedgerStats;
     private readonly BlackLedgerDispatchService _blackLedgerDispatches;
     private readonly BlackLedgerTickNewsNotificationService _blackLedgerTickNews;
     private readonly BlackLedgerFactionOnboardingService _blackLedgerFactions;
+    private readonly BlackLedgerAdvisoryService _blackLedgerAdvisories;
+    private readonly BlackLedgerWorldTickBriefingService _blackLedgerBriefings;
+    private readonly BeHumanEventAdapterPostureService _beHumanEventAdapterPosture;
+    private readonly GmSessionVenueService _gmSessionVenues;
     private readonly AnarchyPreviewService _anarchyPreview;
     private readonly PublicPackageCatalogService _packageCatalog;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
@@ -100,10 +105,15 @@ public sealed class PublicLandingController : Controller
         CommunityCreatorHorizonsService communityCreatorHorizons,
         WaveEightHorizonsService waveEightHorizons,
         KarmaForgeDiscoveryService karmaForge,
+        BuildGhostConciergeService buildGhostConcierge,
         BlackLedgerPublicStatsService blackLedgerStats,
         BlackLedgerDispatchService blackLedgerDispatches,
         BlackLedgerTickNewsNotificationService blackLedgerTickNews,
         BlackLedgerFactionOnboardingService blackLedgerFactions,
+        BlackLedgerAdvisoryService blackLedgerAdvisories,
+        BlackLedgerWorldTickBriefingService blackLedgerBriefings,
+        BeHumanEventAdapterPostureService beHumanEventAdapterPosture,
+        GmSessionVenueService gmSessionVenues,
         AnarchyPreviewService anarchyPreview,
         PublicPackageCatalogService packageCatalog,
         PublicCreatorPublicationDiscoveryService publicCreatorDiscovery,
@@ -145,10 +155,15 @@ public sealed class PublicLandingController : Controller
         _communityCreatorHorizons = communityCreatorHorizons;
         _waveEightHorizons = waveEightHorizons;
         _karmaForge = karmaForge;
+        _buildGhostConcierge = buildGhostConcierge;
         _blackLedgerStats = blackLedgerStats;
         _blackLedgerDispatches = blackLedgerDispatches;
         _blackLedgerTickNews = blackLedgerTickNews;
         _blackLedgerFactions = blackLedgerFactions;
+        _blackLedgerAdvisories = blackLedgerAdvisories;
+        _blackLedgerBriefings = blackLedgerBriefings;
+        _beHumanEventAdapterPosture = beHumanEventAdapterPosture;
+        _gmSessionVenues = gmSessionVenues;
         _anarchyPreview = anarchyPreview;
         _packageCatalog = packageCatalog;
         _publicCreatorDiscovery = publicCreatorDiscovery;
@@ -1432,6 +1447,16 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/Participate.cshtml", model);
     }
 
+    [HttpGet("/participate/build-ghosts")]
+    [Produces("text/html")]
+    public async Task<IActionResult> BuildGhostConciergePage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken));
+
+    [HttpGet("/participate/build-ghosts.json")]
+    [Produces("application/json")]
+    public IActionResult BuildGhostConciergeJson()
+        => Ok(_buildGhostConcierge.Build());
+
     [HttpGet("/ready")]
     [Produces("text/html")]
     public async Task<IActionResult> ReadyForTonightPage(CancellationToken cancellationToken)
@@ -1566,6 +1591,82 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> CommunityPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildCommunityHubPageModel(cancellationToken));
+
+    [HttpGet("/community/runs/{runId}/venue")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CommunityRunVenuePage([FromRoute] string runId, CancellationToken cancellationToken)
+    {
+        string normalizedRunId = string.IsNullOrWhiteSpace(runId) ? "open-run" : runId.Trim();
+        TrustPageViewModel model = await BuildHorizonPreviewPageModel(
+            pageId: "community-run-venue",
+            title: "Open-run venue",
+            description: "Public-safe venue posture for an open run without leaking private room truth.",
+            currentPath: $"/community/runs/{normalizedRunId}/venue",
+            eyebrow: "Community venue",
+            heading: "Open-run venue posture",
+            intro: "This page stays public-safe on purpose. Chummer can acknowledge that a run has a live-room handoff without publishing private room links, player emails, or campaign truth.",
+            sections:
+            [
+                new TrustPageSectionViewModel(
+                    "community_run_venue_public_surface",
+                    "Public-safe venue",
+                    "What this page can show",
+                    "This route can acknowledge a venue without leaking the room itself.",
+                    [
+                        "Public-safe session title or run label.",
+                        "Scheduled start time when the organizer has published it.",
+                        "Whether the live-room handoff is not configured, private, or ready for authenticated participants."
+                    ]),
+                new TrustPageSectionViewModel(
+                    "community_run_venue_private_boundary",
+                    "Privacy boundary",
+                    "What stays out of public view",
+                    "Private session data remains on signed-in Chummer rails.",
+                    [
+                        "Private room links for closed tables.",
+                        "Runner sheets, campaign spoilers, and GM-only notes.",
+                        "Player emails, attendance imports, and provider-secret state."
+                    ]),
+                new TrustPageSectionViewModel(
+                    "community_run_venue_fallback",
+                    "Fallback",
+                    "Fallback when the provider is unavailable",
+                    "Manual venue handoff stays available when provider automation is off.",
+                    [
+                        "Live room integration unavailable. Paste your external room link manually or use another provider.",
+                        "Chummer keeps the scheduling and closeout truth even when BeHuman create mode is off."
+                    ])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Open community hub", "/community", "primary"),
+                new TrustPageActionViewModel("Open participate", "/participate", "secondary"),
+                new TrustPageActionViewModel("Open support", "/contact#support-intake", "ghost")
+            ],
+            cancellationToken: cancellationToken,
+            summaryPoints:
+            [
+                "Public-safe venue posture only",
+                "No private room disclosure",
+                "Manual fallback stays available"
+            ]);
+        return View("~/Views/PublicLanding/TrustPage.cshtml", model);
+    }
+
+    [HttpGet("/account/campaigns/{campaignId}/sessions/{sessionId}/venue")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountCampaignSessionVenuePage([FromRoute] string campaignId, [FromRoute] string sessionId, CancellationToken cancellationToken)
+        => await BuildGmSessionVenuePage("overview", campaignId, sessionId, $"/account/campaigns/{campaignId}/sessions/{sessionId}/venue", cancellationToken);
+
+    [HttpGet("/account/campaigns/{campaignId}/sessions/{sessionId}/venue/manage")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountCampaignSessionVenueManagePage([FromRoute] string campaignId, [FromRoute] string sessionId, CancellationToken cancellationToken)
+        => await BuildGmSessionVenuePage("manage", campaignId, sessionId, $"/account/campaigns/{campaignId}/sessions/{sessionId}/venue/manage", cancellationToken);
+
+    [HttpGet("/account/campaigns/{campaignId}/sessions/{sessionId}/venue/closeout")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountCampaignSessionVenueCloseoutPage([FromRoute] string campaignId, [FromRoute] string sessionId, CancellationToken cancellationToken)
+        => await BuildGmSessionVenuePage("closeout", campaignId, sessionId, $"/account/campaigns/{campaignId}/sessions/{sessionId}/venue/closeout", cancellationToken);
 
     [HttpGet("/runs")]
     public IActionResult RunsAliasPage()
@@ -1851,6 +1952,21 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
+    [HttpGet("/ledger/turns/{turn}/newsreel.json")]
+    [Produces("application/json")]
+    public IActionResult LedgerTurnNewsreelJson([FromRoute] string turn)
+    {
+        if (!int.TryParse(turn, out int requestedTurn) || requestedTurn < 0)
+        {
+            return NotFound();
+        }
+
+        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
+        return briefing is null
+            ? NotFound()
+            : Ok(briefing);
+    }
+
     [HttpGet("/ledger/turns/{turn}/dispatches")]
     [Produces("text/html")]
     public async Task<IActionResult> LedgerTurnDispatchesPage([FromRoute] string turn, CancellationToken cancellationToken)
@@ -1913,11 +2029,20 @@ public sealed class PublicLandingController : Controller
                 promo.PublicName,
                 provider_status = promo.ProviderStatus,
                 render_mode = promo.RenderMode,
+                fallback_render_mode = promo.FallbackRenderMode,
                 formats = promo.FormatLabels,
                 static_card_label = promo.StaticCardLabel,
+                playback_label = promo.PlaybackLabel,
                 captions = promo.CaptionLines,
+                campaign_hook = promo.CampaignHook,
+                audience_promise = promo.AudiencePromise,
+                validation_href = promo.ValidationHref,
+                storyboard_shots = promo.StoryboardShots,
                 html_href = promo.HtmlHref,
                 captions_href = promo.CaptionsHref,
+                poster_href = promo.PosterHref,
+                video_mp4_href = promo.VideoMp4Href,
+                video_webm_href = promo.VideoWebmHref,
             });
     }
 
@@ -1982,6 +2107,94 @@ public sealed class PublicLandingController : Controller
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+    }
+
+    [HttpGet("/account/ledger/advisory")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerAdvisoryPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/account/ledger/advisory";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger advisory voting", "Signed-in advisory signal lane for players, GMs, and faction leaders.", currentPath, user.DisplayName, user.Email);
+            var model = _blackLedgerAdvisories.BuildPage(chrome, user);
+            return View("~/Views/PublicLanding/LedgerAdvisory.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+    }
+
+    [HttpGet("/account/ledger/advisory.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> AccountLedgerAdvisoryJson(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            return Ok(_blackLedgerAdvisories.BuildSummaryJson(user));
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect("/login?next=%2Faccount%2Fledger%2Fadvisory.json");
+        }
+    }
+
+    [HttpPost("/account/ledger/advisory/vote")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AccountLedgerAdvisoryVotePost([FromForm] string ballotId, [FromForm] string optionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            _blackLedgerAdvisories.SubmitVote(user, ballotId, optionId);
+            return Redirect("/account/ledger/advisory");
+        }
+        catch (Exception ex) when (ex is HubRequestAuthException or InvalidOperationException)
+        {
+            return Redirect("/account/ledger/advisory");
+        }
+    }
+
+    [HttpGet("/account/ledger/worldtick/validation")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerWorldTickValidationPage(CancellationToken cancellationToken)
+    {
+        const string currentPath = "/account/ledger/worldtick/validation";
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildLedgerWorldTickValidationPageModel(user, cancellationToken);
+            return View("~/Views/PublicLanding/LedgerWorldTickValidation.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+    }
+
+    [HttpGet("/account/ledger/worldtick/validation.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> AccountLedgerWorldTickValidationJson(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            string? factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId;
+            BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(1, factionId);
+            return packet is null ? NotFound() : Ok(packet);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect("/login?next=%2Faccount%2Fledger%2Fworldtick%2Fvalidation.json");
         }
     }
 
@@ -2081,6 +2294,48 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> AccountLedgerFactionPrivateLorePage([FromRoute] string factionId, [FromQuery] string? campaignId, CancellationToken cancellationToken)
         => await BuildLedgerFactionWorkspacePage($"/account/ledger/factions/{factionId}/private-lore", factionId, "private-lore", campaignId, cancellationToken);
+
+    [HttpGet("/account/ledger/factions/{factionId}/leader-briefing")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AccountLedgerFactionLeaderBriefingPage([FromRoute] string factionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var model = await BuildLedgerFactionLeaderBriefingPageModel(user, factionId, cancellationToken);
+            return model is null
+                ? NotFound()
+                : View("~/Views/PublicLanding/LedgerLeaderBriefing.cshtml", model);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString($"/account/ledger/factions/{factionId}/leader-briefing")}");
+        }
+    }
+
+    [HttpGet("/account/ledger/factions/{factionId}/leader-briefing.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> AccountLedgerFactionLeaderBriefingJson([FromRoute] string factionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            BlackLedgerAccountFactionAllegianceDto? allegiance = _blackLedgerFactions.GetAllegiance(user);
+            if (allegiance is null || !string.Equals(allegiance.ActiveFactionId.Replace('_', '-'), factionId.Replace('_', '-'), StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid();
+            }
+
+            BlackLedgerFactionLeaderDigestViewModel? digest = _blackLedgerBriefings.BuildLeaderDigest(factionId, 1);
+            return digest is null ? NotFound() : Ok(digest);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString($"/account/ledger/factions/{factionId}/leader-briefing.json")}");
+        }
+    }
 
     [HttpPost("/account/ledger/factions/{factionId}/actions")]
     [ValidateAntiForgeryToken]
@@ -3936,7 +4191,7 @@ public sealed class PublicLandingController : Controller
             return new HomePrimaryActionViewModel(
                 "Devices & access",
                 "Link this copy",
-                "You already have an account-backed install path. Open Devices and access to claim the install instead of starting over.",
+                "You already have a pending linked install. Open Devices and access to claim this copy instead of starting over.",
                 "Open Devices and access",
                 "/account/access",
                 "primary");
@@ -4736,10 +4991,130 @@ public sealed class PublicLandingController : Controller
                 authenticated: chrome.Authenticated,
                 currentPath),
             SignalLoop: signalLoop,
+            BuildGhostConcierge: BuildBuildGhostConciergeTeaser(),
             SignalProjection: signalProjection,
             SignalOperations: signalOperations,
+            BeHumanEventAdapter: BuildBeHumanEventAdapterPanel(),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private BuildGhostConciergeTeaserViewModel BuildBuildGhostConciergeTeaser()
+    {
+        BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
+        return new BuildGhostConciergeTeaserViewModel(
+            StatusLabel: "Build Ghost pilot boundary",
+            Summary: projection.HumanizedSummary,
+            Href: "/participate/build-ghosts",
+            ProofPoints:
+            [
+                projection.FacePopStatus,
+                projection.AnswerlyStatus,
+                projection.EngineStatus
+            ]);
+    }
+
+    private async Task<BuildGhostConciergePageViewModel> BuildBuildGhostConciergePageModel(CancellationToken cancellationToken)
+    {
+        BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var chrome = await BuildPublicOrAuthenticatedChromeAsync(
+            "Build Ghost concierge",
+            "Bounded public intake and explanation for ALICE Build Ghosts without surrendering runtime truth.",
+            "/participate/build-ghosts",
+            cancellationToken);
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+        return new BuildGhostConciergePageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Bounded public pilot",
+            Heading: "FacePop can greet. Answerly can explain. Chummer still owns Build Ghost truth.",
+            Intro: "This page is the safe public front door for ALICE Build Ghost experiments. It explains the split cleanly instead of pretending the concierge, the explainer, and the compare engine are the same thing.",
+            Projection: projection,
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private BeHumanEventAdapterPanelViewModel BuildBeHumanEventAdapterPanel()
+    {
+        BeHumanEventAdapterPosture posture = _beHumanEventAdapterPosture.Build();
+        string summary = posture.Verdict switch
+        {
+            "BEHUMAN_EVENT_ADAPTER_READY" when posture.CapacityClaimAllowed && posture.VerifiedRegistrationCapacity is > 0
+                => $"BeHuman is allowed only as a verified event venue layer. Current verified registration capacity is bounded to {posture.VerifiedRegistrationCapacity.Value} seats and does not grant truth authority outside community events.",
+            "BEHUMAN_EVENT_ADAPTER_READY"
+                => "BeHuman is allowed only as a verified event venue layer. Capacity remains intentionally unclaimed until a verified registration bound is attached.",
+            _
+                => posture.FailureReason ?? "BeHuman event routing stays fail-closed until Chummer has first-party verification and the required operating secrets."
+        };
+
+        string statusLabel = posture.Verdict == "BEHUMAN_EVENT_ADAPTER_READY"
+            ? "Verified event venue only"
+            : "Fail-closed until verified";
+
+        return new BeHumanEventAdapterPanelViewModel(
+            Verdict: posture.Verdict,
+            StatusLabel: statusLabel,
+            Summary: summary,
+            OperatingMode: posture.OperatingMode,
+            CapacityClaimAllowed: posture.CapacityClaimAllowed,
+            VerifiedRegistrationCapacity: posture.VerifiedRegistrationCapacity,
+            AllowedEventFamilies: posture.AllowedEventFamilies,
+            ForbiddenTruthDomains: posture.ForbiddenTruthDomains);
+    }
+
+    private async Task<IActionResult> BuildGmSessionVenuePage(
+        string section,
+        string campaignId,
+        string sessionId,
+        string currentPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            AuthenticatedHubSubject subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            GmSessionVenueSurfaceProjection venue = _gmSessionVenues.DescribeVenue(user.UserId, campaignId, sessionId, requireManage: section != "overview");
+            var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+            var chrome = await BuildPublicOrAuthenticatedChromeAsync("Session venue", "Manage the live-room handoff without surrendering campaign truth.", currentPath, cancellationToken);
+            var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
+            GmSessionVenuePageViewModel model = new(
+                Chrome: chrome,
+                Section: section,
+                CampaignId: venue.CampaignId,
+                CampaignName: venue.CampaignName,
+                SessionId: venue.SessionId,
+                SessionTitle: venue.SessionTitle,
+                VenueStatus: venue.VenueStatus,
+                Provider: venue.Provider,
+                Mode: venue.Mode,
+                Visibility: venue.Visibility,
+                ScheduledTimeSummary: venue.ScheduledTimeSummary,
+                PrivacyStatus: venue.PrivacyStatus,
+                ConsentStatus: venue.ConsentStatus,
+                AttendeeSyncStatus: venue.AttendeeSyncStatus,
+                LatestRecapStatus: venue.LatestRecapStatus,
+                ProviderRoomUrl: venue.ProviderRoomUrl,
+                InvitePageUrl: venue.InvitePageUrl,
+                FallbackMessage: venue.FallbackMessage,
+                CanManage: venue.CanManage,
+                ProviderCreateAvailable: venue.ProviderCreateAvailable,
+                ProviderCreateDisabledReason: venue.ProviderCreateDisabledReason,
+                TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+                SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+            return View("~/Views/PublicLanding/GmSessionVenue.cshtml", model);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+        catch (CommunityAccessDeniedException ex)
+        {
+            return Problem(statusCode: StatusCodes.Status403Forbidden, detail: ex.Message);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 
     private async Task<TrustPageViewModel> BuildHorizonPreviewPageModel(
@@ -5900,13 +6275,13 @@ public sealed class PublicLandingController : Controller
         if (pulse.MissingDesktopClientCoverage || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
-                ? "Signed-in handoff remains the safest route while desktop proof receipts stay review-required."
+                ? "The linked install route remains the safest option while desktop proof receipts stay review-required."
                 : "The current shelf is still installable, but keep parity-sensitive installs on the review-required lane until current desktop proof receipts are green.";
         }
 
         string accessSummary = releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
-            ? "Signed-in handoff is the recommended path so the install can stay linked."
-            : "Guest-readable handoff is live on the current shelf, and Signed-in handoff keeps the install linked once you want account-aware follow-through.";
+            ? "The linked install route is the recommended path so the install can stay attached."
+            : "The public download is live on the current shelf, and signing in keeps the install linked once you want account-aware follow-through.";
         return $"{releaseExperience.Recommended.Title} on {releaseExperience.Display.ChannelLabel}. {accessSummary}";
     }
 
@@ -5923,21 +6298,21 @@ public sealed class PublicLandingController : Controller
         if (pulse.MissingDesktopClientCoverage || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase))
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
-                ? "Signed-in handoff stays preferred while desktop proof receipts are still review-required."
-                : "Guest and signed-in handoffs are both visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
+                ? "The linked install route stays preferred while desktop proof receipts are still review-required."
+                : "Public downloads are visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
         {
-            return "Signed-in handoff is the live path now, so the install stays linked and support can follow the exact device.";
+            return "The linked install route is the live path now, so the install stays attached and support can follow the exact device.";
         }
 
         if (releaseExperience.GuestDownloadAvailable)
         {
-            return "Guest-readable handoff is visible now, and Signed-in handoff adds linked-install follow-through once you want the install attached to your account.";
+            return "The public download is visible now, and signing in adds linked-install follow-through once you want the install attached to your account.";
         }
 
-        return "Signed-in handoff is available now for linked-install follow-through.";
+        return "Linked-install follow-through is available now when you sign in.";
     }
 
     private static string BuildJourneyPulseSummary(PublicTrustPulseSnapshot pulse)
@@ -6682,7 +7057,7 @@ public sealed class PublicLandingController : Controller
     private static string? BuildBootstrapCommandIntro(string? platform)
         => platform switch
         {
-            "macos" => "Copy this into Terminal.",
+            "macos" => "Copy this one Terminal command into Terminal.",
             "linux" => "Paste this into your shell.",
             _ => null
         };
@@ -6704,7 +7079,7 @@ public sealed class PublicLandingController : Controller
     private static string? BuildBootstrapCommandNote(string? platform)
         => platform switch
         {
-            "macos" => "It streams a short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
+            "macos" => "It streams a short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies the published DMG digest, installs, and links the selected apps.",
             "linux" => "It streams a short-lived shell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the applications menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             _ => null
         };
@@ -8782,6 +9157,7 @@ echo "Help: ${HELP_URL}"
             notificationsHref: "/account/ledger/notifications",
             turnHref: $"/ledger/turns/{newsTurn}",
             dispatchHref: string.IsNullOrWhiteSpace(selectedFactionId) ? $"/ledger/turns/{newsTurn}/dispatches" : $"/ledger/factions/{selectedFactionId}/dispatches");
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(newsTurn);
 
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
@@ -8805,6 +9181,7 @@ echo "Help: ${HELP_URL}"
             Dispatches: dispatches,
             SelectedDispatch: selectedDispatch,
             NewsreelStatus: newsreelStatus,
+            WorldTurnBriefing: worldTurnBriefing,
             SelectedFactionPromo: selectedFaction is null ? null : _blackLedgerFactions.GetPromoArtifact(selectedFaction.Id),
             CommandMap: commandMap,
             PrimaryAction: mapFocused
@@ -8968,6 +9345,7 @@ echo "Help: ${HELP_URL}"
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
         var chrome = _chrome.BuildAuthenticatedChrome("My Black Ledger faction", "Signed-in Black Ledger faction home, welcome kit, and action trail.", "/account/ledger", user.DisplayName, user.Email);
         BlackLedgerFactionHomeViewModel model = _blackLedgerFactions.BuildFactionHome(chrome, user);
+        string factionId = model.Faction.FactionId.Replace('_', '-');
         return model with
         {
             NewsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
@@ -8977,7 +9355,11 @@ echo "Help: ${HELP_URL}"
                 notificationsHref: "/account/ledger/notifications",
                 turnHref: "/ledger/turns/1",
                 dispatchHref: "/ledger/turns/1/dispatches",
-                recipientUserId: user.UserId)
+                recipientUserId: user.UserId),
+            WorldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1),
+            LeaderDigest = _blackLedgerBriefings.BuildLeaderDigest(factionId, 1),
+            ValidationPacket = _blackLedgerBriefings.BuildValidationPacket(1, factionId),
+            AdvisorySummary = _blackLedgerAdvisories.BuildSummary(user)
         };
     }
 
@@ -8987,24 +9369,161 @@ echo "Help: ${HELP_URL}"
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
         var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger notifications", "Signed-in Black Ledger newsreel delivery posture and receipts.", "/account/ledger/notifications", user.DisplayName, user.Email);
+        string? factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId?.Replace('_', '-');
+        BlackLedgerNewsStatusViewModel status = _blackLedgerTickNews.BuildStatusViewModel(
+            worldId: "emerald-sprawl-prelude",
+            turn: 1,
+            scopeLabel: "Signed-in account lane",
+            notificationsHref: "/account/ledger/notifications",
+            turnHref: "/ledger/turns/1",
+            dispatchHref: "/ledger/turns/1/dispatches",
+            recipientUserId: user.UserId);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        BlackLedgerWorldTickValidationPacketViewModel? validationPacket = _blackLedgerBriefings.BuildValidationPacket(1, factionId);
+        BlackLedgerFactionLeaderDigestViewModel? leaderDigest = string.IsNullOrWhiteSpace(factionId)
+            ? null
+            : _blackLedgerBriefings.BuildLeaderDigest(factionId, 1);
+        BlackLedgerFactionPromoArtifactViewModel? promoArtifact = string.IsNullOrWhiteSpace(factionId)
+            ? null
+            : _blackLedgerFactions.GetPromoArtifact(factionId);
+        _blackLedgerTickNews.BackfillInboxEntries(user.UserId);
+        List<BlackLedgerInboxMessageViewModel> inboxMessages = _blackLedgerTickNews.ListInboxEntries(user.UserId)
+            .Select(static item => new BlackLedgerInboxMessageViewModel(
+                Kind: item.Kind,
+                Eyebrow: item.Eyebrow,
+                Heading: item.Heading,
+                Summary: item.Summary,
+                Href: item.Href,
+                CtaLabel: item.CtaLabel,
+                StatusLabel: item.StatusLabel))
+            .ToList();
+        if (inboxMessages.Count == 0)
+        {
+            inboxMessages =
+            [
+                new(
+                    Kind: "newsreel",
+                    Eyebrow: "World turn",
+                    Heading: worldTurnBriefing?.InboxHeadline ?? "Turn 1 newsreel is ready",
+                    Summary: worldTurnBriefing?.NewsreelLead ?? status.Summary,
+                    Href: "/ledger/turns/1",
+                    CtaLabel: "Open newsreel",
+                    StatusLabel: status.StatusLabel),
+                new(
+                    Kind: "validation",
+                    Eyebrow: "Validation",
+                    Heading: "World-tick validation packet",
+                    Summary: validationPacket?.Summary ?? "Validate the inbox-safe world turn against the same receipt-backed packet.",
+                    Href: "/account/ledger/worldtick/validation",
+                    CtaLabel: "Open validation",
+                    StatusLabel: "Ready")
+            ];
+
+            if (leaderDigest is not null)
+            {
+                inboxMessages.Add(new BlackLedgerInboxMessageViewModel(
+                    Kind: "leader_digest",
+                    Eyebrow: "Leader brief",
+                    Heading: $"{leaderDigest.PublicName} personalized digest",
+                    Summary: leaderDigest.Summary,
+                    Href: $"/account/ledger/factions/{leaderDigest.FactionId}/leader-briefing",
+                    CtaLabel: "Open leader brief",
+                    StatusLabel: "Personalized"));
+            }
+
+            if (promoArtifact is not null)
+            {
+                inboxMessages.Add(new BlackLedgerInboxMessageViewModel(
+                    Kind: "promo",
+                    Eyebrow: "Faction promo",
+                    Heading: $"{promoArtifact.PublicName} motion promo rail",
+                    Summary: $"{promoArtifact.CampaignHook} {promoArtifact.AudiencePromise}",
+                    Href: promoArtifact.HtmlHref,
+                    CtaLabel: "Open promo rail",
+                    StatusLabel: "Public-safe"));
+            }
+        }
+
+        BlackLedgerAdvisorySummaryViewModel advisorySummary = _blackLedgerAdvisories.BuildSummary(user);
+        if (advisorySummary.PlayerBallots.Count > 0 || advisorySummary.GmBallots.Count > 0 || advisorySummary.ExecutiveSummaries.Count > 0)
+        {
+            inboxMessages.Insert(0, new BlackLedgerInboxMessageViewModel(
+                Kind: "advisory",
+                Eyebrow: "Advisory",
+                Heading: advisorySummary.Heading,
+                Summary: advisorySummary.NoDemocracyNote,
+                Href: "/account/ledger/advisory",
+                CtaLabel: "Open advisory lane",
+                StatusLabel: "Advisory"));
+        }
+
         return new BlackLedgerNotificationsPageViewModel(
             Chrome: chrome,
-            Heading: "Turn 1 newsreel delivery",
-            Intro: "This route shows whether the seeded Black Ledger Turn 1 newsreel was sent, suppressed, dry-run only, or blocked by configuration for this account.",
-            Status: _blackLedgerTickNews.BuildStatusViewModel(
-                worldId: "emerald-sprawl-prelude",
-                turn: 1,
-                scopeLabel: "Signed-in account lane",
-                notificationsHref: "/account/ledger/notifications",
-                turnHref: "/ledger/turns/1",
-                dispatchHref: "/ledger/turns/1/dispatches",
-                recipientUserId: user.UserId),
+            Heading: "World turn inbox and delivery receipts",
+            Intro: "This route shows the inbox-safe newsreel, whether delivery actually happened, and the validation packet behind the current world turn for this account.",
+            Status: status,
             DeliveryNotes:
             [
-                "Newsreel email stays public-safe and never includes private campaign labels.",
+                "Inbox copy is public-safe, receipt-backed, and explicit about the Turn 0 -> Turn 1 boundary.",
                 "Operator preview policy can suppress delivery to regular accounts without hiding the reason.",
-                "Duplicate sends are blocked by the stored event key."
-            ]);
+                "Duplicate sends are blocked by the stored event key, not by vague best effort.",
+                "Advisory voting remains upstream signal. Players inform GMs, GMs inform leaders, and the chain can still overrule the vote."
+            ],
+            InboxMessages: inboxMessages,
+            WorldTurnBriefing: worldTurnBriefing,
+            ValidationPacket: validationPacket,
+            AdvisorySummary: advisorySummary);
+    }
+
+    private async Task<BlackLedgerLeaderBriefingPageViewModel?> BuildLedgerFactionLeaderBriefingPageModel(HubUserDto user, string factionId, CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
+        BlackLedgerAccountFactionAllegianceDto? allegiance = _blackLedgerFactions.GetAllegiance(user);
+        if (allegiance is null
+            || !string.Equals(allegiance.ActiveFactionId.Replace('_', '-'), factionId.Replace('_', '-'), StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        BlackLedgerFactionLeaderDigestViewModel? digest = _blackLedgerBriefings.BuildLeaderDigest(factionId, 1);
+        if (digest is null)
+        {
+            return null;
+        }
+
+        return new BlackLedgerLeaderBriefingPageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome(
+                $"{digest.PublicName} leader brief",
+                "Signed-in faction-leader digest for the active Black Ledger allegiance.",
+                $"/account/ledger/factions/{digest.FactionId}/leader-briefing",
+                user.DisplayName,
+                user.Email),
+            Heading: digest.Heading,
+            Intro: "This is the personalized world-tick readout for the faction leader. It turns the current public board into specific pressure calls and bounded next moves.",
+            Digest: digest,
+            WorldTurnBriefing: _blackLedgerBriefings.BuildWorldTurnBriefing(1),
+            ValidationPacket: _blackLedgerBriefings.BuildValidationPacket(1, digest.FactionId));
+    }
+
+    private async Task<BlackLedgerWorldTickValidationPageViewModel> BuildLedgerWorldTickValidationPageModel(HubUserDto user, CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
+        BlackLedgerAccountFactionAllegianceDto? allegiance = _blackLedgerFactions.GetAllegiance(user);
+        string? factionId = allegiance?.ActiveFactionId?.Replace('_', '-');
+        BlackLedgerWorldTickValidationPacketViewModel packet = _blackLedgerBriefings.BuildValidationPacket(1, factionId)
+            ?? throw new InvalidOperationException("Black Ledger validation packet is unavailable.");
+        return new BlackLedgerWorldTickValidationPageViewModel(
+            Chrome: _chrome.BuildAuthenticatedChrome(
+                "Black Ledger world-tick validation",
+                "Signed-in validation packet for inbox newsreel, leader brief, and public world-turn posture.",
+                "/account/ledger/worldtick/validation",
+                user.DisplayName,
+                user.Email),
+            Heading: "World-tick validation packet",
+            Intro: "Use this route to validate the inbox newsreel, the public turn packet, and the faction-leader readout against the same receipt-backed world-turn truth.",
+            Packet: packet,
+            WorldTurnBriefing: _blackLedgerBriefings.BuildWorldTurnBriefing(1),
+            LeaderDigest: string.IsNullOrWhiteSpace(factionId) ? null : _blackLedgerBriefings.BuildLeaderDigest(factionId, 1));
     }
 
     private async Task<BlackLedgerFactionOnboardingViewModel> BuildLedgerOnboardingPageModel(HubUserDto user, string? step, CancellationToken cancellationToken)
@@ -9036,17 +9555,19 @@ echo "Help: ${HELP_URL}"
         return new BlackLedgerFactionPromoPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 $"{promo.PublicName} promo",
-                "Public-safe faction onboarding promo artifacts with explicit provider-verification posture.",
+                "Public-safe faction onboarding promo artifacts with an explicit first-party motion-video contract and storyboard fallback.",
                 $"/ledger/factions/{promo.FactionId}/promo",
                 cancellationToken),
             Heading: $"{promo.PublicName} onboarding promo",
-            Intro: "This route ships the honest first-party fallback: storyboard formats, static card, captions, and explicit provider-verification posture instead of an unverified external render claim.",
+            Intro: "This route ships an honest first-party motion video, captions, a route-backed JSON brief, and a storyboard fallback without any external render claim.",
             Promo: promo,
             DeliveryNotes:
             [
-                "Provider status stays explicit until a verified media adapter exists.",
+                "The first-party motion video is the shipped public contract for this lane.",
+                "Storyboard fallback remains available if motion playback is unavailable.",
                 "No official lore text and no provider branding appear here.",
-                "These links are route-backed fallback artifacts, not placeholder buttons."
+                "These links are route-backed shipped artifacts, not placeholder buttons.",
+                "Validation stays on the same faction-leader and world-turn receipts that drive the inbox lane."
             ]);
     }
 
@@ -9097,9 +9618,9 @@ echo "Help: ${HELP_URL}"
         return "set -euo pipefail; " +
             "TMP_BOOTSTRAP_SCRIPT=\"$(mktemp)\"; " +
             "trap 'rm -f \"$TMP_BOOTSTRAP_SCRIPT\"' EXIT; " +
-            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
+            "curl -fsSL " + SingleQuoteShellValue(bootstrapUrl) + " > \"$TMP_BOOTSTRAP_SCRIPT\" || { echo 'Failed to fetch bootstrap script; refresh the release page and retry.' >&2; exit 1; }; " +
             "ACTUAL_BOOTSTRAP_SHA256=\"$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' \"$TMP_BOOTSTRAP_SCRIPT\")\"; " +
-            "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the signed-in handoff page and retry.' >&2; exit 1; }; " +
+            "[[ \"$ACTUAL_BOOTSTRAP_SHA256\" == " + SingleQuoteShellValue(bootstrapSha256) + " ]] || { echo 'Bootstrap digest mismatch; refresh the release page and retry.' >&2; exit 1; }; " +
             "CHUMMER_RELEASE_CHANNEL='preview' " +
             "CHUMMER_ALLOW_UNSIGNED_PREVIEW='1' " +
             "CHUMMER_ALLOW_REMOTE_RELEASE_PROOF_INPUTS='1' " +

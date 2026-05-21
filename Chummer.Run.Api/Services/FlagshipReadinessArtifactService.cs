@@ -58,16 +58,75 @@ public sealed class FlagshipReadinessArtifactService
         }
 
         var relativePath = DefaultReadinessRelativePath.Replace('/', Path.DirectorySeparatorChar);
-        return new[]
+        var candidates = new[]
             {
+                Path.GetFullPath(Path.Combine("/docker/fleet", relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath)),
-                Path.GetFullPath(Path.Combine("/docker/fleet", relativePath))
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", relativePath))
             }
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault(File.Exists);
+            .ToArray();
+        return ResolveFreshestReadinessPath(candidates)
+            ?? candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static string? ResolveFreshestReadinessPath(IEnumerable<string> candidates)
+    {
+        string? selectedPath = null;
+        DateTimeOffset? selectedGeneratedAt = null;
+        foreach (string candidate in candidates)
+        {
+            if (!TryReadGeneratedAt(candidate, out DateTimeOffset generatedAt))
+            {
+                continue;
+            }
+
+            if (selectedGeneratedAt is null || generatedAt > selectedGeneratedAt.Value)
+            {
+                selectedPath = candidate;
+                selectedGeneratedAt = generatedAt;
+            }
+        }
+
+        return selectedPath;
+    }
+
+    private static bool TryReadGeneratedAt(string path, out DateTimeOffset generatedAt)
+    {
+        generatedAt = default;
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("contract_name", out JsonElement contractNameElement)
+                || !string.Equals(contractNameElement.GetString(), "fleet.flagship_product_readiness", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            string? rawGeneratedAt = null;
+            if (root.TryGetProperty("generated_at", out JsonElement generatedAtElement))
+            {
+                rawGeneratedAt = generatedAtElement.GetString();
+            }
+            else if (root.TryGetProperty("generatedAt", out JsonElement camelGeneratedAtElement))
+            {
+                rawGeneratedAt = camelGeneratedAtElement.GetString();
+            }
+
+            return DateTimeOffset.TryParse(rawGeneratedAt, out generatedAt);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string? FirstNonEmpty(params string?[] values)

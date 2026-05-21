@@ -239,7 +239,7 @@ public sealed class HostedProofContractService
 
         string summary = installation is not null
             ? $"{installation.Platform ?? "desktop"} {installation.Channel} {installation.Version} can move from a public horizon brief to account-aware install follow-through without changing the published build bytes."
-            : $"Receipt {receipt!.ReceiptId} keeps the public horizon guest-readable while the next account-aware install follow-through stays on first-party access routes.";
+            : $"Receipt {receipt!.ReceiptId} keeps the public horizon open while the next linked install follow-through stays on first-party access routes.";
 
         return new HostedProofContractProjection(
             ContractId: StableId("hosted-proof-account-aware-horizon", installation?.InstallationId ?? receipt!.ReceiptId),
@@ -251,11 +251,11 @@ public sealed class HostedProofContractService
             ClaimSensitivity: "account_aware_continuation",
             Owner: "public_landing_and_install_linking",
             DecisionAuthority: "install_linking_and_horizon_review",
-            CloseoutPosture: "Horizon conversion proof only closes when the guest-readable brief and the signed-in install continuation still describe the same published bytes.",
+            CloseoutPosture: "Horizon conversion proof only closes when the public brief and the signed-in install continuation still describe the same published bytes.",
             Summary: summary,
             EvidenceLines:
             [
-                "/roadmap/shadowcasters-network stays guest-readable as the honest horizon brief.",
+                "/roadmap/shadowcasters-network stays openly readable as the honest horizon brief.",
                 "/account/access is the account-aware follow-through route when install recovery, support, or claim continuity must stay linked.",
                 "The published packages stay the same; only the short-lived setup assistant and install claim become account-aware."
             ],
@@ -263,7 +263,7 @@ public sealed class HostedProofContractService
             [
                 new HostedProofContractActionProjection("open_shadowcasters_route", "Open Shadowcasters", "/roadmap/shadowcasters-network", "Review the public horizon brief before stepping into account-aware follow-through."),
                 new HostedProofContractActionProjection("open_account_access", "Open Devices & access", "/account/access", "Inspect the signed-in install continuity and recovery path."),
-                new HostedProofContractActionProjection("open_download_dispatch", "Open downloads", "/downloads", "Compare the same published bytes against the guest-readable release shelf.")
+                new HostedProofContractActionProjection("open_download_dispatch", "Open downloads", "/downloads", "Compare the same published bytes against the open public release shelf.")
             ],
             EmittedAtUtc: now,
             Locale: context.Locale,

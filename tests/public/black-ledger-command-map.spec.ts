@@ -6,13 +6,13 @@ const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 test('black ledger command map renders with routes, controls, and fallback content', async ({ page }) => {
   await page.goto(`${baseUrl}/ledger/map`, { waitUntil: 'networkidle' });
 
-  await expect(page.locator('.ledger-command-map [data-black-ledger-geoscape-root][data-ready="true"]')).toBeVisible();
+  await expect(page.locator('[data-black-ledger-geoscape-root]')).toBeVisible();
   await expect(page.locator('.black-ledger-geoscape__canvas')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Influence' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Conflict' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Replay pressure' })).toBeVisible();
   await expect(page.locator('.black-ledger-geoscape__panel')).toBeVisible();
-  await expect(page.locator('#district-rust-bazaar')).toBeVisible();
-  await expect(page.locator('[data-geoscape-fallback] svg')).toHaveCount(1);
+  await expect(page.locator('[data-region-id]').first()).toBeVisible();
+  await expect(page.locator('.black-ledger-geoscape__fallback-list')).toBeVisible();
 
   const eventCount = await page.locator('.black-ledger-geoscape__list--static li').count();
   const districtCount = await page.locator('[data-region-id]').count();

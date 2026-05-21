@@ -72,6 +72,20 @@
 
         return resolvedHref;
     }
+
+    static string HumanizeStatusToken(string? value, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return fallback;
+        }
+
+        return string.Join(
+            " ",
+            value.Trim()
+                .Split(['_', '-'], StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant()));
+    }
 }
 
 <section class="trust-page-hero">
@@ -81,7 +95,7 @@
         <p class="page-copy">Use this page for the short customer-facing summary. It should point you to install, live proof, support, or the deeper report without making you decode the whole release stack.</p>
         <div class="trust-claim__microproof">
             <span>@Model.ReleaseExperience.Display.BuildLabel</span>
-            <span>@Model.ReleaseExperience.Display.ChannelLabel</span>
+            <span>@HumanizeStatusToken(Model.Manifest.RolloutState, "Current release")</span>
             <span>Published @publishedLabel</span>
             <span>Validation @validationState</span>
         </div>
@@ -127,7 +141,7 @@
     <div class="settings-summary-list">
         <div class="settings-summary-row">
             <span>Channel</span>
-            <strong>@Model.Manifest.Channel</strong>
+            <strong>@Model.ReleaseExperience.Display.ChannelLabel</strong>
         </div>
         <div class="settings-summary-row">
             <span>Build</span>

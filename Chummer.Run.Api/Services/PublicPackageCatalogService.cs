@@ -330,7 +330,7 @@ public sealed class PublicPackageCatalogService
                     "Account value begins after install through claim, recovery, updates, and support continuity.",
                     "Release truth still lives on status, downloads, and the release proof rails."
                 ],
-                "Downloads, status, and the account-backed install path already point here.",
+                "Downloads, status, and linked-install follow-through already point here.",
                 "Open downloads",
                 "/downloads",
                 "Track the linked install, recovery state, and support follow-through from the account package rail.",

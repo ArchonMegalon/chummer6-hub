@@ -70,7 +70,7 @@
                         ? release.GuestGateSummary
                         : "Other platforms stay on the main platform downloads shelf below. Manual packages and technical detail stay collapsed underneath."))
         </p>
-        <p class="muted-copy">Open downloads first. Create account for guided install only when you want first-launch recovery, linked restore, and support follow-through to stay attached.</p>
+        <p class="muted-copy">Open downloads first. Add an account only when you want install recovery, linked restore, and support follow-through to stay attached after the first launch.</p>
         <p class="muted-copy">Need the current shelf anchor again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
     </div>
 </section>
@@ -116,15 +116,15 @@ else
                     <article class="recommended-download__trustfact">
                         <span>Binary</span>
                         <strong>The same build for everyone</strong>
-                        <p>Account-aware install value lives in the handoff, not in a personalized binary.</p>
+                        <p>Install continuity lives in the handoff and account return, not in a personalized binary.</p>
                     </article>
                     <article class="recommended-download__trustfact">
                         <span>First launch</span>
-                        <strong>@(guestGateRequired ? "Signed-in handoff first" : "Guest or link this copy")</strong>
+                        <strong>@(guestGateRequired ? "Link this copy from the first launch" : "Link this copy on first launch")</strong>
                         <p>
                             @(guestGateRequired
-                                ? "This install path starts from a signed-in handoff so recovery and support stay attached from the first launch."
-                                : "The app can still start as guest or attach this installed copy to your account when you are ready.")
+                                ? "This install path begins from a linked handoff so recovery and support stay attached from the first launch."
+                                : "You can install now, and Chummer links this copy on first launch before the workspace opens.")
                         </p>
                     </article>
                     <article class="recommended-download__trustfact">

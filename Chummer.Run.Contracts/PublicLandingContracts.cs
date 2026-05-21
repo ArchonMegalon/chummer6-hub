@@ -163,8 +163,16 @@ public sealed record PublicReleaseManifestDto(
                     : channel.Trim();
 
     private static bool IsPublicStable(string? channel, string? rolloutState)
-        => string.Equals((channel ?? string.Empty).Trim(), "docker", StringComparison.OrdinalIgnoreCase)
-           && string.Equals((rolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase);
+    {
+        var normalizedChannel = (channel ?? string.Empty).Trim();
+        var normalizedRolloutState = (rolloutState ?? string.Empty).Trim();
+        return string.Equals(normalizedRolloutState, "public_stable", StringComparison.OrdinalIgnoreCase)
+            && (
+                string.Equals(normalizedChannel, "docker", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedChannel, "public_stable", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedChannel, "stable", StringComparison.OrdinalIgnoreCase)
+            );
+    }
 }
 
 public sealed record PublicReleaseProofDto(

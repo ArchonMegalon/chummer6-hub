@@ -20,9 +20,9 @@ public sealed class FeedbackOperatingLoopViewTests
         Assert.DoesNotContain("Proof-backed closeout", view, StringComparison.Ordinal);
         Assert.DoesNotContain("private work queue", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Milestone pressure", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("_PublicSignalOperationsPacket", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("_PublicSignalProjectionPacket", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("How this board is handled", view, StringComparison.Ordinal);
+        Assert.Contains("_PublicSignalOperationsPacket", view, StringComparison.Ordinal);
+        Assert.Contains("_PublicSignalProjectionPacket", view, StringComparison.Ordinal);
+        Assert.Contains("Hosted signal promotion still needs ingress, routing, and closeout discipline.", view, StringComparison.Ordinal);
     }
 
     [Fact]

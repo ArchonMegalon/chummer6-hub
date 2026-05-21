@@ -1,0 +1,72 @@
+{
+  "name": "Chummer",
+  "short_name": "Chummer",
+  "id": "/mobile",
+  "description": "Shadowrun character and campaign companion with first-party package, mobile, play, and support rails.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/mobile",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
+  "orientation": "portrait-primary",
+  "background_color": "#07131c",
+  "theme_color": "#07131c",
+  "categories": [
+    "games",
+    "productivity",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/pwa-screenshot-mobile.svg",
+      "sizes": "1179x2556",
+      "type": "image/svg+xml",
+      "form_factor": "narrow",
+      "label": "Mobile continuity dashboard with role entry, install status, and session return cues."
+    },
+    {
+      "src": "/pwa-screenshot-wide.svg",
+      "sizes": "1512x982",
+      "type": "image/svg+xml",
+      "form_factor": "wide",
+      "label": "Tablet and desktop shell showing player, GM, and observer entry on one bounded mobile rail."
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Open mobile rail",
+      "short_name": "Mobile",
+      "url": "/mobile"
+    },
+    {
+      "name": "Open play shell",
+      "short_name": "Play",
+      "url": "/play"
+    },
+    {
+      "name": "Open continuity",
+      "short_name": "Continuity",
+      "url": "/play/continuity"
+    },
+    {
+      "name": "Open packages",
+      "short_name": "Packages",
+      "url": "/packages"
+    }
+  ]
+}

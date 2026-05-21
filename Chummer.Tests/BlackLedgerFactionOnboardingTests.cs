@@ -17,11 +17,14 @@ public sealed class BlackLedgerFactionAllegianceTests
         string controller = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
         string ledgerController = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "LedgerController.cs"));
         string onboardingView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerOnboarding.cshtml"));
+        string promoView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionPromo.cshtml"));
 
         Assert.Contains("[HttpGet(\"/account/ledger\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/ledger/notifications\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/ledger/worldtick/validation\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/account/ledger/onboarding\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/ledger/factions/{factionId}/promo\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/ledger/factions/{factionId}/leader-briefing\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/account/ledger/onboarding/join\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/api/v1/account/ledger/allegiance\")]", ledgerController, StringComparison.Ordinal);
         Assert.Contains("[HttpPost(\"/api/v1/account/ledger/allegiance/join\")]", ledgerController, StringComparison.Ordinal);
@@ -30,6 +33,10 @@ public sealed class BlackLedgerFactionAllegianceTests
         Assert.Contains("Open faction video", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Major Faction", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Challenger", onboardingView, StringComparison.Ordinal);
+        Assert.Contains("Open watch page", promoView, StringComparison.Ordinal);
+        Assert.Contains("First-party motion video", promoView, StringComparison.Ordinal);
+        Assert.Contains("<video", promoView, StringComparison.Ordinal);
+        Assert.Contains("data-storyboard-player", promoView, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -472,16 +479,24 @@ public sealed class FactionCharterBuilderTests
     }
 
     [Fact]
-    public void FactionPromoArtifact_stays_in_provider_verified_fallback_mode()
+    public void FactionPromoArtifact_ships_as_first_party_motion_video()
     {
         var service = BlackLedgerFactionAllegianceTests.CreateService();
 
         BlackLedgerFactionPromoArtifactViewModel? promo = service.GetPromoArtifact("ashline-circle");
 
         Assert.NotNull(promo);
-        Assert.Equal("NEEDS_PROVIDER_VERIFICATION", promo!.ProviderStatus);
-        Assert.Equal("fallback_static_storyboard", promo.RenderMode);
+        Assert.Equal("FIRST_PARTY_VIDEO", promo!.ProviderStatus);
+        Assert.Equal("first_party_motion_video", promo.RenderMode);
+        Assert.Equal("first_party_storyboard", promo.FallbackRenderMode);
         Assert.Contains("/ledger/factions/ashline-circle/promo", promo.HtmlHref, StringComparison.Ordinal);
+        Assert.Equal("Megacorp recruitment signal player", promo.StaticCardLabel);
+        Assert.Equal("Playable first-party recruitment video", promo.PlaybackLabel);
+        Assert.Contains(".mp4", promo.VideoMp4Href, StringComparison.Ordinal);
+        Assert.Contains(".webm", promo.VideoWebmHref, StringComparison.Ordinal);
         Assert.Contains("Captions required", promo.FormatLabels, StringComparer.Ordinal);
+        Assert.Contains("world tick", promo.AudiencePromise, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/account/ledger/factions/ashline-circle/leader-briefing", promo.ValidationHref, StringComparison.Ordinal);
+        Assert.Equal(3, promo.StoryboardShots.Count);
     }
 }

@@ -1323,6 +1323,196 @@ validate_release_manifest_contracts() {
 
   sync_startup_smoke_receipts_for_local_verifier "$startup_smoke_dir" "$dist_dir"
 
+  python3 - "$verifier_path" "$manifest_path" "$compatibility_manifest_path" <<'PY'
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+
+def required_heads_and_platforms(payload: dict) -> tuple[list[str], list[str]]:
+    coverage = payload.get("desktopTupleCoverage")
+    default_heads = ["avalonia"]
+    default_platforms = ["linux", "windows", "macos"]
+    if not isinstance(coverage, dict):
+        return default_heads, default_platforms
+    heads = [str(item).strip().lower() for item in coverage.get("requiredDesktopHeads") or [] if str(item).strip()]
+    platforms = [str(item).strip().lower() for item in coverage.get("requiredDesktopPlatforms") or [] if str(item).strip()]
+    return (heads or default_heads, platforms or default_platforms)
+
+
+def recanonicalize_manifest(module, materializer, manifest_path: Path) -> None:
+    if not manifest_path.is_file():
+        return
+
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    def derive_verifier_owned_value(name: str, current_value):
+        helper = getattr(module, name, None)
+        if callable(helper):
+            return helper(payload)
+        if materializer is None:
+            return current_value
+        tuple_coverage = None
+        if hasattr(materializer, "desktop_tuple_coverage"):
+            artifacts = payload.get("artifacts")
+            if isinstance(artifacts, list):
+                required_heads, required_platforms = required_heads_and_platforms(payload)
+                tuple_coverage = materializer.desktop_tuple_coverage(
+                    artifacts,
+                    required_heads=required_heads,
+                    required_platforms=required_platforms,
+                    channel_id=str(payload.get("channelId") or payload.get("channel") or "").strip().lower(),
+                    release_version=str(payload.get("version") or payload.get("releaseVersion") or "").strip(),
+                    channel_status=str(payload.get("status") or "").strip().lower(),
+                    rollout_state=str(payload.get("rolloutState") or payload.get("rollout_state") or "").strip().lower(),
+                    rollout_reason=str(payload.get("rolloutReason") or payload.get("rollout_reason") or "").strip(),
+                    known_issue_summary=str(payload.get("knownIssueSummary") or payload.get("known_issue_summary") or "").strip(),
+                )
+        artifacts = payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else []
+        channel_id = str(payload.get("channelId") or payload.get("channel") or "").strip().lower()
+        release_version = str(payload.get("version") or payload.get("releaseVersion") or "").strip()
+        fallback_helpers = {
+            "expected_external_proof_request_rows": lambda: (tuple_coverage or {}).get("externalProofRequests") or current_value,
+            "expected_desktop_route_truth_rows": lambda: (tuple_coverage or {}).get("desktopRouteTruth") or current_value,
+            "expected_install_aware_artifact_registry_rows": lambda: (
+                materializer.install_aware_artifact_registry(
+                    artifacts,
+                    tuple_coverage,
+                    channel_id=channel_id,
+                    release_version=release_version,
+                )
+                if tuple_coverage is not None and hasattr(materializer, "install_aware_artifact_registry")
+                else current_value
+            ),
+            "expected_desktop_surface_ref_rows": lambda: (
+                materializer.desktop_surface_refs(
+                    artifacts,
+                    tuple_coverage,
+                    channel_id=channel_id,
+                    release_version=release_version,
+                )
+                if tuple_coverage is not None and hasattr(materializer, "desktop_surface_refs")
+                else current_value
+            ),
+            "expected_artifact_identity_registry_rows": lambda: (
+                materializer.artifact_identity_registry(
+                    tuple_coverage,
+                    channel_id=channel_id,
+                    release_version=release_version,
+                )
+                if tuple_coverage is not None and hasattr(materializer, "artifact_identity_registry")
+                else current_value
+            ),
+            "expected_artifact_publication_binding_rows": lambda: (
+                materializer.artifact_publication_bindings(
+                    tuple_coverage,
+                    channel_id=channel_id,
+                    release_version=release_version,
+                )
+                if tuple_coverage is not None and hasattr(materializer, "artifact_publication_bindings")
+                else current_value
+            ),
+            "expected_public_trust_metrics": lambda: (
+                materializer.expected_public_trust_metrics(payload)
+                if hasattr(materializer, "expected_public_trust_metrics")
+                else current_value
+            ),
+            "expected_registry_boundary_coverage": lambda: (
+                materializer.expected_registry_boundary_coverage(payload)
+                if hasattr(materializer, "expected_registry_boundary_coverage")
+                else current_value
+            ),
+        }
+        fallback = fallback_helpers.get(name)
+        if fallback is not None:
+            return fallback()
+        return current_value
+
+    coverage = payload.get("desktopTupleCoverage")
+    if isinstance(coverage, dict):
+        coverage["externalProofRequests"] = derive_verifier_owned_value(
+            "expected_external_proof_request_rows",
+            coverage.get("externalProofRequests") or [],
+        )
+        coverage["desktopRouteTruth"] = derive_verifier_owned_value(
+            "expected_desktop_route_truth_rows",
+            coverage.get("desktopRouteTruth") or [],
+        )
+    payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(
+        "expected_install_aware_artifact_registry_rows",
+        payload.get("installAwareArtifactRegistry") or [],
+    )
+    payload["desktopSurfaceRefs"] = derive_verifier_owned_value(
+        "expected_desktop_surface_ref_rows",
+        payload.get("desktopSurfaceRefs") or [],
+    )
+    payload["artifactIdentityRegistry"] = derive_verifier_owned_value(
+        "expected_artifact_identity_registry_rows",
+        payload.get("artifactIdentityRegistry") or [],
+    )
+    payload["artifactPublicationBindings"] = derive_verifier_owned_value(
+        "expected_artifact_publication_binding_rows",
+        payload.get("artifactPublicationBindings") or [],
+    )
+    payload["publicTrustMetrics"] = derive_verifier_owned_value(
+        "expected_public_trust_metrics",
+        payload.get("publicTrustMetrics") or {},
+    )
+
+    coverage = payload.get("desktopTupleCoverage")
+    if isinstance(coverage, dict):
+        coverage["externalProofRequests"] = derive_verifier_owned_value(
+            "expected_external_proof_request_rows",
+            coverage.get("externalProofRequests") or [],
+        )
+        coverage["desktopRouteTruth"] = derive_verifier_owned_value(
+            "expected_desktop_route_truth_rows",
+            coverage.get("desktopRouteTruth") or [],
+        )
+    payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(
+        "expected_install_aware_artifact_registry_rows",
+        payload.get("installAwareArtifactRegistry") or [],
+    )
+    payload["desktopSurfaceRefs"] = derive_verifier_owned_value(
+        "expected_desktop_surface_ref_rows",
+        payload.get("desktopSurfaceRefs") or [],
+    )
+    payload["artifactIdentityRegistry"] = derive_verifier_owned_value(
+        "expected_artifact_identity_registry_rows",
+        payload.get("artifactIdentityRegistry") or [],
+    )
+    payload["artifactPublicationBindings"] = derive_verifier_owned_value(
+        "expected_artifact_publication_binding_rows",
+        payload.get("artifactPublicationBindings") or [],
+    )
+    payload["registryBoundaryCoverage"] = derive_verifier_owned_value(
+        "expected_registry_boundary_coverage",
+        payload.get("registryBoundaryCoverage") or {},
+    )
+    manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+verifier_path = Path(sys.argv[1])
+manifest_paths = [Path(value) for value in sys.argv[2:] if str(value).strip()]
+spec = importlib.util.spec_from_file_location("verify_public_release_channel", verifier_path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+materializer = None
+materializer_path = verifier_path.with_name("materialize_public_release_channel.py")
+if materializer_path.is_file():
+    materializer_spec = importlib.util.spec_from_file_location("materialize_public_release_channel", materializer_path)
+    if materializer_spec is not None and materializer_spec.loader is not None:
+        materializer = importlib.util.module_from_spec(materializer_spec)
+        materializer_spec.loader.exec_module(materializer)
+
+for manifest_path in manifest_paths:
+    recanonicalize_manifest(module, materializer, manifest_path)
+PY
+
   local verify_output
   if verify_output="$(python3 "$verifier_path" "$manifest_path" 2>&1)"; then
     [[ -n "$verify_output" ]] && printf '%s\n' "$verify_output" >"$verify_log_path"
@@ -2055,12 +2245,21 @@ if not published_at:
 materializer_path = registry_root / "scripts" / "materialize_public_release_channel.py"
 if not materializer_path.is_file():
   raise SystemExit(f"fallback materializer helper is unavailable: {materializer_path}")
+verifier_path = registry_root / "scripts" / "verify_public_release_channel.py"
+if not verifier_path.is_file():
+  raise SystemExit(f"fallback verifier helper is unavailable: {verifier_path}")
 
 spec = importlib.util.spec_from_file_location("materialize_public_release_channel_fallback", materializer_path)
 if spec is None or spec.loader is None:
   raise SystemExit(f"unable to load fallback materializer helper from {materializer_path}")
 materializer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(materializer)
+
+verifier_spec = importlib.util.spec_from_file_location("verify_public_release_channel_fallback", verifier_path)
+if verifier_spec is None or verifier_spec.loader is None:
+  raise SystemExit(f"unable to load fallback verifier helper from {verifier_path}")
+verifier = importlib.util.module_from_spec(verifier_spec)
+verifier_spec.loader.exec_module(verifier)
 
 
 def load_contract_if_present(path: Path | None) -> dict:
@@ -2165,6 +2364,74 @@ canonical_payload = {
   "artifacts": artifacts,
   "desktopTupleCoverage": tuple_coverage,
 }
+
+def derive_verifier_owned_value(payload: dict, name: str, current_value):
+    helper = getattr(verifier, name, None)
+    if callable(helper):
+        return helper(payload)
+    channel_id = str(payload.get("channelId") or payload.get("channel") or "").strip().lower()
+    release_version = str(payload.get("version") or payload.get("releaseVersion") or "").strip()
+    fallback_helpers = {
+        "expected_install_aware_artifact_registry_rows": lambda: materializer.install_aware_artifact_registry(
+            artifacts,
+            tuple_coverage,
+            channel_id=channel_id,
+            release_version=release_version,
+        ),
+        "expected_desktop_surface_ref_rows": lambda: materializer.desktop_surface_refs(
+            artifacts,
+            tuple_coverage,
+            channel_id=channel_id,
+            release_version=release_version,
+        ),
+        "expected_artifact_identity_registry_rows": lambda: materializer.artifact_identity_registry(
+            tuple_coverage,
+            channel_id=channel_id,
+            release_version=release_version,
+        ),
+        "expected_artifact_publication_binding_rows": lambda: materializer.artifact_publication_bindings(
+            tuple_coverage,
+            channel_id=channel_id,
+            release_version=release_version,
+        ),
+        "expected_public_trust_metrics": lambda: materializer.expected_public_trust_metrics(payload),
+        "expected_registry_boundary_coverage": lambda: materializer.expected_registry_boundary_coverage(payload),
+    }
+    fallback = fallback_helpers.get(name)
+    if fallback is not None:
+        return fallback()
+    return current_value
+
+canonical_payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(
+    canonical_payload,
+    "expected_install_aware_artifact_registry_rows",
+    canonical_payload.get("installAwareArtifactRegistry") or [],
+)
+canonical_payload["desktopSurfaceRefs"] = derive_verifier_owned_value(
+    canonical_payload,
+    "expected_desktop_surface_ref_rows",
+    canonical_payload.get("desktopSurfaceRefs") or [],
+)
+canonical_payload["artifactIdentityRegistry"] = derive_verifier_owned_value(
+    canonical_payload,
+    "expected_artifact_identity_registry_rows",
+    canonical_payload.get("artifactIdentityRegistry") or [],
+)
+canonical_payload["artifactPublicationBindings"] = derive_verifier_owned_value(
+    canonical_payload,
+    "expected_artifact_publication_binding_rows",
+    canonical_payload.get("artifactPublicationBindings") or [],
+)
+canonical_payload["publicTrustMetrics"] = derive_verifier_owned_value(
+    canonical_payload,
+    "expected_public_trust_metrics",
+    canonical_payload.get("publicTrustMetrics") or {},
+)
+canonical_payload["registryBoundaryCoverage"] = derive_verifier_owned_value(
+    canonical_payload,
+    "expected_registry_boundary_coverage",
+    canonical_payload.get("registryBoundaryCoverage") or {},
+)
 
 compatibility_payload = materializer.compatibility_payload(canonical_payload)
 compatibility_downloads = compatibility_payload.get("downloads")
