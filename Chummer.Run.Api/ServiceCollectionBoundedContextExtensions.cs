@@ -35,9 +35,12 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<WaveEightHorizonsService>();
         services.AddSingleton<KarmaForgeStore>();
         services.AddSingleton<KarmaForgeDiscoveryService>();
+        services.AddSingleton<BuildGhostConciergeService>();
         services.AddSingleton<BlackLedgerPublicStatsService>();
         services.AddSingleton<BlackLedgerDispatchService>();
         services.AddSingleton<BlackLedgerFactionOnboardingService>();
+        services.AddSingleton<BlackLedgerWorldTickBriefingService>();
+        services.AddSingleton<BeHumanEventAdapterPostureService>();
         services.AddSingleton<AnarchyPreviewService>();
         services.AddSingleton<TeableKarmaForgeReviewBoardService>();
         services.AddHostedService<TeableKarmaForgeReviewBoardSyncWorker>();
@@ -72,6 +75,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddHttpClient<ParticipationOperatorNotificationService>();
         services.AddSingleton<BlackLedgerNewsRecipientResolver>();
         services.AddHttpClient<BlackLedgerTickNewsNotificationService>();
+        services.AddHttpClient<BlackLedgerAdvisoryService>();
         services.AddHostedService<BlackLedgerTickNewsDispatchWorker>();
         services.AddScoped<BoostSessionService>();
         return services;
@@ -86,6 +90,9 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<CreatorPublicationRegistryBridge>();
         services.AddSingleton<PublicCreatorPublicationDiscoveryService>();
         services.AddSingleton<CampaignSpineService>();
+        services.AddSingleton<GmSessionVenueStore>();
+        services.AddSingleton<IGmSessionVenueAdapter, BeHumanGmSessionVenueAdapter>();
+        services.AddSingleton<GmSessionVenueService>();
         services.AddSingleton<CampaignFederationOrchestrationService>();
         services.AddSingleton<CampaignWorkspaceServerPlaneService>();
         services.AddSingleton<CampaignFederationOrchestrationService>();
@@ -106,6 +113,14 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<PrivacyBoundedSupportStatusService>();
         services.AddSingleton<PublicSignalToCanonPacketService>();
         services.AddSingleton<SupportAssistantService>();
+        services.AddSingleton<IFirstPartySupportAssistant>(static provider => provider.GetRequiredService<SupportAssistantService>());
+        services.AddSingleton<AnswerlyRuntimePolicy>();
+        services.AddSingleton<RuleSafeOutputGate>();
+        services.AddSingleton<RulesCoachRouter>();
+        services.AddSingleton<AnswerlyHumanizerAdapter>();
+        services.AddSingleton<RuleGhostService>();
+        services.AddSingleton<AnswerlyOpenAiCompatService>();
+        services.AddSingleton<IChummerAssistantAdapter, AnswerlySupportAssistantAdapter>();
         services.AddSingleton<CrashSupportService>();
         services.AddHttpClient<SupportProgressEmailWorkflowService>();
         return services;

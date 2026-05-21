@@ -224,6 +224,45 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void BuildGhostConciergeViewUsesTheSharedParticipationDecisionShell()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "BuildGhostConcierge.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("Build Ghost operating split", view, StringComparison.Ordinal);
+        Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
+        Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
+        Assert.Contains("The experiment should leave behind receipts, not vibes.", view, StringComparison.Ordinal);
+        Assert.Contains("Use the public tools to guide the experiment, not to own it.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ParticipateViewLinksToTheBuildGhostConciergeWithoutClaimingToolTruth()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Participate.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("ALICE build ghosts", view, StringComparison.Ordinal);
+        Assert.Contains("Open Build Ghost concierge", view, StringComparison.Ordinal);
+        Assert.Contains("The actual Build Ghost compare and apply truth still stays inside first-party Chummer runtime and receipts.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildGhostConciergeControllerAndServicesWireTheBoundedRoute()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string servicesPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string services = File.ReadAllText(servicesPath);
+
+        Assert.Contains("BuildGhostConciergeService", services, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/build-ghosts\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/participate/build-ghosts.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildGhostConcierge.cshtml", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FeatureDetailViewUsesTheSharedRouteChoiceShellAndExitRailInsteadOfStoppingAtHeroAndFamilyPartial()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml");
