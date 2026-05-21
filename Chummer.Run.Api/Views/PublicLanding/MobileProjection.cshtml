@@ -9,50 +9,79 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">Mobile play shell preview; installability proof pending.</p>
+        <p class="page-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
             <span>@Model.CurrentRoleLabel</span>
-            <span>Manifest and service worker live</span>
-            <span>Offline depth still proving</span>
+            <span>Installable app shell live</span>
+            <span>Offline and reconnect lane cached</span>
         </div>
     </div>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
-        <a class="button-like button-like--secondary" href="/status">Read install status</a>
+        <button class="button-like button-like--secondary" type="button" data-install-prompt-button aria-disabled="true">Install this app</button>
+        <a class="button-like button-like--ghost" href="/play/continuity">Open continuity</a>
     </div>
 </section>
 
 <section class="workflow-band workflow-band--compact">
     <div class="workflow-band__lead">
         <p class="eyebrow">Installability state</p>
-        <h2 class="editorial-title">Compact public truth for the play shell.</h2>
-        <p class="editorial-copy">The shell is real, the manifest is real, and the service worker is real. Public install prompts and offline depth still need explicit proof.</p>
+        <h2 class="editorial-title">Install like an app. Re-enter like a session shell.</h2>
+        <p class="editorial-copy">@Model.InstallabilitySummary</p>
     </div>
     <div class="flagship-gateway-grid flagship-gateway-grid--compact">
         <article class="gateway-card">
             <div class="gateway-card__header">
-                <span class="tag">Live</span>
-                <h3>Web app manifest</h3>
+                <span class="tag" data-pwa-online-state>Checking</span>
+                <h3>Install readiness</h3>
             </div>
-            <p>Standalone display, icons, scope, and start route are shipped from the live shell.</p>
-            <a class="editorial-strip__action" href="/manifest.json">Open manifest</a>
+            <p data-pwa-install-state>The shell is available now. Install prompt support depends on the browser, but the app route, manifest, and service worker are all in place.</p>
+            <div class="stacked-actions">
+                <a class="editorial-strip__action" href="/manifest.webmanifest">Open manifest</a>
+                <a class="editorial-strip__action" href="/downloads">Desktop downloads</a>
+            </div>
         </article>
         <article class="gateway-card">
             <div class="gateway-card__header">
                 <span class="tag">Live</span>
-                <h3>Service worker</h3>
+                <h3>Offline return path</h3>
             </div>
-            <p>First-party route caching exists and can be inspected directly.</p>
-            <a class="editorial-strip__action" href="/service-worker.js">Open service worker</a>
+            <p>The worker keeps the mobile rail, play shell, continuity route, and install assets cached so a reconnect starts from the right surface.</p>
+            <div class="stacked-actions">
+                <a class="editorial-strip__action" href="/service-worker.js">Open service worker</a>
+                <a class="editorial-strip__action" href="/mobile/pwa.json">Open PWA JSON</a>
+            </div>
         </article>
         <article class="gateway-card">
             <div class="gateway-card__header">
-                <span class="tag">Pending proof</span>
-                <h3>Install prompts and offline depth</h3>
+                <span class="tag">Continuity</span>
+                <h3>Next-safe-action rail</h3>
             </div>
-            <p>Prompt timing, platform install UX, and offline cache depth stay demoted until proven live.</p>
-            <a class="editorial-strip__action" href="/status">Open status</a>
+            <p>The installable shell does not replace downloads, support, or account recovery. It keeps the return path explicit when you move between public, linked, and session surfaces.</p>
+            <div class="stacked-actions">
+                <a class="editorial-strip__action" href="/play/continuity">Open continuity</a>
+                <a class="editorial-strip__action" href="/ready/handoff/mobile.json">Open handoff JSON</a>
+            </div>
         </article>
+    </div>
+</section>
+
+<section class="workflow-band workflow-band--compact">
+    <div class="workflow-band__lead">
+        <p class="eyebrow">Capabilities</p>
+        <h2 class="editorial-title">One bounded shell, five explicit promises.</h2>
+    </div>
+    <div class="flagship-gateway-grid flagship-gateway-grid--compact">
+        @foreach (var capability in Model.Capabilities)
+        {
+            <article class="gateway-card">
+                <div class="gateway-card__header">
+                    <span class="tag">Included</span>
+                    <h3>@capability.Label</h3>
+                </div>
+                <p>@capability.Summary</p>
+            </article>
+        }
     </div>
 </section>
 
@@ -60,6 +89,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Role entry</p>
         <h2 class="editorial-title">Player, GM, and observer routes converge on one shell.</h2>
+        <p class="editorial-copy">Choose a role-specific front door without branching into different product truths. The same app shell keeps install, continuity, and reconnect posture visible in every role.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var role in Model.Roles)
@@ -73,3 +103,87 @@
         }
     </div>
 </section>
+
+@if (Model.SignedInStatus is not null)
+{
+    <section class="workflow-band workflow-band--compact">
+        @await Html.PartialAsync("~/Views/Shared/_SignedInTrustStatusPanel.cshtml", Model.SignedInStatus)
+    </section>
+}
+
+@if (Model.TrustPulse is not null)
+{
+    <section class="workflow-band workflow-band--compact">
+        @await Html.PartialAsync("~/Views/Shared/_PublicTrustPulsePanel.cshtml", Model.TrustPulse)
+    </section>
+}
+
+@section Scripts
+{
+    <script>
+        (function () {
+            var installButton = document.querySelector("[data-install-prompt-button]");
+            var installState = document.querySelector("[data-pwa-install-state]");
+            var onlineState = document.querySelector("[data-pwa-online-state]");
+            var deferredPrompt = null;
+
+            function setOnlineState() {
+                if (!onlineState) {
+                    return;
+                }
+
+                onlineState.textContent = navigator.onLine ? "Online" : "Offline";
+            }
+
+            function setInstallAvailability(ready) {
+                if (!installButton || !installState) {
+                    return;
+                }
+
+                if (ready) {
+                    installButton.removeAttribute("aria-disabled");
+                    installState.textContent = "This browser exposed a direct install prompt. Use it when you want the shell pinned like an app.";
+                    return;
+                }
+
+                installButton.setAttribute("aria-disabled", "true");
+                installState.textContent = "If this browser does not expose a direct install prompt, use its Add to Home Screen or Install App menu. The shell still keeps the same continuity rail.";
+            }
+
+            setOnlineState();
+            setInstallAvailability(false);
+            window.addEventListener("online", setOnlineState);
+            window.addEventListener("offline", setOnlineState);
+
+            window.addEventListener("beforeinstallprompt", function (event) {
+                event.preventDefault();
+                deferredPrompt = event;
+                setInstallAvailability(true);
+            });
+
+            if (installButton) {
+                installButton.addEventListener("click", async function () {
+                    if (!deferredPrompt) {
+                        return;
+                    }
+
+                    deferredPrompt.prompt();
+                    try {
+                        await deferredPrompt.userChoice;
+                    } finally {
+                        deferredPrompt = null;
+                        setInstallAvailability(false);
+                    }
+                });
+            }
+
+            window.addEventListener("appinstalled", function () {
+                deferredPrompt = null;
+                if (installState) {
+                    installState.textContent = "Installed. Re-open the shell from your app drawer or home screen to keep continuity and role entry on the same rail.";
+                }
+                setInstallAvailability(false);
+            });
+        })();
+    </script>
+}

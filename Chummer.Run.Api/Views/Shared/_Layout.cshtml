@@ -135,10 +135,14 @@
     <title>@pageTitle · Chummer</title>
     <meta name="description" content="@chrome.Description" />
     <meta name="theme-color" content="#07131c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Chummer" />
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
     <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
-    <link rel="manifest" href="~/manifest.json" asp-append-version="true" />
+    <link rel="manifest" href="~/manifest.webmanifest" asp-append-version="true" />
     <link rel="icon" href="~/pwa-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="~/pwa-maskable.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
