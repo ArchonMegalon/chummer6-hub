@@ -5,6 +5,7 @@ import { test, expect } from 'playwright/test';
 const repoRoot = process.cwd();
 const mobileViewPath = path.join(repoRoot, 'Chummer.Run.Api', 'Views', 'PublicLanding', 'MobileProjection.cshtml');
 const controllerPath = path.join(repoRoot, 'Chummer.Run.Api', 'Controllers', 'PublicLandingController.cs');
+const layoutPath = path.join(repoRoot, 'Chummer.Run.Api', 'Views', 'Shared', '_Layout.cshtml');
 const manifestPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'manifest.json');
 const manifestAliasPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'manifest.webmanifest');
 const swPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'service-worker.js');
@@ -12,6 +13,7 @@ const swPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'service-worker
 test('mobile and PWA public routes keep installability and role entry explicit', async () => {
   const mobileView = readFileSync(mobileViewPath, 'utf8');
   const controller = readFileSync(controllerPath, 'utf8');
+  const layout = readFileSync(layoutPath, 'utf8');
   const manifest = readFileSync(manifestPath, 'utf8');
   const manifestAlias = readFileSync(manifestAliasPath, 'utf8');
   const serviceWorker = readFileSync(swPath, 'utf8');
@@ -30,6 +32,10 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(controller).toContain('[HttpGet("/player")]');
   expect(controller).toContain('[HttpGet("/gm")]');
   expect(controller).toContain('[HttpGet("/observer")]');
+  expect(layout).toContain('rel="icon" href="~/favicon.svg"');
+  expect(layout).toContain('rel="shortcut icon" href="~/favicon.ico"');
+  expect(layout).toContain('rel="apple-touch-icon" href="~/apple-touch-icon.png"');
+  expect(layout).toContain('asp-append-version="true"');
 
   expect(manifest).toContain('"id": "/mobile"');
   expect(manifest).toContain('"display_override"');
@@ -39,9 +45,14 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(manifest).toContain('"url": "/play/continuity"');
   expect(manifestAlias).toContain('"start_url": "/mobile"');
   expect(manifestAlias).toContain('"shortcuts"');
+  expect(manifestAlias).toContain('"/pwa-icon.svg"');
+  expect(manifestAlias).toContain('"/pwa-maskable.svg"');
   expect(serviceWorker).toContain('"/mobile"');
   expect(serviceWorker).toContain('"/play"');
   expect(serviceWorker).toContain('"/play/continuity"');
   expect(serviceWorker).toContain('"/manifest.webmanifest"');
+  expect(serviceWorker).toContain('"/apple-touch-icon.png"');
+  expect(serviceWorker).toContain('"/favicon.ico"');
+  expect(serviceWorker).toContain('"/favicon.svg"');
   expect(serviceWorker).toContain('navigationPreload');
 });
