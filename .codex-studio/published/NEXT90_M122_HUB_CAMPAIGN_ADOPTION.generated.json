@@ -24,13 +24,10 @@
   "source_file": "tests/RunServicesSmoke/Program.cs",
   "surfaces_passed": [
     "implement_campaign_adoption_wizard_state:hub",
+    "runner_goal_persistence:hub",
     "resolution_report_approval_world_tick_news:hub"
   ],
-  "missing_markers": {
-    "runner_goal_persistence:hub": [
-      "Assert(m122WorkspaceServerPlanePayload?.ChangePackets.Any(item => string.Equals(item.Kind, \"runner_goal\", StringComparison.Ordinal)) == true, \"campaign spine server plane api should project runner-goal pins onto the bounded what-changed rail.\");"
-    ]
-  },
+  "missing_markers": {},
   "required_markers": {
     "implement_campaign_adoption_wizard_state:hub": [
       "var campaignAdoptionResult = await campaignSpineController.UpsertMyCampaignWorkspaceCampaignAdoption(",
@@ -55,5 +52,5 @@
       "Assert(reloadedAdoptionLoop.PlayerSafeNews.Any(item => item.Title.Contains(\"Tacoma grid rumor\", StringComparison.Ordinal)), \"campaign spine adoption loop should preserve the player-safe news preview across reload.\");"
     ]
   },
-  "generated_at": "2026-05-15T17:30:48Z"
+  "generated_at": "2026-05-21T15:28:28Z"
 }

@@ -5,22 +5,24 @@ namespace Chummer.Tests;
 public sealed class FeedbackOperatingLoopViewTests
 {
     [Fact]
-    public void FeedbackPageProjectsMilestonesRoadmapAndShippedProofIntoOneOperatingLoop()
+    public void FeedbackPageKeepsPublicFollowThroughVisibleWithoutReadingLikeAnOperatorBoard()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("A public signal should enter one loop and leave with an evidence-backed closeout.", view, StringComparison.Ordinal);
+        Assert.Contains("A public signal should start in one place and end on a page people can actually use.", view, StringComparison.Ordinal);
         Assert.Contains("var signalLoop = Model.SignalLoop;", view, StringComparison.Ordinal);
         Assert.Contains("Signal loop snapshot", view, StringComparison.Ordinal);
         Assert.Contains("@signalLoop.OpenMilestoneCount", view, StringComparison.Ordinal);
-        Assert.Contains("Open milestone ledger", view, StringComparison.Ordinal);
-        Assert.Contains("Browse roadmap", view, StringComparison.Ordinal);
+        Assert.Contains("Open roadmap", view, StringComparison.Ordinal);
         Assert.Contains("Open changelog", view, StringComparison.Ordinal);
         Assert.Contains("This page stays public-facing on purpose.", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("_PublicSignalOperationsPacket", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("_PublicSignalProjectionPacket", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("How this board is handled", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Proof-backed closeout", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("private work queue", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Milestone pressure", view, StringComparison.Ordinal);
+        Assert.Contains("_PublicSignalOperationsPacket", view, StringComparison.Ordinal);
+        Assert.Contains("_PublicSignalProjectionPacket", view, StringComparison.Ordinal);
+        Assert.Contains("Hosted signal promotion still needs ingress, routing, and closeout discipline.", view, StringComparison.Ordinal);
     }
 
     [Fact]
