@@ -17,3 +17,79 @@ Accept: text/html
 
 GET {{Chummer.Run.Api_HostAddress}}/participate
 Accept: text/html
+
+###
+
+GET {{Chummer.Run.Api_HostAddress}}/v1/models
+Authorization: Bearer {{$processEnv ANSWERLY_OPENAI_COMPAT_API_TOKEN}}
+Accept: application/json
+
+###
+
+GET {{Chummer.Run.Api_HostAddress}}/api/v1/models
+Authorization: Bearer {{$processEnv ANSWERLY_OPENAI_COMPAT_API_TOKEN}}
+Accept: application/json
+
+###
+
+POST {{Chummer.Run.Api_HostAddress}}/v1/chat/completions
+Authorization: Bearer {{$processEnv ANSWERLY_OPENAI_COMPAT_API_TOKEN}}
+Content-Type: application/json
+
+{
+  "model": "answerly-support-assistant",
+  "messages": [
+    {
+      "role": "user",
+      "content": "How do I install the Windows desktop build?"
+    }
+  ]
+}
+
+###
+
+POST {{Chummer.Run.Api_HostAddress}}/api/v1/chat/completions
+Authorization: Bearer {{$processEnv ANSWERLY_OPENAI_COMPAT_API_TOKEN}}
+Content-Type: application/json
+
+{
+  "model": "answerly-support-assistant",
+  "messages": [
+    {
+      "role": "user",
+      "content": "How do I install the Windows desktop build?"
+    }
+  ]
+}
+
+###
+
+POST {{Chummer.Run.Api_HostAddress}}/api/v1/chat/completions
+Authorization: Bearer {{$processEnv ANSWERLY_OPENAI_COMPAT_API_TOKEN}}
+Content-Type: application/json
+
+{
+  "model": "sr-rulebot",
+  "messages": [
+    {
+      "role": "user",
+      "content": "In SR6, how should I think about Edge during a firefight?"
+    }
+  ]
+}
+
+###
+
+POST {{Chummer.Run.Api_HostAddress}}/api/v1/chat/completions
+Authorization: Bearer {{$processEnv ANSWERLY_OPENAI_COMPAT_API_TOKEN}}
+Content-Type: application/json
+
+{
+  "model": "sr-rulebot",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Quote the full decking rules from the book."
+    }
+  ]
+}

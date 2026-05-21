@@ -191,6 +191,56 @@ public sealed record SupportAssistantResponse(
     IReadOnlyList<SupportAssistantCitation> Citations,
     IReadOnlyList<SupportAssistantAction> Actions);
 
+public static class RulesCoachRouteTypes
+{
+    public const string SupportQuestion = "support_question";
+    public const string RulesCalculationQuestion = "rules_calculation_question";
+    public const string RawRulesQuestion = "raw_rules_question";
+    public const string PrivateCampaignQuestion = "private_campaign_question";
+    public const string UnsupportedQuestion = "unsupported_question";
+}
+
+public sealed record RuleSafeCalculationStep(
+    string Label,
+    string Value,
+    string Source);
+
+public sealed record RuleSafeSourceAnchor(
+    string PackageId,
+    string SourceLabel,
+    string? SectionReference,
+    string? SourceText);
+
+public sealed record RuleSafeAnswerPacket(
+    string PacketId,
+    string QuestionId,
+    string AccountScope,
+    string RulesetId,
+    string AnswerType,
+    string Authority,
+    string SafeSummary,
+    IReadOnlyList<RuleSafeCalculationStep> CalculationSteps,
+    IReadOnlyList<RuleSafeSourceAnchor> SourceAnchors,
+    IReadOnlyList<string> ReceiptIds,
+    string Confidence,
+    IReadOnlyList<string> ForbiddenToAnswerly,
+    string HumanizerInstruction,
+    string FallbackMessage);
+
+public sealed record RuleSafeOutputGateResult(
+    bool Allowed,
+    string Output,
+    IReadOnlyList<string> BlockingReasons);
+
+public sealed record RulesCoachRouteDecision(
+    string RouteType,
+    bool AnswerlyAllowed,
+    bool PacketRequired,
+    bool PrivateDataPresent,
+    bool SourcebookRisk,
+    bool FallbackRequired,
+    string ReceiptId);
+
 public sealed record CrashEnvelope(
     [Required(AllowEmptyStrings = false), StringLength(64)] string CrashId,
     [Required(AllowEmptyStrings = false), StringLength(64)] string HeadId,

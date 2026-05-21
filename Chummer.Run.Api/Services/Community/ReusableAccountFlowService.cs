@@ -120,10 +120,10 @@ public sealed class ReusableAccountFlowService
                     ? "Group capability truth cannot surface until a governed group exists."
                     : $"{primaryGroup.Capabilities.Count.ToString(CultureInfo.InvariantCulture)} capability marker(s) stay attached to the group flow.",
                 primaryGroup is null
-                    ? "No member rail is available yet."
+                    ? "No member list is attached yet."
                     : string.Equals(primaryGroup.OwnerUserId, user.UserId, StringComparison.OrdinalIgnoreCase)
-                        ? "The signed-in account is the group owner for the reusable group rail."
-                        : $"The signed-in account participates in owner group {primaryGroup.OwnerUserId}."
+                        ? "This signed-in account currently owns the group."
+                        : $"This signed-in account currently participates in owner group {primaryGroup.OwnerUserId}."
             ],
             Actions:
             [
@@ -211,10 +211,10 @@ public sealed class ReusableAccountFlowService
             EvidenceLines:
             [
                 latestJoinCode is null
-                    ? "No issued join code is available to attach a new member yet."
+                    ? "No join code has been issued yet for a new member."
                     : $"Join code {latestJoinCode.JoinCodeId} has been used {latestJoinCode.Uses.ToString(CultureInfo.InvariantCulture)} time(s).",
                 latestJoinCode?.ExpiresAtUtc is null
-                    ? "The current join-code rail has no explicit expiry."
+                    ? "The current join code does not expire automatically."
                     : $"The current join-code rail expires {DescribeAge(latestJoinCode.ExpiresAtUtc.Value - now)} from now.",
                 primaryGroup is null
                     ? "A governed group must exist before join codes can be issued."
@@ -222,7 +222,7 @@ public sealed class ReusableAccountFlowService
             ],
             Actions:
             [
-                new ReusableAccountFlowActionProjection("open_join_code_issue", "Open join-code issue", route, "Issue or inspect reusable group join codes."),
+                new ReusableAccountFlowActionProjection("open_join_code_issue", "Open join codes", route, "Issue or inspect group join codes."),
                 new ReusableAccountFlowActionProjection("open_groups", "Open groups", "/groups", "Return to the governed group rail that owns the join code."),
                 new ReusableAccountFlowActionProjection("open_account", "Open account", "/account", "Return to the signed-in account rail.")
             ],

@@ -19,6 +19,7 @@ SOURCE_FILES = [
     ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
     "Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json",
     "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
+    "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-osx-arm64.receipt.json",
     "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
 ]
 

@@ -71,10 +71,10 @@ public sealed class HostedBoundedContextCoverageService
             ReleaseVersion: manifest.Version,
             ProofStatus: ResolveProofStatus(manifest),
             SupportabilityState: ResolveSupportabilityState(manifest),
-            Summary: "Public landing, downloads, roadmap, and Participate stay guest-readable and release-backed instead of leaking signed-in account, support, or campaign internals.",
+            Summary: "Public landing, downloads, roadmap, and Participate stay openly readable and release-backed instead of leaking signed-in account, support, or campaign internals.",
             EvidenceLines:
             [
-                "/, /downloads, /now, and /horizons remain the guest-readable hosted rail.",
+                "/, /downloads, /now, and /horizons remain the openly readable hosted rail.",
                 feedbackPacket is null
                     ? "Public signal still enters through /participate before any account-linked followthrough is attached."
                     : $"{feedbackPacket.Route} keeps governed signal intake separate from the signed-in support and account rails.",
@@ -82,7 +82,7 @@ public sealed class HostedBoundedContextCoverageService
             ],
             Actions:
             [
-                new HostedBoundedContextCoverageActionProjection("open_public_landing", "Open public landing", "/", "Inspect the guest-readable product entry rail."),
+                new HostedBoundedContextCoverageActionProjection("open_public_landing", "Open public landing", "/", "Inspect the openly readable product entry rail."),
                 new HostedBoundedContextCoverageActionProjection("open_downloads", "Open downloads", "/downloads", "Compare public release and install entry posture."),
                 new HostedBoundedContextCoverageActionProjection("open_participate", "Open Participate", feedbackPacket?.Route ?? "/participate", "Inspect the governed public signal intake lane.")
             ],
@@ -337,7 +337,7 @@ public sealed class HostedBoundedContextCoverageService
             Summary: "Hub closes hosted bounded-context coverage only when public, account/community, campaign, support, and orchestration routes stay on separate owned rails with explicit comparison paths.",
             EvidenceLines:
             [
-                "AddHubPublicGuideContext owns guest-readable landing, downloads, roadmap, progress, and trust content.",
+                "AddHubPublicGuideContext owns openly readable landing, downloads, roadmap, progress, and trust content.",
                 "AddHubAccountsAndCommunityContext owns signed-in account, group, membership, reward, entitlement, and community lanes.",
                 "AddHubCampaignSpineContext owns workspaces, open-run orchestration, creator-publication return lanes, and campaign continuity.",
                 "AddHubControlAndSupportContext owns support, crash, feedback, privacy-bounded status, and support followthrough.",

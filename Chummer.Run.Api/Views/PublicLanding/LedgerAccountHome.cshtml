@@ -5,21 +5,67 @@
     ViewData["SurfaceClass"] = "surface-ledger";
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
-        <p class="eyebrow">Faction home</p>
+<section class="ledger-flagship ledger-flagship--account">
+    <div class="ledger-flagship__copy">
+        <p class="eyebrow">Faction command</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        <p class="ledger-flagship__support">This is the internal Black Ledger bridgehead: one globe, one board state, one faction posture, and one professional world-turn briefing lane.</p>
         <div class="trust-claim__microproof">
             <span>Faction: @Model.Faction.PublicName</span>
             <span>Membership: @Model.Allegiance.MembershipType</span>
             <span>Lock until: @Model.Allegiance.LockUntilUtc?.ToString("yyyy-MM-dd")</span>
         </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')">Open my faction</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open notifications</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory voting</a>
+            <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open public globe</a>
+        </div>
     </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')">Open my faction</a>
-        <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open notifications</a>
-        <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open command map</a>
+    <div class="ledger-flagship__stage">
+        <div class="ledger-flagship__map-frame">
+            <div
+                class="ledger-flagship__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="account"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=1&amp;mode=influence"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-initial-mode="influence"
+                data-selected-faction="@Model.Faction.FactionId.Replace('_', '-')"
+                data-tick-headline="Turn 1 pressure live."
+                data-primary-label="Open faction workspace"
+                data-primary-href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')"
+                data-secondary-label="Leader briefing"
+                data-secondary-href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')/leader-briefing"></div>
+        </div>
+        <div class="ledger-flagship__nav" aria-label="Black Ledger command lanes">
+            <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')">
+                <span class="tag">Workspace</span>
+                <strong>Faction command deck</strong>
+                <p>Management, receipts, action points, and private posture stay on the authenticated lane.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/factions/@Model.Faction.FactionId.Replace('_', '-')/leader-briefing">
+                <span class="tag">Leader</span>
+                <strong>Leader briefing</strong>
+                <p>Personalized pressure calls, next moves, and per-faction world-tick interpretation.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
+                <span class="tag">Validation</span>
+                <strong>World-tick packet</strong>
+                <p>Receipt-backed validation for the current world turn, ready for review and signoff.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/notifications">
+                <span class="tag">Inbox</span>
+                <strong>Newsreel inbox</strong>
+                <p>See what actually shipped to your mailbox, with delivery posture and receipts.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/advisory">
+                <span class="tag">Advisory</span>
+                <strong>Vote and executive signal</strong>
+                <p>Players can pressure the GM desk, GMs can pressure the leader, and the chain stays explicitly non-democratic.</p>
+            </a>
+        </div>
     </div>
 </section>
 
@@ -27,7 +73,7 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Turn 1 newsreel</p>
+            <p class="eyebrow">World turn inbox</p>
             <h2 class="editorial-title">@Model.NewsreelStatus.StatusLabel</h2>
             <p class="editorial-copy">@Model.NewsreelStatus.Summary</p>
         </div>
@@ -39,6 +85,84 @@
         <div class="stacked-actions">
             <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.NotificationsHref">Open notification receipts</a>
             <a class="button-like button-like--secondary" href="@Model.NewsreelStatus.TurnHref">Open Turn 1</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open validation packet</a>
+        </div>
+    </section>
+}
+
+@if (Model.AdvisorySummary is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Advisory command</p>
+            <h2 class="editorial-title">@Model.AdvisorySummary.Heading</h2>
+            <p class="editorial-copy">@Model.AdvisorySummary.NoDemocracyNote</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            <article class="route-choice-card">
+                <span class="tag">Players</span>
+                <p>@Model.AdvisorySummary.PlayerBallots.Count player advisory ballot(s) are open on this lane.</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">GMs</span>
+                <p>@Model.AdvisorySummary.GmBallots.Count GM strategy ballot(s) are open on this lane.</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Executive</span>
+                <p>@Model.AdvisorySummary.ExecutiveSummaries.Count executive intake summary lane(s) are available.</p>
+            </article>
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory lane</a>
+            <a class="button-like button-like--secondary" href="@Model.AdvisorySummary.OpenMailHref">Open mail-backed route</a>
+        </div>
+    </section>
+}
+
+@if (Model.WorldTurnBriefing is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">@Model.WorldTurnBriefing.TransitionLabel</p>
+            <h2 class="editorial-title">@Model.WorldTurnBriefing.InboxHeadline</h2>
+            <p class="editorial-copy">@Model.WorldTurnBriefing.NewsreelLead</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            <article class="route-choice-card">
+                <span class="tag">World state</span>
+                <p>@Model.WorldTurnBriefing.StateSummary</p>
+            </article>
+            @foreach (var item in Model.WorldTurnBriefing.NewsreelBullets.Take(2))
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Newsreel beat</span>
+                    <p>@item</p>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@if (Model.LeaderDigest is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Leader readout</p>
+            <h2 class="editorial-title">@Model.LeaderDigest.Heading</h2>
+            <p class="editorial-copy">@Model.LeaderDigest.Summary</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var item in Model.LeaderDigest.PressureCalls.Take(3))
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Pressure call</span>
+                    <p>@item</p>
+                </article>
+            }
+        </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--secondary" href="/account/ledger/factions/@Model.LeaderDigest.FactionId/leader-briefing">Open leader brief</a>
+            <a class="button-like button-like--secondary" href="@Model.LeaderDigest.ValidationHref">Open leader JSON</a>
         </div>
     </section>
 }
@@ -65,14 +189,15 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Faction promo artifact</p>
-            <h2 class="editorial-title">Provider-verified fallback</h2>
-            <p class="editorial-copy">This onboarding lane stays honest: provider verification is still required, so the faction promo ships as first-party storyboard, static card, and captions.</p>
+            <h2 class="editorial-title">First-party motion video lane</h2>
+            <p class="editorial-copy">@Model.PromoArtifact.CampaignHook</p>
         </div>
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">@Model.PromoArtifact.ProviderStatus</span>
                 <h3>@Model.PromoArtifact.PublicName</h3>
                 <p>Render mode: @Model.PromoArtifact.RenderMode</p>
+                <p>@Model.PromoArtifact.AudiencePromise</p>
                 <div class="route-choice-card__proof">
                     @foreach (var format in Model.PromoArtifact.FormatLabels)
                     {
@@ -83,8 +208,29 @@
                     <a class="editorial-strip__action" href="@Model.PromoArtifact.HtmlHref">Open promo brief</a>
                     <a class="editorial-strip__action" href="@Model.PromoArtifact.JsonHref">Open JSON brief</a>
                     <a class="editorial-strip__action" href="@Model.PromoArtifact.CaptionsHref">Open captions</a>
+                    <a class="editorial-strip__action" href="@Model.PromoArtifact.ValidationHref">Open validation</a>
                 </div>
             </article>
+        </div>
+    </section>
+}
+
+@if (Model.ValidationPacket is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Validation</p>
+            <h2 class="editorial-title">Professional world-tick packet</h2>
+            <p class="editorial-copy">@Model.ValidationPacket.Summary</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var check in Model.ValidationPacket.Checks.Take(3))
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Check</span>
+                    <p>@check</p>
+                </article>
+            }
         </div>
     </section>
 }
@@ -110,3 +256,5 @@
         </div>
     </section>
 }
+
+<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>

@@ -580,7 +580,7 @@ public sealed class PublicConciergeService
         {
             return new PublicConciergeWidgetViewModel(
                 StatusLabel: "Disabled by kill switch",
-                Summary: "This public surface is running fallback-only mode. The first-party route list below remains the supported path.");
+                Summary: "This public surface is using the direct first-party path right now. The supported links below remain the source of truth.");
         }
 
         string? iframeHref = GetSurfaceConfig(surface.ConfigPrefix, "WIDGET_URL");
@@ -594,8 +594,8 @@ public sealed class PublicConciergeService
         if (!Uri.TryCreate(iframeHref, UriKind.Absolute, out Uri? widgetUri))
         {
             return new PublicConciergeWidgetViewModel(
-                StatusLabel: "Fallback only",
-                Summary: "The configured widget URL is invalid on this host, so only the first-party branch cards are active.");
+                StatusLabel: "Direct first-party path",
+                Summary: "The optional guided widget is unavailable on this host, so the first-party branch cards below stay active.");
         }
 
         string origin = $"{widgetUri.Scheme}://{widgetUri.Host}{(widgetUri.IsDefaultPort ? string.Empty : $":{widgetUri.Port}")}";

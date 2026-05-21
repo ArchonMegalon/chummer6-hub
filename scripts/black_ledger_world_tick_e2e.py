@@ -90,8 +90,12 @@ def run(base_url: str, world: str) -> int:
     failures: list[str] = []
     seed = load_seed(world)
     factions = seed.get("factions", [])
-    districts = seed.get("map", {}).get("districts", [])
-    ai_personalities = {item.get("id") for item in seed.get("ai_personalities", []) if item.get("id")}
+    districts = seed.get("districts") or seed.get("map", {}).get("districts", [])
+    ai_personalities = {
+        item.get("personality_id") or item.get("id")
+        for item in seed.get("ai_personalities", [])
+        if item.get("personality_id") or item.get("id")
+    }
     turns = seed.get("turns", [])
     turn_zero = next((turn for turn in turns if turn.get("turn") == 0), None)
     turn_one = next((turn for turn in turns if turn.get("turn") == 1), None)
@@ -126,6 +130,9 @@ def run(base_url: str, world: str) -> int:
     ledger_response.raise_for_status()
     turn_two_response = requests.get(f"{base_url}/ledger?turn=2", timeout=30)
     turn_two_response.raise_for_status()
+    newsreel_response = requests.get(f"{base_url}/ledger/turns/1/newsreel.json", timeout=30)
+    newsreel_response.raise_for_status()
+    newsreel_payload = newsreel_response.json()
 
     assert_required_phrases(root_response.text, ROOT_REQUIRED_PHRASES, failures, "/")
     assert_required_phrases(ledger_response.text, LEDGER_REQUIRED_PHRASES, failures, "/ledger")
@@ -133,6 +140,18 @@ def run(base_url: str, world: str) -> int:
     scan_forbidden(root_response.text, failures, "/")
     scan_forbidden(ledger_response.text, failures, "/ledger")
     scan_forbidden(turn_two_response.text, failures, "/ledger?turn=2")
+    scan_forbidden_values(newsreel_payload, failures, "/ledger/turns/1/newsreel.json")
+
+    if newsreel_payload.get("fromTurn") != 0:
+        failures.append(f"unexpected fromTurn in newsreel payload: {newsreel_payload.get('fromTurn')}")
+    if newsreel_payload.get("toTurn") != 1:
+        failures.append(f"unexpected toTurn in newsreel payload: {newsreel_payload.get('toTurn')}")
+    if newsreel_payload.get("transitionLabel") != "Turn 0 -> Turn 1":
+        failures.append(f"unexpected transitionLabel: {newsreel_payload.get('transitionLabel')}")
+    if "Turn 0" not in str(newsreel_payload.get("transitionNarrative", "")):
+        failures.append("newsreel transitionNarrative is missing Turn 0 framing")
+    if not newsreel_payload.get("newsreelBullets"):
+        failures.append("newsreelBullets are missing")
 
     payload = {
         "contract_name": "chummer.black_ledger_preseeded_world_e2e",
@@ -146,6 +165,7 @@ def run(base_url: str, world: str) -> int:
         "turn_0_present": turn_zero is not None,
         "turn_1_receipt_id": None if turn_one is None else turn_one.get("receipt_id"),
         "turn_2_preview_checked": True,
+        "newsreel_transition_checked": True,
         "failure_count": len(failures),
         "failures": failures,
     }

@@ -58,6 +58,21 @@ public sealed record BlackLedgerNewsDeliveryReceipt(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset AttemptedAtUtc);
 
+public sealed record BlackLedgerInboxEntry(
+    string EntryId,
+    string RecipientUserId,
+    string WorldId,
+    int Turn,
+    string Kind,
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    string Href,
+    string CtaLabel,
+    string StatusLabel,
+    string SourceReceiptId,
+    DateTimeOffset CreatedAtUtc);
+
 public sealed record BlackLedgerTickNewsNotificationBatchReceipt(
     string BatchId,
     string Policy,
@@ -112,6 +127,12 @@ public sealed class BlackLedgerNewsRecipientResolver
             if (string.IsNullOrWhiteSpace(operatorEmail))
             {
                 return new BlackLedgerNewsRecipientResolution(policy, "suppressed_no_recipients", "recipient_missing", Array.Empty<BlackLedgerNewsRecipientCandidate>());
+            }
+
+            BlackLedgerNewsRecipientCandidate? mappedOperator = ResolveUserByEmail(operatorEmail, "operator_account_fallback");
+            if (mappedOperator is not null)
+            {
+                return new BlackLedgerNewsRecipientResolution(policy, "resolved", null, [mappedOperator]);
             }
 
             return new BlackLedgerNewsRecipientResolution(
@@ -219,6 +240,27 @@ public sealed class BlackLedgerNewsRecipientResolver
         }
     }
 
+    private BlackLedgerNewsRecipientCandidate? ResolveUserByEmail(string email, string source)
+    {
+        lock (_store.Gate)
+        {
+            HubUserDto? user = _store.UsersById.Values
+                .FirstOrDefault(candidate => string.Equals(NormalizeEmail(candidate.Email), email, StringComparison.OrdinalIgnoreCase));
+            if (user is null)
+            {
+                return null;
+            }
+
+            return new BlackLedgerNewsRecipientCandidate(
+                RecipientKey: $"user:{user.UserId}",
+                RecipientUserId: user.UserId,
+                DisplayName: string.IsNullOrWhiteSpace(user.DisplayName) ? "Operator" : user.DisplayName,
+                Email: email,
+                SubscriptionBacked: true,
+                Source: source);
+        }
+    }
+
     public static string NormalizePolicy(string? policy)
     {
         string normalized = (policy ?? string.Empty).Trim().ToLowerInvariant();
@@ -266,6 +308,8 @@ public sealed class BlackLedgerTickNewsNotificationService
     private readonly CommunityStore _store;
     private readonly IConfiguration _configuration;
     private readonly BlackLedgerNewsRecipientResolver _resolver;
+    private readonly BlackLedgerWorldTickBriefingService _briefings;
+    private readonly BlackLedgerFactionOnboardingService _factions;
     private readonly ILogger<BlackLedgerTickNewsNotificationService> _logger;
 
     public BlackLedgerTickNewsNotificationService(
@@ -273,12 +317,16 @@ public sealed class BlackLedgerTickNewsNotificationService
         CommunityStore store,
         IConfiguration configuration,
         BlackLedgerNewsRecipientResolver resolver,
+        BlackLedgerWorldTickBriefingService briefings,
+        BlackLedgerFactionOnboardingService factions,
         ILogger<BlackLedgerTickNewsNotificationService>? logger = null)
     {
         _httpClient = httpClient;
         _store = store;
         _configuration = configuration;
         _resolver = resolver;
+        _briefings = briefings;
+        _factions = factions;
         _logger = logger ?? NullLogger<BlackLedgerTickNewsNotificationService>.Instance;
     }
 
@@ -298,6 +346,60 @@ public sealed class BlackLedgerTickNewsNotificationService
                 .Take(Math.Max(1, take))
                 .ToArray();
         }
+    }
+
+    public IReadOnlyList<BlackLedgerInboxEntry> ListInboxEntries(string recipientUserId, string worldId = "emerald-sprawl-prelude", int take = 24)
+    {
+        if (string.IsNullOrWhiteSpace(recipientUserId))
+        {
+            return Array.Empty<BlackLedgerInboxEntry>();
+        }
+
+        lock (_store.Gate)
+        {
+            return _store.BlackLedgerInboxEntries
+                .Where(item =>
+                    string.Equals(item.RecipientUserId, recipientUserId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.WorldId, worldId, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .Take(Math.Max(1, take))
+                .ToArray();
+        }
+    }
+
+    public int BackfillInboxEntries(string recipientUserId, string worldId = "emerald-sprawl-prelude")
+    {
+        if (string.IsNullOrWhiteSpace(recipientUserId))
+        {
+            return 0;
+        }
+
+        BlackLedgerNewsDeliveryReceipt[] receipts;
+        lock (_store.Gate)
+        {
+            bool alreadyHasEntries = _store.BlackLedgerInboxEntries.Any(item =>
+                string.Equals(item.RecipientUserId, recipientUserId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(item.WorldId, worldId, StringComparison.OrdinalIgnoreCase));
+            if (alreadyHasEntries)
+            {
+                return 0;
+            }
+
+            receipts = _store.BlackLedgerNewsDeliveryReceipts
+                .Where(item =>
+                    string.Equals(item.RecipientUserId, recipientUserId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.WorldId, worldId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(item.Status, "sent", StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(static item => item.CreatedAtUtc)
+                .ToArray();
+        }
+
+        foreach (BlackLedgerNewsDeliveryReceipt receipt in receipts)
+        {
+            UpsertInboxEntries(receipt);
+        }
+
+        return receipts.Length;
     }
 
     public BlackLedgerNewsStatusViewModel BuildStatusViewModel(
@@ -521,16 +623,20 @@ public sealed class BlackLedgerTickNewsNotificationService
     {
         string trimmedBase = ledgerBaseUrl.TrimEnd('/');
         BlackLedgerTickReceiptViewModel tick = world.LastTick ?? throw new InvalidOperationException("World preview is missing the last tick.");
+        BlackLedgerWorldTurnBriefingViewModel? briefing = _briefings.BuildWorldTurnBriefing(tick.Turn, $"{trimmedBase}/ledger");
+        string publicHeadline = briefing?.InboxHeadline ?? world.TurnHeadline;
+        string publicSummary = briefing?.NewsreelLead ?? tick.Summary;
+        IReadOnlyList<string> highlights = briefing?.NewsreelBullets ?? tick.Effects.Select(effect => $"{effect.Target}: {effect.PublicReason}").Take(4).ToArray();
         return new BlackLedgerWorldTickNewsEvent(
             WorldId: world.WorldId,
             WorldName: world.PublicName,
-            FromTurn: Math.Max(0, tick.Turn - 1),
+            FromTurn: briefing?.FromTurn ?? Math.Max(0, tick.Turn - 1),
             ToTurn: tick.Turn,
             TickReceiptId: tick.ReceiptId,
             NewsId: $"black_ledger_news_{world.WorldId}_{tick.Turn}",
-            PublicHeadline: world.TurnHeadline,
-            PublicSummary: tick.Summary,
-            PublicHighlights: tick.Effects.Select(effect => $"{effect.Target}: {effect.PublicReason}").Take(4).ToArray(),
+            PublicHeadline: publicHeadline,
+            PublicSummary: publicSummary,
+            PublicHighlights: highlights,
             LedgerUrl: $"{trimmedBase}/ledger?turn={tick.Turn}",
             DispatchUrl: $"{trimmedBase}/ledger/dispatches/dispatch_turn_{tick.Turn:0000}_main",
             TickReceiptUrl: $"{trimmedBase}/ledger/closeouts",
@@ -600,6 +706,11 @@ public sealed class BlackLedgerTickNewsNotificationService
             AttemptedAtUtc = DateTimeOffset.UtcNow,
         };
         UpsertReceipt(finalized);
+        if (string.Equals(status, "sent", StringComparison.OrdinalIgnoreCase)
+            && !string.IsNullOrWhiteSpace(finalized.RecipientUserId))
+        {
+            UpsertInboxEntries(finalized);
+        }
         return finalized;
     }
 
@@ -621,6 +732,105 @@ public sealed class BlackLedgerTickNewsNotificationService
             if (_store.BlackLedgerNewsDeliveryReceipts.Count > 256)
             {
                 _store.BlackLedgerNewsDeliveryReceipts.RemoveRange(256, _store.BlackLedgerNewsDeliveryReceipts.Count - 256);
+            }
+
+            _store.PersistLocked();
+        }
+    }
+
+    private void UpsertInboxEntries(BlackLedgerNewsDeliveryReceipt receipt)
+    {
+        BlackLedgerWorldTurnBriefingViewModel? briefing = _briefings.BuildWorldTurnBriefing(receipt.ToTurn);
+        List<BlackLedgerInboxEntry> entries =
+        [
+            new(
+                EntryId: $"blinbox_news_{receipt.RecipientUserId}_{receipt.TickReceiptId}",
+                RecipientUserId: receipt.RecipientUserId,
+                WorldId: receipt.WorldId,
+                Turn: receipt.ToTurn,
+                Kind: "newsreel",
+                Eyebrow: "World turn",
+                Heading: briefing?.InboxHeadline ?? $"World Turn {receipt.ToTurn} newsreel",
+                Summary: briefing?.NewsreelLead ?? "Receipt-backed world-turn newsreel is ready.",
+                Href: $"/ledger/turns/{receipt.ToTurn}",
+                CtaLabel: "Open newsreel",
+                StatusLabel: "Delivered",
+                SourceReceiptId: receipt.ReceiptId,
+                CreatedAtUtc: receipt.CreatedAtUtc),
+            new(
+                EntryId: $"blinbox_validation_{receipt.RecipientUserId}_{receipt.TickReceiptId}",
+                RecipientUserId: receipt.RecipientUserId,
+                WorldId: receipt.WorldId,
+                Turn: receipt.ToTurn,
+                Kind: "validation",
+                Eyebrow: "Validation",
+                Heading: "World-tick validation packet",
+                Summary: "Validate the inbox-safe turn packet against the same receipt-backed world-turn truth.",
+                Href: "/account/ledger/worldtick/validation",
+                CtaLabel: "Open validation",
+                StatusLabel: "Ready",
+                SourceReceiptId: receipt.ReceiptId,
+                CreatedAtUtc: receipt.CreatedAtUtc)
+        ];
+
+        foreach (BlackLedgerFactionSummaryDto faction in _factions.ListFactionSummaries().Take(6))
+        {
+            string factionId = faction.FactionId.Replace('_', '-');
+            BlackLedgerFactionPromoArtifactViewModel? promo = _factions.GetPromoArtifact(factionId);
+            if (promo is null)
+            {
+                continue;
+            }
+
+            entries.Add(new BlackLedgerInboxEntry(
+                EntryId: $"blinbox_promo_{receipt.RecipientUserId}_{receipt.TickReceiptId}_{factionId}",
+                RecipientUserId: receipt.RecipientUserId,
+                WorldId: receipt.WorldId,
+                Turn: receipt.ToTurn,
+                Kind: "promo",
+                Eyebrow: "Faction promo",
+                Heading: $"{promo.PublicName} motion promo rail",
+                Summary: $"{promo.CampaignHook} {promo.AudiencePromise}",
+                Href: promo.HtmlHref,
+                CtaLabel: "Open promo rail",
+                StatusLabel: "Public-safe",
+                SourceReceiptId: receipt.ReceiptId,
+                CreatedAtUtc: receipt.CreatedAtUtc));
+            entries.Add(new BlackLedgerInboxEntry(
+                EntryId: $"blinbox_leader_{receipt.RecipientUserId}_{receipt.TickReceiptId}_{factionId}",
+                RecipientUserId: receipt.RecipientUserId,
+                WorldId: receipt.WorldId,
+                Turn: receipt.ToTurn,
+                Kind: "leader_digest",
+                Eyebrow: "Leader brief",
+                Heading: $"{promo.PublicName} leader validation",
+                Summary: "Personalized faction-leader readout and validation handoff for the current world turn.",
+                Href: promo.ValidationHref,
+                CtaLabel: "Open leader brief",
+                StatusLabel: "Personalized",
+                SourceReceiptId: receipt.ReceiptId,
+                CreatedAtUtc: receipt.CreatedAtUtc));
+        }
+
+        lock (_store.Gate)
+        {
+            foreach (BlackLedgerInboxEntry entry in entries)
+            {
+                int index = _store.BlackLedgerInboxEntries.FindIndex(item => string.Equals(item.EntryId, entry.EntryId, StringComparison.OrdinalIgnoreCase));
+                if (index >= 0)
+                {
+                    _store.BlackLedgerInboxEntries[index] = entry;
+                }
+                else
+                {
+                    _store.BlackLedgerInboxEntries.Add(entry);
+                }
+            }
+
+            _store.BlackLedgerInboxEntries.Sort(static (left, right) => right.CreatedAtUtc.CompareTo(left.CreatedAtUtc));
+            if (_store.BlackLedgerInboxEntries.Count > 512)
+            {
+                _store.BlackLedgerInboxEntries.RemoveRange(512, _store.BlackLedgerInboxEntries.Count - 512);
             }
 
             _store.PersistLocked();
@@ -676,7 +886,7 @@ public sealed class BlackLedgerTickNewsNotificationService
                 binding_id = bindingId,
                 channel = EmailChannel,
                 recipient = recipient.Email,
-                subject = $"[Chummer] Black Ledger turn {tickNews.ToTurn}: The city is moving",
+                subject = $"[Chummer] Black Ledger {tickNews.FromTurn}→{tickNews.ToTurn}: {tickNews.PublicHeadline}",
                 content = BuildEmailBody(tickNews),
                 metadata,
                 idempotency_key = idempotencyKey,
@@ -743,7 +953,7 @@ public sealed class BlackLedgerTickNewsNotificationService
         StringBuilder builder = new();
         builder.AppendLine($"{tickNews.PublicHeadline}");
         builder.AppendLine();
-        builder.AppendLine($"Turn {tickNews.ToTurn} already ran.");
+        builder.AppendLine($"World turn transition: Turn {tickNews.FromTurn} -> Turn {tickNews.ToTurn}.");
         builder.AppendLine();
         builder.AppendLine(tickNews.PublicSummary);
         builder.AppendLine();
@@ -769,9 +979,51 @@ public sealed class BlackLedgerTickNewsNotificationService
         builder.AppendLine($"Ledger: {tickNews.LedgerUrl}");
         builder.AppendLine($"Tick receipt lane: {tickNews.TickReceiptUrl}");
         builder.AppendLine($"Manage notifications: {tickNews.LedgerUrl}");
+        AppendFactionPromoRail(builder);
         builder.AppendLine($"Receipt: {tickNews.TickReceiptId}");
         builder.AppendLine("Privacy note: public-safe aggregate/news only. No private campaign, support, or administrative data is included.");
         return builder.ToString().Trim();
+    }
+
+    private void AppendFactionPromoRail(StringBuilder builder)
+    {
+        IReadOnlyList<BlackLedgerFactionSummaryDto> factions = _factions.ListFactionSummaries();
+        if (factions.Count == 0)
+        {
+            return;
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("Faction promo and validation lane:");
+        foreach (BlackLedgerFactionSummaryDto faction in factions.Take(6))
+        {
+            string normalizedFactionId = faction.FactionId.Replace('_', '-');
+            BlackLedgerFactionPromoArtifactViewModel? promo = _factions.GetPromoArtifact(normalizedFactionId);
+            string promoHref = promo?.HtmlHref ?? $"/ledger/factions/{normalizedFactionId}/promo";
+            string promoJsonHref = promo?.JsonHref ?? $"/ledger/factions/{normalizedFactionId}/promo.json";
+            string validationHref = promo?.ValidationHref ?? $"/account/ledger/factions/{normalizedFactionId}/leader-briefing";
+            builder.Append("- ")
+                .Append(faction.PublicName)
+                .Append(": promo ")
+                .AppendLine(ToAbsoluteLedgerUrl(promoHref));
+            builder.Append("  JSON: ").AppendLine(ToAbsoluteLedgerUrl(promoJsonHref));
+            builder.Append("  Leader validation: ").AppendLine(ToAbsoluteLedgerUrl(validationHref));
+        }
+    }
+
+    private static string ToAbsoluteLedgerUrl(string href)
+    {
+        if (string.IsNullOrWhiteSpace(href))
+        {
+            return "https://chummer.run/ledger";
+        }
+
+        if (Uri.TryCreate(href, UriKind.Absolute, out Uri? absolute))
+        {
+            return absolute.ToString();
+        }
+
+        return $"https://chummer.run{(href.StartsWith("/", StringComparison.Ordinal) ? href : $"/{href}")}";
     }
 
     private static string BuildEventKey(BlackLedgerWorldTickNewsEvent tickNews, string recipientKey)
@@ -830,17 +1082,17 @@ public sealed class BlackLedgerTickNewsNotificationService
     private static string BuildStatusSummary(string status, string? failureReason, bool isRecipientScoped)
         => status switch
         {
-            "sent" => "Turn 1 newsreel email was sent with a delivery receipt.",
-            "duplicate" => "Turn 1 newsreel was already delivered for this event key, so a duplicate send was prevented.",
-            "pending_dry_run" or "dry_run" => "Turn 1 newsreel was rendered in dry-run mode without sending email.",
-            "suppressed_disabled" => "Turn 1 newsreel email is disabled on this runtime.",
-            "suppressed_no_recipients" => "Turn 1 newsreel email had no eligible recipients on this runtime.",
-            "suppressed_multiple_users_no_subscription" => "Turn 1 newsreel preview fallback refused delivery because multiple users exist without an explicit subscription.",
-            "suppressed_delivery_unconfigured" => "Turn 1 newsreel email could not send because EA delivery configuration is missing.",
-            "suppressed_privacy_failed" => "Turn 1 newsreel email was blocked by the privacy gate before delivery.",
-            "suppressed_not_current_recipient" when isRecipientScoped => "A Turn 1 newsreel exists, but this account is not part of the current recipient policy.",
-            "failed_delivery" => $"Turn 1 newsreel email attempted delivery, but the downstream dispatch failed{(string.IsNullOrWhiteSpace(failureReason) ? "." : $": {failureReason}.")}",
-            _ => "Turn 1 newsreel email has not produced a usable receipt yet."
+            "sent" => "The current world-turn newsreel email was sent with a delivery receipt.",
+            "duplicate" => "This world-turn newsreel was already delivered for the same event key, so a duplicate send was prevented.",
+            "pending_dry_run" or "dry_run" => "The current world-turn newsreel was rendered in dry-run mode without sending email.",
+            "suppressed_disabled" => "World-turn newsreel email is disabled on this runtime.",
+            "suppressed_no_recipients" => "World-turn newsreel email had no eligible recipients on this runtime.",
+            "suppressed_multiple_users_no_subscription" => "World-turn preview fallback refused delivery because multiple users exist without an explicit subscription.",
+            "suppressed_delivery_unconfigured" => "World-turn newsreel email could not send because EA delivery configuration is missing.",
+            "suppressed_privacy_failed" => "World-turn newsreel email was blocked by the privacy gate before delivery.",
+            "suppressed_not_current_recipient" when isRecipientScoped => "A world-turn newsreel exists, but this account is not part of the current recipient policy.",
+            "failed_delivery" => $"World-turn newsreel email attempted delivery, but the downstream dispatch failed{(string.IsNullOrWhiteSpace(failureReason) ? "." : $": {failureReason}.")}",
+            _ => "World-turn newsreel email has not produced a usable receipt yet."
         };
 
     private static int ExtractCurrentTurn(WorldTickProjection worldTick)
@@ -916,5 +1168,27 @@ public sealed class BlackLedgerTickNewsDispatchWorker : BackgroundService
             BlackLedgerWorldTickNewsEvent tickNews = _notifications.BuildEventFromStoredProjections(worldTick, news, baseUrl);
             await _notifications.NotifyTickNewsAsync(tickNews, dryRun: false, policyOverride: null, cancellationToken);
         }
+
+        await DispatchSeededTurnOneCatchupAsync(baseUrl, cancellationToken);
+    }
+
+    private async Task DispatchSeededTurnOneCatchupAsync(string baseUrl, CancellationToken cancellationToken)
+    {
+        BlackLedgerWorldTickNewsEvent? seeded = _notifications.BuildSeededWorldEvent("emerald-sprawl-prelude", 1, baseUrl);
+        if (seeded is null)
+        {
+            return;
+        }
+
+        bool alreadyExists = _notifications.ListReceipts(seeded.WorldId, seeded.ToTurn, take: 64)
+            .Any(receipt =>
+                string.Equals(receipt.TickReceiptId, seeded.TickReceiptId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(receipt.NewsId, seeded.NewsId, StringComparison.OrdinalIgnoreCase));
+        if (alreadyExists)
+        {
+            return;
+        }
+
+        await _notifications.NotifyTickNewsAsync(seeded, dryRun: false, policyOverride: null, cancellationToken);
     }
 }

@@ -41,7 +41,7 @@ def main() -> int:
     for faction in FACTIONS:
         r = requests.get(f"{base}/ledger/factions/{faction}/promo.json", timeout=30)
         payload = r.json() if r.ok else {}
-        status = "pass" if r.status_code == 200 and payload.get("render_mode") == "fallback_static_storyboard" else "fail"
+        status = "pass" if r.status_code == 200 and payload.get("render_mode") == "first_party_motion_video" else "fail"
         if status != "pass":
             overall = "fail"
         receipt = {

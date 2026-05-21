@@ -40,7 +40,7 @@ public sealed class BlackLedgerStatsViewTests
         Assert.Contains("pressure, not people", ledgerView, System.StringComparison.Ordinal);
         Assert.Contains("Closeout Feed", service, System.StringComparison.Ordinal);
         Assert.Contains("Replay Turn 1", landingView, System.StringComparison.Ordinal);
-        Assert.Contains("Enter Black Ledger", landingView, System.StringComparison.Ordinal);
+        Assert.Contains("carry your runners into the Black Ledger", landingView, System.StringComparison.Ordinal);
     }
 
     [Fact]
@@ -114,11 +114,11 @@ public sealed class BlackLedgerStatsViewTests
         var stats = service.ListPublicStats(2);
 
         Assert.NotNull(world);
-        Assert.False(world!.DeterministicPreview);
-        Assert.Equal(1, world.CurrentTurn);
-        Assert.Contains("Turn 1", world.TurnHeadline, System.StringComparison.Ordinal);
-        Assert.Equal("ledger_tick_0001_preseeded", world.LastTick!.ReceiptId);
-        Assert.Equal("preseeded", world.LastTick.Mode);
+        Assert.True(world!.DeterministicPreview);
+        Assert.Equal(2, world.CurrentTurn);
+        Assert.Contains("Turn 2", world.TurnHeadline, System.StringComparison.Ordinal);
+        Assert.Equal("ledger_tick_0002_deterministic_preview", world.LastTick!.ReceiptId);
+        Assert.Equal("deterministic_test", world.LastTick.Mode);
         Assert.DoesNotContain(world.TurnNavigation, static item => item.Turn == 2);
         Assert.Contains(stats, static stat =>
             string.Equals(stat.Id, "package-pressure", System.StringComparison.Ordinal)
@@ -155,6 +155,45 @@ public sealed class BlackLedgerStatsViewTests
             && item.InvolvedDistricts.Any(static district => string.Equals(district, "Rust Bazaar", System.StringComparison.Ordinal)));
         Assert.Contains(dispatches, static item =>
             string.Equals(item.DispatchId, "dispatch_turn_0001_ghostline_rumor_suppressed", System.StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void SeedBackedWorldBuildsProfessionalTurnAndLeaderBriefings()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_BLACK_LEDGER_SEED_PATH"] = Path.GetFullPath(Path.Combine(
+                    "/docker/chummercomplete",
+                    "chummer-hub-registry",
+                    "black-ledger",
+                    "worlds",
+                    "emerald-sprawl-prelude.yaml")),
+            })
+            .Build();
+
+        var stats = new BlackLedgerPublicStatsService(configuration);
+        var factions = BlackLedgerFactionAllegianceTests.CreateService();
+        var service = new BlackLedgerWorldTickBriefingService(stats, factions);
+
+        var briefing = service.BuildWorldTurnBriefing(1);
+        var digest = service.BuildLeaderDigest("ashline-circle", 1);
+        var packet = service.BuildValidationPacket(1, "ashline-circle");
+
+        Assert.NotNull(briefing);
+        Assert.Equal(0, briefing!.FromTurn);
+        Assert.Equal(1, briefing.ToTurn);
+        Assert.Contains("Turn 0", briefing.TransitionNarrative, System.StringComparison.Ordinal);
+        Assert.Contains("newsreel.json", briefing.ValidationJsonHref, System.StringComparison.Ordinal);
+        Assert.NotNull(briefing.Broadcast);
+        Assert.Contains("/media/ledger/newsreels/turn-1-newsreel.mp4", briefing.Broadcast!.VideoMp4Href, System.StringComparison.Ordinal);
+        Assert.Contains(".vtt", briefing.Broadcast.CaptionsHref, System.StringComparison.Ordinal);
+        Assert.NotNull(digest);
+        Assert.Equal("ashline-circle", digest!.FactionId);
+        Assert.NotEmpty(digest.PressureCalls);
+        Assert.NotEmpty(digest.RecommendedActions);
+        Assert.NotNull(packet);
+        Assert.Contains("/account/ledger/factions/ashline-circle/leader-briefing", packet!.Links, System.StringComparer.Ordinal);
     }
 
     [Fact]

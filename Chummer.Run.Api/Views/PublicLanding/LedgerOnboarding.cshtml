@@ -28,28 +28,67 @@
     };
 }
 
-<section class="trust-page-hero trust-page-hero--compact">
-    <div class="trust-page-hero__copy">
+<section class="ledger-flagship ledger-flagship--onboarding">
+    <div class="ledger-flagship__copy">
         <p class="eyebrow">Black Ledger onboarding</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        <p class="ledger-flagship__support">Choose on the globe first. The faction should feel like a country with pressure, territory, and visible consequence before you ever hit a form.</p>
         <div class="trust-claim__microproof" aria-label="Onboarding steps">
             @foreach (var step in Model.Steps)
             {
                 <a class="inline-link" href="@step.Href">@(step.Current ? $"{step.Label} (current)" : step.Complete ? $"{step.Label} (complete)" : step.Label)</a>
             }
         </div>
+        <div class="stacked-actions">
+            @if (Model.HasActiveAllegiance && Model.CurrentAllegiance is not null)
+            {
+                <a class="button-like button-like--primary" href="/account/ledger/factions/@Model.CurrentAllegiance.ActiveFactionId.Replace('_', '-')">Open my faction</a>
+            }
+            else
+            {
+                <a class="button-like button-like--primary" href="/account/ledger/onboarding?step=factions">Choose a faction</a>
+            }
+            <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open public globe</a>
+        </div>
     </div>
-    <div class="stacked-actions">
-        @if (Model.HasActiveAllegiance && Model.CurrentAllegiance is not null)
-        {
-            <a class="button-like button-like--primary" href="/account/ledger/factions/@Model.CurrentAllegiance.ActiveFactionId.Replace('_', '-')">Open my faction</a>
-        }
-        else
-        {
-            <a class="button-like button-like--primary" href="/account/ledger/onboarding?step=factions">Choose a faction</a>
-        }
-        <a class="button-like button-like--secondary" href="/ledger/map#ledger-map">Open globe</a>
+    <div class="ledger-flagship__stage">
+        <div class="ledger-flagship__map-frame">
+            <div
+                class="ledger-flagship__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="onboarding"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-initial-mode="influence"
+                data-tick-headline="Turn 1 pressure live."
+                data-primary-label="Choose faction"
+                data-primary-href="/account/ledger/onboarding?step=factions"
+                data-secondary-label="Found new faction"
+                data-secondary-href="/account/ledger/factions/create"></div>
+        </div>
+        <div class="ledger-flagship__nav" aria-label="Onboarding command lanes">
+            <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/account/ledger/onboarding?step=factions">
+                <span class="tag">Choose</span>
+                <strong>Pick a faction country</strong>
+                <p>Start with the globe, hover pressure, then commit to the side you actually want to carry.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/onboarding?step=choose-path">
+                <span class="tag">Found</span>
+                <strong>Choose a founder path</strong>
+                <p>Major and challenger routes stay explicit and receipt-backed before you build the charter.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/factions/create?charterType=major">
+                <span class="tag">Major</span>
+                <strong>Found a major</strong>
+                <p>Build a flagship faction with visible slot pressure and city-scale consequence.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/factions/create?charterType=challenger">
+                <span class="tag">Challenger</span>
+                <strong>Found a challenger</strong>
+                <p>Launch a smaller but sharper country on the board and fight for relevance.</p>
+            </a>
+        </div>
     </div>
 </section>
 
@@ -61,12 +100,6 @@
             <h2 class="editorial-title">Pick a side on the globe, then commit.</h2>
             <p class="editorial-copy">@Model.ExistingFactionSummary</p>
         </div>
-        <div
-            class="ledger-onboarding__geoscape"
-            data-black-ledger-geoscape-root
-            data-variant="onboarding"
-            data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map"
-            data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"></div>
         <div class="faction-profile-grid">
             @foreach (var faction in Model.ExistingFactions)
             {
@@ -93,7 +126,7 @@
                     <p class="muted-copy">@faction.Summary</p>
                     <div class="trust-claim__microproof">
                         <span>Safety: public-safe</span>
-                        <span>Video: storyboard fallback</span>
+                        <span>Video: first-party motion</span>
                         <span>Join path: account-wide</span>
                     </div>
                     <div class="stacked-actions">
@@ -158,7 +191,7 @@ else
                     <span class="tag">Next</span>
                     <h3>Open the chooser</h3>
                 </div>
-                <p>Faction cards include globe position, score ledgers, and storyboard-safe intros before commitment.</p>
+                <p>Faction cards include globe position, score ledgers, and motion-video intros with storyboard fallback before commitment.</p>
                 <a class="editorial-strip__action" href="/account/ledger/onboarding?step=factions">Open faction chooser</a>
             </article>
         </div>

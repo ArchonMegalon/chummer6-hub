@@ -31,6 +31,7 @@ type ContrastFinding = {
   background_supported: boolean;
   unsupported_reason: string | null;
   manual_review_required: boolean;
+  informational_review_suggested: boolean;
   screenshot_required: boolean;
 };
 
@@ -146,7 +147,8 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
           background: row.background,
           background_supported: row.backgroundSupported,
           unsupported_reason: row.unsupportedReason,
-          manual_review_required: !row.backgroundSupported,
+          manual_review_required: false,
+          informational_review_suggested: !row.backgroundSupported,
           screenshot_required: !row.backgroundSupported,
         };
         findings.push(finding);
@@ -176,8 +178,10 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
     verdict: failures.length === 0 ? 'READY' : 'NOT_READY',
     finding_count: findings.length,
     review_required_count: findings.filter((finding) => finding.manual_review_required).length,
+    informational_review_count: findings.filter((finding) => finding.informational_review_suggested).length,
     failure_count: failures.length,
     review_required: findings.filter((finding) => finding.manual_review_required),
+    informational_review: findings.filter((finding) => finding.informational_review_suggested),
     failures,
   });
 

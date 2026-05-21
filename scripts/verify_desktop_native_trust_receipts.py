@@ -274,9 +274,9 @@ REQUIRED_SOURCE_MARKERS = {
     Path("Chummer.Run.Api/Views/Accounts/Account.cshtml"): [
         "The next safe action is still inside Chummer on the already-downloaded device.",
         "Only use the recovery code if that copy explicitly enters recovery mode.",
-        "Claim, update, rollback, recovery, and support stay on this same account rail once the install is linked.",
-        "Continue claim, update, rollback, recovery, and support follow-through from the claimed desktop install first.",
-        "Use Devices & access only to relink or reclaim that copy, and keep browser routes as fallback instead of the default ritual.",
+        "Claim, update, rollback, recovery, and support stay on this same account page once the install is linked.",
+        "Continue claim, update, rollback, recovery, and support from the claimed desktop install first.",
+        "Use Devices & access only to relink or reclaim that copy, and keep browser pages as backup help instead of the normal path.",
     ],
     Path("tests/RunServicesVerification/InstallLinkingContinuationVerification.cs"): [
         "ContinueClaimedInstall(",
@@ -1240,6 +1240,8 @@ def _flagship_readiness_path() -> Path:
     if raw:
         configured = Path(raw)
         return configured if configured.is_absolute() else configured.resolve()
+    if FALLBACK_FLAGSHIP_READINESS_PATH.is_file():
+        return FALLBACK_FLAGSHIP_READINESS_PATH
     if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
         return DEFAULT_FLAGSHIP_READINESS_PATH
     return FALLBACK_FLAGSHIP_READINESS_PATH
@@ -1957,24 +1959,24 @@ def _load_flagship_readiness_snapshot(errors: list[str]) -> dict | None:
         return None
 
     coverage_gap_keys = readiness_payload.get("scoped_warning_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("warning_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("scoped_missing_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("missing_keys")
     readiness_audit = readiness_payload.get("flagship_readiness_audit")
-    if not isinstance(coverage_gap_keys, list) and isinstance(readiness_audit, dict):
+    if (not isinstance(coverage_gap_keys, list) or not coverage_gap_keys) and isinstance(readiness_audit, dict):
         coverage_gap_keys = readiness_audit.get("scoped_coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("scoped_warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("scoped_missing_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("missing_coverage_keys")
     if not isinstance(coverage_gap_keys, list):
         coverage_gap_keys = []

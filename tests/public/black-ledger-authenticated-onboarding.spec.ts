@@ -13,10 +13,11 @@ test('black ledger onboarding wizard is route-backed and guest-gated cleanly', a
   expect(page.url()).toContain('/login?next=');
 
   const requiredCopy = [
-    'Choose your flag.',
-    'all current runners',
-    'all future runners',
+    'Pick a side on the globe, then commit.',
+    'One allegiance across current and future runners.',
     'Join this faction',
+    'Open faction video',
+    'Open faction file',
     'Found Major Faction',
     'Found Challenger',
   ];

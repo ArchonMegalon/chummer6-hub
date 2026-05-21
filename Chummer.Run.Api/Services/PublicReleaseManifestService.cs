@@ -932,8 +932,8 @@ public sealed class PublicReleaseManifestService
         adoptionHealth["accountLinkedInstallCount"] = accountLinkedInstallCount;
         adoptionHealth["summary"] =
             $"{GetJsonInt32(adoptionHealth["primaryPromotedCount"])} primary routes are promoted; " +
-            $"{publicInstallCount} are guest-readable, " +
-            $"{accountLinkedInstallCount} require account-linked install handoff, " +
+            $"{publicInstallCount} are open-public, " +
+            $"{accountLinkedInstallCount} use linked install follow-through, " +
             $"{GetJsonInt32(adoptionHealth["fallbackRecoveryCount"])} fallback recovery routes are promoted, " +
             $"and {GetJsonInt32(adoptionHealth["blockedRouteCount"])} routes are still blocked on proof.";
     }
@@ -996,7 +996,7 @@ public sealed class PublicReleaseManifestService
         entitlement["summary"] =
             $"Entitlement and install-hand-off truth spans {GetJsonInt32(entitlement["installAwareArtifactCount"])} install-aware registry rows, " +
             $"{desktopSurfaceRefCount} desktop surface refs, " +
-            $"{openPublicSurfaceCount} guest-readable surfaces, and " +
+            $"{openPublicSurfaceCount} open-public surfaces, and " +
             $"{accountRequiredSurfaceCount} account-required surfaces.";
     }
 

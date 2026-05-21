@@ -139,25 +139,25 @@ def _load_flagship_readiness_snapshot() -> dict:
         return snapshot
 
     coverage_gap_keys = readiness_payload.get("scoped_warning_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("warning_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("scoped_missing_keys")
-    if not isinstance(coverage_gap_keys, list):
+    if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
         coverage_gap_keys = readiness_payload.get("missing_keys")
 
     readiness_audit = readiness_payload.get("flagship_readiness_audit")
-    if not isinstance(coverage_gap_keys, list) and isinstance(readiness_audit, dict):
+    if (not isinstance(coverage_gap_keys, list) or not coverage_gap_keys) and isinstance(readiness_audit, dict):
         coverage_gap_keys = readiness_audit.get("scoped_coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("coverage_gap_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("scoped_warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("warning_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("scoped_missing_coverage_keys")
-        if not isinstance(coverage_gap_keys, list):
+        if not isinstance(coverage_gap_keys, list) or not coverage_gap_keys:
             coverage_gap_keys = readiness_audit.get("missing_coverage_keys")
 
     normalized_coverage_gap_keys = [

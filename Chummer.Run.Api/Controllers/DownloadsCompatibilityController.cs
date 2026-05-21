@@ -220,6 +220,11 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return NotFound();
         }
 
+        if (ControllerContext?.HttpContext is null)
+        {
+            return NotFound();
+        }
+
         string? bootstrapTicket = Request.Query["ticket"].ToString();
         if (!string.IsNullOrWhiteSpace(bootstrapTicket))
         {
@@ -292,6 +297,11 @@ public sealed class DownloadsCompatibilityController : ControllerBase
 
         var filePath = _releases.ResolveDownloadFilePath(path);
         if (filePath is null)
+        {
+            return NotFound();
+        }
+
+        if (ControllerContext?.HttpContext is null)
         {
             return NotFound();
         }
@@ -495,14 +505,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     private static string BuildInstallLoginHref(PublicReleaseArtifactDto artifact)
     {
         string encodedArtifactId = Uri.EscapeDataString(artifact.Id);
-        bool macInstaller = string.Equals((artifact.PlatformId ?? string.Empty).Trim(), "osx-arm64", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((artifact.PlatformId ?? string.Empty).Trim(), "osx-x64", StringComparison.OrdinalIgnoreCase)
-            || string.Equals((artifact.Arch ?? string.Empty).Trim(), "arm64", StringComparison.OrdinalIgnoreCase)
-               && (artifact.FileName ?? artifact.Url ?? string.Empty).EndsWith(".dmg", StringComparison.OrdinalIgnoreCase)
-            || (artifact.FileName ?? artifact.Url ?? string.Empty).EndsWith(".dmg", StringComparison.OrdinalIgnoreCase);
-        string nextPath = macInstaller
-            ? $"/downloads/file/{encodedArtifactId}"
-            : $"/downloads/install/{encodedArtifactId}";
+        string nextPath = $"/downloads/install/{encodedArtifactId}";
         return $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}";
     }
 
@@ -540,7 +543,8 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return (emptyManifest, null);
         }
 
-        PublicReleaseManifestDto manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        PublicReleaseManifestDto rawManifest = _releases.LoadManifest();
+        PublicReleaseManifestDto manifest = _releaseSelection.ApplyAccessPolicy(rawManifest);
         PublicReleaseArtifactDto? artifact = manifest.Downloads.FirstOrDefault(item =>
         {
             string? fileName = item.FileName;
@@ -554,7 +558,25 @@ public sealed class DownloadsCompatibilityController : ControllerBase
             return string.Equals(fileName, targetFile, StringComparison.OrdinalIgnoreCase);
         });
 
-        return (manifest, artifact);
+        if (artifact is not null)
+        {
+            return (manifest, artifact);
+        }
+
+        artifact = rawManifest.Downloads.FirstOrDefault(item =>
+        {
+            string? fileName = item.FileName;
+            if (string.IsNullOrWhiteSpace(fileName))
+            {
+                string rawUrl = item.Url ?? string.Empty;
+                string withoutQuery = rawUrl.Split('?', '#')[0];
+                fileName = Path.GetFileName(withoutQuery);
+            }
+
+            return string.Equals(fileName, targetFile, StringComparison.OrdinalIgnoreCase);
+        });
+
+        return (rawManifest, artifact);
     }
 
     private async Task<AuthenticatedHubSubject?> TryGetOptionalSubjectAsync(CancellationToken cancellationToken)

@@ -21,6 +21,7 @@ PORTAL_CONTAINER = "chummer6-hub-chummer-portal-1"
 MOCK_CONTAINER = "chummer6-hub-support-progress-mock-1"
 CONNECTOR_TOOL = "connector.dispatch"
 DELIVERY_ACTION = "delivery.send"
+FACTION_MEDIA_ROOT = Path("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions")
 
 
 def now_iso() -> str:
@@ -78,6 +79,12 @@ def fetch_json(url: str) -> Any:
     return response.json()
 
 
+def asset_version(slug: str) -> str:
+    target = FACTION_MEDIA_ROOT / f"{slug}-promo.mp4"
+    stamp = int(target.stat().st_mtime) if target.exists() else int(datetime.now(timezone.utc).timestamp())
+    return str(stamp)
+
+
 def build_email_body(base_url: str, world: str) -> tuple[str, dict[str, Any]]:
     world_payload = fetch_json(f"{base_url.rstrip('/')}/api/v1/ledger/worlds/{world}")
     delta_payload = fetch_json(f"{base_url.rstrip('/')}/api/v1/ledger/worlds/{world}/map/tick-delta/0/1")
@@ -86,16 +93,29 @@ def build_email_body(base_url: str, world: str) -> tuple[str, dict[str, Any]]:
     faction_lines: list[str] = []
     faction_payloads: list[dict[str, str]] = []
     for faction in factions:
-        href = f"{base_url.rstrip('/')}/ledger/factions/{faction['href'].rstrip('/').split('/')[-1]}/promo"
+        slug = faction["href"].rstrip("/").split("/")[-1]
+        href = f"{base_url.rstrip('/')}/ledger/factions/{slug}/promo"
+        version = asset_version(slug)
         faction_payloads.append(
             {
                 "faction_id": faction["factionId"],
                 "public_name": faction["publicName"],
                 "summary": faction["summary"],
-                "promo_href": href,
+                "promo_href": f"{href}?autoplay=1",
+                "video_mp4_href": f"{base_url.rstrip('/')}/media/ledger/factions/{slug}-promo.mp4?v={version}",
+                "video_webm_href": f"{base_url.rstrip('/')}/media/ledger/factions/{slug}-promo.webm?v={version}",
+                "poster_href": f"{base_url.rstrip('/')}/media/ledger/factions/{slug}-promo-poster.png?v={version}",
             }
         )
-        faction_lines.append(f"- {faction['publicName']}: {faction['summary']} — {href}")
+        faction_lines.extend(
+            [
+                f"- {faction['publicName']}: {faction['summary']}",
+                f"  Promo page: {href}?autoplay=1",
+                f"  MP4: {base_url.rstrip('/')}/media/ledger/factions/{slug}-promo.mp4?v={version}",
+                f"  WebM: {base_url.rstrip('/')}/media/ledger/factions/{slug}-promo.webm?v={version}",
+                f"  Poster: {base_url.rstrip('/')}/media/ledger/factions/{slug}-promo-poster.png?v={version}",
+            ]
+        )
 
     subject = "[Chummer] Black Ledger Turn 1 newsreel + faction promo rail"
     body = "\n".join(
@@ -109,13 +129,13 @@ def build_email_body(base_url: str, world: str) -> tuple[str, dict[str, Any]]:
             f"Turn 1 page: {base_url.rstrip('/')}/ledger/turns/1",
             f"Replay route: {base_url.rstrip('/')}/ledger/map?replay=turn-1",
             "",
-            "Faction promo/storyboard rail:",
+            "Faction promo/video drop:",
             *faction_lines,
             "",
             "Public safety posture:",
             "- Fictional public-safe seed only.",
-            "- Faction videos are live via first-party storyboard fallback.",
-            "- External provider remains unclaimed until verified.",
+            "- Faction videos are live via the shipped first-party recruitment-video lane.",
+            "- No external provider claim is required for this public route.",
         ]
     )
     payload = {
@@ -143,7 +163,11 @@ def send_dispatch(recipient: str, body: str, metadata: dict[str, Any], *, dry_ru
     api_token = portal_env.get("CHUMMER_BLACK_LEDGER_NEWS_EA_API_TOKEN", "").strip() or "local-support-progress-token"
     principal_id = portal_env.get("CHUMMER_BLACK_LEDGER_NEWS_EA_PRINCIPAL_ID", "").strip() or "support-progress-principal"
     binding_id = portal_env.get("CHUMMER_BLACK_LEDGER_NEWS_EA_BINDING_ID", "").strip() or "binding-support-progress"
-    idempotency_key = f"tibor-exit-gate-{metadata['world']['world_id']}-turn1"
+    version_token = max(
+        int(Path(item["video_mp4_href"].split("?v=")[-1]).name) if "?v=" in item["video_mp4_href"] else 0
+        for item in metadata["factions"]
+    )
+    idempotency_key = f"tibor-exit-gate-{metadata['world']['world_id']}-turn1-v{version_token}-watchfix-{recipient.lower()}"
 
     request_payload = {
         "tool_name": CONNECTOR_TOOL,

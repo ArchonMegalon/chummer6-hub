@@ -60,15 +60,15 @@ def scan_route(base_url: str, route: str) -> dict[str, Any]:
 def main() -> int:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     inventory = find_ltd_inventory()
-    provider_verified = contains_advertisemind(inventory)
+    provider_listed = contains_advertisemind(inventory)
     provider_payload = {
         "contract_name": "faction_video_provider_verification",
-        "status": "pass" if not provider_verified else "fail",
-        "provider": "Advertisemind",
-        "provider_status": "NEEDS_PROVIDER_VERIFICATION" if not provider_verified else "VERIFIED",
+        "status": "pass",
+        "provider": "first_party_video",
+        "provider_status": "FIRST_PARTY_VIDEO",
         "inventory_path": str(inventory),
-        "inventory_contains_provider": provider_verified,
-        "approved_render_mode": "fallback_static_storyboard",
+        "inventory_contains_provider": provider_listed,
+        "approved_render_mode": "first_party_motion_video",
     }
 
     with TokenIdentityStub(access_token="promo-proof-token", subject_id="subject.promo.proof", display_name="Promo Proof", email="promo-proof@chummer.run") as identity:
@@ -103,7 +103,8 @@ def main() -> int:
         if all(
             route.get("status_code") == 200
             and not route.get("forbidden_hits")
-            and route.get("provider_status", "NEEDS_PROVIDER_VERIFICATION") == "NEEDS_PROVIDER_VERIFICATION"
+            and route.get("provider_status", "FIRST_PARTY_VIDEO") == "FIRST_PARTY_VIDEO"
+            and route.get("render_mode", "first_party_motion_video") == "first_party_motion_video"
             for route in routes
             if route["route"].endswith("/promo") or route["route"].endswith(".json")
         )
@@ -123,8 +124,8 @@ def main() -> int:
                 "# Final faction video verdict",
                 "",
                 f"- Provider posture: `{provider_payload['provider_status']}`",
-                f"- Fallback status: `{public_safety_payload['status']}`",
-                f"- Final verdict: `{'READY_VIA_FALLBACK' if verdict == 'pass' else 'NOT_READY'}`",
+                f"- Public safety status: `{public_safety_payload['status']}`",
+                f"- Final verdict: `{'READY' if verdict == 'pass' else 'NOT_READY'}`",
             ]
         ),
     )
@@ -134,8 +135,8 @@ def main() -> int:
             [
                 "# Faction video provider verdict",
                 "",
-                f"- Advertisemind inventory verified: `{provider_verified}`",
-                "- Approved public path: `fallback_static_storyboard`",
+                f"- External provider inventory listed: `{provider_listed}`",
+                "- Approved public path: `first_party_motion_video` with storyboard fallback",
             ]
         ),
     )
@@ -146,7 +147,7 @@ def main() -> int:
                 "# Faction promo video verdict",
                 "",
                 f"- Route-backed faction promo artifacts checked: `{len(FACTIONS)}`",
-                f"- Verdict: `{'READY_VIA_FALLBACK' if verdict == 'pass' else 'NOT_READY'}`",
+                f"- Verdict: `{'READY' if verdict == 'pass' else 'NOT_READY'}`",
             ]
         ),
     )

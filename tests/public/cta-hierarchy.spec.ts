@@ -19,7 +19,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     const heroActions = page.locator('.launch-hero__actions a.button-like');
     const texts = await heroActions.allTextContents();
     const normalized = texts.map((text) => text.replace(/\s+/g, ' ').trim());
-    const expected = ['Enter Black Ledger', 'Download Chummer'];
+    const expected = ['Open Black Ledger', 'Download Chummer'];
     expect(normalized.slice(0, 2), `${viewport.name} hero CTA order`).toEqual(expected);
 
     const heroBoxes = [];
@@ -58,7 +58,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     [
       '# Homepage Simplification Changelog',
       '',
-      '- Hero keeps two ranked CTAs: `Enter Black Ledger`, `Download Chummer`.',
+      '- Hero keeps two ranked CTAs: `Open Black Ledger`, `Download Chummer`.',
       '- Homepage remains on the five-section model: hero, score-strip, factions, play-downloads, footer.',
       '- Proof and release posture stay off the first screen and live on Status instead.',
       '- Support/help CTAs remain lower on the page instead of competing with the hero path.',

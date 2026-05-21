@@ -5,20 +5,175 @@
     ViewData["SurfaceClass"] = "surface-ledger";
 }
 
-<section class="trust-page-hero">
-    <div class="trust-page-hero__copy">
+<section class="ledger-flagship ledger-flagship--notifications">
+    <div class="ledger-flagship__copy">
         <p class="eyebrow">Signed-in notification rail</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
+        <p class="ledger-flagship__support">Inbox is not a dead list. It should open on the world board, show the turn posture, and only then drop you into delivery truth.</p>
         <div class="trust-claim__microproof">
             <span>Status: @Model.Status.StatusLabel</span>
             <span>Policy: @Model.Status.Policy</span>
             <span>Receipts: @Model.Status.ReceiptCount</span>
         </div>
+        <div class="stacked-actions">
+            <a class="button-like button-like--primary" href="@Model.Status.TurnHref">Open Turn 1</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/worldtick/validation">Open validation packet</a>
+            <a class="button-like button-like--secondary" href="/account/ledger/advisory">Open advisory lane</a>
+            <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
+        </div>
     </div>
-    <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@Model.Status.TurnHref">Open Turn 1</a>
-        <a class="button-like button-like--secondary" href="/account/ledger">Back to faction home</a>
+    <div class="ledger-flagship__stage">
+        <div class="ledger-flagship__map-frame">
+            <div
+                class="ledger-flagship__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="notifications"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=1&amp;mode=recent-changes"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-initial-mode="recent-changes"
+                data-tick-headline="Newsreel pressure live."
+                data-primary-label="Open Turn 1"
+                data-primary-href="@Model.Status.TurnHref"
+                data-secondary-label="Open validation"
+                data-secondary-href="/account/ledger/worldtick/validation"></div>
+        </div>
+        <div class="ledger-flagship__nav" aria-label="Notification command lanes">
+            <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="@Model.Status.TurnHref">
+                <span class="tag">Turn</span>
+                <strong>Open the world turn</strong>
+                <p>Jump from the globe straight into the current turn and the route-backed world state.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/worldtick/validation">
+                <span class="tag">Validation</span>
+                <strong>Review the packet</strong>
+                <p>Every inbox line should trace back to a packet you can validate and hand off.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger">
+                <span class="tag">Home</span>
+                <strong>Return to command</strong>
+                <p>Go back to your faction command deck and read the board in the broader context.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/account/ledger/advisory">
+                <span class="tag">Advisory</span>
+                <strong>Open advisory voting</strong>
+                <p>See the player and GM vote lanes that feed upward into the faction chain of command.</p>
+            </a>
+            <a class="ledger-flagship__nav-card" href="/ledger/map#ledger-map">
+                <span class="tag">Public</span>
+                <strong>Open the public globe</strong>
+                <p>Compare the signed-in inbox posture against the public-safe world presentation.</p>
+            </a>
+        </div>
+    </div>
+</section>
+
+@if (Model.AdvisorySummary is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Advisory signal</p>
+            <h2 class="editorial-title">@Model.AdvisorySummary.Heading</h2>
+            <p class="editorial-copy">@Model.AdvisorySummary.NoDemocracyNote</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            <article class="route-choice-card">
+                <span class="tag">Players</span>
+                <p>@Model.AdvisorySummary.PlayerBallots.Count player ballot(s) currently open.</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">GMs</span>
+                <p>@Model.AdvisorySummary.GmBallots.Count GM strategy ballot(s) currently open.</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Executive</span>
+                <p>@Model.AdvisorySummary.ExecutiveSummaries.Count executive summary rail(s) currently visible.</p>
+            </article>
+        </div>
+    </section>
+}
+
+@if (Model.WorldTurnBriefing is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">@Model.WorldTurnBriefing.TransitionLabel</p>
+            <h2 class="editorial-title">@Model.WorldTurnBriefing.InboxHeadline</h2>
+            <p class="editorial-copy">@Model.WorldTurnBriefing.NewsreelLead</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var beat in Model.WorldTurnBriefing.NewsreelBullets.Take(3))
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Inbox beat</span>
+                    <p>@beat</p>
+                </article>
+            }
+        </div>
+    </section>
+
+    @if (Model.WorldTurnBriefing.Broadcast is not null)
+    {
+        <section class="editorial-block ledger-newsreel-broadcast" id="newsreel-player">
+            <div class="editorial-block__lead">
+                <p class="eyebrow">Inbox watch package</p>
+                <h2 class="editorial-title">@Model.WorldTurnBriefing.Broadcast.PackageLabel</h2>
+                <p class="editorial-copy">Open the same anchor-led bulletin your inbox is referring to instead of reading a dead status card.</p>
+            </div>
+            <div class="ledger-newsreel-broadcast__shell">
+                <div class="ledger-newsreel-broadcast__player">
+                    <video class="ledger-newsreel-broadcast__video faction-promo-video"
+                           controls
+                           playsinline
+                           preload="metadata"
+                           poster="@Model.WorldTurnBriefing.Broadcast.PosterHref">
+                        <source src="@Model.WorldTurnBriefing.Broadcast.VideoMp4Href" type="video/mp4" />
+                        <source src="@Model.WorldTurnBriefing.Broadcast.VideoWebmHref" type="video/webm" />
+                        <track kind="captions" src="@Model.WorldTurnBriefing.Broadcast.CaptionsHref" srclang="en" label="English" default />
+                        Your browser does not support HTML5 video playback for this route.
+                    </video>
+                    <div class="trust-claim__microproof">
+                        <span>Anchor: @Model.WorldTurnBriefing.Broadcast.AnchorName</span>
+                        <span>Desk: @Model.WorldTurnBriefing.Broadcast.DeskLabel</span>
+                        <span>Duration: @Model.WorldTurnBriefing.Broadcast.DurationLabel</span>
+                    </div>
+                </div>
+                <aside class="ledger-newsreel-broadcast__sidebar">
+                    <article class="route-choice-card">
+                        <span class="tag">Audio</span>
+                        <h3>Broadcast mix</h3>
+                        <p>@Model.WorldTurnBriefing.Broadcast.AudioPosture</p>
+                        <p>@Model.WorldTurnBriefing.Broadcast.MusicPosture</p>
+                        <div class="route-choice-card__proof">
+                            <a href="@Model.WorldTurnBriefing.Broadcast.WatchHref">Open watch route</a>
+                            <a href="@Model.WorldTurnBriefing.Broadcast.CaptionsHref">Captions</a>
+                        </div>
+                    </article>
+                </aside>
+            </div>
+        </section>
+    }
+}
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Inbox queue</p>
+        <h2 class="editorial-title">Actual messages, not just status</h2>
+        <p class="editorial-copy">The signed-in lane now shows the turn packet, validation handoff, leader digest, and faction promo as discrete inbox items.</p>
+    </div>
+    <div class="route-choice-grid">
+        @foreach (var message in Model.InboxMessages)
+        {
+            <article class="route-choice-card">
+                <span class="tag">@message.Eyebrow</span>
+                <h3>@message.Heading</h3>
+                <p>@message.Summary</p>
+                <div class="route-choice-card__proof">
+                    <span>Status: @message.StatusLabel</span>
+                    <a href="@message.Href">@message.CtaLabel</a>
+                </div>
+            </article>
+        }
     </div>
 </section>
 
@@ -71,3 +226,25 @@
         </div>
     </section>
 }
+
+@if (Model.ValidationPacket is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Validation packet</p>
+            <h2 class="editorial-title">Send this for review</h2>
+            <p class="editorial-copy">@Model.ValidationPacket.Summary</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var check in Model.ValidationPacket.Checks.Take(3))
+            {
+                <article class="route-choice-card">
+                    <span class="tag">Validation</span>
+                    <p>@check</p>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+<script type="module" src="~/js/black-ledger-geoscape.js" asp-append-version="true"></script>

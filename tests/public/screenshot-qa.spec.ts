@@ -22,14 +22,15 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
 
     const heroTitle = page.locator('.launch-hero__title');
     const primaryCta = page.locator('.launch-hero__actions a.button-like').first();
-    const footer = page.locator('[data-homepage-section="trust-footer"]');
-    const preview = page.locator('[data-homepage-section="preview"]');
+    const footer = page.locator('[data-homepage-section="footer"]');
+    const factions = page.locator('[data-homepage-section="factions"]');
+    const playDownloads = page.locator('[data-homepage-section="play-downloads"]');
     const sidebar = page.locator('.site-sidebar');
 
-    await expect(heroTitle).toContainText('Build the runner. Run the table. Keep the ledger honest.');
-    await expect(primaryCta).toContainText('Open downloads');
-    await expect(preview).toContainText('Black Ledger');
-    await expect(preview).toContainText('Karma Forge');
+    await expect(heroTitle).toContainText('The city is moving.');
+    await expect(primaryCta).toContainText('Open Black Ledger');
+    await expect(factions).toContainText('Six seeded houses are already pushing on the same city.');
+    await expect(playDownloads).toContainText('One compact rail for build, play shell, and public status.');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {
