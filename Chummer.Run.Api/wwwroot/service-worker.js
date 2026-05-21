@@ -12,6 +12,7 @@ const PRECACHE_URLS = [
   "/help",
   "/status",
   "/manifest.webmanifest",
+  "/site.webmanifest",
   "/manifest.json",
   "/css/site.css",
   "/js/site.js",

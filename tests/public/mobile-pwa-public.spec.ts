@@ -8,6 +8,7 @@ const controllerPath = path.join(repoRoot, 'Chummer.Run.Api', 'Controllers', 'Pu
 const layoutPath = path.join(repoRoot, 'Chummer.Run.Api', 'Views', 'Shared', '_Layout.cshtml');
 const manifestPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'manifest.json');
 const manifestAliasPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'manifest.webmanifest');
+const siteManifestPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'site.webmanifest');
 const swPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'service-worker.js');
 
 test('mobile and PWA public routes keep installability and role entry explicit', async () => {
@@ -16,6 +17,7 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   const layout = readFileSync(layoutPath, 'utf8');
   const manifest = readFileSync(manifestPath, 'utf8');
   const manifestAlias = readFileSync(manifestAliasPath, 'utf8');
+  const siteManifest = readFileSync(siteManifestPath, 'utf8');
   const serviceWorker = readFileSync(swPath, 'utf8');
 
   expect(mobileView).toContain('Install this app');
@@ -47,10 +49,14 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(manifestAlias).toContain('"shortcuts"');
   expect(manifestAlias).toContain('"/pwa-icon.svg"');
   expect(manifestAlias).toContain('"/pwa-maskable.svg"');
+  expect(siteManifest).toContain('"start_url": "/mobile"');
+  expect(siteManifest).toContain('"shortcuts"');
+  expect(siteManifest).toContain('"/pwa-icon.svg"');
   expect(serviceWorker).toContain('"/mobile"');
   expect(serviceWorker).toContain('"/play"');
   expect(serviceWorker).toContain('"/play/continuity"');
   expect(serviceWorker).toContain('"/manifest.webmanifest"');
+  expect(serviceWorker).toContain('"/site.webmanifest"');
   expect(serviceWorker).toContain('"/apple-touch-icon.png"');
   expect(serviceWorker).toContain('"/favicon.ico"');
   expect(serviceWorker).toContain('"/favicon.svg"');
