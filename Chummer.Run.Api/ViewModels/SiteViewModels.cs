@@ -373,17 +373,121 @@ public sealed record BlackLedgerNewsStatusViewModel(
     string DispatchHref,
     IReadOnlyList<BlackLedgerNewsReceiptEntryViewModel> Receipts);
 
+public sealed record BlackLedgerInboxMessageViewModel(
+    string Kind,
+    string Eyebrow,
+    string Heading,
+    string Summary,
+    string Href,
+    string CtaLabel,
+    string StatusLabel);
+
+public sealed record BlackLedgerAdvisoryOptionViewModel(
+    string OptionId,
+    string Label,
+    string Summary,
+    int VoteCount,
+    string VoteShareLabel,
+    bool Selected);
+
+public sealed record BlackLedgerAdvisoryBallotViewModel(
+    string BallotId,
+    string Audience,
+    string AudienceLabel,
+    string Heading,
+    string Summary,
+    string AdvisoryPosture,
+    string ResultDestination,
+    string DeliveryPosture,
+    string StatusLabel,
+    bool UserMayVote,
+    string? SelectedOptionId,
+    IReadOnlyList<BlackLedgerAdvisoryOptionViewModel> Options);
+
+public sealed record BlackLedgerAdvisoryExecutiveSummaryViewModel(
+    string FactionId,
+    string Heading,
+    string Summary,
+    string ExecutivePosture,
+    IReadOnlyList<string> Highlights);
+
+public sealed record BlackLedgerAdvisorySummaryViewModel(
+    string Heading,
+    string Intro,
+    string NoDemocracyNote,
+    string OpenMailHref,
+    IReadOnlyList<BlackLedgerAdvisoryBallotViewModel> PlayerBallots,
+    IReadOnlyList<BlackLedgerAdvisoryBallotViewModel> GmBallots,
+    IReadOnlyList<BlackLedgerAdvisoryExecutiveSummaryViewModel> ExecutiveSummaries);
+
+public sealed record BlackLedgerWorldTurnBriefingViewModel(
+    string WorldId,
+    string WorldName,
+    int FromTurn,
+    int ToTurn,
+    string TransitionLabel,
+    string TransitionNarrative,
+    string StateSummary,
+    string InboxHeadline,
+    string NewsreelLead,
+    IReadOnlyList<string> NewsreelBullets,
+    IReadOnlyList<string> ValidationChecks,
+    string ValidationJsonHref,
+    BlackLedgerNewsreelBroadcastViewModel? Broadcast = null);
+
+public sealed record BlackLedgerNewsreelBroadcastViewModel(
+    string PackageLabel,
+    string AnchorName,
+    string DeskLabel,
+    string WatchHref,
+    string VideoMp4Href,
+    string VideoWebmHref,
+    string PosterHref,
+    string CaptionsHref,
+    string AudioPosture,
+    string MusicPosture,
+    string DurationLabel,
+    IReadOnlyList<string> Rundown,
+    IReadOnlyList<string> TickerItems);
+
+public sealed record BlackLedgerFactionLeaderDigestViewModel(
+    string FactionId,
+    string PublicName,
+    string LeaderHandle,
+    string Heading,
+    string Summary,
+    IReadOnlyList<string> PressureCalls,
+    IReadOnlyList<string> RecommendedActions,
+    string ValidationHref);
+
+public sealed record BlackLedgerWorldTickValidationPacketViewModel(
+    string WorldId,
+    string WorldName,
+    int ToTurn,
+    string Summary,
+    IReadOnlyList<string> Checks,
+    IReadOnlyList<string> Links);
+
 public sealed record BlackLedgerFactionPromoArtifactViewModel(
     string FactionId,
     string PublicName,
     string ProviderStatus,
     string RenderMode,
+    string FallbackRenderMode,
     string HtmlHref,
     string JsonHref,
     string CaptionsHref,
+    string PosterHref,
+    string VideoMp4Href,
+    string VideoWebmHref,
     string StaticCardLabel,
+    string PlaybackLabel,
     IReadOnlyList<string> FormatLabels,
-    IReadOnlyList<string> CaptionLines);
+    IReadOnlyList<string> CaptionLines,
+    string CampaignHook,
+    string AudiencePromise,
+    string ValidationHref,
+    IReadOnlyList<string> StoryboardShots);
 
 public sealed record BlackLedgerWorldPreviewViewModel(
     string WorldId,
@@ -439,6 +543,7 @@ public sealed record BlackLedgerHubPageViewModel(
     IReadOnlyList<BlackLedgerDispatchViewModel> Dispatches,
     BlackLedgerDispatchViewModel? SelectedDispatch,
     BlackLedgerNewsStatusViewModel? NewsreelStatus,
+    BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing,
     BlackLedgerFactionPromoArtifactViewModel? SelectedFactionPromo,
     BlackLedgerCommandMapViewModel? CommandMap,
     TrustPageActionViewModel PrimaryAction,
@@ -512,14 +617,28 @@ public sealed record BlackLedgerFactionHomeViewModel(
     IReadOnlyList<string> WelcomeKit,
     IReadOnlyList<BlackLedgerFactionActionReceiptDto> RecentActionReceipts,
     BlackLedgerNewsStatusViewModel? NewsreelStatus = null,
-    BlackLedgerFactionPromoArtifactViewModel? PromoArtifact = null);
+    BlackLedgerFactionPromoArtifactViewModel? PromoArtifact = null,
+    BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing = null,
+    BlackLedgerFactionLeaderDigestViewModel? LeaderDigest = null,
+    BlackLedgerWorldTickValidationPacketViewModel? ValidationPacket = null,
+    BlackLedgerAdvisorySummaryViewModel? AdvisorySummary = null);
 
 public sealed record BlackLedgerNotificationsPageViewModel(
     SiteChromeViewModel Chrome,
     string Heading,
     string Intro,
     BlackLedgerNewsStatusViewModel Status,
-    IReadOnlyList<string> DeliveryNotes);
+    IReadOnlyList<string> DeliveryNotes,
+    IReadOnlyList<BlackLedgerInboxMessageViewModel> InboxMessages,
+    BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing = null,
+    BlackLedgerWorldTickValidationPacketViewModel? ValidationPacket = null,
+    BlackLedgerAdvisorySummaryViewModel? AdvisorySummary = null);
+
+public sealed record BlackLedgerAdvisoryPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerAdvisorySummaryViewModel Summary);
 
 public sealed record BlackLedgerFactionPromoPageViewModel(
     SiteChromeViewModel Chrome,
@@ -527,6 +646,22 @@ public sealed record BlackLedgerFactionPromoPageViewModel(
     string Intro,
     BlackLedgerFactionPromoArtifactViewModel Promo,
     IReadOnlyList<string> DeliveryNotes);
+
+public sealed record BlackLedgerLeaderBriefingPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerFactionLeaderDigestViewModel Digest,
+    BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing,
+    BlackLedgerWorldTickValidationPacketViewModel? ValidationPacket);
+
+public sealed record BlackLedgerWorldTickValidationPageViewModel(
+    SiteChromeViewModel Chrome,
+    string Heading,
+    string Intro,
+    BlackLedgerWorldTickValidationPacketViewModel Packet,
+    BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing,
+    BlackLedgerFactionLeaderDigestViewModel? LeaderDigest);
 
 public sealed record BlackLedgerFactionCreatePageViewModel(
     SiteChromeViewModel Chrome,
@@ -1029,10 +1164,62 @@ public sealed record ParticipatePageViewModel(
     IReadOnlyList<ResolvedPublicCardViewModel> PublicLane,
     IReadOnlyList<ResolvedPublicCardViewModel> SignedInLane,
     PublicSignalLoopSnapshotViewModel SignalLoop,
+    BuildGhostConciergeTeaserViewModel? BuildGhostConcierge = null,
     PublicSignalProjectionPacketViewModel? SignalProjection = null,
     PublicSignalOperationsPacketViewModel? SignalOperations = null,
+    BeHumanEventAdapterPanelViewModel? BeHumanEventAdapter = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record BuildGhostConciergeTeaserViewModel(
+    string StatusLabel,
+    string Summary,
+    string Href,
+    IReadOnlyList<string> ProofPoints);
+
+public sealed record BuildGhostConciergePageViewModel(
+    SiteChromeViewModel Chrome,
+    string Eyebrow,
+    string Heading,
+    string Intro,
+    BuildGhostConciergeProjection Projection,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record GmSessionVenuePageViewModel(
+    SiteChromeViewModel Chrome,
+    string Section,
+    string CampaignId,
+    string CampaignName,
+    string SessionId,
+    string SessionTitle,
+    string VenueStatus,
+    string Provider,
+    string Mode,
+    string Visibility,
+    string ScheduledTimeSummary,
+    string PrivacyStatus,
+    string ConsentStatus,
+    string AttendeeSyncStatus,
+    string? LatestRecapStatus,
+    string? ProviderRoomUrl,
+    string InvitePageUrl,
+    string FallbackMessage,
+    bool CanManage,
+    bool ProviderCreateAvailable,
+    string? ProviderCreateDisabledReason,
+    PublicTrustPulsePanelViewModel? TrustPulse = null,
+    SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record BeHumanEventAdapterPanelViewModel(
+    string Verdict,
+    string StatusLabel,
+    string Summary,
+    string OperatingMode,
+    bool CapacityClaimAllowed,
+    int? VerifiedRegistrationCapacity,
+    IReadOnlyList<string> AllowedEventFamilies,
+    IReadOnlyList<string> ForbiddenTruthDomains);
 
 public sealed record PublicSignalLoopSnapshotViewModel(
     int OpenMilestoneCount,

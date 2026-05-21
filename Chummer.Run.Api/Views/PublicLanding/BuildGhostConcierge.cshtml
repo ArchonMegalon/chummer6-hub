@@ -1,0 +1,98 @@
+@model BuildGhostConciergePageViewModel
+@{
+    ViewData["Title"] = "Build Ghost concierge";
+    ViewData["Chrome"] = Model.Chrome;
+    ViewData["SurfaceClass"] = "surface-participate";
+    var projection = Model.Projection;
+}
+
+<section class="release-footnote">
+    <p class="eyebrow">@Model.Eyebrow</p>
+    <h1 class="page-title">@Model.Heading</h1>
+    <p class="page-copy">@Model.Intro</p>
+    <div class="stacked-actions">
+        @foreach (var action in projection.Actions)
+        {
+            <a class="button-like button-like--@action.Tone" href="@action.Href">@action.Label</a>
+        }
+    </div>
+</section>
+
+<section class="status-decision-strip" aria-label="Build Ghost operating split">
+    <article class="status-decision-strip__card">
+        <span class="tag">FacePop</span>
+        <h2>@projection.FacePopStatus</h2>
+        <p>Public-safe greeting, routing, and intake only. It can help a builder arrive at the right first-party lane without becoming the lane.</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Answerly</span>
+        <h2>@projection.AnswerlyStatus</h2>
+        <p>@projection.HumanizedSummary</p>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Chummer</span>
+        <h2>@projection.EngineStatus</h2>
+        <p>Ghost spawn, compare, legality explanation, discard, and apply all stay inside first-party contracts and receipts.</p>
+    </article>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Canonical lane</p>
+        <h2 class="editorial-title">Use the public tools to guide the experiment, not to own it.</h2>
+        <p class="editorial-copy">@projection.CanonicalLane</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">FacePop can</span>
+            <h3>Open the conversation</h3>
+            <p>Use the concierge to capture the comparison question and route the builder into a governed next step.</p>
+            <div class="route-choice-card__proof">
+                @foreach (var item in projection.FacePopResponsibilities)
+                {
+                    <span>@item</span>
+                }
+            </div>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Answerly can</span>
+            <h3>Explain the boundary</h3>
+            <p>Let the explainer clarify what the ghost experiment means without letting it compute mechanics or choose the winning variant.</p>
+            <div class="route-choice-card__proof">
+                @foreach (var item in projection.AnswerlyResponsibilities)
+                {
+                    <span>@item</span>
+                }
+            </div>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Chummer must</span>
+            <h3>Own the real compare bench</h3>
+            <p>@projection.RuntimeBoundary</p>
+            <div class="route-choice-card__proof">
+                @foreach (var item in projection.ChummerResponsibilities)
+                {
+                    <span>@item</span>
+                }
+            </div>
+        </article>
+    </div>
+</section>
+
+<section class="trust-claims">
+    <div class="trust-claims__lead">
+        <p class="eyebrow">Proof objects</p>
+        <h2 class="editorial-title">The experiment should leave behind receipts, not vibes.</h2>
+        <p class="editorial-copy">A builder should be able to see what was compared, what changed, and whether the ghost was applied or discarded.</p>
+    </div>
+    <div class="trust-claims__grid">
+        @foreach (var artifact in projection.CompareArtifacts)
+        {
+            <article class="trust-claim">
+                <span class="tag">Artifact</span>
+                <h3>@artifact</h3>
+                <p>First-party output only. No concierge or explainer tool is allowed to publish this as truth on its own.</p>
+            </article>
+        }
+    </div>
+</section>

@@ -4,6 +4,8 @@ using Chummer.Run.Api.Services;
 using Chummer.Run.Api.Services.Community;
 using Chummer.Run.Api.Services.InstallLinking;
 using Chummer.Run.Api.Services.KarmaForge;
+using Chummer.Run.Api.Services.Support;
+using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Identity;
 using Microsoft.AspNetCore.DataProtection;
@@ -355,6 +357,113 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("private, no-store", fixture.Controller.ControllerContext.HttpContext.Response.Headers.CacheControl.ToString());
     }
 
+    [Fact]
+    public void PublicNewsreelJsonReturnsTurnZeroToOneContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.LedgerTurnNewsreelJson("1");
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal(0, payload.RootElement.GetProperty("FromTurn").GetInt32());
+        Assert.Equal(1, payload.RootElement.GetProperty("ToTurn").GetInt32());
+        Assert.Equal("Turn 0 -> Turn 1", payload.RootElement.GetProperty("TransitionLabel").GetString());
+        Assert.Contains("Turn 0", payload.RootElement.GetProperty("TransitionNarrative").GetString(), StringComparison.Ordinal);
+        Assert.True(payload.RootElement.GetProperty("NewsreelBullets").GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public void BuildGhostConciergeJsonReturnsBoundedSplitContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.BuildGhostConciergeJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("/participate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
+        Assert.Equal("Public concierge only", payload.RootElement.GetProperty("FacePopStatus").GetString());
+        Assert.Equal("First-party compare/apply only", payload.RootElement.GetProperty("EngineStatus").GetString());
+        Assert.Contains("FacePop greeting", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
+        Assert.Contains("Neither FacePop nor Answerly may compute legality", payload.RootElement.GetProperty("RuntimeBoundary").GetString(), StringComparison.Ordinal);
+        Assert.True(payload.RootElement.GetProperty("Actions").GetArrayLength() >= 3);
+    }
+
+    [Fact]
+    public async Task SignedInWorldTickValidationJsonReturnsReceiptBackedPacket()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+        var user = fixture.Accounts.EnsureUser("subject.dispatch", "Dispatch User", "dispatch@example.com");
+        fixture.BlackLedgerFactions.JoinFaction(user, "ashline-circle");
+
+        IActionResult result = await fixture.Controller.AccountLedgerWorldTickValidationJson(CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("emerald-sprawl-prelude", payload.RootElement.GetProperty("WorldId").GetString());
+        Assert.Equal(1, payload.RootElement.GetProperty("ToTurn").GetInt32());
+        Assert.True(payload.RootElement.GetProperty("Checks").GetArrayLength() >= 3);
+        Assert.Contains(
+            payload.RootElement.GetProperty("Links").EnumerateArray().Select(item => item.GetString()),
+            item => string.Equals(item, "/account/ledger/factions/ashline-circle/leader-briefing", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SignedInLeaderBriefingJsonReturnsFactionSpecificDigest()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+        var user = fixture.Accounts.EnsureUser("subject.dispatch", "Dispatch User", "dispatch@example.com");
+        fixture.BlackLedgerFactions.JoinFaction(user, "ashline-circle");
+
+        IActionResult result = await fixture.Controller.AccountLedgerFactionLeaderBriefingJson("ashline-circle", CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("ashline-circle", payload.RootElement.GetProperty("FactionId").GetString());
+        Assert.Equal("Ashline Circle", payload.RootElement.GetProperty("PublicName").GetString());
+        Assert.True(payload.RootElement.GetProperty("PressureCalls").GetArrayLength() > 0);
+        Assert.True(payload.RootElement.GetProperty("RecommendedActions").GetArrayLength() > 0);
+    }
+
+    [Fact]
+    public async Task UnauthenticatedValidationRouteRedirectsToLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+
+        IActionResult result = await fixture.Controller.AccountLedgerWorldTickValidationPage(CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Faccount%2Fledger%2Fworldtick%2Fvalidation", redirect.Url);
+    }
+
+    [Fact]
+    public async Task LeaderBriefingJsonForWrongFactionIsForbidden()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+        var user = fixture.Accounts.EnsureUser("subject.dispatch", "Dispatch User", "dispatch@example.com");
+        fixture.BlackLedgerFactions.JoinFaction(user, "ashline-circle");
+
+        IActionResult result = await fixture.Controller.AccountLedgerFactionLeaderBriefingJson("glass-tower-compact", CancellationToken.None);
+
+        Assert.IsType<ForbidResult>(result);
+    }
+
     private sealed class Fixture : IDisposable
     {
         private readonly string _root;
@@ -622,23 +731,41 @@ public sealed class PublicLandingDownloadDispatchTests
                 NullLogger<HubIdentityClient>.Instance);
             CommunityStore communityStore = new(Configuration, NullLogger<CommunityStore>.Instance);
             Accounts = new AccountService(communityStore);
+            WorkspaceLifecyclePolicyService workspaceLifecycle = new(Configuration);
+            CampaignArtifactRegistryBridge artifactRegistry = new(communityStore);
+            CampaignSpineService campaignSpine = new(communityStore, workspaceLifecycle, artifactRegistry);
             BlackLedgerPublicStatsService blackLedgerStats = new(Configuration);
             BlackLedgerDispatchService blackLedgerDispatches = new(communityStore, blackLedgerStats, NullLogger<BlackLedgerDispatchService>.Instance);
+            BlackLedgerFactions = new BlackLedgerFactionOnboardingService(Configuration, blackLedgerStats, campaignSpine, communityStore);
+            BlackLedgerWorldTickBriefingService blackLedgerBriefings = new(blackLedgerStats, BlackLedgerFactions);
             BlackLedgerTickNewsNotificationService blackLedgerTickNews = new(
                 new HttpClient(new StaticJsonHandler("""{"ok":true}""")),
                 communityStore,
                 Configuration,
                 new BlackLedgerNewsRecipientResolver(communityStore, Configuration),
+                blackLedgerBriefings,
+                BlackLedgerFactions,
                 NullLogger<BlackLedgerTickNewsNotificationService>.Instance);
+            BlackLedgerAdvisoryService blackLedgerAdvisories = new(
+                new HttpClient(new StaticJsonHandler("""{"target_ref":"delivery-test"}""")),
+                communityStore,
+                Configuration,
+                BlackLedgerFactions,
+                NullLogger<BlackLedgerAdvisoryService>.Instance);
             AnarchyPreviewService anarchyPreview = new(blackLedgerDispatches);
             ParticipationOperatorNotificationService participationNotifications = new(
                 new HttpClient(new StaticJsonHandler("""{"target_ref":"delivery-test"}""")),
                 communityStore,
                 Configuration,
                 NullLogger<ParticipationOperatorNotificationService>.Instance);
-            WorkspaceLifecyclePolicyService workspaceLifecycle = new(Configuration);
-            CampaignArtifactRegistryBridge artifactRegistry = new(communityStore);
-            CampaignSpineService campaignSpine = new(communityStore, workspaceLifecycle, artifactRegistry);
+            BeHumanEventAdapterPostureService beHumanPosture = new(Configuration);
+            IGmSessionVenueAdapter gmVenueAdapter = new BeHumanGmSessionVenueAdapter(new StaticHttpClientFactory(new HttpClient(new StaticJsonHandler("""{}"""))), Configuration, beHumanPosture);
+            GmSessionVenueService gmSessionVenues = new(new GmSessionVenueStore(Configuration), beHumanPosture, gmVenueAdapter, Configuration, communityStore);
+            AnswerlyRuntimePolicy answerlyPolicy = new(Configuration);
+            BuildGhostConciergeService buildGhostConcierge = new(
+                Configuration,
+                answerlyPolicy,
+                new AnswerlyHumanizerAdapter(answerlyPolicy, new RuleSafeOutputGate()));
             InstallLinkingStore = new InstallLinkingStore(Configuration, NullLogger<InstallLinkingStore>.Instance);
             InstallLinking = new InstallLinkingService(InstallLinkingStore, Configuration);
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
@@ -666,10 +793,15 @@ public sealed class PublicLandingDownloadDispatchTests
 	                communityCreatorHorizons: null!,
 		                waveEightHorizons: null!,
 		                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
+                        buildGhostConcierge: buildGhostConcierge,
 		                blackLedgerStats: blackLedgerStats,
 		                blackLedgerDispatches: blackLedgerDispatches,
                         blackLedgerTickNews: blackLedgerTickNews,
-		                blackLedgerFactions: new BlackLedgerFactionOnboardingService(Configuration, blackLedgerStats, campaignSpine, communityStore),
+		                blackLedgerFactions: BlackLedgerFactions,
+                        blackLedgerAdvisories: blackLedgerAdvisories,
+                        blackLedgerBriefings: blackLedgerBriefings,
+                        beHumanEventAdapterPosture: new BeHumanEventAdapterPostureService(Configuration),
+                        gmSessionVenues: gmSessionVenues,
 	                anarchyPreview: anarchyPreview,
                 packageCatalog: new PublicPackageCatalogService(),
                 publicCreatorDiscovery: null!,
@@ -706,6 +838,8 @@ public sealed class PublicLandingDownloadDispatchTests
         public InstallBootstrapTicketService InstallBootstrapTickets { get; }
 
         public PersonalizedInstallScriptService PersonalizedInstallScripts { get; }
+
+        public BlackLedgerFactionOnboardingService BlackLedgerFactions { get; }
 
         public PublicLandingController Controller { get; }
 
@@ -772,6 +906,18 @@ public sealed class PublicLandingDownloadDispatchTests
                 {
                     Content = new StringContent(_payload, Encoding.UTF8, "application/json")
                 });
+        }
+
+        private sealed class StaticHttpClientFactory : IHttpClientFactory
+        {
+            private readonly HttpClient _client;
+
+            public StaticHttpClientFactory(HttpClient client)
+            {
+                _client = client;
+            }
+
+            public HttpClient CreateClient(string name) => _client;
         }
 
         public void Dispose()

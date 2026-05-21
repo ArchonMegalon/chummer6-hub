@@ -10,6 +10,8 @@
     var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
     var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
     var shippedFollowUp = signalLoop.ShippedFollowUp.Take(3).ToArray();
+    var beHuman = Model.BeHumanEventAdapter;
+    var buildGhost = Model.BuildGhostConcierge;
     var sourceAlias = Context?.Request?.Query["source"].ToString() ?? string.Empty;
     var fromFeedbackAlias = string.Equals(sourceAlias, "feedback", StringComparison.OrdinalIgnoreCase);
     var betaHref = Model.Chrome.Authenticated
@@ -137,7 +139,7 @@
         <a class="button-like button-like--secondary" href="/contact#support-intake">Report a problem</a>
         <a class="button-like button-like--ghost" href="@betaHref">Join beta waitlist</a>
     </div>
-    <p class="muted-copy">Follow an item to hear when it actually changes. Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
+    <p class="muted-copy">Follow an item to hear when it actually changes. Votes show demand; Chummer-owned proof decides what ships. Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Participation loop snapshot">
@@ -228,6 +230,31 @@
     </div>
 </section>
 
+@if (buildGhost is not null)
+{
+    <section class="editorial-block" id="build-ghost-concierge">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">ALICE build ghosts</p>
+            <h2 class="editorial-title">Use public concierge and explanation layers without pretending they own the ghost bench.</h2>
+            <p class="editorial-copy">@buildGhost.Summary</p>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">@buildGhost.StatusLabel</span>
+                <h3>FacePop and Answerly can help open the lane</h3>
+                <p>The actual Build Ghost compare and apply truth still stays inside first-party Chummer runtime and receipts.</p>
+                <div class="route-choice-card__proof">
+                    @foreach (var item in buildGhost.ProofPoints)
+                    {
+                        <span>@item</span>
+                    }
+                </div>
+                <a class="editorial-strip__action" href="@buildGhost.Href">Open Build Ghost concierge</a>
+            </article>
+        </div>
+    </section>
+}
+
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Public loop</p>
@@ -249,6 +276,54 @@
         }
     </div>
 </section>
+
+@if (beHuman is not null)
+{
+    <section class="editorial-block" id="behuman-event-posture">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Community event venue boundary</p>
+            <h2 class="editorial-title">BeHuman can help host public community events, but it does not get product truth.</h2>
+            <p class="editorial-copy">@beHuman.Summary</p>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">@beHuman.StatusLabel</span>
+                <h3>@beHuman.Verdict</h3>
+                <p>Operating mode: <code class="mono-receipt">@beHuman.OperatingMode</code></p>
+                <p>
+                    @if (beHuman.CapacityClaimAllowed && beHuman.VerifiedRegistrationCapacity is > 0)
+                    {
+                        <span>Verified registration capacity: @beHuman.VerifiedRegistrationCapacity</span>
+                    }
+                    else
+                    {
+                        <span>Capacity stays unclaimed until a verified first-party receipt exists.</span>
+                    }
+                </p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Allowed event families</span>
+                <h3>Community-only scope</h3>
+                <div class="route-choice-card__proof">
+                    @foreach (var eventFamily in beHuman.AllowedEventFamilies)
+                    {
+                        <span>@eventFamily</span>
+                    }
+                </div>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Forbidden truth domains</span>
+                <h3>Chummer keeps the authority</h3>
+                <div class="route-choice-card__proof">
+                    @foreach (var truthDomain in beHuman.ForbiddenTruthDomains)
+                    {
+                        <span>@truthDomain</span>
+                    }
+                </div>
+            </article>
+        </div>
+    </section>
+}
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
