@@ -7,6 +7,8 @@
         ? "/participate/codex"
         : "/auth/google/start?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
+    var signalProjection = Model.SignalProjection;
+    var signalOperations = Model.SignalOperations;
     var followSettingsHref = signalLoop.FollowSettingsHref;
     var followSettingsLabel = signalLoop.FollowSettingsLabel;
     var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
@@ -57,8 +59,8 @@
         {
             Badge = "Share it",
             Title = "Post one clear public item",
-            Summary = "A public feature request, UX pain point, or safe public bug should enter one visible queue instead of scattering across roadmap comments, support tickets, and social replies.",
-            Proof = "The page starts with the public/private boundary so the board stays useful.",
+            Summary = "A public feature request, UX pain point, or safe public bug should live on one public page instead of scattering across comments and replies.",
+            Proof = "Start here when the issue can stay public.",
             Href = "#feedback-public-lanes",
             Label = "Review the public pages"
         },
@@ -66,8 +68,8 @@
         {
             Badge = "Review",
             Title = "The team reviews it before plans change",
-            Summary = "Votes and comments help show demand, but product planning still decides whether the signal becomes research, milestone work, follow-up, or a public no for now.",
-            Proof = "Public interest helps prioritize; it does not auto-ship work.",
+            Summary = "Votes and comments help show demand, but the roadmap only moves when the team is ready to name what comes next.",
+            Proof = "Public interest helps prioritize; it does not promise a ship date.",
             Href = "/roadmap",
             Label = "Open roadmap"
         },
@@ -75,8 +77,8 @@
         {
             Badge = "Ship it",
             Title = "The loop closes only after people can use it",
-            Summary = "A signal is not done because code merged. It is done when releases, live pages, guides, or proof show that people can actually use the result.",
-            Proof = "The changelog is the public receipt.",
+            Summary = "A signal is not done because code merged. It is done when a release, live page, or guide lets people actually use the result.",
+            Proof = "The changelog shows what is available now.",
             Href = "/changelog",
             Label = "Open changelog"
         },
@@ -119,44 +121,72 @@
     };
 }
 
+@if (signalProjection is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Projection boundary</p>
+            <h2 class="editorial-title">Public feedback can show direction without pretending to be release truth.</h2>
+            <p class="editorial-copy">This packet keeps the public board subordinate to first-party truth, fallback, and shipped closeout before feature demand becomes public celebration.</p>
+        </div>
+        <div class="support-operations-panel">
+            @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
+        </div>
+    </section>
+}
+
+@if (signalOperations is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Operations packet</p>
+            <h2 class="editorial-title">Hosted signal promotion still needs ingress, routing, and closeout discipline.</h2>
+            <p class="editorial-copy">The public board earns trust only when promotion, taxonomy, webhook ingress, and closeout routes remain inspectable instead of becoming vibes.</p>
+        </div>
+        <div class="support-operations-panel">
+            @await Html.PartialAsync("~/Views/Shared/_PublicSignalOperationsPacket.cshtml", signalOperations)
+        </div>
+    </section>
+}
+
 <section class="release-footnote route-anchor-target" id="public-feedback">
     <p class="eyebrow">Feedback</p>
     <h1 class="page-title">Share product ideas and safe public bugs in one place</h1>
-    <p class="page-copy">Use this page for public feedback, then move to roadmap for what is next, changelog for shipped updates, or help when the issue is private. Votes show demand; Chummer-owned proof decides what ships.</p>
+    <p class="page-copy">Use this page for public feedback, then move to roadmap for what is next, changelog for shipped updates, or help when the issue is private.</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="#feedback-public-lanes">Review public pages</a>
         <a class="button-like button-like--secondary" href="/roadmap">Open roadmap</a>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
     </div>
-    <p class="muted-copy">Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback.</p>
+    <p class="muted-copy">Votes show demand; Chummer-owned proof decides what ships. Good reports include context and reproduction steps. Private logs and account issues belong in Help, not public feedback.</p>
 </section>
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Public-safe boundary</p>
         <h2 class="editorial-title">This page stays public-facing on purpose.</h2>
-        <p class="editorial-copy">Use the public board for safe ideas and safe bugs. If the issue needs logs, account history, recovery, or operator follow-up, leave this page and use Help.</p>
+        <p class="editorial-copy">Use the public board for safe ideas and safe bugs. This page stays preview-only on this host until proof-backed closeout is real here. If the issue needs logs, account history, recovery, or private support follow-up, leave this page and use Help.</p>
     </div>
 </section>
 
 <section class="status-decision-strip" aria-label="Signal loop snapshot">
     <article class="status-decision-strip__card">
-        <span class="tag">Milestone pressure</span>
-        <h2>@signalLoop.OpenMilestoneCount open slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") currently sit behind the public loop.</h2>
-        <p>@signalLoop.ClaimedMilestoneCount claimed now. @signalLoop.HighDifficultyMilestoneCount high-coordination slice@(signalLoop.HighDifficultyMilestoneCount == 1 ? string.Empty : "s") still need careful review before roadmap promises move.</p>
-        <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open milestone ledger</a>
+        <span class="tag">Roadmap</span>
+        <h2>@signalLoop.OpenMilestoneCount named slice@(signalLoop.OpenMilestoneCount == 1 ? string.Empty : "s") are visible on the public roadmap.</h2>
+        <p>@signalLoop.ClaimedMilestoneCount active now. @signalLoop.HighDifficultyMilestoneCount larger slice@(signalLoop.HighDifficultyMilestoneCount == 1 ? string.Empty : "s") still need more work before they become present-tense promises.</p>
+        <a class="button-like button-like--ghost" href="/roadmap#roadmap-milestones">Open roadmap</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Projected movement</span>
-        <h2>@signalLoop.RoadmapFollowUpCount named horizon@(signalLoop.RoadmapFollowUpCount == 1 ? string.Empty : "s") already carry the current public direction.</h2>
-        <p>Direction is visible now, but it still stays separate from shipped proof and private support follow-through.</p>
-        <a class="button-like button-like--ghost" href="/roadmap#roadmap-horizons">Browse roadmap</a>
-    </article>
-    <article class="status-decision-strip__card">
-        <span class="tag">Proof-backed closeout</span>
-        <h2>@signalLoop.ShippedFollowUpCount live proof example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show what honest closeout looks like.</h2>
-        <p>Use the changelog when you need evidence that a person can actually reach the result today.</p>
+        <span class="tag">Shipped today</span>
+        <h2>@signalLoop.ShippedFollowUpCount live example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show what people can use now.</h2>
+        <p>When the question is what works today, switch to the changelog and current proof instead of staying on the feedback page.</p>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
+    </article>
+    <article class="status-decision-strip__card">
+        <span class="tag">Private help</span>
+        <h2>Move off this page as soon as the issue needs logs, recovery, or account detail.</h2>
+        <p>Public feedback works best when private support work stays on the help path.</p>
+        <a class="button-like button-like--ghost" href="/help">Open help</a>
     </article>
 </section>
 
@@ -164,7 +194,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Pick the right page</p>
         <h2 class="editorial-title">Public signal, roadmap direction, shipped proof, and private support should not blur together.</h2>
-        <p class="editorial-copy">The experience is calmer when each job has one page and one promise. Feedback starts the conversation; it is not the shipped status page or the private support queue.</p>
+        <p class="editorial-copy">The experience is calmer when each job has one page and one promise. Feedback starts the conversation; it is not the shipped status page or the private support inbox.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -188,8 +218,8 @@
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Signal loop</p>
-        <h2 class="editorial-title">A public signal should enter one loop and leave with an evidence-backed closeout.</h2>
-        <p class="editorial-copy">This keeps product learning visible without pretending that comments are the same thing as release proof or private support.</p>
+        <h2 class="editorial-title">A public signal should start in one place and end on a page people can actually use.</h2>
+        <p class="editorial-copy">This keeps public feedback visible without pretending that comments are the same thing as roadmap commitments, shipped proof, or private support. Public feedback can still show demand, but account-backed follow-up stays off until shipped proof and first-party closeout receipts are both real on this host.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var stage in signalStages)
@@ -204,6 +234,14 @@
                 </div>
             </article>
         }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Closeout posture</p>
+        <h2 class="editorial-title">Shipped follow-through stays upstream of public celebration.</h2>
+        <p class="editorial-copy">First-party follow-up is still preview-only on this host. The public board can show demand now, but shipped follow-through only lands after shipped proof and first-party receipts agree.</p>
     </div>
 </section>
 
@@ -275,15 +313,15 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Operating loop</p>
-        <h2 class="editorial-title">One public signal should map to actual milestone pressure, projected direction, and proof-backed closeout.</h2>
-        <p class="editorial-copy">Public feedback stays first-party. The follow-through can stay visible without turning this page into a private work queue.</p>
+        <p class="eyebrow">Follow-through</p>
+        <h2 class="editorial-title">One public signal should connect to a roadmap page, a shipped page, or a help page.</h2>
+        <p class="editorial-copy">Public feedback stays first-party. Follow-through can stay visible without turning this page into an operations board.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">Milestone pressure</span>
+            <span class="tag">Roadmap</span>
             <h3>What active product movement looks like right now</h3>
-            <p>Signals that survive public intake should run into real product slices instead of vague roadmap prose or optimistic comment-thread promises.</p>
+            <p>Signals that matter should turn into named roadmap movement instead of vague comment-thread promises.</p>
             @if (milestoneFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -299,12 +337,12 @@
                     }
                 </div>
             }
-            <a class="editorial-strip__action" href="/roadmap#roadmap-milestones">Open roadmap milestones</a>
+            <a class="editorial-strip__action" href="/roadmap#roadmap-milestones">Open roadmap</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Projected direction</span>
+            <span class="tag">What might come next</span>
             <h3>What public movement looks like before anything is called shipped</h3>
-            <p>The next public explanation should land on a named horizon with explicit user pain and a truthful next page, not as a promise buried in feedback replies.</p>
+            <p>The next public explanation should land on a named horizon with a truthful next page, not as a promise buried in feedback replies.</p>
             @if (roadmapFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -323,9 +361,9 @@
             <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse roadmap</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Proof-backed closeout</span>
-            <h3>What a real closeout example already looks like</h3>
-            <p>Public signal only closes when a release, live page, guide, or proof lets a person actually reach the result. That evidence lives here, not in a vote count.</p>
+            <span class="tag">What works today</span>
+            <h3>What a real shipped example already looks like</h3>
+            <p>Public signal only closes when a release, live page, or guide lets a person actually reach the result. That evidence lives here, not in a vote count.</p>
             @if (shippedFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -349,7 +387,7 @@
 <section class="release-footnote">
     <p class="eyebrow">Account-aware follow-up</p>
     <h2 class="editorial-title">Create the account when you want signal, installs, support, and roadmap follow-up to return to one place.</h2>
-    <p class="editorial-copy">The public board still works without an account. The account becomes useful once you want device continuity, tracked support return, roadmap follows, and future install linking attached to the same calmer shell.</p>
+    <p class="editorial-copy">The public board still works without an account. The account becomes useful once you want device continuity, support return, roadmap follows, and future install linking attached to one calmer place.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@followSettingsHref">@followSettingsLabel</a>
         <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>

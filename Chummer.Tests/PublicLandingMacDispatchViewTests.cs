@@ -14,7 +14,7 @@ public sealed class PublicLandingMacDispatchViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("\"macos\" => \"Install command\"", controller, StringComparison.Ordinal);
-        Assert.Contains("\"macos\" => \"Copy this into Terminal.\"", controller, StringComparison.Ordinal);
+        Assert.Contains("\"macos\" => \"Copy this one Terminal command into Terminal.\"", controller, StringComparison.Ordinal);
         Assert.Contains("\"macos\" => \"Copy the install command\"", controller, StringComparison.Ordinal);
         Assert.Contains("\"macos\" => \"Install your personalized Chummer6 app\"", controller, StringComparison.Ordinal);
         Assert.Contains("\"Copy the install command and run it in Terminal.\"", controller, StringComparison.Ordinal);

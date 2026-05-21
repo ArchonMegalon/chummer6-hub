@@ -7057,7 +7057,7 @@ public sealed class PublicLandingController : Controller
     private static string? BuildBootstrapCommandIntro(string? platform)
         => platform switch
         {
-            "macos" => "Copy this into Terminal.",
+            "macos" => "Copy this one Terminal command into Terminal.",
             "linux" => "Paste this into your shell.",
             _ => null
         };
@@ -7079,7 +7079,7 @@ public sealed class PublicLandingController : Controller
     private static string? BuildBootstrapCommandNote(string? platform)
         => platform switch
         {
-            "macos" => "It streams a short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
+            "macos" => "It streams a short-lived setup assistant directly into bash. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the Applications folder or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies the published DMG digest, installs, and links the selected apps.",
             "linux" => "It streams a short-lived shell setup assistant. The assistant asks which Chummer apps to install, where to put them, whether quick access should stay in the applications menu or add Desktop links, whether to open them when it finishes, and then shows live progress while it downloads, verifies, installs, and links the selected apps.",
             _ => null
         };

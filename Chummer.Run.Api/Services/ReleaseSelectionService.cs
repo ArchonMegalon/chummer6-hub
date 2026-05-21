@@ -72,6 +72,8 @@ public sealed class ReleaseSelectionService
             ? (experience.AccountRequiredInstallSteps?.Count > 0 ? experience.AccountRequiredInstallSteps : experience.InstallSteps) ?? new List<string>()
             : experience.InstallSteps ?? new List<string>();
         var recommendedUsesMacBootstrap = recommended is not null && UsesMacBootstrapFlow(recommended);
+        // macOS preview posture stays on one Terminal command instead of a raw DMG handoff.
+        // The guided setup path verifies the published DMG digest before install continuity is claimed.
         var guestGateArtifactHref = recommended is null
             ? "/downloads"
             : BuildSignupDispatchHref(recommended);
@@ -187,36 +189,36 @@ public sealed class ReleaseSelectionService
         if (guestInstallAvailable && accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach install continuity from the first handoff.";
+            accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach install continuity after the first launch link.";
             createAccountSummary = "Some platforms are published directly now. Create an account only when you want guided recovery, tracked support, or linked install history on the same return path.";
-            signInSummary = "Sign in to reopen the same guided install handoff, recovery path, and support history.";
+            signInSummary = "Sign in to reopen linked installs, recovery history, and support follow-through.";
             downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
-            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to any route that still uses a signed-in handoff.";
+            accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to routes that keep install continuity attached after linking.";
         }
         else if (guestInstallAvailable)
         {
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} Create an account when you want recovery, tracked support, or linked install history on the same return path.";
             accountValueSummary = "The account does not change the published file. It adds recovery, tracked support, and linked install history when you want a calmer return path.";
             createAccountSummary = "Create an account when you want recovery, tracked support, and linked install history on the same return path. The download file stays the same for everyone.";
-            signInSummary = "Sign in to reopen your recovery, support history, and any linked-install follow-through.";
+            signInSummary = "Sign in to reopen your recovery history, support follow-through, and linked installs.";
             downloadFaqAnswer = availabilitySummary;
             accountFaqAnswer = "Account creation gives you recovery, tracked support, and linked install history. It does not change the published file.";
         }
         else if (accountRequiredInstallAvailable)
         {
             availabilitySummary = $"{GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
-            accountValueSummary = "The account does not change the published file. It is part of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
-            createAccountSummary = "Create the account first. The current install handoff keeps recovery, support, and install return attached from the first launch.";
-            signInSummary = "Sign in to continue the current install handoff and reopen the same recovery and support path.";
+            accountValueSummary = "The account does not change the published file. It is part of the current install route, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            createAccountSummary = "Create the account first. The current install route keeps recovery, support, and install return attached from the first launch.";
+            signInSummary = "Sign in to continue the current install route and reopen the same recovery and support path.";
             downloadFaqAnswer = $"Yes for the current route. {GatedInstallSentence(accountPlatforms)} Create an account first so recovery, support, and install return stay attached from the first launch.";
-            accountFaqAnswer = "Account creation is the start of the current install handoff, and it keeps recovery, tracked support, and linked install history on the same return path.";
+            accountFaqAnswer = "Account creation starts the current install route, and it keeps recovery, tracked support, and linked install history on the same return path.";
         }
         else
         {
             availabilitySummary = "No public download is on the shelf right now. Create an account if you want release follow-through and support when the next build lands.";
             accountValueSummary = "The account keeps recovery, tracked support, and release follow-through together when the next build lands.";
             createAccountSummary = "Create an account if you want release follow-through, tracked support, and a calmer return path when the next build lands.";
-            signInSummary = "Sign in to reopen your account-backed release follow-through and support history.";
+            signInSummary = "Sign in to reopen your linked release follow-through and support history.";
             downloadFaqAnswer = "Not right now. No public download is on the shelf yet.";
             accountFaqAnswer = "Account creation gives you recovery, tracked support, and release follow-through when the next build lands.";
         }
