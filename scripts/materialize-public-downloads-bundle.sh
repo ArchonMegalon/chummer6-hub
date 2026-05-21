@@ -581,6 +581,7 @@ PY
 fi
 
 DOWNLOADS_DIR="$combined_files_root" \
+SOURCE_MANIFEST_PATH="$PUBLIC_RELEASE_CHANNEL_SOURCE_PATH" \
 MANIFEST_PATH="$generated_root/releases.json" \
 CANONICAL_MANIFEST_PATH="$generated_root/RELEASE_CHANNEL.generated.json" \
 PORTAL_MANIFEST_PATH="$OUTPUT_ROOT/releases.json" \
