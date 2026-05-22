@@ -338,6 +338,94 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void RequiresCanonicalManifestRewriteWhenInstallAwareRegistryDriftsFromCoverageTruth()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260522-203456",
+            ["publishedAt"] = "2026-05-22T20:36:30Z",
+            ["status"] = "published",
+            ["desktopTupleCoverage"] = new Dictionary<string, object?>
+            {
+                ["desktopRouteTruth"] = new object[]
+                {
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:linux:linux-x64", ["head"] = "avalonia", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["artifactId"] = "avalonia-linux-x64-installer", ["routeRole"] = "primary", ["promotionState"] = "promoted", ["revokeState"] = "not_revoked", ["publicInstallRoute"] = "/downloads/install/avalonia-linux-x64-installer" },
+                    new Dictionary<string, object?> { ["tupleId"] = "blazor-desktop:linux:linux-x64", ["head"] = "blazor-desktop", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["artifactId"] = "blazor-desktop-linux-x64-installer", ["routeRole"] = "primary", ["promotionState"] = "proof_required", ["revokeState"] = "not_revoked", ["publicInstallRoute"] = "/downloads/install/blazor-desktop-linux-x64-installer" },
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:windows:win-x64", ["head"] = "avalonia", ["platform"] = "windows", ["rid"] = "win-x64", ["arch"] = "x64", ["artifactId"] = "avalonia-win-x64-installer", ["routeRole"] = "primary", ["promotionState"] = "promoted", ["revokeState"] = "not_revoked", ["publicInstallRoute"] = "/downloads/install/avalonia-win-x64-installer" },
+                    new Dictionary<string, object?> { ["tupleId"] = "blazor-desktop:windows:win-x64", ["head"] = "blazor-desktop", ["platform"] = "windows", ["rid"] = "win-x64", ["arch"] = "x64", ["artifactId"] = "blazor-desktop-win-x64-installer", ["routeRole"] = "primary", ["promotionState"] = "proof_required", ["revokeState"] = "not_revoked", ["publicInstallRoute"] = "/downloads/install/blazor-desktop-win-x64-installer" }
+                }
+            },
+            ["installAwareArtifactRegistry"] = new object[]
+            {
+                new Dictionary<string, object?> { ["tupleId"] = "avalonia:linux:linux-x64", ["artifactId"] = "avalonia-linux-x64-installer", ["currentForInstalledBuild"] = false },
+                new Dictionary<string, object?> { ["tupleId"] = "blazor-desktop:linux:linux-x64", ["artifactId"] = "blazor-desktop-linux-x64-installer", ["currentForInstalledBuild"] = false },
+                new Dictionary<string, object?> { ["tupleId"] = "avalonia:windows:win-x64", ["artifactId"] = "avalonia-win-x64-installer", ["currentForInstalledBuild"] = false },
+                new Dictionary<string, object?> { ["tupleId"] = "blazor-desktop:windows:win-x64", ["artifactId"] = "blazor-desktop-win-x64-installer", ["currentForInstalledBuild"] = false }
+            },
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?> { ["artifactId"] = "avalonia-linux-x64-installer", ["head"] = "avalonia", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["kind"] = "installer", ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb", ["fileName"] = "chummer-avalonia-linux-x64-installer.deb", ["sha256"] = "linuxa", ["sizeBytes"] = 1L },
+                new Dictionary<string, object?> { ["artifactId"] = "blazor-desktop-linux-x64-installer", ["head"] = "blazor-desktop", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["kind"] = "installer", ["downloadUrl"] = "/downloads/files/chummer-blazor-desktop-linux-x64-installer.deb", ["fileName"] = "chummer-blazor-desktop-linux-x64-installer.deb", ["sha256"] = "linuxb", ["sizeBytes"] = 2L },
+                new Dictionary<string, object?> { ["artifactId"] = "avalonia-win-x64-installer", ["head"] = "avalonia", ["platform"] = "windows", ["rid"] = "win-x64", ["arch"] = "x64", ["kind"] = "installer", ["downloadUrl"] = "/downloads/files/chummer-avalonia-win-x64-installer.exe", ["fileName"] = "chummer-avalonia-win-x64-installer.exe", ["sha256"] = "wina", ["sizeBytes"] = 3L },
+                new Dictionary<string, object?> { ["artifactId"] = "blazor-desktop-win-x64-installer", ["head"] = "blazor-desktop", ["platform"] = "windows", ["rid"] = "win-x64", ["arch"] = "x64", ["kind"] = "installer", ["downloadUrl"] = "/downloads/files/chummer-blazor-desktop-win-x64-installer.exe", ["fileName"] = "chummer-blazor-desktop-win-x64-installer.exe", ["sha256"] = "winb", ["sizeBytes"] = 4L }
+            }
+        });
+
+        var service = fixture.CreateService();
+
+        Assert.True(service.RequiresCanonicalManifestRewrite());
+
+        string json = service.LoadCanonicalManifestJson()!;
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement registry = document.RootElement.GetProperty("installAwareArtifactRegistry");
+        Assert.True(registry.EnumerateArray().Single(row => row.GetProperty("tupleId").GetString() == "avalonia:linux:linux-x64").GetProperty("currentForInstalledBuild").GetBoolean());
+        Assert.False(registry.EnumerateArray().Single(row => row.GetProperty("tupleId").GetString() == "blazor-desktop:linux:linux-x64").GetProperty("currentForInstalledBuild").GetBoolean());
+        Assert.True(registry.EnumerateArray().Single(row => row.GetProperty("tupleId").GetString() == "avalonia:windows:win-x64").GetProperty("currentForInstalledBuild").GetBoolean());
+        Assert.False(registry.EnumerateArray().Single(row => row.GetProperty("tupleId").GetString() == "blazor-desktop:windows:win-x64").GetProperty("currentForInstalledBuild").GetBoolean());
+    }
+
+    [Fact]
+    public void LoadCanonicalManifestJsonAlwaysNormalizesInstallAwareRegistryFromCoverageTruth()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-20260522-205120",
+            ["publishedAt"] = "2026-05-22T20:53:11Z",
+            ["status"] = "published",
+            ["desktopTupleCoverage"] = new Dictionary<string, object?>
+            {
+                ["desktopRouteTruth"] = new object[]
+                {
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:linux:linux-x64", ["head"] = "avalonia", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["artifactId"] = "avalonia-linux-x64-installer", ["routeRole"] = "primary", ["promotionState"] = "promoted", ["revokeState"] = "not_revoked", ["publicInstallRoute"] = "/downloads/install/avalonia-linux-x64-installer" },
+                    new Dictionary<string, object?> { ["tupleId"] = "avalonia:windows:win-x64", ["head"] = "avalonia", ["platform"] = "windows", ["rid"] = "win-x64", ["arch"] = "x64", ["artifactId"] = "avalonia-win-x64-installer", ["routeRole"] = "primary", ["promotionState"] = "promoted", ["revokeState"] = "not_revoked", ["publicInstallRoute"] = "/downloads/install/avalonia-win-x64-installer" }
+                }
+            },
+            ["installAwareArtifactRegistry"] = new object[]
+            {
+                new Dictionary<string, object?> { ["tupleId"] = "avalonia:linux:linux-x64", ["artifactId"] = "avalonia-linux-x64-installer", ["currentForInstalledBuild"] = false },
+                new Dictionary<string, object?> { ["tupleId"] = "avalonia:windows:win-x64", ["artifactId"] = "avalonia-win-x64-installer", ["currentForInstalledBuild"] = false }
+            },
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?> { ["artifactId"] = "avalonia-linux-x64-installer", ["head"] = "avalonia", ["platform"] = "linux", ["rid"] = "linux-x64", ["arch"] = "x64", ["kind"] = "installer", ["downloadUrl"] = "/downloads/files/chummer-avalonia-linux-x64-installer.deb", ["fileName"] = "chummer-avalonia-linux-x64-installer.deb", ["sha256"] = "linuxa", ["sizeBytes"] = 1L },
+                new Dictionary<string, object?> { ["artifactId"] = "avalonia-win-x64-installer", ["head"] = "avalonia", ["platform"] = "windows", ["rid"] = "win-x64", ["arch"] = "x64", ["kind"] = "installer", ["downloadUrl"] = "/downloads/files/chummer-avalonia-win-x64-installer.exe", ["fileName"] = "chummer-avalonia-win-x64-installer.exe", ["sha256"] = "wina", ["sizeBytes"] = 3L }
+            }
+        });
+
+        string json = fixture.CreateService().LoadCanonicalManifestJson()!;
+
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement registry = document.RootElement.GetProperty("installAwareArtifactRegistry");
+        Assert.All(registry.EnumerateArray(), row => Assert.True(row.GetProperty("currentForInstalledBuild").GetBoolean()));
+    }
+
+    [Fact]
     public void ManifestSerializationKeepsLegacyReleaseProofObject()
     {
         using var fixture = new PublicReleaseManifestFixture();

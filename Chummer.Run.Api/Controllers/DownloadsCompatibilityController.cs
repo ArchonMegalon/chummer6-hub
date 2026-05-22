@@ -56,24 +56,10 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     [HttpGet("/downloads/RELEASE_CHANNEL.generated.json")]
     public IActionResult CanonicalReleaseManifest()
     {
-        if (_releases.RequiresCanonicalManifestRewrite())
-        {
-            string? filteredManifest = _releases.LoadCanonicalManifestJson();
-            return filteredManifest is null
-                ? NotFound()
-                : Content(filteredManifest, "application/json; charset=utf-8");
-        }
-
-        var manifestPath = _releases.ResolveCanonicalManifestFilePath();
-        if (manifestPath is null)
-        {
-            return NotFound();
-        }
-
-        return PhysicalFile(
-            manifestPath,
-            "application/json; charset=utf-8",
-            enableRangeProcessing: false);
+        string? filteredManifest = _releases.LoadCanonicalManifestJson();
+        return filteredManifest is null
+            ? NotFound()
+            : Content(filteredManifest, "application/json; charset=utf-8");
     }
 
     [HttpGet("/downloads/proof/windows")]

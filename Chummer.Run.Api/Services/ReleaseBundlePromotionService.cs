@@ -837,6 +837,11 @@ public sealed class ReleaseBundlePromotionService
         }
 
         normalizedCanonicalManifest["desktopTupleCoverage"] = coverage.DeepClone();
+        normalizedCanonicalManifest["installAwareArtifactRegistry"] = BuildInstallAwareArtifactRegistry(
+            normalizedArtifacts,
+            coverage,
+            canonicalChannel,
+            canonicalVersion);
         normalizedCanonicalManifest["rolloutState"] = rolloutState;
         normalizedCanonicalManifest["rolloutReason"] = rolloutReason;
         normalizedCanonicalManifest["supportabilityState"] = supportabilityState;
@@ -845,6 +850,177 @@ public sealed class ReleaseBundlePromotionService
         normalizedCanonicalManifest["fixAvailabilitySummary"] = fixAvailabilitySummary;
 
         return (normalizedCompatibilityManifest, normalizedCanonicalManifest);
+    }
+
+    private static JsonArray BuildInstallAwareArtifactRegistry(
+        JsonArray artifacts,
+        JsonObject coverage,
+        string channelId,
+        string releaseVersion)
+    {
+        if (coverage["desktopRouteTruth"] is not JsonArray desktopRouteTruth)
+        {
+            return [];
+        }
+
+        Dictionary<string, CanonicalArtifactState> artifactById = ExtractCanonicalArtifactRows(artifacts)
+            .Where(static artifact => !string.IsNullOrWhiteSpace(artifact.ArtifactId))
+            .GroupBy(static artifact => NormalizeToken(artifact.ArtifactId), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.OrderBy(static artifact => artifact.Kind, StringComparer.Ordinal).First(),
+                StringComparer.OrdinalIgnoreCase);
+
+        List<JsonObject> rows = [];
+        foreach (JsonObject routeRow in desktopRouteTruth.OfType<JsonObject>())
+        {
+            string artifactId = ExpectedInstallerArtifactIdForRoute(routeRow);
+            if (string.IsNullOrWhiteSpace(artifactId))
+            {
+                continue;
+            }
+
+            string head = NormalizeToken(GetJsonString(routeRow["head"]));
+            string platform = NormalizePlatform(GetJsonString(routeRow["platform"]));
+            string rid = NormalizeToken(GetJsonString(routeRow["rid"]));
+            string arch = NormalizeToken(GetJsonString(routeRow["arch"]));
+            if (string.IsNullOrWhiteSpace(arch)
+                && RidToPlatformArch.TryGetValue(rid, out (string Platform, string Arch) platformArch))
+            {
+                arch = platformArch.Arch;
+            }
+
+            string installedBuildSelector = InstallAwareInstalledBuildSelector(
+                channelId,
+                releaseVersion,
+                head,
+                platform,
+                arch);
+            string tupleId = (GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim();
+            string kind = InstallAwareArtifactKind(artifactById, artifactId);
+            bool currentForInstalledBuild =
+                string.Equals(NormalizeToken(GetJsonString(routeRow["promotionState"])), "promoted", StringComparison.Ordinal)
+                && !string.Equals(NormalizeToken(GetJsonString(routeRow["revokeState"])), "revoked", StringComparison.Ordinal);
+
+            JsonArray recoveryProofRefs =
+            [
+                (GetJsonString(routeRow["publicInstallRoute"]) ?? string.Empty).Trim(),
+                $"startup-smoke/startup-smoke-{head}-{rid}.receipt.json",
+                $"desktopTupleCoverage.desktopRouteTruth[{tupleId}]",
+            ];
+
+            JsonObject conciergeAssetRefs = new()
+            {
+                ["releaseExplainerPacket"] = $"concierge/release/{channelId}/{releaseVersion}/{artifactId}",
+                ["supportClosurePacket"] = $"concierge/support/{channelId}/{releaseVersion}/{artifactId}",
+                ["publicTrustWrapper"] = (GetJsonString(routeRow["publicInstallRoute"]) ?? string.Empty).Trim(),
+            };
+
+            rows.Add(new JsonObject
+            {
+                ["registryId"] = $"concierge:{channelId}:{releaseVersion}:{artifactId}",
+                ["artifactId"] = artifactId,
+                ["channelId"] = channelId,
+                ["releaseVersion"] = releaseVersion,
+                ["tupleId"] = tupleId,
+                ["head"] = head,
+                ["platform"] = platform,
+                ["rid"] = rid,
+                ["arch"] = arch,
+                ["kind"] = kind,
+                ["installedBuildSelector"] = installedBuildSelector,
+                ["currentForInstalledBuild"] = currentForInstalledBuild,
+                ["channelRationale"] = InstallAwareChannelRationale(routeRow, channelId, installedBuildSelector),
+                ["correctnessReason"] = InstallAwareCorrectnessReason(routeRow, artifactId, installedBuildSelector),
+                ["recoveryProofRefs"] = new JsonArray(
+                    recoveryProofRefs
+                        .Select(GetJsonString)
+                        .Where(static value => !string.IsNullOrWhiteSpace(value))
+                        .Select(static value => JsonValue.Create(value))
+                        .ToArray()),
+                ["conciergeAssetRefs"] = conciergeAssetRefs,
+            });
+        }
+
+        return new JsonArray(
+            rows.OrderBy(static row => NormalizePlatform(GetJsonString(row["platform"])), StringComparer.Ordinal)
+                .ThenBy(static row => NormalizeToken(GetJsonString(row["head"])), StringComparer.Ordinal)
+                .ThenBy(static row => NormalizeToken(GetJsonString(row["rid"])), StringComparer.Ordinal)
+                .ThenBy(static row => NormalizeToken(GetJsonString(row["artifactId"])), StringComparer.Ordinal)
+                .Select(static row => (JsonNode)row)
+                .ToArray());
+    }
+
+    private static string ExpectedInstallerArtifactIdForRoute(JsonObject routeRow)
+    {
+        string artifactId = NormalizeToken(GetJsonString(routeRow["artifactId"]));
+        if (!string.IsNullOrWhiteSpace(artifactId))
+        {
+            return artifactId;
+        }
+
+        string head = NormalizeToken(GetJsonString(routeRow["head"]));
+        string rid = NormalizeToken(GetJsonString(routeRow["rid"]));
+        return string.IsNullOrWhiteSpace(head) || string.IsNullOrWhiteSpace(rid)
+            ? string.Empty
+            : $"{head}-{rid}-installer";
+    }
+
+    private static string InstallAwareArtifactKind(
+        IReadOnlyDictionary<string, CanonicalArtifactState> artifactById,
+        string artifactId)
+        => artifactById.TryGetValue(NormalizeToken(artifactId), out CanonicalArtifactState? artifact)
+            ? NormalizeToken(artifact.Kind) switch
+            {
+                { Length: > 0 } kind => kind,
+                _ => "installer",
+            }
+            : "installer";
+
+    private static string InstallAwareInstalledBuildSelector(
+        string channelId,
+        string releaseVersion,
+        string head,
+        string platform,
+        string arch)
+        => $"{channelId}/{releaseVersion}/{head}/{platform}/{arch}";
+
+    private static string InstallAwareChannelRationale(
+        JsonObject routeRow,
+        string channelId,
+        string installedBuildSelector)
+    {
+        string tupleId = (GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim();
+        string routeRole = NormalizeToken(GetJsonString(routeRow["routeRole"]));
+        string promotionState = NormalizeToken(GetJsonString(routeRow["promotionState"]));
+        string revokeState = NormalizeToken(GetJsonString(routeRow["revokeState"]));
+        if (string.Equals(revokeState, "revoked", StringComparison.Ordinal))
+        {
+            return $"Published {channelId} channel blocks {routeRole}-route {tupleId} for installed build selector {installedBuildSelector} because registry revoke truth is active.";
+        }
+
+        if (string.Equals(promotionState, "promoted", StringComparison.Ordinal))
+        {
+            return string.Equals(routeRole, "fallback", StringComparison.Ordinal)
+                ? $"Published {channelId} channel keeps fallback route {tupleId} current for installed build selector {installedBuildSelector} as recovery/manual routing."
+                : $"Published {channelId} channel keeps primary-route {tupleId} current for installed build selector {installedBuildSelector}.";
+        }
+
+        return $"Published {channelId} channel keeps {routeRole}-route {tupleId} blocked for installed build selector {installedBuildSelector} until installer and startup-smoke proof are present.";
+    }
+
+    private static string InstallAwareCorrectnessReason(
+        JsonObject routeRow,
+        string artifactId,
+        string installedBuildSelector)
+    {
+        string tupleId = (GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim();
+        string promotionState = NormalizeToken(GetJsonString(routeRow["promotionState"]));
+        string revokeState = NormalizeToken(GetJsonString(routeRow["revokeState"]));
+        return string.Equals(promotionState, "promoted", StringComparison.Ordinal)
+               && !string.Equals(revokeState, "revoked", StringComparison.Ordinal)
+            ? $"Offer {artifactId} to installed build selector {installedBuildSelector} because tuple {tupleId} is currently promoted for this channel."
+            : $"Do not offer {artifactId} to installed build selector {installedBuildSelector} because tuple {tupleId} is not currently promoted for this channel.";
     }
 
     private static string NormalizeReleaseProofForPublication(

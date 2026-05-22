@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"
+REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"
 
 BUNDLE_DIR="${1:-${DOWNLOAD_BUNDLE_DIR:-$REPO_ROOT/Chummer.Portal/downloads}}"
 MANIFEST_PATH="${CHUMMER_RELEASE_UPLOAD_MANIFEST_PATH:-$BUNDLE_DIR/releases.json}"
@@ -50,10 +52,270 @@ if [[ ! -d "$BUNDLE_DIR/files" ]]; then
   exit 1
 fi
 
+if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
+  echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2
+  exit 1
+fi
+
+if [[ ! -f "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" ]]; then
+  echo "Missing registry verifier: $REGISTRY_ROOT/scripts/verify_public_release_channel.py" >&2
+  exit 1
+fi
+
 to_bool() {
   local value
   value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
+canonicalize_release_channel_registries() {
+  local manifest_path="${1:-}"
+  if [[ -z "$manifest_path" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$manifest_path" <<'PY'
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+def normalized_token(value) -> str:
+    return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+verifier_path = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+materializer_path = verifier_path.with_name("materialize_public_release_channel.py")
+
+spec = importlib.util.spec_from_file_location("verify_public_release_channel", verifier_path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+materializer = None
+if materializer_path.is_file():
+    materializer_spec = importlib.util.spec_from_file_location("materialize_public_release_channel", materializer_path)
+    if materializer_spec is not None and materializer_spec.loader is not None:
+        materializer = importlib.util.module_from_spec(materializer_spec)
+        materializer_spec.loader.exec_module(materializer)
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+def required_heads_and_platforms(local_payload: dict) -> tuple[list[str], list[str]]:
+    coverage = local_payload.get("desktopTupleCoverage")
+    default_heads = ["avalonia"]
+    default_platforms = ["linux", "windows", "macos"]
+    if not isinstance(coverage, dict):
+        return default_heads, default_platforms
+    heads = [str(item).strip().lower() for item in coverage.get("requiredDesktopHeads") or [] if str(item).strip()]
+    platforms = [str(item).strip().lower() for item in coverage.get("requiredDesktopPlatforms") or [] if str(item).strip()]
+    return (heads or default_heads, platforms or default_platforms)
+
+def fallback_tuple_coverage(local_payload: dict) -> dict | None:
+    if materializer is None or not hasattr(materializer, "desktop_tuple_coverage"):
+        return None
+    artifacts = local_payload.get("artifacts")
+    if not isinstance(artifacts, list):
+        return None
+    required_heads, required_platforms = required_heads_and_platforms(local_payload)
+    return materializer.desktop_tuple_coverage(
+        artifacts,
+        required_heads=required_heads,
+        required_platforms=required_platforms,
+    )
+
+tuple_coverage = payload.get("desktopTupleCoverage")
+if not isinstance(tuple_coverage, dict):
+    tuple_coverage = fallback_tuple_coverage(payload)
+if isinstance(tuple_coverage, dict):
+    payload["desktopTupleCoverage"] = tuple_coverage
+
+channel_id = str(payload.get("channelId") or payload.get("channel") or "").strip()
+release_version = str(payload.get("version") or "").strip()
+
+def derive_verifier_owned_value(name: str, current_value: object) -> object:
+    helper = getattr(module, name, None)
+    if callable(helper):
+        try:
+            return helper(payload)
+        except TypeError:
+            pass
+    fallback_helpers = {
+        "expected_install_aware_artifact_registry_rows": lambda: (
+            materializer.install_aware_artifact_registry(
+                tuple_coverage,
+                channel_id=channel_id,
+                release_version=release_version,
+            )
+            if tuple_coverage is not None and hasattr(materializer, "install_aware_artifact_registry")
+            else current_value
+        ),
+        "expected_desktop_route_truth_rows": lambda: (
+            materializer.desktop_route_truth(
+                tuple_coverage,
+                channel_id=channel_id,
+                release_version=release_version,
+            )
+            if tuple_coverage is not None and hasattr(materializer, "desktop_route_truth")
+            else current_value
+        ),
+        "expected_external_proof_request_rows": lambda: (
+            materializer.external_proof_requests(tuple_coverage)
+            if tuple_coverage is not None and hasattr(materializer, "external_proof_requests")
+            else current_value
+        ),
+    }
+    fallback = fallback_helpers.get(name)
+    return fallback() if fallback is not None else current_value
+
+coverage = payload.get("desktopTupleCoverage")
+if isinstance(coverage, dict):
+    coverage["externalProofRequests"] = derive_verifier_owned_value(
+        "expected_external_proof_request_rows",
+        coverage.get("externalProofRequests") or [],
+    )
+    coverage["desktopRouteTruth"] = derive_verifier_owned_value(
+        "expected_desktop_route_truth_rows",
+        coverage.get("desktopRouteTruth") or [],
+    )
+payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(
+    "expected_install_aware_artifact_registry_rows",
+    payload.get("installAwareArtifactRegistry") or [],
+)
+manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+canonicalize_bundle_release_channel_registries() {
+  canonicalize_release_channel_registries "$MANIFEST_PATH"
+  canonicalize_release_channel_registries "$CANONICAL_MANIFEST_PATH"
+}
+
+canonicalize_release_channel_registries() {
+  local manifest_path="${1:-}"
+  if [[ -z "$manifest_path" || ! -f "$manifest_path" ]]; then
+    return 0
+  fi
+
+  python3 - "$REGISTRY_ROOT/scripts/verify_public_release_channel.py" "$manifest_path" <<'PY'
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+def normalized_token(value) -> str:
+    return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+verifier_path = Path(sys.argv[1])
+manifest_path = Path(sys.argv[2])
+materializer_path = verifier_path.with_name("materialize_public_release_channel.py")
+
+spec = importlib.util.spec_from_file_location("verify_public_release_channel", verifier_path)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+materializer = None
+if materializer_path.is_file():
+    materializer_spec = importlib.util.spec_from_file_location("materialize_public_release_channel", materializer_path)
+    if materializer_spec is not None and materializer_spec.loader is not None:
+        materializer = importlib.util.module_from_spec(materializer_spec)
+        materializer_spec.loader.exec_module(materializer)
+
+payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+def required_heads_and_platforms(local_payload: dict) -> tuple[list[str], list[str]]:
+    coverage = local_payload.get("desktopTupleCoverage")
+    default_heads = ["avalonia"]
+    default_platforms = ["linux", "windows", "macos"]
+    if not isinstance(coverage, dict):
+        return default_heads, default_platforms
+    heads = [str(item).strip().lower() for item in coverage.get("requiredDesktopHeads") or [] if str(item).strip()]
+    platforms = [str(item).strip().lower() for item in coverage.get("requiredDesktopPlatforms") or [] if str(item).strip()]
+    return (heads or default_heads, platforms or default_platforms)
+
+def fallback_tuple_coverage(local_payload: dict) -> dict | None:
+    if materializer is None or not hasattr(materializer, "desktop_tuple_coverage"):
+        return None
+    artifacts = local_payload.get("artifacts")
+    if not isinstance(artifacts, list):
+        return None
+    required_heads, required_platforms = required_heads_and_platforms(local_payload)
+    return materializer.desktop_tuple_coverage(
+        artifacts,
+        required_heads=required_heads,
+        required_platforms=required_platforms,
+    )
+
+tuple_coverage = payload.get("desktopTupleCoverage")
+if not isinstance(tuple_coverage, dict):
+    tuple_coverage = fallback_tuple_coverage(payload)
+if isinstance(tuple_coverage, dict):
+    payload["desktopTupleCoverage"] = tuple_coverage
+
+channel_id = str(payload.get("channelId") or payload.get("channel") or "").strip()
+release_version = str(payload.get("version") or "").strip()
+
+def derive_verifier_owned_value(name: str, current_value: object) -> object:
+    helper = getattr(module, name, None)
+    if callable(helper):
+        try:
+            return helper(payload)
+        except TypeError:
+            pass
+    fallback_helpers = {
+        "expected_install_aware_artifact_registry_rows": lambda: (
+            materializer.install_aware_artifact_registry(
+                tuple_coverage,
+                channel_id=channel_id,
+                release_version=release_version,
+            )
+            if tuple_coverage is not None and hasattr(materializer, "install_aware_artifact_registry")
+            else current_value
+        ),
+        "expected_desktop_route_truth_rows": lambda: (
+            materializer.desktop_route_truth(
+                tuple_coverage,
+                channel_id=channel_id,
+                release_version=release_version,
+            )
+            if tuple_coverage is not None and hasattr(materializer, "desktop_route_truth")
+            else current_value
+        ),
+        "expected_external_proof_request_rows": lambda: (
+            materializer.external_proof_requests(tuple_coverage)
+            if tuple_coverage is not None and hasattr(materializer, "external_proof_requests")
+            else current_value
+        ),
+    }
+    fallback = fallback_helpers.get(name)
+    return fallback() if fallback is not None else current_value
+
+coverage = payload.get("desktopTupleCoverage")
+if isinstance(coverage, dict):
+    coverage["externalProofRequests"] = derive_verifier_owned_value(
+        "expected_external_proof_request_rows",
+        coverage.get("externalProofRequests") or [],
+    )
+    coverage["desktopRouteTruth"] = derive_verifier_owned_value(
+        "expected_desktop_route_truth_rows",
+        coverage.get("desktopRouteTruth") or [],
+    )
+payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(
+    "expected_install_aware_artifact_registry_rows",
+    payload.get("installAwareArtifactRegistry") or [],
+)
+manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+PY
+}
+
+canonicalize_bundle_release_channel_registries() {
+  canonicalize_release_channel_registries "$MANIFEST_PATH"
+  canonicalize_release_channel_registries "$CANONICAL_MANIFEST_PATH"
 }
 
 resolve_upload_token() {
@@ -337,6 +599,10 @@ request_common=(
   --config "$auth_curl_config"
   -H "Accept: application/json"
 )
+
+canonicalize_bundle_release_channel_registries
+
+canonicalize_bundle_release_channel_registries
 
 upload_files=()
 while IFS= read -r file_path; do

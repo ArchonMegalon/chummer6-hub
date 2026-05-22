@@ -5422,6 +5422,57 @@ body.nav-sheet-open {
   margin-top: 1rem;
 }
 
+.surface-now .page-title,
+.surface-now .editorial-title,
+.surface-now .status-decision-strip__card h2,
+.surface-now .evidence-row__copy h3,
+.surface-now .workflow-card__copy h3,
+.surface-now .route-callout h3,
+.surface-now .evidence-header__stats strong {
+  color: #13233a;
+}
+
+.surface-now .page-copy,
+.surface-now .editorial-copy,
+.surface-now .muted-copy,
+.surface-now .status-decision-strip__card p,
+.surface-now .evidence-row__copy p,
+.surface-now .workflow-card__copy p,
+.surface-now .route-callout p,
+.surface-now .evidence-header__label,
+.surface-now .workflow-card__proof {
+  color: #43566f;
+}
+
+.surface-now .status-decision-strip__card,
+.surface-now .evidence-group,
+.surface-now .release-footnote,
+.surface-now .workflow-card,
+.surface-now .route-callout {
+  background: #fff9f1;
+  border-color: rgba(88, 59, 24, 0.18);
+}
+
+.surface-now .workflow-band {
+  padding: 1.45rem;
+  border-radius: 32px;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 241, 0.96), rgba(250, 242, 229, 0.98)),
+    radial-gradient(circle at top right, rgba(181, 126, 63, 0.08), transparent 28%);
+  border: 1px solid rgba(88, 59, 24, 0.14);
+  box-shadow: var(--shadow-soft);
+}
+
+.surface-now .workflow-band__lead {
+  margin-bottom: 1.35rem;
+}
+
+.surface-now .eyebrow,
+.surface-now .tag,
+.surface-now .readiness-tag {
+  color: #8b4f12;
+}
+
 .home-cockpit-strip,
 .account-rail-snapshot {
   width: min(var(--site-max), calc(100% - 2rem));
@@ -6139,11 +6190,23 @@ body.nav-sheet-open {
   min-height: 380px;
 }
 
+.black-ledger-geoscape__webgl,
 .black-ledger-geoscape__canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   min-height: 380px;
+}
+
+.black-ledger-geoscape__webgl {
+  z-index: 0;
+}
+
+.black-ledger-geoscape__canvas {
+  z-index: 1;
+  background: transparent;
 }
 
 .black-ledger-geoscape__overlay {
@@ -6153,6 +6216,7 @@ body.nav-sheet-open {
   display: grid;
   gap: 0.35rem;
   pointer-events: none;
+  z-index: 2;
 }
 
 .black-ledger-geoscape__eyebrow {

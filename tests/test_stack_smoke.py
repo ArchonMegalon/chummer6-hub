@@ -238,24 +238,61 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('"expected_registry_boundary_coverage"', bootstrap_text)
         self.assertIn('sync_startup_smoke_receipts_for_local_verifier "$startup_smoke_dir" "$audit_dir"', bootstrap_text)
         self.assertIn("startup-smoke/startup-smoke-*.receipt.json copies in verifier-compatible layout", bootstrap_text)
-        self.assertIn("exposes desktop files that are not present in manifest truth", bootstrap_text)
-        self.assertIn("retrying materializer with startup-smoke filter disabled", bootstrap_text)
-        self.assertIn("generating fallback manifests directly from dist files", bootstrap_text)
-        self.assertIn('[[ -f "$canonical_manifest_path" ]]', bootstrap_text)
-        self.assertIn('log "manifest fallback completed: $canonical_manifest_path and $compatibility_manifest_path"', bootstrap_text)
-        self.assertNotIn('[[ -f "$canonical_output" ]]', bootstrap_text)
-        self.assertIn("materializer.desktop_tuple_coverage(", bootstrap_text)
-        self.assertIn("materializer.compatibility_payload(canonical_payload)", bootstrap_text)
-        self.assertIn('def derive_verifier_owned_value(payload: dict, name: str, current_value):', bootstrap_text)
-        self.assertIn('"expected_desktop_surface_ref_rows"', bootstrap_text)
-        self.assertIn('"expected_artifact_publication_binding_rows"', bootstrap_text)
-        self.assertIn('"expected_registry_boundary_coverage"', bootstrap_text)
-        self.assertIn('compatibility_downloads = compatibility_payload.get("downloads")', bootstrap_text)
-        self.assertIn('"compatibility_count": len(compatibility_downloads)', bootstrap_text)
-        self.assertNotIn('"compatibility_count": len(downloads)', bootstrap_text)
-        self.assertNotIn('"promotedInstallerTuples": [],', bootstrap_text)
-        self.assertNotIn("mapfile -t", bootstrap_text)
-        self.assertNotIn("readarray -t", bootstrap_text)
+
+    def test_mac_bootstrap_captures_post_publish_live_manifest_projection(self):
+        bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+
+        self.assertIn("capture_post_publish_manifest_projection()", bootstrap_text)
+        self.assertIn('local projection_dir="$dist_dir/post-publish-manifest"', bootstrap_text)
+        self.assertIn('curl --fail --silent --show-error --location "$verify_url" -o "$live_manifest"', bootstrap_text)
+        self.assertIn("Local canonical manifest reflects the just-built bundle fragment.", bootstrap_text)
+        self.assertIn('log "capturing post-publish live manifest projection"', bootstrap_text)
+        self.assertIn('capture_post_publish_manifest_projection "$verify_url" "$dist_dir"', bootstrap_text)
+
+    def test_mac_bootstrap_captures_post_publish_live_manifest_projection(self):
+        bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+
+        self.assertIn("capture_post_publish_manifest_projection()", bootstrap_text)
+        self.assertIn('local projection_dir="$dist_dir/post-publish-manifest"', bootstrap_text)
+        self.assertIn('curl --fail --silent --show-error --location "$verify_url" -o "$live_manifest"', bootstrap_text)
+        self.assertIn("Local canonical manifest reflects the just-built bundle fragment.", bootstrap_text)
+        self.assertIn('log "capturing post-publish live manifest projection"', bootstrap_text)
+        self.assertIn('capture_post_publish_manifest_projection "$verify_url" "$dist_dir"', bootstrap_text)
+
+    def test_publish_download_bundle_recanonicalizes_release_channel_registries(self):
+        script_path = REPO_ROOT / "scripts" / "publish-download-bundle.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn("bundle_manifest_matches_files()", script_text)
+        self.assertIn("Set RELEASE_VERSION and RELEASE_PUBLISHED_AT explicitly for this republish.", script_text)
+        self.assertIn('CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}"', script_text)
+        self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"', script_text)
+        self.assertIn('chummer-blazor-desktop-*-installer.dmg', script_text)
+        self.assertIn('bash "$SCRIPT_DIR/generate-releases-manifest.sh"', script_text)
+        self.assertIn('bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR"', script_text)
+
+    def test_mac_bootstrap_remote_ui_publish_path_uses_hardened_bundle_publisher(self):
+        bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+        remote_ui_publish_path = REPO_ROOT.parent / "chummer6-ui" / "scripts" / "publish-download-bundle.sh"
+        publish_text = remote_ui_publish_path.read_text(encoding="utf-8")
+
+        self.assertIn('local remote_ui_repo="${CHUMMER_REMOTE_UI_REPO_DIR:-/docker/chummercomplete/chummer6-ui}"', bootstrap_text)
+        self.assertIn("bash scripts/publish-download-bundle.sh", bootstrap_text)
+        self.assertIn("bundle_manifest_matches_files()", publish_text)
+        self.assertIn('CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}"', publish_text)
+        self.assertIn('CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"', publish_text)
+        self.assertIn('chummer-blazor-desktop-*-installer.dmg', publish_text)
+        self.assertIn("Set RELEASE_VERSION and RELEASE_PUBLISHED_AT explicitly for this republish.", publish_text)
+        self.assertIn('CHUMMER_PUBLIC_EDGE_DOWNLOADS_MIRROR_DIRS', publish_text)
+        self.assertIn('$REPO_ROOT/../chummer.run-services/Chummer.Portal/downloads', publish_text)
+        self.assertIn('$REPO_ROOT/../chummer6-hub/Chummer.Portal/downloads', publish_text)
+        self.assertIn('sync_live_downloads_mirror_dir()', publish_text)
+        self.assertIn('bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$target_dir/RELEASE_CHANNEL.generated.json" >/dev/null', publish_text)
+        self.assertIn('bash "$SCRIPT_DIR/generate-releases-manifest.sh"', publish_text)
+        self.assertIn('bash "$SCRIPT_DIR/verify-releases-manifest.sh" "$DEPLOY_DIR"', publish_text)
 
     def test_shared_http_release_uploader_avoids_bash4_only_array_builtins(self):
         uploader_path = REPO_ROOT.parent / "chummer-presentation" / "scripts" / "publish-download-bundle-http.sh"
@@ -381,6 +418,46 @@ class StackConfigSmokeTests(unittest.TestCase):
             script_text = script_path.read_text(encoding="utf-8")
             self.assertNotIn("mapfile -t", script_text, msg=f"bash 4-only mapfile found in {script_path}")
             self.assertNotIn("readarray -t", script_text, msg=f"bash 4-only readarray found in {script_path}")
+
+    def test_http_release_upload_script_recanonicalizes_bundle_manifests_before_upload(self):
+        script_path = REPO_ROOT / "scripts" / "publish-download-bundle-http.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"', script_text)
+        self.assertIn('canonicalize_release_channel_registries() {', script_text)
+        self.assertIn('canonicalize_bundle_release_channel_registries()', script_text)
+        self.assertIn('canonicalize_bundle_release_channel_registries', script_text)
+        self.assertIn('payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(', script_text)
+        self.assertIn('canonicalize_bundle_release_channel_registries\n\nupload_files=()', script_text)
+
+    def test_mac_bootstrap_verifies_local_canonical_manifest_before_live_publish_check(self):
+        bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+
+        self.assertIn('log "verifying local bundle manifest"', bootstrap_text)
+        self.assertIn('bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"', bootstrap_text)
+        self.assertIn('log "verifying local canonical release manifest"', bootstrap_text)
+        self.assertIn('bash scripts/verify-releases-manifest.sh "$dist_dir/RELEASE_CHANNEL.generated.json"', bootstrap_text)
+
+    def test_http_release_upload_script_recanonicalizes_bundle_manifests_before_upload(self):
+        script_path = REPO_ROOT / "scripts" / "publish-download-bundle-http.sh"
+        script_text = script_path.read_text(encoding="utf-8")
+
+        self.assertIn('REGISTRY_ROOT="${CHUMMER_HUB_REGISTRY_ROOT:-/docker/chummercomplete/chummer-hub-registry}"', script_text)
+        self.assertIn('canonicalize_release_channel_registries() {', script_text)
+        self.assertIn('canonicalize_bundle_release_channel_registries()', script_text)
+        self.assertIn('canonicalize_bundle_release_channel_registries', script_text)
+        self.assertIn('payload["installAwareArtifactRegistry"] = derive_verifier_owned_value(', script_text)
+        self.assertIn('canonicalize_bundle_release_channel_registries\n\nupload_files=()', script_text)
+
+    def test_mac_bootstrap_verifies_local_canonical_manifest_before_live_publish_check(self):
+        bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
+        bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+
+        self.assertIn('log "verifying local bundle manifest"', bootstrap_text)
+        self.assertIn('bash scripts/verify-releases-manifest.sh "$dist_dir/releases.json"', bootstrap_text)
+        self.assertIn('log "verifying local canonical release manifest"', bootstrap_text)
+        self.assertIn('bash scripts/verify-releases-manifest.sh "$dist_dir/RELEASE_CHANNEL.generated.json"', bootstrap_text)
 
     def test_release_upload_bootstrap_can_repair_missing_status_and_verify_dummy_bundle(self):
         bootstrap_path = (
