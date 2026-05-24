@@ -265,6 +265,9 @@ internal sealed class PublicReleaseExperienceDocument
     public string? FlagshipClaimSummary { get; init; }
     public string? FlagshipGradeSummary { get; init; }
     public string? FlagshipAcceptanceSource { get; init; }
+    public string? DesktopPlatformMatrixSource { get; init; }
+    public string? DesktopGoldAcceptanceSource { get; init; }
+    public List<string>? ReleaseLabelResolverRules { get; init; }
     public string? KnownIssueLanguageSource { get; init; }
     public string? ResponsivenessBudgetsSource { get; init; }
     public string? DesktopFlagshipHead { get; init; }
