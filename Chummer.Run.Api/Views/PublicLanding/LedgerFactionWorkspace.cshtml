@@ -64,6 +64,29 @@
     </div>
 </section>
 
+@if (Model.ConnectedLanePacket is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Connected command lane</p>
+            <h2 class="editorial-title">@Model.ConnectedLanePacket.Heading</h2>
+            <p class="editorial-copy">@Model.ConnectedLanePacket.Summary</p>
+        </div>
+        <div class="route-choice-grid">
+            @foreach (var cue in Model.ConnectedLanePacket.Cues)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@cue.StatusLabel</span>
+                    <h3>@cue.Label</h3>
+                    <p>@cue.Summary</p>
+                    <a class="editorial-strip__action" href="@cue.Href">Open lane</a>
+                </article>
+            }
+        </div>
+        <p class="editorial-copy">@Model.ConnectedLanePacket.BoundaryLine</p>
+    </section>
+}
+
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Faction posture</p>

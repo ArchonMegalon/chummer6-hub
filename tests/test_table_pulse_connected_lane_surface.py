@@ -123,6 +123,50 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             result.stderr,
         )
 
+    def test_verifier_fails_when_media_horizon_drops_connected_lane(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="table-pulse-media-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            media_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml"
+            media_path.write_text(
+                media_path.read_text(encoding="utf-8").replace(
+                    "<p class=\"eyebrow\">Connected lane</p>",
+                    "<p class=\"eyebrow\">Artifact lane</p>",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml missing marker: <p class=\"eyebrow\">Connected lane</p>",
+            result.stderr,
+        )
+
+    def test_verifier_fails_when_workspace_drops_connected_lane(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="table-pulse-workspace-") as temp_dir:
+            temp_root = Path(temp_dir)
+            self.copy_sources(temp_root)
+            workspace_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml"
+            workspace_path.write_text(
+                workspace_path.read_text(encoding="utf-8").replace(
+                    "Connected command lane",
+                    "Workspace tabs",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_verifier(temp_root)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml missing marker: Connected command lane",
+            result.stderr,
+        )
+
     @staticmethod
     def copy_sources(temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:

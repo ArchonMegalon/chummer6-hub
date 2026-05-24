@@ -30,6 +30,14 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
         "Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
     ),
+    "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml": (
+        "Connected command lane",
+        "@Model.ConnectedLanePacket.BoundaryLine",
+    ),
+    "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml": (
+        "<p class=\"eyebrow\">Connected lane</p>",
+        "@Model.ConnectedLanePacket.BoundaryLine",
+    ),
 }
 
 
