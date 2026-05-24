@@ -227,6 +227,35 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
         ):
             self.assertEqual(verifier.main(), 1)
 
+    def test_verifier_fails_when_live_public_route_drops_table_pulse_live_inbox(self) -> None:
+        class FakeResponse:
+            def __init__(self, text: str) -> None:
+                self.text = text
+
+            def raise_for_status(self) -> None:
+                return None
+
+        route_bodies = {
+            "http://example.test/living-world": "<section><p class='eyebrow'>Connected lane</p><p>Living World receipts only</p></section>",
+            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/passport": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+        }
+
+        def fake_get(url: str, timeout: int) -> FakeResponse:
+            self.assertEqual(timeout, 30)
+            return FakeResponse(route_bodies[url])
+
+        script_dir = str(SCRIPT.parent)
+        with patch.object(sys, "path", [script_dir, *sys.path]):
+            import verify_table_pulse_connected_lane_surface as verifier
+
+        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+            sys,
+            "argv",
+            ["verify_table_pulse_connected_lane_surface.py", "--base-url", "http://example.test"],
+        ):
+            self.assertEqual(verifier.main(), 1)
+
     @staticmethod
     def copy_sources(temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:
