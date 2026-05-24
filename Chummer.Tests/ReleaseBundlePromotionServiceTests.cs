@@ -491,6 +491,50 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
+    public async Task PromoteAsyncRebuildsInstallAwareRegistryFromNormalizedRouteTruth()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260522-201500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-install-aware"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        await fixture.PromoteAsync(bundlePath);
+
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+        JsonElement[] rows = canonical.RootElement
+            .GetProperty("installAwareArtifactRegistry")
+            .EnumerateArray()
+            .ToArray();
+
+        JsonElement primary = Assert.Single(rows.Where(row =>
+            row.GetProperty("artifactId").GetString() == "avalonia-osx-arm64-installer"));
+        Assert.True(primary.GetProperty("currentForInstalledBuild").GetBoolean());
+        Assert.Contains(
+            "primary-route avalonia:macos:osx-arm64 current",
+            primary.GetProperty("channelRationale").GetString(),
+            StringComparison.Ordinal);
+
+        JsonElement fallback = Assert.Single(rows.Where(row =>
+            row.GetProperty("artifactId").GetString() == "blazor-desktop-osx-arm64-installer"));
+        Assert.False(fallback.GetProperty("currentForInstalledBuild").GetBoolean());
+    }
+
+    [Fact]
     public async Task PromoteAsyncDowngradesPassedReleaseProofWhenItPredatesCurrentPublicationWindow()
     {
         using var fixture = new ReleaseBundlePromotionFixture();

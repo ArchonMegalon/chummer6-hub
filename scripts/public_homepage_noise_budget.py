@@ -15,7 +15,7 @@ import requests
 COMPLETION_DIR = Path(
     os.environ.get(
         "CHUMMER_COMPLETION_DIR",
-        "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
+        "/docker/chummercomplete/_completion/pregold_ux_pwa_black_ledger",
     )
 )
 
@@ -70,13 +70,13 @@ def main() -> int:
     }
 
     failures: list[str] = []
-    if section_count != 6:
-        failures.append(f"expected exactly 6 homepage sections, found {section_count}")
+    if section_count > 5:
+        failures.append(f"expected at most 5 homepage sections, found {section_count}")
     if word_count > 900:
         failures.append(f"homepage main content is too long ({word_count} words)")
-    if proof_mentions > 10:
+    if proof_mentions > 4:
         failures.append(f"homepage mentions proof too often ({proof_mentions})")
-    if artifact_mentions > 1:
+    if artifact_mentions > 0:
         failures.append(f"homepage mentions artifacts too often ({artifact_mentions})")
     if link_count > 40:
         failures.append(f"homepage contains too many links ({link_count})")
