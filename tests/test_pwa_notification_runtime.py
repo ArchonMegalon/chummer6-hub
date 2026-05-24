@@ -80,7 +80,16 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
                   title: "Table Pulse",
                   body: "Heat moved in Tacoma.",
                   href: "/account/ledger/notifications",
-                  tag: "table-pulse"
+                  tag: "table-pulse",
+                  icon: "https://evil.invalid/track.png",
+                  badge: "/favicon.svg",
+                  actions: [
+                    {{
+                      action: "open-passport",
+                      title: "Open passport",
+                      href: "/passport"
+                    }}
+                  ]
                 }})
               }},
               waitUntil: (promise) => {{ pushPromise = promise; return promise; }}
@@ -91,9 +100,9 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
 
             let clickPromise = null;
             const clickEvent = {{
-              action: "",
+              action: "open-passport",
               notification: {{
-                data: {{ href: "/account/ledger/notifications", tag: "table-pulse" }},
+                data: notifications[0].options.data,
                 close: () => {{}}
               }},
               waitUntil: (promise) => {{ clickPromise = promise; return promise; }}
@@ -139,13 +148,15 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
         self.assertEqual(len(payload["notifications"]), 1)
         self.assertEqual(payload["notifications"][0]["title"], "Table Pulse")
         self.assertEqual(payload["notifications"][0]["options"]["data"]["href"], "/account/ledger/notifications")
+        self.assertEqual(payload["notifications"][0]["options"]["icon"], "/apple-touch-icon.png")
+        self.assertEqual(payload["notifications"][0]["options"]["badge"], "/favicon.svg")
 
         message_types = [entry["type"] for entry in payload["clientMessages"]]
         self.assertIn("chummer:pwa-notification-push", message_types)
         self.assertIn("chummer:pwa-notification-click", message_types)
         self.assertIn("chummer:pwa-notification-close", message_types)
         self.assertTrue(payload["focused"])
-        self.assertIn("https://chummer.run/account/ledger/notifications", payload["opened"])
+        self.assertIn("https://chummer.run/passport", payload["opened"])
 
 
 if __name__ == "__main__":

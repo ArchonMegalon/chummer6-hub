@@ -150,6 +150,7 @@ async function refreshRuntime(request) {
 async function handlePush(event) {
   const payload = normalizePushPayload(event);
   const href = normalizeNotificationHref(payload.href || payload.route || payload.url || DEFAULT_NOTIFICATION_HREF);
+  const actionRoutes = {};
   const notificationData = {
     href,
     route: href,
@@ -172,8 +173,8 @@ async function handlePush(event) {
 
   const options = {
     body: payload.body || DEFAULT_NOTIFICATION_BODY,
-    icon: payload.icon || NOTIFICATION_ICON,
-    badge: payload.badge || NOTIFICATION_BADGE,
+    icon: normalizeNotificationAssetPath(payload.icon, NOTIFICATION_ICON),
+    badge: normalizeNotificationAssetPath(payload.badge, NOTIFICATION_BADGE),
     tag: notificationData.tag,
     data: notificationData,
     renotify: payload.renotify === true,
@@ -183,12 +184,30 @@ async function handlePush(event) {
 
   if (Array.isArray(payload.actions) && payload.actions.length > 0) {
     options.actions = payload.actions
-      .filter((action) => action && action.action && action.title)
-      .slice(0, 2)
-      .map((action) => ({
-        action: String(action.action),
-        title: String(action.title)
-      }));
+      .map((action) => {
+        if (!action || !action.action || !action.title) {
+          return null;
+        }
+
+        const actionId = String(action.action).trim();
+        const actionTitle = String(action.title).trim();
+        const actionHref = normalizeNotificationHref(action.href || action.route || action.url || "");
+        if (!actionId || !actionTitle) {
+          return null;
+        }
+
+        actionRoutes[actionId] = actionHref;
+        return {
+          action: actionId,
+          title: actionTitle
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 2);
+  }
+
+  if (Object.keys(actionRoutes).length > 0) {
+    notificationData.actionRoutes = actionRoutes;
   }
 
   await self.registration.showNotification(payload.title || DEFAULT_NOTIFICATION_TITLE, options);
@@ -200,12 +219,7 @@ async function handleNotificationClick(event) {
     notification.close();
   }
 
-  const href = normalizeNotificationHref(
-    event.action
-      || notification?.data?.href
-      || notification?.data?.route
-      || DEFAULT_NOTIFICATION_HREF
-  );
+  const href = resolveNotificationActionHref(event.action, notification?.data);
 
   await broadcastClientMessage("chummer:pwa-notification-click", {
     action: event.action || null,
@@ -287,6 +301,39 @@ function normalizeNotificationHref(value) {
   } catch {
     return DEFAULT_NOTIFICATION_HREF;
   }
+}
+
+function normalizeNotificationAssetPath(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const url = new URL(String(value), self.location.origin);
+    if (url.origin !== self.location.origin) {
+      return fallback;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function resolveNotificationActionHref(actionId, data) {
+  const actionRoutes = data?.actionRoutes;
+  if (actionId && actionRoutes && typeof actionRoutes === "object") {
+    const routed = actionRoutes[String(actionId)];
+    if (routed) {
+      return normalizeNotificationHref(routed);
+    }
+  }
+
+  return normalizeNotificationHref(
+    data?.href
+      || data?.route
+      || DEFAULT_NOTIFICATION_HREF
+  );
 }
 
 async function broadcastClientMessage(type, payload) {

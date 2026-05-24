@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path("/docker/chummercomplete/chummer.run-services")
+ROOT = Path(__file__).resolve().parents[1]
 SERVICE_WORKER = ROOT / "Chummer.Run.Api" / "wwwroot" / "service-worker.js"
 
 REQUIRED_MARKERS = (
@@ -16,6 +16,8 @@ REQUIRED_MARKERS = (
     'clients.openWindow',
     'client.postMessage({ type, payload })',
     "normalizeNotificationHref(",
+    "normalizeNotificationAssetPath(",
+    "resolveNotificationActionHref(",
 )
 
 
