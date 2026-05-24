@@ -151,6 +151,9 @@ class BlackLedgerGeoscapeRoot {
     this.tooltipTag = null;
     this.tooltipTitle = null;
     this.tooltipBody = null;
+    this.signalPrimary = null;
+    this.signalSecondary = null;
+    this.signalTertiary = null;
     this.modeButtons = [];
     this.replayButton = null;
     this.regionMap = new Map();
@@ -164,6 +167,21 @@ class BlackLedgerGeoscapeRoot {
     this.rotation = -0.52;
     this.tilt = -0.2;
     this.lastTimestamp = 0;
+    this.handleResize = () => this.syncCanvasSize();
+    this.handleWebGlContextLost = (event) => {
+      event.preventDefault();
+      this.gl = null;
+      this.glProgram = null;
+      this.glBuffer = null;
+      this.glTexture = null;
+      this.glUniforms = null;
+      this.root.dataset.renderer = 'canvas-geoscape';
+      this.renderFrame();
+    };
+    this.handleWebGlContextRestored = () => {
+      this.initWebGl();
+      this.renderFrame();
+    };
   }
 
   syncModeState() {
@@ -221,8 +239,14 @@ class BlackLedgerGeoscapeRoot {
     this.root.innerHTML = `
       <div class="black-ledger-geoscape__shell black-ledger-geoscape__shell--${this.variant}">
         <div class="black-ledger-geoscape__stage">
+          <div class="black-ledger-geoscape__stage-skin" aria-hidden="true"></div>
           <canvas class="black-ledger-geoscape__webgl" aria-hidden="true"></canvas>
           <canvas class="black-ledger-geoscape__canvas" role="img" aria-label="Black Ledger command globe"></canvas>
+          <div class="black-ledger-geoscape__signal-rail" aria-hidden="true">
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--primary">command map priming…</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--secondary">heat routes synchronizing</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">public-safe deck online</span>
+          </div>
           <div class="black-ledger-geoscape__overlay">
             <div class="black-ledger-geoscape__eyebrow">Black Ledger command globe</div>
             <div class="black-ledger-geoscape__headline">${this.variant === 'teaser' ? 'Turn 1 already ran.' : 'Pressure is crossing the board.'}</div>
@@ -265,10 +289,15 @@ class BlackLedgerGeoscapeRoot {
     this.tooltipTag = this.root.querySelector('.black-ledger-geoscape__tooltip-tag');
     this.tooltipTitle = this.root.querySelector('.black-ledger-geoscape__tooltip-title');
     this.tooltipBody = this.root.querySelector('.black-ledger-geoscape__tooltip-body');
+    this.signalPrimary = this.root.querySelector('.black-ledger-geoscape__signal-chip--primary');
+    this.signalSecondary = this.root.querySelector('.black-ledger-geoscape__signal-chip--secondary');
+    this.signalTertiary = this.root.querySelector('.black-ledger-geoscape__signal-chip--tertiary');
     this.replayButton = this.root.querySelector('.black-ledger-geoscape__replay');
+    this.glCanvas?.addEventListener('webglcontextlost', this.handleWebGlContextLost, false);
+    this.glCanvas?.addEventListener('webglcontextrestored', this.handleWebGlContextRestored, false);
     this.initWebGl();
     this.syncCanvasSize();
-    window.addEventListener('resize', () => this.syncCanvasSize(), { passive: true });
+    window.addEventListener('resize', this.handleResize, { passive: true });
   }
 
   syncCanvasSize() {
@@ -344,12 +373,13 @@ class BlackLedgerGeoscapeRoot {
         vec2 delta = frag - center;
         float dist = length(delta);
 
-        vec3 color = vec3(0.012, 0.024, 0.041);
+        vec3 color = vec3(0.006, 0.017, 0.026);
         float starNoise = fract(sin(dot(frag + vec2(u_time * 11.0, u_time * 7.0), vec2(12.9898, 78.233))) * 43758.5453);
         float star = step(0.9984, starNoise) * (0.3 + 0.7 * fract(starNoise * 91.0));
-        color += vec3(star * 0.9);
+        color += vec3(star * 0.85);
         float halo = smoothstep(u_radius * 1.9, u_radius * 0.2, dist);
-        color += vec3(0.02, 0.05, 0.09) * halo;
+        color += vec3(0.01, 0.08, 0.1) * halo;
+        float alpha = clamp(0.18 + halo * 0.5, 0.18, 0.78);
 
         if (dist <= u_radius) {
           vec2 sphere = delta / u_radius;
@@ -364,15 +394,17 @@ class BlackLedgerGeoscapeRoot {
           float diffuse = max(dot(normal, lightDir), 0.0);
           float rim = pow(1.0 - max(normal.z, 0.0), 2.0);
           float specular = pow(max(dot(reflect(-lightDir, normal), vec3(0.0, 0.0, 1.0)), 0.0), 22.0);
-          vec3 lit = tex * (0.28 + diffuse * 0.95) + vec3(0.18, 0.34, 0.48) * rim * 0.55 + vec3(0.72, 0.84, 0.98) * specular * 0.24;
+          vec3 lit = tex * (0.26 + diffuse * 0.92) + vec3(0.08, 0.47, 0.46) * rim * 0.58 + vec3(0.98, 0.66, 0.22) * specular * 0.12;
           float atmosphere = smoothstep(0.7, 1.0, 1.0 - z);
-          color = lit + vec3(0.18, 0.42, 0.78) * atmosphere * 0.18;
+          color = lit + vec3(0.12, 0.64, 0.67) * atmosphere * 0.18;
+          alpha = 1.0;
         } else if (dist <= u_radius * 1.08) {
           float edge = 1.0 - smoothstep(u_radius, u_radius * 1.08, dist);
-          color += vec3(0.14, 0.42, 0.74) * edge * 0.35;
+          color += vec3(0.08, 0.72, 0.78) * edge * 0.34;
+          alpha = max(alpha, edge * 0.62);
         }
 
-        gl_FragColor = vec4(color, 1.0);
+        gl_FragColor = vec4(color, alpha);
       }
     `;
 
@@ -411,6 +443,7 @@ class BlackLedgerGeoscapeRoot {
       earth: gl.getUniformLocation(program, 'u_earth'),
     };
     this.glTexture = this.createEarthTexture(gl);
+    this.root.dataset.renderer = 'webgl-geoscape';
   }
 
   compileGlShader(gl, type, source) {
@@ -431,9 +464,9 @@ class BlackLedgerGeoscapeRoot {
     const ctx = textureCanvas.getContext('2d');
 
     const ocean = ctx.createLinearGradient(0, 0, 0, textureCanvas.height);
-    ocean.addColorStop(0, '#1f5f96');
-    ocean.addColorStop(0.45, '#0f3559');
-    ocean.addColorStop(1, '#08192b');
+    ocean.addColorStop(0, '#14505f');
+    ocean.addColorStop(0.45, '#0a293c');
+    ocean.addColorStop(1, '#030914');
     ctx.fillStyle = ocean;
     ctx.fillRect(0, 0, textureCanvas.width, textureCanvas.height);
 
@@ -457,7 +490,7 @@ class BlackLedgerGeoscapeRoot {
       const fill = ctx.createLinearGradient(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
       fill.addColorStop(0, landmass.fill[0]);
       fill.addColorStop(0.55, landmass.fill[1]);
-      fill.addColorStop(1, '#405b37');
+      fill.addColorStop(1, '#24362d');
       drawMapPath(landmass.points);
       ctx.fillStyle = fill;
       ctx.fill();
@@ -531,16 +564,19 @@ class BlackLedgerGeoscapeRoot {
       return false;
     }
     const gl = this.gl;
-    gl.viewport(0, 0, this.glCanvas.width, this.glCanvas.height);
+    const drawingWidth = this.glCanvas.width || gl.drawingBufferWidth;
+    const drawingHeight = this.glCanvas.height || gl.drawingBufferHeight;
+    const pixelRatio = width > 0 ? drawingWidth / width : 1;
+    gl.viewport(0, 0, drawingWidth, drawingHeight);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.glProgram);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.glBuffer);
     gl.enableVertexAttribArray(this.glUniforms.position);
     gl.vertexAttribPointer(this.glUniforms.position, 2, gl.FLOAT, false, 0, 0);
-    gl.uniform2f(this.glUniforms.resolution, width, height);
+    gl.uniform2f(this.glUniforms.resolution, drawingWidth, drawingHeight);
     gl.uniform1f(this.glUniforms.time, time);
-    gl.uniform1f(this.glUniforms.radius, radius);
+    gl.uniform1f(this.glUniforms.radius, radius * pixelRatio);
     gl.uniform1f(this.glUniforms.yaw, this.rotation);
     gl.uniform1f(this.glUniforms.pitch, this.tilt);
     gl.activeTexture(gl.TEXTURE0);
@@ -907,6 +943,14 @@ class BlackLedgerGeoscapeRoot {
         ? 'Reduced motion active. Replay advances step by step.'
         : `${this.state.tickHeadline} · ${this.state.mode.replace('-', ' ')} · ${replayLabel}`;
     }
+    if (this.signalPrimary && this.signalSecondary && this.signalTertiary) {
+      const eventTone = highlightedEvent?.eventType || 'recent-changes';
+      const shortTitle = highlightedEvent?.title || activeFaction.name;
+      this.root.dataset.signalTone = eventTone;
+      this.signalPrimary.textContent = `${shortTitle.slice(0, 28)}${shortTitle.length > 28 ? '…' : ''}`;
+      this.signalSecondary.textContent = `heat ${Math.max(0, activeFaction.heat)} · pressure ${activeFaction.pressureScore} · ${Math.max(1, relatedRegions.length)} districts`;
+      this.signalTertiary.textContent = `${(activeFaction.type || 'faction').toLowerCase()} · ${this.state.mode.replace('-', ' ')} lane`;
+    }
     this.root.dataset.renderSignature = `${this.state.mode}:${activeFaction.slug}:${this.root.dataset.replayState || 'idle'}`;
   }
 
@@ -955,11 +999,28 @@ class BlackLedgerGeoscapeRoot {
 
   drawBackdrop(ctx, width, height, centerX, centerY, radius, time) {
     const gradient = ctx.createRadialGradient(centerX * 0.84, centerY * 0.54, radius * 0.18, centerX, centerY, radius * 2.1);
-    gradient.addColorStop(0, 'rgba(46, 88, 132, 0.38)');
-    gradient.addColorStop(0.48, 'rgba(8, 16, 27, 0.82)');
+    gradient.addColorStop(0, 'rgba(17, 106, 121, 0.34)');
+    gradient.addColorStop(0.48, 'rgba(7, 13, 24, 0.78)');
     gradient.addColorStop(1, 'rgba(2, 7, 12, 1)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
+
+    const alleyGlow = ctx.createLinearGradient(width * 0.08, height * 0.68, width * 0.92, height * 0.2);
+    alleyGlow.addColorStop(0, 'rgba(255, 100, 46, 0.16)');
+    alleyGlow.addColorStop(0.48, 'rgba(19, 212, 234, 0.12)');
+    alleyGlow.addColorStop(1, 'rgba(4, 18, 26, 0)');
+    ctx.fillStyle = alleyGlow;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.strokeStyle = 'rgba(90, 220, 244, 0.08)';
+    ctx.lineWidth = 1;
+    for (let index = 0; index < 18; index += 1) {
+      const y = height * 0.06 + index * ((height * 0.88) / 18);
+      ctx.beginPath();
+      ctx.moveTo(width * 0.04, y);
+      ctx.lineTo(width * 0.96, y + Math.sin(time * 0.16 + index * 0.35) * 6);
+      ctx.stroke();
+    }
 
     for (let index = 0; index < 26; index += 1) {
       const seed = seedFromString(`star-${index}`);
@@ -975,8 +1036,8 @@ class BlackLedgerGeoscapeRoot {
 
   drawSphere(ctx, radius, time) {
     const atmosphere = ctx.createRadialGradient(-radius * 0.3, -radius * 0.45, radius * 0.12, 0, 0, radius * 1.24);
-    atmosphere.addColorStop(0, 'rgba(61, 140, 199, 0.98)');
-    atmosphere.addColorStop(0.48, 'rgba(13, 62, 102, 0.99)');
+    atmosphere.addColorStop(0, 'rgba(36, 179, 191, 0.98)');
+    atmosphere.addColorStop(0.48, 'rgba(10, 72, 92, 0.99)');
     atmosphere.addColorStop(0.78, 'rgba(6, 22, 38, 1)');
     atmosphere.addColorStop(1, 'rgba(2, 8, 14, 1)');
     ctx.fillStyle = atmosphere;
@@ -1007,7 +1068,7 @@ class BlackLedgerGeoscapeRoot {
       ctx.restore();
     }
 
-    ctx.strokeStyle = 'rgba(92, 226, 255, 0.3)';
+    ctx.strokeStyle = 'rgba(92, 226, 255, 0.34)';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.arc(0, 0, radius + 12, 0, TWO_PI);
