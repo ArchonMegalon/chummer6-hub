@@ -59,6 +59,55 @@
     </div>
 </section>
 
+@if (Model.GmCockpitPacket is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">GM cockpit</p>
+            <h2 class="editorial-title">@Model.GmCockpitPacket.Heading</h2>
+            <p class="editorial-copy">@Model.GmCockpitPacket.Summary</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            <article class="route-choice-card">
+                <span class="tag">Command posture</span>
+                <p>@Model.GmCockpitPacket.CommandPosture</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Living Newsroom</span>
+                <p>@Model.GmCockpitPacket.LivingNewsroomSummary</p>
+                <div class="route-choice-card__proof">
+                    <a href="@Model.GmCockpitPacket.LivingNewsroomHref">Open watch lane</a>
+                    <a href="/living-world">Open Living World</a>
+                </div>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Aftermath</span>
+                <p>@Model.GmCockpitPacket.AftermathSummary</p>
+                <div class="route-choice-card__proof">
+                    <a href="@Model.GmCockpitPacket.AftermathHref">Open aftermath rail</a>
+                </div>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Boundary</span>
+                <p>@Model.GmCockpitPacket.BoundaryLine</p>
+            </article>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var cue in Model.GmCockpitPacket.Cues)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@cue.Label</span>
+                    <h3>@cue.StatusLabel</h3>
+                    <p>@cue.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <a href="@cue.Href">Open lane</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
 @if (Model.ValidationPacket is not null)
 {
     <section class="editorial-block">

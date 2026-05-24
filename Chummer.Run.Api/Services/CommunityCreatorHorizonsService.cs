@@ -84,6 +84,56 @@ public sealed class CommunityCreatorHorizonsService
             ["Aggregate proof", "Public-safe counts", "Bounded identity"])
     ];
 
+    private static readonly IReadOnlyList<CommunityCreatorDocument> SignalDeckDocuments =
+    [
+        new(
+            "pressure_posture",
+            "Signal Deck pressure posture",
+            "Public-safe command-deck posture for governed consequence cues, inbox continuity, and follow-through pressure.",
+            "/signal-deck/receipts/pressure_posture.md",
+            "/signal-deck/receipts/pressure_posture.json",
+            ["Command pressure", "Governed cues", "Inbox continuity"]),
+        new(
+            "command_boundary",
+            "Signal Deck command boundary",
+            "Explains how Signal Deck stays first-party, bounded, and consequence-backed without turning into private world authority.",
+            "/signal-deck/receipts/command_boundary.md",
+            "/signal-deck/receipts/command_boundary.json",
+            ["Command boundary", "No hidden authority", "First-party only"]),
+        new(
+            "aftermath_return_loop",
+            "Signal Deck aftermath return loop",
+            "Shows how command pressure survives through aftermath, Living Newsroom framing, and Runner Passport continuity.",
+            "/signal-deck/receipts/aftermath_return_loop.md",
+            "/signal-deck/receipts/aftermath_return_loop.json",
+            ["Aftermath rail", "Living Newsroom", "Runner continuity"])
+    ];
+
+    private static readonly IReadOnlyList<CommunityCreatorDocument> LivingWorldDocuments =
+    [
+        new(
+            "watch_package_posture",
+            "Living World watch package posture",
+            "Public-safe between-session posture showing how Living Newsroom framing, faction command, and governed follow-through stay attached to the same turn.",
+            "/living-world/receipts/watch_package_posture.md",
+            "/living-world/receipts/watch_package_posture.json",
+            ["Watch package", "Between-session loop", "First-party framing"]),
+        new(
+            "command_followthrough_boundary",
+            "Living World command follow-through boundary",
+            "Explains how living-world engagement stays governed, opt-in, and bounded instead of becoming autonomous world simulation.",
+            "/living-world/receipts/command_followthrough_boundary.md",
+            "/living-world/receipts/command_followthrough_boundary.json",
+            ["Governed follow-through", "No autonomous simulation", "Bounded engagement"]),
+        new(
+            "newsroom_aftermath_loop",
+            "Living World newsroom and aftermath loop",
+            "Shows how the public-safe bulletin, aftermath rail, and runner continuity stay stitched together across the same turn.",
+            "/living-world/receipts/newsroom_aftermath_loop.md",
+            "/living-world/receipts/newsroom_aftermath_loop.json",
+            ["Living Newsroom", "Aftermath rail", "Runner continuity"])
+    ];
+
     private readonly CommunityStore _communityStore;
     private readonly InstallLinkingStore _installLinkingStore;
     private readonly PublicCreatorPublicationDiscoveryService _publicCreatorDiscovery;
@@ -101,10 +151,14 @@ public sealed class CommunityCreatorHorizonsService
     public IReadOnlyList<CommunityCreatorDocument> ListCommunityDocuments() => CommunityDocuments;
     public IReadOnlyList<CommunityCreatorDocument> ListCreatorDocuments() => CreatorDocuments;
     public IReadOnlyList<CommunityCreatorDocument> ListPassportDocuments() => PassportDocuments;
+    public IReadOnlyList<CommunityCreatorDocument> ListSignalDeckDocuments() => SignalDeckDocuments;
+    public IReadOnlyList<CommunityCreatorDocument> ListLivingWorldDocuments() => LivingWorldDocuments;
 
     public CommunityCreatorDocument GetCommunityDocument(string id) => GetById(CommunityDocuments, id, "community packet");
     public CommunityCreatorDocument GetCreatorDocument(string id) => GetById(CreatorDocuments, id, "creator packet");
     public CommunityCreatorDocument GetPassportDocument(string id) => GetById(PassportDocuments, id, "passport receipt");
+    public CommunityCreatorDocument GetSignalDeckDocument(string id) => GetById(SignalDeckDocuments, id, "signal deck receipt");
+    public CommunityCreatorDocument GetLivingWorldDocument(string id) => GetById(LivingWorldDocuments, id, "living world receipt");
 
     public CommunityHubPublicSummary BuildCommunitySummary()
     {
@@ -155,6 +209,40 @@ public sealed class CommunityCreatorHorizonsService
                 PendingJoinCount: community.PendingJoinCount,
                 ParticipationNotificationCount: _communityStore.ParticipationNotificationReceipts.Count,
                 LastUpdatedUtc: activeInstallations.FirstOrDefault()?.UpdatedAtUtc ?? now);
+        }
+    }
+
+    public SignalDeckPublicSummary BuildSignalDeckSummary()
+    {
+        CommunityHubPublicSummary community = BuildCommunitySummary();
+        lock (_installLinkingStore.Gate)
+        {
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            int activeInstallations = _installLinkingStore.InstallationsById.Values.Count(
+                item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase));
+            return new SignalDeckPublicSummary(
+                ActiveInstallationCount: activeInstallations,
+                OpenRunCount: community.OpenRuns.Count,
+                PendingJoinCount: community.PendingJoinCount,
+                ParticipationNotificationCount: _communityStore.ParticipationNotificationReceipts.Count,
+                LastUpdatedUtc: now);
+        }
+    }
+
+    public LivingWorldPublicSummary BuildLivingWorldSummary()
+    {
+        CommunityHubPublicSummary community = BuildCommunitySummary();
+        CreatorOsPublicSummary creator = BuildCreatorSummary();
+        lock (_installLinkingStore.Gate)
+        {
+            int activeInstallations = _installLinkingStore.InstallationsById.Values.Count(
+                item => string.Equals(item.Status, ClaimedInstallationStates.Active, StringComparison.OrdinalIgnoreCase));
+            return new LivingWorldPublicSummary(
+                ActiveInstallationCount: activeInstallations,
+                OpenRunCount: community.OpenRuns.Count,
+                ParticipationNotificationCount: _communityStore.ParticipationNotificationReceipts.Count,
+                ReturnLoopPublicationCount: creator.ReturnLoopCount,
+                LastUpdatedUtc: DateTimeOffset.UtcNow);
         }
     }
 
@@ -419,6 +507,108 @@ public sealed class CommunityCreatorHorizonsService
         return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
     }
 
+    public string BuildSignalDeckMarkdown(string id)
+    {
+        CommunityCreatorDocument document = GetSignalDeckDocument(id);
+        SignalDeckPublicSummary summary = BuildSignalDeckSummary();
+        List<string> lines =
+        [
+            $"# {document.Label}",
+            string.Empty,
+            document.Summary,
+            string.Empty,
+            "## Current first-party posture",
+            string.Empty,
+            $"- Active claimed installs on the continuity rail: {summary.ActiveInstallationCount}",
+            $"- Open runs visible to the shared command rail: {summary.OpenRunCount}",
+            $"- Pending join requests waiting on follow-through: {summary.PendingJoinCount}",
+            $"- Participation receipts on the first-party spine: {summary.ParticipationNotificationCount}",
+            string.Empty,
+            "## Boundary",
+            string.Empty,
+            BuildSignalDeckBoundary(id),
+            string.Empty,
+            $"JSON route: {document.JsonRoute}"
+        ];
+        return string.Join('\n', lines) + "\n";
+    }
+
+    public string BuildSignalDeckJson(string id)
+    {
+        CommunityCreatorDocument document = GetSignalDeckDocument(id);
+        SignalDeckPublicSummary summary = BuildSignalDeckSummary();
+        object payload = new
+        {
+            document.Id,
+            document.Label,
+            document.Summary,
+            status = "live",
+            proof_kind = "signal_deck_public_safe_receipt",
+            counts = new
+            {
+                summary.ActiveInstallationCount,
+                summary.OpenRunCount,
+                summary.PendingJoinCount,
+                summary.ParticipationNotificationCount
+            },
+            boundary = BuildSignalDeckBoundary(id),
+            generated_at_utc = DateTimeOffset.UtcNow
+        };
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    }
+
+    public string BuildLivingWorldMarkdown(string id)
+    {
+        CommunityCreatorDocument document = GetLivingWorldDocument(id);
+        LivingWorldPublicSummary summary = BuildLivingWorldSummary();
+        List<string> lines =
+        [
+            $"# {document.Label}",
+            string.Empty,
+            document.Summary,
+            string.Empty,
+            "## Current first-party posture",
+            string.Empty,
+            $"- Active claimed installs on the continuity rail: {summary.ActiveInstallationCount}",
+            $"- Open runs on the shared turn rail: {summary.OpenRunCount}",
+            $"- Participation receipts on the first-party spine: {summary.ParticipationNotificationCount}",
+            $"- Creator publications with return-loop summaries: {summary.ReturnLoopPublicationCount}",
+            string.Empty,
+            "## Boundary",
+            string.Empty,
+            BuildLivingWorldBoundary(id),
+            string.Empty,
+            $"JSON route: {document.JsonRoute}"
+        ];
+        return string.Join('\n', lines) + "\n";
+    }
+
+    public string BuildLivingWorldJson(string id)
+    {
+        CommunityCreatorDocument document = GetLivingWorldDocument(id);
+        LivingWorldPublicSummary summary = BuildLivingWorldSummary();
+        object payload = new
+        {
+            document.Id,
+            document.Label,
+            document.Summary,
+            status = "live",
+            proof_kind = "living_world_public_safe_receipt",
+            counts = new
+            {
+                summary.ActiveInstallationCount,
+                summary.OpenRunCount,
+                summary.ParticipationNotificationCount,
+                summary.ReturnLoopPublicationCount
+            },
+            boundary = BuildLivingWorldBoundary(id),
+            generated_at_utc = DateTimeOffset.UtcNow
+        };
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    }
+
     private static CommunityCreatorDocument GetById(IReadOnlyList<CommunityCreatorDocument> documents, string id, string label)
         => documents.FirstOrDefault(item => string.Equals(item.Id, id?.Trim(), StringComparison.OrdinalIgnoreCase))
             ?? throw new KeyNotFoundException($"Unknown {label} '{id}'.");
@@ -456,6 +646,22 @@ public sealed class CommunityCreatorHorizonsService
             "cross_table_identity_boundary" => "Cross-table trust stays bounded, explainable, and non-surveillant. It is not a secret ranking engine.",
             _ => "Participation proof remains aggregate and first-party. Private moderation, private identity links, and account recovery detail stay signed-in."
         };
+
+    private static string BuildSignalDeckBoundary(string id)
+        => id switch
+        {
+            "pressure_posture" => "Signal Deck can expose governed command pressure and consequence posture on first-party rails, but it does not become automatic world authority or a hidden moderation score.",
+            "command_boundary" => "Signal Deck stays bounded to first-party command and follow-through. It does not reveal private session transcript detail, moderation internals, or off-platform operator state.",
+            _ => "Aftermath return loops can stay attached to Signal Deck posture, Living Newsroom framing, and Runner Passport continuity without leaking private campaign detail."
+        };
+
+    private static string BuildLivingWorldBoundary(string id)
+        => id switch
+        {
+            "watch_package_posture" => "Living World can expose the current public-safe watch package and first-party follow-through posture, but it does not claim an autonomous always-on simulation.",
+            "command_followthrough_boundary" => "Living World engagement stays governed, opt-in, and bounded to first-party command, aftermath, and continuity rails. It does not mutate world truth outside those receipts.",
+            _ => "Living Newsroom framing, aftermath, and runner continuity can stay on the same turn loop without exposing private campaign detail or pretending off-table fiction is authoritative by itself."
+        };
 }
 
 public sealed record CommunityCreatorDocument(
@@ -485,4 +691,18 @@ public sealed record RunnerPassportPublicSummary(
     int OpenRunCount,
     int PendingJoinCount,
     int ParticipationNotificationCount,
+    DateTimeOffset LastUpdatedUtc);
+
+public sealed record SignalDeckPublicSummary(
+    int ActiveInstallationCount,
+    int OpenRunCount,
+    int PendingJoinCount,
+    int ParticipationNotificationCount,
+    DateTimeOffset LastUpdatedUtc);
+
+public sealed record LivingWorldPublicSummary(
+    int ActiveInstallationCount,
+    int OpenRunCount,
+    int ParticipationNotificationCount,
+    int ReturnLoopPublicationCount,
     DateTimeOffset LastUpdatedUtc);

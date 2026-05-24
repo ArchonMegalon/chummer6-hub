@@ -2531,5 +2531,7 @@ python3 scripts/verify_next90_m143_hub_exchange_output_receipts.py
 python3 -m unittest tests/test_next90_m143_hub_exchange_output_receipts.py
 python3 scripts/verify_next90_m144_hub_release_truth_alignment.py
 python3 -m unittest tests/test_next90_m144_hub_release_truth_alignment.py
+python3 scripts/verify_table_pulse_connected_lane_surface.py
+python3 -m unittest tests/test_table_pulse_connected_lane_surface.py
 
 bash scripts/ai/run_services_smoke.sh
