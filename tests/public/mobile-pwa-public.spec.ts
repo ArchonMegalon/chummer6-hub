@@ -66,4 +66,13 @@ test('mobile and PWA public routes keep installability and role entry explicit',
     return registration.active?.scriptURL ?? null;
   });
   expect(readyWorkerUrl).toContain('/service-worker.js');
+
+  const controllerWorkerUrl = await page.evaluate(() => {
+    if (!('serviceWorker' in navigator)) {
+      return null;
+    }
+
+    return navigator.serviceWorker.controller?.scriptURL ?? null;
+  });
+  expect(controllerWorkerUrl).toContain('/service-worker.js');
 });
