@@ -2,6 +2,30 @@ const GLOBE_WORLD_ID = 'emerald-sprawl-prelude';
 const BASE_MAP_WIDTH = 1200;
 const BASE_MAP_HEIGHT = 760;
 const TWO_PI = Math.PI * 2;
+const EARTH_LANDMASSES = [
+  { id: 'north-america', fill: ['#315f49', '#7fb06a'], coastline: '#c9e5c1', points: [{ lat: 12, lon: -116 }, { lat: 20, lon: -104 }, { lat: 28, lon: -98 }, { lat: 36, lon: -104 }, { lat: 45, lon: -110 }, { lat: 56, lon: -122 }, { lat: 67, lon: -148 }, { lat: 72, lon: -160 }, { lat: 69, lon: -126 }, { lat: 62, lon: -108 }, { lat: 54, lon: -90 }, { lat: 50, lon: -74 }, { lat: 45, lon: -66 }, { lat: 34, lon: -78 }, { lat: 25, lon: -83 }, { lat: 19, lon: -90 }] },
+  { id: 'greenland', fill: ['#8aa385', '#d5e1d1'], coastline: '#f2fbf0', points: [{ lat: 60, lon: -52 }, { lat: 66, lon: -48 }, { lat: 72, lon: -42 }, { lat: 79, lon: -34 }, { lat: 82, lon: -24 }, { lat: 77, lon: -18 }, { lat: 70, lon: -24 }, { lat: 63, lon: -40 }] },
+  { id: 'south-america', fill: ['#336a43', '#7cbc67'], coastline: '#cae8c6', points: [{ lat: 12, lon: -80 }, { lat: 10, lon: -72 }, { lat: 6, lon: -62 }, { lat: -5, lon: -54 }, { lat: -15, lon: -51 }, { lat: -24, lon: -55 }, { lat: -35, lon: -60 }, { lat: -46, lon: -68 }, { lat: -53, lon: -74 }, { lat: -50, lon: -67 }, { lat: -35, lon: -72 }, { lat: -18, lon: -78 }, { lat: -3, lon: -81 }] },
+  { id: 'africa', fill: ['#586f3e', '#b89b58'], coastline: '#f0dbaf', points: [{ lat: 35, lon: -16 }, { lat: 30, lon: -3 }, { lat: 25, lon: 12 }, { lat: 12, lon: 24 }, { lat: 2, lon: 33 }, { lat: -8, lon: 40 }, { lat: -18, lon: 34 }, { lat: -28, lon: 28 }, { lat: -34, lon: 18 }, { lat: -30, lon: 8 }, { lat: -18, lon: 2 }, { lat: -6, lon: -4 }, { lat: 8, lon: -10 }, { lat: 21, lon: -16 }] },
+  { id: 'eurasia', fill: ['#4e6e4a', '#92b16f'], coastline: '#d8efc8', points: [{ lat: 37, lon: -10 }, { lat: 44, lon: -2 }, { lat: 50, lon: 10 }, { lat: 56, lon: 28 }, { lat: 60, lon: 48 }, { lat: 64, lon: 74 }, { lat: 68, lon: 98 }, { lat: 68, lon: 126 }, { lat: 61, lon: 150 }, { lat: 54, lon: 160 }, { lat: 46, lon: 146 }, { lat: 34, lon: 130 }, { lat: 24, lon: 118 }, { lat: 16, lon: 104 }, { lat: 12, lon: 86 }, { lat: 18, lon: 70 }, { lat: 28, lon: 58 }, { lat: 35, lon: 44 }, { lat: 40, lon: 30 }, { lat: 42, lon: 18 }, { lat: 39, lon: 6 }, { lat: 36, lon: -2 }] },
+  { id: 'arabia-india', fill: ['#6f7542', '#d3a95d'], coastline: '#f0dcb1', points: [{ lat: 30, lon: 34 }, { lat: 26, lon: 44 }, { lat: 18, lon: 56 }, { lat: 12, lon: 64 }, { lat: 8, lon: 76 }, { lat: 16, lon: 82 }, { lat: 24, lon: 74 }, { lat: 28, lon: 62 }, { lat: 30, lon: 50 }] },
+  { id: 'australia', fill: ['#5d7048', '#b79d66'], coastline: '#efdcb4', points: [{ lat: -12, lon: 113 }, { lat: -16, lon: 126 }, { lat: -24, lon: 138 }, { lat: -32, lon: 151 }, { lat: -40, lon: 147 }, { lat: -42, lon: 133 }, { lat: -34, lon: 118 }, { lat: -24, lon: 113 }] },
+  { id: 'antarctica', fill: ['#b8cad3', '#eef7ff'], coastline: '#f8fdff', points: [{ lat: -70, lon: -180 }, { lat: -74, lon: -132 }, { lat: -76, lon: -86 }, { lat: -74, lon: -32 }, { lat: -75, lon: 20 }, { lat: -78, lon: 76 }, { lat: -76, lon: 126 }, { lat: -72, lon: 172 }, { lat: -68, lon: 180 }] },
+];
+const EARTH_MOUNTAIN_RANGES = [
+  { id: 'rockies', color: '#e7dfc7', points: [{ lat: 58, lon: -140 }, { lat: 50, lon: -128 }, { lat: 42, lon: -118 }, { lat: 34, lon: -108 }, { lat: 24, lon: -100 }] },
+  { id: 'andes', color: '#e8dfcb', points: [{ lat: 9, lon: -78 }, { lat: -4, lon: -76 }, { lat: -18, lon: -72 }, { lat: -32, lon: -70 }, { lat: -48, lon: -72 }] },
+  { id: 'alps-atlas', color: '#efe4cf', points: [{ lat: 35, lon: -8 }, { lat: 36, lon: 6 }, { lat: 44, lon: 12 }, { lat: 47, lon: 18 }] },
+  { id: 'east-africa', color: '#dfd6be', points: [{ lat: 14, lon: 36 }, { lat: 8, lon: 38 }, { lat: -2, lon: 35 }, { lat: -14, lon: 31 }] },
+  { id: 'urals', color: '#e6dfc9', points: [{ lat: 63, lon: 54 }, { lat: 56, lon: 58 }, { lat: 49, lon: 60 }] },
+  { id: 'himalaya', color: '#f2ead8', points: [{ lat: 32, lon: 72 }, { lat: 31, lon: 82 }, { lat: 30, lon: 92 }, { lat: 28, lon: 102 }] },
+  { id: 'great-dividing', color: '#e9dcc2', points: [{ lat: -17, lon: 146 }, { lat: -24, lon: 149 }, { lat: -31, lon: 151 }, { lat: -37, lon: 149 }] },
+];
+const EARTH_CLOUD_BANDS = [
+  { lat: 14, startLon: -165, endLon: -20, width: 12, alpha: 0.18, drift: 0.45 },
+  { lat: -8, startLon: 24, endLon: 176, width: 14, alpha: 0.14, drift: -0.38 },
+  { lat: 42, startLon: -72, endLon: 132, width: 10, alpha: 0.1, drift: 0.28 },
+];
 
 function slugify(value) {
   return String(value ?? '')
@@ -108,6 +132,12 @@ class BlackLedgerGeoscapeRoot {
       tickHeadline: root.dataset.tickHeadline || 'Turn 1 pressure live.',
     };
     this.frame = null;
+    this.glCanvas = null;
+    this.gl = null;
+    this.glProgram = null;
+    this.glBuffer = null;
+    this.glTexture = null;
+    this.glUniforms = null;
     this.canvas = null;
     this.ctx = null;
     this.panelTag = null;
@@ -121,10 +151,14 @@ class BlackLedgerGeoscapeRoot {
     this.tooltipTag = null;
     this.tooltipTitle = null;
     this.tooltipBody = null;
+    this.signalPrimary = null;
+    this.signalSecondary = null;
+    this.signalTertiary = null;
     this.modeButtons = [];
     this.replayButton = null;
     this.regionMap = new Map();
     this.factionNodes = [];
+    this.regionShapesByFaction = new Map();
     this.events = [];
     this.arcs = [];
     this.currentData = null;
@@ -133,6 +167,21 @@ class BlackLedgerGeoscapeRoot {
     this.rotation = -0.52;
     this.tilt = -0.2;
     this.lastTimestamp = 0;
+    this.handleResize = () => this.syncCanvasSize();
+    this.handleWebGlContextLost = (event) => {
+      event.preventDefault();
+      this.gl = null;
+      this.glProgram = null;
+      this.glBuffer = null;
+      this.glTexture = null;
+      this.glUniforms = null;
+      this.root.dataset.renderer = 'canvas-geoscape';
+      this.renderFrame();
+    };
+    this.handleWebGlContextRestored = () => {
+      this.initWebGl();
+      this.renderFrame();
+    };
   }
 
   syncModeState() {
@@ -190,7 +239,14 @@ class BlackLedgerGeoscapeRoot {
     this.root.innerHTML = `
       <div class="black-ledger-geoscape__shell black-ledger-geoscape__shell--${this.variant}">
         <div class="black-ledger-geoscape__stage">
+          <div class="black-ledger-geoscape__stage-skin" aria-hidden="true"></div>
+          <canvas class="black-ledger-geoscape__webgl" aria-hidden="true"></canvas>
           <canvas class="black-ledger-geoscape__canvas" role="img" aria-label="Black Ledger command globe"></canvas>
+          <div class="black-ledger-geoscape__signal-rail" aria-hidden="true">
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--primary">command map priming…</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--secondary">heat routes synchronizing</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">public-safe deck online</span>
+          </div>
           <div class="black-ledger-geoscape__overlay">
             <div class="black-ledger-geoscape__eyebrow">Black Ledger command globe</div>
             <div class="black-ledger-geoscape__headline">${this.variant === 'teaser' ? 'Turn 1 already ran.' : 'Pressure is crossing the board.'}</div>
@@ -219,6 +275,7 @@ class BlackLedgerGeoscapeRoot {
       <div class="black-ledger-geoscape__fallback-list" aria-label="Accessible geoscape list"></div>
     `;
 
+    this.glCanvas = this.root.querySelector('.black-ledger-geoscape__webgl');
     this.canvas = this.root.querySelector('.black-ledger-geoscape__canvas');
     this.ctx = this.canvas.getContext('2d');
     this.panelTag = this.root.querySelector('.black-ledger-geoscape__panel-tag');
@@ -232,9 +289,15 @@ class BlackLedgerGeoscapeRoot {
     this.tooltipTag = this.root.querySelector('.black-ledger-geoscape__tooltip-tag');
     this.tooltipTitle = this.root.querySelector('.black-ledger-geoscape__tooltip-title');
     this.tooltipBody = this.root.querySelector('.black-ledger-geoscape__tooltip-body');
+    this.signalPrimary = this.root.querySelector('.black-ledger-geoscape__signal-chip--primary');
+    this.signalSecondary = this.root.querySelector('.black-ledger-geoscape__signal-chip--secondary');
+    this.signalTertiary = this.root.querySelector('.black-ledger-geoscape__signal-chip--tertiary');
     this.replayButton = this.root.querySelector('.black-ledger-geoscape__replay');
+    this.glCanvas?.addEventListener('webglcontextlost', this.handleWebGlContextLost, false);
+    this.glCanvas?.addEventListener('webglcontextrestored', this.handleWebGlContextRestored, false);
+    this.initWebGl();
     this.syncCanvasSize();
-    window.addEventListener('resize', () => this.syncCanvasSize(), { passive: true });
+    window.addEventListener('resize', this.handleResize, { passive: true });
   }
 
   syncCanvasSize() {
@@ -245,6 +308,12 @@ class BlackLedgerGeoscapeRoot {
     const stage = this.root.querySelector('.black-ledger-geoscape__stage');
     const bounds = stage.getBoundingClientRect();
     const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    if (this.glCanvas) {
+      this.glCanvas.width = Math.max(320, Math.floor(bounds.width * ratio));
+      this.glCanvas.height = Math.max(300, Math.floor(bounds.height * ratio));
+      this.glCanvas.style.width = `${Math.max(320, Math.floor(bounds.width))}px`;
+      this.glCanvas.style.height = `${Math.max(300, Math.floor(bounds.height))}px`;
+    }
     this.canvas.width = Math.max(320, Math.floor(bounds.width * ratio));
     this.canvas.height = Math.max(300, Math.floor(bounds.height * ratio));
     this.canvas.style.width = `${Math.max(320, Math.floor(bounds.width))}px`;
@@ -254,13 +323,282 @@ class BlackLedgerGeoscapeRoot {
     this.renderFrame();
   }
 
+  initWebGl() {
+    if (!this.glCanvas) {
+      return;
+    }
+    const gl = this.glCanvas.getContext('webgl', { antialias: true, alpha: true, premultipliedAlpha: true });
+    if (!gl) {
+      return;
+    }
+
+    const vertexSource = `
+      attribute vec2 a_position;
+      varying vec2 v_uv;
+      void main() {
+        v_uv = a_position * 0.5 + 0.5;
+        gl_Position = vec4(a_position, 0.0, 1.0);
+      }
+    `;
+    const fragmentSource = `
+      precision mediump float;
+      varying vec2 v_uv;
+      uniform vec2 u_resolution;
+      uniform float u_time;
+      uniform float u_radius;
+      uniform float u_yaw;
+      uniform float u_pitch;
+      uniform sampler2D u_earth;
+
+      vec3 rotateYawPitch(vec3 point, float yaw, float pitch) {
+        float sinYaw = sin(yaw);
+        float cosYaw = cos(yaw);
+        float sinPitch = sin(pitch);
+        float cosPitch = cos(pitch);
+        vec3 yawed = vec3(
+          point.x * cosYaw - point.z * sinYaw,
+          point.y,
+          point.x * sinYaw + point.z * cosYaw
+        );
+        return vec3(
+          yawed.x,
+          yawed.y * cosPitch - yawed.z * sinPitch,
+          yawed.y * sinPitch + yawed.z * cosPitch
+        );
+      }
+
+      void main() {
+        vec2 frag = gl_FragCoord.xy;
+        vec2 center = u_resolution * 0.5;
+        vec2 delta = frag - center;
+        float dist = length(delta);
+
+        vec3 color = vec3(0.006, 0.017, 0.026);
+        float starNoise = fract(sin(dot(frag + vec2(u_time * 11.0, u_time * 7.0), vec2(12.9898, 78.233))) * 43758.5453);
+        float star = step(0.9984, starNoise) * (0.3 + 0.7 * fract(starNoise * 91.0));
+        color += vec3(star * 0.85);
+        float halo = smoothstep(u_radius * 1.9, u_radius * 0.2, dist);
+        color += vec3(0.01, 0.08, 0.1) * halo;
+        float alpha = clamp(0.18 + halo * 0.5, 0.18, 0.78);
+
+        if (dist <= u_radius) {
+          vec2 sphere = delta / u_radius;
+          float z = sqrt(max(0.0, 1.0 - dot(sphere, sphere)));
+          vec3 normal = normalize(rotateYawPitch(vec3(sphere.x, -sphere.y, z), u_yaw, u_pitch));
+          float lat = degrees(asin(clamp(normal.y, -1.0, 1.0)));
+          float lon = degrees(atan(normal.x, normal.z));
+          vec2 mapUv = vec2((lon + 180.0) / 360.0, (90.0 - lat) / 180.0);
+          vec3 tex = texture2D(u_earth, mapUv).rgb;
+
+          vec3 lightDir = normalize(vec3(-0.55, 0.35, 0.76));
+          float diffuse = max(dot(normal, lightDir), 0.0);
+          float rim = pow(1.0 - max(normal.z, 0.0), 2.0);
+          float specular = pow(max(dot(reflect(-lightDir, normal), vec3(0.0, 0.0, 1.0)), 0.0), 22.0);
+          vec3 lit = tex * (0.26 + diffuse * 0.92) + vec3(0.08, 0.47, 0.46) * rim * 0.58 + vec3(0.98, 0.66, 0.22) * specular * 0.12;
+          float atmosphere = smoothstep(0.7, 1.0, 1.0 - z);
+          color = lit + vec3(0.12, 0.64, 0.67) * atmosphere * 0.18;
+          alpha = 1.0;
+        } else if (dist <= u_radius * 1.08) {
+          float edge = 1.0 - smoothstep(u_radius, u_radius * 1.08, dist);
+          color += vec3(0.08, 0.72, 0.78) * edge * 0.34;
+          alpha = max(alpha, edge * 0.62);
+        }
+
+        gl_FragColor = vec4(color, alpha);
+      }
+    `;
+
+    const vertexShader = this.compileGlShader(gl, gl.VERTEX_SHADER, vertexSource);
+    const fragmentShader = this.compileGlShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+    if (!vertexShader || !fragmentShader) {
+      return;
+    }
+    const program = gl.createProgram();
+    gl.attachShader(program, vertexShader);
+    gl.attachShader(program, fragmentShader);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error(gl.getProgramInfoLog(program));
+      return;
+    }
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]),
+      gl.STATIC_DRAW,
+    );
+
+    this.gl = gl;
+    this.glProgram = program;
+    this.glBuffer = buffer;
+    this.glUniforms = {
+      position: gl.getAttribLocation(program, 'a_position'),
+      resolution: gl.getUniformLocation(program, 'u_resolution'),
+      time: gl.getUniformLocation(program, 'u_time'),
+      radius: gl.getUniformLocation(program, 'u_radius'),
+      yaw: gl.getUniformLocation(program, 'u_yaw'),
+      pitch: gl.getUniformLocation(program, 'u_pitch'),
+      earth: gl.getUniformLocation(program, 'u_earth'),
+    };
+    this.glTexture = this.createEarthTexture(gl);
+    this.root.dataset.renderer = 'webgl-geoscape';
+  }
+
+  compileGlShader(gl, type, source) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      console.error(gl.getShaderInfoLog(shader));
+      return null;
+    }
+    return shader;
+  }
+
+  createEarthTexture(gl) {
+    const textureCanvas = document.createElement('canvas');
+    textureCanvas.width = 2048;
+    textureCanvas.height = 1024;
+    const ctx = textureCanvas.getContext('2d');
+
+    const ocean = ctx.createLinearGradient(0, 0, 0, textureCanvas.height);
+    ocean.addColorStop(0, '#14505f');
+    ocean.addColorStop(0.45, '#0a293c');
+    ocean.addColorStop(1, '#030914');
+    ctx.fillStyle = ocean;
+    ctx.fillRect(0, 0, textureCanvas.width, textureCanvas.height);
+
+    const drawMapPath = (points) => {
+      ctx.beginPath();
+      points.forEach((point, index) => {
+        const x = ((point.lon + 180) / 360) * textureCanvas.width;
+        const y = ((90 - point.lat) / 180) * textureCanvas.height;
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.closePath();
+    };
+
+    EARTH_LANDMASSES.forEach((landmass) => {
+      const xs = landmass.points.map((point) => ((point.lon + 180) / 360) * textureCanvas.width);
+      const ys = landmass.points.map((point) => ((90 - point.lat) / 180) * textureCanvas.height);
+      const fill = ctx.createLinearGradient(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+      fill.addColorStop(0, landmass.fill[0]);
+      fill.addColorStop(0.55, landmass.fill[1]);
+      fill.addColorStop(1, '#24362d');
+      drawMapPath(landmass.points);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = landmass.coastline;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    });
+
+    EARTH_MOUNTAIN_RANGES.forEach((range) => {
+      ctx.beginPath();
+      range.points.forEach((point, index) => {
+        const x = ((point.lon + 180) / 360) * textureCanvas.width;
+        const y = ((90 - point.lat) / 180) * textureCanvas.height;
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.strokeStyle = 'rgba(90, 63, 38, 0.6)';
+      ctx.lineWidth = 10;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.strokeStyle = range.color;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    });
+
+    EARTH_CLOUD_BANDS.forEach((band, index) => {
+      ctx.fillStyle = `rgba(255,255,255,${band.alpha})`;
+      ctx.beginPath();
+      for (let step = 0; step <= 48; step += 1) {
+        const ratio = step / 48;
+        const lon = band.startLon + ((band.endLon - band.startLon) * ratio);
+        const lat = band.lat + Math.sin((ratio * Math.PI * 4) + index) * 3.5;
+        const x = ((lon + 180) / 360) * textureCanvas.width;
+        const y = ((90 - lat) / 180) * textureCanvas.height;
+        const width = (textureCanvas.height * 0.008) * band.width * (0.7 + Math.sin(ratio * Math.PI * 2) * 0.15);
+        if (step === 0) {
+          ctx.moveTo(x, y - width);
+        } else {
+          ctx.lineTo(x, y - width);
+        }
+      }
+      for (let step = 48; step >= 0; step -= 1) {
+        const ratio = step / 48;
+        const lon = band.startLon + ((band.endLon - band.startLon) * ratio);
+        const lat = band.lat + Math.sin((ratio * Math.PI * 4) + index) * 3.5;
+        const x = ((lon + 180) / 360) * textureCanvas.width;
+        const y = ((90 - lat) / 180) * textureCanvas.height;
+        const width = (textureCanvas.height * 0.008) * band.width * (0.7 + Math.sin(ratio * Math.PI * 2) * 0.15);
+        ctx.lineTo(x, y + width);
+      }
+      ctx.closePath();
+      ctx.fill();
+    });
+
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, textureCanvas);
+    return texture;
+  }
+
+  renderWebGlBase(time, width, height, radius) {
+    if (!this.gl || !this.glProgram || !this.glBuffer || !this.glTexture) {
+      return false;
+    }
+    const gl = this.gl;
+    const drawingWidth = this.glCanvas.width || gl.drawingBufferWidth;
+    const drawingHeight = this.glCanvas.height || gl.drawingBufferHeight;
+    const pixelRatio = width > 0 ? drawingWidth / width : 1;
+    gl.viewport(0, 0, drawingWidth, drawingHeight);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.useProgram(this.glProgram);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.glBuffer);
+    gl.enableVertexAttribArray(this.glUniforms.position);
+    gl.vertexAttribPointer(this.glUniforms.position, 2, gl.FLOAT, false, 0, 0);
+    gl.uniform2f(this.glUniforms.resolution, drawingWidth, drawingHeight);
+    gl.uniform1f(this.glUniforms.time, time);
+    gl.uniform1f(this.glUniforms.radius, radius * pixelRatio);
+    gl.uniform1f(this.glUniforms.yaw, this.rotation);
+    gl.uniform1f(this.glUniforms.pitch, this.tilt);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.glTexture);
+    gl.uniform1i(this.glUniforms.earth, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    return true;
+  }
+
   buildModel() {
     const data = this.currentData;
     const regionById = new Map();
     data.regions.forEach((region) => {
       const lat = yToLat(region.centerY);
       const lon = xToLon(region.centerX);
-      regionById.set(region.regionId, { ...region, lat, lon, slug: slugify(region.regionId) });
+      regionById.set(region.regionId, {
+        ...region,
+        lat,
+        lon,
+        slug: slugify(region.regionId),
+        polygon: this.parseRegionPolygon(region.polygonPoints),
+      });
     });
     this.regionMap = regionById;
 
@@ -287,8 +625,12 @@ class BlackLedgerGeoscapeRoot {
         pressureScore,
         volatility,
         seed: seedFromString(faction.factionId),
+        countryShapes: regions
+          .map((region) => regionById.get(region.regionId)?.polygon)
+          .filter((polygon) => Array.isArray(polygon) && polygon.length >= 3),
       };
     });
+    this.regionShapesByFaction = new Map(this.factionNodes.map((faction) => [faction.slug, faction.countryShapes || []]));
 
     this.events = data.events.map((event) => {
       const region = regionById.get(event.regionId);
@@ -308,6 +650,26 @@ class BlackLedgerGeoscapeRoot {
     this.root.dataset.eventCount = String(this.events.length);
     this.root.dataset.arcCount = String(this.arcs.length);
     this.root.dataset.districtCount = String(data.regions.length);
+  }
+
+  parseRegionPolygon(polygonPoints) {
+    return String(polygonPoints || '')
+      .trim()
+      .split(/\s+/)
+      .map((point) => {
+        const [xValue, yValue] = point.split(',');
+        const x = Number.parseFloat(xValue);
+        const y = Number.parseFloat(yValue);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return null;
+        }
+
+        return {
+          lat: yToLat(y),
+          lon: xToLon(x),
+        };
+      })
+      .filter(Boolean);
   }
 
   renderControls() {
@@ -581,6 +943,14 @@ class BlackLedgerGeoscapeRoot {
         ? 'Reduced motion active. Replay advances step by step.'
         : `${this.state.tickHeadline} · ${this.state.mode.replace('-', ' ')} · ${replayLabel}`;
     }
+    if (this.signalPrimary && this.signalSecondary && this.signalTertiary) {
+      const eventTone = highlightedEvent?.eventType || 'recent-changes';
+      const shortTitle = highlightedEvent?.title || activeFaction.name;
+      this.root.dataset.signalTone = eventTone;
+      this.signalPrimary.textContent = `${shortTitle.slice(0, 28)}${shortTitle.length > 28 ? '…' : ''}`;
+      this.signalSecondary.textContent = `heat ${Math.max(0, activeFaction.heat)} · pressure ${activeFaction.pressureScore} · ${Math.max(1, relatedRegions.length)} districts`;
+      this.signalTertiary.textContent = `${(activeFaction.type || 'faction').toLowerCase()} · ${this.state.mode.replace('-', ' ')} lane`;
+    }
     this.root.dataset.renderSignature = `${this.state.mode}:${activeFaction.slug}:${this.root.dataset.replayState || 'idle'}`;
   }
 
@@ -612,11 +982,15 @@ class BlackLedgerGeoscapeRoot {
     const centerY = height / 2;
     const radius = Math.min(width, height) * (this.variant === 'teaser' ? 0.31 : 0.34);
     ctx.clearRect(0, 0, width, height);
-
-    this.drawBackdrop(ctx, width, height, centerX, centerY, radius, time);
+    const usedWebGl = this.renderWebGlBase(time, width, height, radius);
+    if (!usedWebGl) {
+      this.drawBackdrop(ctx, width, height, centerX, centerY, radius, time);
+    }
     ctx.save();
     ctx.translate(centerX, centerY);
-    this.drawSphere(ctx, radius, time);
+    if (!usedWebGl) {
+      this.drawSphere(ctx, radius, time);
+    }
     this.drawArcs(ctx, radius, time);
     this.drawFactions(ctx, radius, time);
     this.drawEvents(ctx, radius, time);
@@ -625,11 +999,28 @@ class BlackLedgerGeoscapeRoot {
 
   drawBackdrop(ctx, width, height, centerX, centerY, radius, time) {
     const gradient = ctx.createRadialGradient(centerX * 0.84, centerY * 0.54, radius * 0.18, centerX, centerY, radius * 2.1);
-    gradient.addColorStop(0, 'rgba(46, 88, 132, 0.38)');
-    gradient.addColorStop(0.48, 'rgba(8, 16, 27, 0.82)');
+    gradient.addColorStop(0, 'rgba(17, 106, 121, 0.34)');
+    gradient.addColorStop(0.48, 'rgba(7, 13, 24, 0.78)');
     gradient.addColorStop(1, 'rgba(2, 7, 12, 1)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
+
+    const alleyGlow = ctx.createLinearGradient(width * 0.08, height * 0.68, width * 0.92, height * 0.2);
+    alleyGlow.addColorStop(0, 'rgba(255, 100, 46, 0.16)');
+    alleyGlow.addColorStop(0.48, 'rgba(19, 212, 234, 0.12)');
+    alleyGlow.addColorStop(1, 'rgba(4, 18, 26, 0)');
+    ctx.fillStyle = alleyGlow;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.strokeStyle = 'rgba(90, 220, 244, 0.08)';
+    ctx.lineWidth = 1;
+    for (let index = 0; index < 18; index += 1) {
+      const y = height * 0.06 + index * ((height * 0.88) / 18);
+      ctx.beginPath();
+      ctx.moveTo(width * 0.04, y);
+      ctx.lineTo(width * 0.96, y + Math.sin(time * 0.16 + index * 0.35) * 6);
+      ctx.stroke();
+    }
 
     for (let index = 0; index < 26; index += 1) {
       const seed = seedFromString(`star-${index}`);
@@ -645,14 +1036,20 @@ class BlackLedgerGeoscapeRoot {
 
   drawSphere(ctx, radius, time) {
     const atmosphere = ctx.createRadialGradient(-radius * 0.3, -radius * 0.45, radius * 0.12, 0, 0, radius * 1.24);
-    atmosphere.addColorStop(0, 'rgba(38, 104, 163, 0.98)');
-    atmosphere.addColorStop(0.48, 'rgba(12, 42, 71, 0.98)');
-    atmosphere.addColorStop(0.78, 'rgba(5, 17, 29, 1)');
+    atmosphere.addColorStop(0, 'rgba(36, 179, 191, 0.98)');
+    atmosphere.addColorStop(0.48, 'rgba(10, 72, 92, 0.99)');
+    atmosphere.addColorStop(0.78, 'rgba(6, 22, 38, 1)');
     atmosphere.addColorStop(1, 'rgba(2, 8, 14, 1)');
     ctx.fillStyle = atmosphere;
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, TWO_PI);
     ctx.fill();
+
+    this.drawOceanRelief(ctx, radius, time);
+    this.drawPolarCaps(ctx, radius);
+    this.drawLandmasses(ctx, radius);
+    this.drawMountainRanges(ctx, radius);
+    this.drawCloudBands(ctx, radius, time);
 
     ctx.strokeStyle = 'rgba(110, 226, 255, 0.11)';
     ctx.lineWidth = 1;
@@ -671,7 +1068,7 @@ class BlackLedgerGeoscapeRoot {
       ctx.restore();
     }
 
-    ctx.strokeStyle = 'rgba(92, 226, 255, 0.3)';
+    ctx.strokeStyle = 'rgba(92, 226, 255, 0.34)';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
     ctx.arc(0, 0, radius + 12, 0, TWO_PI);
@@ -686,6 +1083,167 @@ class BlackLedgerGeoscapeRoot {
     }
   }
 
+  drawOceanRelief(ctx, radius, time) {
+    const glow = ctx.createRadialGradient(-radius * 0.42, -radius * 0.56, radius * 0.06, -radius * 0.12, -radius * 0.08, radius * 1.18);
+    glow.addColorStop(0, 'rgba(166, 227, 255, 0.22)');
+    glow.addColorStop(0.3, 'rgba(73, 153, 214, 0.14)');
+    glow.addColorStop(1, 'rgba(4, 17, 27, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, TWO_PI);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.995, 0, TWO_PI);
+    ctx.clip();
+    for (let index = 0; index < 12; index += 1) {
+      const bandRadius = radius * (0.62 + index * 0.035);
+      const alpha = 0.022 + ((Math.sin(time * 0.22 + index * 0.9) + 1) * 0.008);
+      ctx.strokeStyle = `rgba(142, 214, 255, ${alpha.toFixed(3)})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(
+        Math.sin(time * 0.08 + index) * radius * 0.05,
+        Math.cos(time * 0.11 + index * 0.7) * radius * 0.03,
+        bandRadius,
+        radius * (0.1 + (index % 3) * 0.03),
+        (index * 0.22) - 0.5,
+        0,
+        TWO_PI,
+      );
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawPolarCaps(ctx, radius) {
+    [
+      { lat: 76, alpha: 0.84, size: 0.19 },
+      { lat: -72, alpha: 0.68, size: 0.17 },
+    ].forEach((cap) => {
+      const projected = this.project(cap.lat, 0, radius * 0.98);
+      if (!projected.visible) {
+        return;
+      }
+      const capRadius = radius * cap.size;
+      const fill = ctx.createRadialGradient(projected.x - capRadius * 0.22, projected.y - capRadius * 0.34, 0, projected.x, projected.y, capRadius);
+      fill.addColorStop(0, `rgba(250, 252, 255, ${cap.alpha})`);
+      fill.addColorStop(0.7, `rgba(214, 232, 243, ${(cap.alpha * 0.78).toFixed(3)})`);
+      fill.addColorStop(1, 'rgba(161, 194, 212, 0)');
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.ellipse(projected.x, projected.y, capRadius * 1.4, capRadius, 0, 0, TWO_PI);
+      ctx.fill();
+    });
+  }
+
+  drawLandmasses(ctx, radius) {
+    EARTH_LANDMASSES.forEach((landmass) => {
+      const projectedPoints = landmass.points
+        .map((point) => this.project(point.lat, point.lon, radius * 0.965))
+        .filter((point) => point.visible);
+      if (projectedPoints.length < 3) {
+        return;
+      }
+      const minX = Math.min(...projectedPoints.map((point) => point.x));
+      const maxX = Math.max(...projectedPoints.map((point) => point.x));
+      const minY = Math.min(...projectedPoints.map((point) => point.y));
+      const maxY = Math.max(...projectedPoints.map((point) => point.y));
+      const fill = ctx.createLinearGradient(minX, minY, maxX, maxY);
+      fill.addColorStop(0, hexToRgba(landmass.fill[0], 0.92));
+      fill.addColorStop(0.55, hexToRgba(landmass.fill[1], 0.84));
+      fill.addColorStop(1, 'rgba(32, 61, 43, 0.72)');
+
+      ctx.beginPath();
+      projectedPoints.forEach((point, index) => {
+        if (index === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      });
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = hexToRgba(landmass.coastline, 0.74);
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(9, 30, 20, 0.28)';
+      ctx.lineWidth = 3.2;
+      ctx.stroke();
+    });
+  }
+
+  drawMountainRanges(ctx, radius) {
+    EARTH_MOUNTAIN_RANGES.forEach((range) => {
+      const projectedPoints = range.points
+        .map((point) => this.project(point.lat, point.lon, radius * 0.978))
+        .filter((point) => point.visible);
+      if (projectedPoints.length < 2) {
+        return;
+      }
+      ctx.beginPath();
+      projectedPoints.forEach((point, index) => {
+        if (index === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      });
+      ctx.strokeStyle = 'rgba(68, 52, 31, 0.36)';
+      ctx.lineWidth = 4.4;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.strokeStyle = hexToRgba(range.color, 0.66);
+      ctx.lineWidth = 2.1;
+      ctx.stroke();
+    });
+  }
+
+  drawCloudBands(ctx, radius, time) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.998, 0, TWO_PI);
+    ctx.clip();
+    EARTH_CLOUD_BANDS.forEach((band, index) => {
+      const steps = 24;
+      const driftOffset = Math.sin(time * band.drift + index) * 8;
+      ctx.beginPath();
+      for (let step = 0; step <= steps; step += 1) {
+        const ratio = step / steps;
+        const lon = band.startLon + ((band.endLon - band.startLon) * ratio) + driftOffset;
+        const lat = band.lat + Math.sin((ratio * Math.PI * 4) + (time * 0.08) + index) * 2.8;
+        const projected = this.project(lat, lon, radius * 1.01);
+        if (!projected.visible) {
+          continue;
+        }
+        const localWidth = radius * 0.012 * band.width * (0.7 + (Math.sin(ratio * Math.PI * 3) * 0.2));
+        if (step === 0) {
+          ctx.moveTo(projected.x, projected.y - localWidth);
+        } else {
+          ctx.lineTo(projected.x, projected.y - localWidth);
+        }
+      }
+      for (let step = steps; step >= 0; step -= 1) {
+        const ratio = step / steps;
+        const lon = band.startLon + ((band.endLon - band.startLon) * ratio) + driftOffset;
+        const lat = band.lat + Math.sin((ratio * Math.PI * 4) + (time * 0.08) + index) * 2.8;
+        const projected = this.project(lat, lon, radius * 1.01);
+        if (!projected.visible) {
+          continue;
+        }
+        const localWidth = radius * 0.012 * band.width * (0.7 + (Math.sin(ratio * Math.PI * 3) * 0.2));
+        ctx.lineTo(projected.x, projected.y + localWidth);
+      }
+      ctx.closePath();
+      ctx.fillStyle = `rgba(244, 250, 255, ${band.alpha})`;
+      ctx.fill();
+    });
+    ctx.restore();
+  }
+
   project(lat, lon, radius) {
     const vector = latLonToVector(lat, lon, radius);
     const rotated = rotateVector(vector, this.rotation, this.tilt);
@@ -698,7 +1256,7 @@ class BlackLedgerGeoscapeRoot {
     };
   }
 
-  drawFactionCountry(ctx, faction, projected, radius, time) {
+  drawFactionBlob(ctx, faction, projected, radius, time) {
     const baseRadius = radius * faction.influenceRadius * (faction.slug === this.state.selectedFaction ? 0.44 : 0.34);
     const wobble = this.reducedMotion ? 0 : Math.sin(time * 0.7 + faction.seed * 10) * 4;
     const pointCount = 9;
@@ -726,6 +1284,47 @@ class BlackLedgerGeoscapeRoot {
     ctx.strokeStyle = hexToRgba(faction.colorPrimary, faction.slug === this.state.selectedFaction ? 0.98 : 0.7);
     ctx.lineWidth = faction.slug === this.state.selectedFaction ? 2.4 : 1.3;
     ctx.stroke();
+  }
+
+  drawFactionCountry(ctx, faction, projected, radius, time) {
+    const countryShapes = this.regionShapesByFaction.get(faction.slug) || [];
+    let drewBorderedCountry = false;
+    countryShapes.forEach((shape) => {
+      const projectedPoints = shape
+        .map((point) => this.project(point.lat, point.lon, radius * 0.92))
+        .filter((point) => point.visible);
+      if (projectedPoints.length < 3) {
+        return;
+      }
+
+      const minX = Math.min(...projectedPoints.map((point) => point.x));
+      const maxX = Math.max(...projectedPoints.map((point) => point.x));
+      const minY = Math.min(...projectedPoints.map((point) => point.y));
+      const maxY = Math.max(...projectedPoints.map((point) => point.y));
+      const fill = ctx.createLinearGradient(minX, minY, maxX, maxY);
+      fill.addColorStop(0, hexToRgba(faction.colorPrimary, faction.slug === this.state.selectedFaction ? 0.42 : 0.28));
+      fill.addColorStop(1, hexToRgba(faction.colorSecondary || faction.colorPrimary, faction.slug === this.state.selectedFaction ? 0.22 : 0.14));
+
+      ctx.beginPath();
+      projectedPoints.forEach((point, index) => {
+        if (index === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      });
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = hexToRgba(faction.colorPrimary, faction.slug === this.state.selectedFaction ? 0.96 : 0.76);
+      ctx.lineWidth = faction.slug === this.state.selectedFaction ? 2.6 : 1.45;
+      ctx.stroke();
+      drewBorderedCountry = true;
+    });
+
+    if (!drewBorderedCountry) {
+      this.drawFactionBlob(ctx, faction, projected, radius, time);
+    }
   }
 
   drawFactions(ctx, radius, time) {

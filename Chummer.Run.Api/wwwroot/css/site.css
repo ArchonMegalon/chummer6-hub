@@ -5422,6 +5422,57 @@ body.nav-sheet-open {
   margin-top: 1rem;
 }
 
+.surface-now .page-title,
+.surface-now .editorial-title,
+.surface-now .status-decision-strip__card h2,
+.surface-now .evidence-row__copy h3,
+.surface-now .workflow-card__copy h3,
+.surface-now .route-callout h3,
+.surface-now .evidence-header__stats strong {
+  color: #13233a;
+}
+
+.surface-now .page-copy,
+.surface-now .editorial-copy,
+.surface-now .muted-copy,
+.surface-now .status-decision-strip__card p,
+.surface-now .evidence-row__copy p,
+.surface-now .workflow-card__copy p,
+.surface-now .route-callout p,
+.surface-now .evidence-header__label,
+.surface-now .workflow-card__proof {
+  color: #43566f;
+}
+
+.surface-now .status-decision-strip__card,
+.surface-now .evidence-group,
+.surface-now .release-footnote,
+.surface-now .workflow-card,
+.surface-now .route-callout {
+  background: #fff9f1;
+  border-color: rgba(88, 59, 24, 0.18);
+}
+
+.surface-now .workflow-band {
+  padding: 1.45rem;
+  border-radius: 32px;
+  background:
+    linear-gradient(180deg, rgba(255, 249, 241, 0.96), rgba(250, 242, 229, 0.98)),
+    radial-gradient(circle at top right, rgba(181, 126, 63, 0.08), transparent 28%);
+  border: 1px solid rgba(88, 59, 24, 0.14);
+  box-shadow: var(--shadow-soft);
+}
+
+.surface-now .workflow-band__lead {
+  margin-bottom: 1.35rem;
+}
+
+.surface-now .eyebrow,
+.surface-now .tag,
+.surface-now .readiness-tag {
+  color: #8b4f12;
+}
+
 .home-cockpit-strip,
 .account-rail-snapshot {
   width: min(var(--site-max), calc(100% - 2rem));
@@ -6139,11 +6190,23 @@ body.nav-sheet-open {
   min-height: 380px;
 }
 
+.black-ledger-geoscape__webgl,
 .black-ledger-geoscape__canvas {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   min-height: 380px;
+}
+
+.black-ledger-geoscape__webgl {
+  z-index: 0;
+}
+
+.black-ledger-geoscape__canvas {
+  z-index: 1;
+  background: transparent;
 }
 
 .black-ledger-geoscape__overlay {
@@ -6153,6 +6216,7 @@ body.nav-sheet-open {
   display: grid;
   gap: 0.35rem;
   pointer-events: none;
+  z-index: 2;
 }
 
 .black-ledger-geoscape__eyebrow {
@@ -6563,6 +6627,30 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.faction-storyboard-strip--action {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.faction-storyboard-frame__visual,
+.faction-storyboard-frame__action,
+.faction-storyboard-frame__proof {
+  margin: 0;
+}
+
+.faction-storyboard-frame__visual {
+  color: var(--ink-strong);
+  font-weight: 700;
+}
+
+.faction-storyboard-frame__action {
+  color: var(--ink-strong);
+}
+
+.faction-storyboard-frame__proof {
+  color: var(--ink-muted);
+  font-size: 0.92rem;
+}
+
 .faction-promo-video {
   width: 100%;
   border-radius: 22px;
@@ -6857,28 +6945,140 @@ body {
   min-height: 470px;
 }
 
+.black-ledger-geoscape__stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(118deg, rgba(255, 124, 47, 0.18), transparent 26%, transparent 68%, rgba(20, 224, 241, 0.14)),
+    linear-gradient(180deg, rgba(6, 11, 18, 0.02), rgba(6, 11, 18, 0.3));
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.black-ledger-geoscape__stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(transparent 0, rgba(255, 255, 255, 0.035) 48%, transparent 50%, transparent 100%),
+    radial-gradient(circle at center, transparent 52%, rgba(5, 8, 14, 0.28) 100%);
+  background-size: 100% 7px, 100% 100%;
+  opacity: 0.52;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.black-ledger-geoscape__stage-skin {
+  position: absolute;
+  inset: -3%;
+  background:
+    radial-gradient(circle at 70% 20%, rgba(25, 223, 241, 0.22), transparent 24%),
+    radial-gradient(circle at 18% 70%, rgba(255, 119, 31, 0.18), transparent 20%),
+    linear-gradient(180deg, rgba(2, 8, 12, 0.18), rgba(2, 8, 12, 0.64)),
+    url('/images/black-ledger-scene.webp') center/cover no-repeat;
+  filter: saturate(1.18) contrast(1.12) brightness(0.72);
+  transform: scale(1.05);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.black-ledger-geoscape__webgl {
+  z-index: 1;
+}
+
 .black-ledger-geoscape__canvas {
   min-height: 470px;
+  z-index: 2;
 }
 
 .black-ledger-geoscape__overlay {
   left: 22px;
   top: 20px;
   gap: 0.42rem;
+  z-index: 4;
 }
 
 .black-ledger-geoscape__eyebrow {
   color: rgba(205, 223, 242, 0.6);
+  text-shadow: 0 0 14px rgba(20, 220, 242, 0.24);
 }
 
 .black-ledger-geoscape__headline {
   font-size: clamp(1.5rem, 2.6vw, 2.35rem);
   letter-spacing: -0.03em;
+  text-shadow: 0 0 24px rgba(6, 12, 20, 0.68);
 }
 
 .black-ledger-geoscape__status {
   max-width: 34ch;
   color: rgba(214, 227, 239, 0.78);
+  text-shadow: 0 0 18px rgba(6, 12, 20, 0.68);
+}
+
+.black-ledger-geoscape__signal-rail {
+  position: absolute;
+  inset: 18px 18px auto auto;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: end;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.black-ledger-geoscape__signal-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: min(52vw, 19rem);
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(92, 226, 255, 0.28);
+  background: rgba(5, 10, 18, 0.72);
+  box-shadow: 0 12px 28px rgba(2, 6, 10, 0.32);
+  color: rgba(224, 242, 250, 0.92);
+  font-family: var(--font-family-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+
+.black-ledger-geoscape__signal-chip--primary {
+  border-color: rgba(93, 230, 255, 0.4);
+  color: rgba(201, 251, 255, 0.98);
+}
+
+.black-ledger-geoscape__signal-chip--secondary {
+  border-color: rgba(255, 171, 94, 0.34);
+  color: rgba(255, 221, 188, 0.94);
+}
+
+.black-ledger-geoscape__signal-chip--tertiary {
+  border-color: rgba(132, 255, 193, 0.28);
+  color: rgba(209, 255, 229, 0.92);
+}
+
+.black-ledger-geoscape[data-signal-tone="conflict"] .black-ledger-geoscape__signal-chip--primary {
+  border-color: rgba(255, 92, 122, 0.42);
+  color: rgba(255, 212, 220, 0.96);
+}
+
+.black-ledger-geoscape[data-signal-tone="magic"] .black-ledger-geoscape__signal-chip--primary {
+  border-color: rgba(180, 132, 255, 0.42);
+  color: rgba(234, 220, 255, 0.96);
+}
+
+.black-ledger-geoscape[data-signal-tone="logistics"] .black-ledger-geoscape__signal-chip--primary {
+  border-color: rgba(112, 255, 200, 0.42);
+  color: rgba(224, 255, 239, 0.96);
+}
+
+.black-ledger-geoscape[data-signal-tone="intel"] .black-ledger-geoscape__signal-chip--primary {
+  border-color: rgba(193, 214, 240, 0.42);
+  color: rgba(240, 247, 255, 0.96);
 }
 
 .black-ledger-geoscape__tooltip {
@@ -7016,6 +7216,16 @@ body {
 
   .black-ledger-geoscape__tooltip {
     width: min(280px, calc(100% - 24px));
+  }
+
+  .black-ledger-geoscape__signal-rail {
+    inset: auto 14px 14px auto;
+    justify-items: start;
+  }
+
+  .black-ledger-geoscape__signal-chip {
+    max-width: min(68vw, 15rem);
+    font-size: 0.68rem;
   }
 
   .ledger-newsreel-broadcast__shell {
