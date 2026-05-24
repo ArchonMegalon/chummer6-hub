@@ -74,6 +74,8 @@ def main() -> int:
             ]
         ),
     )
+    if status == "pass":
+        print("domain_canonicalization:ok")
     return 0 if status == "pass" else 1
 
 
