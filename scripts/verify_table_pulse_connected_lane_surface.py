@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from pathlib import Path
+
+import requests
 
 
 REPO_ROOT = Path(
@@ -40,8 +43,36 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+LIVE_ROUTE_MARKERS: dict[str, tuple[str, ...]] = {
+    "/living-world": (
+        "Connected lane",
+        "Table Pulse Live inbox",
+    ),
+    "/signal-deck": (
+        "Connected lane",
+        "Table Pulse Live inbox",
+    ),
+    "/passport": (
+        "Connected lane",
+        "Table Pulse Live inbox",
+    ),
+}
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Verify the connected Table Pulse lane in source and optionally on live public routes.",
+    )
+    parser.add_argument(
+        "--base-url",
+        default="",
+        help="Optional running Hub base URL. When provided, verify live public horizon pages too.",
+    )
+    return parser.parse_args()
+
 
 def main() -> int:
+    args = parse_args()
     missing: list[str] = []
 
     for relative_path, markers in REQUIRED_MARKERS.items():
@@ -54,6 +85,16 @@ def main() -> int:
         for marker in markers:
             if marker not in text:
                 missing.append(f"{relative_path} missing marker: {marker}")
+
+    if args.base_url:
+        base_url = args.base_url.rstrip("/")
+        for route, markers in LIVE_ROUTE_MARKERS.items():
+            response = requests.get(f"{base_url}{route}", timeout=30)
+            response.raise_for_status()
+            body = response.text
+            for marker in markers:
+                if marker not in body:
+                    missing.append(f"live route {route} missing marker: {marker}")
 
     if missing:
         for item in missing:
