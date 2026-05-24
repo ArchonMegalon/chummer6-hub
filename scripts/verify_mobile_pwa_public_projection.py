@@ -61,6 +61,9 @@ def run(base_url: str) -> int:
     has_expected_shell_cache_paths = all(path in service_worker_response.text for path in EXPECTED_SHELL_CACHE_PATHS)
     has_navigation_preload = "navigationPreload" in service_worker_response.text
     has_runtime_cache = "RUNTIME_CACHE" in service_worker_response.text
+    has_push_handler = 'self.addEventListener("push"' in service_worker_response.text
+    has_notification_click_handler = 'self.addEventListener("notificationclick"' in service_worker_response.text
+    has_notification_close_handler = 'self.addEventListener("notificationclose"' in service_worker_response.text
     continuity_receipt_count = len(receipt_index.get("receipts") or [])
     continuity_boundary_present = bool(receipt_index.get("boundary"))
     mobile_json_has_routes = (
@@ -80,6 +83,9 @@ def run(base_url: str) -> int:
         has_expected_shell_cache_paths,
         has_navigation_preload,
         has_runtime_cache,
+        has_push_handler,
+        has_notification_click_handler,
+        has_notification_close_handler,
         continuity_receipt_count >= 3,
         continuity_boundary_present,
         mobile_json_has_routes,
@@ -108,6 +114,9 @@ def run(base_url: str) -> int:
             "has_navigation_preload": has_navigation_preload,
             "has_runtime_cache": has_runtime_cache,
             "has_expected_shell_cache_paths": has_expected_shell_cache_paths,
+            "has_push_handler": has_push_handler,
+            "has_notification_click_handler": has_notification_click_handler,
+            "has_notification_close_handler": has_notification_close_handler,
         },
         "page_assertions": {
             "has_manifest_link": has_manifest_link,
@@ -141,6 +150,9 @@ def run(base_url: str) -> int:
                 f"- Service worker fetch handler present: `{payload['service_worker']['has_fetch_handler']}`",
                 f"- Service worker navigation preload present: `{has_navigation_preload}`",
                 f"- Service worker continuity cache paths present: `{has_expected_shell_cache_paths}`",
+                f"- Service worker push handler present: `{has_push_handler}`",
+                f"- Service worker notification click handler present: `{has_notification_click_handler}`",
+                f"- Service worker notification close handler present: `{has_notification_close_handler}`",
                 f"- Continuity receipt count: `{continuity_receipt_count}`",
                 f"- Continuity boundary present: `{continuity_boundary_present}`",
             ]

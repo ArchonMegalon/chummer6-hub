@@ -2,6 +2,11 @@ const CACHE_NAME = "chummer-public-v2";
 const SHELL_CACHE = `${CACHE_NAME}-shell`;
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
 const NAVIGATION_FALLBACK = "/mobile";
+const NOTIFICATION_ICON = "/apple-touch-icon.png";
+const NOTIFICATION_BADGE = "/favicon.ico";
+const DEFAULT_NOTIFICATION_TITLE = "Chummer update";
+const DEFAULT_NOTIFICATION_BODY = "Open Chummer to review the latest activity.";
+const DEFAULT_NOTIFICATION_HREF = "/account/ledger/notifications";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
@@ -119,6 +124,18 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+self.addEventListener("push", (event) => {
+  event.waitUntil(handlePush(event));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.waitUntil(handleNotificationClick(event));
+});
+
+self.addEventListener("notificationclose", (event) => {
+  event.waitUntil(handleNotificationClose(event));
+});
+
 async function refreshRuntime(request) {
   const response = await fetch(request);
   if (!response.ok) {
@@ -128,4 +145,159 @@ async function refreshRuntime(request) {
   const copy = response.clone();
   await caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
   return response;
+}
+
+async function handlePush(event) {
+  const payload = normalizePushPayload(event);
+  const href = normalizeNotificationHref(payload.href || payload.route || payload.url || DEFAULT_NOTIFICATION_HREF);
+  const notificationData = {
+    href,
+    route: href,
+    tag: payload.tag || "chummer-update",
+    family: payload.family || "general",
+    notificationId: payload.notificationId || payload.id || null,
+    receivedAt: new Date().toISOString(),
+    source: "service-worker-push"
+  };
+
+  await broadcastClientMessage("chummer:pwa-notification-push", {
+    title: payload.title || DEFAULT_NOTIFICATION_TITLE,
+    body: payload.body || DEFAULT_NOTIFICATION_BODY,
+    data: notificationData
+  });
+
+  if (payload.silent === true) {
+    return;
+  }
+
+  const options = {
+    body: payload.body || DEFAULT_NOTIFICATION_BODY,
+    icon: payload.icon || NOTIFICATION_ICON,
+    badge: payload.badge || NOTIFICATION_BADGE,
+    tag: notificationData.tag,
+    data: notificationData,
+    renotify: payload.renotify === true,
+    requireInteraction: payload.requireInteraction === true,
+    silent: false
+  };
+
+  if (Array.isArray(payload.actions) && payload.actions.length > 0) {
+    options.actions = payload.actions
+      .filter((action) => action && action.action && action.title)
+      .slice(0, 2)
+      .map((action) => ({
+        action: String(action.action),
+        title: String(action.title)
+      }));
+  }
+
+  await self.registration.showNotification(payload.title || DEFAULT_NOTIFICATION_TITLE, options);
+}
+
+async function handleNotificationClick(event) {
+  const notification = event.notification;
+  if (notification) {
+    notification.close();
+  }
+
+  const href = normalizeNotificationHref(
+    event.action
+      || notification?.data?.href
+      || notification?.data?.route
+      || DEFAULT_NOTIFICATION_HREF
+  );
+
+  await broadcastClientMessage("chummer:pwa-notification-click", {
+    action: event.action || null,
+    href,
+    data: notification?.data || null
+  });
+
+  const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const targetUrl = new URL(href, self.location.origin).href;
+
+  for (const client of windowClients) {
+    if (!("focus" in client)) {
+      continue;
+    }
+
+    try {
+      const clientUrl = new URL(client.url, self.location.origin);
+      if (clientUrl.origin === self.location.origin) {
+        await client.focus();
+        if ("navigate" in client && client.url !== targetUrl) {
+          await client.navigate(targetUrl);
+        }
+        return;
+      }
+    } catch {
+      // Ignore malformed client URLs and continue trying.
+    }
+  }
+
+  if (self.clients.openWindow) {
+    await self.clients.openWindow(targetUrl);
+  }
+}
+
+async function handleNotificationClose(event) {
+  await broadcastClientMessage("chummer:pwa-notification-close", {
+    href: normalizeNotificationHref(event.notification?.data?.href || event.notification?.data?.route || DEFAULT_NOTIFICATION_HREF),
+    data: event.notification?.data || null
+  });
+}
+
+function normalizePushPayload(event) {
+  if (!event || !event.data) {
+    return {};
+  }
+
+  try {
+    const json = event.data.json();
+    return json && typeof json === "object" ? json : {};
+  } catch {
+    try {
+      const text = event.data.text();
+      if (!text) {
+        return {};
+      }
+
+      return {
+        title: DEFAULT_NOTIFICATION_TITLE,
+        body: text
+      };
+    } catch {
+      return {};
+    }
+  }
+}
+
+function normalizeNotificationHref(value) {
+  if (!value) {
+    return DEFAULT_NOTIFICATION_HREF;
+  }
+
+  try {
+    const url = new URL(String(value), self.location.origin);
+    if (url.origin !== self.location.origin) {
+      return DEFAULT_NOTIFICATION_HREF;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return DEFAULT_NOTIFICATION_HREF;
+  }
+}
+
+async function broadcastClientMessage(type, payload) {
+  const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  await Promise.all(
+    clients.map(async (client) => {
+      try {
+        client.postMessage({ type, payload });
+      } catch {
+        // Ignore postMessage failures for detached or unavailable clients.
+      }
+    })
+  );
 }

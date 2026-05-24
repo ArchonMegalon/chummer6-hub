@@ -61,4 +61,9 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(serviceWorker).toContain('"/favicon.ico"');
   expect(serviceWorker).toContain('"/favicon.svg"');
   expect(serviceWorker).toContain('navigationPreload');
+  expect(serviceWorker).toContain('self.addEventListener("push"');
+  expect(serviceWorker).toContain('self.addEventListener("notificationclick"');
+  expect(serviceWorker).toContain('self.addEventListener("notificationclose"');
+  expect(serviceWorker).toContain('showNotification(');
+  expect(serviceWorker).toContain('clients.openWindow');
 });
