@@ -217,6 +217,33 @@ class MobilePwaPublicProjectionTests(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
 
+    def test_verifier_fails_when_service_worker_drops_required_shell_cache_path(self) -> None:
+        class DriftedSession(_FakeSession):
+            def get(self, url: str, timeout: int = 30, allow_redirects: bool = True) -> _FakeResponse:
+                response = super().get(url, timeout=timeout, allow_redirects=allow_redirects)
+                if url.endswith("/service-worker.js"):
+                    return _FakeResponse(
+                        response.url,
+                        text=response.text.replace("/play/continuity\n", "", 1),
+                    )
+                return response
+
+        module = _load_module()
+        stdout = io.StringIO()
+
+        with (
+            patch.object(module.requests, "Session", return_value=DriftedSession()),
+            patch.object(module, "completion_path", side_effect=lambda name: Path("/tmp") / name),
+            patch.object(module, "write_json"),
+            patch.object(module, "write_text"),
+            patch.object(module, "now_iso", return_value="2026-05-24T00:00:00Z"),
+            redirect_stdout(stdout),
+        ):
+            result = module.run("http://example.test")
+
+        self.assertEqual(result, 1)
+        self.assertNotIn("mobile_pwa_public_projection:ok", stdout.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()
