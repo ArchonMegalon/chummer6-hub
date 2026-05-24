@@ -158,6 +158,73 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
         self.assertTrue(payload["focused"])
         self.assertIn("https://chummer.run/passport", payload["opened"])
 
+    def test_service_worker_runtime_cache_is_public_only(self) -> None:
+        node_script = textwrap.dedent(
+            f"""
+            const fs = require("node:fs");
+            const vm = require("node:vm");
+
+            const source = fs.readFileSync({json.dumps(str(SERVICE_WORKER))}, "utf8");
+            const context = {{
+              URL,
+              Response,
+              caches: {{
+                open: async () => ({{ addAll: async () => {{}}, put: async () => {{}} }}),
+                keys: async () => [],
+                delete: async () => true,
+                match: async () => null
+              }},
+              fetch: async () => new Response("ok", {{ status: 200 }}),
+              self: {{
+                location: {{ origin: "https://chummer.run" }},
+                registration: {{
+                  showNotification: async () => {{}},
+                  navigationPreload: {{ enable: async () => {{}} }}
+                }},
+                skipWaiting: async () => {{}},
+                addEventListener: () => {{}},
+                clients: {{
+                  matchAll: async () => [],
+                  openWindow: async () => null
+                }}
+              }}
+            }};
+
+            vm.createContext(context);
+            vm.runInContext(source, context);
+
+            const publicNavigate = {{ url: "https://chummer.run/mobile", mode: "navigate" }};
+            const accountNavigate = {{ url: "https://chummer.run/account/ledger/notifications", mode: "navigate" }};
+            const apiGet = {{ url: "https://chummer.run/api/v1/ledger/worlds", mode: "same-origin" }};
+            const publicAsset = {{ url: "https://chummer.run/css/site.css", mode: "same-origin" }};
+            const payload = {{
+              publicNavigate: context.isPublicRuntimeCacheableRequest(publicNavigate),
+              accountNavigate: context.isPublicRuntimeCacheableRequest(accountNavigate),
+              apiGet: context.isPublicRuntimeCacheableRequest(apiGet),
+              publicAsset: context.isPublicRuntimeCacheableRequest(publicAsset),
+              publicResponse: context.shouldCacheResponse(publicNavigate, new Response("ok", {{ status: 200 }})),
+              accountResponse: context.shouldCacheResponse(accountNavigate, new Response("ok", {{ status: 200 }}))
+            }};
+            process.stdout.write(JSON.stringify(payload));
+            """
+        )
+
+        result = subprocess.run(
+            ["node", "-e", node_script],
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stderr or result.stdout)
+        payload = json.loads(result.stdout)
+
+        self.assertTrue(payload["publicNavigate"])
+        self.assertTrue(payload["publicAsset"])
+        self.assertTrue(payload["publicResponse"])
+        self.assertFalse(payload["accountNavigate"])
+        self.assertFalse(payload["apiGet"])
+        self.assertFalse(payload["accountResponse"])
 
 if __name__ == "__main__":
     unittest.main()

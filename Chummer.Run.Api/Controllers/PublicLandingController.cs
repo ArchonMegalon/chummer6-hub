@@ -10000,13 +10000,16 @@ echo "Help: ${HELP_URL}"
         string runnerPassportPosture = leaderDigest is null
             ? "Runner Passport stays ready to stamp return posture, trust, and privacy-safe continuity after each remote reaction."
             : $"Runner Passport can stamp {leaderDigest.PublicName} response posture, return trust, and proof-safe cross-table continuity after the current inbox action.";
+        string aftermathPosture = workspaceServerPlane?.AftermathPackages.Count > 0
+            ? $"Table Pulse Aftermath is holding {workspaceServerPlane.AftermathPackages.Count} governed return package(s) so recap and coaching stay attached to the same first-party rail."
+            : "Table Pulse Aftermath stays private and ready even when no package is queued yet, so debrief and coaching remain separate from the live packet lane.";
         string verdictLabel = workspaceServerPlane is null
             ? "Consent-gated preview"
             : "Governed signed-in lane";
         string boundaryLine = workspaceServerPlane is null
-            ? "No governed workspace means no reaction write path. The route stays read-only instead of inventing detached minigame truth."
-            : "Remote reactions can write only governed consequence posture on the signed-in workspace rail. They do not publish world truth, public scores, or private session transcripts.";
-        string consentPosture = "Table Pulse is opt-in, consent-gated, and review-based. Remote reactions are mini-games and packets, not direct table mutation or automatic world-state authority.";
+            ? "No governed workspace means no live reaction write path. Table Pulse Live stays read-only instead of inventing detached minigame truth, and Table Pulse Aftermath stays parked."
+            : "Table Pulse Live can write only governed consequence posture on the signed-in workspace rail. It does not publish world truth, public scores, or private session transcripts. Table Pulse Aftermath remains the separate private return rail.";
+        string consentPosture = "Table Pulse Live is opt-in, consent-gated, and review-based. Remote reactions are mini-games and packets, not direct table mutation or automatic world-state authority. Table Pulse Aftermath remains private and GM-controlled.";
 
         List<BlackLedgerTablePulseCueViewModel> cues =
         [
@@ -10062,18 +10065,20 @@ echo "Help: ${HELP_URL}"
                 ? "Adjudication is parked until a governed workspace is available for this signed-in account."
                 : null;
 
-        string summary = "Table Pulse turns the signed-in inbox into a command packet: read heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same proof-backed rail.";
+        string summary = "Table Pulse Live turns the signed-in inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same proof-backed rail. Table Pulse Aftermath is the separate private return lane.";
         string[] labels =
         [
+            "Table Pulse Live",
             "heat threshold watch",
             "delivery receipts",
             "remote reaction minigames",
             "Signal Deck",
-            "Runner Passport"
+            "Runner Passport",
+            "Table Pulse Aftermath"
         ];
 
         return new BlackLedgerTablePulsePacketViewModel(
-            Heading: "Table Pulse command packet",
+            Heading: "Table Pulse Live command packet",
             Summary: summary,
             VerdictLabel: verdictLabel,
             BoundaryLine: boundaryLine,
@@ -10083,6 +10088,8 @@ echo "Help: ${HELP_URL}"
             RemoteReactionPosture: remoteReactionPosture,
             SignalDeckPosture: signalDeckPosture,
             RunnerPassportPosture: runnerPassportPosture,
+            AftermathPosture: aftermathPosture,
+            AftermathHref: "/account/work",
             EntryHref: status.NotificationsHref,
             Labels: labels,
             Cues: cues,
@@ -10289,17 +10296,17 @@ echo "Help: ${HELP_URL}"
 
         return new BlackLedgerFactionPromoPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
-                $"{promo.PublicName} promo",
-                "Public-safe faction onboarding promo artifacts with an explicit first-party motion-video contract and storyboard fallback.",
+                $"{promo.PublicName} war bulletin",
+                "Public-safe faction war-bulletin artifacts with an explicit first-party motion-video contract and storyboard fallback.",
                 $"/ledger/factions/{promo.FactionId}/promo",
                 cancellationToken),
-            Heading: $"{promo.PublicName} onboarding promo",
-            Intro: "This route ships an honest first-party motion video, captions, a route-backed JSON brief, and a storyboard fallback without any external render claim.",
+            Heading: $"{promo.PublicName} mobilization bulletin",
+            Intro: "This route ships an honest first-party motion video, captions, a route-backed JSON brief, and a storyboard fallback. It is supposed to hit like propaganda while still staying subordinate to proof.",
             Promo: promo,
             DeliveryNotes:
             [
                 "The first-party motion video is the shipped public contract for this lane.",
-                "Storyboard fallback remains available if motion playback is unavailable.",
+                "Storyboard fallback remains available if motion playback is unavailable, but it still has to carry command-bulletin energy.",
                 "No official lore text and no provider branding appear here.",
                 "These links are route-backed shipped artifacts, not placeholder buttons.",
                 "Validation stays on the same faction-leader and world-turn receipts that drive the inbox lane."

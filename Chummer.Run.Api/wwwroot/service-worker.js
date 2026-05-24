@@ -1,4 +1,4 @@
-const CACHE_NAME = "chummer-public-v2";
+const CACHE_NAME = "chummer-public-v3";
 const SHELL_CACHE = `${CACHE_NAME}-shell`;
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
 const NAVIGATION_FALLBACK = "/mobile";
@@ -30,6 +30,50 @@ const PRECACHE_URLS = [
   "/pwa-maskable.svg",
   "/pwa-screenshot-mobile.svg",
   "/pwa-screenshot-wide.svg"
+];
+const PUBLIC_NAVIGATION_CACHE_PATHS = new Set([
+  "/",
+  "/mobile",
+  "/play",
+  "/play/continuity",
+  "/packages",
+  "/downloads",
+  "/help",
+  "/status"
+]);
+const PUBLIC_RUNTIME_CACHE_PREFIXES = [
+  "/css/",
+  "/js/",
+  "/images/",
+  "/media/",
+  "/fonts/"
+];
+const PUBLIC_RUNTIME_CACHE_SUFFIXES = [
+  ".css",
+  ".js",
+  ".svg",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+  ".ico",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".eot",
+  ".webmanifest",
+  ".json",
+  ".txt"
+];
+const NON_CACHEABLE_PATH_PREFIXES = [
+  "/account",
+  "/api",
+  "/admin",
+  "/support",
+  "/signin",
+  "/signout",
+  "/auth"
 ];
 
 self.addEventListener("install", (event) => {
@@ -74,15 +118,19 @@ self.addEventListener("fetch", (event) => {
           }
 
           const response = await fetch(event.request);
-          const copy = response.clone();
-          event.waitUntil(
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(event.request, copy))
-          );
+          if (shouldCacheResponse(event.request, response)) {
+            const copy = response.clone();
+            event.waitUntil(
+              caches.open(RUNTIME_CACHE).then((cache) => cache.put(event.request, copy))
+            );
+          }
           return response;
         } catch {
-          const cachedRoute = await caches.match(event.request);
-          if (cachedRoute) {
-            return cachedRoute;
+          if (isPublicRuntimeCacheableRequest(event.request)) {
+            const cachedRoute = await caches.match(event.request);
+            if (cachedRoute) {
+              return cachedRoute;
+            }
           }
 
           const mobileRail = await caches.match(NAVIGATION_FALLBACK);
@@ -104,8 +152,10 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
-      const cached = await caches.match(event.request);
-      const isStaticAsset = ["/css/", "/js/", ".svg", ".json"].some((segment) => requestUrl.pathname.includes(segment));
+      const cacheable = isPublicRuntimeCacheableRequest(event.request);
+      const cached = cacheable ? await caches.match(event.request) : null;
+      const isStaticAsset = PUBLIC_RUNTIME_CACHE_PREFIXES.some((prefix) => requestUrl.pathname.startsWith(prefix))
+        || PUBLIC_RUNTIME_CACHE_SUFFIXES.some((suffix) => requestUrl.pathname.endsWith(suffix));
       if (cached && isStaticAsset) {
         event.waitUntil(refreshRuntime(event.request));
         return cached;
@@ -138,7 +188,7 @@ self.addEventListener("notificationclose", (event) => {
 
 async function refreshRuntime(request) {
   const response = await fetch(request);
-  if (!response.ok) {
+  if (!shouldCacheResponse(request, response)) {
     return response;
   }
 
@@ -147,6 +197,43 @@ async function refreshRuntime(request) {
   return response;
 }
 
+function isPublicRuntimeCacheableRequest(request) {
+  if (!request) {
+    return false;
+  }
+
+  try {
+    const url = new URL(request.url, self.location.origin);
+    if (url.origin !== self.location.origin) {
+      return false;
+    }
+
+    if (NON_CACHEABLE_PATH_PREFIXES.some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {
+      return false;
+    }
+
+    if (request.mode === "navigate") {
+      return PUBLIC_NAVIGATION_CACHE_PATHS.has(url.pathname);
+    }
+
+    if (PRECACHE_URLS.includes(url.pathname)) {
+      return true;
+    }
+
+    return PUBLIC_RUNTIME_CACHE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))
+      || PUBLIC_RUNTIME_CACHE_SUFFIXES.some((suffix) => url.pathname.endsWith(suffix));
+  } catch {
+    return false;
+  }
+}
+
+function shouldCacheResponse(request, response) {
+  if (!response || !response.ok || response.status !== 200) {
+    return false;
+  }
+
+  return isPublicRuntimeCacheableRequest(request);
+}
 async function handlePush(event) {
   const payload = normalizePushPayload(event);
   const href = normalizeNotificationHref(payload.href || payload.route || payload.url || DEFAULT_NOTIFICATION_HREF);

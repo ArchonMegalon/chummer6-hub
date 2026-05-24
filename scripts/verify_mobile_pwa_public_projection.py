@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from urllib.parse import urlparse
 
 import requests
 
@@ -9,6 +10,15 @@ from absolute_completion_common import LocalHubApp, completion_path, now_iso, wr
 
 
 ROUTES = ["/mobile", "/pwa", "/play", "/player", "/gm", "/observer", "/session"]
+EXPECTED_FINAL_ROUTES = {
+    "/mobile": "/mobile",
+    "/pwa": "/mobile",
+    "/play": "/play",
+    "/player": "/play?role=player",
+    "/gm": "/play?role=gm",
+    "/observer": "/play?role=observer",
+    "/session": "/play",
+}
 EXPECTED_SHORTCUTS = {"/mobile", "/play", "/play/continuity"}
 EXPECTED_SHELL_CACHE_PATHS = {"/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"}
 
@@ -25,11 +35,16 @@ def run(base_url: str) -> int:
     for route in ROUTES:
         response = session.get(f"{base_url}{route}", timeout=30, allow_redirects=True)
         response.raise_for_status()
+        final_url = response.url
+        parsed_final = urlparse(final_url)
+        final_route = f"{parsed_final.path}{f'?{parsed_final.query}' if parsed_final.query else ''}"
         route_results.append(
             {
                 "route": route,
                 "status_code": response.status_code,
-                "final_url": response.url,
+                "final_url": final_url,
+                "final_route": final_route,
+                "expected_final_route": EXPECTED_FINAL_ROUTES[route],
             }
         )
 
@@ -71,6 +86,10 @@ def run(base_url: str) -> int:
         and mobile_json.get("continuity_route") == "/play/continuity"
         and mobile_json.get("receipt_index_route") == "/play/continuity/receipts"
     )
+    role_routes_hold = all(
+        result["final_route"] == result["expected_final_route"]
+        for result in route_results
+    )
     checks = [
         has_manifest_link,
         has_sw_registration,
@@ -89,6 +108,7 @@ def run(base_url: str) -> int:
         continuity_receipt_count >= 3,
         continuity_boundary_present,
         mobile_json_has_routes,
+        role_routes_hold,
     ]
 
     payload = {
@@ -123,6 +143,7 @@ def run(base_url: str) -> int:
             "has_service_worker_registration": has_sw_registration,
             "has_install_button": has_install_button,
             "has_continuity_action": has_continuity_action,
+            "role_routes_hold": role_routes_hold,
             "continuity_page_status_code": continuity_html.status_code,
         },
         "continuity": {
@@ -153,6 +174,7 @@ def run(base_url: str) -> int:
                 f"- Service worker push handler present: `{has_push_handler}`",
                 f"- Service worker notification click handler present: `{has_notification_click_handler}`",
                 f"- Service worker notification close handler present: `{has_notification_close_handler}`",
+                f"- Role-route redirects hold: `{role_routes_hold}`",
                 f"- Continuity receipt count: `{continuity_receipt_count}`",
                 f"- Continuity boundary present: `{continuity_boundary_present}`",
             ]

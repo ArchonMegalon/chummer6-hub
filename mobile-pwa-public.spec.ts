@@ -1,42 +1,52 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { test, expect } from 'playwright/test';
 
-const repoRoot = process.cwd();
-const mobileViewPath = path.join(repoRoot, 'Chummer.Run.Api', 'Views', 'PublicLanding', 'MobileProjection.cshtml');
-const controllerPath = path.join(repoRoot, 'Chummer.Run.Api', 'Controllers', 'PublicLandingController.cs');
-const manifestPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'manifest.json');
-const swPath = path.join(repoRoot, 'Chummer.Run.Api', 'wwwroot', 'service-worker.js');
+const baseUrl = (process.env.CHUMMER_HUB_BASE_URL ?? 'http://127.0.0.1:8091').replace(/\/$/, '');
 
-test('mobile and PWA public routes keep installability and role entry explicit', async () => {
-  const mobileView = readFileSync(mobileViewPath, 'utf8');
-  const controller = readFileSync(controllerPath, 'utf8');
-  const manifest = readFileSync(manifestPath, 'utf8');
-  const serviceWorker = readFileSync(swPath, 'utf8');
+const routeExpectations: Array<{ route: string; finalPath: string }> = [
+  { route: '/mobile', finalPath: '/mobile' },
+  { route: '/pwa', finalPath: '/mobile' },
+  { route: '/play', finalPath: '/play' },
+  { route: '/player', finalPath: '/play?role=player' },
+  { route: '/gm', finalPath: '/play?role=gm' },
+  { route: '/observer', finalPath: '/play?role=observer' },
+  { route: '/session', finalPath: '/play' }
+];
 
-  expect(mobileView).toContain('Install this app');
-  expect(mobileView).toContain('beforeinstallprompt');
-  expect(mobileView).toContain('One bounded shell, five explicit promises.');
-  expect(mobileView).toContain('Player, GM, and observer routes converge on one shell.');
-  expect(mobileView).toContain('_SignedInTrustStatusPanel');
-  expect(mobileView).toContain('_PublicTrustPulsePanel');
+test('mobile and PWA public routes keep installability and role entry explicit', async ({ page, request, context }) => {
+  await context.grantPermissions(['notifications'], { origin: baseUrl });
 
-  expect(controller).toContain('[HttpGet("/mobile")]');
-  expect(controller).toContain('[HttpGet("/pwa")]');
-  expect(controller).toContain('[HttpGet("/play")]');
-  expect(controller).toContain('[HttpGet("/player")]');
-  expect(controller).toContain('[HttpGet("/gm")]');
-  expect(controller).toContain('[HttpGet("/observer")]');
+  for (const expectation of routeExpectations) {
+    const response = await request.get(`${baseUrl}${expectation.route}`);
+    expect(response.ok(), `route ${expectation.route} should succeed`).toBeTruthy();
+    const finalUrl = new URL(response.url());
+    expect(`${finalUrl.pathname}${finalUrl.search}`).toBe(expectation.finalPath);
+  }
 
-  expect(manifest).toContain('"id": "/mobile"');
-  expect(manifest).toContain('"display_override"');
-  expect(manifest).toContain('"screenshots"');
-  expect(manifest).toContain('"start_url": "/mobile"');
-  expect(manifest).toContain('"url": "/play"');
-  expect(manifest).toContain('"url": "/play/continuity"');
-  expect(serviceWorker).toContain('"/mobile"');
-  expect(serviceWorker).toContain('"/play"');
-  expect(serviceWorker).toContain('"/play/continuity"');
-  expect(serviceWorker).toContain('navigationPreload');
-  expect(serviceWorker).toContain('RUNTIME_CACHE');
+  const manifestResponse = await request.get(`${baseUrl}/manifest.json`);
+  expect(manifestResponse.ok()).toBeTruthy();
+  const manifest = await manifestResponse.json();
+  expect(manifest.id).toBe('/mobile');
+  expect(manifest.start_url).toBe('/mobile');
+  expect(Array.isArray(manifest.display_override) && manifest.display_override.length > 0).toBeTruthy();
+  expect(Array.isArray(manifest.screenshots) && manifest.screenshots.length).toBeGreaterThanOrEqual(2);
+
+  await page.goto(`${baseUrl}/mobile`, { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'Mobile and PWA entry' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Install this app' })).toBeVisible();
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /manifest\.(json|webmanifest)/);
+
+  const swUrl = await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) {
+      return null;
+    }
+
+    const registration = await navigator.serviceWorker.getRegistration('/');
+    if (!registration) {
+      return null;
+    }
+
+    const worker = registration.active ?? registration.waiting ?? registration.installing;
+    return worker?.scriptURL ?? null;
+  });
+  expect(swUrl).toContain('/service-worker.js');
 });

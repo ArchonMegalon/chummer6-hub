@@ -18,6 +18,8 @@ REQUIRED_MARKERS = (
     "normalizeNotificationHref(",
     "normalizeNotificationAssetPath(",
     "resolveNotificationActionHref(",
+    "isPublicRuntimeCacheableRequest(",
+    "NON_CACHEABLE_PATH_PREFIXES",
 )
 
 
