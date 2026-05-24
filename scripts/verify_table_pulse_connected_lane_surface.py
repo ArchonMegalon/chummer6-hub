@@ -16,30 +16,19 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": (
         "Runner Passport connected lane",
         "Connected faction command lane",
-        "Table Pulse turns the signed-in inbox into a command packet",
+        "Table Pulse Live turns the signed-in inbox into a command packet",
         "GM cockpit keeps remote-reaction aftermath on one command rail",
+        "Table Pulse Live inbox",
     ),
     "Chummer.Run.Api/Views/Accounts/Account.cshtml": (
-        "<strong>Table Pulse command-to-fallout lane</strong>",
+        "<strong>Table Pulse Live command-to-fallout lane</strong>",
         "Open campaign memory",
-        "<strong>Table Pulse return lane</strong>",
+        "<strong>Table Pulse Aftermath return lane</strong>",
         "Open aftermath rail",
     ),
-    "Chummer.Run.Api/Views/PublicLanding/Home.cshtml": (
-        "Table Pulse return rail: signed-in reaction fallout stays on the same governed workspace",
-        "This is the off-table half of the same governed Table Pulse loop",
-    ),
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": (
-        "The signed-in shelf is the return rail for Table Pulse",
-        "the artifact shelf keeps your live Table Pulse return cues, aftermath, replay, and linked creator-publication record together",
-    ),
-    "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml": (
-        "Connected command lane",
-        "@Model.ConnectedLanePacket.BoundaryLine",
-    ),
-    "Chummer.Run.Api/Views/PublicLanding/MediaArtifactHorizon.cshtml": (
-        "<p class=\"eyebrow\">Connected lane</p>",
-        "@Model.ConnectedLanePacket.BoundaryLine",
+        "the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
+        "Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
     ),
 }
 

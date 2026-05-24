@@ -165,10 +165,10 @@
         ? "/account/work#selected-campaign-memory"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
     var selectedWorkspaceTablePulseSummary = selectedWorkspaceServerPlane is null
-        ? "This workspace is not attached to a governed server plane yet, so Table Pulse follow-through stays armed but cannot write command-to-fallout posture here."
+        ? "This workspace is not attached to a governed server plane yet, so Table Pulse Live follow-through stays armed but cannot write command-to-fallout posture here."
         : selectedWorkspaceLeadConsequence is not null
-            ? $"Table Pulse is already carrying {selectedWorkspaceConsequences.Count} governed consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and aftermath follow-through are attached to real campaign return instead of flavor-only recap copy."
-            : "Table Pulse is armed on this workspace even before the next reaction resolves, so the next signed-in inbox packet can return through carry-forward, memory, and aftermath on the same governed rail.";
+            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} governed consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath follow-through are attached to real campaign return instead of flavor-only recap copy."
+            : "Table Pulse Live is armed on this workspace even before the next reaction resolves, so the next signed-in inbox packet can return through carry-forward, memory, and Table Pulse Aftermath on the same governed rail.";
     var selectedWorkspaceLivingNewsroomSummary = selectedWorkspaceNextSessionCarryForward is not null
         ? $"Living Newsroom framing is anchored by next-session carry-forward: {selectedWorkspaceNextSessionCarryForward.Summary}"
         : selectedWorkspaceCampaignMemory is not null
@@ -193,7 +193,7 @@
     var selectedRunTablePulseSummary = selectedRun is null
         ? string.Empty
         : selectedRun.LatestContinuity is not null
-            ? $"This run already has live continuity, so the next Table Pulse reaction should return through the same governed workspace rail instead of splitting into a separate follow-up story."
+            ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same governed workspace rail instead of splitting into a separate Table Pulse Aftermath story."
             : "This run is ready to bind the next governed reaction, carry-forward receipt, and aftermath package on the shared command rail.";
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
@@ -1665,7 +1665,7 @@
                                 <p><strong>Lead transfer:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
                             }
                             <div class="settings-form">
-                                <p><strong>Table Pulse command-to-fallout lane</strong></p>
+                                <p><strong>Table Pulse Live command-to-fallout lane</strong></p>
                                 <p class="muted-copy">@selectedWorkspaceTablePulseSummary</p>
                                 <div class="settings-summary-list">
                                     <div class="settings-summary-row">
@@ -1690,7 +1690,7 @@
                                     </div>
                                 </div>
                                 <div class="stacked-actions">
-                                    <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse inbox</a>
+                                    <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
                                     <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
                                     <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
                                     <a class="button-like button-like--ghost" href="@selectedWorkspaceCarryForwardHref">Open carry-forward</a>
@@ -2760,12 +2760,12 @@
                             <p><strong>Continuity:</strong> @selectedRun.LatestContinuity.Summary</p>
                         }
                         <div class="settings-form">
-                            <p><strong>Table Pulse return lane</strong></p>
+                            <p><strong>Table Pulse Aftermath return lane</strong></p>
                             <p class="muted-copy">@selectedRunTablePulseSummary</p>
                             <div class="settings-summary-list">
                                 <div class="settings-summary-row">
                                     <span>Inbox and reactions</span>
-                                    <strong>Use the signed-in Table Pulse lane to trigger or review the next bounded response.</strong>
+                                    <strong>Use the signed-in Table Pulse Live lane to trigger or review the next bounded response.</strong>
                                 </div>
                                 <div class="settings-summary-row">
                                     <span>Workspace return</span>
@@ -2777,7 +2777,7 @@
                                 </div>
                             </div>
                             <div class="stacked-actions">
-                                <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse inbox</a>
+                                <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
                                 <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
                                 <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
                                 <a class="button-like button-like--ghost" href="@selectedRunWorkspaceHref">Open campaign workspace</a>

@@ -2169,7 +2169,7 @@ public sealed class PublicLandingController : Controller
         }
         catch (Exception ex) when (ex is HubRequestAuthException or InvalidOperationException or ArgumentException)
         {
-            _logger.LogWarning(ex, "Table Pulse reaction adjudication failed for the signed-in ledger lane.");
+            _logger.LogWarning(ex, "Table Pulse Live reaction adjudication failed for the signed-in ledger lane.");
             return Redirect("/account/ledger/notifications?reaction=error");
         }
     }
@@ -3971,7 +3971,7 @@ public sealed class PublicLandingController : Controller
             Chrome: chrome,
             Eyebrow: "Command horizon",
             Heading: "Signal Deck",
-            Intro: "Signal Deck now has a real first-party route: governed command pressure, consequence posture, and aftermath continuity stay attached to the same signed-in Table Pulse rail instead of disappearing into generic recap copy.",
+            Intro: "Signal Deck now has a real first-party route: governed command pressure, consequence posture, and aftermath continuity stay attached to the same signed-in Table Pulse Live rail instead of disappearing into generic recap copy.",
             BoundaryLine: "Signal Deck is a first-party command and follow-through surface. It can show governed pressure and consequence posture, but it does not become automatic world authority, a hidden moderation score, or a private transcript lane.",
             SummaryPoints:
             [
@@ -3982,7 +3982,7 @@ public sealed class PublicLandingController : Controller
             Documents: _communityCreatorHorizons.ListSignalDeckDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
             PrimaryAction: new TrustPageActionViewModel("Open command pressure receipt", "/signal-deck/receipts/pressure_posture.md", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Open receipt JSON", "/signal-deck/receipts/pressure_posture.json", "secondary"),
-            TertiaryAction: new TrustPageActionViewModel("Open Table Pulse inbox", "/account/ledger/notifications", "ghost"),
+            TertiaryAction: new TrustPageActionViewModel("Open Table Pulse Live inbox", "/account/ledger/notifications", "ghost"),
             ConnectedLanePacket: BuildSignalDeckConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -9585,7 +9585,7 @@ echo "Help: ${HELP_URL}"
             ? $"Governed aftermath currently holds {aftermathCount} package(s), so remote reactions can return as receipts and follow-through instead of disappearing into flavor-only copy."
             : "No governed aftermath package is attached yet, so follow-through stays armed and bounded until the next safe action writes one.";
         string aftermathHref = "/account/work#aftermath-packages";
-        string summary = "After a Table Pulse reaction resolves, the result should survive as follow-through: Signal Deck keeps the pressure cue visible, and Runner Passport keeps the trust/return story bounded and public-safe.";
+        string summary = "After a Table Pulse Live reaction resolves, the result should survive as follow-through: Signal Deck keeps the pressure cue visible, and Runner Passport keeps the trust/return story bounded and public-safe.";
         string boundaryLine = "Follow-through stays on first-party rails only. Signal Deck shows governed consequence posture; Runner Passport shows aggregate trust and continuity proof without leaking private account or moderation detail.";
 
         BlackLedgerFollowThroughCueViewModel[] cues =
@@ -9641,7 +9641,7 @@ echo "Help: ${HELP_URL}"
         string leaderHref = string.IsNullOrWhiteSpace(factionId)
             ? "/account/ledger"
             : $"/account/ledger/factions/{factionId}/leader-briefing";
-        string summary = "Runner Passport is the continuity rail for Table Pulse: trust stays public-safe, but the signed-in command loop can still carry inbox reactions, Signal Deck cues, Living Newsroom framing, and aftermath follow-through on one governed path.";
+        string summary = "Runner Passport is the continuity rail for Table Pulse Live: trust stays public-safe, but the signed-in command loop can still carry inbox reactions, Signal Deck cues, Living Newsroom framing, and Table Pulse Aftermath follow-through on one governed path.";
         string boundaryLine = "Runner Passport exposes aggregate trust and return posture only. It can point to signed-in command lanes, but it does not project private identity, moderation decisions, or transcript detail.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
@@ -9651,10 +9651,10 @@ echo "Help: ${HELP_URL}"
                 Href: "/passport/receipts/runner_return_posture.md",
                 StatusLabel: "Public-safe"),
             new(
-                Label: "Table Pulse inbox",
+                Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
                     ? $"The signed-in inbox is already carrying {consequenceCount} governed consequence cue(s), so trust continuity is attached to real command fallout instead of free-floating copy."
-                    : "Table Pulse is armed for this account, so the next governed reaction can land on the same trust rail instead of disappearing into a separate system.",
+                    : "Table Pulse Live is armed for this account, so the next governed reaction can land on the same trust rail instead of disappearing into a separate system.",
                 Href: "/account/ledger/notifications",
                 StatusLabel: workspaceServerPlane is null ? "Armed" : "Signed-in"),
             new(
@@ -9698,7 +9698,7 @@ echo "Help: ${HELP_URL}"
         string leaderHref = string.IsNullOrWhiteSpace(factionId)
             ? "/account/ledger"
             : $"/account/ledger/factions/{factionId}/leader-briefing";
-        string summary = "Signal Deck is the command-facing continuity rail for Table Pulse: pressure cues, inbox reactions, Living Newsroom framing, and aftermath return all stay attached to one first-party path.";
+        string summary = "Signal Deck is the command-facing continuity rail for Table Pulse Live: pressure cues, inbox reactions, Living Newsroom framing, and Table Pulse Aftermath return all stay attached to one first-party path.";
         string boundaryLine = "Signal Deck shows governed command posture only. It does not publish private transcript detail, hidden moderation state, or automatic world authority outside first-party rails.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
@@ -9767,7 +9767,7 @@ echo "Help: ${HELP_URL}"
                 Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
                 StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
             new(
-                Label: "Table Pulse inbox",
+                Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
                     ? $"{consequenceCount} consequence cue(s) are already live, so between-session follow-through is attached to governed command truth."
                     : "The signed-in inbox is armed so the next remote reaction can enter the same governed between-session loop.",
@@ -9809,12 +9809,12 @@ echo "Help: ${HELP_URL}"
     {
         int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
         int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
-        string summary = "Faction workspace is part of the same governed command rail as Table Pulse, Signal Deck, Runner Passport, Living Newsroom, and aftermath. Command does not end at action points; it carries through to fallout.";
+        string summary = "Faction workspace is part of the same governed command rail as Table Pulse Live, Signal Deck, Runner Passport, Living Newsroom, and Table Pulse Aftermath. Command does not end at action points; it carries through to fallout.";
         string boundaryLine = "Workspace command stays authenticated and receipt-backed. It can route pressure, command, and governed fallout, but it does not publish private lore or invent public world truth outside first-party rails.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
-                Label: "Table Pulse inbox",
+                Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
                     ? $"{consequenceCount} consequence cue(s) are already live from the inbox rail, so this workspace can act on real governed pressure."
                     : "Open the signed-in inbox to review or trigger the next bounded remote reaction before spending command effort here.",
@@ -10110,36 +10110,36 @@ echo "Help: ${HELP_URL}"
                 Summary: "Remote intercept adjudication absorbed the hottest pressure line before it spilled into the next turn packet.",
                 ReturnLoopAction: "Review heat fallout",
                 ReturnLoopRoute: "/account/work",
-                Note: "Table Pulse remote reaction: intercept"),
+                Note: "Table Pulse Live remote reaction: intercept"),
             "cover-story" => new CampaignConsequenceUpdateRequest(
                 Kind: "reputation",
                 State: "under_review",
                 Summary: "Cover Story adjudication is holding the public narrative in a review posture until receipts catch up.",
                 ReturnLoopAction: "Review reputation fallout",
                 ReturnLoopRoute: "/account/work",
-                Note: "Table Pulse remote reaction: cover story"),
+                Note: "Table Pulse Live remote reaction: cover story"),
             "scramble" => new CampaignConsequenceUpdateRequest(
                 Kind: "contact",
                 State: "fragile",
                 Summary: "Scramble adjudication kept the contact network live, but the route is still fragile and needs a follow-through pass.",
                 ReturnLoopAction: "Review contact fallout",
                 ReturnLoopRoute: "/account/work",
-                Note: "Table Pulse remote reaction: scramble"),
+                Note: "Table Pulse Live remote reaction: scramble"),
             "temptation" => new CampaignConsequenceUpdateRequest(
                 Kind: "faction",
                 State: "strained",
                 Summary: "Temptation adjudication created faction leverage, but it also strained the standing that has to be justified on the next safe return.",
                 ReturnLoopAction: "Confirm faction standing",
                 ReturnLoopRoute: "/account/work",
-                Note: "Table Pulse remote reaction: temptation"),
+                Note: "Table Pulse Live remote reaction: temptation"),
             "shadow-reply" => new CampaignConsequenceUpdateRequest(
                 Kind: "downtime",
                 State: "queued",
                 Summary: "Shadow Reply adjudication queued an off-table response packet on the governed aftermath rail.",
                 ReturnLoopAction: "Review downtime obligations",
                 ReturnLoopRoute: "/account/work#aftermath-packages",
-                Note: "Table Pulse remote reaction: shadow reply"),
-            _ => throw new ArgumentException($"Unsupported Table Pulse reaction id: {reactionId}", nameof(reactionId))
+                Note: "Table Pulse Live remote reaction: shadow reply"),
+            _ => throw new ArgumentException($"Unsupported Table Pulse Live reaction id: {reactionId}", nameof(reactionId))
         };
     }
 

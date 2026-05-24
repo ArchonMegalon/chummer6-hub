@@ -42,7 +42,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             account_path = temp_root / "Chummer.Run.Api/Views/Accounts/Account.cshtml"
             account_path.write_text(
                 account_path.read_text(encoding="utf-8").replace(
-                    "<strong>Table Pulse command-to-fallout lane</strong>",
+                    "<strong>Table Pulse Live command-to-fallout lane</strong>",
                     "<strong>Workspace recap</strong>",
                     1,
                 ),
@@ -53,19 +53,19 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/Accounts/Account.cshtml missing marker: <strong>Table Pulse command-to-fallout lane</strong>",
+            "Chummer.Run.Api/Views/Accounts/Account.cshtml missing marker: <strong>Table Pulse Live command-to-fallout lane</strong>",
             result.stderr,
         )
 
-    def test_verifier_fails_when_home_drops_return_rail_language(self) -> None:
+    def test_verifier_fails_when_shelf_drops_return_rail_language(self) -> None:
         with tempfile.TemporaryDirectory(prefix="table-pulse-home-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
-            home_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Home.cshtml"
-            home_path.write_text(
-                home_path.read_text(encoding="utf-8").replace(
-                    "Table Pulse return rail: signed-in reaction fallout stays on the same governed workspace",
-                    "Signed-in reaction fallout stays on the same governed workspace",
+            shelf_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
+            shelf_path.write_text(
+                shelf_path.read_text(encoding="utf-8").replace(
+                    "Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
+                    "return artifacts that stay on this signed-in shelf",
                     1,
                 ),
                 encoding="utf-8",
@@ -75,7 +75,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse return rail: signed-in reaction fallout stays on the same governed workspace",
+            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
             result.stderr,
         )
 
@@ -86,7 +86,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             shelf_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
             shelf_path.write_text(
                 shelf_path.read_text(encoding="utf-8").replace(
-                    "the artifact shelf keeps your live Table Pulse return cues, aftermath, replay, and linked creator-publication record together",
+                    "the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
                     "the artifact shelf keeps your live aftermath, replay, and linked creator-publication record together",
                     1,
                 ),
@@ -97,7 +97,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: the artifact shelf keeps your live Table Pulse return cues, aftermath, replay, and linked creator-publication record together",
+            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
             result.stderr,
         )
 

@@ -146,10 +146,10 @@
     static string ArtifactViewSummary(string view) => view switch
     {
         "personal" => "Keep the account-side runner and return artifacts visible without losing the shared record they already ride on.",
-        "campaign" => "Stay on the shared crew and continuity page for campaign-owned artifacts, prep packets, and aftermath or replay follow-through.",
+        "campaign" => "Stay on the shared crew and continuity page for campaign-owned artifacts, prep packets, Table Pulse Aftermath return cues, and aftermath or replay follow-through.",
         "creator" => "Inspect only the creator-linked lineage, trust ranking, availability, and next step for published or publication-ready artifacts.",
         "public" => "Inspect only the published shared-publication page so discoverable creator packets, trust posture, and publication detail stay together while you are signed in.",
-        _ => "When you are signed in, the artifact shelf keeps your live aftermath, replay, and linked creator-publication record together instead of splitting them into separate artifact stories."
+        _ => "When you are signed in, the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together instead of splitting them into separate artifact stories."
     };
 
     string PublicationAvailabilityLabel(bool discoverable)
@@ -305,7 +305,7 @@
             <article class="continuity-band__fact">
                 <span>Visible recap cards</span>
                 <strong>@signedInRecapShelf.Length</strong>
-                <p>Aftermath, replay, and return artifacts that stay on this signed-in shelf.</p>
+                <p>Aftermath, replay, and Table Pulse Aftermath return artifacts that stay on this signed-in shelf.</p>
             </article>
             <article class="continuity-band__fact">
                 <span>Visible creator cards</span>
