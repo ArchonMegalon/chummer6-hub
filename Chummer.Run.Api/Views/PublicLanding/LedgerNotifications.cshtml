@@ -68,6 +68,118 @@
     </div>
 </section>
 
+@if (Model.TablePulsePacket is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Table Pulse Live</p>
+            <h2 class="editorial-title">@Model.TablePulsePacket.Heading</h2>
+            <p class="editorial-copy">@Model.TablePulsePacket.Summary</p>
+        </div>
+        <div class="trust-claim__microproof">
+            <span>Verdict: @Model.TablePulsePacket.VerdictLabel</span>
+            <span>@Model.TablePulsePacket.ConsentPosture</span>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            <article class="route-choice-card">
+                <span class="tag">Boundary</span>
+                <p>@Model.TablePulsePacket.BoundaryLine</p>
+            </article>
+        </div>
+        <div class="trust-claim__microproof">
+            @foreach (var label in Model.TablePulsePacket.Labels)
+            {
+                <span>@label</span>
+            }
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var cue in Model.TablePulsePacket.Cues)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@cue.Label</span>
+                    <h3>@cue.StatusLabel</h3>
+                    <p>@cue.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <a href="@cue.Href">Open lane</a>
+                    </div>
+                </article>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Model.TablePulsePacket.AdjudicationSummary))
+        {
+            <div class="trust-claim__microproof">
+                <span>@Model.TablePulsePacket.AdjudicationSummary</span>
+            </div>
+        }
+        <div class="route-choice-grid route-choice-grid--three">
+            <article class="route-choice-card">
+                <span class="tag">Heat posture</span>
+                <p>@Model.TablePulsePacket.HeatPosture</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Notification posture</span>
+                <p>@Model.TablePulsePacket.NotificationPosture</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Remote reaction lane</span>
+                <p>@Model.TablePulsePacket.RemoteReactionPosture</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Signal Deck</span>
+                <p>@Model.TablePulsePacket.SignalDeckPosture</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Runner Passport</span>
+                <p>@Model.TablePulsePacket.RunnerPassportPosture</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Aftermath</span>
+                <p>@Model.TablePulsePacket.AftermathPosture</p>
+                <div class="route-choice-card__proof">
+                    <a href="@Model.TablePulsePacket.AftermathHref">Open aftermath rail</a>
+                </div>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Living World</span>
+                <p>Keep the between-session watch package, command follow-through, and aftermath rail on one first-party route.</p>
+                <div class="route-choice-card__proof">
+                    <a href="/living-world">Open Living World</a>
+                </div>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Entry</span>
+                <p>Use the inbox route as the Table Pulse Live packet, not a dead notification shelf.</p>
+                <div class="route-choice-card__proof">
+                    <a href="@Model.TablePulsePacket.EntryHref">Open Table Pulse Live lane</a>
+                </div>
+            </article>
+        </div>
+        @if (Model.TablePulsePacket.ReactionOptions.Count > 0)
+        {
+            <div class="editorial-block__lead">
+                <p class="eyebrow">Remote reaction adjudication</p>
+                <h3 class="editorial-title">Bounded minigame prompts</h3>
+                <p class="editorial-copy">These prompts write into the governed campaign consequence lane instead of inventing a side-channel minigame log.</p>
+            </div>
+            <div class="route-choice-grid route-choice-grid--three">
+                @foreach (var option in Model.TablePulsePacket.ReactionOptions)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@option.Kind</span>
+                        <h3>@option.Label</h3>
+                        <p>@option.Summary</p>
+                        <form method="post" action="/account/ledger/notifications/table-pulse/react">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="reactionId" value="@option.ReactionId" />
+                            <button class="button-like button-like--secondary" type="submit">@option.ActionLabel</button>
+                        </form>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+}
+
 @if (Model.AdvisorySummary is not null)
 {
     <section class="editorial-block">
@@ -139,6 +251,25 @@
                     </div>
                 </div>
                 <aside class="ledger-newsreel-broadcast__sidebar">
+                    @if (Model.WorldTurnBriefing.Broadcast.ActionBeats.Count > 0)
+                    {
+                        <article class="route-choice-card">
+                            <span class="tag">Action board</span>
+                            <h3>Inbox-worthy beats</h3>
+                            <div class="ledger-newsreel-broadcast__action-strip">
+                                @foreach (var beat in Model.WorldTurnBriefing.Broadcast.ActionBeats.Take(3))
+                                {
+                                    <article class="ledger-newsreel-broadcast__action-card">
+                                        <span class="tag">@beat.ActorKind</span>
+                                        <h4>@beat.BeatLabel</h4>
+                                        <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
+                                        <p>@beat.ActionSummary</p>
+                                        <p class="ledger-newsreel-broadcast__action-proof">@beat.ProofNote</p>
+                                    </article>
+                                }
+                            </div>
+                        </article>
+                    }
                     <article class="route-choice-card">
                         <span class="tag">Audio</span>
                         <h3>Broadcast mix</h3>

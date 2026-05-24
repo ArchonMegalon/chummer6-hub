@@ -1,7 +1,12 @@
-const CACHE_NAME = "chummer-public-v2";
+const CACHE_NAME = "chummer-public-v3";
 const SHELL_CACHE = `${CACHE_NAME}-shell`;
 const RUNTIME_CACHE = `${CACHE_NAME}-runtime`;
 const NAVIGATION_FALLBACK = "/mobile";
+const NOTIFICATION_ICON = "/apple-touch-icon.png";
+const NOTIFICATION_BADGE = "/favicon.ico";
+const DEFAULT_NOTIFICATION_TITLE = "Chummer update";
+const DEFAULT_NOTIFICATION_BODY = "Open Chummer to review the latest activity.";
+const DEFAULT_NOTIFICATION_HREF = "/account/ledger/notifications";
 const PRECACHE_URLS = [
   "/",
   "/mobile",
@@ -25,6 +30,50 @@ const PRECACHE_URLS = [
   "/pwa-maskable.svg",
   "/pwa-screenshot-mobile.svg",
   "/pwa-screenshot-wide.svg"
+];
+const PUBLIC_NAVIGATION_CACHE_PATHS = new Set([
+  "/",
+  "/mobile",
+  "/play",
+  "/play/continuity",
+  "/packages",
+  "/downloads",
+  "/help",
+  "/status"
+]);
+const PUBLIC_RUNTIME_CACHE_PREFIXES = [
+  "/css/",
+  "/js/",
+  "/images/",
+  "/media/",
+  "/fonts/"
+];
+const PUBLIC_RUNTIME_CACHE_SUFFIXES = [
+  ".css",
+  ".js",
+  ".svg",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+  ".ico",
+  ".woff",
+  ".woff2",
+  ".ttf",
+  ".eot",
+  ".webmanifest",
+  ".json",
+  ".txt"
+];
+const NON_CACHEABLE_PATH_PREFIXES = [
+  "/account",
+  "/api",
+  "/admin",
+  "/support",
+  "/signin",
+  "/signout",
+  "/auth"
 ];
 
 self.addEventListener("install", (event) => {
@@ -69,15 +118,19 @@ self.addEventListener("fetch", (event) => {
           }
 
           const response = await fetch(event.request);
-          const copy = response.clone();
-          event.waitUntil(
-            caches.open(RUNTIME_CACHE).then((cache) => cache.put(event.request, copy))
-          );
+          if (shouldCacheResponse(event.request, response)) {
+            const copy = response.clone();
+            event.waitUntil(
+              caches.open(RUNTIME_CACHE).then((cache) => cache.put(event.request, copy))
+            );
+          }
           return response;
         } catch {
-          const cachedRoute = await caches.match(event.request);
-          if (cachedRoute) {
-            return cachedRoute;
+          if (isPublicRuntimeCacheableRequest(event.request)) {
+            const cachedRoute = await caches.match(event.request);
+            if (cachedRoute) {
+              return cachedRoute;
+            }
           }
 
           const mobileRail = await caches.match(NAVIGATION_FALLBACK);
@@ -99,8 +152,10 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith(
     (async () => {
-      const cached = await caches.match(event.request);
-      const isStaticAsset = ["/css/", "/js/", ".svg", ".json"].some((segment) => requestUrl.pathname.includes(segment));
+      const cacheable = isPublicRuntimeCacheableRequest(event.request);
+      const cached = cacheable ? await caches.match(event.request) : null;
+      const isStaticAsset = PUBLIC_RUNTIME_CACHE_PREFIXES.some((prefix) => requestUrl.pathname.startsWith(prefix))
+        || PUBLIC_RUNTIME_CACHE_SUFFIXES.some((suffix) => requestUrl.pathname.endsWith(suffix));
       if (cached && isStaticAsset) {
         event.waitUntil(refreshRuntime(event.request));
         return cached;
@@ -119,13 +174,265 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
+self.addEventListener("push", (event) => {
+  event.waitUntil(handlePush(event));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.waitUntil(handleNotificationClick(event));
+});
+
+self.addEventListener("notificationclose", (event) => {
+  event.waitUntil(handleNotificationClose(event));
+});
+
 async function refreshRuntime(request) {
   const response = await fetch(request);
-  if (!response.ok) {
+  if (!shouldCacheResponse(request, response)) {
     return response;
   }
 
   const copy = response.clone();
   await caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
   return response;
+}
+
+function isPublicRuntimeCacheableRequest(request) {
+  if (!request) {
+    return false;
+  }
+
+  try {
+    const url = new URL(request.url, self.location.origin);
+    if (url.origin !== self.location.origin) {
+      return false;
+    }
+
+    if (NON_CACHEABLE_PATH_PREFIXES.some((prefix) => url.pathname === prefix || url.pathname.startsWith(`${prefix}/`))) {
+      return false;
+    }
+
+    if (request.mode === "navigate") {
+      return PUBLIC_NAVIGATION_CACHE_PATHS.has(url.pathname);
+    }
+
+    if (PRECACHE_URLS.includes(url.pathname)) {
+      return true;
+    }
+
+    return PUBLIC_RUNTIME_CACHE_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))
+      || PUBLIC_RUNTIME_CACHE_SUFFIXES.some((suffix) => url.pathname.endsWith(suffix));
+  } catch {
+    return false;
+  }
+}
+
+function shouldCacheResponse(request, response) {
+  if (!response || !response.ok || response.status !== 200) {
+    return false;
+  }
+
+  return isPublicRuntimeCacheableRequest(request);
+}
+
+async function handlePush(event) {
+  const payload = normalizePushPayload(event);
+  const href = normalizeNotificationHref(payload.href || payload.route || payload.url || DEFAULT_NOTIFICATION_HREF);
+  const actionRoutes = {};
+  const notificationData = {
+    href,
+    route: href,
+    tag: payload.tag || "chummer-update",
+    family: payload.family || "general",
+    notificationId: payload.notificationId || payload.id || null,
+    receivedAt: new Date().toISOString(),
+    source: "service-worker-push"
+  };
+
+  await broadcastClientMessage("chummer:pwa-notification-push", {
+    title: payload.title || DEFAULT_NOTIFICATION_TITLE,
+    body: payload.body || DEFAULT_NOTIFICATION_BODY,
+    data: notificationData
+  });
+
+  if (payload.silent === true) {
+    return;
+  }
+
+  const options = {
+    body: payload.body || DEFAULT_NOTIFICATION_BODY,
+    icon: normalizeNotificationAssetPath(payload.icon, NOTIFICATION_ICON),
+    badge: normalizeNotificationAssetPath(payload.badge, NOTIFICATION_BADGE),
+    tag: notificationData.tag,
+    data: notificationData,
+    renotify: payload.renotify === true,
+    requireInteraction: payload.requireInteraction === true,
+    silent: false
+  };
+
+  if (Array.isArray(payload.actions) && payload.actions.length > 0) {
+    options.actions = payload.actions
+      .map((action) => {
+        if (!action || !action.action || !action.title) {
+          return null;
+        }
+
+        const actionId = String(action.action).trim();
+        const actionTitle = String(action.title).trim();
+        const actionHref = normalizeNotificationHref(action.href || action.route || action.url || "");
+        if (!actionId || !actionTitle) {
+          return null;
+        }
+
+        actionRoutes[actionId] = actionHref;
+        return {
+          action: actionId,
+          title: actionTitle
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 2);
+  }
+
+  if (Object.keys(actionRoutes).length > 0) {
+    notificationData.actionRoutes = actionRoutes;
+  }
+
+  await self.registration.showNotification(payload.title || DEFAULT_NOTIFICATION_TITLE, options);
+}
+
+async function handleNotificationClick(event) {
+  const notification = event.notification;
+  if (notification) {
+    notification.close();
+  }
+
+  const href = resolveNotificationActionHref(event.action, notification?.data);
+
+  await broadcastClientMessage("chummer:pwa-notification-click", {
+    action: event.action || null,
+    href,
+    data: notification?.data || null
+  });
+
+  const windowClients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const targetUrl = new URL(href, self.location.origin).href;
+
+  for (const client of windowClients) {
+    if (!("focus" in client)) {
+      continue;
+    }
+
+    try {
+      const clientUrl = new URL(client.url, self.location.origin);
+      if (clientUrl.origin === self.location.origin) {
+        await client.focus();
+        if ("navigate" in client && client.url !== targetUrl) {
+          await client.navigate(targetUrl);
+        }
+        return;
+      }
+    } catch {
+      // Ignore malformed client URLs and continue trying.
+    }
+  }
+
+  if (self.clients.openWindow) {
+    await self.clients.openWindow(targetUrl);
+  }
+}
+
+async function handleNotificationClose(event) {
+  await broadcastClientMessage("chummer:pwa-notification-close", {
+    href: normalizeNotificationHref(event.notification?.data?.href || event.notification?.data?.route || DEFAULT_NOTIFICATION_HREF),
+    data: event.notification?.data || null
+  });
+}
+
+function normalizePushPayload(event) {
+  if (!event || !event.data) {
+    return {};
+  }
+
+  try {
+    const json = event.data.json();
+    return json && typeof json === "object" ? json : {};
+  } catch {
+    try {
+      const text = event.data.text();
+      if (!text) {
+        return {};
+      }
+
+      return {
+        title: DEFAULT_NOTIFICATION_TITLE,
+        body: text
+      };
+    } catch {
+      return {};
+    }
+  }
+}
+
+function normalizeNotificationHref(value) {
+  if (!value) {
+    return DEFAULT_NOTIFICATION_HREF;
+  }
+
+  try {
+    const url = new URL(String(value), self.location.origin);
+    if (url.origin !== self.location.origin) {
+      return DEFAULT_NOTIFICATION_HREF;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return DEFAULT_NOTIFICATION_HREF;
+  }
+}
+
+function normalizeNotificationAssetPath(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  try {
+    const url = new URL(String(value), self.location.origin);
+    if (url.origin !== self.location.origin) {
+      return fallback;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function resolveNotificationActionHref(actionId, data) {
+  const actionRoutes = data?.actionRoutes;
+  if (actionId && actionRoutes && typeof actionRoutes === "object") {
+    const routed = actionRoutes[String(actionId)];
+    if (routed) {
+      return normalizeNotificationHref(routed);
+    }
+  }
+
+  return normalizeNotificationHref(
+    data?.href
+      || data?.route
+      || DEFAULT_NOTIFICATION_HREF
+  );
+}
+
+async function broadcastClientMessage(type, payload) {
+  const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  await Promise.all(
+    clients.map(async (client) => {
+      try {
+        client.postMessage({ type, payload });
+      } catch {
+        // Ignore postMessage failures for detached or unavailable clients.
+      }
+    })
+  );
 }

@@ -15,6 +15,7 @@ using Chummer.Run.Contracts.Community;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Control.Contracts.Support;
+using Chummer.Run.Api.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
@@ -1733,6 +1734,16 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> RunnerPassportPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunnerPassportPageModel(cancellationToken));
 
+    [HttpGet("/signal-deck")]
+    [Produces("text/html")]
+    public async Task<IActionResult> SignalDeckPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildSignalDeckPageModel(cancellationToken));
+
+    [HttpGet("/living-world")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LivingWorldPreviewPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildLivingWorldPageModel(cancellationToken));
+
     [HttpGet("/community/open-runs/{packetId}.md")]
     [Produces("text/markdown")]
     public IActionResult CommunityOpenRunPacketMarkdown([FromRoute] string packetId)
@@ -1762,6 +1773,26 @@ public sealed class PublicLandingController : Controller
     [Produces("application/json")]
     public IActionResult PassportReceiptJson([FromRoute] string receiptId)
         => Content(_communityCreatorHorizons.BuildPassportJson(receiptId), "application/json");
+
+    [HttpGet("/signal-deck/receipts/{receiptId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult SignalDeckReceiptMarkdown([FromRoute] string receiptId)
+        => Content(_communityCreatorHorizons.BuildSignalDeckMarkdown(receiptId), "text/markdown");
+
+    [HttpGet("/signal-deck/receipts/{receiptId}.json")]
+    [Produces("application/json")]
+    public IActionResult SignalDeckReceiptJson([FromRoute] string receiptId)
+        => Content(_communityCreatorHorizons.BuildSignalDeckJson(receiptId), "application/json");
+
+    [HttpGet("/living-world/receipts/{receiptId}.md")]
+    [Produces("text/markdown")]
+    public IActionResult LivingWorldReceiptMarkdown([FromRoute] string receiptId)
+        => Content(_communityCreatorHorizons.BuildLivingWorldMarkdown(receiptId), "text/markdown");
+
+    [HttpGet("/living-world/receipts/{receiptId}.json")]
+    [Produces("application/json")]
+    public IActionResult LivingWorldReceiptJson([FromRoute] string receiptId)
+        => Content(_communityCreatorHorizons.BuildLivingWorldJson(receiptId), "application/json");
 
     [HttpGet("/karma-forge")]
     public IActionResult KarmaForgeAliasPage()
@@ -2038,6 +2069,13 @@ public sealed class PublicLandingController : Controller
                 audience_promise = promo.AudiencePromise,
                 validation_href = promo.ValidationHref,
                 storyboard_shots = promo.StoryboardShots,
+                storyboard_frames = promo.StoryboardFrames.Select(frame => new
+                {
+                    label = frame.Label,
+                    visual_hook = frame.VisualHook,
+                    action_beat = frame.ActionBeat,
+                    proof_payoff = frame.ProofPayoff,
+                }),
                 html_href = promo.HtmlHref,
                 captions_href = promo.CaptionsHref,
                 poster_href = promo.PosterHref,
@@ -2101,12 +2139,38 @@ public sealed class PublicLandingController : Controller
         {
             var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
             var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
-            var model = await BuildLedgerNotificationsPageModel(user, cancellationToken);
+            var model = await BuildLedgerNotificationsPageModel(user, subject.SubjectId, cancellationToken);
             return View("~/Views/PublicLanding/LedgerNotifications.cshtml", model);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
             return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+    }
+
+    [HttpPost("/account/ledger/notifications/table-pulse/react")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> AccountLedgerTablePulseReactionPost([FromForm] string reactionId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? workspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+            if (workspace is null)
+            {
+                return Redirect("/account/ledger/notifications");
+            }
+
+            CampaignConsequenceUpdateRequest request = BuildTablePulseReactionConsequenceRequest(reactionId);
+            _workspaceServerPlane.UpsertCampaignConsequence(user, workspace.WorkspaceId, request, installLinking);
+            return Redirect($"/account/ledger/notifications?reaction={Uri.EscapeDataString(request.Kind)}");
+        }
+        catch (Exception ex) when (ex is HubRequestAuthException or InvalidOperationException or ArgumentException)
+        {
+            _logger.LogWarning(ex, "Table Pulse reaction adjudication failed for the signed-in ledger lane.");
+            return Redirect("/account/ledger/notifications?reaction=error");
         }
     }
 
@@ -3837,25 +3901,138 @@ public sealed class PublicLandingController : Controller
     private async Task<MediaArtifactHorizonPageViewModel> BuildRunnerPassportPageModel(CancellationToken cancellationToken)
     {
         RunnerPassportPublicSummary summary = _communityCreatorHorizons.BuildPassportSummary();
-        return await BuildMediaArtifactHorizonPageModel(
-            currentPath: "/passport",
-            title: "Runner Passport",
-            description: "Public-safe runner return posture, participation proof, and bounded cross-table trust.",
-            eyebrow: "Identity horizon",
-            heading: "Runner Passport",
-            intro: "Runner Passport now ships real public-safe receipts: runner return posture, bounded cross-table trust, and privacy-safe participation proof on first-party routes.",
-            boundaryLine: "The public lane exposes aggregate readiness and trust boundaries only. Private identity links, moderation state, and account recovery stay signed-in.",
-            summaryPoints:
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome("Runner Passport", "Public-safe runner return posture, participation proof, and bounded cross-table trust.", "/passport", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Runner Passport", "Public-safe runner return posture, participation proof, and bounded cross-table trust.", "/passport", cancellationToken);
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
+        string? factionId = null;
+        if (user is not null && subject is not null)
+        {
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+            workspaceServerPlane = starterWorkspace is null
+                ? null
+                : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
+            factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId?.Replace('_', '-');
+        }
+
+        return new MediaArtifactHorizonPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Identity horizon",
+            Heading: "Runner Passport",
+            Intro: "Runner Passport now ships real public-safe receipts: runner return posture, bounded cross-table trust, and privacy-safe participation proof on first-party routes.",
+            BoundaryLine: "The public lane exposes aggregate readiness and trust boundaries only. Private identity links, moderation state, and account recovery stay signed-in.",
+            SummaryPoints:
             [
                 $"{summary.ActiveInstallationCount} active claimed installs",
                 $"{summary.OpenRunCount} open runs on the public board",
                 $"{summary.PendingJoinCount} pending join requests"
             ],
-            documents: _communityCreatorHorizons.ListPassportDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            primaryAction: new TrustPageActionViewModel("Open runner return receipt", "/passport/receipts/runner_return_posture.md", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open receipt JSON", "/passport/receipts/runner_return_posture.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open community", "/community", "ghost"),
-            cancellationToken: cancellationToken);
+            Documents: _communityCreatorHorizons.ListPassportDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            PrimaryAction: new TrustPageActionViewModel("Open runner return receipt", "/passport/receipts/runner_return_posture.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open receipt JSON", "/passport/receipts/runner_return_posture.json", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open community", "/community", "ghost"),
+            ConnectedLanePacket: BuildRunnerPassportConnectedLanePacket(summary, workspaceServerPlane, factionId, _blackLedgerBriefings.BuildWorldTurnBriefing(1)),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildSignalDeckPageModel(CancellationToken cancellationToken)
+    {
+        SignalDeckPublicSummary summary = _communityCreatorHorizons.BuildSignalDeckSummary();
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome("Signal Deck", "Governed command pressure, consequence posture, and aftermath continuity on first-party rails.", "/signal-deck", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Signal Deck", "Governed command pressure, consequence posture, and aftermath continuity on first-party rails.", "/signal-deck", cancellationToken);
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
+        string? factionId = null;
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        if (user is not null && subject is not null)
+        {
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+            workspaceServerPlane = starterWorkspace is null
+                ? null
+                : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
+            factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId?.Replace('_', '-');
+        }
+
+        int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+
+        return new MediaArtifactHorizonPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "Command horizon",
+            Heading: "Signal Deck",
+            Intro: "Signal Deck now has a real first-party route: governed command pressure, consequence posture, and aftermath continuity stay attached to the same signed-in Table Pulse rail instead of disappearing into generic recap copy.",
+            BoundaryLine: "Signal Deck is a first-party command and follow-through surface. It can show governed pressure and consequence posture, but it does not become automatic world authority, a hidden moderation score, or a private transcript lane.",
+            SummaryPoints:
+            [
+                consequenceCount > 0 ? $"{consequenceCount} governed consequence cue(s) live" : "Command rail armed",
+                $"{summary.OpenRunCount} open runs on the public board",
+                aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) on the return rail" : "Aftermath rail armed"
+            ],
+            Documents: _communityCreatorHorizons.ListSignalDeckDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            PrimaryAction: new TrustPageActionViewModel("Open command pressure receipt", "/signal-deck/receipts/pressure_posture.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open receipt JSON", "/signal-deck/receipts/pressure_posture.json", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open Table Pulse inbox", "/account/ledger/notifications", "ghost"),
+            ConnectedLanePacket: BuildSignalDeckConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildLivingWorldPageModel(CancellationToken cancellationToken)
+    {
+        LivingWorldPublicSummary summary = _communityCreatorHorizons.BuildLivingWorldSummary();
+        AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
+        var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), subject is not null);
+        SiteChromeViewModel chrome = subject is not null && user is not null
+            ? _chrome.BuildAuthenticatedChrome("Living World", "Between-session command, watch framing, and aftermath continuity on first-party rails.", "/living-world", user.DisplayName, user.Email)
+            : await BuildPublicOrAuthenticatedChromeAsync("Living World", "Between-session command, watch framing, and aftermath continuity on first-party rails.", "/living-world", cancellationToken);
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = null;
+        string? factionId = null;
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        if (user is not null && subject is not null)
+        {
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+            workspaceServerPlane = starterWorkspace is null
+                ? null
+                : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
+            factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId?.Replace('_', '-');
+        }
+
+        int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+
+        return new MediaArtifactHorizonPageViewModel(
+            Chrome: chrome,
+            Eyebrow: "World horizon",
+            Heading: "Living World",
+            Intro: "Living World is now a real first-party route for between-session command continuity: the watch package, faction command, Runner Passport, and aftermath rail stay attached to the same governed turn instead of scattering into concept-only copy.",
+            BoundaryLine: "Living World engagement is governed, opt-in, and first-party. It does not claim autonomous simulation, automatic world truth, or unbounded off-table authorship.",
+            SummaryPoints:
+            [
+                worldTurnBriefing?.Broadcast is not null ? "Watch package live" : "Watch framing armed",
+                consequenceCount > 0 ? $"{consequenceCount} consequence cue(s) live" : "Command rail armed",
+                aftermathCount > 0 ? $"{aftermathCount} aftermath package(s) queued" : "Aftermath rail armed"
+            ],
+            Documents: _communityCreatorHorizons.ListLivingWorldDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
+            PrimaryAction: new TrustPageActionViewModel("Open watch package receipt", "/living-world/receipts/watch_package_posture.md", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open receipt JSON", "/living-world/receipts/watch_package_posture.json", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open public watch lane", worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1", "ghost"),
+            ConnectedLanePacket: BuildLivingWorldConnectedLanePacket(summary, workspaceServerPlane, factionId, worldTurnBriefing),
+            TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
+            SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
 
     private async Task<MediaArtifactHorizonPageViewModel> BuildGhostwirePageModel(CancellationToken cancellationToken)
@@ -5603,7 +5780,8 @@ public sealed class PublicLandingController : Controller
 
     private async Task<SupportIntakeDefaults> ResolveSupportIntakeDefaultsAsync(CancellationToken cancellationToken)
     {
-        var subject = await TryGetOptionalSubjectAsync(cancellationToken);
+        var currentPath = Request.Path.HasValue ? Request.Path.Value! : "/contact";
+        var subject = await TryGetOptionalPublicSurfaceSubjectAsync(currentPath, cancellationToken);
         if (subject is null)
         {
             return SupportIntakeDefaults.Empty;
@@ -9133,7 +9311,7 @@ echo "Help: ${HELP_URL}"
                 string.Equals(faction.Id, selectedFactionId, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(faction.Id.Replace('_', '-'), selectedFactionId, StringComparison.OrdinalIgnoreCase));
         var intro = world?.DeterministicPreview == true
-            ? "This deterministic turn-two preview shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
+            ? "This deterministic turn-two board shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
             : "A fictional, public-safe seed world with six factions, visible pressure zones, and bounded dispatches.";
         if (selectedFaction is not null)
         {
@@ -9165,7 +9343,7 @@ echo "Help: ${HELP_URL}"
                 "Public-safe campaign pressure, package heat, and proof-backed closeout movement.",
                 currentPath,
                 cancellationToken),
-            Eyebrow: mapFocused ? "Black Ledger command map" : selectedFaction is null ? "Black Ledger preview" : "Black Ledger faction file",
+            Eyebrow: mapFocused ? "Black Ledger command map" : selectedFaction is null ? "Black Ledger command deck" : "Black Ledger faction file",
             Heading: selectedFaction is not null
                 ? $"{selectedFaction.PublicName} faction file"
                 : mapFocused
@@ -9283,6 +9461,13 @@ echo "Help: ${HELP_URL}"
         string? resolvedCampaignId = string.IsNullOrWhiteSpace(campaignId)
             ? workspaceSummary.Workspaces.FirstOrDefault()?.CampaignId ?? workspaceSummary.Campaigns.FirstOrDefault()?.CampaignId
             : campaignId.Trim();
+        var installLinking = _installLinking.GetSummary(user.UserId, user.SubjectId);
+        CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = starterWorkspace is null
+            ? null
+            : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+        RunnerPassportPublicSummary runnerPassportSummary = _communityCreatorHorizons.BuildPassportSummary();
         BlackLedgerPrivateLoreOverlayDto? overlay = string.IsNullOrWhiteSpace(resolvedCampaignId)
             ? null
             : _blackLedgerFactions.GetPrivateLoreOverlay(resolvedCampaignId, faction.Id);
@@ -9334,6 +9519,11 @@ echo "Help: ${HELP_URL}"
             Allegiance: _blackLedgerFactions.GetAllegiance(user),
             AvailableActions: string.Equals(currentSection, "manage", StringComparison.OrdinalIgnoreCase) ? _blackLedgerFactions.GetActionDefinitions(faction.Id) : Array.Empty<BlackLedgerFactionActionDefinitionDto>(),
             RecentActionReceipts: _blackLedgerFactions.GetActionReceipts(faction.Id).Take(6).ToArray(),
+            ConnectedLanePacket: BuildLedgerWorkspaceConnectedLanePacket(
+                workspaceServerPlane,
+                runnerPassportSummary,
+                normalizedFactionId,
+                worldTurnBriefing),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
@@ -9344,8 +9534,15 @@ echo "Help: ${HELP_URL}"
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
         var chrome = _chrome.BuildAuthenticatedChrome("My Black Ledger faction", "Signed-in Black Ledger faction home, welcome kit, and action trail.", "/account/ledger", user.DisplayName, user.Email);
+        var installLinking = _installLinking.GetSummary(user.UserId, user.SubjectId);
+        CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = starterWorkspace is null
+            ? null
+            : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
+        RunnerPassportPublicSummary runnerPassportSummary = _communityCreatorHorizons.BuildPassportSummary();
         BlackLedgerFactionHomeViewModel model = _blackLedgerFactions.BuildFactionHome(chrome, user);
         string factionId = model.Faction.FactionId.Replace('_', '-');
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
         return model with
         {
             NewsreelStatus = _blackLedgerTickNews.BuildStatusViewModel(
@@ -9356,19 +9553,317 @@ echo "Help: ${HELP_URL}"
                 turnHref: "/ledger/turns/1",
                 dispatchHref: "/ledger/turns/1/dispatches",
                 recipientUserId: user.UserId),
-            WorldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1),
+            WorldTurnBriefing = worldTurnBriefing,
             LeaderDigest = _blackLedgerBriefings.BuildLeaderDigest(factionId, 1),
             ValidationPacket = _blackLedgerBriefings.BuildValidationPacket(1, factionId),
-            AdvisorySummary = _blackLedgerAdvisories.BuildSummary(user)
+            AdvisorySummary = _blackLedgerAdvisories.BuildSummary(user),
+            FollowThroughPacket = BuildLedgerFollowThroughPacket(
+                workspaceServerPlane,
+                runnerPassportSummary,
+                factionId,
+                worldTurnBriefing)
         };
     }
 
-    private async Task<BlackLedgerNotificationsPageViewModel> BuildLedgerNotificationsPageModel(HubUserDto user, CancellationToken cancellationToken)
+    private static BlackLedgerFollowThroughPacketViewModel BuildLedgerFollowThroughPacket(
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane,
+        RunnerPassportPublicSummary runnerPassportSummary,
+        string factionId,
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing)
+    {
+        string signalDeckSummary = workspaceServerPlane?.Consequences.Count > 0
+            ? $"Signal Deck is carrying {workspaceServerPlane.Consequences.Count} governed consequence cue(s) forward from the latest inbox reaction and workspace truth."
+            : "Signal Deck is armed, but no governed consequence cue has been written yet for this signed-in lane.";
+        string runnerPassportSummaryText =
+            $"Runner Passport is live with {runnerPassportSummary.ActiveInstallationCount} claimed install(s), {runnerPassportSummary.OpenRunCount} public open run(s), and {runnerPassportSummary.ParticipationNotificationCount} participation receipt(s) on the first-party rail.";
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+        string livingNewsroomSummary = worldTurnBriefing?.Broadcast is not null
+            ? $"Living Newsroom is carrying {worldTurnBriefing.Broadcast.PackageLabel} as the public-safe bulletin for this turn, so the same anchor-led package can frame what Signal Deck and the inbox are reacting to."
+            : "Living Newsroom is armed for this turn, but the signed-in lane has not attached a watch package yet.";
+        string livingNewsroomHref = worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1";
+        string aftermathSummary = aftermathCount > 0
+            ? $"Governed aftermath currently holds {aftermathCount} package(s), so remote reactions can return as receipts and follow-through instead of disappearing into flavor-only copy."
+            : "No governed aftermath package is attached yet, so follow-through stays armed and bounded until the next safe action writes one.";
+        string aftermathHref = "/account/work#aftermath-packages";
+        string summary = "After a Table Pulse reaction resolves, the result should survive as follow-through: Signal Deck keeps the pressure cue visible, and Runner Passport keeps the trust/return story bounded and public-safe.";
+        string boundaryLine = "Follow-through stays on first-party rails only. Signal Deck shows governed consequence posture; Runner Passport shows aggregate trust and continuity proof without leaking private account or moderation detail.";
+
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signal Deck",
+                Summary: signalDeckSummary,
+                Href: "/signal-deck",
+                StatusLabel: workspaceServerPlane?.Consequences.Count > 0 ? "Consequence-backed" : "Armed"),
+            new(
+                Label: "Runner Passport",
+                Summary: runnerPassportSummaryText,
+                Href: "/passport",
+                StatusLabel: "Public-safe live"),
+            new(
+                Label: "Living Newsroom",
+                Summary: livingNewsroomSummary,
+                Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
+                StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
+            new(
+                Label: "Leader follow-through",
+                Summary: "Leader briefing stays the escalation lane when a reaction outcome needs another command decision before the next turn packet.",
+                Href: $"/account/ledger/factions/{factionId}/leader-briefing",
+                StatusLabel: "Escalation"),
+            new(
+                Label: "Governed aftermath",
+                Summary: "Any remote reaction that lands as downtime or aftermath must stay on the governed return-loop rail instead of becoming orphaned flavor text.",
+                Href: "/account/work#aftermath-packages",
+                StatusLabel: "Return-loop")
+        ];
+
+        return new BlackLedgerFollowThroughPacketViewModel(
+            Heading: "Signal Deck and Runner Passport follow-through",
+            Summary: summary,
+            SignalDeckSummary: signalDeckSummary,
+            RunnerPassportSummary: runnerPassportSummaryText,
+            LivingNewsroomSummary: livingNewsroomSummary,
+            LivingNewsroomHref: livingNewsroomHref,
+            AftermathSummary: aftermathSummary,
+            AftermathHref: aftermathHref,
+            BoundaryLine: boundaryLine,
+            Cues: cues);
+    }
+
+    private static BlackLedgerConnectedLanePacketViewModel BuildRunnerPassportConnectedLanePacket(
+        RunnerPassportPublicSummary runnerPassportSummary,
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane,
+        string? factionId,
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing)
+    {
+        int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+        string leaderHref = string.IsNullOrWhiteSpace(factionId)
+            ? "/account/ledger"
+            : $"/account/ledger/factions/{factionId}/leader-briefing";
+        string summary = "Runner Passport is the continuity rail for Table Pulse: trust stays public-safe, but the signed-in command loop can still carry inbox reactions, Signal Deck cues, Living Newsroom framing, and aftermath follow-through on one governed path.";
+        string boundaryLine = "Runner Passport exposes aggregate trust and return posture only. It can point to signed-in command lanes, but it does not project private identity, moderation decisions, or transcript detail.";
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Trust posture",
+                Summary: $"Passport is live with {runnerPassportSummary.ActiveInstallationCount} claimed install(s), {runnerPassportSummary.OpenRunCount} open run(s), and {runnerPassportSummary.ParticipationNotificationCount} participation receipt(s) on the first-party rail.",
+                Href: "/passport/receipts/runner_return_posture.md",
+                StatusLabel: "Public-safe"),
+            new(
+                Label: "Table Pulse inbox",
+                Summary: consequenceCount > 0
+                    ? $"The signed-in inbox is already carrying {consequenceCount} governed consequence cue(s), so trust continuity is attached to real command fallout instead of free-floating copy."
+                    : "Table Pulse is armed for this account, so the next governed reaction can land on the same trust rail instead of disappearing into a separate system.",
+                Href: "/account/ledger/notifications",
+                StatusLabel: workspaceServerPlane is null ? "Armed" : "Signed-in"),
+            new(
+                Label: "Leader command",
+                Summary: string.IsNullOrWhiteSpace(factionId)
+                    ? "Sign in and join a faction to bind Runner Passport to the leader briefing and governed command deck."
+                    : "Use the leader briefing when a passport-safe reaction needs a bounded escalation instead of a detached trust note.",
+                Href: leaderHref,
+                StatusLabel: string.IsNullOrWhiteSpace(factionId) ? "Sign-in" : "Command-linked"),
+            new(
+                Label: "Living Newsroom",
+                Summary: worldTurnBriefing?.Broadcast is not null
+                    ? $"Living Newsroom is framing this turn through {worldTurnBriefing.Broadcast.PackageLabel}, so Runner Passport can stay attached to the same public-safe watch package."
+                    : "Living Newsroom framing is armed and will attach once the current turn publishes a watch package.",
+                Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
+                StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
+            new(
+                Label: "Aftermath return loop",
+                Summary: aftermathCount > 0
+                    ? $"{aftermathCount} aftermath package(s) are on the governed return rail, so Passport continuity can survive the off-table handoff."
+                    : "Aftermath return loops stay armed even when the queue is empty, so trust does not vanish when a session moves off-table.",
+                Href: "/account/work#aftermath-packages",
+                StatusLabel: aftermathCount > 0 ? "Return-loop" : "Armed")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "Runner Passport connected lane",
+            Summary: summary,
+            BoundaryLine: boundaryLine,
+            Cues: cues);
+    }
+
+    private static BlackLedgerConnectedLanePacketViewModel BuildSignalDeckConnectedLanePacket(
+        SignalDeckPublicSummary signalDeckSummary,
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane,
+        string? factionId,
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing)
+    {
+        int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+        string leaderHref = string.IsNullOrWhiteSpace(factionId)
+            ? "/account/ledger"
+            : $"/account/ledger/factions/{factionId}/leader-briefing";
+        string summary = "Signal Deck is the command-facing continuity rail for Table Pulse: pressure cues, inbox reactions, Living Newsroom framing, and aftermath return all stay attached to one first-party path.";
+        string boundaryLine = "Signal Deck shows governed command posture only. It does not publish private transcript detail, hidden moderation state, or automatic world authority outside first-party rails.";
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Command pressure",
+                Summary: consequenceCount > 0
+                    ? $"{consequenceCount} governed consequence cue(s) are already live, so Signal Deck is carrying real fallout instead of speculative flavor."
+                    : "Signal Deck is armed even before the next reaction resolves, so the next inbox packet can stay on the same command rail.",
+                Href: "/account/ledger/notifications",
+                StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Armed"),
+            new(
+                Label: "Leader command",
+                Summary: string.IsNullOrWhiteSpace(factionId)
+                    ? "Join a faction to bind Signal Deck to the leader briefing and GM cockpit escalation lane."
+                    : "Use the leader briefing when Signal Deck pressure needs a second command decision before the next turn packet.",
+                Href: leaderHref,
+                StatusLabel: string.IsNullOrWhiteSpace(factionId) ? "Sign-in" : "Cockpit"),
+            new(
+                Label: "Living Newsroom",
+                Summary: worldTurnBriefing?.Broadcast is not null
+                    ? $"Living Newsroom is currently framed by {worldTurnBriefing.Broadcast.PackageLabel}, so Signal Deck can stay attached to the same public-safe watch package."
+                    : "Living Newsroom watch framing is armed and will attach when the current turn publishes a bulletin.",
+                Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
+                StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
+            new(
+                Label: "Aftermath rail",
+                Summary: aftermathCount > 0
+                    ? $"{aftermathCount} aftermath package(s) are already queued on the governed return rail, so Signal Deck pressure survives the off-table handoff."
+                    : "Aftermath return rail is attached even when no package is queued yet, so command pressure does not disappear after adjudication.",
+                Href: "/account/work#aftermath-packages",
+                StatusLabel: aftermathCount > 0 ? "Queued" : "Armed"),
+            new(
+                Label: "Public-safe receipts",
+                Summary: $"Signal Deck receipts currently summarize {signalDeckSummary.ActiveInstallationCount} active install(s), {signalDeckSummary.OpenRunCount} open run(s), and {signalDeckSummary.ParticipationNotificationCount} participation receipt(s) on first-party rails.",
+                Href: "/signal-deck/receipts/pressure_posture.md",
+                StatusLabel: "Receipt-backed")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "Signal Deck connected lane",
+            Summary: summary,
+            BoundaryLine: boundaryLine,
+            Cues: cues);
+    }
+
+    private static BlackLedgerConnectedLanePacketViewModel BuildLivingWorldConnectedLanePacket(
+        LivingWorldPublicSummary livingWorldSummary,
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane,
+        string? factionId,
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing)
+    {
+        int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+        string leaderHref = string.IsNullOrWhiteSpace(factionId)
+            ? "/account/ledger"
+            : $"/account/ledger/factions/{factionId}/leader-briefing";
+        string summary = "Living World is the between-session continuity layer for this epic: watch packages, command follow-through, Runner Passport, and aftermath all stay attached to the same governed turn instead of forking into separate systems.";
+        string boundaryLine = "Living World engagement is first-party, governed, and fail-closed. It can frame and carry follow-through, but it does not claim autonomous simulation or detached world authority.";
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Watch package",
+                Summary: worldTurnBriefing?.Broadcast is not null
+                    ? $"Living Newsroom is currently carrying {worldTurnBriefing.Broadcast.PackageLabel}, so the same public-safe bulletin can frame what the command rail is reacting to."
+                    : "Watch framing is armed and will attach once the current turn publishes its bulletin.",
+                Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
+                StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
+            new(
+                Label: "Table Pulse inbox",
+                Summary: consequenceCount > 0
+                    ? $"{consequenceCount} consequence cue(s) are already live, so between-session follow-through is attached to governed command truth."
+                    : "The signed-in inbox is armed so the next remote reaction can enter the same governed between-session loop.",
+                Href: "/account/ledger/notifications",
+                StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Inbox"),
+            new(
+                Label: "Faction command",
+                Summary: string.IsNullOrWhiteSpace(factionId)
+                    ? "Join a faction to bind Living World follow-through to the leader briefing and command deck."
+                    : "Leader briefing keeps between-session escalation on the same command rail instead of a detached lore layer.",
+                Href: leaderHref,
+                StatusLabel: string.IsNullOrWhiteSpace(factionId) ? "Sign-in" : "Command-linked"),
+            new(
+                Label: "Runner Passport",
+                Summary: $"Runner Passport keeps {livingWorldSummary.ActiveInstallationCount} active install(s) and {livingWorldSummary.ParticipationNotificationCount} participation receipt(s) attached to this same between-session rail.",
+                Href: "/passport",
+                StatusLabel: "Continuity"),
+            new(
+                Label: "Aftermath rail",
+                Summary: aftermathCount > 0
+                    ? $"{aftermathCount} aftermath package(s) are already queued, so Living World fallout survives the off-table handoff."
+                    : "Aftermath rail is attached even before the next package is written, so the between-session lane stays governed and real.",
+                Href: "/account/work#aftermath-packages",
+                StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "Living World connected lane",
+            Summary: summary,
+            BoundaryLine: boundaryLine,
+            Cues: cues);
+    }
+
+    private static BlackLedgerConnectedLanePacketViewModel BuildLedgerWorkspaceConnectedLanePacket(
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane,
+        RunnerPassportPublicSummary runnerPassportSummary,
+        string factionId,
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing)
+    {
+        int consequenceCount = workspaceServerPlane?.Consequences.Count ?? 0;
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+        string summary = "Faction workspace is part of the same governed command rail as Table Pulse, Signal Deck, Runner Passport, Living Newsroom, and aftermath. Command does not end at action points; it carries through to fallout.";
+        string boundaryLine = "Workspace command stays authenticated and receipt-backed. It can route pressure, command, and governed fallout, but it does not publish private lore or invent public world truth outside first-party rails.";
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Table Pulse inbox",
+                Summary: consequenceCount > 0
+                    ? $"{consequenceCount} consequence cue(s) are already live from the inbox rail, so this workspace can act on real governed pressure."
+                    : "Open the signed-in inbox to review or trigger the next bounded remote reaction before spending command effort here.",
+                Href: "/account/ledger/notifications",
+                StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Inbox"),
+            new(
+                Label: "Leader briefing",
+                Summary: "Escalate into the GM cockpit when a faction action needs a second command decision, governed adjudication, or a bounded follow-through review.",
+                Href: $"/account/ledger/factions/{factionId}/leader-briefing",
+                StatusLabel: "Cockpit"),
+            new(
+                Label: "Runner Passport",
+                Summary: $"Runner Passport is carrying {runnerPassportSummary.ActiveInstallationCount} claimed install(s) and {runnerPassportSummary.ParticipationNotificationCount} participation receipt(s), so faction follow-through stays attached to real runner continuity.",
+                Href: "/passport",
+                StatusLabel: "Trust rail"),
+            new(
+                Label: "Living Newsroom",
+                Summary: worldTurnBriefing?.Broadcast is not null
+                    ? $"Public fallout is currently framed by {worldTurnBriefing.Broadcast.PackageLabel}, keeping faction command tied to the same watch package as the public lane."
+                    : "Living Newsroom watch framing is armed and will attach here once the current turn publishes a bulletin.",
+                Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
+                StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
+            new(
+                Label: "Aftermath rail",
+                Summary: aftermathCount > 0
+                    ? $"{aftermathCount} aftermath package(s) are on the governed return rail, so this workspace can review fallout instead of losing the thread after adjudication."
+                    : "Aftermath rail is attached even when the queue is empty, so the workspace stays connected to return-loop posture.",
+                Href: "/account/work#aftermath-packages",
+                StatusLabel: aftermathCount > 0 ? "Queued" : "Armed")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "Connected faction command lane",
+            Summary: summary,
+            BoundaryLine: boundaryLine,
+            Cues: cues);
+    }
+
+    private async Task<BlackLedgerNotificationsPageViewModel> BuildLedgerNotificationsPageModel(HubUserDto user, string subjectId, CancellationToken cancellationToken)
     {
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), authenticated: true);
         _ = await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken);
         var chrome = _chrome.BuildAuthenticatedChrome("Black Ledger notifications", "Signed-in Black Ledger newsreel delivery posture and receipts.", "/account/ledger/notifications", user.DisplayName, user.Email);
+        var installLinking = _installLinking.GetSummary(user.UserId, subjectId);
+        CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = starterWorkspace is null
+            ? null
+            : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
         string? factionId = _blackLedgerFactions.GetAllegiance(user)?.ActiveFactionId?.Replace('_', '-');
         BlackLedgerNewsStatusViewModel status = _blackLedgerTickNews.BuildStatusViewModel(
             worldId: "emerald-sprawl-prelude",
@@ -9457,6 +9952,14 @@ echo "Help: ${HELP_URL}"
                 StatusLabel: "Advisory"));
         }
 
+        BlackLedgerTablePulsePacketViewModel tablePulsePacket = BuildLedgerTablePulsePacket(
+            status,
+            worldTurnBriefing,
+            validationPacket,
+            leaderDigest,
+            promoArtifact,
+            workspaceServerPlane);
+
         return new BlackLedgerNotificationsPageViewModel(
             Chrome: chrome,
             Heading: "World turn inbox and delivery receipts",
@@ -9470,9 +9973,174 @@ echo "Help: ${HELP_URL}"
                 "Advisory voting remains upstream signal. Players inform GMs, GMs inform leaders, and the chain can still overrule the vote."
             ],
             InboxMessages: inboxMessages,
+            TablePulsePacket: tablePulsePacket,
             WorldTurnBriefing: worldTurnBriefing,
             ValidationPacket: validationPacket,
             AdvisorySummary: advisorySummary);
+    }
+
+    private static BlackLedgerTablePulsePacketViewModel BuildLedgerTablePulsePacket(
+        BlackLedgerNewsStatusViewModel status,
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing,
+        BlackLedgerWorldTickValidationPacketViewModel? validationPacket,
+        BlackLedgerFactionLeaderDigestViewModel? leaderDigest,
+        BlackLedgerFactionPromoArtifactViewModel? promoArtifact,
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane)
+    {
+        string heatPosture = worldTurnBriefing is null
+            ? "Heat posture is quiet enough to hold a notification-only lane."
+            : $"{worldTurnBriefing.WorldName} is carrying live district pressure into Turn {worldTurnBriefing.ToTurn}; treat inbox opens as heat-bearing moves, not passive updates.";
+        string notificationPosture = $"Delivery policy is {status.Policy.ToLowerInvariant()} with {status.ReceiptCount} stored receipt(s) across {status.RecipientCount} recipient lane(s).";
+        string remoteReactionPosture = leaderDigest is null
+            ? "Remote reactions stay public-safe here: respond from inbox, then escalate into GM adjudication before consequence writes land."
+            : $"{leaderDigest.PublicName} can turn inbox beats into remote reactions, minigame prompts, and bounded command intents before the next turn packet lands.";
+        string signalDeckPosture = promoArtifact is null
+            ? "Signal Deck stays attached to the same inbox packet so command visuals, pressure cues, and receipts never split into a second truth."
+            : $"{promoArtifact.PublicName} promo rails are ready to amplify Signal Deck cues without leaving the authenticated command lane.";
+        string runnerPassportPosture = leaderDigest is null
+            ? "Runner Passport stays ready to stamp return posture, trust, and privacy-safe continuity after each remote reaction."
+            : $"Runner Passport can stamp {leaderDigest.PublicName} response posture, return trust, and proof-safe cross-table continuity after the current inbox action.";
+        string aftermathPosture = workspaceServerPlane?.AftermathPackages.Count > 0
+            ? $"Table Pulse Aftermath is holding {workspaceServerPlane.AftermathPackages.Count} governed return package(s) so recap and coaching stay attached to the same first-party rail."
+            : "Table Pulse Aftermath stays private and ready even when no package is queued yet, so debrief and coaching remain separate from the live packet lane.";
+        string verdictLabel = workspaceServerPlane is null
+            ? "Consent-gated preview"
+            : "Governed signed-in lane";
+        string boundaryLine = workspaceServerPlane is null
+            ? "No governed workspace means no live reaction write path. Table Pulse Live stays read-only instead of inventing detached minigame truth, and Table Pulse Aftermath stays parked."
+            : "Table Pulse Live can write only governed consequence posture on the signed-in workspace rail. It does not publish world truth, public scores, or private session transcripts. Table Pulse Aftermath remains the separate private return rail.";
+        string consentPosture = "Table Pulse Live is opt-in, consent-gated, and review-based. Remote reactions are mini-games and packets, not direct table mutation or automatic world-state authority. Table Pulse Aftermath remains private and GM-controlled.";
+
+        List<BlackLedgerTablePulseCueViewModel> cues =
+        [
+            new(
+                Label: "Heat",
+                Summary: heatPosture,
+                StatusLabel: "Live pressure",
+                Href: status.TurnHref),
+            new(
+                Label: "Notifications",
+                Summary: notificationPosture,
+                StatusLabel: status.StatusLabel,
+                Href: status.NotificationsHref),
+            new(
+                Label: "Remote reactions",
+                Summary: remoteReactionPosture,
+                StatusLabel: "GM bounded",
+                Href: "/account/ledger/worldtick/validation"),
+            new(
+                Label: "Signal Deck",
+                Summary: signalDeckPosture,
+                StatusLabel: promoArtifact is null ? "Ready" : "Promo-backed",
+                Href: "/signal-deck"),
+            new(
+                Label: "Runner Passport",
+                Summary: runnerPassportPosture,
+                StatusLabel: "Return-safe",
+                Href: "/passport")
+        ];
+
+        if (validationPacket is not null)
+        {
+            cues.Add(new BlackLedgerTablePulseCueViewModel(
+                Label: "Validation",
+                Summary: validationPacket.Summary,
+                StatusLabel: "Receipt-backed",
+                Href: "/account/ledger/worldtick/validation"));
+        }
+
+        BlackLedgerRemoteReactionOptionViewModel[] reactionOptions = workspaceServerPlane is null
+            ? Array.Empty<BlackLedgerRemoteReactionOptionViewModel>()
+            : [
+                new("intercept", "Intercept", "heat", "Cut the hottest consequence line early and trade tempo for lower exposure.", "Adjudicate intercept"),
+                new("cover-story", "Cover Story", "reputation", "Shift public framing before the next world-tick receipt makes the damage stick.", "Adjudicate cover story"),
+                new("scramble", "Scramble", "contact", "Stabilize contact fallout and route pressure before the next return loop.", "Adjudicate scramble"),
+                new("temptation", "Temptation", "faction", "Push a risky faction offer that can buy leverage at the cost of trust posture.", "Adjudicate temptation"),
+                new("shadow-reply", "Shadow Reply", "downtime", "Queue an off-table response packet that resolves on the governed aftermath rail.", "Adjudicate shadow reply")
+            ];
+
+        string? adjudicationSummary = workspaceServerPlane?.Consequences.Count > 0
+            ? $"Current governed consequence posture: {string.Join(", ", workspaceServerPlane.Consequences.Take(3).Select(static item => $"{item.Label} {item.State}"))}."
+            : workspaceServerPlane is null
+                ? "Adjudication is parked until a governed workspace is available for this signed-in account."
+                : null;
+
+        string summary = "Table Pulse Live turns the signed-in inbox into a command packet: read world heat, confirm delivery, trigger remote reactions, and keep Signal Deck plus Runner Passport on the same proof-backed rail. Table Pulse Aftermath is the separate private return lane.";
+        string[] labels =
+        [
+            "Table Pulse Live",
+            "heat threshold watch",
+            "delivery receipts",
+            "remote reaction minigames",
+            "Signal Deck",
+            "Runner Passport",
+            "Table Pulse Aftermath"
+        ];
+
+        return new BlackLedgerTablePulsePacketViewModel(
+            Heading: "Table Pulse Live command packet",
+            Summary: summary,
+            VerdictLabel: verdictLabel,
+            BoundaryLine: boundaryLine,
+            ConsentPosture: consentPosture,
+            HeatPosture: heatPosture,
+            NotificationPosture: notificationPosture,
+            RemoteReactionPosture: remoteReactionPosture,
+            SignalDeckPosture: signalDeckPosture,
+            RunnerPassportPosture: runnerPassportPosture,
+            AftermathPosture: aftermathPosture,
+            AftermathHref: "/account/work",
+            EntryHref: status.NotificationsHref,
+            Labels: labels,
+            Cues: cues,
+            ReactionOptions: reactionOptions,
+            AdjudicationSummary: adjudicationSummary);
+    }
+
+    private static CampaignConsequenceUpdateRequest BuildTablePulseReactionConsequenceRequest(string reactionId)
+    {
+        string normalizedReactionId = AccountService.NormalizeOptional(reactionId)?.ToLowerInvariant()
+            ?? throw new ArgumentException("reaction id is required.", nameof(reactionId));
+
+        return normalizedReactionId switch
+        {
+            "intercept" => new CampaignConsequenceUpdateRequest(
+                Kind: "heat",
+                State: "contained",
+                Summary: "Remote intercept adjudication absorbed the hottest pressure line before it spilled into the next turn packet.",
+                ReturnLoopAction: "Review heat fallout",
+                ReturnLoopRoute: "/account/work",
+                Note: "Table Pulse remote reaction: intercept"),
+            "cover-story" => new CampaignConsequenceUpdateRequest(
+                Kind: "reputation",
+                State: "under_review",
+                Summary: "Cover Story adjudication is holding the public narrative in a review posture until receipts catch up.",
+                ReturnLoopAction: "Review reputation fallout",
+                ReturnLoopRoute: "/account/work",
+                Note: "Table Pulse remote reaction: cover story"),
+            "scramble" => new CampaignConsequenceUpdateRequest(
+                Kind: "contact",
+                State: "fragile",
+                Summary: "Scramble adjudication kept the contact network live, but the route is still fragile and needs a follow-through pass.",
+                ReturnLoopAction: "Review contact fallout",
+                ReturnLoopRoute: "/account/work",
+                Note: "Table Pulse remote reaction: scramble"),
+            "temptation" => new CampaignConsequenceUpdateRequest(
+                Kind: "faction",
+                State: "strained",
+                Summary: "Temptation adjudication created faction leverage, but it also strained the standing that has to be justified on the next safe return.",
+                ReturnLoopAction: "Confirm faction standing",
+                ReturnLoopRoute: "/account/work",
+                Note: "Table Pulse remote reaction: temptation"),
+            "shadow-reply" => new CampaignConsequenceUpdateRequest(
+                Kind: "downtime",
+                State: "queued",
+                Summary: "Shadow Reply adjudication queued an off-table response packet on the governed aftermath rail.",
+                ReturnLoopAction: "Review downtime obligations",
+                ReturnLoopRoute: "/account/work#aftermath-packages",
+                Note: "Table Pulse remote reaction: shadow reply"),
+            _ => throw new ArgumentException($"Unsupported Table Pulse reaction id: {reactionId}", nameof(reactionId))
+        };
     }
 
     private async Task<BlackLedgerLeaderBriefingPageViewModel?> BuildLedgerFactionLeaderBriefingPageModel(HubUserDto user, string factionId, CancellationToken cancellationToken)
@@ -9491,6 +10159,14 @@ echo "Help: ${HELP_URL}"
             return null;
         }
 
+        var installLinking = _installLinking.GetSummary(user.UserId, user.SubjectId);
+        CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane = starterWorkspace is null
+            ? null
+            : _workspaceServerPlane.GetWorkspaceServerPlane(user, starterWorkspace.WorkspaceId, installLinking);
+        RunnerPassportPublicSummary runnerPassportSummary = _communityCreatorHorizons.BuildPassportSummary();
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(1);
+
         return new BlackLedgerLeaderBriefingPageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome(
                 $"{digest.PublicName} leader brief",
@@ -9501,8 +10177,74 @@ echo "Help: ${HELP_URL}"
             Heading: digest.Heading,
             Intro: "This is the personalized world-tick readout for the faction leader. It turns the current public board into specific pressure calls and bounded next moves.",
             Digest: digest,
-            WorldTurnBriefing: _blackLedgerBriefings.BuildWorldTurnBriefing(1),
-            ValidationPacket: _blackLedgerBriefings.BuildValidationPacket(1, digest.FactionId));
+            WorldTurnBriefing: worldTurnBriefing,
+            ValidationPacket: _blackLedgerBriefings.BuildValidationPacket(1, digest.FactionId),
+            GmCockpitPacket: BuildLedgerGmCockpitPacket(
+                workspaceServerPlane,
+                runnerPassportSummary,
+                digest.FactionId,
+                worldTurnBriefing));
+    }
+
+    private static BlackLedgerGmCockpitPacketViewModel BuildLedgerGmCockpitPacket(
+        CampaignWorkspaceServerPlaneProjection? workspaceServerPlane,
+        RunnerPassportPublicSummary runnerPassportSummary,
+        string factionId,
+        BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing)
+    {
+        string commandPosture = workspaceServerPlane?.Consequences.Count > 0
+            ? $"{workspaceServerPlane.Consequences.Count} governed consequence cue(s) are live; leader escalation should stay on explicit return-loop actions instead of freeform side decisions."
+            : "No governed consequence cue is active yet, so the cockpit remains a bounded readout instead of a mutation-heavy control panel.";
+        int aftermathCount = workspaceServerPlane?.AftermathPackages.Count ?? 0;
+        string livingNewsroomSummary = worldTurnBriefing?.Broadcast is not null
+            ? $"Living Newsroom is carrying {worldTurnBriefing.Broadcast.PackageLabel}; use the same public-safe watch package when you want the command desk to review how the turn is framed outside the private cockpit."
+            : "Living Newsroom is available, but no watch package is attached to this briefing yet.";
+        string livingNewsroomHref = worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1";
+        string aftermathSummary = aftermathCount > 0
+            ? $"Aftermath queue has {aftermathCount} governed package(s) waiting on the return-loop rail, so GM review can stay attached to concrete fallout instead of freeform notes."
+            : "Aftermath queue is empty right now, so this cockpit is reading posture rather than shepherding live fallout packages.";
+        string aftermathHref = "/account/work#aftermath-packages";
+        string summary = "GM cockpit keeps remote-reaction aftermath on one command rail: review consequences, escalate to leader intent, preserve Signal Deck continuity, and keep Runner Passport trust bounded.";
+        string boundaryLine = "This cockpit can interpret and escalate governed consequence posture only. It does not create public scores, mutate world truth directly, or reveal private session transcript detail.";
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Reaction inbox",
+                Summary: "Open the signed-in notifications lane to review or trigger bounded remote reactions before the next world-tick packet locks in.",
+                Href: "/account/ledger/notifications",
+                StatusLabel: "Inbox"),
+            new(
+                Label: "Governed aftermath",
+                Summary: "Downtime and aftermath consequences stay attached to the governed return-loop rail when a remote reaction resolves off-table.",
+                Href: "/account/work#aftermath-packages",
+                StatusLabel: "Return-loop"),
+            new(
+                Label: "Runner Passport",
+                Summary: $"Runner Passport currently carries {runnerPassportSummary.ActiveInstallationCount} claimed install(s) and {runnerPassportSummary.ParticipationNotificationCount} participation receipt(s) on the first-party trust lane.",
+                Href: "/passport",
+                StatusLabel: "Trust rail"),
+            new(
+                Label: "Living Newsroom",
+                Summary: livingNewsroomSummary,
+                Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
+                StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
+            new(
+                Label: "Faction command",
+                Summary: "Escalate from the briefing back into faction command when a reaction outcome needs new action points, district posture, or private-lore review.",
+                Href: $"/account/ledger/factions/{factionId}",
+                StatusLabel: "Command deck")
+        ];
+
+        return new BlackLedgerGmCockpitPacketViewModel(
+            Heading: "GM cockpit follow-through",
+            Summary: summary,
+            CommandPosture: commandPosture,
+            LivingNewsroomSummary: livingNewsroomSummary,
+            LivingNewsroomHref: livingNewsroomHref,
+            AftermathSummary: aftermathSummary,
+            AftermathHref: aftermathHref,
+            BoundaryLine: boundaryLine,
+            Cues: cues);
     }
 
     private async Task<BlackLedgerWorldTickValidationPageViewModel> BuildLedgerWorldTickValidationPageModel(HubUserDto user, CancellationToken cancellationToken)
@@ -9554,17 +10296,17 @@ echo "Help: ${HELP_URL}"
 
         return new BlackLedgerFactionPromoPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
-                $"{promo.PublicName} promo",
-                "Public-safe faction onboarding promo artifacts with an explicit first-party motion-video contract and storyboard fallback.",
+                $"{promo.PublicName} war bulletin",
+                "Public-safe faction war-bulletin artifacts with an explicit first-party motion-video contract and storyboard fallback.",
                 $"/ledger/factions/{promo.FactionId}/promo",
                 cancellationToken),
-            Heading: $"{promo.PublicName} onboarding promo",
-            Intro: "This route ships an honest first-party motion video, captions, a route-backed JSON brief, and a storyboard fallback without any external render claim.",
+            Heading: $"{promo.PublicName} mobilization bulletin",
+            Intro: "This route ships an honest first-party motion video, captions, a route-backed JSON brief, and a storyboard fallback. It is supposed to hit like propaganda while still staying subordinate to proof.",
             Promo: promo,
             DeliveryNotes:
             [
                 "The first-party motion video is the shipped public contract for this lane.",
-                "Storyboard fallback remains available if motion playback is unavailable.",
+                "Storyboard fallback remains available if motion playback is unavailable, but it still has to carry command-bulletin energy.",
                 "No official lore text and no provider branding appear here.",
                 "These links are route-backed shipped artifacts, not placeholder buttons.",
                 "Validation stays on the same faction-leader and world-turn receipts that drive the inbox lane."

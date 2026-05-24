@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from urllib.parse import urlparse
 
 import requests
 
@@ -9,6 +10,15 @@ from absolute_completion_common import LocalHubApp, completion_path, now_iso, wr
 
 
 ROUTES = ["/mobile", "/pwa", "/play", "/player", "/gm", "/observer", "/session"]
+EXPECTED_FINAL_ROUTES = {
+    "/mobile": "/mobile",
+    "/pwa": "/mobile",
+    "/play": "/play",
+    "/player": "/play?role=player",
+    "/gm": "/play?role=gm",
+    "/observer": "/play?role=observer",
+    "/session": "/play",
+}
 EXPECTED_SHORTCUTS = {"/mobile", "/play", "/play/continuity"}
 EXPECTED_SHELL_CACHE_PATHS = {"/mobile", "/play", "/play/continuity", "/mobile/pwa.json", "/ready/handoff/mobile.json"}
 
@@ -25,11 +35,16 @@ def run(base_url: str) -> int:
     for route in ROUTES:
         response = session.get(f"{base_url}{route}", timeout=30, allow_redirects=True)
         response.raise_for_status()
+        final_url = response.url
+        parsed_final = urlparse(final_url)
+        final_route = f"{parsed_final.path}{f'?{parsed_final.query}' if parsed_final.query else ''}"
         route_results.append(
             {
                 "route": route,
                 "status_code": response.status_code,
-                "final_url": response.url,
+                "final_url": final_url,
+                "final_route": final_route,
+                "expected_final_route": EXPECTED_FINAL_ROUTES[route],
             }
         )
 
@@ -61,12 +76,19 @@ def run(base_url: str) -> int:
     has_expected_shell_cache_paths = all(path in service_worker_response.text for path in EXPECTED_SHELL_CACHE_PATHS)
     has_navigation_preload = "navigationPreload" in service_worker_response.text
     has_runtime_cache = "RUNTIME_CACHE" in service_worker_response.text
+    has_push_handler = 'self.addEventListener("push"' in service_worker_response.text
+    has_notification_click_handler = 'self.addEventListener("notificationclick"' in service_worker_response.text
+    has_notification_close_handler = 'self.addEventListener("notificationclose"' in service_worker_response.text
     continuity_receipt_count = len(receipt_index.get("receipts") or [])
     continuity_boundary_present = bool(receipt_index.get("boundary"))
     mobile_json_has_routes = (
         mobile_json.get("install_route") == "/downloads"
         and mobile_json.get("continuity_route") == "/play/continuity"
         and mobile_json.get("receipt_index_route") == "/play/continuity/receipts"
+    )
+    role_routes_hold = all(
+        result["final_route"] == result["expected_final_route"]
+        for result in route_results
     )
     checks = [
         has_manifest_link,
@@ -80,9 +102,13 @@ def run(base_url: str) -> int:
         has_expected_shell_cache_paths,
         has_navigation_preload,
         has_runtime_cache,
+        has_push_handler,
+        has_notification_click_handler,
+        has_notification_close_handler,
         continuity_receipt_count >= 3,
         continuity_boundary_present,
         mobile_json_has_routes,
+        role_routes_hold,
     ]
 
     payload = {
@@ -108,12 +134,16 @@ def run(base_url: str) -> int:
             "has_navigation_preload": has_navigation_preload,
             "has_runtime_cache": has_runtime_cache,
             "has_expected_shell_cache_paths": has_expected_shell_cache_paths,
+            "has_push_handler": has_push_handler,
+            "has_notification_click_handler": has_notification_click_handler,
+            "has_notification_close_handler": has_notification_close_handler,
         },
         "page_assertions": {
             "has_manifest_link": has_manifest_link,
             "has_service_worker_registration": has_sw_registration,
             "has_install_button": has_install_button,
             "has_continuity_action": has_continuity_action,
+            "role_routes_hold": role_routes_hold,
             "continuity_page_status_code": continuity_html.status_code,
         },
         "continuity": {
@@ -141,6 +171,10 @@ def run(base_url: str) -> int:
                 f"- Service worker fetch handler present: `{payload['service_worker']['has_fetch_handler']}`",
                 f"- Service worker navigation preload present: `{has_navigation_preload}`",
                 f"- Service worker continuity cache paths present: `{has_expected_shell_cache_paths}`",
+                f"- Service worker push handler present: `{has_push_handler}`",
+                f"- Service worker notification click handler present: `{has_notification_click_handler}`",
+                f"- Service worker notification close handler present: `{has_notification_close_handler}`",
+                f"- Role-route redirects hold: `{role_routes_hold}`",
                 f"- Continuity receipt count: `{continuity_receipt_count}`",
                 f"- Continuity boundary present: `{continuity_boundary_present}`",
             ]

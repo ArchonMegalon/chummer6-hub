@@ -382,6 +382,73 @@ public sealed record BlackLedgerInboxMessageViewModel(
     string CtaLabel,
     string StatusLabel);
 
+public sealed record BlackLedgerTablePulseCueViewModel(
+    string Label,
+    string Summary,
+    string StatusLabel,
+    string Href);
+
+public sealed record BlackLedgerRemoteReactionOptionViewModel(
+    string ReactionId,
+    string Label,
+    string Kind,
+    string Summary,
+    string ActionLabel);
+
+public sealed record BlackLedgerTablePulsePacketViewModel(
+    string Heading,
+    string Summary,
+    string VerdictLabel,
+    string BoundaryLine,
+    string ConsentPosture,
+    string HeatPosture,
+    string NotificationPosture,
+    string RemoteReactionPosture,
+    string SignalDeckPosture,
+    string RunnerPassportPosture,
+    string AftermathPosture,
+    string AftermathHref,
+    string EntryHref,
+    IReadOnlyList<string> Labels,
+    IReadOnlyList<BlackLedgerTablePulseCueViewModel> Cues,
+    IReadOnlyList<BlackLedgerRemoteReactionOptionViewModel> ReactionOptions,
+    string? AdjudicationSummary = null);
+
+public sealed record BlackLedgerFollowThroughCueViewModel(
+    string Label,
+    string Summary,
+    string Href,
+    string StatusLabel);
+
+public sealed record BlackLedgerFollowThroughPacketViewModel(
+    string Heading,
+    string Summary,
+    string SignalDeckSummary,
+    string RunnerPassportSummary,
+    string LivingNewsroomSummary,
+    string LivingNewsroomHref,
+    string AftermathSummary,
+    string AftermathHref,
+    string BoundaryLine,
+    IReadOnlyList<BlackLedgerFollowThroughCueViewModel> Cues);
+
+public sealed record BlackLedgerConnectedLanePacketViewModel(
+    string Heading,
+    string Summary,
+    string BoundaryLine,
+    IReadOnlyList<BlackLedgerFollowThroughCueViewModel> Cues);
+
+public sealed record BlackLedgerGmCockpitPacketViewModel(
+    string Heading,
+    string Summary,
+    string CommandPosture,
+    string LivingNewsroomSummary,
+    string LivingNewsroomHref,
+    string AftermathSummary,
+    string AftermathHref,
+    string BoundaryLine,
+    IReadOnlyList<BlackLedgerFollowThroughCueViewModel> Cues);
+
 public sealed record BlackLedgerAdvisoryOptionViewModel(
     string OptionId,
     string Label,
@@ -430,10 +497,23 @@ public sealed record BlackLedgerWorldTurnBriefingViewModel(
     string StateSummary,
     string InboxHeadline,
     string NewsreelLead,
+    IReadOnlyList<BlackLedgerActionBeatViewModel> ActionBeats,
     IReadOnlyList<string> NewsreelBullets,
     IReadOnlyList<string> ValidationChecks,
     string ValidationJsonHref,
     BlackLedgerNewsreelBroadcastViewModel? Broadcast = null);
+
+public sealed record BlackLedgerActionBeatViewModel(
+    string BeatId,
+    string ActorKind,
+    string ActorLabel,
+    string BeatLabel,
+    string ActionSummary,
+    string Stakes,
+    string ProofNote,
+    string VisualHook,
+    string CommandIntent,
+    string ConsequenceLine);
 
 public sealed record BlackLedgerNewsreelBroadcastViewModel(
     string PackageLabel,
@@ -447,6 +527,7 @@ public sealed record BlackLedgerNewsreelBroadcastViewModel(
     string AudioPosture,
     string MusicPosture,
     string DurationLabel,
+    IReadOnlyList<BlackLedgerActionBeatViewModel> ActionBeats,
     IReadOnlyList<string> Rundown,
     IReadOnlyList<string> TickerItems);
 
@@ -487,7 +568,14 @@ public sealed record BlackLedgerFactionPromoArtifactViewModel(
     string CampaignHook,
     string AudiencePromise,
     string ValidationHref,
-    IReadOnlyList<string> StoryboardShots);
+    IReadOnlyList<string> StoryboardShots,
+    IReadOnlyList<BlackLedgerStoryboardFrameViewModel> StoryboardFrames);
+
+public sealed record BlackLedgerStoryboardFrameViewModel(
+    string Label,
+    string VisualHook,
+    string ActionBeat,
+    string ProofPayoff);
 
 public sealed record BlackLedgerWorldPreviewViewModel(
     string WorldId,
@@ -574,6 +662,7 @@ public sealed record BlackLedgerFactionWorkspacePageViewModel(
     BlackLedgerAccountFactionAllegianceDto? Allegiance = null,
     IReadOnlyList<BlackLedgerFactionActionDefinitionDto>? AvailableActions = null,
     IReadOnlyList<BlackLedgerFactionActionReceiptDto>? RecentActionReceipts = null,
+    BlackLedgerConnectedLanePacketViewModel? ConnectedLanePacket = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
@@ -621,7 +710,8 @@ public sealed record BlackLedgerFactionHomeViewModel(
     BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing = null,
     BlackLedgerFactionLeaderDigestViewModel? LeaderDigest = null,
     BlackLedgerWorldTickValidationPacketViewModel? ValidationPacket = null,
-    BlackLedgerAdvisorySummaryViewModel? AdvisorySummary = null);
+    BlackLedgerAdvisorySummaryViewModel? AdvisorySummary = null,
+    BlackLedgerFollowThroughPacketViewModel? FollowThroughPacket = null);
 
 public sealed record BlackLedgerNotificationsPageViewModel(
     SiteChromeViewModel Chrome,
@@ -630,6 +720,7 @@ public sealed record BlackLedgerNotificationsPageViewModel(
     BlackLedgerNewsStatusViewModel Status,
     IReadOnlyList<string> DeliveryNotes,
     IReadOnlyList<BlackLedgerInboxMessageViewModel> InboxMessages,
+    BlackLedgerTablePulsePacketViewModel? TablePulsePacket = null,
     BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing = null,
     BlackLedgerWorldTickValidationPacketViewModel? ValidationPacket = null,
     BlackLedgerAdvisorySummaryViewModel? AdvisorySummary = null);
@@ -653,7 +744,8 @@ public sealed record BlackLedgerLeaderBriefingPageViewModel(
     string Intro,
     BlackLedgerFactionLeaderDigestViewModel Digest,
     BlackLedgerWorldTurnBriefingViewModel? WorldTurnBriefing,
-    BlackLedgerWorldTickValidationPacketViewModel? ValidationPacket);
+    BlackLedgerWorldTickValidationPacketViewModel? ValidationPacket,
+    BlackLedgerGmCockpitPacketViewModel? GmCockpitPacket = null);
 
 public sealed record BlackLedgerWorldTickValidationPageViewModel(
     SiteChromeViewModel Chrome,
@@ -1810,6 +1902,7 @@ public sealed record MediaArtifactHorizonPageViewModel(
     TrustPageActionViewModel PrimaryAction,
     TrustPageActionViewModel SecondaryAction,
     TrustPageActionViewModel TertiaryAction,
+    BlackLedgerConnectedLanePacketViewModel? ConnectedLanePacket = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
 
