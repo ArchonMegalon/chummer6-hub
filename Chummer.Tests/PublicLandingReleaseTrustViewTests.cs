@@ -315,6 +315,21 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void AuthEntryViewKeepsGoogleCtaOnInstallerReturnPath()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml");
+        string controller = File.ReadAllText(controllerPath);
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}"", controller, StringComparison.Ordinal);
+        Assert.Contains("Model.NextPath.StartsWith("/downloads"", view, StringComparison.Ordinal);
+        Assert.Contains("href="@Model.GoogleStartHref"", view, StringComparison.Ordinal);
+        Assert.Contains("Continue with Google", view, StringComparison.Ordinal);
+        Assert.Contains("After verification you return to @nextTarget.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LayoutLoadsClickRankOnlyWhenExplicitlyConfiguredWithoutCacheBusting()
     {
         string layoutPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Shared", "_Layout.cshtml");
