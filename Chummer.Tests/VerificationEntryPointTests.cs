@@ -419,6 +419,8 @@ public sealed class VerificationEntryPointTests
         string controller = File.ReadAllText(controllerPath);
 
         Assert.Contains("TryGetOptionalPublicSurfaceSubjectAsync", controller, StringComparison.Ordinal);
+        Assert.Contains("var currentPath = Request.Path.HasValue ? Request.Path.Value! : \"/contact\";", controller, StringComparison.Ordinal);
+        Assert.Contains("ResolveSupportIntakeDefaultsAsync", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -512,6 +514,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("run-mac-release-bootstrap.sh", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("copying the generated `Command` block", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("raw public script has no upload credential", maintenanceReadme, StringComparison.Ordinal);
+        Assert.Contains("preflight_capacity_abort", maintenanceReadme, StringComparison.Ordinal);
+        Assert.Contains("preflight-capacity-abort.json", maintenanceReadme, StringComparison.Ordinal);
+        Assert.Contains("does **not** count as clone, packaging, startup-smoke, manifest, or upload evidence", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("Cleanup after every run", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("delete the local temporary release artifacts again", maintenanceReadme, StringComparison.Ordinal);
         Assert.Contains("RELEASE_CHANNEL.generated.json", maintenanceReadme, StringComparison.Ordinal);
@@ -530,6 +535,7 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("pins the repo refs to expected commits", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_RELEASE_KEEP_UPLOAD_RESPONSE", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", publicReadme, StringComparison.Ordinal);
+        Assert.Contains("preflight-capacity-abort.json", publicReadme, StringComparison.Ordinal);
         Assert.Contains("defaults temporary packaging work to `$work_root/tmp`", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_TMPDIR", publicReadme, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_DESKTOP_INSTALLER_TMPDIR", publicReadme, StringComparison.Ordinal);
@@ -654,6 +660,9 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("upload_release_bundle_http()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("write_public_promotion_evidence()", bootstrap, StringComparison.Ordinal);
         Assert.Contains("require_min_free_space_gib", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("write_preflight_capacity_abort_receipt()", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("\"abortClass\": \"preflight_capacity_abort\"", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("does not count as release evidence", bootstrap, StringComparison.Ordinal);
         Assert.Contains("log_disk_space", bootstrap, StringComparison.Ordinal);
         Assert.Contains("hdiutil create for signed repack", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_MAC_RELEASE_MIN_FREE_GIB", bootstrap, StringComparison.Ordinal);
