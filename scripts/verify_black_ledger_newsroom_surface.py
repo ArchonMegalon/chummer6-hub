@@ -74,6 +74,12 @@ RECEIPTS_JSON_EXPECTATIONS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+NEGATIVE_PATH_EXPECTATIONS: dict[str, int] = {
+    "/ledger/newsroom/turn-999-newsreel": 404,
+    "/ledger/newsroom/turn-999-newsreel/transcript": 404,
+    "/ledger/newsroom/turn-999-newsreel/receipts": 404,
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -149,6 +155,13 @@ def main() -> int:
             location = response.headers.get("Location", "")
             if expected not in location:
                 missing.append(f"live route {route} redirect missing marker: {expected}")
+
+        for route, expected_status in NEGATIVE_PATH_EXPECTATIONS.items():
+            response = requests.get(f"{base_url}{route}", timeout=30, allow_redirects=False)
+            if response.status_code != expected_status:
+                missing.append(
+                    f"live route {route} expected status {expected_status}, got {response.status_code}"
+                )
 
     if missing:
         for item in missing:

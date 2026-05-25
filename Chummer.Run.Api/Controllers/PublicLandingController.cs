@@ -2021,7 +2021,7 @@ public sealed class PublicLandingController : Controller
         }
 
         BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
-        if (briefing?.Broadcast is null)
+        if (briefing?.Broadcast is null || briefing.ToTurn != requestedTurn)
         {
             return NotFound();
         }
@@ -2040,7 +2040,7 @@ public sealed class PublicLandingController : Controller
         }
 
         BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
-        if (briefing?.Broadcast is null)
+        if (briefing?.Broadcast is null || briefing.ToTurn != requestedTurn)
         {
             return NotFound();
         }
@@ -2058,7 +2058,7 @@ public sealed class PublicLandingController : Controller
         }
 
         BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(requestedTurn, null);
-        return packet is null
+        return packet is null || packet.ToTurn != requestedTurn
             ? NotFound()
             : Ok(packet);
     }
