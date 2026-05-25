@@ -250,6 +250,21 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('log "capturing post-publish live manifest projection"', bootstrap_text)
         self.assertIn('capture_post_publish_manifest_projection "$verify_url" "$dist_dir"', bootstrap_text)
 
+    def test_mac_bootstrap_writes_preflight_capacity_abort_receipt(self):
+        bootstrap_paths = [
+            REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh",
+            REPO_ROOT / "Chummer.Run.Api" / "wwwroot" / "artifacts" / "mac-codex-release-pipeline" / "bootstrap.sh",
+        ]
+
+        for bootstrap_path in bootstrap_paths:
+            bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
+            self.assertIn("write_preflight_capacity_abort_receipt()", bootstrap_text)
+            self.assertIn('"abortClass": "preflight_capacity_abort"', bootstrap_text)
+            self.assertIn('local evidence_dir="$evidence_root/release-evidence"', bootstrap_text)
+            self.assertIn('local receipt_path="$evidence_dir/preflight-capacity-abort.json"', bootstrap_text)
+            self.assertIn("This run stopped before clone/build/packaging/startup-smoke/upload and does not count as release evidence.", bootstrap_text)
+            self.assertIn("practical headroom target", bootstrap_text)
+
     def test_mac_bootstrap_captures_post_publish_live_manifest_projection(self):
         bootstrap_path = REPO_ROOT.parent / "chummer-design" / "products" / "chummer" / "maintenance" / "bootstrap-mac-codex-release.sh"
         bootstrap_text = bootstrap_path.read_text(encoding="utf-8")
@@ -380,6 +395,9 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('"expected_artifact_identity_registry_rows"', script_text)
         self.assertIn('"expected_artifact_publication_binding_rows"', script_text)
         self.assertIn('"expected_registry_boundary_coverage"', script_text)
+        self.assertIn("def assert_desktop_surface_ref_consistency(local_payload: dict)", script_text)
+        self.assertIn("desktopSurfaceRefs must not surface proof_required tuples", script_text)
+        self.assertIn("assert_desktop_surface_ref_consistency(payload)", script_text)
 
     def test_run_services_public_bundle_materializer_recanonicalizes_verifier_owned_release_channel_surfaces(self):
         script_path = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
@@ -396,6 +414,9 @@ class StackConfigSmokeTests(unittest.TestCase):
         self.assertIn('"expected_artifact_identity_registry_rows"', script_text)
         self.assertIn('"expected_artifact_publication_binding_rows"', script_text)
         self.assertIn('"expected_registry_boundary_coverage"', script_text)
+        self.assertIn("def assert_desktop_surface_ref_consistency(local_payload: dict)", script_text)
+        self.assertIn("desktopSurfaceRefs must not surface proof_required tuples", script_text)
+        self.assertIn("assert_desktop_surface_ref_consistency(payload)", script_text)
 
     def test_run_services_public_bundle_materializer_prefers_canonical_release_channel_source(self):
         script_path = REPO_ROOT / "scripts" / "materialize-public-downloads-bundle.sh"
