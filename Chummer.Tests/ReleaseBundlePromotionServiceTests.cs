@@ -67,7 +67,6 @@ public sealed class ReleaseBundlePromotionServiceTests
             .ToArray();
         Assert.Equal(["avalonia-osx-arm64-dmg"], canonicalIds);
 
-        Assert.Equal(1, compatibility.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("persistence").GetProperty("artifactCount").GetInt32());
         Assert.Equal(1, canonical.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("persistence").GetProperty("artifactCount").GetInt32());
         Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", macFileName)));
     }
@@ -152,8 +151,6 @@ public sealed class ReleaseBundlePromotionServiceTests
         Assert.Equal(4, compatibility.RootElement.GetProperty("downloads").GetArrayLength());
         Assert.Equal(4, canonical.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("persistence").GetProperty("artifactCount").GetInt32());
         Assert.Equal(4, canonical.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("compatibility").GetProperty("compatibleArtifactCount").GetInt32());
-        Assert.Equal(4, compatibility.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("persistence").GetProperty("artifactCount").GetInt32());
-        Assert.Equal(4, compatibility.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("compatibility").GetProperty("compatibleArtifactCount").GetInt32());
     }
 
     [Fact]
@@ -875,16 +872,19 @@ public sealed class ReleaseBundlePromotionServiceTests
                     SizeBytes: size,
                     PlatformLabel: $"Avalonia Desktop {artifact.Platform} {artifact.Arch}"));
 
-                File.WriteAllText(
-                    Path.Combine(smokeRoot, $"startup-smoke-{artifact.Head}-{artifact.Platform}-{artifact.Arch}.receipt.json"),
-                    JsonSerializer.Serialize(new
-                    {
-                        headId = artifact.Head,
-                        platform = artifact.ReceiptPlatformOverride ?? artifact.Platform,
-                        arch = artifact.Arch,
-                        artifactDigest = artifact.UseArtifactSha256ReceiptField ? null : $"sha256:{sha}",
-                        artifactSha256 = artifact.UseArtifactSha256ReceiptField ? sha : null
-                    }, TestJsonOptions));
+                if (artifact.Kind is "installer" or "dmg" or "pkg" or "msix")
+                {
+                    File.WriteAllText(
+                        Path.Combine(smokeRoot, $"startup-smoke-{artifact.Head}-{artifact.Platform}-{artifact.Arch}.receipt.json"),
+                        JsonSerializer.Serialize(new
+                        {
+                            headId = artifact.Head,
+                            platform = artifact.ReceiptPlatformOverride ?? artifact.Platform,
+                            arch = artifact.Arch,
+                            artifactDigest = artifact.UseArtifactSha256ReceiptField ? null : $"sha256:{sha}",
+                            artifactSha256 = artifact.UseArtifactSha256ReceiptField ? sha : null
+                        }, TestJsonOptions));
+                }
 
                 evidenceArtifacts.Add(new PromotionEvidenceArtifact(
                     ArtifactId: artifact.ArtifactId,
@@ -1038,7 +1038,18 @@ public sealed class ReleaseBundlePromotionServiceTests
                         journeysPassed = new[] { "build_explain_publish" },
                         proofRoutes
                     },
-                    artifacts
+                    artifacts,
+                    registryBoundaryCoverage = new
+                    {
+                        persistence = new
+                        {
+                            artifactCount = artifacts.Count
+                        },
+                        compatibility = new
+                        {
+                            compatibleArtifactCount = artifacts.Count
+                        }
+                    }
                 }, TestJsonOptions));
         }
 

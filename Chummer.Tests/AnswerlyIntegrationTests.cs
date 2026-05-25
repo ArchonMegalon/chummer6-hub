@@ -65,6 +65,18 @@ public sealed class RulesCoachRouterTests
     }
 
     [Fact]
+    public void Decide_RoutesBuildGhostFeedbackQuestionsToSupportAssistant()
+    {
+        RulesCoachRouter router = new();
+
+        RulesCoachRouteDecision result = router.Decide("How do I report a build ghost compare apply bug through feedback?");
+
+        Assert.Equal(RulesCoachRouteTypes.SupportQuestion, result.RouteType);
+        Assert.True(result.AnswerlyAllowed);
+        Assert.False(result.PacketRequired);
+    }
+
+    [Fact]
     public void Decide_FailClosesRawRulesQuestions()
     {
         RulesCoachRouter router = new();
