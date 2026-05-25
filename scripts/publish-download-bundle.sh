@@ -15,11 +15,21 @@ FILES_SOURCE="$BUNDLE_DIR/files"
 RELEASE_PROOF_PATH="${RELEASE_PROOF_PATH:-}"
 STARTUP_SMOKE_SOURCE="${STARTUP_SMOKE_SOURCE:-$BUNDLE_DIR/startup-smoke}"
 PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER:-false}"
+CHUMMER_MACOS_PUBLIC_SHELF_ENABLED="${CHUMMER_MACOS_PUBLIC_SHELF_ENABLED:-false}"
 
 to_bool() {
   local value
   value="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
   [[ "$value" == "1" || "$value" == "true" || "$value" == "yes" || "$value" == "on" ]]
+}
+
+is_public_artifact() {
+  local artifact_name
+  artifact_name="$(basename "$1")"
+  if ! to_bool "$CHUMMER_MACOS_PUBLIC_SHELF_ENABLED" && [[ "$artifact_name" == chummer-*-osx-*installer.dmg || "$artifact_name" == chummer-*-osx-*installer.pkg ]]; then
+    return 1
+  fi
+  return 0
 }
 
 bundle_manifest_matches_files() {
@@ -99,7 +109,11 @@ if [[ ! -d "$FILES_SOURCE" ]]; then
   exit 1
 fi
 
-mapfile -t artifacts < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
+artifacts=()
+while IFS= read -r artifact_path; do
+  [[ -n "$artifact_path" ]] || continue
+  artifacts+=("$artifact_path")
+done < <(find "$FILES_SOURCE" -maxdepth 1 -type f \
   \( -name "chummer-avalonia-*.exe" -o -name "chummer-avalonia-*.zip" -o \
      -name "chummer-avalonia-*.tar.gz" -o -name "chummer-avalonia-*-installer.exe" -o -name "chummer-avalonia-*-installer.deb" -o \
      -name "chummer-avalonia-*-installer.pkg" -o -name "chummer-avalonia-*-installer.dmg" -o \
@@ -220,7 +234,9 @@ sync_live_downloads_mirror_dir() {
 }
 
 for artifact in "${artifacts[@]}"; do
-  cp "$artifact" "$sync_source_dir/"
+  if is_public_artifact "$artifact"; then
+    cp "$artifact" "$sync_source_dir/"
+  fi
 done
 
 release_version="${RELEASE_VERSION:-}"
@@ -229,7 +245,8 @@ release_published_at="${RELEASE_PUBLISHED_AT:-}"
 default_published_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 if [[ -f "$MANIFEST_SOURCE" ]]; then
-  readarray -t manifest_meta < <(python3 - "$MANIFEST_SOURCE" <<'PY'
+  manifest_meta_file="$(mktemp)"
+  python3 - "$MANIFEST_SOURCE" <<'PY' >"$manifest_meta_file"
 import json
 import sys
 from pathlib import Path
@@ -240,9 +257,19 @@ print(str(data.get("version", "unpublished")))
 print(str(data.get("channel", "docker")))
 print(str(data.get("publishedAt", "")))
 PY
-)
+  manifest_meta=()
+  while IFS= read -r line; do
+    manifest_meta+=("$line")
+  done <"$manifest_meta_file"
+  rm -f "$manifest_meta_file"
 
-  readarray -t manifest_integrity < <(bundle_manifest_matches_files "$MANIFEST_SOURCE" "$FILES_SOURCE")
+  manifest_integrity_file="$(mktemp)"
+  bundle_manifest_matches_files "$MANIFEST_SOURCE" "$FILES_SOURCE" >"$manifest_integrity_file"
+  manifest_integrity=()
+  while IFS= read -r line; do
+    manifest_integrity+=("$line")
+  done <"$manifest_integrity_file"
+  rm -f "$manifest_integrity_file"
   manifest_matches_files="${manifest_integrity[0]:-false}"
 
   if [[ "$manifest_matches_files" != "true" && -z "${RELEASE_VERSION:-}" ]]; then
@@ -284,7 +311,11 @@ CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FILTER="${CHUMMER_PUBLIC_SKIP_STARTUP_SMOKE_FI
 CHUMMER_EXTERNAL_PROOF_BASE_URL="${CHUMMER_EXTERNAL_PROOF_BASE_URL:-https://chummer.run}" \
 bash "$SCRIPT_DIR/generate-releases-manifest.sh"
 
-readarray -t promoted_file_names < <(python3 - "$DEPLOY_DIR/RELEASE_CHANNEL.generated.json" <<'PY'
+promoted_file_names=()
+while IFS= read -r file_name; do
+  [[ -n "$file_name" ]] || continue
+  promoted_file_names+=("$file_name")
+done < <(python3 - "$DEPLOY_DIR/RELEASE_CHANNEL.generated.json" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -513,7 +544,11 @@ PY
     rm -f "$verified_startup_smoke_tmp"
     exit 1
   fi
-  readarray -t verified_startup_smoke_receipts <"$verified_startup_smoke_tmp"
+  verified_startup_smoke_receipts=()
+  while IFS= read -r receipt_path; do
+    [[ -n "$receipt_path" ]] || continue
+    verified_startup_smoke_receipts+=("$receipt_path")
+  done <"$verified_startup_smoke_tmp"
   rm -f "$verified_startup_smoke_tmp"
 
   startup_smoke_deploy_dir="$DEPLOY_DIR/startup-smoke"
