@@ -422,41 +422,63 @@ public sealed class BlackLedgerFactionOnboardingService
         IReadOnlyList<string> captions = normalizedFactionId switch
         {
             "glass-tower-compact" => [
-                "Security this polished is a recruitment weapon.",
-                "Sky-bridges, white-glove retainers, and airborne contracts sell authority before the words land.",
-                "Prestige is only real if the next turn can measure the panic you prevented."
+                "Tonight on the Black Ledger: the Compact swears the skyline still answers to executive command.",
+                "An orkish correspondent watches security teams lock the skybridge while residents surge below.",
+                "The captain leads the closeout and sells control as a visible public performance, not a whispered claim."
             ],
             "rust-market-syndicate" => [
-                "Every crate is inventory. Every witness is a customer in waiting.",
-                "Debt-orange light, stacked freight, and market thunder make the whole block feel purchasable.",
-                "Even this bravado still answers to the turn packet. That is how you know it is real."
+                "The lead bulletin says the Rust Market books are being settled in public tonight.",
+                "An orkish correspondent reports from the freight lane as loaders swing crates through a panicked crowd.",
+                "The loader-boss forces a brutal recovery spectacle and dares the district to call it bluff instead of order."
             ],
             "ashline-circle" => [
-                "Power is ordinary. Certified supremacy is the offer.",
-                "Ritual fire, gold seal, and disciplined witnesses make the district kneel on cue.",
-                "Your oath still answers to the public world tick. That is the flex."
+                "The nightly anchor warns that Ashline ritual authority is moving from rumor into visible force.",
+                "An orkish correspondent stands at the edge of the ward ring as heat lifts and the crowd recoils.",
+                "The enforcer walks into the firelight and turns mystical intimidation into a televised claim of dominion."
             ],
             "neon-docks-union" => [
-                "The port is the heartbeat. We decide who gets oxygen.",
-                "Cargo towers, cyan beacons, and steel gantries turn logistics into a parade of dominance.",
-                "Throughput is not a slogan when the board can watch the pressure move in real time."
+                "The bulletin opens with a claim that the docks will keep moving no matter who cut the alarms.",
+                "An orkish correspondent reports from the catwalk while containers swing and the harbor fog flashes electric blue.",
+                "The dock rigger seizes the gantry line and turns logistics into a hard-edged display of union control."
             ],
             "ghostline-network" => [
-                "Rumor is for civilians. Verified narrative is for operators.",
-                "The screen glitches, the lie evaporates, and the faction keeps the broadcast crown.",
-                "Pressure is public. Secrets remain buried. Control both and you win the city."
+                "The opener says Ghostline is fighting for the signal itself, not just the street beneath it.",
+                "An orkish correspondent breaks through a glitching wall of screens while false feeds die behind him.",
+                "The operator kills the rumor stream and reasserts verified narrative control in full public view."
             ],
             "barrens-free-wardens" => [
-                "This is not a briefing. It is the order that keeps the district alive.",
-                "Floodlights, convoy steel, and stubborn mutual defense turn panic into allegiance.",
-                "Protection only counts when the ledger can prove who stood their ground."
+                "The bulletin says the Wardens are broadcasting survival as a promise, not a slogan.",
+                "An orkish correspondent crouches at the barricade while floodlights catch steel and frightened civilians.",
+                "The convoy marshal drives the line forward and sells protection as something the whole district can witness."
             ],
             _ => [
-                $"{detail.PublicName} ships a first-party recruitment signal with theatrical pressure and public proof.",
+                $"{detail.PublicName} ships a first-party recruitment bulletin with theatrical pressure and public proof.",
                 "The public lane is allowed to roar, but it is not allowed to lie.",
                 "Motion video, captions, and route-backed validation are available now."
             ]
         };
+
+        IReadOnlyList<BlackLedgerStoryboardFrameViewModel> storyboardFrames =
+        [
+            new(
+                Label: "Anchor Open",
+                VisualHook: $"{detail.PublicName} hits the nightly bulletin desk first: charismatic anchor, premium newsroom wall, and one pressure claim already on screen.",
+                ActionBeat: captions[0],
+                ProofPayoff: "The first scene now sells the bulletin format directly, but the claim still has to survive the public world tick."
+            ),
+            new(
+                Label: "Field Report",
+                VisualHook: "An orkish correspondent pushes through the faction environment live while panic, infrastructure, or ritual pressure moves behind him.",
+                ActionBeat: captions[1],
+                ProofPayoff: "The middle beat now proves visible people, motion, and camera pressure instead of a static card with dramatic copy."
+            ),
+            new(
+                Label: "Action Close",
+                VisualHook: "Close hard on the faction lead changing the district in frame while the lower-third still points back to a measurable promise.",
+                ActionBeat: captions[2],
+                ProofPayoff: "The closer still names the validation route directly, but now does it through a visible action beat instead of inert atmosphere."
+            ),
+        ];
 
         return new BlackLedgerFactionPromoArtifactViewModel(
             FactionId: normalizedFactionId,
@@ -470,19 +492,20 @@ public sealed class BlackLedgerFactionOnboardingService
             PosterHref: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo-poster.png"),
             VideoMp4Href: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo-mobile.mp4"),
             VideoWebmHref: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo.webm"),
-            StaticCardLabel: "Megacorp recruitment signal player",
-            PlaybackLabel: "Playable first-party recruitment video",
+            StaticCardLabel: "Scene-driven faction mobilization bulletin",
+            PlaybackLabel: "Playable first-party cinematic war bulletin",
             FormatLabels: ["16:9 MP4", "16:9 WebM", "Storyboard fallback", "Captions required"],
             CaptionLines: captions,
-            CampaignHook: $"{detail.PublicName} storms the district with theatrical pressure, hard-edged certainty, and one measurable promise the next turn must justify.",
-            AudiencePromise: "The lane is allowed to feel like megacorp propaganda, but it still loses the argument if the world tick, dispatch receipts, and faction file disagree.",
+            CampaignHook: $"{detail.PublicName} now opens on a glamour-news anchor, cuts to an orkish field correspondent in the district, and closes on a visible faction lead changing the scene before the next turn can judge the claim.",
+            AudiencePromise: "This lane is now a first-party nightly bulletin with visible people, camera motion, and action on screen. It is still allowed to feel like propaganda, but it loses immediately if the world tick, dispatch receipts, faction file, and visible action disagree.",
             ValidationHref: $"/account/ledger/factions/{normalizedFactionId}/leader-briefing",
             StoryboardShots:
             [
-                "Cold open like a recruitment reel: oversized emblem, district under lights, pressure already moving in formation.",
-                "Middle beat on spectacle and dominance: what this banner protects, sells, commands, or extracts from the city.",
-                "Close on the measurable promise: a public-safe claim the audience can verify in the ledger and dispatch lanes next turn."
-            ]);
+                "Anchor open in the Black Ledger studio with a headline and lower-third already framing the faction conflict.",
+                "Field report with an orkish correspondent inside the district while pressure, civilians, or infrastructure move behind him.",
+                "Action close on the faction lead changing the conflict in frame and handing the claim back to the validation lanes."
+            ],
+            StoryboardFrames: storyboardFrames);
     }
 
     public IReadOnlyList<BlackLedgerFactionActionDefinitionDto> GetActionDefinitions(string factionId)
