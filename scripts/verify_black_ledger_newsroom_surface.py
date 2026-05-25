@@ -82,6 +82,11 @@ WATCH_ROUTE_TEXT_MARKERS: tuple[str, ...] = (
     "Published:",
 )
 
+NO_STORE_HEADER_MARKERS: tuple[str, ...] = (
+    "no-store",
+    "max-age=0",
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -122,10 +127,18 @@ def main() -> int:
                 missing.append("live route /ledger/newsroom redirect missing turn newsroom target")
             if not current_watch_route.startswith("/"):
                 current_watch_route = f"/{current_watch_route.lstrip('/')}"
+        cache_control = newsroom_home.headers.get("Cache-Control", "")
+        for marker in NO_STORE_HEADER_MARKERS:
+            if marker not in cache_control:
+                missing.append(f"live route /ledger/newsroom missing cache-control marker: {marker}")
 
         watch_response = requests.get(f"{base_url}{current_watch_route}", timeout=30)
         watch_response.raise_for_status()
         watch_body = watch_response.text
+        cache_control = watch_response.headers.get("Cache-Control", "")
+        for marker in NO_STORE_HEADER_MARKERS:
+            if marker not in cache_control:
+                missing.append(f"live route {current_watch_route} missing cache-control marker: {marker}")
         for marker in WATCH_ROUTE_TEXT_MARKERS:
             if marker not in watch_body:
                 missing.append(f"live route {current_watch_route} missing marker: {marker}")
@@ -154,12 +167,20 @@ def main() -> int:
             location = transcript_response.headers.get("Location", "")
             if ".vtt" not in location:
                 missing.append(f"live route {current_watch_route}/transcript redirect missing marker: .vtt")
+        cache_control = transcript_response.headers.get("Cache-Control", "")
+        for marker in NO_STORE_HEADER_MARKERS:
+            if marker not in cache_control:
+                missing.append(f"live route {current_watch_route}/transcript missing cache-control marker: {marker}")
 
         receipts_response = requests.get(
             f"{base_url}{current_watch_route}/receipts",
             timeout=30,
         )
         receipts_response.raise_for_status()
+        cache_control = receipts_response.headers.get("Cache-Control", "")
+        for marker in NO_STORE_HEADER_MARKERS:
+            if marker not in cache_control:
+                missing.append(f"live route {current_watch_route}/receipts missing cache-control marker: {marker}")
         try:
             receipts_payload = receipts_response.json()
         except json.JSONDecodeError as exc:
