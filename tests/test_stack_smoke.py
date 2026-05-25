@@ -593,6 +593,10 @@ class StackConfigSmokeTests(unittest.TestCase):
             )
             self.assertEqual(verify.returncode, 0, msg=verify.stderr or verify.stdout)
 
+            materialized = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(materialized.get("channel"), "preview")
+            self.assertIn("preview", str(materialized.get("rolloutState") or "").lower())
+
             stamped_receipt = receipt_path.read_text(encoding="utf-8")
             self.assertIn('"status": "pass"', stamped_receipt)
 

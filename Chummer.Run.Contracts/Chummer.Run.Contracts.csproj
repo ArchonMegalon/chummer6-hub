@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -6,11 +6,9 @@
     <Nullable>enable</Nullable>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
     <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
-    <RuntimeIdentifiers Condition="'$(RuntimeIdentifiers)' == '' and '$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</RuntimeIdentifiers>
     <PreferBundledChummerMediaContracts Condition="'$(PreferBundledChummerMediaContracts)' == ''">false</PreferBundledChummerMediaContracts>
     <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
     <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">$(MSBuildThisFileDirectory)../../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
-    <ChummerMediaContractsProject Condition="'$(PreferBundledChummerMediaContracts)' != 'true' and '$(ChummerMediaContractsProject)' == '' and Exists('/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj')">/docker/fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj</ChummerMediaContractsProject>
     <ChummerMediaContractsAssembly Condition="'$(ChummerMediaContractsAssembly)' == '' and Exists('$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll')">$(MSBuildThisFileDirectory)../compat/Chummer.Media.Contracts.dll</ChummerMediaContractsAssembly>
   </PropertyGroup>
 

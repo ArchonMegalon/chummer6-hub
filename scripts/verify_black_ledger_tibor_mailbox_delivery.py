@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
 
 
-EMAILIT_API_KEY = "secret_FiT7mnEllFcHlSSdOTDwBLjy78UmutFU"
 RECIPIENT = "tibor.girschele@gmail.com"
 OUTPUT = Path("/docker/chummercomplete/chummer-design/_completion/full_product_every_aspect/BLACK_LEDGER_TIBOR_MAILBOX_DELIVERY.generated.json")
 EXPECTED_SUBJECTS = {
@@ -27,12 +27,29 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def emailit_api_key() -> str:
+    value = os.environ.get("IDENTITY_EMAILIT_API_KEY", "").strip()
+    if value:
+        return value
+
+    env_path = Path("/docker/chummercomplete/chummer.run-services/.env")
+    if env_path.is_file():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            if line.startswith("IDENTITY_EMAILIT_API_KEY="):
+                _, _, raw = line.partition("=")
+                token = raw.strip()
+                if token:
+                    return token
+
+    raise RuntimeError("IDENTITY_EMAILIT_API_KEY is missing")
+
+
 def fetch_latest_subject_statuses() -> dict[str, dict]:
     matched: dict[str, dict] = {}
     response = requests.get(
         "https://api.emailit.com/v2/emails",
         headers={
-            "Authorization": f"Bearer {EMAILIT_API_KEY}",
+            "Authorization": f"Bearer {emailit_api_key()}",
             "Accept": "application/json",
         },
         params={"page": 1, "limit": 100},
