@@ -20,6 +20,19 @@ public sealed class SignedInShellContinuityViewTests
     }
 
     [Fact]
+    public void HomeViewFailsClosedOnRawWorkspaceDecisionNoticeNoise()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("BuildCalmHomeDecisionNoticeSummary", view, StringComparison.Ordinal);
+        Assert.Contains("LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
+        Assert.Contains("A previous campaign workspace needs review before you continue. Open the campaign workspace for the safe next step.", view, StringComparison.Ordinal);
+        Assert.Contains("Workspace review: @leadWorkspaceDecisionNoticeSummary", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Notice: @leadWorkspaceServerPlane.DecisionNotices[0].Summary", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AccountViewPublishesCalmAccountRailAndRecoveryFallbackCopy()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
