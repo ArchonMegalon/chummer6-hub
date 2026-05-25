@@ -166,13 +166,7 @@ public sealed class ReleaseBundlePromotionService
             ? LoadJsonObject(liveCanonicalManifestPath)
             : null;
 
-        IReadOnlySet<string> incomingArtifactIds = incomingCompatibilityManifest.Downloads
-            .Select(static artifact => artifact.Id)
-            .Where(static id => !string.IsNullOrWhiteSpace(id))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        List<string> replacedFileNames = existingCompatibilityManifest?.Downloads
-            .Where(download => incomingArtifactIds.Contains(download.Id))
+        List<string> existingFileNames = existingCompatibilityManifest?.Downloads
             .Select(ResolveDownloadFileName)
             .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -214,7 +208,7 @@ public sealed class ReleaseBundlePromotionService
             .Select(ResolveDownloadFileName)
             .Where(static fileName => !string.IsNullOrWhiteSpace(fileName))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (string replacedFileName in replacedFileNames)
+        foreach (string replacedFileName in existingFileNames)
         {
             if (mergedFileNames.Contains(replacedFileName))
             {
@@ -675,71 +669,12 @@ public sealed class ReleaseBundlePromotionService
         PublicReleaseManifestDto? existingManifest,
         PublicReleaseManifestDto incomingManifest)
     {
-        if (existingManifest is null)
-        {
-            return incomingManifest;
-        }
-
-        Dictionary<string, PublicReleaseArtifactDto> incomingById = incomingManifest.Downloads
-            .ToDictionary(static artifact => artifact.Id, StringComparer.OrdinalIgnoreCase);
-
-        List<PublicReleaseArtifactDto> mergedDownloads = new(existingManifest.Downloads.Count + incomingById.Count);
-        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
-        foreach (PublicReleaseArtifactDto existingArtifact in existingManifest.Downloads)
-        {
-            if (incomingById.TryGetValue(existingArtifact.Id, out PublicReleaseArtifactDto? replacement))
-            {
-                mergedDownloads.Add(replacement);
-                seen.Add(existingArtifact.Id);
-                continue;
-            }
-
-            mergedDownloads.Add(existingArtifact);
-            seen.Add(existingArtifact.Id);
-        }
-
-        foreach ((string artifactId, PublicReleaseArtifactDto artifact) in incomingById)
-        {
-            if (!seen.Contains(artifactId))
-            {
-                mergedDownloads.Add(artifact);
-            }
-        }
-
-        return incomingManifest with
-        {
-            Downloads = mergedDownloads
-        };
+        return incomingManifest;
     }
 
     private static JsonObject MergeCanonicalManifest(JsonObject? existingManifest, JsonObject incomingManifest)
     {
-        JsonObject merged = existingManifest?.DeepClone().AsObject() ?? new JsonObject();
-        foreach ((string propertyName, JsonNode? node) in incomingManifest)
-        {
-            if (string.Equals(propertyName, "artifacts", StringComparison.Ordinal)
-                || string.Equals(propertyName, "runtimeBundleHeads", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            merged[propertyName] = node?.DeepClone();
-        }
-
-        merged["artifacts"] = MergeArrayById(
-            existingManifest?["artifacts"] as JsonArray,
-            incomingManifest["artifacts"] as JsonArray,
-            "artifactId");
-
-        if (incomingManifest["runtimeBundleHeads"] is JsonArray incomingHeads)
-        {
-            merged["runtimeBundleHeads"] = MergeArrayById(
-                existingManifest?["runtimeBundleHeads"] as JsonArray,
-                incomingHeads,
-                "headId");
-        }
-
-        return merged;
+        return incomingManifest.DeepClone().AsObject();
     }
 
     private static (PublicReleaseManifestDto CompatibilityManifest, JsonObject CanonicalManifest) NormalizeMergedShelfProjection(
