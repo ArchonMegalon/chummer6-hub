@@ -127,6 +127,7 @@ restore_run_services_test_project
 
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_routes.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_surface.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {
   python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'

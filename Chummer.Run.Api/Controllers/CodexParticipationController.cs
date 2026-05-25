@@ -67,7 +67,7 @@ public sealed class CodexParticipationController : Controller
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return Redirect("/auth/google/start?next=%2Fparticipate%2Fcodex");
+            return Redirect("/login?next=%2Fparticipate%2Fcodex");
         }
         catch (HubRequestAuthException ex)
         {
