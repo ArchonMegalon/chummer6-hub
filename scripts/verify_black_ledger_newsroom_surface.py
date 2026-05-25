@@ -3,8 +3,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
+from urllib.parse import urljoin
 
 import requests
 
@@ -80,6 +82,13 @@ NEGATIVE_PATH_EXPECTATIONS: dict[str, int] = {
     "/ledger/newsroom/turn-999-newsreel/receipts": 404,
 }
 
+WATCH_ROUTE_ASSET_PATTERNS: dict[str, tuple[str, str]] = {
+    "poster": (r'poster="([^"]+turn-1-newsreel-poster\.png[^"]*)"', "image/png"),
+    "mp4": (r'<source src="([^"]+turn-1-newsreel\.mp4[^"]*)"\s+type="video/mp4"', "video/mp4"),
+    "webm": (r'<source src="([^"]+turn-1-newsreel\.webm[^"]*)"\s+type="video/webm"', "video/webm"),
+    "vtt": (r'<track kind="captions" src="([^"]+turn-1-newsreel\.vtt[^"]*)"', "text/vtt"),
+}
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -118,6 +127,20 @@ def main() -> int:
             for marker in markers:
                 if marker not in body:
                     missing.append(f"live route {route} missing marker: {marker}")
+            if route == "/ledger/newsroom/turn-1-newsreel":
+                for asset_label, (pattern, expected_type) in WATCH_ROUTE_ASSET_PATTERNS.items():
+                    match = re.search(pattern, body)
+                    if match is None:
+                        missing.append(f"live route {route} missing {asset_label} asset reference")
+                        continue
+                    asset_url = urljoin(f"{base_url}{route}", match.group(1))
+                    asset_response = requests.get(asset_url, timeout=30)
+                    asset_response.raise_for_status()
+                    content_type = asset_response.headers.get("Content-Type", "")
+                    if expected_type not in content_type:
+                        missing.append(
+                            f"asset {asset_label} for {route} expected content type {expected_type}, got {content_type}"
+                        )
 
         receipts_response = requests.get(
             f"{base_url}/ledger/newsroom/turn-1-newsreel/receipts",

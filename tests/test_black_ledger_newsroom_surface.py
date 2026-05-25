@@ -218,6 +218,76 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
         ):
             self.assertEqual(verifier.main(), 1)
 
+    def test_verifier_fails_when_watch_page_drops_mp4_asset_reference(self) -> None:
+        class FakeResponse:
+            def __init__(self, text: str = "", status_code: int = 200, headers: dict[str, str] | None = None) -> None:
+                self.text = text
+                self.status_code = status_code
+                self.headers = headers or {}
+
+            def raise_for_status(self) -> None:
+                return None
+
+        class FakeJsonResponse(FakeResponse):
+            def __init__(self, payload: dict[str, object], status_code: int = 200) -> None:
+                super().__init__(text="", status_code=status_code, headers={})
+                self._payload = payload
+
+            def json(self) -> dict[str, object]:
+                return self._payload
+
+        watch_html = """
+<section>
+  <h2>Black Ledger Newsroom</h2>
+  <video poster="/media/ledger/newsreels/turn-1-newsreel-poster.png?v=1">
+    <source src="/media/ledger/newsreels/turn-1-newsreel.webm?v=1" type="video/webm" />
+    <track kind="captions" src="/media/ledger/newsreels/turn-1-newsreel.vtt?v=1" />
+  </video>
+  <a>Transcript</a><a>Source receipts</a><a>Feedback</a><span>Published:</span>
+</section>
+"""
+        receipts_payload = {
+            "summary": "Turn 0 -> Turn 1 validation packet for the inbox/newsreel lane.",
+            "checks": [
+                "Public-safe effects carried: 6",
+                "Notification route: /account/ledger/notifications",
+            ],
+        }
+        redirect_bodies = {
+            "http://example.test/ledger/newsroom": FakeResponse(status_code=302, headers={"Location": "/ledger/newsroom/turn-2-newsreel"}),
+            "http://example.test/ledger/newsroom/turn-1-newsreel/transcript": FakeResponse(status_code=302, headers={"Location": "/media/ledger/newsreels/turn-1-newsreel.vtt"}),
+            "http://example.test/ledger/newsroom/turn-999-newsreel": FakeResponse(status_code=404, headers={}),
+            "http://example.test/ledger/newsroom/turn-999-newsreel/transcript": FakeResponse(status_code=404, headers={}),
+            "http://example.test/ledger/newsroom/turn-999-newsreel/receipts": FakeResponse(status_code=404, headers={}),
+        }
+
+        def fake_get(url: str, timeout: int, allow_redirects: bool = True) -> FakeResponse:
+            self.assertEqual(timeout, 30)
+            if not allow_redirects:
+                return redirect_bodies[url]
+            if url.endswith("/ledger/newsroom/turn-1-newsreel"):
+                return FakeResponse(text=watch_html)
+            if url.endswith("/ledger/newsroom/turn-1-newsreel/receipts"):
+                return FakeJsonResponse(receipts_payload)
+            if url.endswith("turn-1-newsreel-poster.png?v=1"):
+                return FakeResponse(status_code=200, headers={"Content-Type": "image/png"})
+            if url.endswith("turn-1-newsreel.webm?v=1"):
+                return FakeResponse(status_code=200, headers={"Content-Type": "video/webm"})
+            if url.endswith("turn-1-newsreel.vtt?v=1"):
+                return FakeResponse(status_code=200, headers={"Content-Type": "text/vtt"})
+            raise AssertionError(f"unexpected url {url}")
+
+        script_dir = str(SCRIPT.parent)
+        with patch.object(sys, "path", [script_dir, *sys.path]):
+            import verify_black_ledger_newsroom_surface as verifier
+
+        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+            sys,
+            "argv",
+            ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
+        ):
+            self.assertEqual(verifier.main(), 1)
+
     @staticmethod
     def copy_sources(temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:
