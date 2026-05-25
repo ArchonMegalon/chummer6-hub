@@ -1998,6 +1998,71 @@ public sealed class PublicLandingController : Controller
             : Ok(briefing);
     }
 
+    [HttpGet("/ledger/newsroom")]
+    [Produces("text/html")]
+    public IActionResult LedgerNewsroomHome()
+    {
+        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(null);
+        if (briefing?.Broadcast is null)
+        {
+            return NotFound();
+        }
+
+        return Redirect(briefing.Broadcast.WatchHref);
+    }
+
+    [HttpGet("/ledger/newsroom/{episodeId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LedgerNewsroomEpisodePage([FromRoute] string episodeId, CancellationToken cancellationToken)
+    {
+        if (!TryParseNewsroomEpisodeTurn(episodeId, out int requestedTurn))
+        {
+            return NotFound();
+        }
+
+        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
+        if (briefing?.Broadcast is null)
+        {
+            return NotFound();
+        }
+
+        var model = await BuildBlackLedgerPageModel($"/ledger/newsroom/{episodeId}", "map", requestedTurn, cancellationToken);
+        return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    [HttpGet("/ledger/newsroom/{episodeId}/transcript")]
+    [Produces("text/vtt")]
+    public IActionResult LedgerNewsroomEpisodeTranscript([FromRoute] string episodeId)
+    {
+        if (!TryParseNewsroomEpisodeTurn(episodeId, out int requestedTurn))
+        {
+            return NotFound();
+        }
+
+        BlackLedgerWorldTurnBriefingViewModel? briefing = _blackLedgerBriefings.BuildWorldTurnBriefing(requestedTurn);
+        if (briefing?.Broadcast is null)
+        {
+            return NotFound();
+        }
+
+        return Redirect(briefing.Broadcast.CaptionsHref);
+    }
+
+    [HttpGet("/ledger/newsroom/{episodeId}/receipts")]
+    [Produces("application/json")]
+    public IActionResult LedgerNewsroomEpisodeReceipts([FromRoute] string episodeId)
+    {
+        if (!TryParseNewsroomEpisodeTurn(episodeId, out int requestedTurn))
+        {
+            return NotFound();
+        }
+
+        BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(requestedTurn, null);
+        return packet is null
+            ? NotFound()
+            : Ok(packet);
+    }
+
     [HttpGet("/ledger/turns/{turn}/dispatches")]
     [Produces("text/html")]
     public async Task<IActionResult> LedgerTurnDispatchesPage([FromRoute] string turn, CancellationToken cancellationToken)
@@ -2009,6 +2074,25 @@ public sealed class PublicLandingController : Controller
 
         var model = await BuildBlackLedgerPageModel($"/ledger/turns/{requestedTurn}/dispatches", "dispatches", requestedTurn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
+    }
+
+    private static bool TryParseNewsroomEpisodeTurn(string? episodeId, out int requestedTurn)
+    {
+        requestedTurn = -1;
+        if (string.IsNullOrWhiteSpace(episodeId))
+        {
+            return false;
+        }
+
+        string normalized = episodeId.Trim();
+        if (normalized.StartsWith("turn-", StringComparison.OrdinalIgnoreCase)
+            && normalized.EndsWith("-newsreel", StringComparison.OrdinalIgnoreCase))
+        {
+            string inner = normalized["turn-".Length..^"-newsreel".Length];
+            return int.TryParse(inner, out requestedTurn) && requestedTurn >= 0;
+        }
+
+        return false;
     }
 
     [HttpGet("/ledger/factions/{factionId}/dispatches")]
@@ -2098,7 +2182,7 @@ public sealed class PublicLandingController : Controller
         for (int index = 0; index < promo.CaptionLines.Count; index += 1)
         {
             int start = index * 6;
-            int end = start + 5;
+            int end = start + 6;
             lines.Add($"{index + 1}");
             lines.Add($"00:00:{start:00}.000 --> 00:00:{end:00}.000");
             lines.Add(promo.CaptionLines[index]);
@@ -10301,12 +10385,12 @@ echo "Help: ${HELP_URL}"
                 $"/ledger/factions/{promo.FactionId}/promo",
                 cancellationToken),
             Heading: $"{promo.PublicName} mobilization bulletin",
-            Intro: "This route ships an honest first-party motion video, captions, a route-backed JSON brief, and a storyboard fallback. It is supposed to hit like propaganda while still staying subordinate to proof.",
+            Intro: "This route ships an honest first-party motion video with visible characters, action, captions, a route-backed JSON brief, and a storyboard fallback. It is supposed to hit like propaganda while still staying subordinate to proof.",
             Promo: promo,
             DeliveryNotes:
             [
                 "The first-party motion video is the shipped public contract for this lane.",
-                "Storyboard fallback remains available if motion playback is unavailable, but it still has to carry command-bulletin energy.",
+                "Storyboard fallback remains available if motion playback is unavailable, but it still has to carry the same scene-driven command-bulletin energy.",
                 "No official lore text and no provider branding appear here.",
                 "These links are route-backed shipped artifacts, not placeholder buttons.",
                 "Validation stays on the same faction-leader and world-turn receipts that drive the inbox lane."

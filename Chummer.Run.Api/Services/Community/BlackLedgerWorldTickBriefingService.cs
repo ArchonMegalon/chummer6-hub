@@ -19,6 +19,7 @@ public sealed class BlackLedgerWorldTickBriefingService
     public BlackLedgerWorldTurnBriefingViewModel? BuildWorldTurnBriefing(int? requestedTurn, string ledgerBasePath = "/ledger")
     {
         BlackLedgerWorldPreviewViewModel? world = _stats.LoadWorldPreview(requestedTurn);
+        BlackLedgerPublicStatsService.BlackLedgerWorldSeedDocument? seed = _stats.LoadSeedDocument();
         BlackLedgerTickReceiptViewModel? tick = world?.LastTick;
         if (world is null || tick is null)
         {
@@ -37,7 +38,8 @@ public sealed class BlackLedgerWorldTickBriefingService
         string newsreelLead = $"{transitionNarrative} {tick.Summary}";
         string validationJsonHref = $"{ledgerBasePath.TrimEnd('/')}/turns/{tick.Turn}/newsreel.json";
         IReadOnlyList<string> bullets = BuildNewsreelBullets(world, tick);
-        BlackLedgerNewsreelBroadcastViewModel? broadcast = BuildBroadcastPackage(world, tick, transitionLabel, newsreelLead, bullets, ledgerBasePath);
+        IReadOnlyList<BlackLedgerActionBeatViewModel> actionBeats = BuildActionBeats(seed, tick.Turn, world, tick);
+        BlackLedgerNewsreelBroadcastViewModel? broadcast = BuildBroadcastPackage(world, tick, transitionLabel, newsreelLead, bullets, actionBeats, ledgerBasePath);
         IReadOnlyList<string> validationChecks =
         [
             $"Receipt-backed transition: {transitionLabel}",
@@ -57,6 +59,7 @@ public sealed class BlackLedgerWorldTickBriefingService
             StateSummary: stateSummary,
             InboxHeadline: inboxHeadline,
             NewsreelLead: newsreelLead,
+            ActionBeats: actionBeats,
             NewsreelBullets: bullets,
             ValidationChecks: validationChecks,
             ValidationJsonHref: validationJsonHref,
@@ -225,6 +228,7 @@ public sealed class BlackLedgerWorldTickBriefingService
         string transitionLabel,
         string newsreelLead,
         IReadOnlyList<string> bullets,
+        IReadOnlyList<BlackLedgerActionBeatViewModel> actionBeats,
         string ledgerBasePath)
     {
         string slug = $"turn-{tick.Turn}-newsreel";
@@ -244,20 +248,26 @@ public sealed class BlackLedgerWorldTickBriefingService
             : mp4Href;
         string posterHref = BuildVersionedMediaHref(Path.Combine(relativeRoot, $"{slug}-poster.png"));
         string captionsHref = BuildVersionedMediaHref(Path.Combine(relativeRoot, $"{slug}.vtt"));
+        string watchHref = $"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}";
+        string transcriptHref = $"{watchHref}/transcript";
+        string receiptsHref = $"{watchHref}/receipts";
+        string publishedLabel = new DateTimeOffset(File.GetLastWriteTimeUtc(mp4Path)).ToString("MMMM d, yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture);
         IReadOnlyList<string> rundown =
         [
             $"Open on anchor desk: {transitionLabel} with receipt {tick.ReceiptId}.",
             $"{world.TurnHeadline}",
-            ..bullets.Take(3).Select(static item => item.TrimEnd('.')),
+            ..actionBeats.Take(4).Select(static beat => $"{beat.ActorLabel}: {beat.CommandIntent}"),
+            ..actionBeats.Take(3).Select(static beat => beat.ConsequenceLine),
+            ..bullets.Take(2).Select(static item => item.TrimEnd('.')),
             BuildStateSummary(world)
         ];
         IReadOnlyList<string> ticker =
         [
             $"{world.PublicName} live",
             $"Turn {tick.Turn} receipt-backed",
+            ..actionBeats.Take(3).Select(static beat => beat.VisualHook),
             $"{world.Districts.OrderByDescending(static district => district.Heat).First().Name} hottest district",
             $"{world.Districts.OrderByDescending(static district => Math.Abs(district.DeltaSinceLastTick)).First().Name} biggest move",
-            "Public-safe aggregate only",
             "No player identities or private table state"
         ];
 
@@ -265,7 +275,9 @@ public sealed class BlackLedgerWorldTickBriefingService
             PackageLabel: "First-party anchor package",
             AnchorName: "Mara Quill",
             DeskLabel: "Black Ledger Network",
-            WatchHref: $"{ledgerBasePath.TrimEnd('/')}/turns/{tick.Turn}#newsreel-player",
+            WatchHref: watchHref,
+            TranscriptHref: transcriptHref,
+            ReceiptsHref: receiptsHref,
             VideoMp4Href: mp4Href,
             VideoWebmHref: webmHref,
             PosterHref: posterHref,
@@ -273,8 +285,56 @@ public sealed class BlackLedgerWorldTickBriefingService
             AudioPosture: "Voice-led bulletin with lower-third stingers",
             MusicPosture: "First-party synthetic score bed with ducked narration",
             DurationLabel: "00:16",
+            PublishedLabel: publishedLabel,
+            EpisodeTypeLabel: "Turn newsreel",
+            PublicSafetyNote: "Public-safe bulletin built from aggregate Black Ledger world receipts. No private campaign table data or sourcebook text is exposed here.",
+            ReconstructionNote: "Some footage is reconstructed from public-safe receipts. The source receipts remain the truth.",
+            FeedbackHref: "/feedback",
+            ActionBeats: actionBeats,
             Rundown: rundown,
             TickerItems: ticker);
+    }
+
+    private static IReadOnlyList<BlackLedgerActionBeatViewModel> BuildActionBeats(
+        BlackLedgerPublicStatsService.BlackLedgerWorldSeedDocument? seed,
+        int turn,
+        BlackLedgerWorldPreviewViewModel world,
+        BlackLedgerTickReceiptViewModel tick)
+    {
+        BlackLedgerPublicStatsService.BlackLedgerTurnDocument? turnDocument = seed?.Turns?
+            .FirstOrDefault(item => item.Turn == turn);
+        if (turnDocument?.ActionBeats?.Count > 0)
+        {
+            return turnDocument.ActionBeats
+                .Take(6)
+                .Select(static beat => new BlackLedgerActionBeatViewModel(
+                    BeatId: string.IsNullOrWhiteSpace(beat.BeatId) ? Guid.NewGuid().ToString("N") : beat.BeatId,
+                    ActorKind: string.IsNullOrWhiteSpace(beat.ActorKind) ? "world" : beat.ActorKind,
+                    ActorLabel: string.IsNullOrWhiteSpace(beat.ActorLabel) ? "World desk" : beat.ActorLabel,
+                    BeatLabel: string.IsNullOrWhiteSpace(beat.BeatLabel) ? "Visible move" : beat.BeatLabel,
+                    ActionSummary: beat.ActionSummary,
+                    Stakes: beat.Stakes,
+                    ProofNote: beat.ProofNote,
+                    VisualHook: string.IsNullOrWhiteSpace(beat.VisualHook) ? $"Focus {beat.ActorLabel} pressure on the live globe." : beat.VisualHook,
+                    CommandIntent: string.IsNullOrWhiteSpace(beat.CommandIntent) ? $"Track {beat.BeatLabel} as a live board move." : beat.CommandIntent,
+                    ConsequenceLine: string.IsNullOrWhiteSpace(beat.ConsequenceLine) ? beat.Stakes : beat.ConsequenceLine))
+                .ToArray();
+        }
+
+        return tick.Effects
+            .Take(4)
+            .Select((effect, index) => new BlackLedgerActionBeatViewModel(
+                BeatId: $"derived-beat-{index + 1}",
+                ActorKind: "faction",
+                ActorLabel: effect.Target,
+                BeatLabel: effect.Metric,
+                ActionSummary: effect.PublicReason,
+                Stakes: $"{world.PublicName} visible pressure moved on receipt-backed world state.",
+                ProofNote: $"Proof: {tick.ReceiptId}",
+                VisualHook: $"Flash {effect.Target} across the globe while {effect.Metric} moves.",
+                CommandIntent: $"Push {effect.Target} onto the command board as a live {effect.Metric} shift.",
+                ConsequenceLine: $"{effect.Target} now changes what players and GMs have to answer next."))
+            .ToArray();
     }
 
     private static string BuildVersionedMediaHref(string relativePath)
