@@ -50,21 +50,6 @@ REQUIRED_SOURCE_MARKERS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-LIVE_ROUTE_MARKERS: dict[str, tuple[str, ...]] = {
-    "/ledger/newsroom/turn-1-newsreel": (
-        "Black Ledger Newsroom",
-        "Transcript",
-        "Source receipts",
-        "Feedback",
-        "Published:",
-    ),
-}
-
-REDIRECT_EXPECTATIONS: dict[str, str] = {
-    "/ledger/newsroom": "/ledger/newsroom/turn-",
-    "/ledger/newsroom/turn-1-newsreel/transcript": ".vtt",
-}
-
 RECEIPTS_JSON_EXPECTATIONS: dict[str, tuple[str, ...]] = {
     "summary": (
         "validation packet",
@@ -76,18 +61,26 @@ RECEIPTS_JSON_EXPECTATIONS: dict[str, tuple[str, ...]] = {
     ),
 }
 
-NEGATIVE_PATH_EXPECTATIONS: dict[str, int] = {
-    "/ledger/newsroom/turn-999-newsreel": 404,
-    "/ledger/newsroom/turn-999-newsreel/transcript": 404,
-    "/ledger/newsroom/turn-999-newsreel/receipts": 404,
-}
+NEGATIVE_PATH_EXPECTATIONS: tuple[str, ...] = (
+    "/ledger/newsroom/turn-999-newsreel",
+    "/ledger/newsroom/turn-999-newsreel/transcript",
+    "/ledger/newsroom/turn-999-newsreel/receipts",
+)
 
 WATCH_ROUTE_ASSET_PATTERNS: dict[str, tuple[str, str]] = {
-    "poster": (r'poster="([^"]+turn-1-newsreel-poster\.png[^"]*)"', "image/png"),
-    "mp4": (r'<source src="([^"]+turn-1-newsreel\.mp4[^"]*)"\s+type="video/mp4"', "video/mp4"),
-    "webm": (r'<source src="([^"]+turn-1-newsreel\.webm[^"]*)"\s+type="video/webm"', "video/webm"),
-    "vtt": (r'<track kind="captions" src="([^"]+turn-1-newsreel\.vtt[^"]*)"', "text/vtt"),
+    "poster": (r'poster="([^"]+turn-\d+-newsreel-poster\.png[^"]*)"', "image/png"),
+    "mp4": (r'<source src="([^"]+turn-\d+-newsreel\.mp4[^"]*)"\s+type="video/mp4"', "video/mp4"),
+    "webm": (r'<source src="([^"]+turn-\d+-newsreel\.webm[^"]*)"\s+type="video/webm"', "video/webm"),
+    "vtt": (r'<track kind="captions" src="([^"]+turn-\d+-newsreel\.vtt[^"]*)"', "text/vtt"),
 }
+
+WATCH_ROUTE_TEXT_MARKERS: tuple[str, ...] = (
+    "Black Ledger Newsroom",
+    "Transcript",
+    "Source receipts",
+    "Feedback",
+    "Published:",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -119,38 +112,58 @@ def main() -> int:
 
     if args.base_url:
         base_url = args.base_url.rstrip("/")
+        newsroom_home = requests.get(f"{base_url}/ledger/newsroom", timeout=30, allow_redirects=False)
+        if newsroom_home.status_code not in {301, 302, 303, 307, 308}:
+            missing.append("live route /ledger/newsroom missing redirect status")
+            current_watch_route = "/ledger/newsroom/turn-1-newsreel"
+        else:
+            current_watch_route = newsroom_home.headers.get("Location", "")
+            if "/ledger/newsroom/turn-" not in current_watch_route:
+                missing.append("live route /ledger/newsroom redirect missing turn newsroom target")
+            if not current_watch_route.startswith("/"):
+                current_watch_route = f"/{current_watch_route.lstrip('/')}"
 
-        for route, markers in LIVE_ROUTE_MARKERS.items():
-            response = requests.get(f"{base_url}{route}", timeout=30)
-            response.raise_for_status()
-            body = response.text
-            for marker in markers:
-                if marker not in body:
-                    missing.append(f"live route {route} missing marker: {marker}")
-            if route == "/ledger/newsroom/turn-1-newsreel":
-                for asset_label, (pattern, expected_type) in WATCH_ROUTE_ASSET_PATTERNS.items():
-                    match = re.search(pattern, body)
-                    if match is None:
-                        missing.append(f"live route {route} missing {asset_label} asset reference")
-                        continue
-                    asset_url = urljoin(f"{base_url}{route}", match.group(1))
-                    asset_response = requests.get(asset_url, timeout=30)
-                    asset_response.raise_for_status()
-                    content_type = asset_response.headers.get("Content-Type", "")
-                    if expected_type not in content_type:
-                        missing.append(
-                            f"asset {asset_label} for {route} expected content type {expected_type}, got {content_type}"
-                        )
+        watch_response = requests.get(f"{base_url}{current_watch_route}", timeout=30)
+        watch_response.raise_for_status()
+        watch_body = watch_response.text
+        for marker in WATCH_ROUTE_TEXT_MARKERS:
+            if marker not in watch_body:
+                missing.append(f"live route {current_watch_route} missing marker: {marker}")
+        for asset_label, (pattern, expected_type) in WATCH_ROUTE_ASSET_PATTERNS.items():
+            match = re.search(pattern, watch_body)
+            if match is None:
+                missing.append(f"live route {current_watch_route} missing {asset_label} asset reference")
+                continue
+            asset_url = urljoin(f"{base_url}{current_watch_route}", match.group(1))
+            asset_response = requests.get(asset_url, timeout=30)
+            asset_response.raise_for_status()
+            content_type = asset_response.headers.get("Content-Type", "")
+            if expected_type not in content_type:
+                missing.append(
+                    f"asset {asset_label} for {current_watch_route} expected content type {expected_type}, got {content_type}"
+                )
+
+        transcript_response = requests.get(
+            f"{base_url}{current_watch_route}/transcript",
+            timeout=30,
+            allow_redirects=False,
+        )
+        if transcript_response.status_code not in {301, 302, 303, 307, 308}:
+            missing.append(f"live route {current_watch_route}/transcript missing redirect status")
+        else:
+            location = transcript_response.headers.get("Location", "")
+            if ".vtt" not in location:
+                missing.append(f"live route {current_watch_route}/transcript redirect missing marker: .vtt")
 
         receipts_response = requests.get(
-            f"{base_url}/ledger/newsroom/turn-1-newsreel/receipts",
+            f"{base_url}{current_watch_route}/receipts",
             timeout=30,
         )
         receipts_response.raise_for_status()
         try:
             receipts_payload = receipts_response.json()
         except json.JSONDecodeError as exc:
-            missing.append(f"live route /ledger/newsroom/turn-1-newsreel/receipts did not return JSON: {exc}")
+            missing.append(f"live route {current_watch_route}/receipts did not return JSON: {exc}")
         else:
             summary_value = str(receipts_payload.get("summary") or "")
             checks_values = receipts_payload.get("checks") or []
@@ -160,30 +173,21 @@ def main() -> int:
             for marker in RECEIPTS_JSON_EXPECTATIONS["summary"]:
                 if marker not in summary_value:
                     missing.append(
-                        "live route /ledger/newsroom/turn-1-newsreel/receipts summary missing marker: "
+                        f"live route {current_watch_route}/receipts summary missing marker: "
                         f"{marker}"
                     )
             for marker in RECEIPTS_JSON_EXPECTATIONS["checks"]:
                 if marker not in checks_text:
                     missing.append(
-                        "live route /ledger/newsroom/turn-1-newsreel/receipts checks missing marker: "
+                        f"live route {current_watch_route}/receipts checks missing marker: "
                         f"{marker}"
                     )
 
-        for route, expected in REDIRECT_EXPECTATIONS.items():
+        for route in NEGATIVE_PATH_EXPECTATIONS:
             response = requests.get(f"{base_url}{route}", timeout=30, allow_redirects=False)
-            if response.status_code not in {301, 302, 303, 307, 308}:
-                missing.append(f"live route {route} missing redirect status")
-                continue
-            location = response.headers.get("Location", "")
-            if expected not in location:
-                missing.append(f"live route {route} redirect missing marker: {expected}")
-
-        for route, expected_status in NEGATIVE_PATH_EXPECTATIONS.items():
-            response = requests.get(f"{base_url}{route}", timeout=30, allow_redirects=False)
-            if response.status_code != expected_status:
+            if response.status_code != 404:
                 missing.append(
-                    f"live route {route} expected status {expected_status}, got {response.status_code}"
+                    f"live route {route} expected status 404, got {response.status_code}"
                 )
 
     if missing:
