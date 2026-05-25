@@ -13,16 +13,47 @@ HUB_PUBLIC_HOST="${HUB_PUBLIC_HOST:-chummer.run}"
 HUB_CLOSEOUT_BUILD="${HUB_CLOSEOUT_BUILD:-1}"
 HUB_CLOSEOUT_BROWSER="${HUB_CLOSEOUT_BROWSER:-1}"
 HUB_CLOSEOUT_LIVE_AUDIT="${HUB_CLOSEOUT_LIVE_AUDIT:-1}"
+HUB_ENV_FILE="${CHUMMER_HUB_ENV_FILE:-}"
+
+if [[ -z "$HUB_ENV_FILE" ]]; then
+  if [[ -f "$ROOT_DIR/.env" ]]; then
+    HUB_ENV_FILE="$ROOT_DIR/.env"
+  elif [[ -f "/docker/chummercomplete/chummer.run-services/.env" ]]; then
+    HUB_ENV_FILE="/docker/chummercomplete/chummer.run-services/.env"
+  fi
+fi
+
+if [[ -n "$HUB_ENV_FILE" ]]; then
+  # Preserve auth-critical values from the selected env file so compose does not
+  # inherit empty shell variables and silently disable sign-in on rebuild.
+  while IFS='=' read -r key value; do
+    case "$key" in
+      IDENTITY_ADMIN_KEY|GOOGLE_OIDC_CLIENT_ID|GOOGLE_OIDC_CLIENT_SECRET|GOOGLE_OIDC_REDIRECT_URI)
+        export "$key=$value"
+        ;;
+    esac
+  done < <(grep -E '^(IDENTITY_ADMIN_KEY|GOOGLE_OIDC_CLIENT_ID|GOOGLE_OIDC_CLIENT_SECRET|GOOGLE_OIDC_REDIRECT_URI)=' "$HUB_ENV_FILE" || true)
+fi
+
+compose_args=(-p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE")
+if [[ -n "$HUB_ENV_FILE" ]]; then
+  compose_args=(--env-file "$HUB_ENV_FILE" "${compose_args[@]}")
+fi
 
 echo "== hub closeout =="
 echo "local base: $HUB_LOCAL_BASE_URL"
 echo "live base: $HUB_LIVE_BASE_URL"
 echo "compose project: $HUB_EDGE_PROJECT_NAME"
+if [[ -n "$HUB_ENV_FILE" ]]; then
+  echo "compose env file: $HUB_ENV_FILE"
+else
+  echo "compose env file: <none>"
+fi
 
 if [[ "$HUB_CLOSEOUT_BUILD" == "1" || "$HUB_CLOSEOUT_BUILD" == "true" || "$HUB_CLOSEOUT_BUILD" == "TRUE" ]]; then
   echo
   echo "== rebuild local public edge =="
-  docker compose -p "$HUB_EDGE_PROJECT_NAME" -f "$HUB_EDGE_COMPOSE_FILE" up -d --build --remove-orphans chummer-run-identity chummer-portal
+  docker compose "${compose_args[@]}" up -d --build --remove-orphans chummer-run-identity chummer-portal
 fi
 
 echo
