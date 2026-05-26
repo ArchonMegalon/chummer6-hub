@@ -2474,6 +2474,39 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void DecisionNoticesFailClosedOnGuidOnlyPortableExchangeSummary()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        RunProjection leadRun = new(
+            RunId: "run-1",
+            CampaignId: workspace.CampaignId,
+            Title: "7b0d6ecf-5fd8-4d87-9a8b-b9aa3cc6d130",
+            Status: "active",
+            Summary: "Pinned run summary.",
+            ActiveSceneId: null,
+            Objectives: [],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            supportDigests: [],
+            prepLibrary: BuildEmptyPrepLibrary(),
+            gmOperations: BuildGovernedGmOperationsReadiness(),
+            leadRun: leadRun);
+
+        DecisionNotice portableExchangeNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.Ordinal));
+        Assert.Equal(
+            "Portable exchange needs review before you continue. Open the workspace lane for the safe next step.",
+            portableExchangeNotice.Summary);
+        Assert.DoesNotContain("7b0d6ecf-5fd8-4d87-9a8b-b9aa3cc6d130", portableExchangeNotice.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SupportClosuresPreferReporterActionCaseOverEarlierNonActionCase()
     {
         SupportCaseDigestViewModel informationalCase = BuildSupportCaseDigest(
