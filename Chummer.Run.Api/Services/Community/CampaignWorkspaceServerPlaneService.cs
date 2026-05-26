@@ -3259,7 +3259,7 @@ public sealed class CampaignWorkspaceServerPlaneService
 
     private static DecisionNotice SanitizeWorkspaceDecisionNotice(DecisionNotice notice)
     {
-        if (!LooksLikeInternalWorkspaceLeak(notice.Summary))
+        if (!WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(notice.Summary))
         {
             return notice;
         }
@@ -3275,25 +3275,6 @@ public sealed class CampaignWorkspaceServerPlaneService
         {
             Summary = fallbackSummary
         };
-    }
-
-    private static bool LooksLikeInternalWorkspaceLeak(string? summary)
-    {
-        if (string.IsNullOrWhiteSpace(summary))
-        {
-            return false;
-        }
-
-        return summary.Contains("workspace uuid", StringComparison.OrdinalIgnoreCase)
-            || summary.Contains("workspace id", StringComparison.OrdinalIgnoreCase)
-            || summary.Contains("uuid", StringComparison.OrdinalIgnoreCase)
-            || summary.Contains("closed workspace", StringComparison.OrdinalIgnoreCase)
-            || summary.Contains("workspace closed", StringComparison.OrdinalIgnoreCase)
-            || summary.Contains("workspace decision", StringComparison.OrdinalIgnoreCase)
-            || System.Text.RegularExpressions.Regex.IsMatch(
-                summary,
-                "\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     }
 
     private static DecisionNotice BuildGmOperationsDecisionNotice(

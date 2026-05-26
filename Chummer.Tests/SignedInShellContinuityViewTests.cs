@@ -26,7 +26,7 @@ public sealed class SignedInShellContinuityViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("BuildCalmHomeDecisionNoticeSummary", view, StringComparison.Ordinal);
-        Assert.Contains("LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
+        Assert.Contains("WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
         Assert.Contains("leadPortableExchangeSummary", view, StringComparison.Ordinal);
         Assert.Contains("A previous campaign workspace needs review before you continue. Open the campaign workspace for the safe next step.", view, StringComparison.Ordinal);
         Assert.Contains("Workspace review: @leadWorkspaceDecisionNoticeSummary", view, StringComparison.Ordinal);
@@ -52,7 +52,7 @@ public sealed class SignedInShellContinuityViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
+        Assert.Contains("WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceDecisionNotices", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspacePortableExchangeSummary", view, StringComparison.Ordinal);
         Assert.Contains("A previous campaign workspace needs review before you continue. Open the workspace lanes below for the safe next step.", view, StringComparison.Ordinal);

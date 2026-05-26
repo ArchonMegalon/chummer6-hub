@@ -137,30 +137,11 @@
     var entitlementSyncReceipts = Model.EntitlementSyncReceipts;
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
-    bool LooksLikeInternalWorkspaceLeak(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        return value.Contains("closed workspace", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace closed", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace decision", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace uuid", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace id", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("uuid", StringComparison.OrdinalIgnoreCase)
-            || System.Text.RegularExpressions.Regex.IsMatch(
-                value,
-                "\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-    }
-
     var selectedWorkspacePortableExchangeNotice = selectedWorkspaceServerPlane?.DecisionNotices.FirstOrDefault(notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.OrdinalIgnoreCase));
     var selectedWorkspaceDecisionNotices = (selectedWorkspaceServerPlane?.DecisionNotices ?? Array.Empty<Chummer.Control.Contracts.Support.DecisionNotice>())
-        .Where(notice => !LooksLikeInternalWorkspaceLeak(notice.Summary))
+        .Where(notice => !WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(notice.Summary))
         .ToArray();
-    var selectedWorkspacePortableExchangeSummary = !LooksLikeInternalWorkspaceLeak(selectedWorkspacePortableExchangeNotice?.Summary)
+    var selectedWorkspacePortableExchangeSummary = !WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(selectedWorkspacePortableExchangeNotice?.Summary)
         ? selectedWorkspacePortableExchangeNotice?.Summary
         : null;
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;

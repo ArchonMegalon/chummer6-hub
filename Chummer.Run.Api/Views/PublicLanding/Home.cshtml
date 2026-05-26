@@ -1,3 +1,4 @@
+@using Chummer.Run.Api.Services
 @model HomePageViewModel
 @{
     var pageTitle = Model.CurrentSection switch
@@ -10,6 +11,11 @@
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-home";
+    ViewData["ContextSidebarHeading"] = "Home sections";
+    ViewData["ContextSidebarSummary"] = "Keep signed-in continuity, access, and work sections in the shared side panel.";
+    ViewData["ContextSidebarLinks"] = Model.Sections
+        .Select(static item => new PublicNavigationLink(item.Label, item.Href))
+        .ToArray();
     var showOnboarding = !Model.Experience.OnboardingCompleted;
     var googlePrimary = string.Equals(Model.Links.RecommendedPrimaryAuth, "google", StringComparison.OrdinalIgnoreCase);
     var followCount = (Model.Experience.FollowHorizons ? 1 : 0) + (Model.Experience.BetaInterest ? 1 : 0);
@@ -47,25 +53,6 @@
     var leadCommunityGuidanceHref = leadCommunityOperation is null
         ? "/account/work#community-ops"
         : $"/account/work#community-op-guidance-{Uri.EscapeDataString(leadCommunityOperation.GroupId)}";
-    bool LooksLikeInternalWorkspaceLeak(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        return value.Contains("closed workspace", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace closed", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace decision", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace uuid", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("workspace id", StringComparison.OrdinalIgnoreCase)
-            || value.Contains("uuid", StringComparison.OrdinalIgnoreCase)
-            || System.Text.RegularExpressions.Regex.IsMatch(
-                value,
-                "\\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\b",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
-    }
-
     bool IsCalmHomeNoticeKind(string? kind)
         => string.Equals(kind, "portable_exchange", StringComparison.OrdinalIgnoreCase)
             || string.Equals(kind, "gm_operations_readiness", StringComparison.OrdinalIgnoreCase)
@@ -79,14 +66,14 @@
         IReadOnlyList<Chummer.Control.Contracts.Support.DecisionNotice>? notices)
     {
         if (!string.IsNullOrWhiteSpace(portableExchangeNotice?.Summary)
-            && !LooksLikeInternalWorkspaceLeak(portableExchangeNotice.Summary))
+            && !WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(portableExchangeNotice.Summary))
         {
             return portableExchangeNotice.Summary;
         }
 
         foreach (Chummer.Control.Contracts.Support.DecisionNotice notice in notices ?? Array.Empty<Chummer.Control.Contracts.Support.DecisionNotice>())
         {
-            if (!IsCalmHomeNoticeKind(notice.Kind) || LooksLikeInternalWorkspaceLeak(notice.Summary))
+            if (!IsCalmHomeNoticeKind(notice.Kind) || WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(notice.Summary))
             {
                 continue;
             }
@@ -102,7 +89,7 @@
     var leadWorkspaceServerPlane = Model.LeadWorkspaceServerPlane;
     var leadWorkspaceState = leadWorkspaceServerPlane?.WorkspaceState;
     var leadPortableExchangeNotice = leadWorkspaceServerPlane?.DecisionNotices.FirstOrDefault(notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.OrdinalIgnoreCase));
-    var leadPortableExchangeSummary = !LooksLikeInternalWorkspaceLeak(leadPortableExchangeNotice?.Summary)
+    var leadPortableExchangeSummary = !WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(leadPortableExchangeNotice?.Summary)
         ? leadPortableExchangeNotice?.Summary
         : null;
     var leadWorkspaceDecisionNoticeSummary = BuildCalmHomeDecisionNoticeSummary(leadPortableExchangeNotice, leadWorkspaceServerPlane?.DecisionNotices);
@@ -327,12 +314,6 @@
         <h1 class="page-title">@heading</h1>
         <p class="page-copy">@summary</p>
     </div>
-    <nav class="account-nav" aria-label="Home sections">
-        @foreach (var navItem in Model.Sections)
-        {
-            <a href="@navItem.Href" aria-current="@(navItem.Current ? "page" : "false")">@navItem.Label</a>
-        }
-    </nav>
 </section>
 
 <div class="sr-only" aria-hidden="true">
@@ -827,6 +808,7 @@ else
                                                             <h3>@leadAftermathPackage.Title</h3>
                                                             <p>
                                                                 @leadAftermathPackage.Summary
+                                                                <span> Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace, not in a disconnected recap lane.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadAftermathEvidence))
                                                                 {
                                                                     <span> Evidence: @leadAftermathEvidence</span>
@@ -927,6 +909,7 @@ else
                                                             <h3>@leadDowntimePackage.Title</h3>
                                                             <p>
                                                                 @leadDowntimePackage.Summary
+                                                                <span> This is the off-table half of the same governed Table Pulse Live and Table Pulse Aftermath loop, not a second disconnected system.</span>
                                                                 @if (!string.IsNullOrWhiteSpace(leadDowntimeEvidence))
                                                                 {
                                                                     <span> Evidence: @leadDowntimeEvidence</span>
