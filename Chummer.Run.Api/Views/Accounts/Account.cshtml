@@ -158,6 +158,9 @@
     var selectedWorkspaceDecisionNotices = (selectedWorkspaceServerPlane?.DecisionNotices ?? Array.Empty<Chummer.Control.Contracts.Support.DecisionNotice>())
         .Where(notice => !LooksLikeInternalWorkspaceLeak(notice.Summary))
         .ToArray();
+    var selectedWorkspacePortableExchangeSummary = !LooksLikeInternalWorkspaceLeak(selectedWorkspacePortableExchangeNotice?.Summary)
+        ? selectedWorkspacePortableExchangeNotice?.Summary
+        : null;
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
@@ -1648,9 +1651,9 @@
                                 <p><strong>GM prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
                                 <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             }
-                            @if (selectedWorkspacePortableExchangeNotice is not null)
+                            @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
                             {
-                                <p id="portable-exchange"><strong>Portable exchange:</strong> @selectedWorkspacePortableExchangeNotice.Summary</p>
+                                <p id="portable-exchange"><strong>Portable exchange:</strong> @selectedWorkspacePortableExchangeSummary</p>
                             }
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
@@ -1761,11 +1764,11 @@
                                         <span>Restore recovery path</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
                                     </div>
-                                    @if (selectedWorkspacePortableExchangeNotice is not null)
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
                                     {
                                         <div class="settings-summary-row">
                                             <span>Portable exchange</span>
-                                            <strong>@selectedWorkspacePortableExchangeNotice.Summary</strong>
+                                            <strong>@selectedWorkspacePortableExchangeSummary</strong>
                                         </div>
                                     }
                                     <div class="settings-summary-row">

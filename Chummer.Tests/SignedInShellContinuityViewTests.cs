@@ -27,9 +27,11 @@ public sealed class SignedInShellContinuityViewTests
 
         Assert.Contains("BuildCalmHomeDecisionNoticeSummary", view, StringComparison.Ordinal);
         Assert.Contains("LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
+        Assert.Contains("leadPortableExchangeSummary", view, StringComparison.Ordinal);
         Assert.Contains("A previous campaign workspace needs review before you continue. Open the campaign workspace for the safe next step.", view, StringComparison.Ordinal);
         Assert.Contains("Workspace review: @leadWorkspaceDecisionNoticeSummary", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Notice: @leadWorkspaceServerPlane.DecisionNotices[0].Summary", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Portable exchange: @leadPortableExchangeNotice.Summary", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -52,7 +54,9 @@ public sealed class SignedInShellContinuityViewTests
 
         Assert.Contains("LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
         Assert.Contains("selectedWorkspaceDecisionNotices", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspacePortableExchangeSummary", view, StringComparison.Ordinal);
         Assert.Contains("A previous campaign workspace needs review before you continue. Open the workspace lanes below for the safe next step.", view, StringComparison.Ordinal);
         Assert.DoesNotContain("foreach (var notice in selectedWorkspaceServerPlane.DecisionNotices)", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("@selectedWorkspacePortableExchangeNotice.Summary", view, StringComparison.Ordinal);
     }
 }
