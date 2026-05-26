@@ -43,4 +43,16 @@ public sealed class SignedInShellContinuityViewTests
         Assert.Contains("Recovery codes stay in reserve.", view, StringComparison.Ordinal);
         Assert.Contains("Do not turn this into a browser-first claim ritual.", view, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void AccountViewFailsClosedOnRawWorkspaceDecisionNoticeNoise()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Accounts", "Account.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("LooksLikeInternalWorkspaceLeak", view, StringComparison.Ordinal);
+        Assert.Contains("selectedWorkspaceDecisionNotices", view, StringComparison.Ordinal);
+        Assert.Contains("A previous campaign workspace needs review before you continue. Open the workspace lanes below for the safe next step.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("foreach (var notice in selectedWorkspaceServerPlane.DecisionNotices)", view, StringComparison.Ordinal);
+    }
 }
