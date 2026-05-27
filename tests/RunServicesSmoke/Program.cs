@@ -2015,6 +2015,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(programSource.Contains("hubGoogleAuth.ValidateProductionReadiness();", StringComparison.Ordinal), "startup should hard-fail in production when Google OIDC credentials are missing.");
     Assert(programSource.Contains("if (!hubGoogleAuth.IsConfigured())", StringComparison.Ordinal), "startup should still allow intentionally unconfigured non-production hosts.");
     Assert(programSource.Contains("Google OIDC is not configured; Hub will start with Google sign-in surfaces disabled.", StringComparison.Ordinal), "startup should keep the degraded Google sign-in warning for non-production hosts.");
+    Assert(programSource.Contains("HubRuntimePathDefaults.ResolveDataProtectionKeysPath", StringComparison.Ordinal), "startup should centralize durable key-ring resolution instead of open-coding a temp fallback.");
+    Assert(programSource.Contains("OAuth and sign-in callback state can break after container churn.", StringComparison.Ordinal), "startup should warn when Google callback state is backed only by a temporary key ring.");
     var authEntrySource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "Auth", "Entry.cshtml"));
     Assert(!authEntrySource.Contains("auth-panel__support", StringComparison.Ordinal), "auth entry should keep one quiet support row instead of duplicating support chrome inside the panel.");
     var landingSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Views", "PublicLanding", "Landing.cshtml"));

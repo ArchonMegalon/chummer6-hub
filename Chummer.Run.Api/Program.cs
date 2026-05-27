@@ -33,11 +33,7 @@ builder.Services
             return new BadRequestObjectResult(problem);
         };
     });
-var dataProtectionPath = builder.Configuration["CHUMMER_DATA_PROTECTION_KEYS_PATH"];
-if (string.IsNullOrWhiteSpace(dataProtectionPath))
-{
-    dataProtectionPath = Path.Combine(Path.GetTempPath(), "chummer-run-api", "data-protection-keys");
-}
+var dataProtectionPath = HubRuntimePathDefaults.ResolveDataProtectionKeysPath(builder.Configuration, builder.Environment);
 
 builder.Services.AddDataProtection()
     .SetApplicationName("Chummer.Run.Api")
@@ -84,6 +80,22 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 });
 
 var app = builder.Build();
+if (!HubRuntimePathDefaults.IsExplicitlyConfigured(builder.Configuration))
+{
+    if (HubRuntimePathDefaults.UsesTempFallback(dataProtectionPath))
+    {
+        app.Logger.LogWarning(
+            "CHUMMER_DATA_PROTECTION_KEYS_PATH is not configured; Hub is using a temporary data-protection key ring at {Path}. OAuth and sign-in callback state can break after container churn.",
+            dataProtectionPath);
+    }
+    else
+    {
+        app.Logger.LogInformation(
+            "CHUMMER_DATA_PROTECTION_KEYS_PATH is not configured; Hub resolved a writable default data-protection key ring at {Path}.",
+            dataProtectionPath);
+    }
+}
+
 var hubGoogleAuth = app.Services.GetRequiredService<HubGoogleAuthService>();
 hubGoogleAuth.ValidateProductionReadiness();
 if (!hubGoogleAuth.IsConfigured())
