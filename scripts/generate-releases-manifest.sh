@@ -390,11 +390,17 @@ def fallback_tuple_coverage(local_payload: dict) -> dict | None:
     )
 
 def derive_verifier_owned_value(name: str, current_value):
+    artifact_bound_registry_names = {
+        "expected_install_aware_artifact_registry_rows",
+        "expected_desktop_surface_ref_rows",
+        "expected_artifact_identity_registry_rows",
+        "expected_artifact_publication_binding_rows",
+    }
     helper = getattr(module, name, None)
-    if callable(helper):
+    if callable(helper) and name not in artifact_bound_registry_names:
         return helper(payload)
     if materializer is None:
-        return current_value
+        return helper(payload) if callable(helper) else current_value
     tuple_coverage = fallback_tuple_coverage(payload)
     artifacts = payload.get("artifacts") if isinstance(payload.get("artifacts"), list) else []
     channel_id = str(payload.get("channelId") or payload.get("channel") or "").strip().lower()
@@ -425,6 +431,7 @@ def derive_verifier_owned_value(name: str, current_value):
         "expected_artifact_identity_registry_rows": lambda: (
             materializer.artifact_identity_registry(
                 tuple_coverage,
+                artifacts,
                 channel_id=channel_id,
                 release_version=release_version,
             )
@@ -434,6 +441,7 @@ def derive_verifier_owned_value(name: str, current_value):
         "expected_artifact_publication_binding_rows": lambda: (
             materializer.artifact_publication_bindings(
                 tuple_coverage,
+                artifacts,
                 channel_id=channel_id,
                 release_version=release_version,
             )
