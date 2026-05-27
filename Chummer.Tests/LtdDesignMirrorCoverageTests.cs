@@ -12,6 +12,7 @@ public sealed class LtdDesignMirrorCoverageTests
         string runtimeRegistry = File.ReadAllText(RepoPaths.FromRoot(".codex-design", "product", "LTD_RUNTIME_AND_PROJECTION_REGISTRY.yaml"));
         string envExample = File.ReadAllText(RepoPaths.FromRoot(".env.example"));
         string ltdInventory = File.ReadAllText(RepoPaths.FromRoot("ltds.md"));
+        string publicEdgeCompose = File.ReadAllText(RepoPaths.FromRoot("docker-compose.public-edge.yml"));
 
         Assert.Contains("Current known external-tool inventory includes:", toolsPlane, StringComparison.Ordinal);
         Assert.Contains("workspace integration Tier 3, vendor license plan Tier 4", toolsPlane, StringComparison.Ordinal);
@@ -32,6 +33,8 @@ public sealed class LtdDesignMirrorCoverageTests
         Assert.Contains("CHUMMER_EA_MAGICFIT_TIER=", envExample, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_EA_MAGICFIT_EMAIL=", envExample, StringComparison.Ordinal);
         Assert.Contains("CHUMMER_EA_MAGICFIT_PASSWORD=", envExample, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_EA_MAGICFIT_EMAIL: ${CHUMMER_EA_MAGICFIT_EMAIL:-}", publicEdgeCompose, StringComparison.Ordinal);
+        Assert.Contains("CHUMMER_EA_MAGICFIT_PASSWORD: ${CHUMMER_EA_MAGICFIT_PASSWORD:-}", publicEdgeCompose, StringComparison.Ordinal);
 
         Assert.Contains("### blipai.app", ltdInventory, StringComparison.Ordinal);
         Assert.Contains("### magicfit", ltdInventory, StringComparison.Ordinal);
