@@ -5959,7 +5959,7 @@ public sealed class PublicLandingController : Controller
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),
             new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
-            new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),
+            new("Proof recency", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
             new("Adoption health", pulse is null
                 ? BuildManifestAdoptionSummary(manifest)
@@ -6136,7 +6136,7 @@ public sealed class PublicLandingController : Controller
 
         if (blockedJourneyCount > 0)
         {
-            segments.Add($"{blockedJourneyCount} golden journey(s) remain blocked");
+            segments.Add($"{blockedJourneyCount} release journey(s) remain blocked");
         }
 
         return string.Join("; ", segments) + ".";
