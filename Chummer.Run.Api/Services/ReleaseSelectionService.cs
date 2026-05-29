@@ -72,9 +72,11 @@ public sealed class ReleaseSelectionService
             ? (experience.AccountRequiredInstallSteps?.Count > 0 ? experience.AccountRequiredInstallSteps : experience.InstallSteps) ?? new List<string>()
             : experience.InstallSteps ?? new List<string>();
         var recommendedUsesMacBootstrap = recommended is not null && UsesMacBootstrapFlow(recommended);
+        var guestDownloadAvailable = manifest.Downloads.Any(static artifact =>
+            !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
         // macOS preview posture stays on one Terminal command instead of a raw DMG handoff.
         // The guided setup path verifies the published DMG digest before install continuity is claimed.
-        var guestGateArtifactHref = recommended is null
+        var guestGateArtifactHref = recommended is null || guestDownloadAvailable
             ? "/downloads"
             : BuildSignupDispatchHref(recommended);
         var guestGateSignInHref = recommended is null
@@ -98,8 +100,7 @@ public sealed class ReleaseSelectionService
             InstallHelpLabel: experience.InstallHelpLabel,
             InstallHelpHref: experience.InstallHelpHref,
             UpdatePostureSummary: experience.UpdatePostureSummary,
-            GuestDownloadAvailable: manifest.Downloads.Any(static artifact =>
-                !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)),
+            GuestDownloadAvailable: guestDownloadAvailable,
             RequestedPlatformHasPublicDownload: requestedPlatformHasPublicDownload,
             PlatformShelfNoticeTitle: shelfNotice?.Title,
             PlatformShelfNoticeSummary: shelfNotice?.Summary,
@@ -757,6 +758,12 @@ public sealed class ReleaseSelectionService
         {
             return string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
                 && HasExplicitArtifactProof(manifest, download);
+        }
+
+        if (string.Equals(platform.PublicManifestVisibility, "visible_as_public_archive_preview", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.Equals(manifest.ProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
+                   && HasExplicitArtifactProof(manifest, download);
         }
 
         return true;

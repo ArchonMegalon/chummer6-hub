@@ -3681,7 +3681,7 @@ public sealed class VerificationEntryPointTests
         Assert.DoesNotContain("`Get preview build`", downloadsPolicy, StringComparison.Ordinal);
         Assert.Contains("`Open downloads`", landingPolicy, StringComparison.Ordinal);
         Assert.DoesNotContain("`Get preview build`", landingPolicy, StringComparison.Ordinal);
-        Assert.Contains("headline: Build a runner, explain every ruling, and recover the campaign.", landingManifest, StringComparison.Ordinal);
+        Assert.Contains("headline: Shadowrun rules truth, with receipts.", landingManifest, StringComparison.Ordinal);
         Assert.Contains("product_proof_primary_label: Open downloads", landingManifest, StringComparison.Ordinal);
         Assert.Contains("Open downloads for the current preview", landingManifest, StringComparison.Ordinal);
         Assert.DoesNotContain("product_proof_primary_label: Create account to install", landingManifest, StringComparison.Ordinal);

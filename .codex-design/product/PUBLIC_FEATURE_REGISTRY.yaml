@@ -11,7 +11,7 @@ cards:
     audience: public
     image_family: solo_operator
     asset_slot: capability_build_runner
-    action_label: Create account to install
+    action_label: Open downloads
     proof_note: "Proof: a real preview build exists now, not just a story about one."
     pain: Clean dossiers, visible tradeoffs, and no hidden modifier stack.
     payoff: Deterministic totals stay readable before you ever take the character to the table.
