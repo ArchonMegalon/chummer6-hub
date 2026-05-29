@@ -5,14 +5,14 @@
   "desktop_client_readiness": {
     "status": "fail",
     "scoped_status": "fail",
-    "generated_at": "2026-05-29T08:09:41Z",
+    "generated_at": "2026-05-29T10:59:36Z",
     "missing_coverage_keys": [
       "desktop_client"
     ],
     "desktop_client_missing": true,
-    "reason": "flagship product readiness proof is not green: fail; missing coverage: desktop_client; readiness plane gaps: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready",
+    "reason": "flagship product readiness proof is not green: fail; missing coverage: desktop_client; readiness plane gaps: flagship_ready, veteran_deep_workflow_ready, primary_route_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready",
     "completion_audit_status": "fail",
-    "completion_audit_reason": "Flagship product readiness planes are not green: flagship_ready, veteran_deep_workflow_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready.",
+    "completion_audit_reason": "Flagship product readiness planes are not green: flagship_ready, veteran_deep_workflow_ready, primary_route_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready.",
     "source_path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "publicTrustSurface": {
@@ -1637,6 +1637,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-29T08:28:35Z",
-  "generatedAt": "2026-05-29T08:28:35Z"
+  "generated_at": "2026-05-29T17:12:12Z",
+  "generatedAt": "2026-05-29T17:12:12Z"
 }

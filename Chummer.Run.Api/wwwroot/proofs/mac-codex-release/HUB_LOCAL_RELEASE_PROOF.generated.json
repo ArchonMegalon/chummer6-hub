@@ -3,14 +3,16 @@
   "package_repo": "chummer6-hub",
   "status": "passed",
   "desktop_client_readiness": {
-    "status": "pass",
-    "scoped_status": "pass",
-    "generated_at": "2026-05-21T17:25:28Z",
-    "missing_coverage_keys": [],
-    "desktop_client_missing": false,
-    "reason": "Flagship product readiness proof is green.",
-    "completion_audit_status": "pass",
-    "completion_audit_reason": "Flagship product readiness proof is green.",
+    "status": "fail",
+    "scoped_status": "fail",
+    "generated_at": "2026-05-29T10:59:36Z",
+    "missing_coverage_keys": [
+      "desktop_client"
+    ],
+    "desktop_client_missing": true,
+    "reason": "flagship product readiness proof is not green: fail; missing coverage: desktop_client; readiness plane gaps: flagship_ready, veteran_deep_workflow_ready, primary_route_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready",
+    "completion_audit_status": "fail",
+    "completion_audit_reason": "Flagship product readiness planes are not green: flagship_ready, veteran_deep_workflow_ready, primary_route_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready.",
     "source_path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "publicTrustSurface": {
@@ -881,7 +883,7 @@
   "base_url": "https://chummer.run",
   "compose_file": "docker-compose.yml",
   "playwright_timeout_seconds": 120,
-  "edge_rebuild_skipped": false,
+  "edge_rebuild_skipped": true,
   "journeys_passed": [
     "install_claim_restore_continue",
     "build_explain_publish",
@@ -1635,6 +1637,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-21T17:26:01Z",
-  "generatedAt": "2026-05-21T17:26:01Z"
+  "generated_at": "2026-05-29T17:12:12Z",
+  "generatedAt": "2026-05-29T17:12:12Z"
 }
