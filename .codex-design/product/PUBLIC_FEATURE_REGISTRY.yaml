@@ -535,7 +535,7 @@ cards:
   - id: participate_future
     bucket: participate
     title: Start KARMA FORGE discovery
-    summary: Turn house-rule pain into governed discovery packets with Icanpreneur prompts, receipts, and Product Governor routing.
+    summary: Turn house-rule pain into governed discovery packets with first-party prompts, receipts, and product review routing.
     href: /participate/karma-forge
     badge: Public
     audience: public
