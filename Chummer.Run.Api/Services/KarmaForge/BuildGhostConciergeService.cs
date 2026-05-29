@@ -21,6 +21,8 @@ public sealed record BuildGhostConciergeProjection(
     IReadOnlyList<string> AnswerlyResponsibilities,
     IReadOnlyList<string> ChummerResponsibilities,
     IReadOnlyList<string> CompareArtifacts,
+    string ClientReportHref,
+    string PublicFeedbackHref,
     IReadOnlyList<BuildGhostConciergeActionProjection> Actions);
 
 public sealed class BuildGhostConciergeService
@@ -51,7 +53,7 @@ public sealed class BuildGhostConciergeService
             RulesetId: "build_ghost",
             AnswerType: "support_question",
             Authority: "chummer6-build-ghost-boundary",
-            SafeSummary: "Build Ghost is a guided experiment lane. FacePop can greet and route a builder into the right intake. Answerly can paraphrase what the experiment means in plain language. Chummer still owns the actual ghost spawn, compare, receipts, legality explanation, and apply decision.",
+            SafeSummary: "Build Ghost is a guided experiment lane. A public concierge can greet and route a builder into the right intake. A bounded explainer can paraphrase what the experiment means in plain language. Chummer still owns the actual ghost spawn, compare, receipts, legality explanation, and apply decision.",
             CalculationSteps:
             [
                 new RuleSafeCalculationStep("Entry", "Public concierge asks what changed and what the builder wants to compare", "facepop_concierge_boundary"),
@@ -63,11 +65,13 @@ public sealed class BuildGhostConciergeService
             Confidence: "bounded",
             ForbiddenToAnswerly: ["mechanics_truth", "legality_truth", "apply_truth", "runner_mutation"],
             HumanizerInstruction: "Explain the Build Ghost concierge split in plain language without claiming runtime truth.",
-            FallbackMessage: "FacePop can greet the builder, Answerly can explain the experiment, and Chummer still owns the actual Build Ghost compare and apply truth.");
+            FallbackMessage: "A public concierge can greet the builder, a bounded explainer can explain the experiment, and Chummer still owns the actual Build Ghost compare and apply truth.");
         RuleSafeOutputGateResult humanized = _humanizer.Humanize(packet);
         string answerlyStatus = _answerlyPolicy.CanUseHumanizer
             ? (humanized.Allowed ? "Bounded explainer ready" : "Bounded explainer fail-closed")
             : "Fallback explainer only";
+        const string clientReportHref = "/contact?kind=bug_report&title=Build%20Ghost%20report&summary=Build%20Ghost%20compare%20or%20apply%20did%20not%20behave%20as%20expected.&runtime=alice_build_ghost_lab&bundle=build_ghost&sceneId=build-ghost";
+        const string publicFeedbackHref = "/feedback?topic=build-ghosts";
 
         return new BuildGhostConciergeProjection(
             FacePopEntryHref: facePopHref,
@@ -75,8 +79,8 @@ public sealed class BuildGhostConciergeService
             AnswerlyStatus: answerlyStatus,
             EngineStatus: "First-party compare/apply only",
             HumanizedSummary: humanized.Allowed ? humanized.Output : packet.FallbackMessage,
-            CanonicalLane: "FacePop greeting -> Answerly bounded explanation -> Chummer Build Ghost compare bench",
-            RuntimeBoundary: "Neither FacePop nor Answerly may compute legality, mutate the runner, or become apply truth.",
+            CanonicalLane: "Public concierge greeting -> bounded explanation -> Chummer Build Ghost compare bench",
+            RuntimeBoundary: "Neither the public concierge nor the bounded explainer may compute legality, mutate the runner, or become apply truth.",
             FacePopResponsibilities:
             [
                 "Greet the builder and ask which runner decision needs comparison.",
@@ -101,6 +105,8 @@ public sealed class BuildGhostConciergeService
                 "What-if receipt packet",
                 "Apply receipt or discard receipt"
             ],
+            ClientReportHref: clientReportHref,
+            PublicFeedbackHref: publicFeedbackHref,
             Actions:
             [
                 new BuildGhostConciergeActionProjection(
@@ -117,7 +123,12 @@ public sealed class BuildGhostConciergeService
                     "Open public concierge",
                     facePopHref,
                     "ghost",
-                    "Use the bounded public invite lane without granting it runtime truth.")
+                    "Use the bounded public invite lane without granting it runtime truth."),
+                new BuildGhostConciergeActionProjection(
+                    "Report a Build Ghost issue",
+                    clientReportHref,
+                    "secondary",
+                    "Open first-party support with the build-ghost runtime context already attached.")
             ]);
     }
 

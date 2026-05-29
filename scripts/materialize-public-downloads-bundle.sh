@@ -327,6 +327,46 @@ def derive_verifier_owned_value(name: str, current_value):
         return fallback()
     return current_value
 
+def assert_desktop_surface_ref_consistency(local_payload: dict) -> None:
+    artifacts = local_payload.get("artifacts") or []
+    artifact_ids = {
+        normalized_token(item.get("artifactId") or item.get("id"))
+        for item in artifacts
+        if isinstance(item, dict) and normalized_token(item.get("artifactId") or item.get("id"))
+    }
+    coverage = local_payload.get("desktopTupleCoverage")
+    route_truth = coverage.get("desktopRouteTruth") if isinstance(coverage, dict) else []
+    route_truth_by_tuple = {
+        str(item.get("tupleId") or "").strip(): item
+        for item in route_truth
+        if isinstance(item, dict) and str(item.get("tupleId") or "").strip()
+    }
+    problems: list[str] = []
+    for row in local_payload.get("desktopSurfaceRefs") or []:
+        if not isinstance(row, dict):
+            continue
+        tuple_id = str(row.get("tupleId") or "").strip()
+        artifact_id = normalized_token(row.get("artifactId"))
+        if not artifact_id or artifact_id not in artifact_ids:
+            problems.append(f"{tuple_id or '<missing-tuple>'}: desktopSurfaceRefs artifactId is missing from artifacts")
+            continue
+        route_row = route_truth_by_tuple.get(tuple_id)
+        if not isinstance(route_row, dict):
+            problems.append(f"{tuple_id}: desktopSurfaceRefs tuple is missing from desktopRouteTruth")
+            continue
+        route_artifact_id = normalized_token(route_row.get("artifactId"))
+        if not route_artifact_id:
+            problems.append(f"{tuple_id}: desktopSurfaceRefs surfaced tuple has empty desktopRouteTruth.artifactId")
+        elif route_artifact_id != artifact_id:
+            problems.append(f"{tuple_id}: desktopSurfaceRefs artifactId does not match desktopRouteTruth.artifactId")
+        if normalized_token(route_row.get("promotionState")) == "proof_required":
+            problems.append(f"{tuple_id}: desktopSurfaceRefs must not surface proof_required tuples")
+    if problems:
+        raise SystemExit(
+            "Release channel desktopSurfaceRefs is inconsistent with artifacts/desktopRouteTruth:\n - "
+            + "\n - ".join(problems)
+        )
+
 coverage = payload.get("desktopTupleCoverage")
 if isinstance(coverage, dict):
     coverage["externalProofRequests"] = derive_verifier_owned_value(
@@ -400,6 +440,7 @@ payload["registryBoundaryCoverage"] = derive_verifier_owned_value(
     "expected_registry_boundary_coverage",
     payload.get("registryBoundaryCoverage") or {},
 )
+assert_desktop_surface_ref_consistency(payload)
 manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 PY
 }

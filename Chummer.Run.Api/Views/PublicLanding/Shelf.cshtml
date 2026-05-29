@@ -58,12 +58,12 @@
                 ? "Personal, campaign, creator, and public returns stay on one signed-in shelf"
                 : "Sign in when you want the private continuity shelf as well as public proof",
             Summary = Model.Chrome.Authenticated
-                ? "The signed-in shelf keeps account-side aftermath, replay, publication, and continuity artifacts visible without splitting them into separate stories."
+                ? "The signed-in shelf is the return rail for Table Pulse Aftermath: aftermath, replay, publication, Signal Deck continuity, and campaign follow-through stay visible without splitting into separate stories."
                 : "Public proof works without an account. Sign in only when you want private continuity, linked returns, and campaign or creator-owned artifact follow-through.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
             Proof = Model.Chrome.Authenticated
-                ? new[] { "Personal and campaign views", "Creator follow-through", "Same return shelf" }
+                ? new[] { "Table Pulse Aftermath return rail", "Creator follow-through", "Same return shelf" }
                 : new[] { "Public first", "Account adds continuity", "No auth wall for proof" }
         },
         new

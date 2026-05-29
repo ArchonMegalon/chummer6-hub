@@ -1,6 +1,7 @@
 using Chummer.Run.Api.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace Chummer.Tests;
@@ -59,6 +60,43 @@ public sealed class HubPageChromeServiceTests
 
         var signIn = Assert.Single(chrome.HeaderActions, action => action.Label == "Sign in");
         Assert.Equal("/auth/google/start?next=%2Fparticipate", signIn.Href);
+    }
+
+    [Fact]
+    public void BuildPublicChromeUsesFlagshipPrimaryNavigationModel()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = CreateService(configuration);
+
+        var chrome = service.BuildPublicChrome("Home", "Flagship shell.", "/");
+
+        Assert.Equal(
+            ["Home", "Get Chummer", "What works today", "Worlds", "Account", "Help"],
+            chrome.PrimaryNavigation.Select(static link => link.Label).ToArray());
+        Assert.Equal("/", chrome.PrimaryNavigation[0].Href);
+        Assert.Equal("/downloads", chrome.PrimaryNavigation[1].Href);
+        Assert.Equal("/ledger", chrome.PrimaryNavigation[3].Href);
+        Assert.Equal("/signup", chrome.PrimaryNavigation[4].Href);
+    }
+
+    [Fact]
+    public void WorldsPrimaryNavigationRouteExistsInMirroredLandingManifest()
+    {
+        string navigationPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_NAVIGATION.yaml");
+        string manifestPath = RepoPaths.FromRoot(".codex-design", "product", "PUBLIC_LANDING_MANIFEST.yaml");
+
+        string navigation = File.ReadAllText(navigationPath);
+        string manifest = File.ReadAllText(manifestPath);
+
+        Assert.Contains("label: Worlds", navigation, StringComparison.Ordinal);
+        Assert.Contains("href: /ledger", navigation, StringComparison.Ordinal);
+        Assert.Matches(new Regex(@"(?m)^\s*-\s+path:\s+/ledger\s*$"), manifest);
     }
 
     [Fact]

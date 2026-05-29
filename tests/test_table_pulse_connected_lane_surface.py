@@ -59,15 +59,15 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             result.stderr,
         )
 
-    def test_verifier_fails_when_shelf_drops_return_rail_language(self) -> None:
+    def test_verifier_fails_when_home_drops_return_rail_language(self) -> None:
         with tempfile.TemporaryDirectory(prefix="table-pulse-home-") as temp_dir:
             temp_root = Path(temp_dir)
             self.copy_sources(temp_root)
-            shelf_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
-            shelf_path.write_text(
-                shelf_path.read_text(encoding="utf-8").replace(
-                    "Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
-                    "return artifacts that stay on this signed-in shelf",
+            home_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Home.cshtml"
+            home_path.write_text(
+                home_path.read_text(encoding="utf-8").replace(
+                    "Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace",
+                    "Signed-in reaction fallout stays on the same governed workspace",
                     1,
                 ),
                 encoding="utf-8",
@@ -77,7 +77,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
+            "Chummer.Run.Api/Views/PublicLanding/Home.cshtml missing marker: Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace",
             result.stderr,
         )
 
@@ -168,7 +168,6 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml missing marker: Connected command lane",
             result.stderr,
         )
-
     def test_verifier_accepts_live_public_routes(self) -> None:
         class FakeResponse:
             def __init__(self, text: str) -> None:

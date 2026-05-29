@@ -155,6 +155,7 @@ def validate_live_route_proof() -> dict[str, Any]:
     routes = payload.get("routes") or []
     failed_count = summary.get("failed_count")
     route_count = summary.get("route_count")
+    expected_route_count = len(load_manifest_routes())
     codex_route = None
     if isinstance(routes, list):
         for route in routes:
@@ -177,7 +178,7 @@ def validate_live_route_proof() -> dict[str, Any]:
     
     ok = (
         isinstance(route_count, int)
-        and route_count >= 63
+        and route_count >= expected_route_count
         and isinstance(failed_count, int)
         and failed_count == 0
         and redirect_ok
@@ -192,7 +193,7 @@ def validate_live_route_proof() -> dict[str, Any]:
         path=path,
         ok=ok,
         detail=(
-            f"route_count={route_count} failed_count={failed_count} "
+            f"route_count={route_count} expected_route_count={expected_route_count} failed_count={failed_count} "
             f"proof_has_participate_codex={isinstance(codex_route, dict)} proof_success={proof_success} "
             f"proof_redirect={proof_redirect!r} live_status={live_status!r} live_location={live_location!r}"
         ),

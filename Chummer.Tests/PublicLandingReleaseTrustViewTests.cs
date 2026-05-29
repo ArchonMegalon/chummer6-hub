@@ -322,9 +322,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controller = File.ReadAllText(controllerPath);
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("GoogleStartHref: $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}"", controller, StringComparison.Ordinal);
-        Assert.Contains("Model.NextPath.StartsWith("/downloads"", view, StringComparison.Ordinal);
-        Assert.Contains("href="@Model.GoogleStartHref"", view, StringComparison.Ordinal);
+        Assert.Contains("GoogleStartHref: $\"/auth/google/start?next={Uri.EscapeDataString(nextPath)}\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Model.NextPath.StartsWith(\"/downloads\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"@Model.GoogleStartHref\"", view, StringComparison.Ordinal);
         Assert.Contains("Continue with Google", view, StringComparison.Ordinal);
         Assert.Contains("After verification you return to @nextTarget.", view, StringComparison.Ordinal);
     }

@@ -38,28 +38,28 @@ public sealed class BlackLedgerPublicStatsService
             period: "Turn 1",
             sampleSize: "6 seeded factions / 8 districts",
             sampleCount: 6,
-            confidenceKey: "preview",
-            confidence: "Preview",
+            confidenceKey: "seeded",
+            confidence: "Seeded",
             privacyNote: "Opt-in aggregate only",
-            sourceKind: "seeded_preview",
-            sourceLabel: "Seeded preview world",
-            sourceSummary: "Derived from the canonical Emerald Sprawl seed before any live opt-in campaign aggregation is allowed.",
-            status: "preview",
+            sourceKind: "seeded_board",
+            sourceLabel: "Canonical seed world",
+            sourceSummary: "Derived from the canonical Emerald Sprawl world seed before any live opt-in campaign aggregation is allowed.",
+            status: "seeded",
             href: "/ledger/stats#mysad-density"),
         CreatePublicStat(
             id: "debt-heat",
             title: "Debt Heat",
             value: "Rust Bazaar 99 heat",
             period: "Turn 1",
-            sampleSize: "Seeded preview world",
+            sampleSize: "Canonical seed world",
             sampleCount: 8,
-            confidenceKey: "preview",
-            confidence: "Preview",
+            confidenceKey: "seeded",
+            confidence: "Seeded",
             privacyNote: "Fictional runner/campaign statistics only",
-            sourceKind: "seeded_preview",
-            sourceLabel: "Seeded preview world",
+            sourceKind: "seeded_board",
+            sourceLabel: "Canonical seed world",
             sourceSummary: "Computed from the canonical seeded faction and district model, not from private campaign telemetry.",
-            status: "preview",
+            status: "seeded",
             href: "/ledger/stats#debt-heat"),
         CreatePublicStat(
             id: "package-pressure",
@@ -68,13 +68,13 @@ public sealed class BlackLedgerPublicStatsService
             period: "Turn 1",
             sampleSize: "3 candidate lanes",
             sampleCount: 3,
-            confidenceKey: "preview",
-            confidence: "Preview",
+            confidenceKey: "seeded",
+            confidence: "Seeded",
             privacyNote: "Proof-backed demand, not roadmap truth",
             sourceKind: "package_registry",
             sourceLabel: "Package registry pressure lanes",
             sourceSummary: "Summarizes seeded package-pressure lanes and keeps release truth separate from demand signals.",
-            status: "preview",
+            status: "seeded",
             href: "/ledger/packages"),
         CreatePublicStat(
             id: "chaos-index",
@@ -83,30 +83,30 @@ public sealed class BlackLedgerPublicStatsService
             period: "Turn 1",
             sampleSize: "8 seeded districts",
             sampleCount: 8,
-            confidenceKey: "preview",
-            confidence: "Preview",
+            confidenceKey: "seeded",
+            confidence: "Seeded",
             privacyNote: "Playful fictional labels only; never point at real people.",
-            sourceKind: "seeded_preview",
-            sourceLabel: "Seeded preview world",
+            sourceKind: "seeded_board",
+            sourceLabel: "Canonical seed world",
             sourceSummary: "Uses district heat from the canonical public-safe seed and fails closed if the source becomes unsafe.",
-            status: "preview",
+            status: "seeded",
             href: "/ledger/factions#chaos-index"),
     ];
 
     private static readonly BlackLedgerModuleViewModel[] Modules =
     [
         new("faction-intel", "Faction Intel", "Read public-safe faction pressure without exposing private tables or runner identities.", "/ledger/factions", "Opt-in aggregate"),
-        new("runner-archetypes", "Runner Archetype Stats", "See archetype pressure, chrome load, and role-shift signals as public-safe aggregates.", "/ledger/stats", "Preview"),
-        new("package-pressure", "Package Pressure", "Track followed package demand and compatibility heat without claiming shipped status early.", "/ledger/packages", "Governed preview"),
+        new("runner-archetypes", "Runner Archetype Stats", "See archetype pressure, chrome load, and role-shift signals as public-safe aggregates.", "/ledger/stats", "Seeded board"),
+        new("package-pressure", "Package Pressure", "Track followed package demand and compatibility heat without claiming shipped status early.", "/ledger/packages", "Governed watch"),
         new("karma-forge-candidates", "Karma Forge Candidate Feed", "See which discovery lanes are generating governed package candidates and closeout motion.", "/karma-forge", "Discovery-linked"),
         new("closeout-feed", "Closeout Feed", "Follow proof-backed closeout motion after public-safe review, not before.", "/ledger/closeouts", "Proof-backed only"),
     ];
 
     private static readonly BlackLedgerCloseoutViewModel[] Closeouts =
     [
-        new("Last tick receipt", "Turn 1 already ran, and the preseeded receipt stays visible before any human steward takes over.", "/ledger/closeouts", "Public-safe receipt"),
+        new("Last tick receipt", "Turn 1 already ran, and the first seeded receipt stays visible before any human steward takes over.", "/ledger/closeouts", "Public-safe receipt"),
         new("Closeout witness feed", "Proof-backed closeout updates only appear after package, route, and release receipts all agree.", "/ledger/closeouts", "Proof-backed"),
-        new("Package recovery watch", "Recovery and rollback posture stays visible without implying promoted shipment.", "/packages", "Governed preview"),
+        new("Package recovery watch", "Recovery and rollback posture stays visible without implying promoted shipment.", "/packages", "Governed watch"),
         new("Karma Forge dispatch", "Discovery packets can point at candidate motion, but not shipped status, until release proof is real.", "/karma-forge", "Signal only"),
     ];
     private static readonly BlackLedgerWorldPreviewViewModel FallbackWorldPreview = new(
@@ -115,13 +115,13 @@ public sealed class BlackLedgerPublicStatsService
         Status: "preseeded_preview",
         CurrentTurn: 1,
         TurnHeadline: "Turn 1 already ran. Debt Heat rose in Rust Bazaar while Ashline MysAd density pushed package pressure toward awakened build support.",
-        SafetyNote: "Seeded preview and opt-in aggregate only. The Ledger explains pressure, not people.",
-        MapNote: "Influence spheres are preview geometry, not private campaign truth. Use the map to inspect public faction pressure, package heat, and closeout motion.",
+        SafetyNote: "Canonical seeded board and opt-in aggregate only. The Ledger explains pressure, not people.",
+        MapNote: "Route-backed globe geometry stays public-safe and receipt-backed. Use the map to inspect faction pressure, package heat, and closeout motion.",
         DeterministicPreview: false,
         TurnNavigation:
         [
-            new(1, "Turn 1 live preview", "/ledger?turn=1", true, false),
-            new(2, "Turn 2 deterministic preview", "/ledger?turn=2", false, true),
+            new(1, "Turn 1 live board", "/ledger?turn=1", true, false),
+            new(2, "Turn 2 deterministic board", "/ledger?turn=2", false, true),
         ],
         Districts:
         [
@@ -158,7 +158,7 @@ public sealed class BlackLedgerPublicStatsService
             "verified_human_steward_pending",
             "human",
             "2026-05-14T12:00:00Z",
-            "Preview handoff receipt proves that verified human takeover outranks interim AI stewardship.",
+            "Handoff receipt proves that verified human takeover outranks interim AI stewardship.",
             "stewarding_operator",
             "public_safe"),
         LastTick: new(
@@ -225,18 +225,19 @@ public sealed class BlackLedgerPublicStatsService
         var modes = BuildMapModes(normalizedMode);
         var events = BuildMapEvents(world);
         var arcs = BuildMapArcs(world);
-        var replaySteps = BuildReplaySteps(world);
+        BlackLedgerWorldSeedDocument? seed = TryLoadSeed();
+        var replaySteps = BuildReplaySteps(world, seed);
 
         return new BlackLedgerCommandMapViewModel(
             WorldId: world.WorldId,
-            RenderMode: "svg_tactical",
+            RenderMode: "earth_globe_country_borders",
             CurrentMode: normalizedMode,
             Modes: modes,
             Events: events,
             Arcs: arcs,
             ReplaySteps: replaySteps,
-            AccessibilityNote: "Keyboard focus, button-based mode switching, and a region/event list fallback stay available even when motion is reduced.",
-            PerformanceNote: "The homepage teaser stays SVG-first. The full Ledger map adds no provider runtime and keeps the seed payload bounded.",
+            AccessibilityNote: "Keyboard focus, button-based mode switching, and a region/event list fallback stay available even when motion is reduced. Faction territory stays readable as bordered countries instead of abstract blobs.",
+            PerformanceNote: "The homepage globe stays bounded, responsive, and flagship-grade while drawing a real earth surface with faction-country borders from route-backed region polygons.",
             PublicSafetyNote: world.SafetyNote);
     }
 
@@ -260,6 +261,7 @@ public sealed class BlackLedgerPublicStatsService
             Regions: world.Districts.Select(static district => new BlackLedgerMapRegionApiDocument(
                 RegionId: district.Id,
                 Name: district.Name,
+                PolygonPoints: district.PolygonPoints,
                 DominantFactionId: NormalizeSlug(district.DominantFaction),
                 Influence: district.Influence,
                 Heat: district.Heat,
@@ -462,7 +464,7 @@ public sealed class BlackLedgerPublicStatsService
                     $"Turn {tick.Turn} already ran.\n\n" +
                     $"{tick.Summary}\n\n" +
                     $"The Ledger marked the movement, not the people: faction pressure shifted, package demand moved, and public-safe closeout witnesses stayed tied to one receipt before any dispatch was allowed to talk.\n\n" +
-                    $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                    $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
                 involvedFactions: world.Factions.Take(4).Select(static item => item.PublicName).ToArray(),
                 involvedDistricts: world.Districts.Take(4).Select(static item => item.Name).ToArray(),
                 packagePressureLinks: ["/ledger/packages", "/karma-forge"],
@@ -484,7 +486,7 @@ public sealed class BlackLedgerPublicStatsService
                     summary: "Useful route-and-drone pressure crossed from rumor to watched package signal.",
                     body:
                         "The requests were not glamorous: better cargo state, clearer drone loadouts, fewer lost handoffs. The Ledger marked it as boring, useful, and therefore dangerous to ignore.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
                     involvedFactions: ["Neon Docks Union", "Ghostline Network"],
                     involvedDistricts: ["Neon Docks", "Old Signal Loop"],
                     packagePressureLinks: ["/ledger/packages", "/karma-forge"],
@@ -517,7 +519,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "The Bazaar did not need names. Gear requests spiked, favors got counted twice, and the district made boring logistics feel dangerous again.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
                     involvedFactions: ["Rust Market Syndicate"],
                     involvedDistricts: ["Rust Bazaar"],
                     packagePressureLinks: ["/ledger/packages"],
@@ -539,7 +541,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "The Circle did not argue about power. It argued about proof. Clean intent with dirty paperwork pushed MysAd density upward and nudged package demand toward explainers instead of swagger.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
                     involvedFactions: ["Ashline Circle"],
                     involvedDistricts: ["Ashline Ward"],
                     packagePressureLinks: ["/ledger/packages", "/karma-forge"],
@@ -561,7 +563,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "Containers moved, drones failed, and somebody's maintenance debt became everybody's routing problem. The Docks did not ask for attention. Package pressure did that for them.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
                     involvedFactions: ["Neon Docks Union"],
                     involvedDistricts: ["Neon Docks"],
                     packagePressureLinks: ["/ledger/packages"],
@@ -583,7 +585,7 @@ public sealed class BlackLedgerPublicStatsService
                     body:
                         $"{effect.PublicReason}\n\n" +
                         "Ghostline killed the noise before it touched the shelf. No heroics, no badges, just one less false truth for the table to trip over.\n\n" +
-                        $"Generated from {tick.ReceiptId} · public-safe seeded preview · no private table data.",
+                        $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
                     involvedFactions: ["Ghostline Network"],
                     involvedDistricts: ["Ghostline East", "Old Signal Loop"],
                     packagePressureLinks: ["/ledger/closeouts", "/ledger/packages"],
@@ -613,7 +615,7 @@ public sealed class BlackLedgerPublicStatsService
             WorldId: worldId,
             Turn: turn,
             Type: type,
-            Scope: "public_safe_seeded_preview",
+            Scope: "public_safe_flagship_seeded_board",
             SourceReceiptId: sourceReceiptId,
             SourceReceiptHref: sourceReceiptHref,
             Title: title,
@@ -755,7 +757,7 @@ public sealed class BlackLedgerPublicStatsService
         int minimumLiveSampleSize = 10;
         string packagePressureConfidenceKey = packagePressure.Count >= minimumLiveSampleSize
             ? "enough_data"
-            : "preview";
+            : "seeded";
 
         BlackLedgerPublicStatViewModel[] stats =
         [
@@ -766,28 +768,28 @@ public sealed class BlackLedgerPublicStatsService
                 period: period,
                 sampleSize: SeededFactionSample(),
                 sampleCount: factions.Count,
-                confidenceKey: "preview",
-                confidence: "Preview",
+                confidenceKey: "seeded",
+                confidence: "Seeded",
                 privacyNote: "Opt-in aggregate only",
-                sourceKind: "seeded_preview",
-                sourceLabel: "Seeded preview world",
-                sourceSummary: "Derived from the preseeded Emerald Sprawl faction model until opted-in live data clears privacy thresholds.",
-                status: "preview",
+                sourceKind: "seeded_board",
+                sourceLabel: "Canonical seed world",
+                sourceSummary: "Derived from the Emerald Sprawl seed model until opted-in live data clears privacy thresholds.",
+                status: "seeded",
                 href: "/ledger/stats#mysad-density"),
             CreatePublicStat(
                 id: "debt-heat",
                 title: "Debt Heat",
                 value: $"Rust Bazaar {AdjustedStat("rust_market_syndicate", "debt_heat")} heat",
                 period: period,
-                sampleSize: "Seeded preview world",
+                sampleSize: "Canonical seed world",
                 sampleCount: districtById.Count,
-                confidenceKey: "preview",
-                confidence: "Preview",
+                confidenceKey: "seeded",
+                confidence: "Seeded",
                 privacyNote: "Fictional runner/campaign statistics only",
-                sourceKind: "seeded_preview",
-                sourceLabel: "Seeded preview world",
+                sourceKind: "seeded_board",
+                sourceLabel: "Canonical seed world",
                 sourceSummary: "Computed from the public-safe seed and last applied tick receipt, never from support or account-linked traffic.",
-                status: "preview",
+                status: "seeded",
                 href: "/ledger/stats#debt-heat"),
             CreatePublicStat(
                 id: "package-pressure",
@@ -797,12 +799,12 @@ public sealed class BlackLedgerPublicStatsService
                 sampleSize: $"{packagePressure.Count} candidate lanes",
                 sampleCount: packagePressure.Count,
                 confidenceKey: packagePressureConfidenceKey,
-                confidence: packagePressureConfidenceKey == "enough_data" ? "Enough data" : "Preview",
+                confidence: packagePressureConfidenceKey == "enough_data" ? "Enough data" : "Seeded",
                 privacyNote: "Proof-backed demand, not roadmap truth",
                 sourceKind: "package_registry",
                 sourceLabel: "Package registry pressure lanes",
-                sourceSummary: "Uses the seed-backed package-pressure lane set and stays preview until live public-safe sample thresholds are satisfied.",
-                status: "preview",
+                sourceSummary: "Uses the seed-backed package-pressure lane set and stays seeded until live public-safe sample thresholds are satisfied.",
+                status: "seeded",
                 href: "/ledger/packages"),
             CreatePublicStat(
                 id: "chaos-index",
@@ -811,13 +813,13 @@ public sealed class BlackLedgerPublicStatsService
                 period: period,
                 sampleSize: $"{districtById.Count} seeded districts",
                 sampleCount: districtById.Count,
-                confidenceKey: "preview",
-                confidence: "Preview",
+                confidenceKey: "seeded",
+                confidence: "Seeded",
                 privacyNote: "Playful fictional labels only; never point at real people.",
-                sourceKind: "seeded_preview",
-                sourceLabel: "Seeded preview world",
+                sourceKind: "seeded_board",
+                sourceLabel: "Canonical seed world",
                 sourceSummary: "Uses district heat snapshots from the canonical public seed and blocks publication if the map becomes unsafe.",
-                status: "preview",
+                status: "seeded",
                 href: "/ledger/factions#chaos-index"),
         ];
 
@@ -831,9 +833,9 @@ public sealed class BlackLedgerPublicStatsService
         string turnHeadline = currentTurn is null
             ? "Turn 0 is loaded."
             : selectedTurn.IsDeterministicPreview
-                ? $"Turn {currentTurn.Turn} deterministic preview is ready. {currentTurn.Summary}"
+                ? $"Turn {currentTurn.Turn} deterministic board is ready. {currentTurn.Summary}"
                 : currentTurn.Headline;
-        string safetyNote = seed.SourcePolicy?.PublicCopyNote ?? "Seeded fictional preview and opt-in aggregate only. The Ledger explains pressure, not people.";
+        string safetyNote = seed.SourcePolicy?.PublicCopyNote ?? "Canonical seeded board and opt-in aggregate only. The Ledger explains pressure, not people.";
         string mapNote = "Use the map to inspect seeded districts, visible pressure arcs, and public-safe dispatches without exposing private tables.";
         var aiNames = GetAiPersonalities(seed)
             .Where(static personality => !string.IsNullOrWhiteSpace(GetPersonalityId(personality)))
@@ -1209,13 +1211,31 @@ public sealed class BlackLedgerPublicStatsService
         return arcs;
     }
 
-    private static IReadOnlyList<BlackLedgerMapReplayStepViewModel> BuildReplaySteps(BlackLedgerWorldPreviewViewModel world)
+    private static IReadOnlyList<BlackLedgerMapReplayStepViewModel> BuildReplaySteps(
+        BlackLedgerWorldPreviewViewModel world,
+        BlackLedgerWorldSeedDocument? seed)
         => world.TurnNavigation
-            .Select(turn => new BlackLedgerMapReplayStepViewModel(
-                turn.Turn,
-                turn.Label,
-                turn.Current && world.LastTick is not null ? world.LastTick.Summary : $"Replay Turn {turn.Turn}.",
-                turn.Current))
+            .Select(turn =>
+            {
+                BlackLedgerTurnDocument? turnDocument = seed?.Turns?.FirstOrDefault(item => item.Turn == turn.Turn);
+                string summary = turn.Current && world.LastTick is not null
+                    ? world.LastTick.Summary
+                    : !string.IsNullOrWhiteSpace(turnDocument?.Summary)
+                        ? turnDocument.Summary
+                        : $"Replay Turn {turn.Turn}.";
+                if (turnDocument?.ActionBeats?.Count > 0)
+                {
+                    int playerCount = turnDocument.ActionBeats.Count(static beat => string.Equals(beat.ActorKind, "player", StringComparison.OrdinalIgnoreCase));
+                    int gmCount = turnDocument.ActionBeats.Count(static beat => string.Equals(beat.ActorKind, "gm", StringComparison.OrdinalIgnoreCase));
+                    summary = $"{summary} {turnDocument.ActionBeats.Count} visible beats seeded: {playerCount} player, {gmCount} GM.";
+                }
+
+                return new BlackLedgerMapReplayStepViewModel(
+                    turn.Turn,
+                    turn.Label,
+                    summary,
+                    turn.Current);
+            })
             .ToArray();
 
     private static BlackLedgerDistrictViewModel ResolveEventRegion(BlackLedgerTickEffectViewModel effect, BlackLedgerWorldPreviewViewModel world)
@@ -1261,7 +1281,9 @@ public sealed class BlackLedgerPublicStatsService
 
     private static bool IsWorldPublicSafe(BlackLedgerWorldSeedDocument world)
     {
-        if ((!string.Equals(world.Status, "preseeded_preview", StringComparison.Ordinal) && !string.Equals(world.Status, "seeded_preview", StringComparison.Ordinal))
+        if ((!string.Equals(world.Status, "preseeded_preview", StringComparison.Ordinal)
+                && !string.Equals(world.Status, "seeded_preview", StringComparison.Ordinal)
+                && !string.Equals(world.Status, "flagship_seeded", StringComparison.Ordinal))
             || world.OfficialIpNamesPresent
             || world.SourcebookTextPresent
             || world.OfficialMapsPresent
@@ -1682,6 +1704,7 @@ public sealed class BlackLedgerPublicStatsService
         public string InputStateHash { get; set; } = string.Empty;
         public string DecisionPacketHash { get; set; } = string.Empty;
         public string OutputStateHash { get; set; } = string.Empty;
+        public List<BlackLedgerActionBeatDocument>? ActionBeats { get; set; }
         public List<BlackLedgerPackagePressureDocument>? PackagePressure { get; set; }
         public List<BlackLedgerTurnActionBeatDocument>? ActionBeats { get; set; }
     }
@@ -1732,6 +1755,20 @@ public sealed class BlackLedgerPublicStatsService
         public string Metric { get; set; } = string.Empty;
         public int Delta { get; set; }
         public string PublicReason { get; set; } = string.Empty;
+    }
+
+    public sealed class BlackLedgerActionBeatDocument
+    {
+        public string BeatId { get; set; } = string.Empty;
+        public string ActorKind { get; set; } = string.Empty;
+        public string ActorLabel { get; set; } = string.Empty;
+        public string BeatLabel { get; set; } = string.Empty;
+        public string ActionSummary { get; set; } = string.Empty;
+        public string Stakes { get; set; } = string.Empty;
+        public string ProofNote { get; set; } = string.Empty;
+        public string VisualHook { get; set; } = string.Empty;
+        public string CommandIntent { get; set; } = string.Empty;
+        public string ConsequenceLine { get; set; } = string.Empty;
     }
 
     public sealed class BlackLedgerPackagePressureDocument
@@ -1811,6 +1848,7 @@ public sealed record BlackLedgerMapApiDocument(
 public sealed record BlackLedgerMapRegionApiDocument(
     string RegionId,
     string Name,
+    string PolygonPoints,
     string DominantFactionId,
     int Influence,
     int Heat,

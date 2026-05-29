@@ -1,17 +1,17 @@
 {
   "contract_name": "fleet.public_progress_report",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-05-19T12:15:19Z",
-  "as_of": "2026-05-19",
-  "history_snapshot_count": 31,
+  "generated_at": "2026-05-01T09:54:07Z",
+  "as_of": "2026-05-01",
+  "history_snapshot_count": 20,
   "brand": "Chummer6",
   "active_wave": "Next 12 Biggest Wins",
   "active_wave_status": "complete",
-  "active_slice": "Next 12 Biggest Wins",
+  "active_slice": "Add operator visibility for dedicated UI journey tester shard health and routing continuity.",
   "headline": "Progress report for a product becoming a build machine.",
   "overall_status": "complete",
-  "progress_percent": 100,
-  "percent_complete": 100,
+  "progress_percent": 99,
+  "percent_complete": 99,
   "percent_inflight": 0,
   "percent_blocked": 0,
   "momentum": {
@@ -20,43 +20,62 @@
   },
   "top_risks": [
     {
+      "key": "flagship_release_truth",
+      "summary": "Executable flagship proof is green, but parity and layout proof are not complete enough to widen final claims."
+    },
+    {
+      "key": "repo_local_backlog",
+      "summary": "Mapped public parts are at zero open milestone weight, but repo-local backlog still has 2 active item(s) across 2 project(s). Next up: Add operator visibility for dedicated UI journey tester shard health and routing continuity.."
+    },
+    {
       "key": "full_product_queue",
-      "summary": "10 open milestones remain in the full-product frontier. The current supervisor ETA is scoped to Next 90-day product advance wave, not full-product parity."
+      "summary": "1 open milestones remain in the full-product frontier. The current supervisor ETA is scoped to Completion review and proof recovery, not full-product parity."
     }
   ],
   "flagship_readiness": {
-    "status": "ready",
-    "summary": "{'ready_count': 8, 'warning_count': 0, 'missing_count': 0, 'scoped_warning_count': 0, 'scoped_missing_count': 0, 'deferred_warning_count': 0, 'history_snapshot_count': 31}",
-    "feature_parity_proven": true,
+    "status": "warning",
+    "summary": "Executable flagship proof is green, but parity and layout proof are not complete enough to widen final claims.",
+    "feature_parity_proven": false,
     "layout_familiarity_proven": true,
     "desktop_executable_gate_status": "pass",
-    "desktop_executable_gate_summary": "Published flagship readiness proof is green.",
+    "desktop_executable_gate_summary": "Desktop executable exit gate is proven by passing packaged-head receipts for promoted desktop platforms (Windows) and per-head flagship UI release proof.",
     "windows_blocking_reason_count": 0,
     "windows_blocking_reasons": [],
     "proofs": {
-      "import_parity_status": "pass",
+      "import_parity_status": "passed",
       "chummer5a_workflow_parity_status": "pass",
       "sr4_workflow_parity_status": "pass",
-      "sr6_workflow_parity_status": "pass",
+      "sr6_workflow_parity_status": "fail",
       "desktop_visual_familiarity_status": "pass",
       "desktop_executable_gate_status": "pass"
     }
   },
   "release_readiness": {
-    "status": "tracked",
-    "summary": "Mapped public parts are at zero open milestone weight, but there are still 10 open milestones in the full-product frontier. The current supervisor ETA is scoped to Next 90-day product advance wave, so it should not be read as a full-product parity ETA.",
+    "status": "warning",
+    "summary": "Executable flagship proof is green, but parity and layout proof are not complete enough to widen final claims. Mapped public parts are at zero open milestone weight, but repo-local backlog still has 2 active item(s) across 2 project(s). Next up: Add operator visibility for dedicated UI journey tester shard health and routing continuity.",
     "blocking_parts": []
   },
   "parity": {
-    "status": "ready",
-    "summary": "Rules/import and workflow parity are proven, and the desktop visual-familiarity gate is green.",
+    "status": "tracked",
+    "summary": "No uncovered-scope markers are currently attached to the mapped public parts. Release-blocking parity still closes through the flagship gate.",
     "uncovered_parts": []
   },
   "repo_backlog": {
-    "open_item_count": 0,
-    "open_project_count": 0,
-    "lead_task": "",
-    "open_items": []
+    "open_item_count": 2,
+    "open_project_count": 2,
+    "lead_task": "Add operator visibility for dedicated UI journey tester shard health and routing continuity.",
+    "open_items": [
+      {
+        "project_id": "fleet",
+        "repo_slug": "fleet",
+        "task": "Add operator visibility for dedicated UI journey tester shard health and routing continuity."
+      },
+      {
+        "project_id": "ui",
+        "repo_slug": "chummer6-ui",
+        "task": "Publish the adversarial Linux user-journey tester gate and keep desktop_client blocked until a separate tester/fixer audit passes with multiple screenshots per workflow."
+      }
+    ]
   },
   "hero": {
     "headline": "Progress report for a product becoming a build machine.",
@@ -79,7 +98,7 @@
       }
     ]
   },
-  "overall_progress_percent": 100,
+  "overall_progress_percent": 99,
   "phase_label": "Public-fit polish",
   "current_phase": "Public-fit polish",
   "next_checkpoint_eta_weeks_low": 0,
@@ -122,7 +141,7 @@
           "body": "A boring, auditable core runtime with no hidden legacy cargo."
         }
       ],
-      "recent_commit_count_7d": 14,
+      "recent_commit_count_7d": 4,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -154,13 +173,13 @@
           "repo_slug": "chummer6-core",
           "path": "/docker/chummercomplete/chummer6-core",
           "lifecycle": "live",
-          "recent_commit_count_7d": 14,
+          "recent_commit_count_7d": 4,
           "design_total_weight": 40,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-17T19:18:52.459606Z",
+            "published_at": "2026-04-30T15:16:47.088207Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -208,7 +227,7 @@
           "body": "Complete desktop/browser workbench with accessibility, localization, and polished shared components."
         }
       ],
-      "recent_commit_count_7d": 52,
+      "recent_commit_count_7d": 17,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -229,7 +248,7 @@
         "capacity_compile": true,
         "capacity_compile_count": 2,
         "published_artifacts_present": true,
-        "published_artifact_count": 67,
+        "published_artifact_count": 29,
         "lifecycle_counts": {
           "live": 1,
           "scaffold": 1
@@ -241,13 +260,13 @@
           "repo_slug": "chummer6-ui",
           "path": "/docker/chummercomplete/chummer6-ui",
           "lifecycle": "live",
-          "recent_commit_count_7d": 48,
+          "recent_commit_count_7d": 16,
           "design_total_weight": 56,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-19T09:42:18.177613Z",
+            "published_at": "2026-05-01T09:39:55.451328Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -257,69 +276,31 @@
             },
             "dispatchable_truth_ready": false,
             "artifacts": [
-              "CHUMMER4_SR4_MUSCLE_MEMORY_INVENTORY.generated.json",
-              "CHUMMER4_SR4_MUSCLE_MEMORY_PARITY_GATE.generated.json",
-              "CHUMMER5A_ABSOLUTE_PARITY_TESTER.generated.json",
               "CHUMMER5A_DESKTOP_WORKFLOW_PARITY.generated.json",
               "CHUMMER5A_LAYOUT_HARD_GATE.generated.json",
-              "CHUMMER5A_LEGACY_EQUIVALENT_CHROME_GATE.generated.json",
-              "CHUMMER5A_MUSCLE_MEMORY_INVENTORY.generated.json",
-              "CHUMMER5A_MUSCLE_MEMORY_PARITY_GATE.generated.json",
               "CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json",
-              "CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.json",
-              "CHUMMER5A_UI_ELEMENT_PARITY_AUDIT.generated.md",
-              "CHUMMER5A_UI_PARITY_TESTER.generated.json",
-              "CHUMMER5A_ULTIMATE_PARITY_TESTER.generated.json",
-              "CHUMMER_SHARED_LEGACY_EQUIVALENT_CHROME_GATE.generated.json",
-              "CHUMMER_SR6_SHARED_MUSCLE_MEMORY_INVENTORY.generated.json",
-              "CHUMMER_SR6_SHARED_MUSCLE_MEMORY_PARITY_GATE.generated.json",
               "CLASSIC_DENSE_WORKBENCH_POSTURE_GATE.generated.json",
-              "DELEGATE_COMMAND_ROUTE_PARITY.generated.json",
               "DENSE_WORKBENCH_RECOVERY_GATE.generated.json",
               "DESKTOP_EXECUTABLE_EXIT_GATE.generated.json",
               "DESKTOP_VISUAL_FAMILIARITY_EXIT_GATE.generated.json",
-              "DESKTOP_VISUAL_PARITY_AUDIT.generated.json",
               "DESKTOP_WORKFLOW_EXECUTION_GATE.generated.json",
-              "GENERATED_DIALOG_ELEMENT_PARITY.generated.json",
-              "INTERACTIVE_CONTROL_INVENTORY.generated.json",
               "NEXT90_M101_AVALONIA_PRIMARY_ROUTE_PROOF.generated.json",
-              "NEXT90_M101_UI_RELEASE_TRAIN.generated.json",
-              "NEXT90_M103_UI_VETERAN_CERTIFICATION.generated.json",
-              "NEXT90_M103_UI_VETERAN_CERTIFICATION_REVIEW.generated.md",
-              "NEXT90_M104_UI_EXPLAIN_RECEIPTS.generated.json",
-              "NEXT90_M105_UI_RESTORE_CONTINUITY.generated.json",
-              "NEXT90_M108_UI_CAMPAIGN_HOME_ARTIFACTS.generated.json",
-              "NEXT90_M112_UI_CAMPAIGN_MEMORY.generated.json",
-              "NEXT90_M113_UI_GM_PREP_ROSTER_SURFACE.generated.json",
-              "NEXT90_M114_UI_RULE_STUDIO.generated.json",
-              "NEXT90_M115_UI_PORTABLE_DOSSIER.generated.json",
-              "NEXT90_M116_UI_CREATOR_PUBLICATION.generated.json",
-              "NEXT90_M117_UI_ARTIFACT_SHELF.generated.json",
-              "NEXT90_M118_UI_ORGANIZER_OPS.generated.json",
-              "NEXT90_M119_UI_FIRST_SESSION_FLOW.generated.json",
-              "NEXT90_M121_UI_GM_RUNBOARD_ROUTE.generated.json",
-              "NEXT90_M135_UI_DESKTOP_SURFACE_COVERAGE.generated.json",
-              "NEXT90_M141_UI_DIRECT_IMPORT_ROUTE_PROOF.generated.json",
-              "NEXT90_M142_UI_DIRECT_WORKFLOW_PROOF.generated.json",
-              "NEXT90_M143_UI_DIRECT_OUTPUT_PROOF.generated.json",
-              "NEXT90_M144_UI_STARTUP_SMOKE_AND_EXECUTABLE_GATE.generated.json",
-              "NEXT90_M145_UI_DESKTOP_EXPLAIN_DRAWER_AND_FOLLOW_UP.generated.json",
-              "PARITY_INVENTORY.generated.json",
               "QUARANTINED_INSTALLER_PROMOTION.generated.json",
               "QUEUE.generated.yaml",
-              "RULESET_UI_ADAPTATION.generated.json",
-              "SECTION_HOST_RULESET_PARITY.generated.json",
               "SR4_DESKTOP_WORKFLOW_PARITY.generated.json",
               "SR4_SR6_DESKTOP_PARITY_FRONTIER.generated.json",
               "SR6_DESKTOP_WORKFLOW_PARITY.generated.json",
               "UI_EXTERNAL_HOST_PROOF_BLOCKERS.generated.json",
               "UI_FLAGSHIP_RELEASE_GATE.generated.json",
+              "UI_LINUX_BLAZOR_DESKTOP_EXIT_GATE.generated.json",
               "UI_LINUX_DESKTOP_EXIT_GATE.generated.json",
               "UI_LOCALIZATION_RELEASE_GATE.generated.json",
               "UI_LOCAL_RELEASE_PROOF.generated.json",
+              "UI_MACOS_AVALONIA_OSX_ARM64_DESKTOP_EXIT_GATE.generated.json",
+              "UI_MACOS_AVALONIA_OSX_X64_DESKTOP_EXIT_GATE.generated.json",
+              "UI_MACOS_BLAZOR_DESKTOP_OSX_ARM64_DESKTOP_EXIT_GATE.generated.json",
+              "UI_WINDOWS_BLAZOR_DESKTOP_WIN_X64_DESKTOP_EXIT_GATE.generated.json",
               "UI_WINDOWS_DESKTOP_EXIT_GATE.generated.json",
-              "USER_JOURNEY_TESTER_AUDIT.generated.json",
-              "USER_JOURNEY_TESTER_TRACE.generated.json",
               "VETERAN_TASK_TIME_EVIDENCE_GATE.generated.json",
               "WORKPACKAGES.generated.yaml"
             ],
@@ -331,13 +312,13 @@
           "repo_slug": "chummer6-ui-kit",
           "path": "/docker/chummercomplete/chummer-ui-kit",
           "lifecycle": "scaffold",
-          "recent_commit_count_7d": 4,
+          "recent_commit_count_7d": 1,
           "design_total_weight": 40,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-05T23:02:20.333619Z",
+            "published_at": "2026-05-01T04:15:44.946314Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -384,7 +365,7 @@
           "body": "A reliable session shell that survives weak networks and resumes cleanly."
         }
       ],
-      "recent_commit_count_7d": 3,
+      "recent_commit_count_7d": 4,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -416,13 +397,13 @@
           "repo_slug": "chummer6-mobile",
           "path": "/docker/chummercomplete/chummer6-mobile",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 3,
+          "recent_commit_count_7d": 4,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-17T18:44:02.789543Z",
+            "published_at": "2026-05-01T05:21:04.273611Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
@@ -472,7 +453,7 @@
           "body": "A cohesive hosted community and publication stack ready for real public participation."
         }
       ],
-      "recent_commit_count_7d": 68,
+      "recent_commit_count_7d": 13,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -493,7 +474,7 @@
         "capacity_compile": true,
         "capacity_compile_count": 3,
         "published_artifacts_present": true,
-        "published_artifact_count": 40,
+        "published_artifact_count": 12,
         "lifecycle_counts": {
           "live": 1,
           "dispatchable": 2
@@ -505,13 +486,13 @@
           "repo_slug": "chummer6-hub",
           "path": "/docker/chummercomplete/chummer6-hub",
           "lifecycle": "live",
-          "recent_commit_count_7d": 61,
+          "recent_commit_count_7d": 8,
           "design_total_weight": 60,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-19T06:14:58.396339Z",
+            "published_at": "2026-05-01T05:02:11.244672Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
@@ -521,38 +502,10 @@
             },
             "dispatchable_truth_ready": false,
             "artifacts": [
-              "BLACK_LEDGER_FEATURE_COMPLETION_AUDIT.generated.json",
-              "CANONICAL_DOMAIN_POLICY.generated.json",
-              "CHUMMER_FLAGSHIP_CUSTOMER_SHAPE_GUIDE.generated.md",
-              "CHUMMER_LTD_MISSED_POTENTIAL_AUDIT.generated.md",
-              "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
-              "CHUMMER_PUBLIC_ROUTE_PROOF.local.generated.json",
-              "FLAGSHIP_PRODUCT_READINESS.generated.json",
-              "GOOGLE_OAUTH_LINKING_PROOF.generated.json",
               "HUB_CAMPAIGN_OS_LOCAL_PROOF.generated.json",
               "HUB_LOCAL_RELEASE_PROOF.generated.json",
               "NEXT90_M113_HUB_ROSTER_OPS.generated.json",
-              "NEXT90_M116_HUB_CREATOR_PUBLICATION.generated.json",
-              "NEXT90_M121_HUB_RUNBOARD_CONTINUITY.generated.json",
-              "NEXT90_M121_HUB_RUNBOARD_RESOLUTION.generated.json",
-              "NEXT90_M122_HUB_CAMPAIGN_ADOPTION.generated.json",
-              "NEXT90_M122_HUB_CAMPAIGN_ADOPTION_LOOP.generated.json",
-              "NEXT90_M123_HUB_OPEN_RUNS.generated.json",
-              "NEXT90_M123_HUB_OPEN_RUN_LOOP.generated.json",
-              "NEXT90_M124_HUB_HOSTED_COMPANION_PACKETS.generated.json",
-              "NEXT90_M125_HUB_PUBLIC_SIGNAL_PACKETS.generated.json",
-              "NEXT90_M126_HUB_HOSTED_PROOF_CONTRACTS.generated.json",
-              "NEXT90_M127_HUB_REGISTRY_TRUTH_BINDING.generated.json",
-              "NEXT90_M128_HUB_PRIVACY_BOUNDED_SUPPORT_STATUS.generated.json",
-              "NEXT90_M129_HUB_REUSABLE_ACCOUNT_FLOWS.generated.json",
-              "NEXT90_M135_HUB_HOSTED_BOUNDED_CONTEXT_COVERAGE.generated.json",
-              "PHONE_LAYOUT_PROOF.local.generated.json",
-              "PORTABLE_RECEIPTS_AUDIT.generated.json",
-              "PUBLIC_CLAIM_SCAN.generated.json",
               "QUEUE.generated.yaml",
-              "RULESET_READINESS.generated.json",
-              "SUPPORT_CASE_FLOW_PROOF.generated.json",
-              "SUPPORT_CASE_FLOW_PROOF.local.generated.json",
               "WORKPACKAGES.generated.yaml"
             ],
             "lifecycle": ""
@@ -569,7 +522,7 @@
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-19T06:34:10.129663Z",
+            "published_at": "2026-05-01T09:53:58.660002Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -593,13 +546,13 @@
           "repo_slug": "chummer6-media-factory",
           "path": "/docker/fleet/repos/chummer-media-factory",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 3,
+          "recent_commit_count_7d": 1,
           "design_total_weight": 54,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-05T23:02:19.964619Z",
+            "published_at": "2026-04-30T18:35:38.123214Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -647,7 +600,7 @@
           "body": "One authoritative public story, compiled cleanly into every downstream surface."
         }
       ],
-      "recent_commit_count_7d": 74,
+      "recent_commit_count_7d": 33,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -680,7 +633,7 @@
           "repo_slug": "chummer6-design",
           "path": "/docker/chummercomplete/chummer-design",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 70,
+          "recent_commit_count_7d": 17,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -707,13 +660,13 @@
           "repo_slug": "Chummer6",
           "path": "/docker/chummercomplete/Chummer6",
           "lifecycle": "signoff_only",
-          "recent_commit_count_7d": 4,
+          "recent_commit_count_7d": 16,
           "design_total_weight": 1,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-05-04T09:07:50.127230Z",
+            "published_at": "2026-04-26T08:53:14.805523Z",
             "stages": {
               "design_compile": true,
               "policy_compile": false,
@@ -768,42 +721,66 @@
     "limitations": [
       "ETA is a momentum-based planning band, not a delivery promise.",
       "Weekly public progress history is now available; ETA uses recorded velocity where enough snapshots exist and falls back to the short-horizon momentum proxy elsewhere.",
-      "Mapped public milestones are complete, but the full-product frontier remains open with 10 milestone(s). Full completion requires full frontier closure.",
+      "Mapped public milestones are complete, but the full-product frontier remains open with 1 milestone(s). Full completion requires full frontier closure.",
       "The current supervisor ETA is tactical or otherwise not yet calendar-grade enough for a full-product parity forecast, so the public surface tracks the remaining frontier without publishing a parity date band."
     ],
-    "history_snapshot_count": 31
+    "history_snapshot_count": 20
   },
   "eta_scope": "full_product_queue_unestimated",
   "full_product_queue": {
-    "mode": "successor_wave",
-    "active_runs_count": 0,
+    "mode": "sharded",
+    "active_runs_count": 4,
     "active_frontier_ids": [
-      1282955792,
-      1399079946,
-      1490492808,
-      3175808079,
-      3681970887,
-      3994613879,
-      4356566327,
-      4878368285,
-      5122388071,
-      5130900955
+      1239074135
     ],
-    "open_frontier_milestones": 10,
-    "open_milestone_ids_count": 10,
+    "open_frontier_milestones": 1,
+    "open_milestone_ids_count": 1,
     "eta": {
-      "eta_human": "6.8d-2.4w",
+      "eta_human": "2h-6h",
       "eta_status": "tracked",
-      "scope_kind": "next_90_day_successor_wave",
-      "scope_label": "Next 90-day product advance wave",
-      "scope_warning": "This successor-wave ETA is tracked separately from the current flagship closeout frontier. It assumes spare-shard execution continues without stealing active closeout shards.",
+      "scope_kind": "completion_review_recovery",
+      "scope_label": "Completion review and proof recovery",
+      "scope_warning": "This ETA covers registry trust, proof, and review recovery. It is still narrower than a final flagship parity claim unless full-product readiness is also green.",
       "eta_weeks_low": null,
       "eta_weeks_high": null,
-      "remaining_open_milestones": 10,
-      "remaining_in_progress_milestones": 10,
+      "remaining_open_milestones": 1,
+      "remaining_in_progress_milestones": 1,
       "remaining_not_started_milestones": 0
     },
-    "active_runs": []
+    "active_runs": [
+      {
+        "run_id": "20260501T095150Z-shard-1",
+        "shard": "shard-1",
+        "frontier_count": 1,
+        "frontier_ids": [
+          1239074135
+        ]
+      },
+      {
+        "run_id": "20260501T095209Z-shard-12",
+        "shard": "shard-12",
+        "frontier_count": 1,
+        "frontier_ids": [
+          1239074135
+        ]
+      },
+      {
+        "run_id": "20260501T095115Z-shard-4",
+        "shard": "shard-4",
+        "frontier_count": 1,
+        "frontier_ids": [
+          1239074135
+        ]
+      },
+      {
+        "run_id": "20260501T094524Z-shard-7",
+        "shard": "shard-7",
+        "frontier_count": 1,
+        "frontier_ids": [
+          1239074135
+        ]
+      }
+    ]
   },
   "closing": {
     "headline": "The project no longer looks like a concept sketch.",

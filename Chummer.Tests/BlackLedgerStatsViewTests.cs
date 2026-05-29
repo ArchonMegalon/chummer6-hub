@@ -63,15 +63,15 @@ public sealed class BlackLedgerStatsViewTests
 
         Assert.Contains(stats, static stat =>
             string.Equals(stat.Id, "mysad-density", System.StringComparison.Ordinal)
-            && string.Equals(stat.Value, "Ashline Circle 39%", System.StringComparison.Ordinal)
-            && string.Equals(stat.Period, "Turn 1", System.StringComparison.Ordinal)
-            && string.Equals(stat.Source, "seeded_preview", System.StringComparison.Ordinal)
+            && string.Equals(stat.Value, "Ashline Circle 34%", System.StringComparison.Ordinal)
+            && string.Equals(stat.Period, "Turn 2", System.StringComparison.Ordinal)
+            && string.Equals(stat.Source, "seeded_board", System.StringComparison.Ordinal)
             && string.Equals(stat.ScopeKey, "public_aggregate", System.StringComparison.Ordinal)
-            && string.Equals(stat.SourceDetail.Kind, "seeded_preview", System.StringComparison.Ordinal)
+            && string.Equals(stat.SourceDetail.Kind, "seeded_board", System.StringComparison.Ordinal)
             && stat.SampleCount == 6);
         Assert.Contains(stats, static stat =>
             string.Equals(stat.Id, "debt-heat", System.StringComparison.Ordinal)
-            && string.Equals(stat.Value, "Rust Bazaar 99 heat", System.StringComparison.Ordinal));
+            && string.Equals(stat.Value, "Rust Bazaar 91 heat", System.StringComparison.Ordinal));
         Assert.Contains(stats, static stat =>
             string.Equals(stat.Id, "package-pressure", System.StringComparison.Ordinal)
             && string.Equals(stat.Value, "7 hot package candidates", System.StringComparison.Ordinal)
@@ -83,13 +83,13 @@ public sealed class BlackLedgerStatsViewTests
 
         Assert.NotNull(world);
         Assert.Equal("emerald-sprawl-prelude", world!.WorldId);
-        Assert.Equal(1, world.CurrentTurn);
+        Assert.Equal(2, world.CurrentTurn);
         Assert.False(world.DeterministicPreview);
         Assert.Equal(8, world.Districts.Count);
         Assert.Equal(6, world.Factions.Count);
         Assert.Equal(4, world.StewardshipPosts.Count);
         Assert.NotNull(world.LastTick);
-        Assert.Equal("ledger_tick_0001_preseeded", world.LastTick!.ReceiptId);
+        Assert.Equal("ledger_tick_0002_flagship_seeded", world.LastTick!.ReceiptId);
         Assert.Equal("preseeded", world.LastTick.Mode);
         Assert.True(world.LastTick.PrivacyPassed);
     }
@@ -117,12 +117,13 @@ public sealed class BlackLedgerStatsViewTests
         Assert.True(world!.DeterministicPreview);
         Assert.Equal(2, world.CurrentTurn);
         Assert.Contains("Turn 2", world.TurnHeadline, System.StringComparison.Ordinal);
-        Assert.Equal("ledger_tick_0002_deterministic_preview", world.LastTick!.ReceiptId);
-        Assert.Equal("deterministic_test", world.LastTick.Mode);
-        Assert.DoesNotContain(world.TurnNavigation, static item => item.Turn == 2);
+        Assert.Equal("ledger_tick_0002_flagship_seeded", world.LastTick!.ReceiptId);
+        Assert.Equal("preseeded", world.LastTick.Mode);
+        Assert.Contains(world.TurnNavigation, static item => item.Turn == 2 && item.Current);
         Assert.Contains(stats, static stat =>
             string.Equals(stat.Id, "package-pressure", System.StringComparison.Ordinal)
             && string.Equals(stat.Value, "7 hot package candidates", System.StringComparison.Ordinal));
+        Assert.Equal("flagship_seeded", service.LoadSeedDocument()!.Status);
     }
 
     [Fact]
@@ -188,12 +189,21 @@ public sealed class BlackLedgerStatsViewTests
         Assert.NotNull(briefing.Broadcast);
         Assert.Contains("/media/ledger/newsreels/turn-1-newsreel.mp4", briefing.Broadcast!.VideoMp4Href, System.StringComparison.Ordinal);
         Assert.Contains(".vtt", briefing.Broadcast.CaptionsHref, System.StringComparison.Ordinal);
+        Assert.True(briefing.Broadcast.ActionBeats.Count >= 5);
+        Assert.Contains(briefing.Broadcast.ActionBeats, beat => string.Equals(beat.ActorKind, "player", System.StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(briefing.Broadcast.ActionBeats, beat => string.Equals(beat.ActorKind, "gm", System.StringComparison.OrdinalIgnoreCase));
         Assert.NotNull(digest);
         Assert.Equal("ashline-circle", digest!.FactionId);
         Assert.NotEmpty(digest.PressureCalls);
         Assert.NotEmpty(digest.RecommendedActions);
         Assert.NotNull(packet);
         Assert.Contains("/account/ledger/factions/ashline-circle/leader-briefing", packet!.Links, System.StringComparer.Ordinal);
+
+        var deterministicBriefing = service.BuildWorldTurnBriefing(2);
+        Assert.NotNull(deterministicBriefing);
+        Assert.Equal(2, deterministicBriefing!.ToTurn);
+        Assert.Equal("/ledger/turns/2#newsreel-player", deterministicBriefing.Broadcast!.WatchHref);
+        Assert.Contains("/media/ledger/newsreels/turn-2-newsreel.mp4", deterministicBriefing.Broadcast.VideoMp4Href, System.StringComparison.Ordinal);
     }
 
     [Fact]

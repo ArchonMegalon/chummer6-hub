@@ -37,6 +37,7 @@ public sealed class BlackLedgerMapTests
         Assert.NotEmpty(map.Factions);
         Assert.NotEmpty(map.Events);
         Assert.NotEmpty(map.ReplaySteps);
+        Assert.Contains(map.ReplaySteps, step => step.Turn == 0 && step.Summary.Contains("player", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -91,6 +92,12 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("getContext('webgl'", script, StringComparison.Ordinal);
         Assert.Contains("createEarthTexture", script, StringComparison.Ordinal);
         Assert.Contains("renderWebGlBase", script, StringComparison.Ordinal);
+        Assert.Contains("webglcontextlost", script, StringComparison.Ordinal);
+        Assert.Contains("webglcontextrestored", script, StringComparison.Ordinal);
+        Assert.Contains("createEarthTexture", script, StringComparison.Ordinal);
+        Assert.Contains("renderWebGlBase", script, StringComparison.Ordinal);
+        Assert.Contains("drawingBufferWidth", script, StringComparison.Ordinal);
+        Assert.Contains("window.addEventListener('resize', this.handleResize", script, StringComparison.Ordinal);
         Assert.Contains("drawLandmasses", script, StringComparison.Ordinal);
         Assert.Contains("drawMountainRanges", script, StringComparison.Ordinal);
         Assert.Contains("parseRegionPolygon", script, StringComparison.Ordinal);

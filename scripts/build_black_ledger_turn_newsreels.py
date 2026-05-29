@@ -70,17 +70,30 @@ def ease(progress: float) -> float:
 
 def build_script(payload: dict) -> tuple[str, list[tuple[float, float, str]]]:
     lead = payload["newsreelLead"].strip()
-    bullets = [str(item).strip().rstrip(".") + "." for item in payload.get("newsreelBullets", [])[:4]]
+    bullets = [str(item).strip().rstrip(".") + "." for item in payload.get("newsreelBullets", [])[:2]]
+    action_beats = payload.get("actionBeats", [])[:6]
     transition = str(payload["transitionLabel"]).strip()
     narrative = str(payload["transitionNarrative"]).strip()
     state_summary = str(payload["stateSummary"]).strip()
     world_name = str(payload["worldName"]).strip()
+    beat_lines = [
+        " ".join(
+            part for part in [
+                f"{str(beat.get('actorLabel', 'World desk')).strip()}:",
+                str(beat.get('commandIntent', '') or beat.get('actionSummary', '')).strip(),
+                str(beat.get('consequenceLine', '')).strip(),
+            ] if part
+        )
+        for beat in action_beats
+        if str(beat.get("actionSummary", "") or beat.get("commandIntent", "")).strip()
+    ]
     lines = [
-        f"Good evening. This is Black Ledger Network with the {transition} world calculation for {world_name}.",
+        f"Black Ledger Network war bulletin. {transition} for {world_name}.",
         lead,
+        *beat_lines,
         *bullets,
         state_summary,
-        "Validation stays receipt-backed, public-safe, and tied to the same city board you can inspect on the route.",
+        "Witnessed, routed, and ready for inspection.",
     ]
 
     timings: list[tuple[float, float, str]] = []
@@ -88,15 +101,12 @@ def build_script(payload: dict) -> tuple[str, list[tuple[float, float, str]]]:
     scripted_lines: list[str] = []
     for line in lines:
         clean = " ".join(line.split())
-        duration = max(1.8, min(4.2, len(clean) / 16.0))
+        duration = max(1.3, min(2.8, len(clean) / 24.0))
         start = cursor
         cursor += duration
         timings.append((start, cursor, clean))
         scripted_lines.append(clean)
-    full_script = " ".join(scripted_lines)
-    if narrative and narrative not in full_script:
-        full_script = f"{full_script} {narrative}"
-    return full_script, timings
+    return " ".join(scripted_lines), timings
 
 
 def write_vtt(path: Path, timings: list[tuple[float, float, str]]) -> None:
@@ -309,16 +319,44 @@ def draw_scene(
     headline_x = 788 + int((1.0 - motion) * 22)
     draw.text((headline_x, 128), headline, fill=(245, 249, 255), font=title_font)
 
+    action_beats = payload.get("actionBeats", [])[:6]
+    beat_cards = [
+        " ".join(
+            part for part in [
+                f"{str(beat.get('actorLabel', 'World desk')).strip()} // {str(beat.get('beatLabel', 'Visible move')).strip()}:",
+                str(beat.get('commandIntent', '') or beat.get('actionSummary', '')).strip(),
+                str(beat.get('consequenceLine', '')).strip(),
+            ] if part
+        )
+        for beat in action_beats
+        if str(beat.get("actionSummary", "") or beat.get("commandIntent", "")).strip()
+    ]
+    stakes_cards = [
+        f"Stakes: {str(beat.get('stakes', '')).strip()}"
+        for beat in action_beats[:3]
+        if str(beat.get("stakes", "")).strip()
+    ]
+    proof_cards = [
+        " ".join(
+            part for part in [
+                f"Proof: {str(beat.get('proofNote', '')).strip()}",
+                str(beat.get('visualHook', '')).strip(),
+            ] if part
+        )
+        for beat in action_beats[:3]
+        if str(beat.get("proofNote", "")).strip() or str(beat.get("visualHook", "")).strip()
+    ]
+
     scene_bodies = [
-        [payload["newsreelLead"]],
-        [str(item) for item in payload.get("newsreelBullets", [])[:2]],
-        [str(item) for item in payload.get("newsreelBullets", [])[2:4]] + [str(payload["stateSummary"])],
+        beat_cards[:3] or [payload["newsreelLead"]],
+        stakes_cards[:3] or [str(item) for item in payload.get("newsreelBullets", [])[:3]],
+        proof_cards[:3] + [str(payload["stateSummary"])] if proof_cards else [str(item) for item in payload.get("newsreelBullets", [])[2:5]] + [str(payload["stateSummary"])],
         list(payload.get("validationChecks", [])[:3]),
     ]
     scene_labels = [
-        "OPENING CALCULATION",
-        "PRESSURE BOARD",
-        "CITY CONSEQUENCES",
+        "VISIBLE MOVES",
+        "STAKES AND PRESSURE",
+        "PROOF AND CONSEQUENCES",
         "VALIDATION AND HANDOFF",
     ]
 
@@ -335,7 +373,7 @@ def draw_scene(
         if index == 0:
             draw.text((WIDTH - 292, block_top + 16), f"T+{int(current_time):02}", fill=(126, 166, 220), font=micro_font)
 
-    tickers = list(payload.get("newsreelBullets", [])) + [str(payload["stateSummary"]), "Public-safe aggregate only", "No private campaign state"]
+    tickers = beat_cards[:3] + [str(payload["stateSummary"]), "Public-safe aggregate only", "No private campaign state"]
     ticker_text = "   //   ".join(tickers)
     ticker_width = int(draw.textlength(ticker_text, font=ticker_font))
     offset = int((current_time * 170) % max(1, ticker_width + 240))

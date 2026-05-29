@@ -22,7 +22,7 @@ test('landing implements the flagship Black Ledger Gate structure', async () => 
   expect(view).toContain('Id = "ledger"');
 
   expect(view).toContain('What works today');
-  expect(view).toContain('Black Ledger preview');
+  expect(view).toContain('Black Ledger command deck');
   expect(view).toContain('Turn 1 already ran. The city is moving.');
   expect(view).toContain('Account value');
 });

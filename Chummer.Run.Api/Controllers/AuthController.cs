@@ -398,6 +398,13 @@ public sealed class AuthController : Controller
         return Redirect(challenge.RedirectUrl);
     }
 
+    [HttpGet("/auth/google/sign-in")]
+    public IActionResult LegacyGoogleSignIn([FromQuery] string? next)
+    {
+        var nextPath = HubBrowserAuthService.SanitizeNextPath(next);
+        return Redirect($"/auth/google/start?next={Uri.EscapeDataString(nextPath)}");
+    }
+
     [HttpGet("/auth/google/link")]
     public async Task<IActionResult> GoogleLinkStart([FromQuery] string? next, CancellationToken cancellationToken)
     {

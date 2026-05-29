@@ -11,7 +11,7 @@
 <section class="faction-detail-hero faction-detail-hero--promo" style="background-image:url('@backgroundHref')">
     <img class="faction-detail-hero__logo" src="@logoHref" alt="@($"{Model.Promo.PublicName} logo")" loading="lazy" />
     <div class="faction-detail-hero__copy">
-        <p class="eyebrow">Faction onboarding video</p>
+        <p class="eyebrow">Faction war bulletin</p>
         <h1 class="editorial-title">@Model.Heading</h1>
         <p class="editorial-copy">@Model.Intro</p>
         <div class="trust-claim__microproof">
@@ -31,7 +31,7 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">First-party motion video</p>
+        <p class="eyebrow">First-party motion bulletin</p>
         <h2 class="editorial-title">@Model.Promo.StaticCardLabel</h2>
         <p class="editorial-copy">@Model.Promo.CampaignHook</p>
     </div>
@@ -52,7 +52,7 @@
             Your browser does not support HTML5 video playback for this route.
         </video>
         <div class="trust-claim__microproof">
-            <span>Fallback mode: storyboard</span>
+            <span>Fallback mode: storyboard bulletin</span>
             <span>Captions: included</span>
         </div>
         <div class="stacked-actions">
@@ -60,14 +60,23 @@
             <button type="button" class="button-like button-like--primary" data-storyboard-toggle>Auto-play storyboard</button>
             <button type="button" class="button-like button-like--secondary" data-storyboard-next>Next frame</button>
         </div>
-        <div class="faction-storyboard-strip">
+        <div class="faction-storyboard-strip faction-storyboard-strip--action">
+            @for (int index = 0; index < Model.Promo.StoryboardFrames.Count; index += 1)
+            {
+                var frame = Model.Promo.StoryboardFrames[index];
+                <article class="route-choice-card" data-storyboard-frame="@(index)" hidden="@(index == 0 ? null : "hidden")">
+                    <span class="tag">@frame.Label</span>
+                    <h3>@Model.Promo.PublicName</h3>
+                    <p class="faction-storyboard-frame__visual">@frame.VisualHook</p>
+                    <p class="faction-storyboard-frame__action">@frame.ActionBeat</p>
+                    <p class="faction-storyboard-frame__proof">@frame.ProofPayoff</p>
+                </article>
+            }
+        </div>
+        <div class="trust-claim__microproof">
             @for (int index = 0; index < Model.Promo.CaptionLines.Count; index += 1)
             {
-                <article class="route-choice-card" data-storyboard-frame="@(index)" hidden="@(index == 0 ? null : "hidden")">
-                    <span class="tag">Frame @(index + 1)</span>
-                    <h3>@Model.Promo.PublicName</h3>
-                    <p>@Model.Promo.CaptionLines[index]</p>
-                </article>
+                <span>Caption @(index + 1): @Model.Promo.CaptionLines[index]</span>
             }
         </div>
     </div>
@@ -80,11 +89,12 @@
         <p class="editorial-copy">@Model.Promo.AudiencePromise</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
-        @foreach (var shot in Model.Promo.StoryboardShots)
+        @foreach (var shot in Model.Promo.StoryboardFrames)
         {
             <article class="route-choice-card">
-                <span class="tag">Shot plan</span>
-                <p>@shot</p>
+                <span class="tag">@shot.Label</span>
+                <p>@shot.VisualHook</p>
+                <p>@shot.ActionBeat</p>
             </article>
         }
     </div>
@@ -94,7 +104,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Formats</p>
         <h2 class="editorial-title">Public-safe deliverables</h2>
-        <p class="editorial-copy">Every faction video route now includes real motion-video files, a JSON brief, a caption file, and a storyboard fallback.</p>
+        <p class="editorial-copy">Every faction video route now includes real motion-video files, a JSON brief, a caption file, and a storyboard fallback that still reads like a command bulletin instead of a dead placeholder.</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
         @foreach (var format in Model.Promo.FormatLabels)
@@ -104,6 +114,40 @@
                 <p>@format</p>
             </article>
         }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Human Review</p>
+        <h2 class="editorial-title">Flagship signoff checklist</h2>
+        <p class="editorial-copy">Machine checks can prove route health, duration, captions, audio, and motion. Flagship release still requires a human reviewer to confirm that the promo plays like a real animated scene instead of a dressed-up motion card.</p>
+    </div>
+    <div class="route-choice-grid route-choice-grid--three">
+        <article class="route-choice-card">
+            <span class="tag">Characters</span>
+            <p>Visible human or metahuman performers must read clearly on screen.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Action</span>
+            <p>The lead has to do something that changes the scene, not just pose under typography.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Camera</span>
+            <p>Movement, framing, and shot progression must feel cinematic rather than slideshow-like.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Lighting</span>
+            <p>Color, contrast, and atmosphere must look intentional and faction-specific.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Safety</span>
+            <p>No provider watermark, no private material, and no sourcebook leakage may appear.</p>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Approval</span>
+            <p>The cinematic lane is not flagship-ready until a named human reviewer signs the final creative receipt.</p>
+        </article>
     </div>
 </section>
 

@@ -29,7 +29,12 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "<strong>Table Pulse Aftermath return lane</strong>",
         "Open aftermath rail",
     ),
+    "Chummer.Run.Api/Views/PublicLanding/Home.cshtml": (
+        "Table Pulse Aftermath return rail: signed-in reaction fallout stays on the same governed workspace",
+        "This is the off-table half of the same governed Table Pulse Live and Table Pulse Aftermath loop",
+    ),
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": (
+        "The signed-in shelf is the return rail for Table Pulse Aftermath",
         "the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
         "Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
     ),

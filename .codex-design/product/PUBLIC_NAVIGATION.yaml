@@ -34,10 +34,12 @@ secondary_nav:
     href: /changelog
   - label: Feedback
     href: /feedback
-  - label: Privacy
-    href: /privacy
   - label: Help
     href: /help
+  - label: FAQ
+    href: /faq
+  - label: Privacy
+    href: /privacy
 utility_nav:
   - label: GitHub
     href: https://github.com/ArchonMegalon/chummer6-hub

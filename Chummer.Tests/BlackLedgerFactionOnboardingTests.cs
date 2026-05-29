@@ -498,5 +498,9 @@ public sealed class FactionCharterBuilderTests
         Assert.Contains("world tick", promo.AudiencePromise, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/account/ledger/factions/ashline-circle/leader-briefing", promo.ValidationHref, StringComparison.Ordinal);
         Assert.Equal(3, promo.StoryboardShots.Count);
+        Assert.Equal(3, promo.StoryboardFrames.Count);
+        Assert.Equal("Cold Open", promo.StoryboardFrames[0].Label);
+        Assert.Contains("pressure", promo.StoryboardFrames[0].VisualHook, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("world tick", promo.StoryboardFrames[0].ProofPayoff, StringComparison.OrdinalIgnoreCase);
     }
 }

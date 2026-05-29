@@ -168,29 +168,18 @@ public sealed class PublicReleaseManifestService
         {
             return true;
         }
-
-        List<ManifestArtifactShape> artifacts = [];
-        if (manifest["artifacts"] is JsonArray artifactRows)
-        {
-            artifacts.AddRange(
-                artifactRows
-                    .OfType<JsonObject>()
-                    .Select(BuildArtifactShape));
-        }
-
-        if (manifest["downloads"] is JsonArray downloadRows)
-        {
-            artifacts.AddRange(
-                downloadRows
-                    .OfType<JsonObject>()
-                    .Select(BuildArtifactShape));
-        }
-
+        List<ManifestArtifactShape> artifacts = CollectManifestArtifactShapes(manifest);
         string channelId = NormalizeToken(GetJsonString(manifest["channelId"]) ?? GetJsonString(manifest["channel"]));
         string releaseVersion = (GetJsonString(manifest["version"]) ?? string.Empty).Trim();
         JsonArray expected = BuildInstallAwareArtifactRegistry(artifacts, coverage, channelId, releaseVersion);
         JsonNode? current = manifest["installAwareArtifactRegistry"];
-        return !JsonNode.DeepEquals(current, expected);
+        if (!JsonNode.DeepEquals(current, expected))
+        {
+            return true;
+        }
+
+        JsonArray expectedDesktopSurfaceRefs = BuildDesktopSurfaceRefs(artifacts, coverage, channelId, releaseVersion);
+        return !JsonNode.DeepEquals(manifest["desktopSurfaceRefs"], expectedDesktopSurfaceRefs);
     }
 
     private static bool InstallAwareRegistryCurrentTruthDrifts(JsonObject manifest, JsonObject coverage)
@@ -703,8 +692,8 @@ public sealed class PublicReleaseManifestService
     {
         HashSet<string> disabledArtifactIds = ResolveDisabledArtifactIds();
         bool forceAccountRequiredDownloads = ForceAccountRequiredDownloads();
-        bool rewriteInstallAwareRegistry = CanonicalManifestNeedsInstallAwareRewrite(json);
-        if (disabledArtifactIds.Count == 0 && !forceAccountRequiredDownloads && !rewriteInstallAwareRegistry)
+        bool rewriteCoverageDerivedRegistries = CanonicalManifestNeedsInstallAwareRewrite(json);
+        if (disabledArtifactIds.Count == 0 && !forceAccountRequiredDownloads && !rewriteCoverageDerivedRegistries)
         {
             JsonObject? passthroughManifest = JsonNode.Parse(json)?.AsObject();
             if (passthroughManifest is null || passthroughManifest["desktopTupleCoverage"] is not JsonObject passthroughCoverage)
@@ -712,24 +701,8 @@ public sealed class PublicReleaseManifestService
                 return json;
             }
 
-            List<ManifestArtifactShape> remainingArtifacts = [];
-            if (passthroughManifest["artifacts"] is JsonArray artifacts)
-            {
-                remainingArtifacts.AddRange(artifacts.OfType<JsonObject>().Select(BuildArtifactShape));
-            }
-
-            if (passthroughManifest["downloads"] is JsonArray downloads)
-            {
-                remainingArtifacts.AddRange(downloads.OfType<JsonObject>().Select(BuildArtifactShape));
-            }
-
-            string channelId = NormalizeToken(GetJsonString(passthroughManifest["channelId"]) ?? GetJsonString(passthroughManifest["channel"]));
-            string releaseVersion = (GetJsonString(passthroughManifest["version"]) ?? string.Empty).Trim();
-            passthroughManifest["installAwareArtifactRegistry"] = BuildInstallAwareArtifactRegistry(
-                remainingArtifacts,
-                passthroughCoverage,
-                channelId,
-                releaseVersion);
+            List<ManifestArtifactShape> remainingArtifacts = CollectManifestArtifactShapes(passthroughManifest);
+            RebuildCoverageDerivedRegistries(passthroughManifest, passthroughCoverage, remainingArtifacts);
             return passthroughManifest.ToJsonString(new JsonSerializerOptions(JsonSerializerDefaults.Web));
         }
 
@@ -746,24 +719,8 @@ public sealed class PublicReleaseManifestService
 
         if (disabledArtifactIds.Count == 0 && manifest["desktopTupleCoverage"] is JsonObject coverage)
         {
-            List<ManifestArtifactShape> remainingArtifacts = [];
-            if (manifest["artifacts"] is JsonArray artifacts)
-            {
-                remainingArtifacts.AddRange(artifacts.OfType<JsonObject>().Select(BuildArtifactShape));
-            }
-
-            if (manifest["downloads"] is JsonArray downloads)
-            {
-                remainingArtifacts.AddRange(downloads.OfType<JsonObject>().Select(BuildArtifactShape));
-            }
-
-            string channelId = NormalizeToken(GetJsonString(manifest["channelId"]) ?? GetJsonString(manifest["channel"]));
-            string releaseVersion = (GetJsonString(manifest["version"]) ?? string.Empty).Trim();
-            manifest["installAwareArtifactRegistry"] = BuildInstallAwareArtifactRegistry(
-                remainingArtifacts,
-                coverage,
-                channelId,
-                releaseVersion);
+            List<ManifestArtifactShape> remainingArtifacts = CollectManifestArtifactShapes(manifest);
+            RebuildCoverageDerivedRegistries(manifest, coverage, remainingArtifacts);
         }
 
         if (forceAccountRequiredDownloads)
@@ -914,13 +871,7 @@ public sealed class PublicReleaseManifestService
         if (manifest["desktopTupleCoverage"] is JsonObject coverage)
         {
             RebuildDesktopTupleCoverage(coverage, remainingArtifacts);
-            string channelId = NormalizeToken(GetJsonString(manifest["channelId"]) ?? GetJsonString(manifest["channel"]));
-            string releaseVersion = (GetJsonString(manifest["version"]) ?? string.Empty).Trim();
-            manifest["installAwareArtifactRegistry"] = BuildInstallAwareArtifactRegistry(
-                remainingArtifacts,
-                coverage,
-                channelId,
-                releaseVersion);
+            RebuildCoverageDerivedRegistries(manifest, coverage, remainingArtifacts);
             if (string.Equals(NormalizeToken(GetJsonString(manifest["status"])), "published", StringComparison.Ordinal))
             {
                 bool coverageComplete = CoverageIsComplete(coverage);
@@ -1571,6 +1522,81 @@ public sealed class PublicReleaseManifestService
                 .ToArray());
     }
 
+    private static JsonArray BuildDesktopSurfaceRefs(
+        IReadOnlyList<ManifestArtifactShape> artifacts,
+        JsonObject coverage,
+        string channelId,
+        string releaseVersion)
+    {
+        if (coverage["desktopRouteTruth"] is not JsonArray desktopRouteTruth)
+        {
+            return [];
+        }
+
+        Dictionary<string, ManifestArtifactShape> artifactById = artifacts
+            .Where(static artifact => !string.IsNullOrWhiteSpace(artifact.ArtifactId))
+            .GroupBy(static artifact => NormalizeToken(artifact.ArtifactId), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                static group => group.Key,
+                static group => group.OrderBy(static artifact => artifact.Kind, StringComparer.Ordinal).First(),
+                StringComparer.OrdinalIgnoreCase);
+
+        List<JsonObject> rows = [];
+        foreach (JsonObject routeRow in desktopRouteTruth.OfType<JsonObject>())
+        {
+            string artifactId = ExpectedInstallerArtifactIdForRoute(routeRow);
+            if (string.IsNullOrWhiteSpace(artifactId))
+            {
+                continue;
+            }
+
+            string head = NormalizeToken(GetJsonString(routeRow["head"]));
+            string platform = NormalizePlatformToken(GetJsonString(routeRow["platform"]));
+            string rid = NormalizeToken(GetJsonString(routeRow["rid"]));
+            string arch = NormalizeToken(GetJsonString(routeRow["arch"]));
+            if (string.IsNullOrWhiteSpace(arch)
+                && RidToPlatformArch.TryGetValue(rid, out (string Platform, string Arch) platformArch))
+            {
+                arch = platformArch.Arch;
+            }
+
+            string kind = InstallAwareArtifactKind(artifactById, artifactId, routeRow);
+            string installAccessClass = DesktopSurfaceInstallAccessClass(artifactById, artifactId, platform, kind);
+            string publicationBindingId = ArtifactPublicationBindingId(channelId, releaseVersion, routeRow);
+            string? publicInstallRoute = (GetJsonString(routeRow["publicInstallRoute"]) ?? string.Empty).Trim();
+
+            JsonObject row = new()
+            {
+                ["registryId"] = DesktopSurfaceRegistryId(channelId, releaseVersion, routeRow),
+                ["artifactId"] = artifactId,
+                ["channelId"] = channelId,
+                ["releaseVersion"] = releaseVersion,
+                ["tupleId"] = (GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim(),
+                ["head"] = head,
+                ["platform"] = platform,
+                ["rid"] = rid,
+                ["arch"] = arch,
+                ["kind"] = kind,
+                ["installAccessClass"] = installAccessClass,
+                ["desktopChannelRef"] = DesktopSurfaceDesktopChannelRef(channelId, releaseVersion, routeRow),
+                ["installGuidanceRef"] = DesktopSurfaceInstallGuidanceRef(channelId, releaseVersion, artifactId),
+                ["participationReceiptRef"] = DesktopSurfaceParticipationReceiptRef(channelId, releaseVersion, routeRow),
+                ["rewardPublicationRef"] = DesktopSurfaceRewardPublicationRef(publicationBindingId),
+                ["publicationBindingId"] = publicationBindingId,
+                ["rationale"] = DesktopSurfaceRationale(routeRow, channelId, installAccessClass),
+            };
+            row["publicInstallRoute"] = string.IsNullOrWhiteSpace(publicInstallRoute) ? null : publicInstallRoute;
+            rows.Add(row);
+        }
+
+        return new JsonArray(
+            rows.OrderBy(static row => NormalizePlatformToken(GetJsonString(row["platform"])), StringComparer.Ordinal)
+                .ThenBy(static row => NormalizeToken(GetJsonString(row["head"])), StringComparer.Ordinal)
+                .ThenBy(static row => NormalizeToken(GetJsonString(row["rid"])), StringComparer.Ordinal)
+                .ThenBy(static row => NormalizeToken(GetJsonString(row["artifactId"])), StringComparer.Ordinal)
+                .Select(static row => (JsonNode)row)
+                .ToArray());
+    }
     private static string ExpectedInstallerArtifactIdForRoute(JsonObject routeRow)
     {
         string artifactId = NormalizeToken(GetJsonString(routeRow["artifactId"]));
@@ -1650,6 +1676,128 @@ public sealed class PublicReleaseManifestService
             : $"Do not offer {artifactId} to installed build selector {installedBuildSelector} because tuple {tupleId} is not currently promoted for this channel.";
     }
 
+    private static string DesktopSurfaceInstallAccessClass(
+        IReadOnlyDictionary<string, ManifestArtifactShape> artifactById,
+        string artifactId,
+        string platform,
+        string kind)
+    {
+        if (artifactById.TryGetValue(NormalizeToken(artifactId), out ManifestArtifactShape? artifact))
+        {
+            string explicitAccessClass = NormalizeToken(artifact.InstallAccessClass);
+            if (!string.IsNullOrWhiteSpace(explicitAccessClass))
+            {
+                return explicitAccessClass;
+            }
+        }
+
+        bool accountRequiredPlatform = platform is "windows" or "macos";
+        bool accountRequiredKind = kind is "installer" or "portable" or "dmg" or "pkg";
+        return accountRequiredPlatform && accountRequiredKind
+            ? InstallAccessClasses.AccountRequired
+            : InstallAccessClasses.OpenPublic;
+    }
+
+    private static string DesktopSurfaceRegistryId(string channelId, string releaseVersion, JsonObject routeRow)
+        => $"desktop-surface:{channelId}:{releaseVersion}:{(GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim()}";
+
+    private static string DesktopSurfaceDesktopChannelRef(string channelId, string releaseVersion, JsonObject routeRow)
+        => $"desktop-channel:{channelId}:{releaseVersion}:{(GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim()}";
+
+    private static string DesktopSurfaceInstallGuidanceRef(string channelId, string releaseVersion, string artifactId)
+        => $"install-guidance:{channelId}:{releaseVersion}:{artifactId}";
+
+    private static string DesktopSurfaceParticipationReceiptRef(string channelId, string releaseVersion, JsonObject routeRow)
+        => $"participation-receipt:{channelId}:{releaseVersion}:{(GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim()}";
+
+    private static string DesktopSurfaceRewardPublicationRef(string publicationBindingId)
+        => $"reward-publication:{publicationBindingId}";
+
+    private static string ArtifactPublicationBindingId(string channelId, string releaseVersion, JsonObject routeRow)
+        => $"binding:{channelId}:{releaseVersion}:{(GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim()}";
+
+    private static string ArtifactPublicationState(JsonObject routeRow)
+    {
+        string explicitState = NormalizeToken(GetJsonString(routeRow["publicationState"]) ?? GetJsonString(routeRow["publication_state"]));
+        if (explicitState is "preview" or "published" or "revoked" or "retained")
+        {
+            return explicitState;
+        }
+
+        string promotionState = NormalizeToken(GetJsonString(routeRow["promotionState"]));
+        string revokeState = NormalizeToken(GetJsonString(routeRow["revokeState"]));
+        string routeRole = NormalizeToken(GetJsonString(routeRow["routeRole"]));
+        if (string.Equals(revokeState, "revoked", StringComparison.Ordinal))
+        {
+            return "revoked";
+        }
+
+        if (string.Equals(promotionState, "promoted", StringComparison.Ordinal))
+        {
+            return "published";
+        }
+
+        return string.Equals(routeRole, "fallback", StringComparison.Ordinal)
+            ? "retained"
+            : "preview";
+    }
+
+    private static string DesktopSurfaceRationale(JsonObject routeRow, string channelId, string installAccessClass)
+    {
+        string tupleId = (GetJsonString(routeRow["tupleId"]) ?? string.Empty).Trim();
+        string routeRole = NormalizeToken(GetJsonString(routeRow["routeRole"]));
+        string publicationState = ArtifactPublicationState(routeRow);
+        string installPosture = string.Equals(installAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
+            ? "entitlement-backed"
+            : "guest-readable";
+
+        return publicationState switch
+        {
+            "published" =>
+                $"{channelId} keeps {tupleId} {installPosture} so desktop channel, install guidance, participation, and reward refs stay governed without exposing provider internals.",
+            "retained" =>
+                $"{channelId} keeps {(string.IsNullOrWhiteSpace(routeRole) ? "desktop" : routeRole)} tuple {tupleId} retained with {installPosture} install guidance so recovery participation and reward refs stay governed.",
+            "revoked" =>
+                $"{channelId} keeps revoked tuple {tupleId} on {installPosture} install guidance so desktop can explain claim, participation, and reward recovery without reopening installs.",
+            _ =>
+                $"{channelId} keeps preview tuple {tupleId} on {installPosture} install guidance so desktop can explain claim, participation, and reward posture before wider publication."
+        };
+    }
+
+    private static List<ManifestArtifactShape> CollectManifestArtifactShapes(JsonObject manifest)
+    {
+        List<ManifestArtifactShape> artifacts = [];
+        if (manifest["artifacts"] is JsonArray artifactRows)
+        {
+            artifacts.AddRange(artifactRows.OfType<JsonObject>().Select(BuildArtifactShape));
+        }
+
+        if (manifest["downloads"] is JsonArray downloadRows)
+        {
+            artifacts.AddRange(downloadRows.OfType<JsonObject>().Select(BuildArtifactShape));
+        }
+
+        return artifacts;
+    }
+
+    private static void RebuildCoverageDerivedRegistries(
+        JsonObject manifest,
+        JsonObject coverage,
+        IReadOnlyList<ManifestArtifactShape> artifacts)
+    {
+        string channelId = NormalizeToken(GetJsonString(manifest["channelId"]) ?? GetJsonString(manifest["channel"]));
+        string releaseVersion = (GetJsonString(manifest["version"]) ?? string.Empty).Trim();
+        manifest["installAwareArtifactRegistry"] = BuildInstallAwareArtifactRegistry(
+            artifacts,
+            coverage,
+            channelId,
+            releaseVersion);
+        manifest["desktopSurfaceRefs"] = BuildDesktopSurfaceRefs(
+            artifacts,
+            coverage,
+            channelId,
+            releaseVersion);
+    }
     private static void FilterExternalProofRequests(JsonArray requests, IReadOnlySet<string> missingTupleIds)
     {
         for (int index = requests.Count - 1; index >= 0; index--)
@@ -1810,7 +1958,8 @@ public sealed class PublicReleaseManifestService
             Arch: arch,
             Kind: NormalizeToken(GetJsonString(artifact["kind"])),
             FileName: fileName,
-            DownloadUrl: downloadUrl);
+            DownloadUrl: downloadUrl,
+            InstallAccessClass: NormalizeToken(GetJsonString(artifact["installAccessClass"]) ?? GetJsonString(artifact["install_access_class"])));
     }
 
     private static ManifestArtifactShape BuildArtifactShape(PublicReleaseArtifactDto artifact)
@@ -1849,7 +1998,8 @@ public sealed class PublicReleaseManifestService
             Arch: arch,
             Kind: NormalizeToken(artifact.Kind),
             FileName: fileName,
-            DownloadUrl: artifact.Url);
+            DownloadUrl: artifact.Url,
+            InstallAccessClass: NormalizeToken(artifact.InstallAccessClass));
     }
 
     private static bool IsDesktopInstallMedia(string platform, string kind)
@@ -2013,5 +2163,6 @@ public sealed class PublicReleaseManifestService
         string Arch,
         string Kind,
         string? FileName,
-        string? DownloadUrl);
+        string? DownloadUrl,
+        string? InstallAccessClass);
 }

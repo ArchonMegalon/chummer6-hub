@@ -11,7 +11,7 @@ public sealed class RulesCoachRouter
         ' ', '\t', '\r', '\n', '.', ',', ';', ':', '!', '?', '(', ')', '[', ']', '{', '}', '/', '\\', '-', '_', '"', '\''
     ];
 
-    private static readonly string[] SupportTerms = ["install", "download", "status", "join", "faction", "email", "newsreel", "link", "support"];
+    private static readonly string[] SupportTerms = ["install", "download", "status", "join", "faction", "email", "newsreel", "link", "support", "feedback", "report", "bug", "ghost", "compare", "apply"];
     private static readonly string[] RulesTerms = ["armor", "illegal", "karma", "modifier", "why", "cost", "calculation", "gear"];
     private static readonly string[] RawRulesTerms = ["quote", "full", "sourcebook", "page", "chapter", "list", "all", "table", "decking", "magic"];
     private static readonly string[] PrivateTerms = ["gm", "secret", "private", "campaign", "runner", "notes", "npc"];
