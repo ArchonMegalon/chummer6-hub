@@ -547,13 +547,13 @@ cards:
     bucket: participate
     title: Guided contribution
     summary: Open the signed-in contribution flow when you want to lend focused, review-safe help.
-    href: /participate/codex
+    href: /account/access
     badge: Registered
     audience: public
     image_family: solo_operator
     cta_kind: explainer
-    guest_href: /login?next=/participate/codex
-    registered_href: /participate/codex
+    guest_href: /login?next=/account/access
+    registered_href: /account/access
     action_label: Open guided contribution
   - id: participate_beta
     bucket: participate

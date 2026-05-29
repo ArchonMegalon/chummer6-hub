@@ -3,9 +3,6 @@
     ViewData["Title"] = "Feedback";
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
-    var codexHref = Model.Chrome.Authenticated
-        ? "/participate/codex"
-        : "/login?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
     var signalProjection = Model.SignalProjection;
     var signalOperations = Model.SignalOperations;
@@ -285,10 +282,10 @@
         <article class="lane-strip">
             <div class="lane-strip__copy">
                 <span class="tag">Deeper participation</span>
-                <h2>Signed-in Codex and deeper participation stay optional</h2>
+                <h2>Signed-in contribution lanes stay optional</h2>
                 <p>Public product signal should work without turning this page into a contributor-only or account-gated surface. Signed-in participation remains available when you need the deeper path.</p>
                 <div class="stacked-actions">
-                    <a class="button-like button-like--secondary" href="@codexHref">@(Model.Chrome.Authenticated ? "Authorize Codex access" : "Sign in for Codex access")</a>
+                    <a class="button-like button-like--secondary" href="/participate">Open guided contribution</a>
                     <a class="button-like button-like--ghost" href="/participate">Open broader participation</a>
                 </div>
                 @if (Model.SignedInLane.Count > 0)

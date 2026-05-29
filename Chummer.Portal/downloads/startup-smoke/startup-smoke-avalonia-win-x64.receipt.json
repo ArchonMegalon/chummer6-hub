@@ -17,7 +17,7 @@
   "recordedAtUtc": "2026-05-21T19:52:05.2855129+00:00",
   "startedAtUtc": "2026-05-21T19:52:05.2833161+00:00",
   "completedAtUtc": "2026-05-21T19:52:05.2855466+00:00",
-  "artifactPath": "/tmp/chummer-ai/tmp/tmp.0qj8snVhAt/chummer-avalonia-win-x64-installer.exe",
+  "artifactPath": "/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads/files/chummer-avalonia-win-x64-installer.exe",
   "artifactFileName": "chummer-avalonia-win-x64-installer.exe",
   "fileName": "chummer-avalonia-win-x64-installer.exe",
   "artifactRelativePath": "files/chummer-avalonia-win-x64-installer.exe",
