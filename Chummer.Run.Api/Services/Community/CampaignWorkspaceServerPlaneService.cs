@@ -3251,9 +3251,30 @@ public sealed class CampaignWorkspaceServerPlaneService
         }
 
         return notices
+            .Select(SanitizeWorkspaceDecisionNotice)
             .DistinctBy(static item => item.NoticeId, StringComparer.OrdinalIgnoreCase)
             .Take(4)
             .ToArray();
+    }
+
+    private static DecisionNotice SanitizeWorkspaceDecisionNotice(DecisionNotice notice)
+    {
+        if (!WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(notice.Summary))
+        {
+            return notice;
+        }
+
+        string fallbackSummary = notice.Kind switch
+        {
+            "portable_exchange" => "Portable exchange needs review before you continue. Open the workspace lane for the safe next step.",
+            "workspace_watchout" => "A previous campaign workspace needs review before you continue. Open the shared campaign view for the safe next step.",
+            _ => "A previous campaign workspace needs review before you continue. Open the workspace lane for the safe next step."
+        };
+
+        return notice with
+        {
+            Summary = fallbackSummary
+        };
     }
 
     private static DecisionNotice BuildGmOperationsDecisionNotice(

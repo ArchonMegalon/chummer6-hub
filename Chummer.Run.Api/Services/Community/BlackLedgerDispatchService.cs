@@ -123,7 +123,7 @@ public sealed class BlackLedgerDispatchService
 
             if (request.AutoApproveSeededPreview && string.Equals(gateReceipt.Status, "pass", StringComparison.OrdinalIgnoreCase))
             {
-                string reviewer = string.IsNullOrWhiteSpace(request.Reviewer) ? "auto_seeded_preview" : request.Reviewer.Trim();
+                string reviewer = string.IsNullOrWhiteSpace(request.Reviewer) ? "auto_flagship_seeded_board" : request.Reviewer.Trim();
                 approvalReceipt = new DispatchApprovalReceipt(
                     ReceiptId: $"dispatch_approval_{Guid.NewGuid():N}"[..36],
                     DispatchId: seeded.DispatchId,
@@ -222,7 +222,7 @@ public sealed class BlackLedgerDispatchService
                 _store.BlackLedgerDispatchPublicationReceipts.Add(new DispatchPublicationReceipt(
                     ReceiptId: $"dispatch_publication_{Guid.NewGuid():N}"[..39],
                     DispatchId: dispatch.DispatchId,
-                    Status: "published_seeded_preview",
+                    Status: "published_flagship_seeded_board",
                     SourceReceiptIds: [dispatch.SourceReceiptId],
                     PublishedAtUtc: dispatch.CreatedAtUtc));
             }
@@ -271,9 +271,9 @@ public sealed class BlackLedgerDispatchService
     private static string BuildDraftBody(DispatchFactPacket facts, string adapter)
         => adapter switch
         {
-            "manual" => $"{facts.Title}\n\n{facts.Summary}\n\nGenerated from {facts.SourceReceiptId} · public-safe seeded preview · no private table data.",
-            "ea" or "1min.ai" or "syllabbles" => $"{facts.Title}\n\nDraft-only dispatch synthesized from Chummer-owned facts.\n\n{facts.Summary}\n\nGenerated from {facts.SourceReceiptId} · public-safe seeded preview · no private table data.",
-            _ => $"{facts.Title}\n\n{facts.Summary}\n\nThe Ledger kept the names out and the pressure visible.\n\nGenerated from {facts.SourceReceiptId} · public-safe seeded preview · no private table data.",
+            "manual" => $"{facts.Title}\n\n{facts.Summary}\n\nGenerated from {facts.SourceReceiptId} · public-safe flagship seeded board · no private table data.",
+            "ea" or "1min.ai" or "syllabbles" => $"{facts.Title}\n\nDraft-only dispatch synthesized from Chummer-owned facts.\n\n{facts.Summary}\n\nGenerated from {facts.SourceReceiptId} · public-safe flagship seeded board · no private table data.",
+            _ => $"{facts.Title}\n\n{facts.Summary}\n\nThe Ledger kept the names out and the pressure visible.\n\nGenerated from {facts.SourceReceiptId} · public-safe flagship seeded board · no private table data.",
         };
 
     private static DispatchGateReceipt BuildGateReceipt(string dispatchId, DispatchFactPacket facts)

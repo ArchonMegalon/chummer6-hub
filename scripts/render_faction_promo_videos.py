@@ -41,7 +41,20 @@ def main() -> int:
     for faction in FACTIONS:
         r = requests.get(f"{base}/ledger/factions/{faction}/promo.json", timeout=30)
         payload = r.json() if r.ok else {}
-        status = "pass" if r.status_code == 200 and payload.get("render_mode") == "first_party_motion_video" else "fail"
+        storyboard_frames = payload.get("storyboard_frames")
+        status = "pass" if (
+            r.status_code == 200
+            and payload.get("render_mode") == "first_party_motion_video"
+            and isinstance(storyboard_frames, list)
+            and len(storyboard_frames) >= 3
+            and all(
+                isinstance(frame, dict)
+                and str(frame.get("visual_hook") or "").strip()
+                and str(frame.get("action_beat") or "").strip()
+                and str(frame.get("proof_payoff") or "").strip()
+                for frame in storyboard_frames
+            )
+        ) else "fail"
         if status != "pass":
             overall = "fail"
         receipt = {
@@ -54,6 +67,7 @@ def main() -> int:
             "provider_status": payload.get("provider_status"),
             "render_mode": payload.get("render_mode"),
             "formats": payload.get("formats"),
+            "storyboard_frame_count": len(storyboard_frames) if isinstance(storyboard_frames, list) else 0,
         }
         receipts.append(receipt)
         out = OUT_DIR / f"{faction.replace('-', '_').upper()}_VIDEO_RECEIPT.generated.json"

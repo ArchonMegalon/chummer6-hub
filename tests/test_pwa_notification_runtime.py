@@ -5,6 +5,7 @@ import subprocess
 import textwrap
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -225,6 +226,52 @@ class PwaNotificationRuntimeTests(unittest.TestCase):
         self.assertFalse(payload["accountNavigate"])
         self.assertFalse(payload["apiGet"])
         self.assertFalse(payload["accountResponse"])
+
+    def test_verifier_accepts_served_service_worker_asset(self) -> None:
+        class FakeResponse:
+            def __init__(self, text: str) -> None:
+                self.text = text
+
+            def raise_for_status(self) -> None:
+                return None
+
+        script_dir = str(VERIFY_SCRIPT.parent)
+        import sys
+
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+
+        import verify_pwa_notification_runtime as verifier
+
+        with patch.object(verifier.requests, "get", return_value=FakeResponse(SERVICE_WORKER.read_text(encoding="utf-8"))):
+            with patch.object(sys, "argv", ["verify_pwa_notification_runtime.py", "--base-url", "http://example.test"]):
+                self.assertEqual(verifier.main(), 0)
+
+    def test_verifier_fails_when_served_service_worker_asset_drops_required_marker(self) -> None:
+        class FakeResponse:
+            def __init__(self, text: str) -> None:
+                self.text = text
+
+            def raise_for_status(self) -> None:
+                return None
+
+        script_dir = str(VERIFY_SCRIPT.parent)
+        import sys
+
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
+
+        import verify_pwa_notification_runtime as verifier
+
+        drifted = SERVICE_WORKER.read_text(encoding="utf-8").replace(
+            'self.addEventListener("notificationclick"',
+            'self.addEventListener("notifyclick"',
+            1,
+        )
+
+        with patch.object(verifier.requests, "get", return_value=FakeResponse(drifted)):
+            with patch.object(sys, "argv", ["verify_pwa_notification_runtime.py", "--base-url", "http://example.test"]):
+                self.assertEqual(verifier.main(), 1)
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ FORBIDDEN_PUBLIC_TERMS = (
 )
 
 ROOT_REQUIRED_PHRASES = (
-    "Black Ledger preview",
+    "Black Ledger command deck",
     "Turn 1 already ran",
     "Open Black Ledger",
 )

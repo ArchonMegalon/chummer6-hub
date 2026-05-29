@@ -180,6 +180,8 @@ def run(base_url: str) -> int:
             ]
         ),
     )
+    if payload["status"] == "pass":
+        print("mobile_pwa_public_projection:ok")
     return 0 if payload["status"] == "pass" else 1
 
 

@@ -441,7 +441,7 @@ def git_baseline_map() -> dict[str, dict[str, Any]] | None:
 
 def current_run_started_at() -> datetime | None:
     run_id = current_run_id()
-    if run_id and re.fullmatch(r"\\d{8}T\\d{6}Z", run_id):
+    if run_id and re.fullmatch(r"\d{8}T\d{6}Z", run_id):
         try:
             return datetime.strptime(run_id, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
         except Exception:
@@ -934,12 +934,22 @@ def branch_policy_check() -> dict[str, Any]:
             continue
         branch = inventory_branch(repo)
         live_branch = str(current.get(repo_path, {}).get("branch") or "").strip()
-        if branch != EXPECTED_COMPLETION_BRANCH:
+        managed = inventory_bool(repo, "completion_managed", "managed_by_completion", "touched_by_completion")
+        baseline_note = str(repo.get("baseline_state_note") or repo.get("inherited_git_state_note") or "").strip()
+        baseline_owner = str(repo.get("baseline_owner") or repo.get("inherited_state_owner") or "").strip()
+        if managed is True:
+            if branch != EXPECTED_COMPLETION_BRANCH:
+                mismatches.append(f"{repo_path}:inventory={branch or 'missing'}")
+            if live_branch != EXPECTED_COMPLETION_BRANCH:
+                mismatches.append(f"{repo_path}:live={live_branch or 'missing'}")
+        elif not branch:
             mismatches.append(f"{repo_path}:inventory={branch or 'missing'}")
-        if live_branch != EXPECTED_COMPLETION_BRANCH:
+        if not live_branch:
             mismatches.append(f"{repo_path}:live={live_branch or 'missing'}")
         if branch and live_branch and branch != live_branch:
             mismatches.append(f"{repo_path}:inventory_live_mismatch={branch}->{live_branch}")
+        if managed is not True and (not baseline_note or not baseline_owner):
+            mismatches.append(f"{repo_path}:missing_inherited_branch_note")
     ok = not mismatches
     return build_check(
         key="branch_policy_alignment",

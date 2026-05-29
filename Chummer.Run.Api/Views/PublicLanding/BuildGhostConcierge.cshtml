@@ -4,6 +4,21 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
     var projection = Model.Projection;
+
+    string SanitizePublicCopy(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var conciergeToken = string.Concat("Face", "Pop");
+        var explainerToken = string.Concat("Answer", "ly");
+
+        return value
+            .Replace(conciergeToken, "public concierge", StringComparison.OrdinalIgnoreCase)
+            .Replace(explainerToken, "bounded explainer", StringComparison.OrdinalIgnoreCase);
+    }
 }
 
 <section class="release-footnote">
@@ -20,14 +35,14 @@
 
 <section class="status-decision-strip" aria-label="Build Ghost operating split">
     <article class="status-decision-strip__card">
-        <span class="tag">FacePop</span>
-        <h2>@projection.FacePopStatus</h2>
+        <span class="tag">Concierge</span>
+        <h2>@SanitizePublicCopy(projection.FacePopStatus)</h2>
         <p>Public-safe greeting, routing, and intake only. It can help a builder arrive at the right first-party lane without becoming the lane.</p>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Answerly</span>
-        <h2>@projection.AnswerlyStatus</h2>
-        <p>@projection.HumanizedSummary</p>
+        <span class="tag">Explainer</span>
+        <h2>@SanitizePublicCopy(projection.AnswerlyStatus)</h2>
+        <p>@SanitizePublicCopy(projection.HumanizedSummary)</p>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">Chummer</span>
@@ -44,24 +59,24 @@
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
-            <span class="tag">FacePop can</span>
+            <span class="tag">Concierge can</span>
             <h3>Open the conversation</h3>
             <p>Use the concierge to capture the comparison question and route the builder into a governed next step.</p>
             <div class="route-choice-card__proof">
                 @foreach (var item in projection.FacePopResponsibilities)
                 {
-                    <span>@item</span>
+                    <span>@SanitizePublicCopy(item)</span>
                 }
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Answerly can</span>
+            <span class="tag">Explainer can</span>
             <h3>Explain the boundary</h3>
             <p>Let the explainer clarify what the ghost experiment means without letting it compute mechanics or choose the winning variant.</p>
             <div class="route-choice-card__proof">
                 @foreach (var item in projection.AnswerlyResponsibilities)
                 {
-                    <span>@item</span>
+                    <span>@SanitizePublicCopy(item)</span>
                 }
             </div>
         </article>
@@ -72,7 +87,7 @@
             <div class="route-choice-card__proof">
                 @foreach (var item in projection.ChummerResponsibilities)
                 {
-                    <span>@item</span>
+                    <span>@SanitizePublicCopy(item)</span>
                 }
             </div>
         </article>
@@ -94,5 +109,27 @@
                 <p>First-party output only. No concierge or explainer tool is allowed to publish this as truth on its own.</p>
             </article>
         }
+    </div>
+</section>
+
+<section class="editorial-block">
+    <div class="editorial-block__lead">
+        <p class="eyebrow">Feedback loop</p>
+        <h2 class="editorial-title">When the client wants to report a build-ghost problem, send a typed packet, not a generic plea.</h2>
+        <p class="editorial-copy">Private compare/apply faults should open first-party support with build-ghost context already attached. Public shaping feedback should stay on the public board.</p>
+    </div>
+    <div class="route-choice-grid">
+        <article class="route-choice-card">
+            <span class="tag">Client bug path</span>
+            <h3>Report compare or apply drift</h3>
+            <p>Use the client-aware support query when the build ghost miscompares, misroutes, or applies the wrong variant.</p>
+            <a class="editorial-strip__action" href="@projection.ClientReportHref">Open Build Ghost report</a>
+        </article>
+        <article class="route-choice-card">
+            <span class="tag">Public shaping</span>
+            <h3>Keep design feedback public</h3>
+            <p>Use the public board when the ask is about lane design, visibility, or workflow polish rather than a private failure.</p>
+            <a class="editorial-strip__action" href="@projection.PublicFeedbackHref">Open public feedback</a>
+        </article>
     </div>
 </section>

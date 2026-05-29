@@ -1,8 +1,18 @@
+@using Chummer.Run.Api.Services
 @model KarmaForgeSubmittedPageViewModel
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge-submitted";
+    ViewData["ContextSidebarHeading"] = "KARMA FORGE receipt";
+    ViewData["ContextSidebarSummary"] = "Keep follow-through, next questions, and saved packet data in the shared side panel.";
+    ViewData["ContextSidebarLinks"] = new[]
+    {
+        new PublicNavigationLink("Bounded follow-through", "#bounded-followthrough"),
+        new PublicNavigationLink("Next questions", "#next-questions"),
+        new PublicNavigationLink("Next steps", "#next-steps"),
+        new PublicNavigationLink("Saved packet data", "#packet-json"),
+    };
     var governedDecisionLabel = string.Concat("Product", " Governor");
     var queueStatusLabel = Model.QueueStatus.Replace(governedDecisionLabel, "Governed product decision", StringComparison.OrdinalIgnoreCase);
     string SanitizePublicText(string value)
@@ -110,12 +120,6 @@
 </section>
 
 <section class="trust-page-layout">
-    <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE receipt sections">
-        <a href="#bounded-followthrough">Bounded follow-through</a>
-        <a href="#next-questions">Next questions</a>
-        <a href="#next-steps">Next steps</a>
-        <a href="#packet-json">Saved packet data</a>
-    </aside>
     <div class="trust-page-sections">
         <article class="trust-page-section" id="next-questions">
             <p class="eyebrow">Follow-through queue</p>

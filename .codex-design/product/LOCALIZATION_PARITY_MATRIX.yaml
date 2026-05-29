@@ -41,7 +41,6 @@ acceptance_gates:
   - locale_smoke_support
   - voice_opt_in_fallback_smoke
   - non_english_generated_artifact_smoke
-copy_risk_matrix_source: LOCALIZATION_AND_COPY_RISK_REVIEW_MATRIX.yaml
 locale_matrix:
   - locale: en-US
     role: source

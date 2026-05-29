@@ -2416,6 +2416,97 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
     }
 
     [Fact]
+    public void DecisionNoticesFailClosedOnInternalWorkspaceWatchoutSummary()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace) with
+        {
+            Watchouts = ["Closed workspace uuid 7b0d6ecf-5fd8-4d87-9a8b-b9aa3cc6d130 needs manual decision review."]
+        };
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            supportDigests: [],
+            prepLibrary: BuildEmptyPrepLibrary(),
+            gmOperations: BuildGovernedGmOperationsReadiness());
+
+        DecisionNotice watchoutNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "workspace_watchout", StringComparison.Ordinal));
+        Assert.Equal(
+            "A previous campaign workspace needs review before you continue. Open the shared campaign view for the safe next step.",
+            watchoutNotice.Summary);
+        Assert.DoesNotContain("uuid", watchoutNotice.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("closed workspace", watchoutNotice.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DecisionNoticesFailClosedOnInternalPortableExchangeSummary()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        RunProjection leadRun = new(
+            RunId: "run-1",
+            CampaignId: workspace.CampaignId,
+            Title: "Closed workspace uuid 7b0d6ecf-5fd8-4d87-9a8b-b9aa3cc6d130",
+            Status: "active",
+            Summary: "Pinned run summary.",
+            ActiveSceneId: null,
+            Objectives: [],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            supportDigests: [],
+            prepLibrary: BuildEmptyPrepLibrary(),
+            gmOperations: BuildGovernedGmOperationsReadiness(),
+            leadRun: leadRun);
+
+        DecisionNotice portableExchangeNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.Ordinal));
+        Assert.Equal(
+            "Portable exchange needs review before you continue. Open the workspace lane for the safe next step.",
+            portableExchangeNotice.Summary);
+        Assert.DoesNotContain("uuid", portableExchangeNotice.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("closed workspace", portableExchangeNotice.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void DecisionNoticesFailClosedOnGuidOnlyPortableExchangeSummary()
+    {
+        CampaignWorkspaceProjection workspace = BuildWorkspaceWithRosterAndAftermath();
+        CampaignWorkspaceDigestProjection digest = BuildWorkspaceDigest(workspace);
+        RunProjection leadRun = new(
+            RunId: "run-1",
+            CampaignId: workspace.CampaignId,
+            Title: "7b0d6ecf-5fd8-4d87-9a8b-b9aa3cc6d130",
+            Status: "active",
+            Summary: "Pinned run summary.",
+            ActiveSceneId: null,
+            Objectives: [],
+            Scenes: [],
+            LatestContinuity: null,
+            CreatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"),
+            UpdatedAtUtc: DateTimeOffset.Parse("2026-04-04T00:00:00Z"));
+
+        IReadOnlyList<DecisionNotice> notices = InvokeBuildDecisionNotices(
+            workspace,
+            digest,
+            supportDigests: [],
+            prepLibrary: BuildEmptyPrepLibrary(),
+            gmOperations: BuildGovernedGmOperationsReadiness(),
+            leadRun: leadRun);
+
+        DecisionNotice portableExchangeNotice = Assert.Single(notices, notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.Ordinal));
+        Assert.Equal(
+            "Portable exchange needs review before you continue. Open the workspace lane for the safe next step.",
+            portableExchangeNotice.Summary);
+        Assert.DoesNotContain("7b0d6ecf-5fd8-4d87-9a8b-b9aa3cc6d130", portableExchangeNotice.Summary, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SupportClosuresPreferReporterActionCaseOverEarlierNonActionCase()
     {
         SupportCaseDigestViewModel informationalCase = BuildSupportCaseDigest(
@@ -8716,13 +8807,14 @@ public sealed class CampaignWorkspaceServerPlaneServiceTests
         IReadOnlyList<SupportCaseDigestViewModel> supportDigests,
         CampaignPrepLibrarySummary prepLibrary,
         GmOperationsReadinessSummary? gmOperations = null,
-        TravelModeReadinessSummary? travelMode = null)
+        TravelModeReadinessSummary? travelMode = null,
+        RunProjection? leadRun = null)
     {
         MethodInfo method = typeof(CampaignWorkspaceServerPlaneService)
             .GetMethod("BuildDecisionNotices", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("BuildDecisionNotices was not found.");
 
-        return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, gmOperations ?? BuildMissingGmOperationsReadiness(), travelMode ?? BuildTravelModeReadinessSummary(), null]));
+        return Assert.IsAssignableFrom<IReadOnlyList<DecisionNotice>>(method.Invoke(null, [workspace, digest, null, supportDigests, prepLibrary, gmOperations ?? BuildMissingGmOperationsReadiness(), travelMode ?? BuildTravelModeReadinessSummary(), leadRun]));
     }
 
     private static IReadOnlyList<SupportClosureCue> InvokeBuildSupportClosures(

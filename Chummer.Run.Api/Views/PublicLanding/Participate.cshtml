@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-participate";
     var codexHref = Model.Chrome.Authenticated
         ? "/participate/codex"
-        : "/auth/google/start?next=%2Fparticipate%2Fcodex";
+        : "/login?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
     var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
     var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
@@ -241,7 +241,7 @@
         <div class="route-choice-grid">
             <article class="route-choice-card">
                 <span class="tag">@buildGhost.StatusLabel</span>
-                <h3>FacePop and Answerly can help open the lane</h3>
+                <h3>Public concierge and boundary explainer can help open the lane</h3>
                 <p>The actual Build Ghost compare and apply truth still stays inside first-party Chummer runtime and receipts.</p>
                 <div class="route-choice-card__proof">
                     @foreach (var item in buildGhost.ProofPoints)

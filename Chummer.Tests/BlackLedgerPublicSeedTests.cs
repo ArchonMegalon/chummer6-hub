@@ -20,6 +20,11 @@ public sealed class BlackLedgerPublicSeedTests
         Assert.False(seed.SourcebookTextPresent);
         Assert.Equal(6, seed.Factions!.Count);
         Assert.Equal(8, seed.Districts!.Count);
+        Assert.Contains(seed.Turns!, turn => turn.Turn == 0 && turn.ActionBeats!.Count >= 6);
+        Assert.Contains(seed.Turns!, turn => turn.Turn == 1 && turn.ActionBeats!.Count >= 5);
+        var turnZero = Assert.Single(seed.Turns!, turn => turn.Turn == 0);
+        Assert.True(turnZero.ActionBeats!.Count(beat => beat.ActorKind == "player") >= 2);
+        Assert.True(turnZero.ActionBeats!.Count(beat => beat.ActorKind == "gm") >= 2);
     }
 
     [Fact]

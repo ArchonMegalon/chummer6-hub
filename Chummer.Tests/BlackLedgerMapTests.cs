@@ -15,7 +15,8 @@ public sealed class BlackLedgerMapTests
 
         Assert.NotNull(map);
         Assert.Equal("conflict", map.CurrentMode);
-        Assert.Equal("svg_tactical", map.RenderMode);
+        Assert.Equal("earth_globe_country_borders", map.RenderMode);
+        Assert.Contains("bordered countries", map.AccessibilityNote, StringComparison.OrdinalIgnoreCase);
         Assert.NotEmpty(map.Events);
         Assert.NotEmpty(map.Arcs);
         Assert.Contains(map.Modes, item => item.Id == "recent-changes");
@@ -30,10 +31,13 @@ public sealed class BlackLedgerMapTests
 
         Assert.NotNull(map);
         Assert.Equal("emerald-sprawl-prelude", map.WorldId);
+        Assert.Equal("earth_globe_country_borders", map.Projection);
         Assert.NotEmpty(map.Regions);
+        Assert.All(map.Regions, region => Assert.False(string.IsNullOrWhiteSpace(region.PolygonPoints)));
         Assert.NotEmpty(map.Factions);
         Assert.NotEmpty(map.Events);
         Assert.NotEmpty(map.ReplaySteps);
+        Assert.Contains(map.ReplaySteps, step => step.Turn == 0 && step.Summary.Contains("player", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -65,6 +69,40 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("[HttpGet(\"worlds/{worldId}/map\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/map/turns/{turn:int}\")]", ledgerApi, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"worlds/{worldId}/map/tick-delta/{fromTurn:int}/{toTurn:int}\")]", ledgerApi, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BlackLedgerMap_view_mounts_real_globe_at_anchor_instead_of_legacy_svg_fallback()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
+
+        Assert.Contains("id=\"ledger-map\"", view, StringComparison.Ordinal);
+        Assert.Contains("The public globe route now lands on the real earth view", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("tactical fallback map", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("<svg viewBox=\"0 0 1200 760\"", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BlackLedgerMap_geoscape_script_draws_faction_country_borders_from_region_polygons()
+    {
+        string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "black-ledger-geoscape.js"));
+
+        Assert.Contains("EARTH_LANDMASSES", script, StringComparison.Ordinal);
+        Assert.Contains("EARTH_MOUNTAIN_RANGES", script, StringComparison.Ordinal);
+        Assert.Contains("getContext('webgl'", script, StringComparison.Ordinal);
+        Assert.Contains("webglcontextlost", script, StringComparison.Ordinal);
+        Assert.Contains("webglcontextrestored", script, StringComparison.Ordinal);
+        Assert.Contains("createEarthTexture", script, StringComparison.Ordinal);
+        Assert.Contains("renderWebGlBase", script, StringComparison.Ordinal);
+        Assert.Contains("drawingBufferWidth", script, StringComparison.Ordinal);
+        Assert.Contains("window.addEventListener('resize', this.handleResize", script, StringComparison.Ordinal);
+        Assert.Contains("drawLandmasses", script, StringComparison.Ordinal);
+        Assert.Contains("drawMountainRanges", script, StringComparison.Ordinal);
+        Assert.Contains("parseRegionPolygon", script, StringComparison.Ordinal);
+        Assert.Contains("region.polygonPoints", script, StringComparison.Ordinal);
+        Assert.Contains("drawFactionCountry", script, StringComparison.Ordinal);
+        Assert.Contains("countryShapes", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("svg_tactical", script, StringComparison.Ordinal);
     }
 
     private static IConfiguration BuildSeedConfiguration()

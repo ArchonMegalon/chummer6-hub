@@ -170,6 +170,7 @@
 
 @if (Model.World is not null)
 {
+    var world = Model.World;
     <section class="editorial-block editorial-block--focused" id="ledger-map" tabindex="-1">
         <div class="editorial-block__lead">
             <p class="eyebrow">Geoscape</p>
@@ -180,37 +181,27 @@
         <div class="ledger-command-map ledger-command-map--pregold">
             @if (commandMap is not null)
             {
-                <p class="muted-copy">@(selectedTurn >= 2 ? "Turn 2 deterministic preview is ready. Mode: deterministic_test. Turn 2 deterministic preview stays public-safe and receipt-backed." : "Mode: preseeded.")</p>
-                <div class="ledger-command-map__globe ledger-command-map__globe--mirrored">
-                    <div class="muted-copy">The flagship globe above is the primary surface. This section keeps the command-map anchor and tactical fallback lane intact.</div>
+                <p class="muted-copy">@(selectedTurn >= 2 ? "Turn 2 deterministic board is ready. Mode: deterministic_test. Turn 2 stays receipt-backed and action-visible." : "Mode: seeded live board.")</p>
+                <div class="ledger-command-map__globe">
+                    <div
+                        class="ledger-flagship__geoscape"
+                        data-black-ledger-geoscape-root
+                        data-variant="full"
+                        data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=@selectedTurn&amp;mode=@(commandMap.CurrentMode)"
+                        data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                        data-initial-mode="@(commandMap.CurrentMode)"
+                        data-selected-faction="@selectedFactionSlug"
+                        data-tick-headline="@Model.World?.TurnHeadline"
+                        data-primary-label="Open faction file"
+                        data-primary-href="/ledger/factions/@(selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle")"
+                        data-secondary-label="Open latest dispatch"
+                        data-secondary-href="/ledger/dispatches"></div>
+                    <p class="muted-copy">The public globe route now lands on the real earth view, with faction countries drawn from route-backed district borders and the same receipt-backed pressure data as the flagship stage.</p>
                 </div>
             }
-            <div class="ledger-command-map__shell ledger-command-map__shell--fallback" data-geoscape-fallback>
-                <div class="ledger-world-shell__map ledger-command-map__map">
-                    <svg viewBox="0 0 1200 760" role="img" aria-label="@Model.World.PublicName tactical fallback map">
-                        <g class="ledger-command-map__grid" aria-hidden="true">
-                            <line x1="0" y1="180" x2="1200" y2="180"></line>
-                            <line x1="0" y1="380" x2="1200" y2="380"></line>
-                            <line x1="0" y1="580" x2="1200" y2="580"></line>
-                            <line x1="240" y1="0" x2="240" y2="760"></line>
-                            <line x1="600" y1="0" x2="600" y2="760"></line>
-                            <line x1="920" y1="0" x2="920" y2="760"></line>
-                        </g>
-                        @foreach (var district in Model.World.Districts)
-                        {
-                            <a href="#@districtAnchorId(district.Id)" aria-label="@district.Summary" data-region-link="@district.Id" id="map-@districtAnchorId(district.Id)">
-                                <polygon id="@districtAnchorId(district.Id)-shape" class="ledger-world-shell__district ledger-command-map__district" points="@district.PolygonPoints" tabindex="0" data-region-id="@district.Id">
-                                    <title>@district.Name</title>
-                                </polygon>
-                            </a>
-                        }
-                    </svg>
-                    <p class="muted-copy">Fallback only. If canvas is unavailable, the bounded tactical shell stays readable and keyboard-safe.</p>
-                </div>
-            </div>
         </div>
         <div class="ledger-world-shell__districts route-choice-grid route-choice-grid--three" aria-label="District fallback cards">
-            @foreach (var district in Model.World.Districts)
+            @foreach (var district in world.Districts)
             {
                 <article class="route-choice-card" id="@districtAnchorId(district.Id)" data-map-district-card="@district.Id">
                     <span class="tag">@district.DominantFaction</span>
@@ -232,8 +223,8 @@
         {
             <section class="editorial-block ledger-newsreel-broadcast" id="newsreel-player">
                 <div class="editorial-block__lead">
-                    <p class="eyebrow">Command newsreel</p>
-                    <h2 class="editorial-title">Anchor package for @worldTurnBriefing!.TransitionLabel</h2>
+                    <p class="eyebrow">Black Ledger Newsroom</p>
+                    <h2 class="editorial-title">@newsreelBroadcast.EpisodeTypeLabel for @worldTurnBriefing!.TransitionLabel</h2>
                     <p class="editorial-copy">@worldTurnBriefing.NewsreelLead</p>
                 </div>
                 <div class="ledger-newsreel-broadcast__shell">
@@ -252,18 +243,45 @@
                             <span>Anchor: @newsreelBroadcast.AnchorName</span>
                             <span>Desk: @newsreelBroadcast.DeskLabel</span>
                             <span>Duration: @newsreelBroadcast.DurationLabel</span>
+                            <span>Published: @newsreelBroadcast.PublishedLabel</span>
                         </div>
                     </div>
                     <aside class="ledger-newsreel-broadcast__sidebar">
+                        @if (newsreelBroadcast.ActionBeats.Count > 0)
+                        {
+                            <article class="route-choice-card">
+                                <span class="tag">Action board</span>
+                                <h3>Visible player, GM, and world moves</h3>
+                                <div class="ledger-newsreel-broadcast__action-strip">
+                                    @foreach (var beat in newsreelBroadcast.ActionBeats.Take(4))
+                                    {
+                                        <article class="ledger-newsreel-broadcast__action-card">
+                                            <span class="tag">@beat.ActorKind</span>
+                                            <h4>@beat.BeatLabel</h4>
+                                            <p class="ledger-newsreel-broadcast__action-actor">@beat.ActorLabel</p>
+                                            <p class="ledger-newsreel-broadcast__action-proof">@beat.VisualHook</p>
+                                            <p>@beat.ActionSummary</p>
+                                            <p class="ledger-newsreel-broadcast__action-stakes">@beat.Stakes</p>
+                                            <p class="ledger-newsreel-broadcast__action-stakes">@beat.ConsequenceLine</p>
+                                            <p class="ledger-newsreel-broadcast__action-proof">@beat.ProofNote</p>
+                                        </article>
+                                    }
+                                </div>
+                            </article>
+                        }
                         <article class="route-choice-card">
                             <span class="tag">@newsreelBroadcast.PackageLabel</span>
                             <h3>Broadcast posture</h3>
                             <p>@newsreelBroadcast.AudioPosture</p>
                             <p>@newsreelBroadcast.MusicPosture</p>
+                            <p>@newsreelBroadcast.PublicSafetyNote</p>
+                            <p>@newsreelBroadcast.ReconstructionNote</p>
                             <div class="route-choice-card__proof">
                                 <a href="@newsreelBroadcast.WatchHref">Open watch route</a>
+                                <a href="@newsreelBroadcast.TranscriptHref">Transcript</a>
+                                <a href="@newsreelBroadcast.ReceiptsHref">Source receipts</a>
                                 <a href="@newsreelBroadcast.CaptionsHref">Captions</a>
-                                <a href="@worldTurnBriefing.ValidationJsonHref">JSON brief</a>
+                                <a href="@newsreelBroadcast.FeedbackHref">Feedback</a>
                             </div>
                         </article>
                         <article class="route-choice-card">
@@ -312,7 +330,7 @@
             <p class="editorial-copy">Every public faction lane shows pressure, not people, with one clear CTA and no fake provider claim.</p>
         </div>
         <div class="faction-profile-grid">
-            @foreach (var faction in Model.World.Factions)
+            @foreach (var faction in world.Factions)
             {
                 var slug = factionSlug(faction.Id);
                 var ledgers = buildLedgers(faction.Id).Take(4).ToArray();
@@ -338,7 +356,7 @@
                     <div class="trust-claim__microproof">
                         <span>Safety: public-safe</span>
                         <span>Video: first-party motion</span>
-                        <span>Receipt: @(Model.World.LastTick?.ReceiptId ?? "turn-1")</span>
+                        <span>Receipt: @(world.LastTick?.ReceiptId ?? "turn-1")</span>
                     </div>
                     <a class="editorial-strip__action" href="/ledger/factions/@slug" data-faction-file-link="@slug">Open faction file</a>
                 </article>

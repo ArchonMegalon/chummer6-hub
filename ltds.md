@@ -15,3 +15,12 @@
 - env_email_key: `CHUMMER_EA_BLIPAI_APP_EMAIL`
 - env_password_key: `CHUMMER_EA_BLIPAI_APP_PASSWORD`
 - mirrors_default: `true`
+
+### magicfit
+
+- tier: `5`
+- credential_source: local `.env`
+- env_email_key: `CHUMMER_EA_MAGICFIT_EMAIL`
+- env_password_key: `CHUMMER_EA_MAGICFIT_PASSWORD`
+- account_email: `tibor.girschele@gmail.com`
+- mirrors_default: `true`

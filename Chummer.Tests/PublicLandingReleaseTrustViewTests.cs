@@ -23,7 +23,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         string view = File.ReadAllText(viewPath);
 
         Assert.Contains("launch-hero", view, StringComparison.Ordinal);
-        Assert.Contains("Black Ledger preview", view, StringComparison.Ordinal);
+        Assert.Contains("Black Ledger command deck", view, StringComparison.Ordinal);
         Assert.Contains("The city is moving.", view, StringComparison.Ordinal);
         Assert.Contains("workflow-band", view, StringComparison.Ordinal);
         Assert.Contains("flagship-gateway-grid", view, StringComparison.Ordinal);
@@ -263,6 +263,32 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void BuildGhostConciergeKeepsTheClientFeedbackLoopVisible()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "BuildGhostConcierge.cshtml");
+        string servicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "KarmaForge", "BuildGhostConciergeService.cs");
+
+        string view = File.ReadAllText(viewPath);
+        string service = File.ReadAllText(servicePath);
+
+        Assert.Contains("Feedback loop", view, StringComparison.Ordinal);
+        Assert.Contains("Open Build Ghost report", view, StringComparison.Ordinal);
+        Assert.Contains("Open public feedback", view, StringComparison.Ordinal);
+        Assert.Contains("/contact?kind=bug_report", service, StringComparison.Ordinal);
+        Assert.Contains("/feedback?topic=build-ghosts", service, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LedgerControllerUsesBoardLanguageForDeterministicTurnTwo()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("This deterministic turn-two board shows how AI interim stewards stay bounded", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("This deterministic turn-two preview shows how AI interim stewards stay bounded", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void FeatureDetailViewUsesTheSharedRouteChoiceShellAndExitRailInsteadOfStoppingAtHeroAndFamilyPartial()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "FeatureDetail.cshtml");
@@ -286,6 +312,21 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Linked installs", view, StringComparison.Ordinal);
         Assert.Contains("Devices and access", view, StringComparison.Ordinal);
         Assert.Contains("The binary stays the same for everyone.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AuthEntryViewKeepsGoogleCtaOnInstallerReturnPath()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AuthController.cs");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "Auth", "Entry.cshtml");
+        string controller = File.ReadAllText(controllerPath);
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("GoogleStartHref: $\"/auth/google/start?next={Uri.EscapeDataString(nextPath)}\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Model.NextPath.StartsWith(\"/downloads\"", view, StringComparison.Ordinal);
+        Assert.Contains("href=\"@Model.GoogleStartHref\"", view, StringComparison.Ordinal);
+        Assert.Contains("Continue with Google", view, StringComparison.Ordinal);
+        Assert.Contains("After verification you return to @nextTarget.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -411,7 +452,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         string layout = File.ReadAllText(layoutPath);
 
-        Assert.Contains("Use <a class=\"quiet-link\" href=\"/now\">what works today</a> for customer-facing proof and <a class=\"quiet-link\" href=\"/status\">status</a> for current cautions.", layout, StringComparison.Ordinal);
+        Assert.Contains("Use <a class=\"quiet-link\" href=\"/downloads\">Get Chummer</a> for the acquisition path, <a class=\"quiet-link\" href=\"/now\">what works today</a> for current proof, and <a class=\"quiet-link\" href=\"/status\">status</a> for cautions.", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterCanonicalSource", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterGeneratedNote", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("Truth boundary", layout, StringComparison.Ordinal);

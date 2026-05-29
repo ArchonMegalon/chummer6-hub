@@ -112,6 +112,7 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<RegistryTruthBindingService>();
         services.AddSingleton<PrivacyBoundedSupportStatusService>();
         services.AddSingleton<PublicSignalToCanonPacketService>();
+        services.AddSingleton<ExecutiveAssistantCredentialCatalogService>();
         services.AddSingleton<SupportAssistantService>();
         services.AddSingleton<IFirstPartySupportAssistant>(static provider => provider.GetRequiredService<SupportAssistantService>());
         services.AddSingleton<AnswerlyRuntimePolicy>();

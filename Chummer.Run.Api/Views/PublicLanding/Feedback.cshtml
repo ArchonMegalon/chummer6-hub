@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-participate";
     var codexHref = Model.Chrome.Authenticated
         ? "/participate/codex"
-        : "/auth/google/start?next=%2Fparticipate%2Fcodex";
+        : "/login?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
     var signalProjection = Model.SignalProjection;
     var signalOperations = Model.SignalOperations;

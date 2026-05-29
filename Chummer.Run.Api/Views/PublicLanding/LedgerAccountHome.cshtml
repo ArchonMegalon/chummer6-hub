@@ -167,6 +167,59 @@
     </section>
 }
 
+@if (Model.FollowThroughPacket is not null)
+{
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Follow-through</p>
+            <h2 class="editorial-title">@Model.FollowThroughPacket.Heading</h2>
+            <p class="editorial-copy">@Model.FollowThroughPacket.Summary</p>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            <article class="route-choice-card">
+                <span class="tag">Signal Deck</span>
+                <p>@Model.FollowThroughPacket.SignalDeckSummary</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Runner Passport</span>
+                <p>@Model.FollowThroughPacket.RunnerPassportSummary</p>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Living Newsroom</span>
+                <p>@Model.FollowThroughPacket.LivingNewsroomSummary</p>
+                <div class="route-choice-card__proof">
+                    <a href="@Model.FollowThroughPacket.LivingNewsroomHref">Open watch lane</a>
+                    <a href="/living-world">Open Living World</a>
+                </div>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Aftermath</span>
+                <p>@Model.FollowThroughPacket.AftermathSummary</p>
+                <div class="route-choice-card__proof">
+                    <a href="@Model.FollowThroughPacket.AftermathHref">Open aftermath rail</a>
+                </div>
+            </article>
+            <article class="route-choice-card">
+                <span class="tag">Boundary</span>
+                <p>@Model.FollowThroughPacket.BoundaryLine</p>
+            </article>
+        </div>
+        <div class="route-choice-grid route-choice-grid--three">
+            @foreach (var cue in Model.FollowThroughPacket.Cues)
+            {
+                <article class="route-choice-card">
+                    <span class="tag">@cue.Label</span>
+                    <h3>@cue.StatusLabel</h3>
+                    <p>@cue.Summary</p>
+                    <div class="route-choice-card__proof">
+                        <a href="@cue.Href">Open lane</a>
+                    </div>
+                </article>
+            }
+        </div>
+    </section>
+}
+
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Identity loop</p>

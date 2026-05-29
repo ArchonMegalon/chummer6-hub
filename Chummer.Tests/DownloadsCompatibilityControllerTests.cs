@@ -53,9 +53,10 @@ public sealed class DownloadsCompatibilityControllerTests
 
         IActionResult result = fixture.Controller.CanonicalReleaseManifest();
 
-        var file = Assert.IsType<PhysicalFileResult>(result);
-        Assert.EndsWith("RELEASE_CHANNEL.generated.json", file.FileName, StringComparison.Ordinal);
-        Assert.Equal("application/json; charset=utf-8", file.ContentType);
+        var content = Assert.IsType<ContentResult>(result);
+        Assert.Equal("application/json; charset=utf-8", content.ContentType);
+        using JsonDocument document = JsonDocument.Parse(content.Content ?? "{}");
+        Assert.True(document.RootElement.TryGetProperty("installAwareArtifactRegistry", out _));
     }
 
     [Fact]

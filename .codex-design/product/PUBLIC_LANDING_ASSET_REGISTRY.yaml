@@ -2,20 +2,6 @@ product: chummer
 surface: chummer.run
 version: 2
 assets:
-  - asset_slot: flagship_black_ledger_glass
-    section_id: hero
-    media_kind: css_console
-    poster_url:
-    poster_avif_url:
-    poster_webp_url:
-    mobile_poster_url:
-    mobile_poster_avif_url:
-    mobile_poster_webp_url:
-    loop_url:
-    alt: Black Ledger Glass flagship console built from first-party HTML and CSS rather than blurred wallpaper art.
-    caption: Black Ledger Glass console
-    motion_policy: html_css_first_party_only
-    fallback_style: proof_console
   - asset_slot: section_hero
     section_id: hero
     media_kind: premium_still

@@ -125,6 +125,12 @@ restore_run_services_test_project() {
 
 restore_run_services_test_project
 
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_routes.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_surface.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_release_bundle_promotion_shelf_replacement.py' >/dev/null
+python3 "$ROOT_DIR/tests/test_stack_smoke.py" >/dev/null
+
 sync_workflow_evidence_timestamps_from_nested_receipts() {
   python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'
 import datetime as dt
@@ -2531,5 +2537,7 @@ python3 scripts/verify_next90_m143_hub_exchange_output_receipts.py
 python3 -m unittest tests/test_next90_m143_hub_exchange_output_receipts.py
 python3 scripts/verify_next90_m144_hub_release_truth_alignment.py
 python3 -m unittest tests/test_next90_m144_hub_release_truth_alignment.py
+python3 scripts/verify_table_pulse_connected_lane_surface.py
+python3 -m unittest tests/test_table_pulse_connected_lane_surface.py
 
 bash scripts/ai/run_services_smoke.sh

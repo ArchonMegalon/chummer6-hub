@@ -39,9 +39,11 @@
         var candidate = normalizeHeaderActionPath(href);
         return candidate switch
         {
+            "" => string.IsNullOrEmpty(normalizedCurrentPath),
             "/what-is-chummer" => string.Equals(normalizedCurrentPath, "/what-is-chummer", StringComparison.OrdinalIgnoreCase),
             "/downloads" => normalizedCurrentPath is "/downloads" || normalizedCurrentPath.StartsWith("/downloads/", StringComparison.OrdinalIgnoreCase),
             "/now" => string.Equals(normalizedCurrentPath, "/now", StringComparison.OrdinalIgnoreCase),
+            "/ledger" => normalizedCurrentPath is "/ledger" || normalizedCurrentPath.StartsWith("/ledger/", StringComparison.OrdinalIgnoreCase),
             "/horizons" => normalizedCurrentPath is "/horizons" or "/roadmap" || normalizedCurrentPath.StartsWith("/roadmap/", StringComparison.OrdinalIgnoreCase),
             "/artifacts" => normalizedCurrentPath is "/artifacts" || normalizedCurrentPath.StartsWith("/artifacts/", StringComparison.OrdinalIgnoreCase),
             "/participate" => normalizedCurrentPath is "/participate" || normalizedCurrentPath.StartsWith("/participate/", StringComparison.OrdinalIgnoreCase),
@@ -81,7 +83,7 @@
         || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
         || routeKey.StartsWith("roadmap-", StringComparison.Ordinal);
     var compactProductLinks = productLinks
-        .Where(link => link.Href is "/what-is-chummer" or "/now" or "/downloads" or "/artifacts")
+        .Where(link => link.Href is "/" or "/downloads" or "/now" or "/ledger")
         .ToArray();
     var footerProductLinks = compactFooter && compactProductLinks.Length > 0
         ? compactProductLinks
@@ -91,14 +93,14 @@
         .ToArray();
     var guidedStartLinks = new[]
     {
-        new PublicNavigationLink("Downloads", "/downloads"),
+        new PublicNavigationLink("Get Chummer", "/downloads"),
         new PublicNavigationLink("What Works Today", "/now"),
         new PublicNavigationLink("Help", "/help"),
         new PublicNavigationLink("Account", chrome.Authenticated ? "/account" : "/signup")
     };
     var worldLinks = new[]
     {
-        new PublicNavigationLink("Black Ledger", "/ledger"),
+        new PublicNavigationLink("Worlds home", "/ledger"),
         new PublicNavigationLink("Dispatches", "/ledger/dispatches"),
         new PublicNavigationLink("Karma Forge", "/participate/karma-forge"),
         new PublicNavigationLink("Anarchy", "/anarchy")
@@ -115,6 +117,9 @@
         .Select(group => group.First())
         .ToArray();
     var utilityLink = chrome.UtilityNavigation.FirstOrDefault();
+    var contextSidebarHeading = ViewData["ContextSidebarHeading"] as string;
+    var contextSidebarSummary = ViewData["ContextSidebarSummary"] as string;
+    var contextSidebarLinks = ViewData["ContextSidebarLinks"] as IReadOnlyList<PublicNavigationLink> ?? Array.Empty<PublicNavigationLink>();
     var requestHost = Context?.Request?.Host.Host?.Trim().TrimEnd('.').ToLowerInvariant() ?? string.Empty;
     var clickRankSiteId = requestHost is "chummer.run" or "www.chummer.run"
         ? (System.Environment.GetEnvironmentVariable("CLICKRANK_AI_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
@@ -140,7 +145,7 @@
     <meta name="apple-mobile-web-app-title" content="Chummer" />
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
     <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
-    <link rel="manifest" href="~/manifest.webmanifest" asp-append-version="true" />
+    <link rel="manifest" href="~/manifest.json" asp-append-version="true" />
     <link rel="icon" href="~/favicon.svg" type="image/svg+xml" asp-append-version="true" />
     <link rel="shortcut icon" href="~/favicon.ico" asp-append-version="true" />
     <link rel="apple-touch-icon" href="~/apple-touch-icon.png" asp-append-version="true" />
@@ -280,9 +285,9 @@
                     <button class="site-sidebar__close button-like button-like--ghost" type="button" data-nav-close aria-label="Hide navigation panel">Hide</button>
                 </div>
                 <div class="site-sidebar__section site-sidebar__section--summary">
-                    <p class="site-sidebar__heading">Start here</p>
-                    <p class="site-sidebar__summary">Most people only need four things: install, honest status, the world lanes, and help when something breaks.</p>
-                    <nav class="site-sidebar__nav" aria-label="Start here navigation">
+                    <p class="site-sidebar__heading">Get started</p>
+                    <p class="site-sidebar__summary">The flagship front door stays simple: get the build, check what works today, keep help nearby, and return through one account path.</p>
+                    <nav class="site-sidebar__nav" aria-label="Get started navigation">
                         @foreach (var link in guidedStartLinks)
                         {
                             var current = isContextualRouteCurrent(link.Href);
@@ -298,7 +303,7 @@
                     </nav>
                 </div>
                 <div class="site-sidebar__section">
-                    <p class="site-sidebar__heading">World lanes</p>
+                    <p class="site-sidebar__heading">Worlds</p>
                     <nav class="site-sidebar__nav" aria-label="World navigation">
                         @foreach (var link in worldLinks)
                         {
@@ -315,7 +320,7 @@
                     </nav>
                 </div>
                 <div class="site-sidebar__section">
-                    <p class="site-sidebar__heading">Core pages</p>
+                    <p class="site-sidebar__heading">Flagship routes</p>
                     <nav class="site-sidebar__nav" aria-label="Primary navigation">
                         @foreach (var link in chrome.PrimaryNavigation)
                         {
@@ -331,10 +336,34 @@
                         }
                     </nav>
                 </div>
+                @if (contextSidebarLinks.Count > 0 && !string.IsNullOrWhiteSpace(contextSidebarHeading))
+                {
+                    <div class="site-sidebar__section">
+                        <p class="site-sidebar__heading">@contextSidebarHeading</p>
+                        @if (!string.IsNullOrWhiteSpace(contextSidebarSummary))
+                        {
+                            <p class="site-sidebar__summary">@contextSidebarSummary</p>
+                        }
+                        <nav class="site-sidebar__nav" aria-label="@contextSidebarHeading">
+                            @foreach (var link in contextSidebarLinks)
+                            {
+                                var current = isContextualRouteCurrent(link.Href);
+                                if (current)
+                                {
+                                    <span class="site-sidebar__current">@link.Label</span>
+                                }
+                                else
+                                {
+                                    <a href="@link.Href">@link.Label</a>
+                                }
+                            }
+                        </nav>
+                    </div>
+                }
                 @if (supplementalSignalLinks.Length > 0)
                 {
                     <div class="site-sidebar__section">
-                        <p class="site-sidebar__heading">Signals</p>
+                        <p class="site-sidebar__heading">Signals and horizons</p>
                         <nav class="site-sidebar__nav" aria-label="Signal navigation">
                             @foreach (var link in supplementalSignalLinks)
                             {
@@ -354,7 +383,7 @@
                 @if (supportLinks.Length > 0)
                 {
                     <div class="site-sidebar__section">
-                        <p class="site-sidebar__heading">Support</p>
+                        <p class="site-sidebar__heading">Trust and support</p>
                         <nav class="site-sidebar__nav" aria-label="Support navigation">
                             @foreach (var link in supportLinks)
                             {
@@ -425,7 +454,7 @@
             <div class="site-footer__inner">
                 <div class="site-footer__brand">
                     <a class="site-footer__wordmark" href="/">CHUMMER</a>
-                    <p class="site-footer__copy">Shadowrun character and campaign companion with clear install, help, and proof pages.</p>
+                    <p class="site-footer__copy">Flagship Shadowrun character and campaign companion with one install path, one truth pipeline, and one return surface.</p>
                 </div>
                 <nav class="site-footer__nav" aria-label="Footer navigation">
                     <div class="site-footer__link-group">
@@ -455,9 +484,9 @@
                     }
                     else
                     {
-                        <p>Live product. Honest install and support guidance.</p>
+                        <p>Live product. One public truth, one account return path, and grounded support guidance.</p>
                     }
-                    <p class="site-footer__provenance">Use <a class="quiet-link" href="/now">what works today</a> for customer-facing proof and <a class="quiet-link" href="/status">status</a> for current cautions.</p>
+                    <p class="site-footer__provenance">Use <a class="quiet-link" href="/downloads">Get Chummer</a> for the acquisition path, <a class="quiet-link" href="/now">what works today</a> for current proof, and <a class="quiet-link" href="/status">status</a> for cautions.</p>
                     @if (utilityLink is not null)
                     {
                         var utilityIsExternal = Uri.TryCreate(utilityLink.Href, UriKind.Absolute, out _);

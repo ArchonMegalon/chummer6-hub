@@ -1,8 +1,19 @@
+@using Chummer.Run.Api.Services
 @model KarmaForgeIntakePageViewModel
 @{
     ViewData["Title"] = Model.Heading;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge";
+    ViewData["ContextSidebarHeading"] = "KARMA FORGE sections";
+    ViewData["ContextSidebarSummary"] = "Use the shared side panel for intake, governor stages, and packet review.";
+    ViewData["ContextSidebarLinks"] = new[]
+    {
+        new PublicNavigationLink("Intake", "#karma-forge-intake"),
+        new PublicNavigationLink("Bounded stages", "#external-stages"),
+        new PublicNavigationLink("Track questions", "#track-questions"),
+        new PublicNavigationLink("Governor decisions", "#candidate-decisions"),
+        new PublicNavigationLink("Recent packets", "#recent-packets"),
+    };
     bool hasErrors = Model.Form.ValidationErrors.Count > 0;
     var historyHref = Model.Form.Authenticated
         ? "#recent-packets"
@@ -189,13 +200,6 @@
 </section>
 
 <section class="trust-page-layout">
-    <aside class="account-nav account-nav--trust" aria-label="KARMA FORGE sections">
-        <a href="#karma-forge-intake">Intake</a>
-        <a href="#external-stages">Bounded stages</a>
-        <a href="#track-questions">Track questions</a>
-        <a href="#candidate-decisions">Governor decisions</a>
-        <a href="#recent-packets">Recent packets</a>
-    </aside>
     <div class="trust-page-sections">
         <article class="trust-page-section trust-page-section--form" id="karma-forge-intake">
             <p class="eyebrow">Structured intake</p>

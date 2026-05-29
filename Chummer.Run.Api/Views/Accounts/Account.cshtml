@@ -1,3 +1,4 @@
+@using Chummer.Run.Api.Services
 @model AccountPageViewModel
 @{
     var pageTitle = Model.CurrentSection switch
@@ -33,6 +34,12 @@
     ViewData["Title"] = pageTitle;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-account";
+    ViewData["ContextSidebarHeading"] = "Account";
+    ViewData["ContextSidebarSummary"] = "Move between profile, access, support, and work from the shared side panel instead of a second inline account rail.";
+    ViewData["ContextSidebarLinks"] = Model.CoreSections
+        .Concat(Model.SecondarySections)
+        .Select(static item => new PublicNavigationLink(item.Label, item.Href))
+        .ToArray();
     var emailLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "email", StringComparison.OrdinalIgnoreCase));
     var googleLink = Model.Links.LinkedIdentities.FirstOrDefault(link => string.Equals(link.Provider, "google", StringComparison.OrdinalIgnoreCase));
     var telegramChannel = Model.Links.ChannelLinks.FirstOrDefault(link => string.Equals(link.ChannelKind, "telegram_official_bot", StringComparison.OrdinalIgnoreCase));
@@ -131,6 +138,12 @@
     var selectedWorkspace = Model.SelectedWorkspace;
     var selectedWorkspaceServerPlane = Model.SelectedWorkspaceServerPlane;
     var selectedWorkspacePortableExchangeNotice = selectedWorkspaceServerPlane?.DecisionNotices.FirstOrDefault(notice => string.Equals(notice.Kind, "portable_exchange", StringComparison.OrdinalIgnoreCase));
+    var selectedWorkspaceDecisionNotices = (selectedWorkspaceServerPlane?.DecisionNotices ?? Array.Empty<Chummer.Control.Contracts.Support.DecisionNotice>())
+        .Where(notice => !WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(notice.Summary))
+        .ToArray();
+    var selectedWorkspacePortableExchangeSummary = !WorkspaceNoticeSafety.LooksLikeInternalWorkspaceLeak(selectedWorkspacePortableExchangeNotice?.Summary)
+        ? selectedWorkspacePortableExchangeNotice?.Summary
+        : null;
     var selectedWorkspaceRosterTransferPlan = Model.SelectedWorkspaceRosterTransferPlan;
     var selectedWorkspacePrepLibrarySearch = Model.SelectedWorkspacePrepLibrarySearch;
     var selectedWorkspacePrepLibraryQuery = Model.SelectedWorkspacePrepLibraryQuery;
@@ -140,13 +153,54 @@
     var selectedWorkspacePrepLaunches = selectedWorkspaceServerPlane?.PrepLaunches ?? Array.Empty<Chummer.Campaign.Contracts.GovernedPrepLaunchProjection>();
     var selectedWorkspaceTravelPrefetches = selectedWorkspaceServerPlane?.TravelPrefetches ?? Array.Empty<Chummer.Campaign.Contracts.TravelPrefetchReceiptProjection>();
     var selectedWorkspaceAftermathPackages = selectedWorkspaceServerPlane?.AftermathPackages ?? Array.Empty<Chummer.Campaign.Contracts.AftermathRecapPackageProjection>();
+    var selectedWorkspaceConsequences = selectedWorkspaceServerPlane?.Consequences ?? selectedWorkspace?.Consequences ?? Array.Empty<Chummer.Campaign.Contracts.CampaignConsequenceProjection>();
+    var selectedWorkspaceLeadConsequence = selectedWorkspaceConsequences.FirstOrDefault();
     var selectedWorkspaceLeadAftermathPackage = selectedWorkspaceAftermathPackages
         .FirstOrDefault(item => !string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
     var selectedWorkspaceDowntimePackage = selectedWorkspaceAftermathPackages
         .FirstOrDefault(item => string.Equals(item.PackageKind, "downtime_brief", StringComparison.OrdinalIgnoreCase));
     var selectedWorkspaceCampaignMemory = selectedWorkspaceServerPlane?.CampaignMemory ?? selectedWorkspace?.CampaignMemory;
     var selectedWorkspaceCampaignMemoryEvidence = selectedWorkspaceCampaignMemory?.EvidenceLines.FirstOrDefault();
+    var selectedWorkspaceAftermathHref = selectedWorkspace is null
+        ? "/account/work#aftermath-packages"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#aftermath-packages";
+    var selectedWorkspaceCarryForwardHref = selectedWorkspace is null
+        ? "/account/work#selected-next-session-carry-forward"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
+    var selectedWorkspaceMemoryHref = selectedWorkspace is null
+        ? "/account/work#selected-campaign-memory"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
+    var selectedWorkspaceTablePulseSummary = selectedWorkspaceServerPlane is null
+        ? "This workspace is not attached to a governed server plane yet, so Table Pulse Live follow-through stays armed but cannot write command-to-fallout posture here."
+        : selectedWorkspaceLeadConsequence is not null
+            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} governed consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath follow-through are attached to real campaign return instead of flavor-only recap copy."
+            : "Table Pulse Live is armed on this workspace even before the next reaction resolves, so the next signed-in inbox packet can return through carry-forward, memory, and Table Pulse Aftermath on the same governed rail.";
+    var selectedWorkspaceLivingNewsroomSummary = selectedWorkspaceNextSessionCarryForward is not null
+        ? $"Living Newsroom framing is anchored by next-session carry-forward: {selectedWorkspaceNextSessionCarryForward.Summary}"
+        : selectedWorkspaceCampaignMemory is not null
+            ? $"Living Newsroom framing is currently anchored by campaign memory: {selectedWorkspaceCampaignMemory.Summary}"
+            : "Living Newsroom watch framing is armed, but this workspace has not attached a current carry-forward or memory packet yet.";
+    var selectedWorkspaceRunnerPassportSummary = selectedWorkspaceLeadConsequence is not null
+        ? "Runner Passport continuity is now attached to real command fallout on this workspace instead of sitting as a detached trust card."
+        : "Runner Passport is ready to stamp bounded trust continuity the moment the next governed reaction lands on this workspace.";
     var selectedRun = Model.SelectedRun;
+    var selectedRunWorkspace = selectedRun is null
+        ? null
+        : Model.CampaignSpine.Workspaces.FirstOrDefault(item => string.Equals(item.CampaignId, selectedRun.CampaignId, StringComparison.OrdinalIgnoreCase));
+    var selectedRunWorkspaceHref = selectedRunWorkspace is null
+        ? "/account/work"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}";
+    var selectedRunAftermathHref = selectedRunWorkspace is null
+        ? "/account/work#aftermath-packages"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#aftermath-packages";
+    var selectedRunCarryForwardHref = selectedRunWorkspace is null
+        ? "/account/work#selected-next-session-carry-forward"
+        : $"/account/work/workspaces/{Uri.EscapeDataString(selectedRunWorkspace.WorkspaceId)}#selected-next-session-carry-forward";
+    var selectedRunTablePulseSummary = selectedRun is null
+        ? string.Empty
+        : selectedRun.LatestContinuity is not null
+            ? $"This run already has live continuity, so the next Table Pulse Live reaction should return through the same governed workspace rail instead of splitting into a separate Table Pulse Aftermath story."
+            : "This run is ready to bind the next governed reaction, carry-forward receipt, and aftermath package on the shared command rail.";
     var selectedBuildLabHandoff = Model.SelectedBuildLabHandoff;
     var selectedRulesNavigatorAnswer = Model.SelectedRulesNavigatorAnswer;
     var selectedCreatorPublication = Model.SelectedCreatorPublication;
@@ -628,23 +682,6 @@
     }
 
     <div class="account-shell">
-        <aside class="account-nav" aria-label="Account sections">
-            <p class="eyebrow">Core settings</p>
-            @foreach (var navItem in Model.CoreSections)
-            {
-                <a href="@navItem.Href" aria-current="@(navItem.Current ? "page" : "false")">@navItem.Label</a>
-            }
-            <details class="details-drawer">
-                <summary>More settings</summary>
-                <div class="stacked-actions">
-                    @foreach (var navItem in Model.SecondarySections)
-                    {
-                        <a href="@navItem.Href" aria-current="@(navItem.Current ? "page" : "false")">@navItem.Label</a>
-                    }
-                </div>
-            </details>
-        </aside>
-
         <div class="account-pane">
             @if (showAccountStatusDrawer)
             {
@@ -1597,9 +1634,9 @@
                                 <p><strong>GM prep:</strong> @selectedWorkspaceServerPlane.PrepLibrary.Summary</p>
                                 <p><strong>Travel mode:</strong> @selectedWorkspaceServerPlane.TravelMode.Summary</p>
                             }
-                            @if (selectedWorkspacePortableExchangeNotice is not null)
+                            @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
                             {
-                                <p id="portable-exchange"><strong>Portable exchange:</strong> @selectedWorkspacePortableExchangeNotice.Summary</p>
+                                <p id="portable-exchange"><strong>Portable exchange:</strong> @selectedWorkspacePortableExchangeSummary</p>
                             }
                             @if (selectedWorkspace.RecapShelf.Count > 0)
                             {
@@ -1633,6 +1670,41 @@
                             {
                                 <p><strong>Lead transfer:</strong> @selectedWorkspace.RosterTransfers[0].Summary</p>
                             }
+                            <div class="settings-form">
+                                <p><strong>Table Pulse Live command-to-fallout lane</strong></p>
+                                <p class="muted-copy">@selectedWorkspaceTablePulseSummary</p>
+                                <div class="settings-summary-list">
+                                    <div class="settings-summary-row">
+                                        <span>Command packet</span>
+                                        <strong>@(selectedWorkspaceLeadConsequence is null ? "Armed" : $"{selectedWorkspaceLeadConsequence.Label} · {selectedWorkspaceLeadConsequence.State}")</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Signal Deck</span>
+                                        <strong>@(selectedWorkspaceLeadConsequence is null ? "Waiting for governed cue" : selectedWorkspaceLeadConsequence.Summary)</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Runner Passport</span>
+                                        <strong>@selectedWorkspaceRunnerPassportSummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Living Newsroom</span>
+                                        <strong>@selectedWorkspaceLivingNewsroomSummary</strong>
+                                    </div>
+                                    <div class="settings-summary-row">
+                                        <span>Aftermath rail</span>
+                                        <strong>@(selectedWorkspaceAftermathPackages.Count == 0 ? "Armed" : $"{selectedWorkspaceAftermathPackages.Count} governed package(s)")</strong>
+                                    </div>
+                                </div>
+                                <div class="stacked-actions">
+                                    <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
+                                    <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
+                                    <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
+                                    <a class="button-like button-like--ghost" href="@selectedWorkspaceCarryForwardHref">Open carry-forward</a>
+                                    <a class="button-like button-like--ghost" href="@selectedWorkspaceMemoryHref">Open campaign memory</a>
+                                    <a class="button-like button-like--ghost" href="@selectedWorkspaceAftermathHref">Open aftermath rail</a>
+                                    <a class="button-like button-like--ghost" href="/passport">Open Runner Passport</a>
+                                </div>
+                            </div>
                         </div>
                         @if (selectedWorkspaceServerPlane is not null)
                         {
@@ -1675,11 +1747,11 @@
                                         <span>Restore recovery path</span>
                                         <strong>@selectedWorkspaceServerPlane.RestoreReceiptStatus.RecoveryRoute</strong>
                                     </div>
-                                    @if (selectedWorkspacePortableExchangeNotice is not null)
+                                    @if (!string.IsNullOrWhiteSpace(selectedWorkspacePortableExchangeSummary))
                                     {
                                         <div class="settings-summary-row">
                                             <span>Portable exchange</span>
-                                            <strong>@selectedWorkspacePortableExchangeNotice.Summary</strong>
+                                            <strong>@selectedWorkspacePortableExchangeSummary</strong>
                                         </div>
                                     }
                                     <div class="settings-summary-row">
@@ -1750,14 +1822,18 @@
                                         }
                                     </ul>
                                 }
-                                @if (selectedWorkspaceServerPlane.DecisionNotices.Count > 0)
+                                @if (selectedWorkspaceDecisionNotices.Length > 0)
                                 {
                                     <ul class="muted-copy">
-                                        @foreach (var notice in selectedWorkspaceServerPlane.DecisionNotices)
+                                        @foreach (var notice in selectedWorkspaceDecisionNotices)
                                         {
                                             <li><strong>@notice.ActionLabel:</strong> @notice.Summary</li>
                                         }
                                     </ul>
+                                }
+                                else if (selectedWorkspaceServerPlane.DecisionNotices.Count > 0)
+                                {
+                                    <p class="muted-copy">A previous campaign workspace needs review before you continue. Open the workspace lanes below for the safe next step.</p>
                                 }
                             </details>
 
@@ -2693,6 +2769,32 @@
                         {
                             <p><strong>Continuity:</strong> @selectedRun.LatestContinuity.Summary</p>
                         }
+                        <div class="settings-form">
+                            <p><strong>Table Pulse Aftermath return lane</strong></p>
+                            <p class="muted-copy">@selectedRunTablePulseSummary</p>
+                            <div class="settings-summary-list">
+                                <div class="settings-summary-row">
+                                    <span>Inbox and reactions</span>
+                                    <strong>Use the signed-in Table Pulse Live lane to trigger or review the next bounded response.</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Workspace return</span>
+                                    <strong>@(selectedRunWorkspace is null ? "Open campaign work" : $"{selectedRunWorkspace.CampaignName} · governed return rail")</strong>
+                                </div>
+                                <div class="settings-summary-row">
+                                    <span>Aftermath</span>
+                                    <strong>@(selectedRunWorkspace?.AftermathPackages is { Count: > 0 } ? $"{selectedRunWorkspace.AftermathPackages.Count} governed package(s)" : "Armed")</strong>
+                                </div>
+                            </div>
+                            <div class="stacked-actions">
+                                <a class="button-like button-like--secondary" href="/account/ledger/notifications">Open Table Pulse Live inbox</a>
+                                <a class="button-like button-like--ghost" href="/signal-deck">Open Signal Deck</a>
+                                <a class="button-like button-like--ghost" href="/living-world">Open Living World</a>
+                                <a class="button-like button-like--ghost" href="@selectedRunWorkspaceHref">Open campaign workspace</a>
+                                <a class="button-like button-like--ghost" href="@selectedRunCarryForwardHref">Open carry-forward</a>
+                                <a class="button-like button-like--ghost" href="@selectedRunAftermathHref">Open aftermath rail</a>
+                            </div>
+                        </div>
                     </article>
                 }
                 else if (selectedBuildLabHandoff is not null)

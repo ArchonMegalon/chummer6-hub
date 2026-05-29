@@ -16,7 +16,7 @@ public sealed class ReleaseBundlePromotionServiceTests
     private static readonly JsonSerializerOptions TestJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Fact]
-    public async Task PromoteAsyncMergesNewArtifactWithoutDroppingExistingShelf()
+    public async Task PromoteAsyncReplacesShelfWithIncomingBundleArtifacts()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
         fixture.WriteLiveArtifact(
@@ -57,9 +57,7 @@ public sealed class ReleaseBundlePromotionServiceTests
             .Select(item => item.GetProperty("id").GetString()!)
             .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        Assert.Equal(
-            ["avalonia-linux-x64-installer", "avalonia-osx-arm64-dmg"],
-            downloadIds);
+        Assert.Equal(["avalonia-osx-arm64-dmg"], downloadIds);
 
         JsonDocument canonical = fixture.ReadCanonicalManifest();
         string[] canonicalIds = canonical.RootElement.GetProperty("artifacts")
@@ -67,12 +65,92 @@ public sealed class ReleaseBundlePromotionServiceTests
             .Select(item => item.GetProperty("artifactId").GetString()!)
             .OrderBy(static value => value, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        Assert.Equal(
-            ["avalonia-linux-x64-installer", "avalonia-osx-arm64-dmg"],
-            canonicalIds);
+        Assert.Equal(["avalonia-osx-arm64-dmg"], canonicalIds);
 
-        Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", "chummer-avalonia-linux-x64-installer.deb")));
+        Assert.Equal(1, canonical.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("persistence").GetProperty("artifactCount").GetInt32());
         Assert.True(File.Exists(Path.Combine(fixture.DownloadsRoot, "files", macFileName)));
+    }
+
+    [Fact]
+    public async Task PromoteAsyncKeepsPublishedArtifactCountsAlignedWithRegistryBoundaryCoverage()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+        fixture.WriteLiveArtifact(
+            artifactId: "avalonia-linux-x64-installer",
+            fileName: "chummer-avalonia-linux-x64-installer.deb",
+            platform: "linux",
+            arch: "x64",
+            kind: "installer",
+            bytes: "linux-live");
+        fixture.AppendLiveArtifact(
+            artifactId: "avalonia-win-x64-installer",
+            fileName: "chummer-avalonia-win-x64-installer.exe",
+            platform: "windows",
+            arch: "x64",
+            kind: "installer",
+            bytes: "windows-live");
+
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260525-204932",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-installer"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview"),
+                new BundleArtifact(
+                    ArtifactId: "blazor-desktop-osx-arm64-installer",
+                    Head: "blazor-desktop",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-blazor-desktop-osx-arm64-installer.dmg",
+                    Bytes: "mac-installer-blazor"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview"),
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-archive",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "archive",
+                    FileName: "chummer-avalonia-osx-arm64.zip",
+                    Bytes: "mac-archive"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false),
+                new BundleArtifact(
+                    ArtifactId: "blazor-desktop-osx-arm64-archive",
+                    Head: "blazor-desktop",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "archive",
+                    FileName: "chummer-blazor-desktop-osx-arm64.zip",
+                    Bytes: "mac-archive-blazor"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false)
+            ],
+            publishedAt: "2026-05-25T20:51:10Z",
+            proofGeneratedAt: "2026-05-25T20:49:32Z");
+
+        await fixture.PromoteAsync(bundlePath);
+
+        using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+
+        Assert.Equal(4, canonical.RootElement.GetProperty("artifacts").GetArrayLength());
+        Assert.Equal(4, compatibility.RootElement.GetProperty("downloads").GetArrayLength());
+        Assert.Equal(4, canonical.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("persistence").GetProperty("artifactCount").GetInt32());
+        Assert.Equal(4, canonical.RootElement.GetProperty("registryBoundaryCoverage").GetProperty("compatibility").GetProperty("compatibleArtifactCount").GetInt32());
     }
 
     [Fact]
@@ -319,7 +397,7 @@ public sealed class ReleaseBundlePromotionServiceTests
     }
 
     [Fact]
-    public async Task PromoteAsyncRefreshesMergedDesktopTupleCoverageWhenNewPlatformCompletesTheShelf()
+    public async Task PromoteAsyncReplacesDesktopTupleCoverageWithIncomingBundleShelf()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
 
@@ -375,23 +453,19 @@ public sealed class ReleaseBundlePromotionServiceTests
         using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
         JsonElement coverage = compatibility.RootElement.GetProperty("desktopTupleCoverage");
         Assert.True(coverage.GetProperty("complete").GetBoolean());
-        Assert.Empty(coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
-            .EnumerateArray()
-            .ToArray());
         string[] promotedTupleIds = coverage.GetProperty("promotedInstallerTuples")
             .EnumerateArray()
             .Select(item => item.GetProperty("tupleId").GetString()!)
             .OrderBy(static value => value, StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(
-            ["avalonia:linux:linux-x64", "avalonia:macos:osx-arm64", "avalonia:windows:win-x64"],
-            promotedTupleIds);
+        Assert.Equal(["avalonia:macos:osx-arm64"], promotedTupleIds);
+        Assert.Equal(["macos"], coverage.GetProperty("requiredDesktopPlatforms").EnumerateArray().Select(item => item.GetString()).ToArray());
         Assert.Equal("promoted_preview", compatibility.RootElement.GetProperty("rolloutState").GetString());
         Assert.Equal("preview_supported", compatibility.RootElement.GetProperty("supportabilityState").GetString());
     }
 
     [Fact]
-    public async Task PromoteAsyncFiltersExternalProofRequestsAgainstMergedShelfCoverage()
+    public async Task PromoteAsyncFiltersExternalProofRequestsAgainstIncomingShelfCoverage()
     {
         using var fixture = new ReleaseBundlePromotionFixture();
 
@@ -434,11 +508,11 @@ public sealed class ReleaseBundlePromotionServiceTests
 
         using JsonDocument compatibility = fixture.ReadCompatibilityManifest();
         JsonElement coverage = compatibility.RootElement.GetProperty("desktopTupleCoverage");
-        string[] missingTupleIds = coverage.GetProperty("missingRequiredPlatformHeadRidTuples")
+        string[] promotedTupleIds = coverage.GetProperty("promotedInstallerTuples")
             .EnumerateArray()
-            .Select(item => item.GetString()!)
+            .Select(item => item.GetProperty("tupleId").GetString()!)
             .ToArray();
-        Assert.Empty(missingTupleIds);
+        Assert.Equal(["avalonia:macos:osx-arm64"], promotedTupleIds);
         Assert.Empty(coverage.GetProperty("externalProofRequests")
             .EnumerateArray()
             .ToArray());
@@ -488,6 +562,50 @@ public sealed class ReleaseBundlePromotionServiceTests
                 Assert.Contains(artifactId, row.GetProperty("installPostureReason").GetString());
             }
         }
+    }
+
+    [Fact]
+    public async Task PromoteAsyncRebuildsInstallAwareRegistryFromNormalizedRouteTruth()
+    {
+        using var fixture = new ReleaseBundlePromotionFixture();
+
+        string bundlePath = fixture.CreateBundle(
+            version: "run-20260522-201500",
+            artifacts:
+            [
+                new BundleArtifact(
+                    ArtifactId: "avalonia-osx-arm64-installer",
+                    Head: "avalonia",
+                    Platform: "macos",
+                    Arch: "arm64",
+                    Kind: "dmg",
+                    FileName: "chummer-avalonia-osx-arm64-installer.dmg",
+                    Bytes: "mac-install-aware"u8.ToArray(),
+                    RequiresSigning: false,
+                    RequiresNotarization: false,
+                    SigningStatusOverride: "skipped_preview",
+                    NotarizationStatusOverride: "skipped_preview")
+            ]);
+
+        await fixture.PromoteAsync(bundlePath);
+
+        using JsonDocument canonical = fixture.ReadCanonicalManifest();
+        JsonElement[] rows = canonical.RootElement
+            .GetProperty("installAwareArtifactRegistry")
+            .EnumerateArray()
+            .ToArray();
+
+        JsonElement primary = Assert.Single(rows.Where(row =>
+            row.GetProperty("artifactId").GetString() == "avalonia-osx-arm64-installer"));
+        Assert.True(primary.GetProperty("currentForInstalledBuild").GetBoolean());
+        Assert.Contains(
+            "primary-route avalonia:macos:osx-arm64 current",
+            primary.GetProperty("channelRationale").GetString(),
+            StringComparison.Ordinal);
+
+        JsonElement fallback = Assert.Single(rows.Where(row =>
+            row.GetProperty("artifactId").GetString() == "blazor-desktop-osx-arm64-installer"));
+        Assert.False(fallback.GetProperty("currentForInstalledBuild").GetBoolean());
     }
 
     [Fact]
@@ -561,13 +679,13 @@ public sealed class ReleaseBundlePromotionServiceTests
         await fixture.PromoteAsync(bundlePath);
         using JsonDocument canonical = fixture.ReadCanonicalManifest();
 
-        foreach (JsonElement artifact in canonical.RootElement.GetProperty("artifacts").EnumerateArray())
-        {
-            Assert.Equal("preview", artifact.GetProperty("channel").GetString());
-            Assert.Equal("preview", artifact.GetProperty("channelId").GetString());
-            Assert.Equal("run-20260420-090000", artifact.GetProperty("version").GetString());
-            Assert.Equal("run-20260420-090000", artifact.GetProperty("releaseVersion").GetString());
-        }
+        JsonElement[] artifacts = canonical.RootElement.GetProperty("artifacts").EnumerateArray().ToArray();
+        JsonElement artifact = Assert.Single(artifacts);
+        Assert.Equal("avalonia-osx-arm64-installer", artifact.GetProperty("artifactId").GetString());
+        Assert.Equal("preview", artifact.GetProperty("channel").GetString());
+        Assert.Equal("preview", artifact.GetProperty("channelId").GetString());
+        Assert.Equal("run-20260420-090000", artifact.GetProperty("version").GetString());
+        Assert.Equal("run-20260420-090000", artifact.GetProperty("releaseVersion").GetString());
     }
 
     private sealed class ReleaseBundlePromotionFixture : IDisposable
@@ -653,6 +771,54 @@ public sealed class ReleaseBundlePromotionServiceTests
                 ]);
         }
 
+        public void AppendLiveArtifact(
+            string artifactId,
+            string fileName,
+            string platform,
+            string arch,
+            string kind,
+            string bytes,
+            string head = "avalonia")
+        {
+            string path = Path.Combine(_downloadsRoot, "files", fileName);
+            File.WriteAllText(path, bytes);
+            string sha = Sha256For(path);
+            long size = new FileInfo(path).Length;
+
+            string compatibilityPath = Path.Combine(_downloadsRoot, "releases.json");
+            JsonObject compatibility = JsonNode.Parse(File.ReadAllText(compatibilityPath))!.AsObject();
+            JsonArray downloads = compatibility["downloads"]!.AsArray();
+            downloads.Add(JsonSerializer.SerializeToNode(new CompatibilityArtifact(
+                Id: artifactId,
+                Platform: $"Avalonia Desktop {platform} {arch}",
+                Url: $"/downloads/files/{fileName}",
+                Sha256: sha,
+                SizeBytes: size,
+                Head: head,
+                PlatformId: $"{platform}-{arch}",
+                Arch: arch,
+                Kind: kind,
+                FileName: fileName,
+                InstallAccessClass: "account_required"), TestJsonOptions));
+            File.WriteAllText(compatibilityPath, compatibility.ToJsonString(TestJsonOptions));
+
+            string canonicalPath = Path.Combine(_downloadsRoot, "RELEASE_CHANNEL.generated.json");
+            JsonObject canonical = JsonNode.Parse(File.ReadAllText(canonicalPath))!.AsObject();
+            JsonArray artifacts = canonical["artifacts"]!.AsArray();
+            artifacts.Add(JsonSerializer.SerializeToNode(new CanonicalArtifact(
+                ArtifactId: artifactId,
+                Head: head,
+                Platform: platform,
+                Arch: arch,
+                Kind: kind,
+                FileName: fileName,
+                DownloadUrl: $"/downloads/files/{fileName}",
+                Sha256: sha,
+                SizeBytes: size,
+                PlatformLabel: $"Avalonia Desktop {platform} {arch}"), TestJsonOptions));
+            File.WriteAllText(canonicalPath, canonical.ToJsonString(TestJsonOptions));
+        }
+
         public string CreateBundle(
             string version,
             IReadOnlyList<BundleArtifact> artifacts,
@@ -706,16 +872,19 @@ public sealed class ReleaseBundlePromotionServiceTests
                     SizeBytes: size,
                     PlatformLabel: $"Avalonia Desktop {artifact.Platform} {artifact.Arch}"));
 
-                File.WriteAllText(
-                    Path.Combine(smokeRoot, $"startup-smoke-{artifact.Head}-{artifact.Platform}-{artifact.Arch}.receipt.json"),
-                    JsonSerializer.Serialize(new
-                    {
-                        headId = artifact.Head,
-                        platform = artifact.ReceiptPlatformOverride ?? artifact.Platform,
-                        arch = artifact.Arch,
-                        artifactDigest = artifact.UseArtifactSha256ReceiptField ? null : $"sha256:{sha}",
-                        artifactSha256 = artifact.UseArtifactSha256ReceiptField ? sha : null
-                    }, TestJsonOptions));
+                if (artifact.Kind is "installer" or "dmg" or "pkg" or "msix")
+                {
+                    File.WriteAllText(
+                        Path.Combine(smokeRoot, $"startup-smoke-{artifact.Head}-{artifact.Platform}-{artifact.Arch}.receipt.json"),
+                        JsonSerializer.Serialize(new
+                        {
+                            headId = artifact.Head,
+                            platform = artifact.ReceiptPlatformOverride ?? artifact.Platform,
+                            arch = artifact.Arch,
+                            artifactDigest = artifact.UseArtifactSha256ReceiptField ? null : $"sha256:{sha}",
+                            artifactSha256 = artifact.UseArtifactSha256ReceiptField ? sha : null
+                        }, TestJsonOptions));
+                }
 
                 evidenceArtifacts.Add(new PromotionEvidenceArtifact(
                     ArtifactId: artifact.ArtifactId,
@@ -869,7 +1038,18 @@ public sealed class ReleaseBundlePromotionServiceTests
                         journeysPassed = new[] { "build_explain_publish" },
                         proofRoutes
                     },
-                    artifacts
+                    artifacts,
+                    registryBoundaryCoverage = new
+                    {
+                        persistence = new
+                        {
+                            artifactCount = artifacts.Count
+                        },
+                        compatibility = new
+                        {
+                            compatibleArtifactCount = artifacts.Count
+                        }
+                    }
                 }, TestJsonOptions));
         }
 
