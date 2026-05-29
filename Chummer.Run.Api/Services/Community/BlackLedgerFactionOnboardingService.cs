@@ -429,7 +429,7 @@ public sealed class BlackLedgerFactionOnboardingService
             "rust-market-syndicate" => [
                 "The lead bulletin says the Rust Market books are being settled in public tonight.",
                 "An orkish correspondent reports from the freight lane as loaders swing crates through a panicked crowd.",
-                "The loader-boss forces a brutal recovery spectacle and dares the district to call it bluff instead of order."
+                "The loader-boss forces a brutal recovery spectacle and challenges the district to call it bluff instead of order."
             ],
             "ashline-circle" => [
                 "The nightly anchor warns that Ashline ritual authority is moving from rumor into visible force.",

@@ -89,7 +89,7 @@ FACTIONS: tuple[FactionSpec, ...] = (
         captions=(
             "The lead bulletin says the Rust Market books are being settled in public tonight.",
             "An orkish correspondent reports from the freight lane as loaders swing crates through a panicked crowd.",
-            "The loader-boss forces a brutal recovery spectacle and dares the district to call it bluff instead of order.",
+            "The loader-boss forces a brutal recovery spectacle and challenges the district to call it bluff instead of order.",
         ),
         scenes=(
             Scene("Night bulletin", "anchor", "newsroom", "public_debt_pressure", CameraPath(50, 70, 120, 40, 1.0, 1.06)),

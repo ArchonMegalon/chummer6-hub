@@ -385,8 +385,9 @@ public sealed class PublicLandingDownloadDispatchTests
         Assert.Equal("/participate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
         Assert.Equal("Public concierge only", payload.RootElement.GetProperty("FacePopStatus").GetString());
         Assert.Equal("First-party compare/apply only", payload.RootElement.GetProperty("EngineStatus").GetString());
-        Assert.Contains("FacePop greeting", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
-        Assert.Contains("Neither FacePop nor Answerly may compute legality", payload.RootElement.GetProperty("RuntimeBoundary").GetString(), StringComparison.Ordinal);
+        Assert.Contains("Public concierge greeting", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
+        Assert.Contains("bounded explanation", payload.RootElement.GetProperty("CanonicalLane").GetString(), StringComparison.Ordinal);
+        Assert.Contains("Neither the public concierge nor the bounded explainer may compute legality", payload.RootElement.GetProperty("RuntimeBoundary").GetString(), StringComparison.Ordinal);
         Assert.True(payload.RootElement.GetProperty("Actions").GetArrayLength() >= 3);
     }
 

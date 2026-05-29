@@ -119,7 +119,7 @@ def main() -> int:
         "Final pre-gold verdict",
         "GOLD_READY" if gold_ready else "NOT_GOLD",
         [
-            "Gold remains blocked until release posture moves beyond governed preview.",
+            "All pre-gold product closure gates pass." if gold_ready else "Gold remains blocked until release posture moves beyond governed preview.",
             "This pass closes the zip’s concrete product gaps without faking provider verification or release truth.",
         ],
     )

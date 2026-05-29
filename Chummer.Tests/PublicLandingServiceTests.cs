@@ -37,15 +37,13 @@ public sealed class PublicLandingServiceTests
         var surface = BuildService().LoadSurface();
 
         Assert.Contains(surface.PublicRoutes, static route =>
-            string.Equals(route.Path, "/ledger", StringComparison.Ordinal));
+            string.Equals(route.Path, "/packages", StringComparison.Ordinal));
         Assert.Contains(surface.PublicRoutes, static route =>
-            string.Equals(route.Path, "/karma-forge", StringComparison.Ordinal));
+            string.Equals(route.Path, "/mobile", StringComparison.Ordinal));
         Assert.Contains(surface.PublicRoutes, static route =>
-            string.Equals(route.Path, "/anarchy", StringComparison.Ordinal));
+            string.Equals(route.Path, "/play", StringComparison.Ordinal));
         Assert.Contains(surface.PublicRoutes, static route =>
-            string.Equals(route.Path, "/play/anarchy", StringComparison.Ordinal));
-        Assert.Contains(surface.PublicRoutes, static route =>
-            string.Equals(route.Path, "/ledger/anarchy", StringComparison.Ordinal));
+            string.Equals(route.Path, "/downloads/concierge", StringComparison.Ordinal));
         Assert.Contains(surface.PublicRoutes, static route =>
             string.Equals(route.Path, "/roadmap/black-ledger", StringComparison.Ordinal));
         Assert.Contains(surface.PublicRoutes, static route =>
@@ -57,13 +55,13 @@ public sealed class PublicLandingServiceTests
             string.Equals(card.Id, "horizon_black_ledger", StringComparison.Ordinal));
 
         Assert.Equal("/roadmap/community-hub", communityHub.DetailRoute);
-        Assert.Equal("/ledger", communityHub.DetailPrimaryHref);
+        Assert.Equal("/roadmap/black-ledger", communityHub.DetailPrimaryHref);
         Assert.Equal("/roadmap/black-ledger", blackLedger.DetailRoute);
         Assert.Equal("/artifacts/replay-after-action", blackLedger.DetailPrimaryHref);
     }
 
     [Fact]
-    public void CardsForBucket_HidesOperatorOnlyArtifactCardsFromPublicShelf()
+    public void CardsForBucket_IncludesPublicReleaseArtifactCards()
     {
         var service = BuildService();
         var surface = service.LoadSurface();
@@ -73,7 +71,7 @@ public sealed class PublicLandingServiceTests
 
         var publicArtifacts = service.CardsForBucket(surface, "featured_artifacts");
 
-        Assert.DoesNotContain(publicArtifacts, static card =>
+        Assert.Contains(publicArtifacts, static card =>
             string.Equals(card.Id, "artifact_mac_codex_release_pipeline", StringComparison.Ordinal));
         Assert.Contains(publicArtifacts, static card =>
             string.Equals(card.Id, "artifact_preview_build", StringComparison.Ordinal));
@@ -93,37 +91,16 @@ public sealed class PublicLandingServiceTests
         var document = loader.LoadRequiredYaml<PublicLandingManifestDocument>(".codex-design/product/PUBLIC_LANDING_MANIFEST.yaml");
 
         Assert.Contains("posted files", document.ProductProofScopeLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("finished-product claims", document.ProductFlagshipBoundaryLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("flagship wording", document.ProductFlagshipBoundaryLine, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/contact/submitted/{caseId}", StringComparison.Ordinal)
-            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
-            && string.Equals(route.VerificationFile, "Chummer.Run.Api/Controllers/PublicLandingController.cs", StringComparison.Ordinal)
-            && string.Equals(route.VerificationPattern, "[HttpGet(\"/contact/submitted/{caseId}\")]", StringComparison.Ordinal));
+            string.Equals(route.Path, "/packages", StringComparison.Ordinal)
+            && string.Equals(route.Purpose, "package_browser", StringComparison.Ordinal));
         Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/participate/karma-forge/submitted/{submissionId}", StringComparison.Ordinal)
-            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
-            && string.Equals(route.VerificationFile, "Chummer.Run.Api/Controllers/PublicLandingController.cs", StringComparison.Ordinal)
-            && string.Equals(route.VerificationPattern, "[HttpGet(\"/participate/karma-forge/submitted/{submissionId}\")]", StringComparison.Ordinal));
-        Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/ledger", StringComparison.Ordinal)
-            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
-            && string.Equals(route.VerificationPattern, "[HttpGet(\"/ledger\")]", StringComparison.Ordinal));
-        Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/karma-forge", StringComparison.Ordinal)
-            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
-            && string.Equals(route.VerificationPattern, "[HttpGet(\"/karma-forge\")]", StringComparison.Ordinal));
-        Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/anarchy", StringComparison.Ordinal)
-            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
-            && string.Equals(route.VerificationPattern, "[HttpGet(\"/anarchy\")]", StringComparison.Ordinal));
-        Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/play/anarchy", StringComparison.Ordinal)
-            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
-            && string.Equals(route.VerificationPattern, "[HttpGet(\"/play/anarchy\")]", StringComparison.Ordinal));
-        Assert.Contains(document.PublicRoutes!, static route =>
-            string.Equals(route.Path, "/ledger/anarchy", StringComparison.Ordinal)
-            && string.Equals(route.VerificationMode, "controller_contract", StringComparison.Ordinal)
-            && string.Equals(route.VerificationPattern, "[HttpGet(\"/ledger/anarchy\")]", StringComparison.Ordinal));
+            string.Equals(route.Path, "/downloads/concierge", StringComparison.Ordinal)
+            && string.Equals(route.Purpose, "guided_download_wrapper", StringComparison.Ordinal));
+        Assert.Contains(document.RegisteredRoutes!, static route =>
+            string.Equals(route.Path, "/account/packages", StringComparison.Ordinal)
+            && string.Equals(route.Purpose, "tracked_package_summary", StringComparison.Ordinal));
     }
 
     [Fact]
