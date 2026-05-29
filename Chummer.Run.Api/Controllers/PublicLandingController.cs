@@ -5954,7 +5954,7 @@ public sealed class PublicLandingController : Controller
         return
         [
             new("Live", BuildLiveLaunchSummary(manifest)),
-            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience)),
+            new("Gold", BuildPreviewLaunchSummary(manifest, releaseExperience)),
             new("Fallback", BuildFallbackLaunchSummary(manifest)),
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),
@@ -6053,7 +6053,7 @@ public sealed class PublicLandingController : Controller
     private static string BuildPreviewLaunchSummary(
         PublicReleaseManifestDto manifest,
         ReleaseExperienceViewModel releaseExperience)
-        => $"{HumanizeToken(manifest.RolloutState, "Current release")} on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+        => $"Gold-ready on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
     {
