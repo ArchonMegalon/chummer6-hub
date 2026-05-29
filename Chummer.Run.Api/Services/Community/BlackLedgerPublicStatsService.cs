@@ -1706,21 +1706,6 @@ public sealed class BlackLedgerPublicStatsService
         public string OutputStateHash { get; set; } = string.Empty;
         public List<BlackLedgerActionBeatDocument>? ActionBeats { get; set; }
         public List<BlackLedgerPackagePressureDocument>? PackagePressure { get; set; }
-        public List<BlackLedgerTurnActionBeatDocument>? ActionBeats { get; set; }
-    }
-
-    public sealed class BlackLedgerTurnActionBeatDocument
-    {
-        public string BeatId { get; set; } = string.Empty;
-        public string ActorKind { get; set; } = string.Empty;
-        public string ActorLabel { get; set; } = string.Empty;
-        public string BeatLabel { get; set; } = string.Empty;
-        public string ActionSummary { get; set; } = string.Empty;
-        public string Stakes { get; set; } = string.Empty;
-        public string ProofNote { get; set; } = string.Empty;
-        public string VisualHook { get; set; } = string.Empty;
-        public string CommandIntent { get; set; } = string.Empty;
-        public string ConsequenceLine { get; set; } = string.Empty;
     }
 
     public sealed class BlackLedgerTurnPrivacyResultDocument

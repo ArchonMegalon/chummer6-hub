@@ -2,23 +2,22 @@ product: chummer
 surface: chummer.run
 version: 1
 primary_nav:
-  - label: Ledger
-    href: /ledger
+  - label: Product
+    href: /what-is-chummer
   - label: Downloads
     href: /downloads
-  - label: Play
-    href: /play
-  - label: Packages
-    href: /packages
-  - label: Help
-    href: /help
+  - label: What works today
+    href: /now
+  - label: Roadmap
+    href: /horizons
+  - label: Artifacts
+    href: /artifacts
+  - label: Participate
+    href: /participate
 public_signal_nav:
   - label: Feedback
     href: /feedback
     fallback_href: /help/feedback
-  - label: Status
-    href: /status
-    fallback_href: /status
   - label: Roadmap
     href: /roadmap
     fallback_href: /horizons
@@ -28,18 +27,16 @@ public_signal_nav:
 secondary_nav:
   - label: Status
     href: /status
-  - label: Roadmap
-    href: /roadmap
-  - label: Changelog
-    href: /changelog
-  - label: Feedback
-    href: /feedback
   - label: Help
     href: /help
   - label: FAQ
     href: /faq
   - label: Privacy
     href: /privacy
+  - label: Terms
+    href: /terms
+  - label: Contact
+    href: /contact
 utility_nav:
   - label: GitHub
     href: https://github.com/ArchonMegalon/chummer6-hub

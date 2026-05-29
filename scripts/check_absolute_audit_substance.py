@@ -20,7 +20,7 @@ PRESENTATION_ROOT = Path("/docker/chummercomplete/chummer-presentation")
 CORE_ROOT = Path("/docker/chummercomplete/chummer-core-engine")
 PASS_STATUSES = {"pass", "passed", "ready", "ok", "green"}
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
-EXPECTED_CODEX_REDIRECT = "/auth/google/start?next=%2Fparticipate%2Fcodex"
+EXPECTED_CODEX_REDIRECT = "/login?next=%2Fparticipate%2Fcodex"
 LIVE_BASE_URL = "https://chummer.run"
 
 
@@ -166,7 +166,7 @@ def validate_live_route_proof() -> dict[str, Any]:
     proof_redirect = codex_route.get("redirect_location") if isinstance(codex_route, dict) else None
     proof_success = bool(codex_route.get("success")) if isinstance(codex_route, dict) else False
     # For /participate/codex, accept either:
-    # 1. proof redirect matches expected OAuth path, OR
+    # 1. proof redirect matches the first-party login handoff, OR
     # 2. live redirect is correct (proof may be stale)
     redirect_ok = (
         isinstance(codex_route, dict)

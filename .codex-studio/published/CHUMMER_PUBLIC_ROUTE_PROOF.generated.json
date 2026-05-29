@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.public_route_proof",
-  "generated_at_utc": "2026-05-22T06:52:39.430085Z",
-  "base_url": "http://127.0.0.1:47829",
+  "generated_at_utc": "2026-05-29T12:09:15.689665Z",
+  "base_url": "http://127.0.0.1:42391",
   "public_host": null,
   "forwarded_proto": null,
   "strict_positive": false,
@@ -10,11 +10,11 @@
   "manifest_surface": "chummer.run",
   "manifest_version": 1,
   "summary": {
-    "route_count": 58,
-    "passed_count": 58,
+    "route_count": 62,
+    "passed_count": 62,
     "failed_count": 0,
-    "positive_proof_count": 58,
-    "public_route_count": 42,
+    "positive_proof_count": 62,
+    "public_route_count": 46,
     "auth_operation_count": 4,
     "registered_route_count": 12,
     "controller_contract_count": 0,
@@ -39,7 +39,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/",
+      "final_url": "http://127.0.0.1:42391/",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -57,7 +57,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/what-is-chummer",
+      "final_url": "http://127.0.0.1:42391/what-is-chummer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -75,7 +75,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/now",
+      "final_url": "http://127.0.0.1:42391/now",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -93,7 +93,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/status",
+      "final_url": "http://127.0.0.1:42391/status",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -111,7 +111,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/horizons",
+      "final_url": "http://127.0.0.1:42391/horizons",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -129,7 +129,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap",
+      "final_url": "http://127.0.0.1:42391/roadmap",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -147,7 +147,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/changelog",
+      "final_url": "http://127.0.0.1:42391/changelog",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -165,7 +165,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/downloads",
+      "final_url": "http://127.0.0.1:42391/downloads",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -183,7 +183,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/help",
+      "final_url": "http://127.0.0.1:42391/help",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -201,7 +201,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/feedback",
+      "final_url": "http://127.0.0.1:42391/feedback",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -219,7 +219,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/faq",
+      "final_url": "http://127.0.0.1:42391/faq",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -237,7 +237,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/privacy",
+      "final_url": "http://127.0.0.1:42391/privacy",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -255,7 +255,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/terms",
+      "final_url": "http://127.0.0.1:42391/terms",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -273,7 +273,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/contact",
+      "final_url": "http://127.0.0.1:42391/contact",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -291,7 +291,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/participate",
+      "final_url": "http://127.0.0.1:42391/participate",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -309,7 +309,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/feedback",
+      "final_url": "http://127.0.0.1:42391/feedback",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -327,7 +327,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/participate/karma-forge",
+      "final_url": "http://127.0.0.1:42391/participate/karma-forge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -345,7 +345,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts",
+      "final_url": "http://127.0.0.1:42391/artifacts",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -363,7 +363,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/current-preview-build",
+      "final_url": "http://127.0.0.1:42391/artifacts/current-preview-build",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -381,7 +381,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/mac-codex-release-pipeline",
+      "final_url": "http://127.0.0.1:42391/artifacts/mac-codex-release-pipeline",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -399,7 +399,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/downloads/release-upload/bootstrap.sh",
+      "final_url": "http://127.0.0.1:42391/downloads/release-upload/bootstrap.sh",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -417,25 +417,25 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/mac-codex-release-pipeline/readme.md",
+      "final_url": "http://127.0.0.1:42391/artifacts/mac-codex-release-pipeline/readme.md",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
     },
     {
-      "path": "/artifacts/explanation-trail",
+      "path": "/artifacts/explanation-receipt-trail",
       "audience": "public",
       "purpose": "artifact_detail",
       "requires_auth": false,
       "must_exist": true,
-      "guest_fallback": "/artifacts/explanation-trail",
+      "guest_fallback": "/artifacts/explanation-receipt-trail",
       "mode": "public_route",
       "proof_class": "public_route",
       "positive_proof": true,
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/explanation-trail",
+      "final_url": "http://127.0.0.1:42391/artifacts/explanation-receipt-trail",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -453,7 +453,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/runsite-pack",
+      "final_url": "http://127.0.0.1:42391/artifacts/runsite-pack",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -471,7 +471,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/dossier-brief",
+      "final_url": "http://127.0.0.1:42391/artifacts/dossier-brief",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -489,7 +489,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/campaign-primer",
+      "final_url": "http://127.0.0.1:42391/artifacts/campaign-primer",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -507,7 +507,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/campaign-primer-video",
+      "final_url": "http://127.0.0.1:42391/artifacts/campaign-primer-video",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -525,7 +525,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/mission-brief-video",
+      "final_url": "http://127.0.0.1:42391/artifacts/mission-brief-video",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -543,7 +543,79 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/artifacts/replay-after-action",
+      "final_url": "http://127.0.0.1:42391/artifacts/replay-after-action",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200"
+    },
+    {
+      "path": "/ledger/newsroom",
+      "audience": "public",
+      "purpose": "public_newsroom_entry",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/ledger/newsroom",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "http://127.0.0.1:42391/ledger/newsroom/turn-2-newsreel",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200"
+    },
+    {
+      "path": "/ledger/newsroom/turn-1-newsreel",
+      "audience": "public",
+      "purpose": "public_newsroom_watch",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/ledger/newsroom/turn-1-newsreel",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "http://127.0.0.1:42391/ledger/newsroom/turn-1-newsreel",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200"
+    },
+    {
+      "path": "/ledger/newsroom/turn-1-newsreel/transcript",
+      "audience": "public",
+      "purpose": "public_newsroom_support_file",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/ledger/newsroom/turn-1-newsreel/transcript",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "http://127.0.0.1:42391/media/ledger/newsreels/turn-1-newsreel.vtt?v=1780035545",
+      "redirect_location": null,
+      "expectation": "public route resolves successfully",
+      "detail": "expected 200 from public route, got 200"
+    },
+    {
+      "path": "/ledger/newsroom/turn-1-newsreel/receipts",
+      "audience": "public",
+      "purpose": "public_newsroom_receipts",
+      "requires_auth": false,
+      "must_exist": true,
+      "guest_fallback": "/ledger/newsroom/turn-1-newsreel/receipts",
+      "mode": "public_route",
+      "proof_class": "public_route",
+      "positive_proof": true,
+      "seeded_receipt": false,
+      "success": true,
+      "status_code": 200,
+      "final_url": "http://127.0.0.1:42391/ledger/newsroom/turn-1-newsreel/receipts",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -561,7 +633,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/nexus-pan",
+      "final_url": "http://127.0.0.1:42391/roadmap/nexus-pan",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -579,7 +651,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/alice",
+      "final_url": "http://127.0.0.1:42391/roadmap/alice",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -597,7 +669,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/knowledge-fabric",
+      "final_url": "http://127.0.0.1:42391/roadmap/knowledge-fabric",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -615,7 +687,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/karma-forge",
+      "final_url": "http://127.0.0.1:42391/roadmap/karma-forge",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -633,7 +705,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/jackpoint",
+      "final_url": "http://127.0.0.1:42391/roadmap/jackpoint",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -651,7 +723,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/runsite",
+      "final_url": "http://127.0.0.1:42391/roadmap/runsite",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -669,7 +741,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/runbook-press",
+      "final_url": "http://127.0.0.1:42391/roadmap/runbook-press",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -687,7 +759,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/community-hub",
+      "final_url": "http://127.0.0.1:42391/roadmap/community-hub",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -705,7 +777,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/black-ledger",
+      "final_url": "http://127.0.0.1:42391/roadmap/black-ledger",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -723,7 +795,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/ghostwire",
+      "final_url": "http://127.0.0.1:42391/roadmap/ghostwire",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -741,7 +813,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/roadmap/local-co-processor",
+      "final_url": "http://127.0.0.1:42391/roadmap/local-co-processor",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -759,7 +831,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/login",
+      "final_url": "http://127.0.0.1:42391/login",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -777,7 +849,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/signup",
+      "final_url": "http://127.0.0.1:42391/signup",
       "redirect_location": null,
       "expectation": "public route resolves successfully",
       "detail": "expected 200 from public route, got 200"
@@ -795,7 +867,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/logout",
+      "final_url": "http://127.0.0.1:42391/logout",
       "redirect_location": "/",
       "expectation": "anonymous request redirects to /",
       "detail": "expected anonymous redirect to /, got / (status 302)"
@@ -813,7 +885,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 405,
-      "final_url": "http://127.0.0.1:47829/auth/email/start",
+      "final_url": "http://127.0.0.1:42391/auth/email/start",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 405"
@@ -831,7 +903,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 400,
-      "final_url": "http://127.0.0.1:47829/auth/email/callback",
+      "final_url": "http://127.0.0.1:42391/auth/email/callback",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 400"
@@ -849,7 +921,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/auth/google/start",
+      "final_url": "http://127.0.0.1:42391/auth/google/start",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 200"
@@ -867,7 +939,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 200,
-      "final_url": "http://127.0.0.1:47829/auth/google/callback",
+      "final_url": "http://127.0.0.1:42391/auth/google/callback",
       "redirect_location": null,
       "expectation": "auth operation returns one of [200, 302, 303, 307, 308, 400, 405] without a 5xx",
       "detail": "expected auth-operation status in [200, 302, 303, 307, 308, 400, 405], got 200"
@@ -885,7 +957,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/home",
+      "final_url": "http://127.0.0.1:42391/home",
       "redirect_location": "/login?next=%2Fhome",
       "expectation": "anonymous request redirects to /login?next=/home",
       "detail": "expected anonymous redirect to /login?next=/home, got /login?next=%2Fhome (status 302)"
@@ -903,7 +975,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/home/access",
+      "final_url": "http://127.0.0.1:42391/home/access",
       "redirect_location": "/login?next=%2Fhome%2Faccess",
       "expectation": "anonymous request redirects to /login?next=/home/access",
       "detail": "expected anonymous redirect to /login?next=/home/access, got /login?next=%2Fhome%2Faccess (status 302)"
@@ -921,7 +993,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/home/work",
+      "final_url": "http://127.0.0.1:42391/home/work",
       "redirect_location": "/login?next=%2Fhome%2Fwork",
       "expectation": "anonymous request redirects to /login?next=/home/work",
       "detail": "expected anonymous redirect to /login?next=/home/work, got /login?next=%2Fhome%2Fwork (status 302)"
@@ -939,7 +1011,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/home/setup",
+      "final_url": "http://127.0.0.1:42391/home/setup",
       "redirect_location": "/login?next=%2Fhome%2Fsetup",
       "expectation": "anonymous request redirects to /login?next=/home/setup",
       "detail": "expected anonymous redirect to /login?next=/home/setup, got /login?next=%2Fhome%2Fsetup (status 302)"
@@ -957,7 +1029,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/account",
+      "final_url": "http://127.0.0.1:42391/account",
       "redirect_location": "/login?next=%2Faccount",
       "expectation": "anonymous request redirects to /login?next=/account",
       "detail": "expected anonymous redirect to /login?next=/account, got /login?next=%2Faccount (status 302)"
@@ -975,7 +1047,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/account/support",
+      "final_url": "http://127.0.0.1:42391/account/support",
       "redirect_location": "/login?next=%2Faccount%2Fsupport",
       "expectation": "anonymous request redirects to /login?next=/account/support",
       "detail": "expected anonymous redirect to /login?next=/account/support, got /login?next=%2Faccount%2Fsupport (status 302)"
@@ -993,7 +1065,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/account/access",
+      "final_url": "http://127.0.0.1:42391/account/access",
       "redirect_location": "/login?next=%2Faccount%2Faccess",
       "expectation": "anonymous request redirects to /login?next=/account/access",
       "detail": "expected anonymous redirect to /login?next=/account/access, got /login?next=%2Faccount%2Faccess (status 302)"
@@ -1011,7 +1083,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/account/work",
+      "final_url": "http://127.0.0.1:42391/account/work",
       "redirect_location": "/login?next=%2Faccount%2Fwork",
       "expectation": "anonymous request redirects to /login?next=/account/work",
       "detail": "expected anonymous redirect to /login?next=/account/work, got /login?next=%2Faccount%2Fwork (status 302)"
@@ -1029,7 +1101,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/account/settings",
+      "final_url": "http://127.0.0.1:42391/account/settings",
       "redirect_location": "/login?next=%2Faccount%2Fsettings",
       "expectation": "anonymous request redirects to /login?next=/account/settings",
       "detail": "expected anonymous redirect to /login?next=/account/settings, got /login?next=%2Faccount%2Fsettings (status 302)"
@@ -1047,7 +1119,7 @@
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/account/advanced",
+      "final_url": "http://127.0.0.1:42391/account/advanced",
       "redirect_location": "/login?next=%2Faccount%2Fadvanced",
       "expectation": "anonymous request redirects to /login?next=/account/advanced",
       "detail": "expected anonymous redirect to /login?next=/account/advanced, got /login?next=%2Faccount%2Fadvanced (status 302)"
@@ -1058,17 +1130,17 @@
       "purpose": "signed_in_participation",
       "requires_auth": true,
       "must_exist": true,
-      "guest_fallback": "/auth/google/start?next=%2Fparticipate%2Fcodex",
+      "guest_fallback": "/login?next=/participate/codex",
       "mode": "registered_fallback",
       "proof_class": "registered_fallback",
       "positive_proof": true,
       "seeded_receipt": false,
       "success": true,
       "status_code": 302,
-      "final_url": "http://127.0.0.1:47829/participate/codex",
-      "redirect_location": "/auth/google/start?next=%2Fparticipate%2Fcodex",
-      "expectation": "anonymous request redirects to /auth/google/start?next=%2Fparticipate%2Fcodex",
-      "detail": "expected anonymous redirect to /auth/google/start?next=%2Fparticipate%2Fcodex, got /auth/google/start?next=%2Fparticipate%2Fcodex (status 302)"
+      "final_url": "http://127.0.0.1:42391/participate/codex",
+      "redirect_location": "/login?next=%2Fparticipate%2Fcodex",
+      "expectation": "anonymous request redirects to /login?next=/participate/codex",
+      "detail": "expected anonymous redirect to /login?next=/participate/codex, got /login?next=%2Fparticipate%2Fcodex (status 302)"
     }
   ],
   "negative_paths": []
