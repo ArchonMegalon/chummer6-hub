@@ -151,7 +151,7 @@ public sealed class PublicSignalProjectionService
         string publicPath = RequireText(surface.PublicPath, $"public signal surface '{surface.Key}' public_path");
         string fallbackPath = RequireText(surface.FallbackPath, $"public signal surface '{surface.Key}' fallback_path");
         string truthPosture = HumanizeToken(surface.TruthPosture, "projection only").ToLowerInvariant();
-        return $"Hosted projection may mirror this route, but the posture stays {truthPosture}. If hosted projection is unavailable or misconfigured, the first-party path falls back to {fallbackPath} instead of hiding {publicPath}.";
+        return $"Hosted projection may mirror this route, but the posture stays {truthPosture}. The first-party path remains {fallbackPath} whenever the hosted mirror is not promoted, so {publicPath} stays visible and useful.";
     }
 
     private static IReadOnlyList<string> ResolveCloseoutRequirements(SignalProjectionDocument document, PublicFeedbackSurfaceDocument surface)
