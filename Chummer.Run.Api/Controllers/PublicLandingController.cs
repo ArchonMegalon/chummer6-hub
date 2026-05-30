@@ -10392,7 +10392,7 @@ echo "Help: ${HELP_URL}"
                 "The first-party motion video is the shipped public contract for this lane.",
                 "Storyboard fallback remains available if motion playback is unavailable, but it still has to carry the same scene-driven command-bulletin energy.",
                 "No official lore text and no provider branding appear here.",
-                "These links are route-backed shipped artifacts, not placeholder buttons.",
+                "These links are route-backed shipped artifacts, not empty buttons.",
                 "Validation stays on the same faction-leader and world-turn receipts that drive the inbox lane."
             ]);
     }

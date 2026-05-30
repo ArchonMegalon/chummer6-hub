@@ -5,7 +5,7 @@
     ViewData["SurfaceClass"] = "surface-participate";
     var codexHref = Model.Chrome.Authenticated
         ? "/participate/codex"
-        : "/login?next=%2Fparticipate%2Fcodex";
+        : "/auth/google/start?next=%2Fparticipate%2Fcodex";
     var signalLoop = Model.SignalLoop;
     var milestoneFollowUp = signalLoop.MilestoneFollowUp.Take(3).ToArray();
     var roadmapFollowUp = signalLoop.RoadmapFollowUp.Take(3).ToArray();
