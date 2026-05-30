@@ -2247,6 +2247,30 @@ td {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.downloads-filter-bar {
+  width: min(var(--site-max), calc(100% - 2rem));
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto auto;
+  gap: 0.8rem;
+  align-items: end;
+}
+
+.downloads-filter-bar .field {
+  margin: 0;
+}
+
+.surface-downloads .downloads-filter-bar label {
+  color: rgba(237, 244, 255, 0.82);
+}
+
+.surface-downloads .downloads-filter-bar select {
+  width: 100%;
+  border-color: rgba(146, 176, 217, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #f6fbff;
+}
+
 .downloads-advanced-link {
   margin: 0;
   color: rgba(237, 244, 255, 0.82);
@@ -4391,6 +4415,10 @@ td {
 
   .roadmap-lane__header {
     flex-direction: column;
+  }
+
+  .downloads-filter-bar {
+    grid-template-columns: 1fr;
   }
 
   .wizard-step {

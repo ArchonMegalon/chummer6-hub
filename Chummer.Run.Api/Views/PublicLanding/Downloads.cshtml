@@ -75,6 +75,31 @@
     </div>
 </section>
 
+<section class="release-shelf" aria-label="Download filters">
+    <form class="downloads-filter-bar" method="get" action="/downloads">
+        <div class="field">
+            <label for="download-platform">Platform</label>
+            <select id="download-platform" name="platform">
+                <option value="">All platforms</option>
+                <option value="windows">Windows</option>
+                <option value="macos">macOS</option>
+                <option value="linux">Linux</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="download-type">Package type</label>
+            <select id="download-type" name="type">
+                <option value="">All types</option>
+                <option value="installer">Installers</option>
+                <option value="archive">Archives</option>
+                <option value="manual">Manual packages</option>
+            </select>
+        </div>
+        <button class="button-like button-like--secondary" type="submit">Apply</button>
+        <a class="button-like button-like--ghost" href="/downloads">Reset</a>
+    </form>
+</section>
+
 @if (Model.Manifest.Downloads.Count == 0 || release.Recommended is null)
 {
     <section class="release-shelf">
