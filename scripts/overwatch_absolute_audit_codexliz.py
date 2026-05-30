@@ -310,8 +310,8 @@ def probe_provider() -> tuple[bool, str]:
         for item in payload["data"]:
             if isinstance(item, dict) and item.get("id"):
                 ids.append(str(item["id"]))
-    if ids and "qwen3.5:122b" not in ids:
-        return False, "model_missing:qwen3.5:122b"
+    if ids and "qwen3-coder-next:q8_0" not in ids:
+        return False, "model_missing:qwen3-coder-next:q8_0"
     return True, f"reachable models={len(ids) if ids else 'unknown'}"
 
 
@@ -506,9 +506,9 @@ def launch_worker(loop_id: int, prompt_path: Path) -> tuple[subprocess.Popen[str
     last_path = RUN_DIR / f"loop-{loop_id}.last.txt"
 
     env = os.environ.copy()
-    env["CODEXLIZ_MODEL"] = "qwen3.5:122b"
-    env["CODEXLIZ_MODEL_GENERAL"] = "qwen3.5:122b"
-    env["CODEXLIZ_MODEL_CODER"] = "qwen3.5:122b"
+    env["CODEXLIZ_MODEL"] = "qwen3-coder-next:q8_0"
+    env["CODEXLIZ_MODEL_GENERAL"] = "qwen3-coder-next:q8_0"
+    env["CODEXLIZ_MODEL_CODER"] = "qwen3-coder-next:q8_0"
     env["CODEXLIZ_COMPLETION_POLICY_ENABLED"] = "0"
     env["CODEXLIZ_TRANSPORT_TRACE_INTERVAL_SECONDS"] = os.environ.get("CODEXLIZ_TRANSPORT_TRACE_INTERVAL_SECONDS", "15")
     env["CODEXLIZ_TRANSPORT_RETRY_INTERVAL_SECONDS"] = os.environ.get("CODEXLIZ_TRANSPORT_RETRY_INTERVAL_SECONDS", "15")
@@ -720,7 +720,7 @@ def main() -> int:
         pre_state_signature = state_signature(state)
         pre_completion_snapshot = completion_snapshot()
 
-        write_ooda("decide", "launch codexliz exec with JSON logging and qwen3.5:122b preference")
+        write_ooda("decide", "launch codexliz exec with JSON logging and qwen3-coder-next:q8_0 preference")
         log(f"launching codexliz loop={loop_id} timeout={ITERATION_TIMEOUT_SECONDS}s")
         process, jsonl_path, stderr_path, last_path = launch_worker(loop_id, prompt_path)
         write_health("launching", loop_id, state, worker_pid=process.pid, last_exit=last_exit, failure_streak=failure_streak, note="worker launched")

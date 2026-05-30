@@ -251,6 +251,7 @@ WORK_QUEUE.md
 /Chummer.Portal/downloads/startup-smoke/
 
 # Generated installer payloads
+/Chummer.Portal/downloads/chummer6_full_product_reaudit_*.zip
 /Chummer.Portal/downloads/files/*.deb
 /Chummer.Portal/downloads/files/*.dmg
 /Chummer.Portal/downloads/files/*.exe
