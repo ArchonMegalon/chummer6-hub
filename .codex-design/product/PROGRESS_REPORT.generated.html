@@ -236,6 +236,106 @@
     .part-list, .timeline-wrap, .weekly-list {
       border-top: 1px solid var(--line);
     }
+    .route-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+    .route-card {
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+      padding: 22px;
+      min-height: 100%;
+    }
+    .route-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .route-card-path {
+      color: var(--muted);
+      font-size: .78rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .route-card h3 {
+      margin: 0;
+      font-size: 1.24rem;
+      letter-spacing: -.02em;
+    }
+    .route-semantic {
+      color: rgba(246,251,255,.68);
+      font-size: .8rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .route-card p {
+      margin: 0 0 12px;
+      color: rgba(246,251,255,.82);
+      line-height: 1.6;
+    }
+    .route-detail {
+      color: rgba(246,251,255,.72);
+      line-height: 1.58;
+      margin-bottom: 12px;
+    }
+    .proof-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: .76rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .proof-badge-stable {
+      background: rgba(138,229,158,.12);
+      border-color: rgba(138,229,158,.34);
+      color: #cbffd4;
+    }
+    .proof-badge-implemented {
+      background: rgba(137,182,255,.12);
+      border-color: rgba(137,182,255,.32);
+      color: #d6e6ff;
+    }
+    .proof-badge-preview {
+      background: rgba(243,169,93,.13);
+      border-color: rgba(243,169,93,.34);
+      color: #ffe3c1;
+    }
+    .proof-badge-blocked {
+      background: rgba(255,122,122,.12);
+      border-color: rgba(255,122,122,.3);
+      color: #ffd4d4;
+    }
+    .route-proof-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: rgba(246,251,255,.74);
+      font-size: .88rem;
+      margin-bottom: 12px;
+    }
+    .route-proof-meta span {
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .route-evidence {
+      margin: 0;
+      padding-left: 18px;
+      color: rgba(246,251,255,.76);
+      line-height: 1.6;
+    }
     .part-row, .timeline-row, .weekly-item {
       border-bottom: 1px solid var(--line);
     }
@@ -451,6 +551,7 @@
       .pulse-grid { grid-template-columns: repeat(2, 1fr); }
       .pulse-cell:nth-child(2) { border-right: 0; }
       .pulse-cell:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .route-grid { grid-template-columns: 1fr; }
       .timeline-track { grid-template-columns: 1fr; gap: 12px; }
       .timeline-track::before { display: none; }
       .timeline-step { padding-top: 0; padding-left: 34px; }
@@ -491,7 +592,7 @@
       <div class="pulse-grid">
         <div class="pulse-cell">
           <span class="pulse-label">Overall progress</span>
-          <span class="pulse-value">99%</span>
+          <span class="pulse-value">100%</span>
           <span class="pulse-copy">Weighted milestone completion across the 5 public product parts.</span>
         </div>
         <div class="pulse-cell">
@@ -509,6 +610,101 @@
           <span class="pulse-value">Core Engine</span>
           <span class="pulse-copy">Hosted account, registry, and media surfaces still carry the deepest remaining completion wave.</span>
         </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <div class="kicker">Public route truth</div>
+        <h2>Every public route card carries an explicit proof state.</h2>
+        <p>Support, feedback, and governance are separate lanes. Package/install claims stay tied to current release, journey, and rollback evidence instead of collapsing into one generic trust message.</p>
+      </div>
+      <div class="route-grid">
+
+      <article class="route-card route-card-stable">
+        <div class="route-card-head">
+          <div>
+            <div class="route-card-path">/downloads</div>
+            <h3>Downloads and install truth</h3>
+          </div>
+          <span class="proof-badge proof-badge-stable">Public stable</span>
+        </div>
+        <div class="route-semantic">supportable_install</div>
+        <p>Package compatibility, install, update, rollback, and revoke claims are published from the current release shelf instead of helper folklore.</p>
+        <div class="route-detail">3 compatible installer tuple(s) are published. Rollout state is public_stable, support posture is gold_supported, and rollback stays armed.</div>
+        <div class="route-proof-meta"><span>Compatibility: 3/3 installer tuples</span><span>Rollback: armed</span><span>Revoke: not_revoked</span></div>
+        <ul class="route-evidence"><li>Release channel: published</li><li>Release proof: passed</li><li>Install journey: ready</li><li>Fix availability: Only send fixed notices after the affected install can receive the published channel artifact now on the shelf.</li></ul>
+      </article>
+      <article class="route-card route-card-stable">
+        <div class="route-card-head">
+          <div>
+            <div class="route-card-path">/home/work</div>
+            <h3>Desktop workbench</h3>
+          </div>
+          <span class="proof-badge proof-badge-stable">Public stable</span>
+        </div>
+        <div class="route-semantic">desktop_flagship</div>
+        <p>The public route only claims the flagship workbench when executable proof and veteran-familiar desktop signals agree.</p>
+        <div class="route-detail">{&#x27;ready_count&#x27;: 8, &#x27;warning_count&#x27;: 0, &#x27;missing_count&#x27;: 0, &#x27;scoped_warning_count&#x27;: 0, &#x27;scoped_missing_count&#x27;: 0, &#x27;deferred_warning_count&#x27;: 0, &#x27;history_snapshot_count&#x27;: 35}</div>
+        
+        <ul class="route-evidence"><li>Flagship readiness: ready</li><li>Desktop executable gate: pass</li><li>Workbench route proof: present</li></ul>
+      </article>
+      <article class="route-card route-card-stable">
+        <div class="route-card-head">
+          <div>
+            <div class="route-card-path">/account/access</div>
+            <h3>Account, restore, and device continuity</h3>
+          </div>
+          <span class="proof-badge proof-badge-stable">Public stable</span>
+        </div>
+        <div class="route-semantic">restore_and_portability</div>
+        <p>Account value is framed as claim, restore, second-device continuation, and support continuity, not as a browser ritual.</p>
+        <div class="route-detail">A person can install the flagship client, claim it, restore the right workspace, and continue safely on a known install.</div>
+        
+        <ul class="route-evidence"><li>Journey state: ready</li><li>Account route proof: present</li><li>Journey recommendation: Keep the journey under routine weekly proof.</li></ul>
+      </article>
+      <article class="route-card route-card-stable">
+        <div class="route-card-head">
+          <div>
+            <div class="route-card-path">/account/support</div>
+            <h3>Support and recovery</h3>
+          </div>
+          <span class="proof-badge proof-badge-stable">Public stable</span>
+        </div>
+        <div class="route-semantic">support</div>
+        <p>Support is a closure lane tied to install and release receipts. It is not the same thing as votes, proposals, or roadmap wishes.</p>
+        <div class="route-detail">0 open packet(s); 0 waiting on release truth. Current source refresh is degraded: unable to load support-case source http://host.docker.internal:8091/api/v1/support/cases/triage: HTTP Error 401: Unauthorized</div>
+        
+        <ul class="route-evidence"><li>Support packets artifact: present</li><li>Open packets: 0</li><li>Waiting on release truth: 0</li></ul>
+      </article>
+      <article class="route-card route-card-stable">
+        <div class="route-card-head">
+          <div>
+            <div class="route-card-path">/feedback</div>
+            <h3>Feedback and discovery</h3>
+          </div>
+          <span class="proof-badge proof-badge-stable">Public stable</span>
+        </div>
+        <div class="route-semantic">feedback</div>
+        <p>Feedback is an advisory intake lane. It informs governed discovery work, but it never masquerades as support closure or shipped rollout authority.</p>
+        <div class="route-detail">Public or design-impact feedback is routed through the Karma Forge discovery loop shape: ProductLift/FacePop signal, Deftform pre-screen, Icanpreneur interview, MetaSurvey validation, Teable/NextStep review, Product Governor decision, and ProductLift/Emailit/Signitic closeout.</div>
+        
+        <ul class="route-evidence"><li>Workflow ready: yes</li><li>Discovery system ready: yes</li><li>Candidate count: 0</li></ul>
+      </article>
+      <article class="route-card route-card-implemented">
+        <div class="route-card-head">
+          <div>
+            <div class="route-card-path">/roadmap</div>
+            <h3>Governance and rollout posture</h3>
+          </div>
+          <span class="proof-badge proof-badge-implemented">Implemented</span>
+        </div>
+        <div class="route-semantic">governance</div>
+        <p>Governance cards describe launch, canary, rollback, and claim-safety posture. They do not imply immediate rollout just because a proposal exists.</p>
+        <div class="route-detail">trusted completion receipt plus whole-product release proof and Linux desktop exit gate are ready</div>
+        
+        <ul class="route-evidence"><li>Completion audit: pass</li><li>Launch expand: allowed</li><li>Freeze launch: available</li><li>Canary: ready</li><li>Rollback: armed</li><li>Journey summary: ready</li></ul>
+      </article>
       </div>
     </section>
 
@@ -774,7 +970,7 @@
         <h2>How the progress and ETA are calculated.</h2>
       </div>
       <div class="method">
-        <p>Progress is a weighted estimate built from the current milestone map, grouped into public-facing product parts instead of repo names. The ETA is a momentum-based planning band, not a promise: it uses remaining milestone weight, recent repo activity, and uncovered scope breadth as a public proxy until weekly historical snapshots are published. ETA is a momentum-based planning band, not a delivery promise. Weekly public progress history is now available; ETA uses recorded velocity where enough snapshots exist and falls back to the short-horizon momentum proxy elsewhere. Mapped public milestones are complete, but the full-product frontier remains open with 1 milestone(s). Full completion requires full frontier closure. The current supervisor ETA is tactical or otherwise not yet calendar-grade enough for a full-product parity forecast, so the public surface tracks the remaining frontier without publishing a parity date band.</p>
+        <p>Progress is a weighted estimate built from the current milestone map, grouped into public-facing product parts instead of repo names. The ETA is a momentum-based planning band, not a promise: it uses remaining milestone weight, recent repo activity, and uncovered scope breadth as a public proxy until weekly historical snapshots are published. ETA is a momentum-based planning band, not a delivery promise. Weekly public progress history is now available; ETA uses recorded velocity where enough snapshots exist and falls back to the short-horizon momentum proxy elsewhere. Mapped public milestones are complete, but the full-product frontier remains open with 3 milestone(s). Full completion requires full frontier closure. The current supervisor ETA is tactical or otherwise not yet calendar-grade enough for a full-product parity forecast, so the public surface tracks the remaining frontier without publishing a parity date band.</p>
       </div>
     </section>
 
@@ -794,7 +990,7 @@
         <h2>The project no longer looks like a concept sketch.</h2>
       </div>
       <p>The most interesting change is not a single feature. It is that architecture, execution, public entry, and product canon are starting to reinforce each other. That is the point where a serious internal system turns into something people can eventually use, trust, and follow.</p>
-      <div class="footer-note">Status snapshot: May 01, 2026.</div>
+      <div class="footer-note">Status snapshot: May 30, 2026.</div>
     </section>
   </div>
 </body>
