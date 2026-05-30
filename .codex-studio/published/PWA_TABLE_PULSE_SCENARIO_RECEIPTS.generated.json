@@ -1,0 +1,38 @@
+{
+  "generated_at_utc": "2026-05-30T16:22:51Z",
+  "status": "pass",
+  "evidence_level": "scenario_receipt",
+  "route": "https://chummer.run/play",
+  "scenarios": [
+    {
+      "id": "pwa_subscription_delivery_click",
+      "steps": [
+        "subscribe",
+        "server-signs-push",
+        "service-worker-receives",
+        "notification-click-opens-play"
+      ],
+      "result": "pass"
+    },
+    {
+      "id": "table_pulse_remote_reaction_gm_adjudication",
+      "steps": [
+        "opt-in",
+        "remote-reaction-submit",
+        "gm-review",
+        "adjudication-receipt-written"
+      ],
+      "result": "pass"
+    },
+    {
+      "id": "table_pulse_optout_suppression",
+      "steps": [
+        "opt-out",
+        "next-push-suppressed",
+        "audit-row-written"
+      ],
+      "result": "pass"
+    }
+  ],
+  "private_campaign_data_captured": false
+}
