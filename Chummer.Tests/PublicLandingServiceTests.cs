@@ -67,12 +67,12 @@ public sealed class PublicLandingServiceTests
         var surface = service.LoadSurface();
 
         Assert.Contains(surface.FeatureCards, static card =>
-            string.Equals(card.Id, "artifact_mac_codex_release_pipeline", StringComparison.Ordinal));
+            string.Equals(card.Id, "artifact_mac_release_pipeline", StringComparison.Ordinal));
 
         var publicArtifacts = service.CardsForBucket(surface, "featured_artifacts");
 
         Assert.Contains(publicArtifacts, static card =>
-            string.Equals(card.Id, "artifact_mac_codex_release_pipeline", StringComparison.Ordinal));
+            string.Equals(card.Id, "artifact_mac_release_pipeline", StringComparison.Ordinal));
         Assert.Contains(publicArtifacts, static card =>
             string.Equals(card.Id, "artifact_preview_build", StringComparison.Ordinal));
     }

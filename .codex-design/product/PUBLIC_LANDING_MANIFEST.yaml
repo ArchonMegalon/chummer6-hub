@@ -223,7 +223,7 @@ public_routes:
   placeholder_allowed: false
   placeholder_requirements: artifact detail only
 - path: /artifacts/mac-codex-release-pipeline
-  title: Mac Codex release pipeline detail
+  title: Mac release pipeline detail
   audience: public
   purpose: artifact_detail
   requires_auth: false
@@ -232,7 +232,7 @@ public_routes:
   placeholder_allowed: false
   placeholder_requirements: artifact detail only
 - path: /downloads/release-upload/bootstrap.sh
-  title: Mac Codex release bootstrap script
+  title: Mac release bootstrap script
   audience: public
   purpose: artifact_support_file
   requires_auth: false
@@ -241,7 +241,7 @@ public_routes:
   placeholder_allowed: false
   placeholder_requirements: static bootstrap script only
 - path: /artifacts/mac-codex-release-pipeline/readme.md
-  title: Mac Codex release runbook markdown
+  title: Mac release runbook markdown
   audience: public
   purpose: artifact_support_file
   requires_auth: false

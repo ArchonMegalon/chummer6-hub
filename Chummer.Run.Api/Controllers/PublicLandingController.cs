@@ -1442,7 +1442,7 @@ public sealed class PublicLandingController : Controller
     {
         var model = await BuildParticipatePageModel(
             title: "Participate",
-            description: "Public product signal stays visible here, while signed-in Codex access remains an optional account-linked lane.",
+            description: "Public product signal stays visible here, while signed-in contribution access remains an optional account-linked lane.",
             currentPath: "/participate",
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/Participate.cshtml", model);
