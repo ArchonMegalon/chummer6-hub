@@ -22,6 +22,16 @@ public sealed class LegacySurfaceRedirectController : ControllerBase
     public IActionResult Session()
         => Redirect("/play");
 
+    [HttpGet("/support")]
+    [HttpGet("/support/{**path}")]
+    public IActionResult Support()
+        => Redirect("/contact");
+
+    [HttpGet("/table-pulse")]
+    [HttpGet("/table-pulse/{**path}")]
+    public IActionResult TablePulse()
+        => Redirect("/account/ledger/notifications");
+
     [HttpGet("/coach")]
     [HttpGet("/coach/{**path}")]
     public IActionResult Coach()
