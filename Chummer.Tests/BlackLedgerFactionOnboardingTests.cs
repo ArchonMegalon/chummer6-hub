@@ -34,7 +34,7 @@ public sealed class BlackLedgerFactionAllegianceTests
         Assert.Contains("Found Major Faction", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Found Challenger", onboardingView, StringComparison.Ordinal);
         Assert.Contains("Open watch page", promoView, StringComparison.Ordinal);
-        Assert.Contains("First-party motion video", promoView, StringComparison.Ordinal);
+        Assert.Contains("First-party motion bulletin", promoView, StringComparison.Ordinal);
         Assert.Contains("<video", promoView, StringComparison.Ordinal);
         Assert.Contains("data-storyboard-player", promoView, StringComparison.Ordinal);
     }
@@ -490,8 +490,8 @@ public sealed class FactionCharterBuilderTests
         Assert.Equal("first_party_motion_video", promo.RenderMode);
         Assert.Equal("first_party_storyboard", promo.FallbackRenderMode);
         Assert.Contains("/ledger/factions/ashline-circle/promo", promo.HtmlHref, StringComparison.Ordinal);
-        Assert.Equal("Megacorp recruitment signal player", promo.StaticCardLabel);
-        Assert.Equal("Playable first-party recruitment video", promo.PlaybackLabel);
+        Assert.Equal("Scene-driven faction mobilization bulletin", promo.StaticCardLabel);
+        Assert.Equal("Playable first-party cinematic war bulletin", promo.PlaybackLabel);
         Assert.Contains(".mp4", promo.VideoMp4Href, StringComparison.Ordinal);
         Assert.Contains(".webm", promo.VideoWebmHref, StringComparison.Ordinal);
         Assert.Contains("Captions required", promo.FormatLabels, StringComparer.Ordinal);
@@ -499,7 +499,7 @@ public sealed class FactionCharterBuilderTests
         Assert.Contains("/account/ledger/factions/ashline-circle/leader-briefing", promo.ValidationHref, StringComparison.Ordinal);
         Assert.Equal(3, promo.StoryboardShots.Count);
         Assert.Equal(3, promo.StoryboardFrames.Count);
-        Assert.Equal("Cold Open", promo.StoryboardFrames[0].Label);
+        Assert.Equal("Anchor Open", promo.StoryboardFrames[0].Label);
         Assert.Contains("pressure", promo.StoryboardFrames[0].VisualHook, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("world tick", promo.StoryboardFrames[0].ProofPayoff, StringComparison.OrdinalIgnoreCase);
     }

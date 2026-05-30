@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.run.public_claim_scan",
   "status": "pass",
-  "generated_at": "2026-05-29T18:59:03.598813Z",
+  "generated_at": "2026-05-30T05:37:15.660201Z",
   "scanned_files": [
     "Chummer.Run.Api/Views/PublicLanding/Anarchy.cshtml",
     "Chummer.Run.Api/Views/PublicLanding/BuildGhostConcierge.cshtml",

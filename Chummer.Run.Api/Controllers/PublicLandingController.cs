@@ -5954,12 +5954,12 @@ public sealed class PublicLandingController : Controller
         return
         [
             new("Live", BuildLiveLaunchSummary(manifest)),
-            new("Gold", BuildPreviewLaunchSummary(manifest, releaseExperience)),
+            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience)),
             new("Fallback", BuildFallbackLaunchSummary(manifest)),
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),
             new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),
-            new("Proof recency", BuildProofFreshnessSummary(manifest, pulse)),
+            new("Proof freshness", BuildProofFreshnessSummary(manifest, pulse)),
             new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),
             new("Adoption health", pulse is null
                 ? BuildManifestAdoptionSummary(manifest)

@@ -283,6 +283,7 @@ WORK_QUEUE.md
 .tmp/
 .local/
 .artifacts/
+/Chummer.Run.Api/.state/
 audit.md
 skillsneeded.txt
 day1.prompt.txt
