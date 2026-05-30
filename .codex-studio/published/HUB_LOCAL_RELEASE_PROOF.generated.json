@@ -3,16 +3,14 @@
   "package_repo": "chummer6-hub",
   "status": "passed",
   "desktop_client_readiness": {
-    "status": "fail",
-    "scoped_status": "fail",
-    "generated_at": "2026-05-29T10:59:36Z",
-    "missing_coverage_keys": [
-      "desktop_client"
-    ],
-    "desktop_client_missing": true,
-    "reason": "flagship product readiness proof is not green: fail; missing coverage: desktop_client; readiness plane gaps: flagship_ready, veteran_deep_workflow_ready, primary_route_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready",
-    "completion_audit_status": "fail",
-    "completion_audit_reason": "Flagship product readiness planes are not green: flagship_ready, veteran_deep_workflow_ready, primary_route_ready, dense_workbench_ready, public_shelf_ready, recovery_trust_ready.",
+    "status": "pass",
+    "scoped_status": "pass",
+    "generated_at": "2026-05-29T23:34:37Z",
+    "missing_coverage_keys": [],
+    "desktop_client_missing": false,
+    "reason": "Flagship product readiness proof is green.",
+    "completion_audit_status": "pass",
+    "completion_audit_reason": "Flagship product readiness proof is green.",
     "source_path": "/docker/fleet/.codex-studio/published/FLAGSHIP_PRODUCT_READINESS.generated.json"
   },
   "publicTrustSurface": {
@@ -1637,6 +1635,6 @@
       ]
     }
   ],
-  "generated_at": "2026-05-29T17:12:12Z",
-  "generatedAt": "2026-05-29T17:12:12Z"
+  "generated_at": "2026-05-30T06:42:42Z",
+  "generatedAt": "2026-05-30T06:42:42Z"
 }
