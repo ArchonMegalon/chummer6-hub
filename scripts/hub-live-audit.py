@@ -11904,12 +11904,12 @@ def main() -> int:
         AuditRoute(
             "/now",
             "What works today and what still needs caution",
-            required_texts=("Ready to install?", "What you can verify now", "Downloads stays the primary install surface", "Load Demo Runner", "Open downloads"),
+            required_texts=("Ready to install?", "What you can verify now", "Downloads stays the primary install surface", "fresh character or your own file", "Open downloads"),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install the current preview",
-            required_texts=("Sign in", "Create account to install", "Advanced download options", "Release notes, known issues, and requirements", "Load Demo Runner"),
+            required_texts=("Sign in", "Create account to install", "Advanced download options", "Release notes, known issues, and requirements", "fresh character or your own file"),
             forbidden_texts=("Package details",),
             expects_header_count=1),
         AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Open what works today"), forbidden_texts=("Research tracks",), expects_header_count=1),
