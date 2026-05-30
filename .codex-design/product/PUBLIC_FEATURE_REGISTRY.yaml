@@ -393,16 +393,16 @@ cards:
     bucket: featured_artifacts
     title: Mac release pipeline
     summary: A Mac release session can clone the release repos, build the desktop artifact, sign and notarize it, publish it to chummer.run, and verify the live shelf from one public runbook.
-    href: /artifacts/mac-codex-release-pipeline
+    href: /artifacts/mac-release-pipeline
     badge: Available today
     audience: public
     image_family: facility_exterior
     asset_slot: release_current_build
-    detail_route: /artifacts/mac-codex-release-pipeline
+    detail_route: /artifacts/mac-release-pipeline
     action_label: Open the Mac release runbook
     detail_primary_href: /downloads/release-upload/bootstrap.sh
     detail_primary_label: Open the Mac bootstrap script
-    fallback_route: /artifacts/mac-codex-release-pipeline/readme.md
+    fallback_route: /artifacts/mac-release-pipeline
     fallback_label: Read the full runbook
     pain: Mac release work falls apart when cloning, signing, notarization, publication, and live verification live in separate tribal steps.
     payoff: One truthful bootstrap turns a Mac release session into a repeatable public-release lane instead of a manual operator ritual.

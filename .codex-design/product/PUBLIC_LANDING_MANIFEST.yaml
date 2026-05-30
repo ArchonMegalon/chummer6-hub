@@ -222,12 +222,12 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: artifact detail only
-- path: /artifacts/mac-codex-release-pipeline
+- path: /artifacts/mac-release-pipeline
   title: Mac release pipeline detail
   audience: public
   purpose: artifact_detail
   requires_auth: false
-  guest_fallback: /artifacts/mac-codex-release-pipeline
+  guest_fallback: /artifacts/mac-release-pipeline
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: artifact detail only
