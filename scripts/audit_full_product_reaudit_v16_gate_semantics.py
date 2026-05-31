@@ -98,6 +98,7 @@ def main() -> int:
 
     canonical_root = WORKSPACE / "chummer-design" / "products" / "chummer"
     mirror_root = RUN_SERVICES / ".codex-design" / "product"
+    public_guide_root = canonical_root / "public-guide"
     for relative_path in (
         "PUBLIC_LANDING_MANIFEST.yaml",
         "PUBLIC_FEATURE_REGISTRY.yaml",
@@ -146,6 +147,48 @@ def main() -> int:
     checks.append(check(release.get("release_manifest", {}).get("proofStatus") == "passed", "release manifest proofStatus is passed"))
     checks.append(check(release.get("release_manifest", {}).get("download_count") == 3, "release manifest has three platform downloads"))
     checks.append(check(all(release.get("live_truth", {}).get("downloads_page", {}).get(key) for key in ("contains_windows", "contains_linux", "contains_macos")), "downloads page proves all platform shelves"))
+
+    public_release_packet = read_json(public_guide_root / "CHUMMER6_PUBLIC_RELEASE_TRUTH_PACKET.generated.json")
+    public_guide_text = "\n".join(
+        read_text(public_guide_root / name)
+        for name in ("README.md", "STATUS.md", "DOWNLOAD.md", "FROM_CHUMMER5A_TO_CHUMMER6.md")
+    )
+    stale_public_guide_phrases = [
+        "macOS still lacks the promoted desktop installer proof",
+        "There is still no public macOS installer",
+        "Still missing from the promoted installer lane: macOS",
+        "There is no public macOS installer today",
+        "Downloads are currently live for Windows and Linux",
+    ]
+    checks.append(check(
+        public_release_packet.get("available_platforms") == ["Windows", "Linux", "macOS"],
+        "public guide release packet agrees with three-platform live shelf",
+        public_release_packet,
+    ))
+    checks.append(check(
+        public_release_packet.get("missing_platforms") == [],
+        "public guide release packet has no missing platform contradiction",
+        public_release_packet,
+    ))
+    checks.append(check(
+        public_release_packet.get("shelf_truth_line") == "Downloads are currently live for Windows, Linux, and macOS.",
+        "public guide shelf truth names Windows, Linux, and macOS",
+        {"shelf_truth_line": public_release_packet.get("shelf_truth_line")},
+    ))
+    checks.append(check(
+        "Avalonia Desktop macOS ARM64 Installer" in public_guide_text
+        and not any(phrase in public_guide_text for phrase in stale_public_guide_phrases),
+        "public guide copy does not regress to stale missing-macOS installer truth",
+        {"forbidden_phrases": stale_public_guide_phrases},
+    ))
+
+    journey_gates = read_json(canonical_root / "JOURNEY_GATES.generated.json")
+    journey_truth = journey_gates.get("current_truth") if isinstance(journey_gates.get("current_truth"), dict) else {}
+    checks.append(check(
+        journey_truth.get("state") == "ready" and journey_truth.get("blocked_count") == 0,
+        "design journey gates current truth is ready with zero blockers",
+        journey_truth,
+    ))
 
     routes = read_json(OUT / "LIVE_PUBLIC_ROUTE_PROOF.generated.json")
     route_paths = {str(item.get("path")) for item in routes.get("required_route_results") or []}
