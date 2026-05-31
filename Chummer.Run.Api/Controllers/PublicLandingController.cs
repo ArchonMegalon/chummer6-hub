@@ -1980,6 +1980,7 @@ public sealed class PublicLandingController : Controller
         }
 
         var model = await BuildBlackLedgerPageModel($"/ledger/turns/{requestedTurn}", "map", requestedTurn, cancellationToken, selectedMapMode: mode);
+        ApplyNoStoreHeaders(Response.Headers);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
@@ -2008,6 +2009,7 @@ public sealed class PublicLandingController : Controller
             return NotFound();
         }
 
+        ApplyNoStoreHeaders(Response.Headers);
         return Redirect(briefing.Broadcast.WatchHref);
     }
 
@@ -2026,6 +2028,7 @@ public sealed class PublicLandingController : Controller
             return NotFound();
         }
 
+        ApplyNoStoreHeaders(Response.Headers);
         var model = await BuildBlackLedgerPageModel($"/ledger/newsroom/{episodeId}", "map", requestedTurn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
@@ -2045,6 +2048,7 @@ public sealed class PublicLandingController : Controller
             return NotFound();
         }
 
+        ApplyNoStoreHeaders(Response.Headers);
         return Redirect(briefing.Broadcast.CaptionsHref);
     }
 
@@ -2058,6 +2062,7 @@ public sealed class PublicLandingController : Controller
         }
 
         BlackLedgerWorldTickValidationPacketViewModel? packet = _blackLedgerBriefings.BuildValidationPacket(requestedTurn, null);
+        ApplyNoStoreHeaders(Response.Headers);
         return packet is null || packet.ToTurn != requestedTurn
             ? NotFound()
             : Ok(packet);
@@ -2073,6 +2078,7 @@ public sealed class PublicLandingController : Controller
         }
 
         var model = await BuildBlackLedgerPageModel($"/ledger/turns/{requestedTurn}/dispatches", "dispatches", requestedTurn, cancellationToken);
+        ApplyNoStoreHeaders(Response.Headers);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
