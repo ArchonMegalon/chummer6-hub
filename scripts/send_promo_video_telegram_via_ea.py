@@ -40,6 +40,7 @@ def main() -> int:
     parser.add_argument("--principal-id", default="", help="Principal id to bind for delivery.")
     parser.add_argument("--chat-id", default="", help="Telegram chat id. Defaults to EA_TELEGRAM_CHAT_ID or the local owner chat.")
     parser.add_argument("--receipt-name", default="", help="Receipt filename under _completion/telegram_promo_delivery.")
+    parser.add_argument("--as-document", action="store_true", help="Send as a Telegram document to avoid video transcoding or preview trimming.")
     args = parser.parse_args()
 
     load_env(EA_ROOT / ".env")
@@ -47,7 +48,7 @@ def main() -> int:
 
     from app.repositories.connector_bindings import InMemoryConnectorBindingRepository
     from app.repositories.tool_registry import InMemoryToolRegistryRepository
-    from app.services.telegram_delivery import send_telegram_video_for_principal
+    from app.services.telegram_delivery import send_telegram_document_for_principal, send_telegram_video_for_principal
     from app.services.tool_runtime import ToolRuntimeService
 
     video = Path(args.video).resolve()
@@ -80,19 +81,32 @@ def main() -> int:
         scope_json={"assistant_surfaces": ["dm"], "delivery": ["video"]},
         status="enabled",
     )
-    receipt = send_telegram_video_for_principal(
-        runtime,
-        principal_id=principal_id,
-        video_ref=str(video),
-        caption=args.caption,
-    )
+    if args.as_document:
+        receipt = send_telegram_document_for_principal(
+            runtime,
+            principal_id=principal_id,
+            document_ref=str(video),
+            caption=args.caption,
+        )
+        transport = "ea.telegram_delivery.send_telegram_document_for_principal"
+        delivery_mode = "document"
+    else:
+        receipt = send_telegram_video_for_principal(
+            runtime,
+            principal_id=principal_id,
+            video_ref=str(video),
+            caption=args.caption,
+        )
+        transport = "ea.telegram_delivery.send_telegram_video_for_principal"
+        delivery_mode = "video"
 
     OUT.mkdir(parents=True, exist_ok=True)
     receipt_name = str(args.receipt_name or f"{video.stem}.telegram.receipt.json").strip()
     payload = {
         "generated_at_utc": utc_now(),
         "status": "sent",
-        "transport": "ea.telegram_delivery.send_telegram_video_for_principal",
+        "transport": transport,
+        "delivery_mode": delivery_mode,
         "principal_id": receipt.principal_id,
         "chat_id": receipt.chat_id,
         "bot_key": receipt.bot_key,
