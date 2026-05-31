@@ -14,6 +14,7 @@ public sealed class WeeklyProductPulseArtifactService
     private const string DefaultProgressReportRelativePath = ".codex-design/product/PROGRESS_REPORT.generated.json";
     private const string DefaultProgressHistoryRelativePath = ".codex-design/product/PROGRESS_HISTORY.generated.json";
     private const string DefaultLocalReleaseProofRelativePath = ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json";
+    private const string LocalReleaseProofFileKey = "CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE";
     private const string DefaultFleetArtifactRoot = "/docker/fleet/.codex-studio/published";
     private const string FleetArtifactRootKey = "CHUMMER_PUBLIC_FLEET_ARTIFACT_ROOT";
     private const string JourneyGatesFileName = "JOURNEY_GATES.generated.json";
@@ -263,8 +264,14 @@ public sealed class WeeklyProductPulseArtifactService
     private string? ResolveOptionalCanonPath(string relativePath)
     {
         string normalizedRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+        if (string.Equals(relativePath, DefaultLocalReleaseProofRelativePath, StringComparison.Ordinal)
+            && _configuration[LocalReleaseProofFileKey]?.Trim() is { Length: > 0 } configuredProofPath)
+        {
+            return File.Exists(configuredProofPath) ? configuredProofPath : null;
+        }
+
         string? canonRoot = _configuration["CHUMMER_PUBLIC_CANON_ROOT"]?.Trim();
-        if (!string.IsNullOrWhiteSpace(canonRoot))
+        if (!string.IsNullOrWhiteSpace(canonRoot) && !string.Equals(relativePath, DefaultLocalReleaseProofRelativePath, StringComparison.Ordinal))
         {
             string configuredPath = Path.Combine(canonRoot, normalizedRelativePath);
             return File.Exists(configuredPath) ? configuredPath : null;
@@ -272,6 +279,9 @@ public sealed class WeeklyProductPulseArtifactService
 
         return new[]
             {
+                !string.IsNullOrWhiteSpace(canonRoot) ? Path.Combine(canonRoot, normalizedRelativePath) : null,
+                LocalReleaseProofPackagePathOrNull(relativePath, AppContext.BaseDirectory),
+                LocalReleaseProofPackagePathOrNull(relativePath, Directory.GetCurrentDirectory()),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", normalizedRelativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, normalizedRelativePath)),
@@ -282,6 +292,11 @@ public sealed class WeeklyProductPulseArtifactService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(static candidate => File.Exists(candidate));
     }
+
+    private static string? LocalReleaseProofPackagePathOrNull(string relativePath, string root)
+        => string.Equals(relativePath, DefaultLocalReleaseProofRelativePath, StringComparison.Ordinal)
+            ? Path.GetFullPath(Path.Combine(root, "wwwroot", "proofs", "mac-codex-release", "HUB_LOCAL_RELEASE_PROOF.generated.json"))
+            : null;
 
     private string? ResolveOptionalFleetArtifactPath(string fileName)
     {

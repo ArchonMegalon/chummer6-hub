@@ -7,6 +7,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import requests
+
 
 WORKSPACE = Path("/docker/chummercomplete")
 RUN_SERVICES = WORKSPACE / "chummer.run-services"
@@ -41,6 +43,31 @@ def run(command: list[str]) -> dict[str, Any]:
         "stdout": completed.stdout[-4000:],
         "stderr": completed.stderr[-4000:],
         "pass": completed.returncode == 0,
+    }
+
+
+def fetch_text(url: str) -> dict[str, Any]:
+    last_error = ""
+    for attempt in range(1, 4):
+        try:
+            response = requests.get(url, timeout=30)
+            return {
+                "url": url,
+                "attempts": attempt,
+                "status_code": response.status_code,
+                "text": response.text,
+                "pass": 200 <= response.status_code < 300,
+            }
+        except requests.RequestException as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+
+    return {
+        "url": url,
+        "attempts": 3,
+        "status_code": None,
+        "text": "",
+        "error": last_error,
+        "pass": False,
     }
 
 
@@ -257,6 +284,27 @@ def main() -> int:
     checks.append(check(routes.get("status") == "pass", "live public route proof status is pass"))
     checks.append(check(not routes.get("dead_links") and not routes.get("forbidden_hits"), "live public routes have no dead links or forbidden launch scaffolding"))
     checks.append(check({"/", "/downloads", "/status", "/ledger/newsroom", "/horizons"}.issubset(route_paths), "route proof includes release-critical public routes", {"route_paths": sorted(route_paths)}))
+
+    live_status = fetch_text(f"{BASE_URL}/status")
+    live_status_text = live_status.get("text") if isinstance(live_status.get("text"), str) else ""
+    checks.append(check(
+        live_status.get("pass") is True
+        and "run-20260518-220935" not in live_status_text
+        and "Current local edge proof passed" in live_status_text
+        and "Current local edge proof is unknown" not in live_status_text
+        and "Gold-ready on Public release Build run-" in live_status_text,
+        "live /status proves current gold-ready release and local edge proof",
+        {
+            "url": live_status.get("url"),
+            "attempts": live_status.get("attempts"),
+            "status_code": live_status.get("status_code"),
+            "contains_stale_run": "run-20260518-220935" in live_status_text,
+            "contains_local_edge_passed": "Current local edge proof passed" in live_status_text,
+            "contains_local_edge_unknown": "Current local edge proof is unknown" in live_status_text,
+            "contains_gold_ready_build": "Gold-ready on Public release Build run-" in live_status_text,
+            "error": live_status.get("error"),
+        },
+    ))
 
     formport = read_json(OUT / "CLASSIC_FORMPORT_TYPED_BINDING_AUDIT.generated.json")
     requirements = formport.get("requirements") or {}

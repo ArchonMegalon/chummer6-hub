@@ -298,6 +298,8 @@ public sealed class PublicTrustPulseService
         return new[]
             {
                 !string.IsNullOrWhiteSpace(canonRoot) ? Path.Combine(canonRoot, relativePath) : null,
+                LocalReleaseProofPackagePathOrNull(defaultRelativePath, AppContext.BaseDirectory),
+                LocalReleaseProofPackagePathOrNull(defaultRelativePath, Directory.GetCurrentDirectory()),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
@@ -308,6 +310,11 @@ public sealed class PublicTrustPulseService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(static candidate => File.Exists(candidate));
     }
+
+    private static string? LocalReleaseProofPackagePathOrNull(string relativePath, string root)
+        => string.Equals(relativePath, DefaultLocalReleaseProofRelativePath, StringComparison.Ordinal)
+            ? Path.GetFullPath(Path.Combine(root, "wwwroot", "proofs", "mac-codex-release", "HUB_LOCAL_RELEASE_PROOF.generated.json"))
+            : null;
 
     private sealed record WeeklyProductPulsePayload(
         [property: JsonPropertyName("contract_name")] string? ContractName,
