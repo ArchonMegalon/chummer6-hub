@@ -1,0 +1,14 @@
+{
+  "generated_at_utc": "2026-05-31T06:18:54Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "tested_routes": [
+    "/",
+    "/ledger",
+    "/ledger/map"
+  ],
+  "playwright_specs": [
+    "tests/public/black-ledger-globe-render.spec.ts",
+    "tests/public/black-ledger-globe-motion.spec.ts"
+  ]
+}

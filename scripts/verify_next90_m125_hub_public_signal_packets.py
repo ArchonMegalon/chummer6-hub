@@ -54,7 +54,8 @@ SOURCE_MARKERS = {
         'Assert.Contains(bundle.Packets, item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal)',
     ],
     "tests/RunServicesSmoke/Program.cs": [
-        'var publicSignalPackets = new PublicSignalToCanonPacketService(releases).Build(supportCase, "en-US");',
+        "var publicSignalPackets = new PublicSignalToCanonPacketService(releases);",
+        'var publicSignalPacketBundle = publicSignalPackets.Build(supportCase, "en-US");',
         'campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.',
         'campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.',
     ],

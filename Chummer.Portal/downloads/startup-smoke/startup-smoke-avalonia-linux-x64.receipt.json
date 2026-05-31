@@ -1,8 +1,8 @@
 {
   "status": "pass",
   "headId": "avalonia",
-  "version": "run-20260518-220935",
-  "releaseVersion": "run-20260518-220935",
+  "version": "run-20260530-184515",
+  "releaseVersion": "run-20260530-184515",
   "channelId": "public_stable",
   "platform": "linux",
   "arch": "x64",

@@ -16,11 +16,15 @@ class ParticipateCodexGuestFallbackTests(unittest.TestCase):
         self.assertIn('return Redirect("/login?next=%2Fparticipate%2Fcodex");', controller)
         self.assertNotIn('return Redirect("/auth/google/start?next=%2Fparticipate%2Fcodex");', controller)
 
-    def test_public_views_use_first_party_login_handoff(self) -> None:
-        for path in (PARTICIPATE_VIEW, FEEDBACK_VIEW):
-            text = path.read_text(encoding="utf-8")
-            self.assertIn('"/login?next=%2Fparticipate%2Fcodex"', text, msg=str(path))
-            self.assertNotIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', text, msg=str(path))
+    def test_participate_public_view_uses_google_auth_handoff(self) -> None:
+        text = PARTICIPATE_VIEW.read_text(encoding="utf-8")
+        self.assertIn('"/auth/google/start?next=%2Fparticipate%2Fcodex"', text)
+        self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
+
+    def test_feedback_public_view_stays_on_participation_surface(self) -> None:
+        text = FEEDBACK_VIEW.read_text(encoding="utf-8")
+        self.assertIn('href="/participate"', text)
+        self.assertNotIn('"/login?next=%2Fparticipate%2Fcodex"', text)
 
 
 if __name__ == "__main__":

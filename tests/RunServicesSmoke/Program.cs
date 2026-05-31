@@ -724,6 +724,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
             UserId: currentUser.UserId,
             GroupId: "grp-demo",
             SponsorSessionId: "sps-demo",
+            ParticipantCodexCode: null,
             AuthClass: "chatgpt_auth_json",
             LaneType: "participant_burst",
             LaneRole: "coding",
@@ -947,6 +948,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         UserId: createdUser.UserId,
         GroupId: "grp-demo",
         SponsorSessionId: "sps-demo",
+        ParticipantCodexCode: null,
         AuthClass: "chatgpt_auth_json",
         LaneType: "participant_burst",
         LaneRole: "coding",
@@ -968,6 +970,7 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         UserId: createdUser.UserId,
         GroupId: "grp-demo",
         SponsorSessionId: "sps-demo",
+        ParticipantCodexCode: null,
         AuthClass: "chatgpt_auth_json",
         LaneType: "participant_burst",
         LaneRole: "review",
@@ -1031,7 +1034,19 @@ async Task VerifyHubCommunitySecurityAndDurabilityAsync()
         ["verified"] = true,
     });
 
-    var ledgerController = new LedgerController(accounts, identityClient, ledger, ledgerVerifier, rewards)
+    var earlyBlackLedgerStats = new BlackLedgerPublicStatsService(configuration);
+    var earlyBlackLedgerDispatches = new BlackLedgerDispatchService(store, earlyBlackLedgerStats, loggerFactory.CreateLogger<BlackLedgerDispatchService>());
+    var earlyBlackLedgerFactions = new BlackLedgerFactionOnboardingService(configuration, earlyBlackLedgerStats, campaignSpine, store);
+    var earlyBlackLedgerBriefings = new BlackLedgerWorldTickBriefingService(earlyBlackLedgerStats, earlyBlackLedgerFactions);
+    var earlyBlackLedgerTickNews = new BlackLedgerTickNewsNotificationService(
+        new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { target_ref = "ea-delivery-news-smoke" }, HttpStatusCode.OK))),
+        store,
+        configuration,
+        new BlackLedgerNewsRecipientResolver(store, configuration),
+        earlyBlackLedgerBriefings,
+        earlyBlackLedgerFactions,
+        loggerFactory.CreateLogger<BlackLedgerTickNewsNotificationService>());
+    var ledgerController = new LedgerController(accounts, identityClient, ledger, ledgerVerifier, rewards, earlyBlackLedgerStats, earlyBlackLedgerDispatches, earlyBlackLedgerTickNews, earlyBlackLedgerFactions)
     {
         ControllerContext = ReceiptControllerContext(signatureHeader: "hmac-sha256:forged", forgedReceipt)
     };
@@ -2686,6 +2701,11 @@ async Task VerifyPublicLandingProjectionAsync()
     var gmVenueAdapter = new BeHumanGmSessionVenueAdapter(new StubHttpClientFactory(new HttpClient(new StubHttpMessageHandler(_ => JsonResponse(new { ok = true }, HttpStatusCode.OK)))), configuration, beHumanEventAdapterPosture);
     var gmSessionVenues = new GmSessionVenueService(new GmSessionVenueStore(configuration), beHumanEventAdapterPosture, gmVenueAdapter, configuration, store);
     var karmaForge = new KarmaForgeDiscoveryService(new KarmaForgeStore(configuration, loggerFactory.CreateLogger<KarmaForgeStore>()), configuration);
+    var answerlyPolicy = new AnswerlyRuntimePolicy(configuration);
+    var buildGhostConcierge = new BuildGhostConciergeService(
+        configuration,
+        answerlyPolicy,
+        new AnswerlyHumanizerAdapter(answerlyPolicy, new RuleSafeOutputGate()));
     var packageCatalog = new PublicPackageCatalogService();
     var publicCreatorDiscovery = new PublicCreatorPublicationDiscoveryService(accounts, campaignSpine, publicationDraftWorkflow);
     var communityCreatorHorizons = new CommunityCreatorHorizonsService(store, installLinkingStore, publicCreatorDiscovery);
@@ -2706,14 +2726,14 @@ async Task VerifyPublicLandingProjectionAsync()
         WebRootPath = Path.Combine(tempRoot, "wwwroot")
     };
     var windowsProofInstallers = new WindowsProofInstallerService(configuration);
-    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -2740,7 +2760,6 @@ async Task VerifyPublicLandingProjectionAsync()
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
-    var answerlyPolicy = new AnswerlyRuntimePolicy(configuration);
     var supportCasesController = new SupportCasesController(
         linkedIdentityClient,
         accounts,
@@ -4970,15 +4989,15 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "campaign_workspace", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit campaign workspace truth from governed change packets.");
     Assert(hostedCompanionPacketBundle.AccountPackets.Any(item => string.Equals(item.OwningDomain, "publication", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit publication truth from governed creator-publication posture.");
     Assert(hostedCompanionPacketBundle.PublicHubPackets.Any(item => string.Equals(item.OwningDomain, "public_hub", StringComparison.Ordinal)), "campaign spine hosted companion packets should emit public-hub truth from the hosted downloads and support posture.");
-    var publicSignalPackets = new PublicSignalToCanonPacketService(releases).Build(supportCase, "en-US");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/participate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "roadmap", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/horizons?source=roadmap#public-roadmap-projection", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed roadmap packets for the public horizons projection.");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?source=changelog#public-shipped-closeout", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal) && string.Equals(item.Route, "/contact", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.");
-    Assert(publicSignalPackets.Packets.Any(item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.");
+    var publicSignalPacketBundle = publicSignalPackets.Build(supportCase, "en-US");
+    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "feedback", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/participate?source=feedback#public-feedback", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed feedback packets for the public first-party feedback lane.");
+    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "roadmap", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/horizons?source=roadmap#public-roadmap-projection", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed roadmap packets for the public horizons projection.");
+    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "changelog", StringComparison.Ordinal) && string.Equals(item.DestinationRoute, "/now?source=changelog#public-shipped-closeout", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed changelog packets for shipped closeout posture.");
+    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "support", StringComparison.Ordinal) && string.Equals(item.Route, "/contact", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed support packets from the first-party contact intake lane.");
+    Assert(publicSignalPacketBundle.Packets.Any(item => string.Equals(item.SurfaceId, "signal_intake", StringComparison.Ordinal) && string.Equals(item.Route, "/participate", StringComparison.Ordinal)), "campaign spine public signal packets should emit governed signal-intake packets for the shared participate surface.");
     var hostedProofContracts = new HostedProofContractService(releases).Build(new HostedProofContractContext(
         OpenRun: reloadedOpenRunDetail,
-        PublicSignals: publicSignalPackets,
+        PublicSignals: publicSignalPacketBundle,
         InstallLinking: linkedSummaryPayload,
         CommunityHubRoute: "/account/work#community-ops",
         CommunityWorkspaceRoute: $"/account/work/workspaces/{Uri.EscapeDataString(workspaceId)}",
@@ -5032,7 +5051,7 @@ async Task VerifyPublicLandingProjectionAsync()
                     "crash-inc-smoke-001"
                 ])
         ],
-        PublicSignals: publicSignalPackets,
+        PublicSignals: publicSignalPacketBundle,
         InstallLinking: linkedSummaryPayload,
         Locale: "en-US"));
     Assert(privacyBoundedSupportStatus.Projections.Any(item => string.Equals(item.SurfaceId, "support_status", StringComparison.Ordinal) && item.Route.Contains("/account/support/", StringComparison.Ordinal)), "campaign spine privacy-bounded support status should keep support status on the account support rail.");
@@ -5438,7 +5457,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

@@ -977,9 +977,9 @@ public sealed class ReleaseSelectionService
 
         return NormalizePlatformId(platform.Id) switch
         {
-            "macos" => "The current public shelf does not publish the signed-in Mac setup-script preview right now. Treat macOS as unavailable until that preview lane is promoted again.",
-            "windows" => $"The desktop contract expects a promoted Windows preview, but the current public shelf does not publish a Windows artifact yet. Treat Windows as unavailable on /downloads until startup smoke and promoted release proof land together.",
-            "linux" => $"The current public shelf does not publish the Linux package right now. Treat Linux as unavailable until the support-directed package lane is promoted again.",
+            "macos" => "The Mac setup-script preview is outside the current public shelf. Use downloads for the promoted desktop package and support help for guided Mac setup.",
+            "windows" => "The Windows preview lane is outside the current public shelf. Use downloads for the promoted desktop package and support help for Windows setup.",
+            "linux" => "The Linux package lane is outside the current public shelf. Use downloads for the promoted desktop package and support help for Linux setup.",
             _ => $"The current public shelf does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform."
         };
     }

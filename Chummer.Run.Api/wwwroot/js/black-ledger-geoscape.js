@@ -2,6 +2,7 @@ const GLOBE_WORLD_ID = 'emerald-sprawl-prelude';
 const BASE_MAP_WIDTH = 1200;
 const BASE_MAP_HEIGHT = 760;
 const TWO_PI = Math.PI * 2;
+const VIDEO_GLOBE_IDLE_SECONDS = 14;
 const EARTH_LANDMASSES = [
   { id: 'north-america', fill: ['#315f49', '#7fb06a'], coastline: '#c9e5c1', points: [{ lat: 12, lon: -116 }, { lat: 20, lon: -104 }, { lat: 28, lon: -98 }, { lat: 36, lon: -104 }, { lat: 45, lon: -110 }, { lat: 56, lon: -122 }, { lat: 67, lon: -148 }, { lat: 72, lon: -160 }, { lat: 69, lon: -126 }, { lat: 62, lon: -108 }, { lat: 54, lon: -90 }, { lat: 50, lon: -74 }, { lat: 45, lon: -66 }, { lat: 34, lon: -78 }, { lat: 25, lon: -83 }, { lat: 19, lon: -90 }] },
   { id: 'greenland', fill: ['#8aa385', '#d5e1d1'], coastline: '#f2fbf0', points: [{ lat: 60, lon: -52 }, { lat: 66, lon: -48 }, { lat: 72, lon: -42 }, { lat: 79, lon: -34 }, { lat: 82, lon: -24 }, { lat: 77, lon: -18 }, { lat: 70, lon: -24 }, { lat: 63, lon: -40 }] },
@@ -121,6 +122,9 @@ class BlackLedgerGeoscapeRoot {
     this.variant = root.dataset.variant || 'full';
     this.mapUrl = root.dataset.mapUrl || `/api/v1/ledger/worlds/${GLOBE_WORLD_ID}/map`;
     this.deltaUrl = root.dataset.deltaUrl || `/api/v1/ledger/worlds/${GLOBE_WORLD_ID}/map/tick-delta/0/1`;
+    this.videoMp4Url = root.dataset.globeVideoMp4 || '/media/ledger/globe/black-ledger-video-globe-idle.mp4';
+    this.videoWebmUrl = root.dataset.globeVideoWebm || '/media/ledger/globe/black-ledger-video-globe-idle.webm';
+    this.videoPosterUrl = root.dataset.globeVideoPoster || '/media/ledger/globe/black-ledger-video-globe-idle-poster.png';
     this.selectedFactionSlug = slugify(root.dataset.selectedFaction || '');
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.state = {
@@ -138,6 +142,8 @@ class BlackLedgerGeoscapeRoot {
     this.glBuffer = null;
     this.glTexture = null;
     this.glUniforms = null;
+    this.videoPlate = null;
+    this.videoPlateReady = false;
     this.canvas = null;
     this.ctx = null;
     this.panelTag = null;
@@ -240,6 +246,10 @@ class BlackLedgerGeoscapeRoot {
       <div class="black-ledger-geoscape__shell black-ledger-geoscape__shell--${this.variant}">
         <div class="black-ledger-geoscape__stage">
           <div class="black-ledger-geoscape__stage-skin" aria-hidden="true"></div>
+          <video class="black-ledger-geoscape__video-plate" aria-hidden="true" muted playsinline loop preload="metadata" poster="${this.videoPosterUrl}">
+            <source src="${this.videoWebmUrl}" type="video/webm">
+            <source src="${this.videoMp4Url}" type="video/mp4">
+          </video>
           <canvas class="black-ledger-geoscape__webgl" aria-hidden="true"></canvas>
           <canvas class="black-ledger-geoscape__canvas" role="img" aria-label="Black Ledger command globe"></canvas>
           <div class="black-ledger-geoscape__signal-rail" aria-hidden="true">
@@ -275,6 +285,7 @@ class BlackLedgerGeoscapeRoot {
       <div class="black-ledger-geoscape__fallback-list" aria-label="Accessible geoscape list"></div>
     `;
 
+    this.videoPlate = this.root.querySelector('.black-ledger-geoscape__video-plate');
     this.glCanvas = this.root.querySelector('.black-ledger-geoscape__webgl');
     this.canvas = this.root.querySelector('.black-ledger-geoscape__canvas');
     this.ctx = this.canvas.getContext('2d');
@@ -293,6 +304,31 @@ class BlackLedgerGeoscapeRoot {
     this.signalSecondary = this.root.querySelector('.black-ledger-geoscape__signal-chip--secondary');
     this.signalTertiary = this.root.querySelector('.black-ledger-geoscape__signal-chip--tertiary');
     this.replayButton = this.root.querySelector('.black-ledger-geoscape__replay');
+    if (this.videoPlate) {
+      this.root.dataset.videoGlobe = 'loading';
+      const markVideoReady = () => {
+        this.videoPlateReady = true;
+        this.root.dataset.videoGlobe = 'ready';
+        this.root.dataset.renderer = 'video-globe-overlay';
+        if (this.reducedMotion) {
+          this.videoPlate.pause();
+        } else {
+          this.videoPlate.play?.().catch(() => {});
+        }
+        this.renderFrame();
+      };
+      const markVideoFallback = () => {
+        this.videoPlateReady = false;
+        this.root.dataset.videoGlobe = 'fallback';
+        this.renderFrame();
+      };
+      this.videoPlate.addEventListener('canplay', markVideoReady, { once: true });
+      this.videoPlate.addEventListener('loadeddata', markVideoReady, { once: true });
+      this.videoPlate.addEventListener('error', markVideoFallback, { once: true });
+      if (this.reducedMotion) {
+        this.videoPlate.pause();
+      }
+    }
     this.glCanvas?.addEventListener('webglcontextlost', this.handleWebGlContextLost, false);
     this.glCanvas?.addEventListener('webglcontextrestored', this.handleWebGlContextRestored, false);
     this.initWebGl();
@@ -982,13 +1018,23 @@ class BlackLedgerGeoscapeRoot {
     const centerY = height / 2;
     const radius = Math.min(width, height) * (this.variant === 'teaser' ? 0.31 : 0.34);
     ctx.clearRect(0, 0, width, height);
-    const usedWebGl = this.renderWebGlBase(time, width, height, radius);
+    const usedVideoGlobe = this.videoPlateReady && this.root.dataset.videoGlobe === 'ready';
+    if (usedVideoGlobe && this.videoPlate && !this.reducedMotion && this.state.replayState !== 'playing') {
+      const phase = (this.videoPlate.currentTime % VIDEO_GLOBE_IDLE_SECONDS) / VIDEO_GLOBE_IDLE_SECONDS;
+      this.rotation = (-36 * Math.PI / 180) + phase * TWO_PI;
+    }
+    if (usedVideoGlobe) {
+      this.root.dataset.renderer = 'video-globe-overlay';
+    }
+    const usedWebGl = usedVideoGlobe ? false : this.renderWebGlBase(time, width, height, radius);
     if (!usedWebGl) {
-      this.drawBackdrop(ctx, width, height, centerX, centerY, radius, time);
+      if (!usedVideoGlobe) {
+        this.drawBackdrop(ctx, width, height, centerX, centerY, radius, time);
+      }
     }
     ctx.save();
     ctx.translate(centerX, centerY);
-    if (!usedWebGl) {
+    if (!usedWebGl && !usedVideoGlobe) {
       this.drawSphere(ctx, radius, time);
     }
     this.drawArcs(ctx, radius, time);

@@ -19,6 +19,7 @@ SOURCE_FILES = [
     ".codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
     "Chummer.Run.Api/wwwroot/proofs/mac-codex-release/HUB_LOCAL_RELEASE_PROOF.generated.json",
     "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json",
+    "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-linux-x64.receipt.json",
     "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-osx-arm64.receipt.json",
     "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json",
 ]
@@ -48,13 +49,14 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             self.copy_sources(temp_root)
             release_channel_path = temp_root / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
             payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
+            tuple_id = payload["artifactIdentityRegistry"][0]["tupleId"]
             payload["artifactIdentityRegistry"][0]["publicInstallRoute"] = "/downloads/install/drifted-route"
             release_channel_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("artifactIdentityRegistry tuple avalonia:linux:linux-x64 drifted", result.stderr)
+        self.assertIn(f"artifactIdentityRegistry tuple {tuple_id} drifted", result.stderr)
 
     def test_verifier_fails_when_install_recovery_refs_drop_tuple_marker(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m144-proof-ref-") as temp_dir:
@@ -62,6 +64,7 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             self.copy_sources(temp_root)
             release_channel_path = temp_root / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
             payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
+            tuple_id = payload["installAwareArtifactRegistry"][0]["tupleId"]
             payload["installAwareArtifactRegistry"][0]["recoveryProofRefs"] = [
                 "/downloads/install/avalonia-win-x64-installer"
             ]
@@ -70,7 +73,7 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("recoveryProofRefs missing desktopTupleCoverage.desktopRouteTruth[avalonia:linux:linux-x64]", result.stderr)
+        self.assertIn(f"recoveryProofRefs missing desktopTupleCoverage.desktopRouteTruth[{tuple_id}]", result.stderr)
 
     def test_verifier_fails_when_release_proof_route_drops_promoted_install_path(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m144-proof-route-") as temp_dir:
@@ -96,15 +99,16 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             self.copy_sources(temp_root)
             release_channel_path = temp_root / "Chummer.Portal/downloads/RELEASE_CHANNEL.generated.json"
             payload = json.loads(release_channel_path.read_text(encoding="utf-8"))
-            for tuple_truth in payload["desktopTupleCoverage"]["desktopRouteTruth"]:
-                if tuple_truth.get("tupleId") == "avalonia:windows:win-x64":
-                    tuple_truth["artifactId"] = "avalonia-win-x64-archive"
-                    break
+            tuple_truth = payload["desktopTupleCoverage"]["desktopRouteTruth"][0]
+            tuple_id = tuple_truth["tupleId"]
             payload["supportabilityState"] = "published"
             payload["rolloutState"] = "published"
             payload["message"] = "Shelf is fully live."
             release_channel_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-            startup_smoke_path = temp_root / "Chummer.Portal/downloads/startup-smoke/startup-smoke-avalonia-win-x64.receipt.json"
+            startup_smoke_path = temp_root / (
+                "Chummer.Portal/downloads/startup-smoke/"
+                f"startup-smoke-{tuple_truth['head']}-{tuple_truth['rid']}.receipt.json"
+            )
             startup_smoke_payload = json.loads(startup_smoke_path.read_text(encoding="utf-8"))
             startup_smoke_payload["artifactSha256"] = "deadbeef" * 8
             startup_smoke_path.write_text(json.dumps(startup_smoke_payload, indent=2), encoding="utf-8")
@@ -112,6 +116,7 @@ class Next90M144HubReleaseTruthAlignmentTests(unittest.TestCase):
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
+        self.assertIn(tuple_id, result.stderr)
         self.assertIn("must stay review_required", result.stderr)
         self.assertIn("must stay coverage_incomplete", result.stderr)
 

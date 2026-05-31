@@ -273,7 +273,8 @@ platforms:
         Assert.False(string.IsNullOrWhiteSpace(experience.PlatformShelfNoticeTitle));
         var windows = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "windows");
         Assert.False(windows.PubliclyAvailable);
-        Assert.Contains("does not publish a Windows artifact yet", windows.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("outside the current public shelf", windows.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("unavailable", windows.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -1,0 +1,34 @@
+version: 1
+last_reviewed: 2026-04-12
+purpose: Release-blocking orientation gate for the first minute of a serious Chummer5a veteran on the promoted desktop route.
+release_blocking: true
+required_landmarks:
+  - File menu
+  - Tools menu
+  - Windows menu
+  - Help menu
+  - Immediate toolstrip
+  - Save or open route
+  - Import route
+  - Settings route
+  - Master index route
+  - Character roster route
+  - Bottom status strip
+tasks:
+  - id: reach_real_workbench
+    description: The first launch reaches a workbench or restore continuation, not a decorative landing surface.
+    time_budget_seconds: 10
+  - id: locate_save_import_settings
+    description: Save, import/open, and settings are visible without hunting.
+    time_budget_seconds: 15
+  - id: locate_master_index_and_roster
+    description: Veteran users can reach master index and roster from the promoted desktop route.
+    time_budget_seconds: 20
+  - id: recover_section_rhythm
+    description: The user can tell where sections live and return to the current section after a distraction.
+    time_budget_seconds: 20
+failure_conditions:
+  - Browser ritual is required before the promoted desktop route feels usable.
+  - The shell opens into dashboard-first marketing chrome.
+  - Save, import, settings, roster, or master index are hidden behind unclear secondary navigation.
+  - The status strip is absent or does not keep trust state visible.

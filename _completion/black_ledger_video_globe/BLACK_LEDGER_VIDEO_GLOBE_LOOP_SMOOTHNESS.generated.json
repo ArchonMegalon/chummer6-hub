@@ -1,0 +1,10 @@
+{
+  "generated_at_utc": "2026-05-31T06:18:54Z",
+  "status": "pass",
+  "asset_id": "ledger_globe_idle_v1",
+  "duration_seconds": 14,
+  "loopable": true,
+  "notes": [
+    "Raster globe plate loops in-place under Chummer-owned live overlays."
+  ]
+}

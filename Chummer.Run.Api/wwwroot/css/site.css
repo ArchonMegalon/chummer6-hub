@@ -2628,6 +2628,16 @@ td {
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
+.compact-rail__copy,
+.compact-rail__copy p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.route-status .compact-rail__item {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .home-rail-section {
   padding: 1.35rem;
   border-radius: 28px;
@@ -6219,6 +6229,7 @@ body.nav-sheet-open {
 }
 
 .black-ledger-geoscape__webgl,
+.black-ledger-geoscape__video-plate,
 .black-ledger-geoscape__canvas {
   position: absolute;
   inset: 0;
@@ -7015,6 +7026,23 @@ body {
 
 .black-ledger-geoscape__webgl {
   z-index: 1;
+}
+
+.black-ledger-geoscape__video-plate {
+  z-index: 1;
+  object-fit: cover;
+  opacity: 0;
+  filter: saturate(1.08) contrast(1.08) brightness(0.76);
+  transition: opacity 220ms ease;
+}
+
+.black-ledger-geoscape[data-video-globe="ready"] .black-ledger-geoscape__video-plate {
+  opacity: 1;
+}
+
+.black-ledger-geoscape[data-video-globe="ready"] .black-ledger-geoscape__stage-skin,
+.black-ledger-geoscape[data-video-globe="ready"] .black-ledger-geoscape__webgl {
+  opacity: 0;
 }
 
 .black-ledger-geoscape__canvas {

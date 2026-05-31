@@ -1,0 +1,23 @@
+{
+  "generated_at_utc": "2026-05-31T06:18:54Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "routes": [
+    {
+      "route": "/",
+      "renderer": "video-globe-overlay",
+      "video_globe": "ready"
+    },
+    {
+      "route": "/ledger",
+      "renderer": "video-globe-overlay",
+      "video_globe": "ready"
+    },
+    {
+      "route": "/ledger/map",
+      "renderer": "video-globe-overlay",
+      "video_globe": "ready"
+    }
+  ],
+  "proof_source": "../_completion/chummer_run_redesign_closure/BLACK_LEDGER_GLOBE_RENDER.generated.json"
+}

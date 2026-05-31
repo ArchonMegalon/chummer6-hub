@@ -436,7 +436,7 @@ def main() -> int:
     copy_or_missing("FINAL_SR6_RULE_AUTHORITY_VERDICT.md", [WORKSPACE / "_completion" / "sr6_rule_authority" / "FINAL_SR6_RULE_AUTHORITY_VERDICT.md"], "NOT_READY\n")
     copy_or_missing("FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md", [WORKSPACE / "_completion" / "magicfit_provider" / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md"], "NOT_READY\n")
     copy_or_missing("FINAL_RAFTER_PIXEFY_QA_STACK_VERDICT.md", [FLEET / "_completion" / "rafter_pixefy" / "FINAL_RAFTER_PIXEFY_QA_STACK_VERDICT.md"], "NOT_READY\n")
-    copy_or_missing("FINAL_BLACK_LEDGER_VIDEO_GLOBE_VERDICT.md", [WORKSPACE / "_completion" / "full_product_reaudit_v14" / "FINAL_BLACK_LEDGER_VIDEO_GLOBE_VERDICT.md"], "NOT_READY\n")
+    copy_or_missing("FINAL_BLACK_LEDGER_VIDEO_GLOBE_VERDICT.md", [RUN_SERVICES / "_completion" / "black_ledger_video_globe" / "FINAL_BLACK_LEDGER_VIDEO_GLOBE_VERDICT.md"], "NOT_READY\n")
     copy_or_missing("FINAL_FACTION_VIDEO_SERIES_VERDICT.md", [WORKSPACE / "_completion" / "full_product_reaudit_v14" / "FINAL_FACTION_VIDEO_SERIES_VERDICT.md"], "NOT_READY\n")
     write_v16_newsroom_verdict(generated)
     copy_or_missing("FINAL_PWA_GOLD_VERDICT.md", [WORKSPACE / "_completion" / "full_product_reaudit_v14" / "FINAL_PWA_GOLD_VERDICT.md"], "NOT_READY\n")

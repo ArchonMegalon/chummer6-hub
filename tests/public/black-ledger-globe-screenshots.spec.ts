@@ -15,7 +15,7 @@ for (const viewport of viewports) {
   test(`black ledger globe screenshot ${viewport.width}x${viewport.height}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto(`${baseUrl}/ledger/map`, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-black-ledger-geoscape-root][data-ready="true"]')).toBeVisible();
+    await expect(page.locator('[data-black-ledger-geoscape-root][data-ready="true"]').first()).toBeVisible();
     await page.screenshot({ path: completionPath(`black-ledger-globe-${viewport.width}x${viewport.height}.png`), fullPage: true });
   });
 }

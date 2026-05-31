@@ -1,0 +1,22 @@
+{
+  "asset_id": "ledger_globe_idle_v1",
+  "mode": "idle_loop",
+  "provider_requested": "MagicFit",
+  "provider_status": "missing_render_asset",
+  "render_mode": "first_party_raster_video_fallback",
+  "generated_at_utc": "2026-05-31T06:12:08.734528Z",
+  "duration_seconds": 14,
+  "loopable": true,
+  "resolution": "1280x720",
+  "files": {
+    "mp4": "/media/ledger/globe/black-ledger-video-globe-idle.mp4",
+    "webm": "/media/ledger/globe/black-ledger-video-globe-idle.webm",
+    "poster_png": "/media/ledger/globe/black-ledger-video-globe-idle-poster.png"
+  },
+  "qa": {
+    "watermark_status": "none",
+    "public_safety_status": "pass",
+    "overlay_truth_status": "chummer_owned_canvas_overlay",
+    "magicfit_claim_allowed": false
+  }
+}

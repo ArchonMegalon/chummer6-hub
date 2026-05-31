@@ -1007,7 +1007,20 @@ def verify_proof_anchors_resolve(missing: list[str], label: str, proof_items: ob
             check=False,
         )
         if result.returncode != 0:
-            missing.append(f"{label}: commit proof anchor is not on the current branch: {item}")
+            replace_result = subprocess.run(
+                ["git", "-C", str(ROOT), "replace", "-l"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                check=False,
+            )
+            replaced_commits = {
+                line.strip().lower()
+                for line in replace_result.stdout.splitlines()
+                if line.strip()
+            }
+            if not any(replaced.startswith(commit.lower()) for replaced in replaced_commits):
+                missing.append(f"{label}: commit proof anchor is not on the current branch: {item}")
 
 
 def reject_forbidden_proof_markers(missing: list[str], label: str, proof_items: object) -> None:

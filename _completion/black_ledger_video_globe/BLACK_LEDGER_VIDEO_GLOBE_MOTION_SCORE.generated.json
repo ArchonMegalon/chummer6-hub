@@ -1,0 +1,11 @@
+{
+  "generated_at_utc": "2026-05-31T06:18:54Z",
+  "status": "pass",
+  "asset_id": "ledger_globe_idle_v1",
+  "motion_score": 0.82,
+  "checks": {
+    "animated_video_plate_present": true,
+    "canvas_overlay_remains_interactive": true,
+    "reduced_motion_uses_paused_video_poster": true
+  }
+}

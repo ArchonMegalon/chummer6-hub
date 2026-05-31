@@ -1,0 +1,11 @@
+{
+  "provider": "MagicFit",
+  "status": "not_verified_for_this_asset",
+  "source_zip": "/home/tibor/black_ledger_video_globe_magicfit_design_20260529.zip",
+  "fallback_asset": {
+    "mp4": "/media/ledger/globe/black-ledger-video-globe-idle.mp4",
+    "webm": "/media/ledger/globe/black-ledger-video-globe-idle.webm",
+    "poster_png": "/media/ledger/globe/black-ledger-video-globe-idle-poster.png"
+  },
+  "gold_claim_allowed": false
+}
