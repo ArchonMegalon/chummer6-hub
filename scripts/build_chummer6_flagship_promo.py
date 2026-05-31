@@ -1,441 +1,268 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import importlib.util
-import math
+import json
+import argparse
 import subprocess
-import sys
-import tempfile
-from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
-from PIL import Image, ImageDraw
 
+WORKSPACE = Path("/docker/chummercomplete")
+SOURCE_DIR = WORKSPACE / "_completion" / "magicfit_jama6_promo_12_scenes"
+PUBLIC_DIR = WORKSPACE / "chummer.run-services" / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
+SOURCE_RECEIPT = SOURCE_DIR / "MAGICFIT_12_SCENE_PROMO_SOURCE_AUDIT.generated.json"
+PROVIDER_RECEIPT = WORKSPACE / "_completion" / "magicfit_provider" / "MAGICFIT_PROVIDER_VERIFICATION.generated.json"
+PUBLIC_RECEIPT = PUBLIC_DIR / "chummer6-flagship-promo.receipt.json"
 
-FACTION_SCRIPT = Path("/docker/chummercomplete/chummer.run-services/scripts/build_black_ledger_faction_motion_videos.py")
-SPEC = importlib.util.spec_from_file_location("build_black_ledger_faction_motion_videos", FACTION_SCRIPT)
-assert SPEC is not None and SPEC.loader is not None
-FACTION = importlib.util.module_from_spec(SPEC)
-sys.modules[SPEC.name] = FACTION
-SPEC.loader.exec_module(FACTION)
+SCENE_GLOB = "[0-9][0-9]_*.mp4"
+TARGET_MP4 = PUBLIC_DIR / "chummer6-flagship-promo.mp4"
+TARGET_WEBM = PUBLIC_DIR / "chummer6-flagship-promo.webm"
+TARGET_POSTER = PUBLIC_DIR / "chummer6-flagship-promo-poster.png"
+TARGET_VTT = PUBLIC_DIR / "chummer6-flagship-promo.vtt"
 
-
-ROOT = Path("/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo")
-FPS = 24
-FACTION.FPS = FPS
-TOTAL_SECONDS = 90
-TOTAL_FRAMES = FPS * TOTAL_SECONDS
-CANVAS_WIDTH = FACTION.CANVAS_WIDTH
-CANVAS_HEIGHT = FACTION.CANVAS_HEIGHT
-VIDEO_WIDTH = 1920
-VIDEO_HEIGHT = 1080
-CROSSFADE_SECONDS = 0.75
-CROSSFADE_FRAMES = int(FPS * CROSSFADE_SECONDS)
-
-
-@dataclass(frozen=True)
-class TrailerScene:
-    label: str
-    caption: str
-    command: str
-    environment: str
-    camera: FACTION.CameraPath
-    accent: tuple[int, int, int]
-
-
-SCENES: tuple[TrailerScene, ...] = (
-    TrailerScene(
-        "Open the client",
-        "Chummer6 opens straight into the workbench: compact, familiar, and ready for a real table.",
-        "anchor",
-        "newsroom",
-        FACTION.CameraPath(50, 70, 120, 40, 1.0, 1.08),
-        (255, 110, 80),
-    ),
-    TrailerScene(
-        "Build the runner",
-        "Attributes, skills, gear, spells, qualities, and derived stats stay visible while the build changes.",
-        "point",
-        "desktop_build",
-        FACTION.CameraPath(100, 90, 190, 70, 1.0, 1.12),
-        (112, 220, 255),
-    ),
-    TrailerScene(
-        "Audit the rules",
-        "Rules are routed through tracked providers with receipts, fixtures, and edition-specific verdicts.",
-        "point",
-        "rules_authority",
-        FACTION.CameraPath(180, 80, 110, 70, 1.0, 1.14),
-        (255, 190, 86),
-    ),
-    TrailerScene(
-        "Run the table",
-        "The GM cockpit keeps pressure, fallout, rulings, and table state on one tight operational rail.",
-        "signal",
-        "gm_cockpit",
-        FACTION.CameraPath(120, 80, 210, 90, 1.02, 1.16),
-        (132, 255, 232),
-    ),
-    TrailerScene(
-        "Track the campaign",
-        "Black Ledger turns campaign pressure into readable map, newsroom, and consequence signals.",
-        "hack",
-        "geoscape",
-        FACTION.CameraPath(80, 60, 220, 90, 1.0, 1.1),
-        (186, 152, 255),
-    ),
-    TrailerScene(
-        "Send table pulse",
-        "Remote reactions become deliberate choices and return to the GM as visible decision receipts.",
-        "signal",
-        "remote_reaction",
-        FACTION.CameraPath(100, 90, 190, 60, 1.03, 1.16),
-        (154, 236, 110),
-    ),
-    TrailerScene(
-        "Install anywhere",
-        "The public client, PWA guidance, downloads, and status pages tell the same release truth.",
-        "advance",
-        "install_status",
-        FACTION.CameraPath(80, 70, 180, 50, 1.0, 1.12),
-        (255, 226, 132),
-    ),
-    TrailerScene(
-        "Review what changed",
-        "Feedback Loop and Karma Forge keep issues, improvements, and follow-through visible.",
-        "advance",
-        "karma_forge",
-        FACTION.CameraPath(110, 80, 210, 80, 1.0, 1.15),
-        (180, 230, 130),
-    ),
-    TrailerScene(
-        "Keep it mouse-first",
-        "Every screen is checked for reachable controls, dense desktop ergonomics, and low-noise copy.",
-        "point",
-        "desktop_controls",
-        FACTION.CameraPath(150, 80, 160, 70, 1.02, 1.16),
-        (126, 206, 255),
-    ),
-    TrailerScene(
-        "Prove the build",
-        "Fleet gates collect live route proof, visual QA, security scans, and release alignment receipts.",
-        "signal",
-        "proof_stack",
-        FACTION.CameraPath(90, 70, 230, 80, 1.0, 1.13),
-        (220, 180, 255),
-    ),
-    TrailerScene(
-        "Present without noise",
-        "No demo scaffolding, no stale status claims, and no hidden proof gaps on public surfaces.",
-        "anchor",
-        "newsroom",
-        FACTION.CameraPath(80, 80, 170, 40, 1.02, 1.16),
-        (255, 170, 116),
-    ),
-    TrailerScene(
-        "Chummer6",
-        "Build the runner. Run the table. Move the city.",
-        "anchor",
-        "finale",
-        FACTION.CameraPath(70, 80, 150, 40, 1.0, 1.18),
-        (255, 226, 132),
-    ),
+CAPTIONS = (
+    (0, 8, "Too much chaos at the table becomes one calm client workflow."),
+    (8, 15, "Open Chummer6 and start from the client, not a marketing page."),
+    (15, 23, "Build the runner with dense desktop controls and low-noise screens."),
+    (23, 30, "Explain values and rule decisions with visible receipts."),
+    (30, 38, "Black Ledger makes the world feel alive without faction detours."),
+    (38, 45, "Release truth, provider proof, and audit freshness stay visible."),
+    (45, 53, "Table Pulse keeps remote players and GM follow-through aligned."),
+    (53, 60, "Remote reactions return as deliberate choices instead of chat noise."),
+    (60, 68, "Karma Forge turns feedback into tracked improvements."),
+    (68, 75, "Newsreels show campaign movement while the client stays the hero."),
+    (75, 83, "Desktop and mobile surfaces point at the same release truth."),
+    (83, 90, "Chummer6: build the runner, run the table, move the city."),
 )
 
-SECONDS_PER_SCENE = TOTAL_SECONDS / len(SCENES)
-SCENE_FRAMES = TOTAL_FRAMES // len(SCENES)
+TARGET_SECONDS = 90.0
+TRANSITION_SECONDS = 0.5
+SCENE_SECONDS = (TARGET_SECONDS + 11 * TRANSITION_SECONDS) / 12
 
 
-def draw_gradient(draw: ImageDraw.ImageDraw, top: tuple[int, int, int], bottom: tuple[int, int, int]) -> None:
-    FACTION.draw_gradient(draw, top, bottom)
+def utc_now() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def draw_stage(draw: ImageDraw.ImageDraw, scene: TrailerScene, phase: float) -> None:
-    if scene.environment == "newsroom":
-        FACTION.draw_newsroom(draw, scene.accent)
-        draw.text((210, 182), "CHUMMER6 NIGHT BULLETIN", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((210, 242), scene.label.upper(), fill=scene.accent, font=FACTION.LABEL_FONT)
-        draw.text((980, 186), "LIVE", fill=(255, 226, 180), font=FACTION.LABEL_FONT)
-        draw.text((980, 228), "COMMUNITY // DESKTOP // BLACK LEDGER", fill=(190, 210, 236), font=FACTION.BODY_FONT)
-        draw.rectangle((0, 856, CANVAS_WIDTH, CANVAS_HEIGHT), fill=(12, 10, 16))
-        ticker = "CHUMMER6 // BUILD THE RUNNER // RUN THE TABLE // MOVE THE CITY"
-        draw.text((80 - (phase * 160), 874), ticker, fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "street_signal":
-        FACTION.draw_gradient(draw, (10, 12, 24), (28, 18, 20))
-        FACTION.draw_grid(draw, (34, 28, 38))
-        FACTION.draw_skyline(draw, scene.accent)
-        draw.rectangle((0, 620, CANVAS_WIDTH, CANVAS_HEIGHT), fill=(18, 18, 24))
-        for x in range(80, CANVAS_WIDTH, 180):
-            draw.line((x, 625, x + 70, CANVAS_HEIGHT), fill=(80, 82, 92), width=4)
-        draw.rounded_rectangle((1020, 210, 1450, 360), radius=18, fill=(10, 18, 28), outline=scene.accent, width=4)
-        draw.text((1055, 245), "STREET SIGNAL", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((1055, 302), "DROP CONFIRMED // 02:14", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "desktop_build":
-        draw_gradient(draw, (18, 20, 28), (10, 14, 18))
-        draw.rounded_rectangle((120, 120, 1520, 770), radius=28, fill=(14, 22, 30), outline=scene.accent, width=4)
-        draw.rounded_rectangle((180, 190, 760, 710), radius=20, fill=(24, 32, 42), outline=(90, 120, 138), width=3)
-        draw.rounded_rectangle((820, 190, 1460, 710), radius=20, fill=(18, 26, 38), outline=(90, 120, 138), width=3)
-        for idx, y in enumerate(range(240, 660, 68)):
-            draw.line((860, y, 1390, y), fill=scene.accent if idx % 2 == 0 else (88, 116, 142), width=6)
-        draw.text((220, 218), "BUILD", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((220, 274), "Essence 5.8 // Gear tuned // Spell list ready", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "rules_authority":
-        draw_gradient(draw, (18, 16, 22), (10, 12, 18))
-        draw.rounded_rectangle((120, 110, 1510, 790), radius=24, fill=(14, 18, 26), outline=scene.accent, width=4)
-        columns = [190, 510, 830, 1150]
-        titles = ["SR4", "SR5", "SR6", "Receipts"]
-        for idx, x in enumerate(columns):
-            draw.rounded_rectangle((x, 205, x + 240, 660), radius=18, fill=(22, 28, 38), outline=(90, 112, 138), width=3)
-            draw.text((x + 34, 238), titles[idx], fill=scene.accent, font=FACTION.TITLE_FONT)
-            for row in range(5):
-                y = 322 + (row * 58)
-                draw.line((x + 34, y, x + 196, y), fill=(150, 170, 190), width=5)
-                draw.ellipse((x + 180, y - 9, x + 204, y + 15), fill=scene.accent)
-        draw.text((190, 710), "edition providers // fixture gates // explain receipts", fill=(255, 255, 255), font=FACTION.LABEL_FONT)
-    elif scene.environment == "gm_cockpit":
-        draw_gradient(draw, (26, 18, 12), (10, 10, 14))
-        for x in range(150, 1450, 260):
-            draw.rounded_rectangle((x, 180, x + 210, 330), radius=18, fill=(34, 24, 20), outline=scene.accent, width=3)
-        draw.rounded_rectangle((160, 410, 1440, 790), radius=24, fill=(18, 16, 20), outline=scene.accent, width=4)
-        for x in range(220, 1380, 190):
-            top = 720 - int(120 * abs(math.sin(phase * math.pi + (x / 200))))
-            draw.rectangle((x, top, x + 80, 748), fill=scene.accent)
-        draw.text((210, 450), "GM COCKPIT", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((210, 510), "Threat clocks, packet pressure, and aftermath stay on one rail.", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "geoscape":
-        draw_gradient(draw, (6, 10, 20), (4, 6, 10))
-        center = (790, 470)
-        draw.ellipse((300, 80, 1280, 860), outline=(80, 138, 170), width=4)
-        for radius in (180, 260, 340):
-            draw.ellipse((center[0] - radius, center[1] - radius, center[0] + radius, center[1] + radius), outline=(18, 58, 78), width=2)
-        points = [(500, 360), (690, 260), (880, 300), (1030, 430), (920, 610), (660, 620), (470, 500)]
-        for px, py in points:
-            pulse = 28 + int(14 * math.sin((phase * math.pi * 2) + (px / 120)))
-            draw.ellipse((px - pulse, py - pulse, px + pulse, py + pulse), outline=scene.accent, width=4)
-        for start, end in zip(points, points[1:] + [points[0]]):
-            draw.line((*start, *end), fill=(142, 220, 238), width=3)
-        draw.text((150, 128), "BLACK LEDGER GEOSCAPE", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((150, 188), "Conflict, logistics, and rumor pressure move together.", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "remote_reaction":
-        draw_gradient(draw, (14, 12, 24), (20, 18, 32))
-        draw.rounded_rectangle((180, 150, 620, 760), radius=34, fill=(10, 14, 26), outline=scene.accent, width=4)
-        draw.rounded_rectangle((970, 160, 1410, 740), radius=26, fill=(12, 18, 30), outline=(132, 166, 220), width=4)
-        draw.text((235, 205), "REMOTE REACTION", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((235, 272), "Packet intercepted // Reply armed", fill=scene.accent, font=FACTION.LABEL_FONT)
-        draw.text((1030, 220), "GM RECEIPT", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((1030, 286), "Accept // Delay // Modify // Reject", fill=(180, 200, 255), font=FACTION.LABEL_FONT)
-        draw.line((660, 300, 930, 300), fill=scene.accent, width=6)
-        draw.line((660, 420, 930, 420), fill=(255, 255, 255), width=3)
-        draw.line((660, 540, 930, 540), fill=scene.accent, width=6)
-    elif scene.environment == "karma_forge":
-        draw_gradient(draw, (20, 22, 16), (12, 18, 12))
-        draw.rounded_rectangle((160, 160, 1440, 760), radius=24, fill=(16, 20, 18), outline=scene.accent, width=4)
-        for idx, x in enumerate((230, 500, 770, 1040, 1310)):
-            height = 120 + int(140 * abs(math.sin((phase * math.pi) + idx)))
-            draw.rounded_rectangle((x - 80, 680 - height, x + 80, 680), radius=18, fill=(42, 52, 38), outline=scene.accent, width=3)
-        draw.text((210, 214), "KARMA FORGE", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((210, 278), "Candidate rules, public-safe proof, community follow-through.", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "install_status":
-        draw_gradient(draw, (12, 18, 24), (8, 12, 18))
-        for idx, (x, title) in enumerate(((160, "Windows"), (500, "Linux"), (840, "PWA"), (1180, "Status"))):
-            draw.rounded_rectangle((x, 180, x + 280, 680), radius=20, fill=(18, 26, 34), outline=scene.accent, width=3)
-            draw.text((x + 38, 225), title, fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-            for row in range(4):
-                y = 330 + row * 72
-                draw.rounded_rectangle((x + 38, y, x + 232, y + 32), radius=8, fill=(38, 48, 58))
-                draw.rectangle((x + 52, y + 10, x + 192 - row * 18, y + 22), fill=scene.accent)
-        draw.text((210, 740), "public stable // preview marked // proof freshness visible", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "desktop_controls":
-        draw_gradient(draw, (16, 18, 20), (10, 12, 14))
-        draw.rounded_rectangle((90, 90, 1510, 815), radius=18, fill=(18, 24, 28), outline=scene.accent, width=4)
-        draw.rectangle((120, 142, 1490, 204), fill=(30, 38, 44))
-        for x in range(150, 780, 115):
-            draw.rounded_rectangle((x, 158, x + 82, 188), radius=6, fill=(54, 64, 72), outline=(130, 150, 164), width=2)
-        for y in range(245, 742, 56):
-            draw.line((150, y, 1430, y), fill=(52, 62, 70), width=2)
-        for x in range(190, 1420, 170):
-            draw.rounded_rectangle((x, 285, x + 118, 330), radius=6, fill=(42, 50, 58), outline=scene.accent, width=2)
-        draw.text((160, 710), "mouse reach // compact controls // familiar desktop density", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "proof_stack":
-        draw_gradient(draw, (10, 14, 22), (8, 8, 12))
-        labels = ["Live routes", "Visual QA", "Security", "Rules", "Desktop", "PWA"]
-        for idx, label in enumerate(labels):
-            x = 190 + (idx % 3) * 430
-            y = 170 + (idx // 3) * 270
-            draw.rounded_rectangle((x, y, x + 330, y + 180), radius=18, fill=(20, 28, 38), outline=scene.accent, width=3)
-            draw.text((x + 34, y + 36), label, fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-            draw.text((x + 34, y + 100), "PASS", fill=scene.accent, font=FACTION.TITLE_FONT)
-            draw.line((x + 35, y + 148, x + 280, y + 148), fill=(120, 145, 170), width=5)
-        draw.text((230, 755), "release truth matrix // final janitor // live-backed receipts", fill=scene.accent, font=FACTION.LABEL_FONT)
-    elif scene.environment == "finale":
-        draw_gradient(draw, (8, 10, 16), (18, 14, 20))
-        FACTION.draw_grid(draw, (24, 34, 46))
-        draw.rounded_rectangle((190, 165, 1410, 720), radius=30, fill=(8, 12, 18, 210), outline=scene.accent, width=5)
-        draw.text((330, 280), "CHUMMER6", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((330, 378), "Build the runner.", fill=scene.accent, font=FACTION.TITLE_FONT)
-        draw.text((330, 462), "Run the table.", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((330, 546), "Move the city.", fill=scene.accent, font=FACTION.TITLE_FONT)
-        draw.text((330, 638), "chummer.run", fill=(255, 240, 190), font=FACTION.TITLE_FONT)
-    else:
-        draw_gradient(draw, (10, 14, 20), (20, 10, 12))
-        FACTION.draw_skyline(draw, scene.accent)
-        draw.rounded_rectangle((120, 128, 1480, 790), radius=32, fill=(6, 10, 14, 180), outline=scene.accent, width=4)
-        draw.text((210, 248), "CHUMMER6", fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-        draw.text((210, 322), "Build the runner. Run the table. Move the city.", fill=scene.accent, font=FACTION.TITLE_FONT)
-        draw.text((210, 404), "chummer.run", fill=(255, 240, 190), font=FACTION.TITLE_FONT)
+def load_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def draw_people(draw: ImageDraw.ImageDraw, scene: TrailerScene, phase: float) -> None:
-    if scene.environment == "newsroom":
-        FACTION.draw_person(draw, 790, 760, 1.66, scene.accent, (70, 40, 32), "anchor", phase)
-        if scene.label.startswith("Karma Forge"):
-            FACTION.draw_person(draw, 1140, 724, 0.9, (154, 236, 110), (56, 82, 46), "signal", phase)
-    elif scene.environment == "street_signal":
-        FACTION.draw_person(draw, 430, 700, 1.3, scene.accent, (58, 42, 34), "report", phase, bulk=1.16)
-        FACTION.draw_person(draw, 820, 700, 0.82, (188, 190, 204), (72, 74, 82), "run", phase, bulk=0.95)
-        FACTION.draw_person(draw, 980, 708, 0.78, (160, 150, 134), (68, 64, 58), "run", phase, bulk=0.9)
-    elif scene.environment == "desktop_build":
-        FACTION.draw_person(draw, 540, 720, 1.22, scene.accent, (52, 76, 96), "point", phase)
-        FACTION.draw_person(draw, 1130, 716, 0.94, (208, 170, 124), (86, 70, 54), "signal", phase)
-    elif scene.environment == "gm_cockpit":
-        FACTION.draw_person(draw, 540, 708, 1.18, scene.accent, (86, 52, 28), "signal", phase)
-        FACTION.draw_person(draw, 1080, 720, 1.04, (190, 180, 170), (74, 66, 58), "point", phase)
-    elif scene.environment == "geoscape":
-        FACTION.draw_person(draw, 420, 690, 1.02, scene.accent, (38, 64, 82), "hack", phase)
-        FACTION.draw_person(draw, 1180, 700, 1.0, (212, 180, 124), (80, 60, 46), "point", phase)
-    elif scene.environment == "remote_reaction":
-        FACTION.draw_person(draw, 420, 700, 1.16, scene.accent, (58, 54, 110), "signal", phase)
-        FACTION.draw_person(draw, 1170, 700, 1.1, (190, 174, 144), (70, 62, 54), "point", phase)
-    elif scene.environment == "karma_forge":
-        FACTION.draw_person(draw, 460, 700, 1.1, scene.accent, (54, 72, 40), "advance", phase)
-        FACTION.draw_person(draw, 790, 704, 0.98, (180, 190, 144), (62, 72, 52), "point", phase)
-        FACTION.draw_person(draw, 1100, 708, 0.96, (164, 144, 202), (68, 56, 84), "signal", phase)
-    elif scene.environment in {"install_status", "rules_authority", "desktop_controls", "proof_stack"}:
-        FACTION.draw_person(draw, 470, 710, 1.0, scene.accent, (58, 68, 78), "point", phase)
-        FACTION.draw_person(draw, 1130, 716, 0.92, (210, 186, 140), (78, 66, 52), "signal", phase)
-    else:
-        FACTION.draw_person(draw, 520, 710, 1.12, scene.accent, (72, 84, 94), "advance", phase)
-        FACTION.draw_person(draw, 760, 706, 1.06, (200, 170, 132), (82, 62, 44), "signal", phase)
-        FACTION.draw_person(draw, 1010, 712, 1.0, (180, 132, 120), (74, 54, 44), "point", phase)
+def run(*command: str) -> None:
+    subprocess.run(command, check=True)
 
 
-def render_scene(scene: TrailerScene, scene_progress: float, absolute_progress: float) -> Image.Image:
-    image = Image.new("RGBA", (CANVAS_WIDTH, CANVAS_HEIGHT), (0, 0, 0, 255))
-    draw = ImageDraw.Draw(image)
-    draw_stage(draw, scene, scene_progress)
-    image = FACTION.add_glow(image, (-120, -60, 520, 420), scene.accent, 74, 42)
-    image = FACTION.add_glow(image, (CANVAS_WIDTH - 520, 40, CANVAS_WIDTH + 120, 700), tuple(min(255, c + 30) for c in scene.accent), 92, 58)
-    sweep = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    sweep_draw = ImageDraw.Draw(sweep)
-    sweep_x = int(-760 + (CANVAS_WIDTH + 1520) * ((absolute_progress * 3.4 + scene_progress * 0.45) % 1.0))
-    for band in range(3):
-        x = sweep_x - (band * 560)
-        sweep_draw.polygon(
+def probe(path: Path) -> dict[str, object]:
+    return json.loads(
+        subprocess.check_output(
             [
-                (x, 0),
-                (x + 360, 0),
-                (x + 780, CANVAS_HEIGHT),
-                (x + 420, CANVAS_HEIGHT),
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration:stream=codec_type,codec_name,width,height",
+                "-of",
+                "json",
+                str(path),
             ],
-            fill=(*scene.accent, 92),
+            text=True,
         )
-    for y in range(60, CANVAS_HEIGHT, 118):
-        offset = int((scene_progress * 180 + y) % 180)
-        sweep_draw.line((0, y + offset - 90, CANVAS_WIDTH, y + offset - 170), fill=(*scene.accent, 52), width=8)
-    image = Image.alpha_composite(image, sweep)
-    draw = ImageDraw.Draw(image)
-    draw_people(draw, scene, scene_progress)
-    draw.rounded_rectangle((72, 60, 860, 188), radius=24, fill=(6, 10, 18, 192), outline=(*scene.accent, 210), width=3)
-    draw.text((104, 84), scene.label.upper(), fill=(255, 255, 255), font=FACTION.TITLE_FONT)
-    draw.text((106, 136), scene.command.upper(), fill=scene.accent, font=FACTION.LABEL_FONT)
-    draw.rounded_rectangle((66, 712, 1534, 844), radius=18, fill=(6, 10, 16, 208), outline=(*scene.accent, 210), width=3)
-    wrapped = FACTION.wrap_text(draw, scene.caption, FACTION.BODY_FONT, 1360)
-    y = 740
-    for line in wrapped[:3]:
-        draw.text((96, y), line, fill=(255, 255, 255), font=FACTION.BODY_FONT)
-        y += 34
-    draw.text((96, 804), "FIRST-PARTY BUILDS // TABLE PRESSURE // COMMUNITY FOLLOW-THROUGH", fill=scene.accent, font=FACTION.LABEL_FONT)
-    return image
+    )
 
 
-def render_final_frame(scene: TrailerScene, scene_progress: float, absolute_progress: float) -> Image.Image:
-    # Keep the authored title/caption safe inside the frame. Earlier full-frame
-    # camera zooms made the trailer feel busier but clipped important product text.
-    return render_scene(scene, scene_progress, absolute_progress)
+def format_ts(seconds: int) -> str:
+    minutes, secs = divmod(seconds, 60)
+    return f"00:{minutes:02}:{secs:02}.000"
 
 
-def write_vtt(path: Path) -> None:
+def write_vtt() -> None:
     lines = ["WEBVTT", ""]
-    for index, scene in enumerate(SCENES):
-        start = index * SECONDS_PER_SCENE
-        end = (index + 1) * SECONDS_PER_SCENE
-        lines.append(str(index + 1))
-        lines.append(f"{format_ts(start)} --> {format_ts(end)}")
-        lines.append(scene.caption)
-        lines.append("")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    for index, (start, end, text) in enumerate(CAPTIONS, start=1):
+        lines.extend([str(index), f"{format_ts(start)} --> {format_ts(end)}", text, ""])
+    TARGET_VTT.write_text("\n".join(lines), encoding="utf-8")
 
 
-def format_ts(seconds: float) -> str:
-    millis = int(round(seconds * 1000))
-    hours, remainder = divmod(millis, 3_600_000)
-    minutes, remainder = divmod(remainder, 60_000)
-    secs, ms = divmod(remainder, 1000)
-    return f"{hours:02}:{minutes:02}:{secs:02}.{ms:03}"
+def validate_inputs() -> list[Path]:
+    if not SOURCE_RECEIPT.is_file():
+        raise SystemExit(f"missing source receipt: {SOURCE_RECEIPT}")
+    if not PROVIDER_RECEIPT.is_file():
+        raise SystemExit(f"missing MagicFit provider receipt: {PROVIDER_RECEIPT}")
+
+    source_receipt = load_json(SOURCE_RECEIPT)
+    provider_receipt = load_json(PROVIDER_RECEIPT)
+    scenes = sorted(SOURCE_DIR.glob(SCENE_GLOB))
+    if len(scenes) != 12:
+        raise SystemExit(f"expected 12 scene clips, found {len(scenes)} in {SOURCE_DIR}")
+    if source_receipt.get("status") != "pass":
+        raise SystemExit("MagicFit source audit is not passing")
+    if provider_receipt.get("status") != "verified":
+        raise SystemExit("MagicFit provider is not verified")
+    return scenes
 
 
-def render() -> None:
-    mp4_path = ROOT / "chummer6-flagship-promo.mp4"
-    webm_path = ROOT / "chummer6-flagship-promo.webm"
-    poster_path = ROOT / "chummer6-flagship-promo-poster.png"
-    captions_path = ROOT / "chummer6-flagship-promo.vtt"
-    with tempfile.TemporaryDirectory(prefix="chummer6-flagship-promo-") as temp_dir:
-        frames_root = Path(temp_dir)
-        for frame_index in range(TOTAL_FRAMES):
-            scene_index = min(len(SCENES) - 1, frame_index // SCENE_FRAMES)
-            scene = SCENES[scene_index]
-            scene_frame = frame_index - (scene_index * SCENE_FRAMES)
-            scene_progress = scene_frame / max(1, SCENE_FRAMES - 1)
-            absolute_progress = frame_index / max(1, TOTAL_FRAMES - 1)
-            final_frame = render_final_frame(scene, scene_progress, absolute_progress)
-            transition_alpha = 0.0
-            if scene_index > 0 and scene_frame < CROSSFADE_FRAMES:
-                transition_alpha = max(transition_alpha, 0.58 * (1.0 - (scene_frame / max(1, CROSSFADE_FRAMES - 1))))
-            if scene_index < len(SCENES) - 1 and scene_frame >= SCENE_FRAMES - CROSSFADE_FRAMES:
-                transition_alpha = max(
-                    transition_alpha,
-                    0.58 * ((scene_frame - (SCENE_FRAMES - CROSSFADE_FRAMES)) / max(1, CROSSFADE_FRAMES - 1)),
-                )
-            if transition_alpha > 0:
-                black = Image.new("RGBA", final_frame.size, (0, 0, 0, 255))
-                final_frame = Image.blend(final_frame.convert("RGBA"), black, transition_alpha)
-            final_frame.save(frames_root / f"frame_{frame_index:04d}.png")
+def validate_public_outputs() -> None:
+    for path in (TARGET_MP4, TARGET_WEBM, TARGET_POSTER, TARGET_VTT, PUBLIC_RECEIPT):
+        if not path.is_file():
+            raise SystemExit(f"missing public promo output: {path}")
 
-        audio_path = frames_root / "score.wav"
-        FACTION.render_soundtrack(audio_path, TOTAL_SECONDS, (94, 188, 376))
-        FACTION.encode_video(frames_root, audio_path, mp4_path, codec="libx264", crf="18", audio_codec="aac", bitrate="160k", size=(VIDEO_WIDTH, VIDEO_HEIGHT))
-        FACTION.encode_video(frames_root, audio_path, webm_path, codec="libvpx-vp9", crf="34", audio_codec="libopus", bitrate="112k", size=(1280, 720))
-        subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-i",
-                str(mp4_path),
-                "-vf",
-                "select=eq(n\\,675)",
-                "-frames:v",
-                "1",
-                "-update",
-                "1",
-                str(poster_path),
-            ],
-            check=True,
+    if not TARGET_VTT.read_text(encoding="utf-8").startswith("WEBVTT\n"):
+        raise SystemExit("promo captions are not a valid WEBVTT file")
+
+    receipt = load_json(PUBLIC_RECEIPT)
+    if receipt.get("status") != "published":
+        raise SystemExit("public promo receipt is not published")
+    if receipt.get("source_scene_count") != 12:
+        raise SystemExit("public promo receipt does not prove 12 source scenes")
+    if receipt.get("faction_assets_used") is not False:
+        raise SystemExit("public promo receipt does not prove faction-free source")
+
+    mp4 = probe(TARGET_MP4)
+    webm = probe(TARGET_WEBM)
+    for name, payload in (("mp4", mp4), ("webm", webm)):
+        streams = payload.get("streams") or []
+        has_video = any(stream.get("codec_type") == "video" for stream in streams)
+        has_audio = any(stream.get("codec_type") == "audio" for stream in streams)
+        duration = float(dict(payload.get("format") or {}).get("duration") or 0.0)
+        if not has_video or not has_audio:
+            raise SystemExit(f"{name} promo output is missing video or audio")
+        if duration < TARGET_SECONDS - 0.5:
+            raise SystemExit(f"{name} promo output is too short: {duration:.3f}s")
+
+
+def build_master(scenes: list[Path], target: Path) -> None:
+    inputs: list[str] = []
+    filters: list[str] = []
+    for index, scene in enumerate(scenes):
+        media = probe(scene)
+        duration = float(dict(media.get("format") or {}).get("duration") or 0.0)
+        if duration <= 0:
+            raise SystemExit(f"cannot read duration for {scene}")
+        stretch = SCENE_SECONDS / duration
+        inputs.extend(["-i", str(scene)])
+        filters.append(
+            f"[{index}:v]scale=1280:720:force_original_aspect_ratio=increase,"
+            f"crop=1280:720,setsar=1,setpts={stretch:.8f}*PTS,"
+            f"trim=duration={SCENE_SECONDS:.6f},setpts=PTS-STARTPTS,"
+            f"fps=24,format=yuv420p[v{index}]"
         )
-    write_vtt(captions_path)
+    chain = "[v0]"
+    for index in range(1, len(scenes)):
+        out = f"[x{index}]"
+        offset = index * (SCENE_SECONDS - TRANSITION_SECONDS)
+        filters.append(
+            f"{chain}[v{index}]xfade=transition=fade:duration={TRANSITION_SECONDS:.3f}:"
+            f"offset={offset:.6f}{out}"
+        )
+        chain = out
+    filters.append(
+        "aevalsrc='0.055*sin(2*PI*55*t)+0.035*sin(2*PI*110*t)+"
+        "0.018*sin(2*PI*(220+20*sin(2*PI*0.04*t))*t)':"
+        f"s=48000:d={TARGET_SECONDS:.3f},"
+        "afade=t=in:st=0:d=1.5,afade=t=out:st=87.5:d=2.5[a]"
+    )
+    run(
+        "ffmpeg",
+        "-y",
+        *inputs,
+        "-filter_complex",
+        ";".join(filters),
+        "-map",
+        chain,
+        "-map",
+        "[a]",
+        "-t",
+        f"{TARGET_SECONDS:.3f}",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "160k",
+        "-movflags",
+        "+faststart",
+        str(target),
+    )
 
 
 def main() -> int:
-    render()
+    parser = argparse.ArgumentParser(description="Build or verify the public Chummer6 flagship promo.")
+    parser.add_argument("--check", action="store_true", help="verify inputs and public outputs without rebuilding media")
+    args = parser.parse_args()
+
+    scenes = validate_inputs()
+    if args.check:
+        validate_public_outputs()
+        print("CHUMMER6_FLAGSHIP_PROMO_READY")
+        return 0
+
+    PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+    build_master(scenes, TARGET_MP4)
+    run(
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(TARGET_MP4),
+        "-c:v",
+        "libvpx-vp9",
+        "-crf",
+        "34",
+        "-b:v",
+        "0",
+        "-c:a",
+        "libopus",
+        "-b:a",
+        "112k",
+        "-vf",
+        "scale=1280:-2",
+        str(TARGET_WEBM),
+    )
+    run(
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(TARGET_MP4),
+        "-vf",
+        "select=eq(n\\,720)",
+        "-frames:v",
+        "1",
+        "-update",
+        "1",
+        str(TARGET_POSTER),
+    )
+    write_vtt()
+
+    mp4_probe = probe(TARGET_MP4)
+    receipt = {
+        "generated_at_utc": utc_now(),
+        "status": "published",
+        "asset_id": "chummer6-flagship-promo",
+        "render_mode": "ea_magicfit_12_scene_no_factions_90s_edit",
+        "old_synthetic_vector_renderer_removed": True,
+        "source_scene_count": len(scenes),
+        "source_scene_dir": str(SOURCE_DIR),
+        "source_receipt": str(SOURCE_RECEIPT),
+        "provider_receipt": str(PROVIDER_RECEIPT),
+        "faction_assets_used": False,
+        "scene_seconds_before_transitions": SCENE_SECONDS,
+        "transition_seconds": TRANSITION_SECONDS,
+        "continuous_audio_track": "ffmpeg_generated_synthetic_music_bed",
+        "public_files": {
+            "mp4": str(TARGET_MP4),
+            "webm": str(TARGET_WEBM),
+            "poster": str(TARGET_POSTER),
+            "captions": str(TARGET_VTT),
+        },
+        "mp4_probe": mp4_probe,
+    }
+    PUBLIC_RECEIPT.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    print(PUBLIC_RECEIPT)
     return 0
 
 

@@ -1,0 +1,39 @@
+{
+  "generated_at_utc": "2026-05-31T11:16:31Z",
+  "status": "published",
+  "asset_id": "chummer6-flagship-promo",
+  "render_mode": "ea_magicfit_12_scene_no_factions_90s_edit",
+  "old_synthetic_vector_renderer_removed": true,
+  "source_scene_count": 12,
+  "source_scene_dir": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes",
+  "source_receipt": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/MAGICFIT_12_SCENE_PROMO_SOURCE_AUDIT.generated.json",
+  "provider_receipt": "/docker/chummercomplete/_completion/magicfit_provider/MAGICFIT_PROVIDER_VERIFICATION.generated.json",
+  "faction_assets_used": false,
+  "scene_seconds_before_transitions": 7.958333333333333,
+  "transition_seconds": 0.5,
+  "continuous_audio_track": "ffmpeg_generated_synthetic_music_bed",
+  "public_files": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo-poster.png",
+    "captions": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.vtt"
+  },
+  "mp4_probe": {
+    "programs": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 720
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio"
+      }
+    ],
+    "format": {
+      "duration": "90.000000"
+    }
+  }
+}

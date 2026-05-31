@@ -3126,6 +3126,43 @@ td {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.flagship-promo-band {
+  gap: 1.25rem;
+}
+
+.flagship-promo-player {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.flagship-promo-player__video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+  border-radius: 8px;
+  border: 1px solid var(--line-subtle);
+  background: #05080d;
+  box-shadow: var(--shadow-soft);
+}
+
+.flagship-promo-player__proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  color: var(--ink-muted);
+  font-family: var(--font-family-mono);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.flagship-promo-player__proof span {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line-subtle);
+  border-radius: 6px;
+  background: rgba(12, 20, 30, 0.76);
+}
+
 .gateway-card,
 .ledger-stat-card,
 .forge-pipeline__stage,

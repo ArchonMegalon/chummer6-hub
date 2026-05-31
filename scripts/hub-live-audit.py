@@ -11951,6 +11951,8 @@ def main() -> int:
                 "Black Ledger",
                 "Three signals, one moving city.",
                 "Six seeded houses are already pushing on the same city.",
+                "Flagship reel",
+                "/media/promo/chummer6-flagship-promo.receipt.json",
                 "Desktop build",
                 "Mobile play shell preview",
                 "Proof and release posture"),

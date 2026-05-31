@@ -260,8 +260,8 @@ def score_people(asset: PromoAsset) -> dict[str, Any]:
     visible_people = 5 if visible_proxy >= 2 else 4 if asset.expected_people >= 1 and asset.avg_frame_diff >= 1.2 else 1
     character_action = 5 if asset.expected_action and asset.avg_frame_diff >= 1.2 else 2
     conflict = 5 if asset.expected_conflict and asset.expected_environment else 2
-    human_review = 5 if human_review_approved(HUMAN_REVIEW_PATH) else 0
-    verdict = "pass" if visible_people >= 4 and character_action >= 4 and human_review >= 4 else "fail"
+    human_review = 5 if Path(asset.mp4_path).is_file() and human_review_approved(HUMAN_REVIEW_PATH) else 0
+    verdict = "pass" if visible_people >= 4 and character_action >= 4 and human_review >= 4 and asset.audio_streams > 0 else "fail"
     notes = []
     if visible_proxy == 0:
         notes.append("Character visibility is asserted by the authored shot plan, not by strong face-detection proof.")
