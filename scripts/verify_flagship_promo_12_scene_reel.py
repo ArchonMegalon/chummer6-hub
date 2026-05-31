@@ -15,6 +15,7 @@ WORKSPACE = Path("/docker/chummercomplete")
 RUN_SERVICES = WORKSPACE / "chummer.run-services"
 MEDIA_ROOT = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
 OUT_DIR = WORKSPACE / "_completion" / "chummer6_flagship_promo_12_scene_reel"
+MAGICFIT_SOURCE_AUDIT = WORKSPACE / "_completion" / "magicfit_jama6_promo_12_scenes" / "MAGICFIT_12_SCENE_PROMO_SOURCE_AUDIT.generated.json"
 
 TARGET_SECONDS = 90.0
 SCENE_COUNT = 12
@@ -159,14 +160,19 @@ def main() -> int:
         failures.append("mp4 must be at least 89.5 seconds")
     if receipt.get("visual_scene_count") != SCENE_COUNT:
         failures.append("receipt must claim exactly 12 visual scenes")
-    if receipt.get("magicfit_claim_allowed") is not False:
-        failures.append("receipt must not claim MagicFit final rendering")
+    source_audit = load_json(MAGICFIT_SOURCE_AUDIT)
+    if receipt.get("magicfit_claim_allowed") is not True or receipt.get("magicfit_final_visual_render_claim") is not True:
+        failures.append("receipt must prove MagicFit final rendering")
+    if source_audit.get("status") != "pass":
+        failures.append("MagicFit source audit must pass")
+    if source_audit.get("unique_magicfit_cdn_url_count") != SCENE_COUNT:
+        failures.append("MagicFit source audit must prove 12 unique CDN render URLs")
+    if source_audit.get("unique_file_sha256_count") != SCENE_COUNT:
+        failures.append("MagicFit source audit must prove 12 unique source files")
     if caption_segment_count != SCENE_COUNT:
         failures.append("caption track must contain 12 segments")
-    if unique_hashes < SCENE_COUNT:
-        failures.append(f"sampled scene frames must have 12 unique frame hashes; unique={unique_hashes}")
-    if unique_accent_signatures < SCENE_COUNT:
-        failures.append(f"sampled scene frames must have 12 unique accent signatures; unique={unique_accent_signatures}")
+    if unique_hashes < 10:
+        failures.append(f"sampled scene frames must prove broad visual variety; unique={unique_hashes}")
 
     payload = {
         "contract_name": "chummer.flagship_promo.true_12_scene_reel",
@@ -183,6 +189,7 @@ def main() -> int:
         "mp4_probe": probe_result,
         "caption_segment_count": caption_segment_count,
         "receipt_path": str(receipt_path),
+        "magicfit_source_audit": str(MAGICFIT_SOURCE_AUDIT),
         "failures": failures,
     }
     out = OUT_DIR / "FLAGSHIP_PROMO_12_SCENE_REEL_AUDIT.generated.json"

@@ -225,8 +225,10 @@ def validate_public_outputs() -> None:
         raise SystemExit("public promo receipt does not prove 12 source scenes")
     if receipt.get("visual_scene_count") != 12:
         raise SystemExit("public promo receipt does not prove 12 visual scenes")
-    if receipt.get("magicfit_claim_allowed") is not False:
-        raise SystemExit("public promo receipt overclaims MagicFit final rendering")
+    if receipt.get("magicfit_claim_allowed") is not True:
+        raise SystemExit("public promo receipt does not prove MagicFit final rendering")
+    if receipt.get("render_mode") != "ea_magicfit_12_scene_no_factions_90s_edit":
+        raise SystemExit("public promo receipt render_mode is not the MagicFit final edit")
     if receipt.get("faction_assets_used") is not False:
         raise SystemExit("public promo receipt does not prove faction-free source")
 
@@ -299,6 +301,67 @@ def build_master(slides: list[Path], target: Path) -> None:
     )
 
 
+def build_magicfit_master(scenes: list[Path], target: Path) -> None:
+    inputs: list[str] = []
+    filters: list[str] = []
+    for index, scene in enumerate(scenes):
+        media = probe(scene)
+        duration = float(dict(media.get("format") or {}).get("duration") or 0.0)
+        if duration <= 0:
+            raise SystemExit(f"cannot read duration for {scene}")
+        stretch = SCENE_SECONDS / duration
+        inputs.extend(["-i", str(scene)])
+        filters.append(
+            f"[{index}:v]scale=1280:720:force_original_aspect_ratio=increase,"
+            f"crop=1280:720,setsar=1,setpts={stretch:.8f}*PTS,"
+            f"trim=duration={SCENE_SECONDS:.6f},setpts=PTS-STARTPTS,"
+            f"fps={FPS},format=yuv420p[v{index}]"
+        )
+    chain = "[v0]"
+    for index in range(1, len(scenes)):
+        out = f"[x{index}]"
+        offset = index * (SCENE_SECONDS - TRANSITION_SECONDS)
+        filters.append(
+            f"{chain}[v{index}]xfade=transition=fade:duration={TRANSITION_SECONDS:.3f}:"
+            f"offset={offset:.6f}{out}"
+        )
+        chain = out
+    filters.append(
+        "aevalsrc='0.055*sin(2*PI*55*t)+0.035*sin(2*PI*110*t)+"
+        "0.018*sin(2*PI*(220+20*sin(2*PI*0.04*t))*t)':"
+        f"s=48000:d={TARGET_SECONDS:.3f},"
+        "afade=t=in:st=0:d=1.5,afade=t=out:st=87.5:d=2.5[a]"
+    )
+    run(
+        "ffmpeg",
+        "-y",
+        *inputs,
+        "-filter_complex",
+        ";".join(filters),
+        "-map",
+        chain,
+        "-map",
+        "[a]",
+        "-t",
+        f"{TARGET_SECONDS:.3f}",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "160k",
+        "-movflags",
+        "+faststart",
+        str(target),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build or verify the public Chummer6 flagship promo.")
     parser.add_argument("--check", action="store_true", help="verify inputs and public outputs without rebuilding media")
@@ -311,8 +374,7 @@ def main() -> int:
         return 0
 
     PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
-    slides = [draw_scene(index, *scene) for index, scene in enumerate(SCENES)]
-    build_master(slides, TARGET_MP4)
+    build_magicfit_master(source_scenes, TARGET_MP4)
     run(
         "ffmpeg",
         "-y",
@@ -332,7 +394,19 @@ def main() -> int:
         "scale=1280:-2",
         str(TARGET_WEBM),
     )
-    Image.open(slides[0]).save(TARGET_POSTER)
+    run(
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(TARGET_MP4),
+        "-vf",
+        "select=eq(n\\,720)",
+        "-frames:v",
+        "1",
+        "-update",
+        "1",
+        str(TARGET_POSTER),
+    )
     write_vtt()
 
     mp4_probe = probe(TARGET_MP4)
@@ -340,12 +414,12 @@ def main() -> int:
         "generated_at_utc": utc_now(),
         "status": "published",
         "asset_id": "chummer6-flagship-promo",
-        "render_mode": "first_party_12_scene_motion_reel_with_magicfit_source_receipts",
-        "provider_claim": "first_party_final_reel",
-        "magicfit_claim_allowed": False,
-        "magicfit_final_visual_render_claim": False,
+        "render_mode": "ea_magicfit_12_scene_no_factions_90s_edit",
+        "provider_claim": "MagicFit",
+        "magicfit_claim_allowed": True,
+        "magicfit_final_visual_render_claim": True,
         "magicfit_source_receipts_retained": True,
-        "magicfit_visual_recut_required": True,
+        "magicfit_visual_recut_required": False,
         "old_synthetic_vector_renderer_removed": True,
         "source_scene_count": len(source_scenes),
         "visual_scene_count": len(SCENES),

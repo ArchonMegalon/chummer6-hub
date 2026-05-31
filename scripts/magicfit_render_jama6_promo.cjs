@@ -1,4 +1,4 @@
-const { chromium } = require('/work/node_modules/playwright');
+const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
@@ -182,6 +182,32 @@ function collectCdnVideoUrlsFromText(text) {
     .map((url) => url.replace(/\\u0026/g, '&').replace(/[),\]]+$/, '')))];
 }
 
+function magicfitUrlTimestamp(url) {
+  const match = url.match(/\/magicfit\/(\d+)-/);
+  return match ? Number(match[1]) : 0;
+}
+
+async function collectVisibleMagicFitVideoUrls(page) {
+  const urls = new Set();
+  const html = await page.content().catch(() => '');
+  for (const found of collectCdnVideoUrlsFromText(html)) urls.add(found);
+  const videos = await page.locator('video').evaluateAll((nodes) => nodes.map((v) => v.currentSrc || v.src).filter(Boolean)).catch(() => []);
+  for (const found of videos) {
+    if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)/.test(found)) urls.add(found);
+  }
+  return urls;
+}
+
+function chooseNewestVideoUrl(urls, baseline, submittedAtMs) {
+  const candidates = [...urls]
+    .filter((url) => /\.(mp4|webm)(?:$|\?)/.test(url))
+    .filter((url) => !baseline.has(url))
+    .map((url) => ({ url, timestamp: magicfitUrlTimestamp(url) }))
+    .filter((item) => item.timestamp === 0 || item.timestamp >= submittedAtMs - 120000)
+    .sort((left, right) => right.timestamp - left.timestamp);
+  return candidates[0]?.url || null;
+}
+
 async function renderScene(page, scene) {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const mp4Path = scenePath(scene, '.mp4');
@@ -208,6 +234,7 @@ async function renderScene(page, scene) {
 
   await page.goto('https://magicfit.pushowl.com/agents/generate?mode=video', { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.waitForTimeout(5000);
+  const baselineVideoUrls = await collectVisibleMagicFitVideoUrls(page);
   await selectPill(page, '9:16', 'Landscape (16:9)').catch(async () => {
     await page.locator('select').nth(0).selectOption('16:9').catch(() => {});
   });
@@ -218,6 +245,7 @@ async function renderScene(page, scene) {
   await fillPrompt(page, fullPrompt);
   await page.screenshot({ path: scenePath(scene, '.before-submit.png'), fullPage: true });
   const submit = page.locator('form button').last();
+  const submittedAtMs = Date.now();
   await submit.click({ timeout: 30000 });
   console.log(`submitted ${scene.id}`);
   await page.waitForTimeout(3000);
@@ -232,7 +260,7 @@ async function renderScene(page, scene) {
     for (const found of videos) {
       if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)/.test(found)) seenVideoUrls.add(found);
     }
-    videoUrl = [...seenVideoUrls].find((url) => /\.(mp4)(?:$|\?)/.test(url)) || [...seenVideoUrls][0] || null;
+    videoUrl = chooseNewestVideoUrl(seenVideoUrls, baselineVideoUrls, submittedAtMs);
     if (!videoUrl) console.log(`poll ${scene.id}: waiting`);
   }
   await page.screenshot({ path: scenePath(scene, '.after-render.png'), fullPage: true }).catch(() => {});

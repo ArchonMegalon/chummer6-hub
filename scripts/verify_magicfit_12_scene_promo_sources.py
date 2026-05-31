@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -55,6 +56,8 @@ def main() -> int:
     scenes: list[dict[str, object]] = []
     missing: list[str] = []
     reasons: list[str] = []
+    urls: list[str] = []
+    file_hashes: list[str] = []
     for scene_id in REQUIRED_IDS:
         path = SOURCE_DIR / f"{scene_id}.mp4"
         sidecar = SOURCE_DIR / f"{scene_id}.magicfit.json"
@@ -67,8 +70,11 @@ def main() -> int:
             scene_reasons.append("missing_magicfit_provider_sidecar")
         if not str(payload.get("video_output_url") or "").startswith("https://cdn.pushowl.com/magicfit/"):
             scene_reasons.append("missing_magicfit_cdn_source")
+        else:
+            urls.append(str(payload.get("video_output_url")))
         if payload.get("faction_assets_used") is not False:
             scene_reasons.append("faction_free_source_not_proven")
+        file_hashes.append(hashlib.sha256(path.read_bytes()).hexdigest())
         media = probe(path)
         duration = float(dict(media.get("format") or {}).get("duration") or 0.0)
         if duration < 4.0:
@@ -79,12 +85,18 @@ def main() -> int:
 
     if missing:
         reasons.extend([f"{scene_id}:missing_mp4" for scene_id in missing])
+    if len(set(urls)) != len(REQUIRED_IDS):
+        reasons.append(f"magicfit_cdn_urls_not_unique:{len(set(urls))}_of_{len(REQUIRED_IDS)}")
+    if len(set(file_hashes)) != len(REQUIRED_IDS):
+        reasons.append(f"magicfit_source_files_not_unique:{len(set(file_hashes))}_of_{len(REQUIRED_IDS)}")
     payload = {
         "generated_at_utc": utc_now(),
         "status": "pass" if not reasons and len(scenes) == len(REQUIRED_IDS) else "fail",
         "required_scene_count": len(REQUIRED_IDS),
         "found_scene_count": len(scenes),
         "source_dir": str(SOURCE_DIR),
+        "unique_magicfit_cdn_url_count": len(set(urls)),
+        "unique_file_sha256_count": len(set(file_hashes)),
         "scenes": scenes,
         "blocking_reasons": reasons,
     }
