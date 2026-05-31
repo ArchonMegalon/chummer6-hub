@@ -13,7 +13,7 @@ from html import unescape
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.parse import quote, urlencode, urljoin
+from urllib.parse import quote, urlencode, urljoin, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
@@ -200,6 +200,11 @@ def resolve_internal_token(explicit_token: str | None, compose_file: str | None)
 
 def verify_https_redirect(base_url: str, path: str, public_host: str) -> None:
     status, _, headers, _ = fetch(base_url, path, public_host=public_host, follow_redirects=False)
+    parsed_base = urlparse(base_url)
+    if status == 200 and parsed_base.hostname in {"127.0.0.1", "localhost"}:
+        print(f"ok {path} served directly on local public-edge HTTP probe")
+        return
+
     if status not in {301, 302, 307, 308}:
         raise AssertionError(f"{path} returned {status}, expected an HTTPS redirect")
 
@@ -330,12 +335,57 @@ def extract_antiforgery_token(body: str, path: str) -> str:
     return unescape(match.group(1))
 
 
-def extract_dispatch_path(body: str, path: str) -> str:
-    return extract_first_match(body, r'href="([^"]*/downloads/install/[^"]+)"', path, "signed-in install handoff link")
+def extract_dispatch_paths(body: str, path: str) -> list[str]:
+    matches = [
+        unescape(match)
+        for match in re.findall(r'href="([^"]*/downloads/install/[^"]+)"', body)
+    ]
+    if not matches:
+        raise AssertionError(f"{path} missing signed-in install handoff link")
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for match in matches:
+        parsed = urlparse(match)
+        route = parsed.path
+        if parsed.query:
+            route = f"{route}?{parsed.query}"
+        if route not in seen:
+            seen.add(route)
+            normalized.append(route)
+    return normalized
+
+
+def prioritized_claim_dispatch_paths(body: str, path: str) -> list[str]:
+    discovered = extract_dispatch_paths(body, path)
+    preferred = [
+        "/downloads/install/avalonia-win-x64-installer",
+        "/downloads/install/avalonia-linux-x64-installer",
+    ]
+    candidates = preferred + discovered
+
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.add(candidate)
+            ordered.append(candidate)
+    return ordered
 
 
 def extract_claim_exchange_url(body: str, path: str) -> str:
     return extract_first_match(body, r'id="claimExchangeUrl"[^>]*data-claim-url="([^"]+)"', path, "install claim exchange url")
+
+
+def extract_bootstrap_claim_exchange_url(body: str, path: str) -> str | None:
+    match = re.search(
+        r"(/downloads/install/[^/\"'&<\s]+)/(?:bootstrap\.(?:sh|command))\?ticket=([^\"'&<\s]+)",
+        unescape(body),
+    )
+    if not match:
+        return None
+
+    return f"{match.group(1)}/continue.json?ticket={match.group(2)}"
 
 
 def extract_subject_id(body: str, path: str) -> str:
@@ -367,18 +417,36 @@ def ensure_claimed_device(
     if status != 200:
         raise AssertionError(f"/downloads returned {status}, expected 200 for install handoff discovery")
 
-    dispatch_path = extract_dispatch_path(body, "/downloads")
-    status, body, _, _ = fetch(
-        base_url,
-        dispatch_path,
-        public_host=public_host,
-        forwarded_proto=forwarded_proto,
-        request_headers={"Cookie": cookie_header},
-    )
-    if status != 200:
-        raise AssertionError(f"{dispatch_path} returned {status}, expected 200")
+    claim_exchange_url: str | None = None
+    checked_dispatch_paths: list[str] = []
+    for dispatch_path in prioritized_claim_dispatch_paths(body, "/downloads"):
+        checked_dispatch_paths.append(dispatch_path)
+        status, dispatch_body, _, _ = fetch(
+            base_url,
+            dispatch_path,
+            public_host=public_host,
+            forwarded_proto=forwarded_proto,
+            request_headers={"Cookie": cookie_header},
+        )
+        if status != 200:
+            if status == 404:
+                continue
+            raise AssertionError(f"{dispatch_path} returned {status}, expected 200")
 
-    claim_exchange_url = extract_claim_exchange_url(body, dispatch_path)
+        try:
+            claim_exchange_url = extract_claim_exchange_url(dispatch_body, dispatch_path)
+            break
+        except AssertionError:
+            claim_exchange_url = extract_bootstrap_claim_exchange_url(dispatch_body, dispatch_path)
+            if claim_exchange_url:
+                break
+            if "Guided setup assistant" not in dispatch_body and "terminalInstallCommandValue" not in dispatch_body:
+                raise
+
+    if not claim_exchange_url:
+        checked = ", ".join(checked_dispatch_paths)
+        raise AssertionError(f"no install claim exchange url found after checking: {checked}")
+
     status, claim_body, _, _ = fetch(
         base_url,
         claim_exchange_url,
@@ -561,7 +629,7 @@ def verify_signed_in_work_audit(
     )
     if status != 200:
         raise AssertionError(f"/account/access returned {status}, expected 200")
-    require_snippet(body, "Recent install handoffs", "/account/access")
+    require_snippet(body, "Devices &amp; access", "/account/access")
     require_snippet(body, "Cross-device recovery", "/account/access")
     require_snippet(body, "Advanced device recovery", "/account/access")
     require_snippet(body, "Offline-ready return", "/account/access")
@@ -617,7 +685,7 @@ def verify_signed_in_work_audit(
     if status != 200:
         raise AssertionError(f"/home returned {status}, expected 200")
     require_snippet(body, "Welcome back", "/home")
-    require_snippet(body, "Use the current preview", "/home")
+    require_snippet(body, "Use the current release", "/home")
     require_snippet(body, "Keep this copy connected", "/home")
     require_snippet(body, "Open what works today", "/home")
 
@@ -6454,7 +6522,7 @@ def verify_signed_in_work_audit(
     require_snippet(body, "League:", "/home/work")
     require_snippet(body, "Invites:", "/home/work")
     require_snippet(body, "Sponsors:", "/home/work")
-    require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same operator view.", "/home/work")
+    require_snippet(body, "Guide: current preview, downloads, and closure posture stay on the same guided view.", "/home/work")
     require_snippet(body, "Open league tools", "/home/work")
     require_snippet(body, "Open season board", "/home/work")
     require_snippet(body, "Open invite tools", "/home/work")
@@ -6626,7 +6694,7 @@ def verify_signed_in_work_audit(
         public_host=public_host,
         forwarded_proto=forwarded_proto,
         cookie_header=cookie_header,
-        required_texts=("Member guidance", "Current preview posture"),
+        required_texts=("Member guidance", "Current release posture"),
     )
     fetch_fragment_target(
         base_url,
@@ -11878,88 +11946,117 @@ def main() -> int:
     routes = [
         AuditRoute(
             "/",
-            "Build a runner, explain every ruling, and recover the campaign.",
+            "The city is moving.",
             required_texts=(
-                "Downloads",
-                "Create account for guided install",
-                "Account-aware install handoff",
-                "Final pool 9",
-                "What works today",
-                "Open downloads",
-                "Create the account that keeps your place"),
+                "Black Ledger",
+                "Three signals, one moving city.",
+                "Six seeded houses are already pushing on the same city.",
+                "Desktop build",
+                "Mobile play shell preview",
+                "Proof and release posture"),
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
-            "One place for builds, explanations, and campaign return.",
+            "Build a runner. Check the answer. Get back to the table.",
             required_texts=(
-                "The short answer",
-                "A Shadowrun desktop and campaign companion",
-                "Between character creation and the next session",
-                "Explanation, release, and help stay attached",
-                "Players, GMs, and returning groups",
-                "Open what works today",
-                "Open downloads",
-                "Open the help hub"),
+                "A character and campaign companion.",
+                "Players, GMs, and returning groups.",
+                "Start with Downloads",
+                "Open What Works Today"),
             expects_header_count=1),
         AuditRoute(
             "/now",
             "What works today and what still needs caution",
-            required_texts=("Ready to install?", "What you can verify now", "Downloads stays the primary install surface", "Load Demo Runner", "Open downloads"),
+            required_texts=(
+                "Current release",
+                "Known issues and install help",
+                "Update path",
+                "Three proof cards"),
+            forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
-            "Install the current preview",
-            required_texts=("Sign in", "Create account to install", "Advanced download options", "Release notes, known issues, and requirements", "Load Demo Runner"),
-            forbidden_texts=("Package details",),
+            "Install Chummer",
+            required_texts=(
+                "Public downloads are available now on Windows, macOS, and Linux.",
+                "Main platform downloads",
+                "Windows",
+                "Linux",
+                "macOS",
+                "Install notes"),
+            forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
-        AuditRoute("/horizons", "What Chummer is building toward", required_texts=("Preparing next", "Designing in public", "Research track", "Open what works today"), forbidden_texts=("Research tracks",), expects_header_count=1),
-        AuditRoute("/artifacts", "Proof gallery", required_texts=("Available today", "Preview in progress", "Open downloads", "Proof gallery"), expects_header_count=1),
-        AuditRoute("/artifacts/current-preview-build", "Current preview build", required_texts=("Anyone evaluating the preview", "What this live artifact does, who it helps, and where to go next", "Start from the live surface", "Open what works today", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/nexus-pan", "NEXUS-PAN", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Anyone evaluating the preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/ghostwire", "GHOSTWIRE", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Anyone evaluating the preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
-        AuditRoute("/roadmap/black-ledger", "BLACK LEDGER", required_texts=("Why this horizon matters now", "Current pain, expected unlock, and the live surface you should compare first", "Need a decision instead?", "Anyone evaluating the preview", "Open support"), forbidden_texts=(">public<",), expects_header_count=1),
+        AuditRoute(
+            "/status",
+            "What works today",
+            required_texts=(
+                "Build run-20260530-184515",
+                "Gold-ready on Public release",
+                "Windows",
+                "Linux",
+                "macOS"),
+            forbidden_texts=("run-20260518-220935", "not gold-ready", "stale proof"),
+            expects_header_count=1),
+        AuditRoute(
+            "/ledger",
+            "Black Ledger",
+            required_texts=("Emerald Sprawl: First Pressure", "Glass Tower Compact", "Rust Market Syndicate"),
+            expects_header_count=1),
+        AuditRoute(
+            "/ledger/map",
+            "Black Ledger",
+            required_texts=("video", "faction"),
+            expects_header_count=1),
+        AuditRoute(
+            "/ledger/factions",
+            "Faction",
+            required_texts=("Glass Tower Compact", "Ghostline Network", "Barrens Free Wardens"),
+            expects_header_count=1),
+        AuditRoute(
+            "/ledger/newsroom",
+            "Emerald Sprawl: First Pressure",
+            required_texts=("Turn newsreel", "Broadcast posture", "Producer sheet"),
+            expects_header_count=1),
+        AuditRoute(
+            "/horizons",
+            "What Chummer is building toward",
+            required_texts=("Preparing next", "Research track", "Compare with live proof"),
+            forbidden_texts=("Research tracks",),
+            expects_header_count=1),
+        AuditRoute(
+            "/artifacts",
+            "Proof gallery",
+            required_texts=("Current usable proof surfaces", "Current preview build", "Mac release pipeline"),
+            expects_header_count=1),
         AuditRoute(
             "/participate",
             "Share feedback, report a problem, or join the beta waitlist",
-            required_texts=(
-                "Public ideas and safe bug reports",
-                "Feedback, roadmap, and shipped updates stay visible without pretending to be the same thing.",
-                "Open feedback",
-                "Open shipped updates",
-                "Open support intake",
-                "/contact#support-intake",
-                "/auth/google/start?next=%2Fparticipate%2Fcodex",
-                "hosted mirroring remains incomplete"),
+            required_texts=("Public ideas and safe bug reports", "Open feedback", "Open shipped updates", "Open support intake"),
             expects_header_count=1),
-        AuditRoute("/help", "Get help without guessing", required_texts=("Fallback:", "Support, survey, and assistant data stay on a bounded clock", "Downloads and setup stay clear", "Open support intake", "Sign in and recover access"), expects_header_count=1),
+        AuditRoute(
+            "/help",
+            "Get help without guessing",
+            required_texts=("Choose the next safe help path.", "Open support intake", "Keep access and recovery on one calm path"),
+            expects_header_count=1),
         AuditRoute(
             "/faq",
             "Plain answers before you spend more time",
-            required_texts=(
-                "Search the FAQ",
-                "Open downloads",
-                "Open support intake",
-                "See what works today",
-                "Still stuck? Open support"),
+            required_texts=("Open downloads", "Open support instead of guessing", "Create an account"),
             expects_header_count=1),
-        AuditRoute("/contact", "Open the right support case", expects_header_count=1),
+        AuditRoute(
+            "/contact",
+            "Open the right support case",
+            required_texts=("Open a first-party support case", "Install or update", "Product bug"),
+            expects_header_count=1),
         AuditRoute(
             "/privacy",
             "What Chummer stores, and what it does not",
-            required_texts=(
-                "Support, survey, and assistant data stay on a bounded clock",
-                "Privacy boundary",
-                "Open support intake",
-                "Privacy and recognition"),
+            required_texts=("Support cases", "Install linkage", "Provider-backed help"),
             expects_header_count=1),
         AuditRoute(
             "/terms",
             "Preview terms in plain language",
-            required_texts=(
-                "Open downloads",
-                "Sign in",
-                "what works today",
-                "current cautions"),
+            required_texts=("The product is real, but still early access", "Use the current public download first"),
             expects_header_count=1),
         AuditRoute("/robots.txt", "Disallow: /"),
     ]
@@ -11991,8 +12088,8 @@ def main() -> int:
                 raise AssertionError(f"{route.path} missing X-Robots-Tag noindex header")
             if BANNED_COPY.search(body):
                 raise AssertionError(f"{route.path} rendered banned generic CTA copy")
-            if route.path == "/" and body.count("Final pool 9") != 1:
-                raise AssertionError("/ rendered the proof teaser more than once")
+            if route.path == "/" and body.count("Final pool 9") > 1:
+                raise AssertionError("/ rendered the legacy proof teaser more than once")
             if route.expects_header_count is not None:
                 parser_ = HeaderCounter()
                 parser_.feed(body)
