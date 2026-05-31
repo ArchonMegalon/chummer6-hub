@@ -2,7 +2,7 @@
   "asset_id": "ledger_globe_idle_v1",
   "mode": "idle_loop",
   "provider_requested": "MagicFit",
-  "provider_status": "missing_render_asset",
+  "provider_status": "not_claimed_for_this_asset",
   "render_mode": "first_party_raster_video_fallback",
   "generated_at_utc": "2026-05-31T06:12:08.734528Z",
   "duration_seconds": 14,
@@ -17,6 +17,7 @@
     "watermark_status": "none",
     "public_safety_status": "pass",
     "overlay_truth_status": "chummer_owned_canvas_overlay",
-    "magicfit_claim_allowed": false
+    "magicfit_claim_allowed": false,
+    "first_party_video_claim_allowed": true
   }
 }

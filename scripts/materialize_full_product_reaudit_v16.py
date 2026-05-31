@@ -20,6 +20,8 @@ FLEET = WORKSPACE / ".integrated" / "fleet"
 CHUMMER6 = WORKSPACE / "Chummer6"
 OUT = WORKSPACE / "_completion" / "full_product_reaudit_v16"
 ZIP = RUN_SERVICES / "Chummer.Portal" / "downloads" / "chummer6_full_product_reaudit_v16_20260529.zip"
+LATEST_HOME_ZIP = Path.home() / "chummer6_full_product_reaudit_v16_20260531.zip"
+UNPACKED_AUDIT_ROOT = Path("/tmp/chummer6_full_product_reaudit_v16_20260531/chummer6_full_product_reaudit_v16_20260531")
 BASE_URL = "https://chummer.run"
 
 REQUIRED_PUBLIC_PATHS = [
@@ -38,8 +40,8 @@ REQUIRED_PUBLIC_PATHS = [
 REQUIRED_GATES = {
     "RELEASE_TRUTH_MATRIX.generated.json": "json_pass",
     "LIVE_STATUS_RELEASE_ALIGNMENT.generated.json": "json_pass",
-    "LIVE_CHUMMER_RUN_ROUTE_PROOF.generated.json": "json_pass",
-    "CLASSIC_FORMPORT_FUNCTIONAL_PARITY_AUDIT.generated.json": "json_pass",
+    "LIVE_PUBLIC_ROUTE_PROOF.generated.json": "json_pass",
+    "CLASSIC_FORMPORT_TYPED_BINDING_AUDIT.generated.json": "json_pass",
     "FINAL_SR4_RULE_AUTHORITY_VERDICT.md": "SR4_RULE_AUTHORITY_READY",
     "FINAL_SR5_RULE_AUTHORITY_VERDICT.md": "SR5_RULE_AUTHORITY_READY",
     "FINAL_SR6_RULE_AUTHORITY_VERDICT.md": "SR6_RULE_AUTHORITY_READY",
@@ -228,7 +230,7 @@ def materialize_live_route_proof(generated: str) -> dict[str, Any]:
             route_ok = False
 
     payload = {
-        "contract_name": "chummer.full_product_reaudit_v16.live_chummer_run_route_proof",
+        "contract_name": "chummer.full_product_reaudit_v16.live_public_route_proof",
         "generated_at_utc": generated,
         "base_url": BASE_URL,
         "public_host": "chummer.run",
@@ -245,25 +247,48 @@ def materialize_live_route_proof(generated: str) -> dict[str, Any]:
         "dead_links": dead_links,
         "status": "pass" if route_ok and not failures and not forbidden_hits and not dead_links else "fail",
     }
+    write_json(OUT / "LIVE_PUBLIC_ROUTE_PROOF.generated.json", payload)
     write_json(OUT / "LIVE_CHUMMER_RUN_ROUTE_PROOF.generated.json", payload)
     return payload
 
 
 def materialize_formport_audit(generated: str) -> dict[str, Any]:
     formport_dir = WORKSPACE / "chummer-presentation" / "Chummer.Avalonia" / "Controls" / "ClassicFormPorts"
-    files = sorted(formport_dir.glob("*ClassicPort.axaml*"))
+    files = sorted(formport_dir.glob("*.axaml*")) + [
+        path
+        for path in (
+            formport_dir / "ClassicFormPortViewModelBridge.cs",
+            formport_dir / "ClassicFormPortSurfaceControl.cs",
+        )
+        if path.is_file()
+    ]
     port_code_files = sorted(formport_dir.glob("*ClassicPort.axaml.cs"))
+    axaml_files = sorted(formport_dir.glob("*ClassicPort.axaml"))
     bridge_file = formport_dir / "ClassicFormPortViewModelBridge.cs"
     source = "\n".join(read_text(path) for path in files)
-    generic_markers = ["state.Rows", "FindValue(rows", "MatchRows(rows", "SectionRowDisplayItem"]
+    generic_markers = [
+        "previewJson",
+        "ReadPreviewFacts",
+        "ClassicDomainFact",
+        "DomainBucket",
+        "state.Rows",
+        "FindValue(rows",
+        "MatchRows(rows",
+        "SectionRowDisplayItem",
+    ]
     generic_hits = [marker for marker in generic_markers if marker in source]
     missing_surface = not files
+    real_command_bindings = bool(axaml_files) and all("Command=" in read_text(path) for path in axaml_files)
     payload = {
-        "contract_name": "chummer.full_product_reaudit_v16.classic_formport_functional_parity",
+        "contract_name": "chummer.full_product_reaudit_v16.classic_formport_typed_binding",
         "generated_at_utc": generated,
         "status": "fail" if generic_hits or missing_surface else "pass",
         "verdict": "NOT_READY" if generic_hits or missing_surface else "CLASSIC_FORMPORT_FUNCTIONAL_PARITY_READY",
         "checked_files": [str(path) for path in files],
+        "blocked_by": [
+            "preview-json/domain-fact projection remains in the shared bridge",
+            "W1 Add/Edit/Delete/key handlers are visible controls but not command-bound actions",
+        ] if generic_hits or not real_command_bindings else [],
         "requirements": {
             "typed_view_model": bridge_file.is_file(),
             "typed_command_bridge": bridge_file.is_file() and all("ClassicFormPortViewModelBridge.Create" in read_text(path) for path in port_code_files),
@@ -271,17 +296,21 @@ def materialize_formport_audit(generated: str) -> dict[str, Any]:
             "add_edit_delete_flows": all(token in source for token in ("Add", "Edit", "Delete")),
             "context_menus": source.count("ContextMenu") >= len(port_code_files),
             "keyboard_shortcuts": source.count("KeyBinding") >= len(port_code_files),
+            "real_command_bindings": real_command_bindings,
             "fixture_data": (WORKSPACE / "chummer-presentation" / ".codex-studio" / "published" / "FORM_PORT_COVERAGE_MATRIX.generated.json").is_file(),
             "side_by_side_screenshots": (WORKSPACE / "chummer-presentation" / ".codex-studio" / "published" / "CHUMMER5A_SCREENSHOT_REVIEW_GATE.generated.json").is_file(),
             "veteran_user_task_review": (WORKSPACE / "chummer-presentation" / ".codex-studio" / "published" / "CLASSIC_FORM_PORT_HUMAN_REVIEW.md").is_file(),
-            "no_primary_state_rows_token_matching": not generic_hits,
+            "no_preview_json_projection": "previewJson" not in generic_hits and "ReadPreviewFacts" not in generic_hits,
+            "no_fact_bucket_projection": "ClassicDomainFact" not in generic_hits and "DomainBucket" not in generic_hits,
+            "no_primary_state_rows_token_matching": "state.Rows" not in generic_hits,
         },
         "generic_projection_hits": generic_hits,
         "missing_surface": missing_surface,
-        "summary": "Classic FormPort W1 surfaces expose typed view-model bridges, Add/Edit/Delete workflows, context menus, keyboard shortcuts, fixture coverage, screenshot evidence, and human review receipts without generic state.Rows projection.",
+        "summary": "Classic FormPort W1 surfaces have more visible controls and typed records, but still depend on preview-json/domain-fact projection and lack command-bound Add/Edit/Delete actions.",
     }
     payload["status"] = "pass" if all(payload["requirements"].values()) and not generic_hits and not missing_surface else "fail"
-    payload["verdict"] = "CLASSIC_FORMPORT_FUNCTIONAL_PARITY_READY" if payload["status"] == "pass" else "NOT_READY"
+    payload["verdict"] = "CLASSIC_FORMPORT_TYPED_BINDING_READY" if payload["status"] == "pass" else "NOT_READY"
+    write_json(OUT / "CLASSIC_FORMPORT_TYPED_BINDING_AUDIT.generated.json", payload)
     write_json(OUT / "CLASSIC_FORMPORT_FUNCTIONAL_PARITY_AUDIT.generated.json", payload)
     return payload
 
@@ -368,8 +397,9 @@ def main() -> int:
     release_payload = {
         "contract_name": "chummer.full_product_reaudit_v16.release_truth_matrix",
         "generated_at_utc": generated,
-        "source_zip": str(ZIP),
-        "source_zip_sha256": sha256(ZIP),
+        "source_zip": str(LATEST_HOME_ZIP if LATEST_HOME_ZIP.is_file() else ZIP),
+        "source_zip_sha256": sha256(LATEST_HOME_ZIP if LATEST_HOME_ZIP.is_file() else ZIP),
+        "unpacked_audit_root": str(UNPACKED_AUDIT_ROOT),
         "status": "pass" if release_truth_pass else "fail",
         "verdict": "RELEASE_TRUTH_ALIGNED" if release_truth_pass else "NOT_GOLD",
         "release_manifest": {
@@ -437,7 +467,7 @@ def main() -> int:
     copy_or_missing("FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md", [WORKSPACE / "_completion" / "magicfit_provider" / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md"], "NOT_READY\n")
     copy_or_missing("FINAL_RAFTER_PIXEFY_QA_STACK_VERDICT.md", [FLEET / "_completion" / "rafter_pixefy" / "FINAL_RAFTER_PIXEFY_QA_STACK_VERDICT.md"], "NOT_READY\n")
     copy_or_missing("FINAL_BLACK_LEDGER_VIDEO_GLOBE_VERDICT.md", [RUN_SERVICES / "_completion" / "black_ledger_video_globe" / "FINAL_BLACK_LEDGER_VIDEO_GLOBE_VERDICT.md"], "NOT_READY\n")
-    copy_or_missing("FINAL_FACTION_VIDEO_SERIES_VERDICT.md", [WORKSPACE / "_completion" / "full_product_reaudit_v14" / "FINAL_FACTION_VIDEO_SERIES_VERDICT.md"], "NOT_READY\n")
+    copy_or_missing("FINAL_FACTION_VIDEO_SERIES_VERDICT.md", [WORKSPACE / "_completion" / "faction_video_series" / "FINAL_FACTION_VIDEO_SERIES_VERDICT.md"], "NOT_READY\n")
     write_v16_newsroom_verdict(generated)
     copy_or_missing("FINAL_PWA_GOLD_VERDICT.md", [WORKSPACE / "_completion" / "full_product_reaudit_v14" / "FINAL_PWA_GOLD_VERDICT.md"], "NOT_READY\n")
     write_v16_table_pulse_verdict(generated)

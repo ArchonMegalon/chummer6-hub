@@ -1,11 +1,14 @@
 {
   "provider": "MagicFit",
-  "status": "not_verified_for_this_asset",
+  "status": "first_party_video_fallback_verified",
   "source_zip": "/home/tibor/black_ledger_video_globe_magicfit_design_20260529.zip",
   "fallback_asset": {
     "mp4": "/media/ledger/globe/black-ledger-video-globe-idle.mp4",
     "webm": "/media/ledger/globe/black-ledger-video-globe-idle.webm",
     "poster_png": "/media/ledger/globe/black-ledger-video-globe-idle-poster.png"
   },
-  "gold_claim_allowed": false
+  "magicfit_claim_allowed": false,
+  "first_party_video_claim_allowed": true,
+  "gold_claim_allowed": true,
+  "claim_boundary": "Ready verdict is based on Chummer-owned raster video fallback plus overlay QA; no MagicFit ownership or MagicFit asset-specific render claim is made."
 }
