@@ -1,0 +1,35 @@
+{
+  "generated_at_utc": "2026-05-31T11:45:12Z",
+  "status": "published",
+  "asset_id": "every-wonder-horizon-promo",
+  "render_mode": "first_party_motion_storyboard_90s",
+  "provider_claim": "none",
+  "magicfit_claim_allowed": false,
+  "horizon_claim_boundary": "directional_future_shelf_not_current_release_truth",
+  "scene_count": 12,
+  "duration_seconds": 90.0,
+  "public_files": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo-poster.png",
+    "captions": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/every-wonder-horizon-promo.vtt"
+  },
+  "mp4_probe": {
+    "programs": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 720
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio"
+      }
+    ],
+    "format": {
+      "duration": "90.000000"
+    }
+  }
+}

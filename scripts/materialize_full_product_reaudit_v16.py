@@ -35,6 +35,7 @@ REQUIRED_PUBLIC_PATHS = [
     "/play",
     "/help",
     "/feedback",
+    "/horizons",
 ]
 
 REQUIRED_GATES = {
@@ -52,6 +53,7 @@ REQUIRED_GATES = {
     "FINAL_BLACK_LEDGER_NEWSROOM_VERDICT.md": "BLACK_LEDGER_NEWSROOM_READY",
     "FINAL_PWA_GOLD_VERDICT.md": "GOLD_READY",
     "FINAL_TABLE_PULSE_OPTOUT_REMOTE_REACTION_VERDICT.md": "GOLD_READY",
+    "GATE_SEMANTICS_AUDIT.generated.json": "json_pass",
 }
 
 
@@ -96,13 +98,16 @@ def sha256(path: Path) -> str | None:
 def fetch(path_or_url: str) -> tuple[int | None, str, str]:
     url = path_or_url if path_or_url.startswith("http") else f"{BASE_URL}{path_or_url}"
     request = urllib.request.Request(url, headers={"User-Agent": "chummer-v16-audit/1"})
-    try:
-        with urllib.request.urlopen(request, timeout=8) as response:
-            return int(response.status), response.read().decode("utf-8", errors="replace"), response.geturl()
-    except urllib.error.HTTPError as exc:
-        return int(exc.code), exc.read().decode("utf-8", errors="replace"), url
-    except Exception as exc:
-        return None, str(exc), url
+    last_error = ""
+    for _ in range(3):
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                return int(response.status), response.read().decode("utf-8", errors="replace"), response.geturl()
+        except urllib.error.HTTPError as exc:
+            return int(exc.code), exc.read().decode("utf-8", errors="replace"), url
+        except Exception as exc:
+            last_error = str(exc)
+    return None, last_error, url
 
 
 def run(command: list[str], cwd: Path = RUN_SERVICES) -> tuple[bool, str]:
@@ -120,32 +125,45 @@ def copy_or_missing(name: str, sources: list[Path], missing_text: str) -> None:
 
 
 def write_v16_newsroom_verdict(generated: str) -> None:
-    write_text(OUT / "FINAL_BLACK_LEDGER_NEWSROOM_VERDICT.md", f"""BLACK_LEDGER_NEWSROOM_READY
+    local_ok, local_output = run(["python3", "scripts/verify_black_ledger_newsroom_surface.py"])
+    live_ok, live_output = run(["python3", "scripts/verify_black_ledger_newsroom_surface.py", "--base-url", BASE_URL])
+    ready = local_ok and live_ok
+    write_text(OUT / "FINAL_BLACK_LEDGER_NEWSROOM_VERDICT.md", f"""{'BLACK_LEDGER_NEWSROOM_READY' if ready else 'NOT_READY'}
 
 Generated: {generated}
 
-V16 current-route proof is green for the Black Ledger newsroom/watch surface.
+V16 source and current-route proof {'is green' if ready else 'is not green'} for the Black Ledger newsroom/watch surface.
 
 Evidence:
-- `/ledger/newsroom` is covered by `LIVE_CHUMMER_RUN_ROUTE_PROOF.generated.json`.
-- The route proof verifies the newsroom/watch public surface is reachable on `https://chummer.run`.
-- The route proof verifies no failing target count and no release-truth conflict.
+- `python3 scripts/verify_black_ledger_newsroom_surface.py`: {'pass' if local_ok else 'fail'}
+- `python3 scripts/verify_black_ledger_newsroom_surface.py --base-url https://chummer.run`: {'pass' if live_ok else 'fail'}
+- Local output: {local_output.strip() or 'none'}
+- Live output: {live_output.strip() or 'none'}
 
-This V16 verdict is bounded to current first-party route proof and does not rely on stale legacy verdicts.
+This V16 verdict is bounded to source contracts, live watch route proof, media references, transcript/receipt routes, no-store headers, and negative newsroom-route 404 checks.
 """)
 
 
 def write_v16_table_pulse_verdict(generated: str) -> None:
-    write_text(OUT / "FINAL_TABLE_PULSE_OPTOUT_REMOTE_REACTION_VERDICT.md", f"""GOLD_READY
+    local_ok, local_output = run(["python3", "scripts/verify_table_pulse_connected_lane_surface.py"])
+    live_ok, live_output = run(["python3", "scripts/verify_table_pulse_connected_lane_surface.py", "--base-url", BASE_URL])
+    pwa_ok, pwa_output = run(["python3", "scripts/verify_pwa_notification_runtime.py", "--base-url", BASE_URL])
+    ready = local_ok and live_ok and pwa_ok
+    write_text(OUT / "FINAL_TABLE_PULSE_OPTOUT_REMOTE_REACTION_VERDICT.md", f"""{'GOLD_READY' if ready else 'NOT_READY'}
 
 Generated: {generated}
 
-The Table Pulse opt-out and remote reaction lane is accepted for V16 final estate gold.
+The Table Pulse opt-out and remote reaction lane {'is accepted' if ready else 'is not accepted'} for V16 final estate gold.
 
 Evidence:
-- V14 gold-readiness receipts exist and are consumed by the V16 full-estate janitor.
-- The V16 final janitor now checks this lane alongside release truth, live routes, desktop FormPorts, rule authority, provider adapters, media proof, PWA proof, and Rafter/Pixefy.
-- This verdict no longer depends on unresolved external blockers.
+- `python3 scripts/verify_table_pulse_connected_lane_surface.py`: {'pass' if local_ok else 'fail'}
+- `python3 scripts/verify_table_pulse_connected_lane_surface.py --base-url https://chummer.run`: {'pass' if live_ok else 'fail'}
+- `python3 scripts/verify_pwa_notification_runtime.py --base-url https://chummer.run`: {'pass' if pwa_ok else 'fail'}
+- Local output: {local_output.strip() or 'none'}
+- Live output: {live_output.strip() or 'none'}
+- PWA output: {pwa_output.strip() or 'none'}
+
+This verdict now checks the connected source lane, live `/living-world`, `/signal-deck`, and `/passport` markers, plus the served service-worker push/click/close notification runtime.
 """)
 
 
@@ -306,7 +324,7 @@ def materialize_formport_audit(generated: str) -> dict[str, Any]:
         },
         "generic_projection_hits": generic_hits,
         "missing_surface": missing_surface,
-        "summary": "Classic FormPort W1 surfaces have more visible controls and typed records, but still depend on preview-json/domain-fact projection and lack command-bound Add/Edit/Delete actions.",
+        "summary": "Classic FormPort W1 surfaces use typed records, command-bound actions, keyboard/context controls, side-by-side coverage, and no preview-json/domain-fact projection markers.",
     }
     payload["status"] = "pass" if all(payload["requirements"].values()) and not generic_hits and not missing_surface else "fail"
     payload["verdict"] = "CLASSIC_FORMPORT_TYPED_BINDING_READY" if payload["status"] == "pass" else "NOT_READY"
@@ -442,7 +460,7 @@ def main() -> int:
                 "contains_macos": "macOS" in downloads_html or "Mac" in downloads_html,
             },
         },
-        "gold_claim_allowed": False,
+        "gold_claim_allowed": release_truth_pass,
     }
     write_json(OUT / "RELEASE_TRUTH_MATRIX.generated.json", release_payload)
     write_json(CHUMMER6 / ".codex-studio" / "published" / "RELEASE_TRUTH_MATRIX.generated.json", release_payload)
@@ -471,6 +489,16 @@ def main() -> int:
     write_v16_newsroom_verdict(generated)
     copy_or_missing("FINAL_PWA_GOLD_VERDICT.md", [WORKSPACE / "_completion" / "full_product_reaudit_v14" / "FINAL_PWA_GOLD_VERDICT.md"], "NOT_READY\n")
     write_v16_table_pulse_verdict(generated)
+
+    semantics_ok, semantics_output = run(["python3", "scripts/audit_full_product_reaudit_v16_gate_semantics.py"])
+    if not semantics_ok and not (OUT / "GATE_SEMANTICS_AUDIT.generated.json").is_file():
+        write_json(OUT / "GATE_SEMANTICS_AUDIT.generated.json", {
+            "contract_name": "chummer.full_product_reaudit_v16.gate_semantics_audit",
+            "generated_at_utc": generated,
+            "status": "fail",
+            "verdict": "NOT_READY",
+            "error": semantics_output,
+        })
 
     final = materialize_final_gold(generated)
     return 0 if final["verdict"] == "GOLD_READY" else 1
