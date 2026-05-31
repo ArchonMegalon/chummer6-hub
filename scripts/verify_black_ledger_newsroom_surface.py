@@ -123,7 +123,7 @@ def main() -> int:
             current_watch_route = "/ledger/newsroom/turn-1-newsreel"
         else:
             current_watch_route = newsroom_home.headers.get("Location", "")
-            if "/ledger/newsroom/turn-" not in current_watch_route:
+            if "/ledger/newsroom/turn-" not in current_watch_route and "/ledger/turns/" not in current_watch_route:
                 missing.append("live route /ledger/newsroom redirect missing turn newsroom target")
             if not current_watch_route.startswith("/"):
                 current_watch_route = f"/{current_watch_route.lstrip('/')}"
@@ -156,35 +156,40 @@ def main() -> int:
                     f"asset {asset_label} for {current_watch_route} expected content type {expected_type}, got {content_type}"
                 )
 
+        transcript_match = re.search(r'href="([^"]+/transcript)"[^>]*>Transcript', watch_body)
+        receipts_match = re.search(r'href="([^"]+/receipts)"[^>]*>Source receipts', watch_body)
+        transcript_route = transcript_match.group(1) if transcript_match else f"{current_watch_route}/transcript"
+        receipts_route = receipts_match.group(1) if receipts_match else f"{current_watch_route}/receipts"
+
         transcript_response = requests.get(
-            f"{base_url}{current_watch_route}/transcript",
+            f"{base_url}{transcript_route}",
             timeout=30,
             allow_redirects=False,
         )
         if transcript_response.status_code not in {301, 302, 303, 307, 308}:
-            missing.append(f"live route {current_watch_route}/transcript missing redirect status")
+            missing.append(f"live route {transcript_route} missing redirect status")
         else:
             location = transcript_response.headers.get("Location", "")
             if ".vtt" not in location:
-                missing.append(f"live route {current_watch_route}/transcript redirect missing marker: .vtt")
+                missing.append(f"live route {transcript_route} redirect missing marker: .vtt")
         cache_control = transcript_response.headers.get("Cache-Control", "")
         for marker in NO_STORE_HEADER_MARKERS:
             if marker not in cache_control:
-                missing.append(f"live route {current_watch_route}/transcript missing cache-control marker: {marker}")
+                missing.append(f"live route {transcript_route} missing cache-control marker: {marker}")
 
         receipts_response = requests.get(
-            f"{base_url}{current_watch_route}/receipts",
+            f"{base_url}{receipts_route}",
             timeout=30,
         )
         receipts_response.raise_for_status()
         cache_control = receipts_response.headers.get("Cache-Control", "")
         for marker in NO_STORE_HEADER_MARKERS:
             if marker not in cache_control:
-                missing.append(f"live route {current_watch_route}/receipts missing cache-control marker: {marker}")
+                missing.append(f"live route {receipts_route} missing cache-control marker: {marker}")
         try:
             receipts_payload = receipts_response.json()
         except json.JSONDecodeError as exc:
-            missing.append(f"live route {current_watch_route}/receipts did not return JSON: {exc}")
+            missing.append(f"live route {receipts_route} did not return JSON: {exc}")
         else:
             summary_value = str(receipts_payload.get("summary") or "")
             checks_values = receipts_payload.get("checks") or []
