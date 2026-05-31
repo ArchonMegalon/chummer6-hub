@@ -90,6 +90,100 @@ def check(condition: bool, name: str, details: dict[str, Any] | None = None) -> 
     return {"name": name, "status": "pass" if condition else "fail", "details": details or {}}
 
 
+STALE_PUBLIC_GUIDE_PHRASES = [
+    "macOS still lacks the promoted desktop installer proof",
+    "There is still no public macOS installer",
+    "Still missing from the promoted installer lane: macOS",
+    "There is no public macOS installer today",
+    "Downloads are currently live for Windows and Linux",
+]
+
+REQUIRED_HORIZON_PROMO_SCENE_IDS = [
+    "opener_table_remembers",
+    "proof_boundary",
+    "nexus_pan",
+    "alice",
+    "karma_forge",
+    "jackpoint",
+    "runsite",
+    "runbook_press",
+    "table_pulse",
+    "black_ledger",
+    "community_hub",
+    "finale_all_horizons",
+]
+
+
+def public_guide_release_truth_checks(public_release_packet: dict[str, Any], public_guide_text: str) -> list[dict[str, Any]]:
+    return [
+        check(
+            public_release_packet.get("available_platforms") == ["Windows", "Linux", "macOS"],
+            "public guide release packet agrees with three-platform live shelf",
+            public_release_packet,
+        ),
+        check(
+            public_release_packet.get("missing_platforms") == [],
+            "public guide release packet has no missing platform contradiction",
+            public_release_packet,
+        ),
+        check(
+            public_release_packet.get("shelf_truth_line") == "Downloads are currently live for Windows, Linux, and macOS.",
+            "public guide shelf truth names Windows, Linux, and macOS",
+            {"shelf_truth_line": public_release_packet.get("shelf_truth_line")},
+        ),
+        check(
+            "Avalonia Desktop macOS ARM64 Installer" in public_guide_text
+            and not any(phrase in public_guide_text for phrase in STALE_PUBLIC_GUIDE_PHRASES),
+            "public guide copy does not regress to stale missing-macOS installer truth",
+            {"forbidden_phrases": STALE_PUBLIC_GUIDE_PHRASES},
+        ),
+    ]
+
+
+def journey_gate_truth_check(journey_gates: dict[str, Any]) -> dict[str, Any]:
+    journey_truth = journey_gates.get("current_truth") if isinstance(journey_gates.get("current_truth"), dict) else {}
+    return check(
+        journey_truth.get("state") == "ready" and journey_truth.get("blocked_count") == 0,
+        "design journey gates current truth is ready with zero blockers",
+        journey_truth,
+    )
+
+
+def every_wonder_horizon_receipt_checks(receipt: dict[str, Any], probe: dict[str, Any]) -> list[dict[str, Any]]:
+    production_scenes = receipt.get("production_scenes") if isinstance(receipt.get("production_scenes"), list) else []
+    scene_ids = [str(scene.get("id") or "") for scene in production_scenes if isinstance(scene, dict)]
+    proof_constraints = receipt.get("proof_constraints") if isinstance(receipt.get("proof_constraints"), list) else []
+    return [
+        check(receipt.get("status") == "published", "every-wonder-horizon-promo has published receipt", receipt),
+        check(
+            probe.get("status") == "pass"
+            and probe.get("has_video")
+            and probe.get("has_audio")
+            and probe.get("duration", 0) >= 89.5,
+            "every-wonder-horizon-promo is a 90-second audio/video asset",
+            probe,
+        ),
+        check(
+            receipt.get("scene_count") == 12 and len(production_scenes) == 12 and scene_ids == REQUIRED_HORIZON_PROMO_SCENE_IDS,
+            "Every Wonder Horizon promo receipt proves the required 12-scene production sheet",
+            {"scene_ids": scene_ids, "required_scene_ids": REQUIRED_HORIZON_PROMO_SCENE_IDS},
+        ),
+        check(
+            receipt.get("horizon_claim_boundary") == "directional_future_shelf_not_current_release_truth"
+            and receipt.get("magicfit_claim_allowed") is False
+            and receipt.get("provider_claim") == "none"
+            and "MagicFit render claim requires provider and scene receipts; otherwise label first-party motion storyboard" in proof_constraints,
+            "Every Wonder Horizon promo stays proof-bounded and does not fake MagicFit rendering",
+            {
+                "horizon_claim_boundary": receipt.get("horizon_claim_boundary"),
+                "magicfit_claim_allowed": receipt.get("magicfit_claim_allowed"),
+                "provider_claim": receipt.get("provider_claim"),
+                "proof_constraints": proof_constraints,
+            },
+        ),
+    ]
+
+
 def main() -> int:
     checks: list[dict[str, Any]] = []
 
@@ -153,42 +247,10 @@ def main() -> int:
         read_text(public_guide_root / name)
         for name in ("README.md", "STATUS.md", "DOWNLOAD.md", "FROM_CHUMMER5A_TO_CHUMMER6.md")
     )
-    stale_public_guide_phrases = [
-        "macOS still lacks the promoted desktop installer proof",
-        "There is still no public macOS installer",
-        "Still missing from the promoted installer lane: macOS",
-        "There is no public macOS installer today",
-        "Downloads are currently live for Windows and Linux",
-    ]
-    checks.append(check(
-        public_release_packet.get("available_platforms") == ["Windows", "Linux", "macOS"],
-        "public guide release packet agrees with three-platform live shelf",
-        public_release_packet,
-    ))
-    checks.append(check(
-        public_release_packet.get("missing_platforms") == [],
-        "public guide release packet has no missing platform contradiction",
-        public_release_packet,
-    ))
-    checks.append(check(
-        public_release_packet.get("shelf_truth_line") == "Downloads are currently live for Windows, Linux, and macOS.",
-        "public guide shelf truth names Windows, Linux, and macOS",
-        {"shelf_truth_line": public_release_packet.get("shelf_truth_line")},
-    ))
-    checks.append(check(
-        "Avalonia Desktop macOS ARM64 Installer" in public_guide_text
-        and not any(phrase in public_guide_text for phrase in stale_public_guide_phrases),
-        "public guide copy does not regress to stale missing-macOS installer truth",
-        {"forbidden_phrases": stale_public_guide_phrases},
-    ))
+    checks.extend(public_guide_release_truth_checks(public_release_packet, public_guide_text))
 
     journey_gates = read_json(canonical_root / "JOURNEY_GATES.generated.json")
-    journey_truth = journey_gates.get("current_truth") if isinstance(journey_gates.get("current_truth"), dict) else {}
-    checks.append(check(
-        journey_truth.get("state") == "ready" and journey_truth.get("blocked_count") == 0,
-        "design journey gates current truth is ready with zero blockers",
-        journey_truth,
-    ))
+    checks.append(journey_gate_truth_check(journey_gates))
 
     routes = read_json(OUT / "LIVE_PUBLIC_ROUTE_PROOF.generated.json")
     route_paths = {str(item.get("path")) for item in routes.get("required_route_results") or []}
@@ -218,6 +280,20 @@ def main() -> int:
 
     flagship_reel = run(["python3", "scripts/verify_flagship_promo_12_scene_reel.py", "--asset", "chummer6-flagship-promo"])
     checks.append(check(flagship_reel["pass"], "Flagship promo has 12 visually distinct sampled scenes", flagship_reel))
+
+    flagship_mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.mp4"
+    flagship_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.receipt.json")
+    flagship_probe = ffprobe(flagship_mp4)
+    checks.append(check(flagship_receipt.get("status") == "published", "chummer6-flagship-promo has published receipt"))
+    checks.append(check(
+        flagship_probe.get("status") == "pass" and flagship_probe.get("has_video") and flagship_probe.get("has_audio") and flagship_probe.get("duration", 0) >= 89.5,
+        "chummer6-flagship-promo is a 90-second audio/video asset",
+        flagship_probe,
+    ))
+
+    horizon_mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.mp4"
+    horizon_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "every-wonder-horizon-promo.receipt.json")
+    checks.extend(every_wonder_horizon_receipt_checks(horizon_receipt, ffprobe(horizon_mp4)))
 
     for asset_id in ("chummer6-flagship-promo", "every-wonder-horizon-promo"):
         mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / f"{asset_id}.mp4"

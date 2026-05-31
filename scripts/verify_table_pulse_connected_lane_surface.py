@@ -63,6 +63,8 @@ LIVE_ROUTE_MARKERS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+LIVE_REQUEST_ATTEMPTS = 3
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -94,9 +96,9 @@ def main() -> int:
     if args.base_url:
         base_url = args.base_url.rstrip("/")
         for route, markers in LIVE_ROUTE_MARKERS.items():
-            response = requests.get(f"{base_url}{route}", timeout=30)
-            response.raise_for_status()
-            body = response.text
+            body = fetch_live_route(f"{base_url}{route}", missing)
+            if not body:
+                continue
             for marker in markers:
                 if marker not in body:
                     missing.append(f"live route {route} missing marker: {marker}")
@@ -108,6 +110,22 @@ def main() -> int:
 
     print("table_pulse_connected_lane_surface:ok")
     return 0
+
+
+def fetch_live_route(url: str, missing: list[str]) -> str:
+    last_error = ""
+    for attempt in range(1, LIVE_REQUEST_ATTEMPTS + 1):
+        try:
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            return response.text
+        except requests.RequestException as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+            if attempt == LIVE_REQUEST_ATTEMPTS:
+                break
+
+    missing.append(f"live route {url} could not be fetched after {LIVE_REQUEST_ATTEMPTS} attempts: {last_error}")
+    return ""
 
 
 if __name__ == "__main__":

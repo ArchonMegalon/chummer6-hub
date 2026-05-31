@@ -255,6 +255,41 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
         ):
             self.assertEqual(verifier.main(), 1)
 
+    def test_verifier_retries_live_route_transport_timeout(self) -> None:
+        class FakeResponse:
+            def __init__(self, text: str) -> None:
+                self.text = text
+
+            def raise_for_status(self) -> None:
+                return None
+
+        route_bodies = {
+            "http://example.test/living-world": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/signal-deck": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+            "http://example.test/passport": "<section><p class='eyebrow'>Connected lane</p><p>Table Pulse Live inbox</p></section>",
+        }
+        attempts = {"http://example.test/living-world": 0}
+
+        def fake_get(url: str, timeout: int) -> FakeResponse:
+            self.assertEqual(timeout, 30)
+            if url == "http://example.test/living-world" and attempts[url] == 0:
+                attempts[url] += 1
+                raise requests.exceptions.ReadTimeout("temporary live read timeout")
+            return FakeResponse(route_bodies[url])
+
+        script_dir = str(SCRIPT.parent)
+        with patch.object(sys, "path", [script_dir, *sys.path]):
+            import verify_table_pulse_connected_lane_surface as verifier
+            import requests
+
+        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+            sys,
+            "argv",
+            ["verify_table_pulse_connected_lane_surface.py", "--base-url", "http://example.test"],
+        ):
+            self.assertEqual(verifier.main(), 0)
+            self.assertEqual(attempts["http://example.test/living-world"], 1)
+
     @staticmethod
     def copy_sources(temp_root: Path) -> None:
         for relative_path in SOURCE_FILES:

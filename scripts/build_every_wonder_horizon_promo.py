@@ -506,6 +506,7 @@ def main() -> int:
         "title": PRODUCTION_TITLE,
         "global_magicfit_prompt": GLOBAL_MAGICFIT_PROMPT,
         "negative_prompt": NEGATIVE_PROMPT,
+        "proof_constraints": list(PROOF_CONSTRAINTS),
         "production_sheet": str(production_sheet_path),
         "production_scenes": production_scenes,
         "public_files": {

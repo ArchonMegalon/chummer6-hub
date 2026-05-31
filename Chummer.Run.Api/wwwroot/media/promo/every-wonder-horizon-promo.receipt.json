@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-05-31T15:16:05Z",
+  "generated_at_utc": "2026-05-31T16:18:14Z",
   "status": "published",
   "asset_id": "every-wonder-horizon-promo",
   "render_mode": "first_party_motion_storyboard_90s",
@@ -12,6 +12,13 @@
   "title": "Chummer6 Horizons - The Table Remembers",
   "global_magicfit_prompt": "Cinematic cyberpunk tabletop product promo, rain-soaked neon sprawl, warm table light, AR campaign interface, dice and character sheets on a dark table, tactical UI overlays, readable horizon cards, polished product trailer, subtle handheld camera, no official game logos, no real brand logos, 16:9, 90 seconds.",
   "negative_prompt": "No official Shadowrun logos, no real corporate logos, no unreadable tiny text, no gore, no messy UI, no cartoon style, no exaggerated fantasy magic, no random weapon closeups, no ungrounded superhero visuals, no voyeuristic surveillance framing, no real-world targeting UI, no player scoring dashboard.",
+  "proof_constraints": [
+    "90 second minimum final duration with audio and video streams",
+    "exactly 12 distinct timed scenes",
+    "captions contain one segment per scene",
+    "horizons are future lanes, not current feature promises",
+    "MagicFit render claim requires provider and scene receipts; otherwise label first-party motion storyboard"
+  ],
   "production_sheet": "/docker/chummercomplete/_completion/every_wonder_horizon_promo/EVERY_WONDER_HORIZON_12_SCENE_PRODUCTION_SHEET.generated.json",
   "production_scenes": [
     {
