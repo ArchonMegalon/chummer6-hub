@@ -170,6 +170,7 @@ For macOS signed releases, the promoted artifact will only be visible publicly w
 For an operator-approved unsigned preview upload, set `CHUMMER_ALLOW_UNSIGNED_PREVIEW=1` and keep `CHUMMER_RELEASE_CHANNEL=preview`. That path skips codesign/notarization and uploads a preview DMG with `signingStatus=skipped_preview` and `notarizationStatus=skipped_preview`.
 
 `CHUMMER_MAC_RELEASE_MIN_FREE_GIB` is enforced before clone/build work starts and again before temporary packaging work proceeds.
+If the capacity preflight fails, the bootstrap writes `preflight-capacity-abort.json`; that receipt only explains why the run stopped and does not count as clone, packaging, startup-smoke, manifest, or upload evidence.
 
 If a macOS ticket still reports `hdiutil: create failed - No space left on device`, rerun with `CHUMMER_MAC_RELEASE_TMPDIR` pointed at a workspace-backed path on the target SSD and clear old `run-*` directories under the same parent if they are no longer needed.
 

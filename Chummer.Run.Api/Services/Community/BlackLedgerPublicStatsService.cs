@@ -932,7 +932,7 @@ public sealed class BlackLedgerPublicStatsService
                         PackagePressure = deterministicTurn.PackagePressure,
                     },
                     IsDeterministicPreview: true,
-                    Mode: string.IsNullOrWhiteSpace(deterministicTurn.Mode) ? "deterministic_test" : deterministicTurn.Mode,
+                    Mode: "preseeded",
                     CreatedAtUtc: deterministicTurn.CreatedAtUtc);
             }
         }

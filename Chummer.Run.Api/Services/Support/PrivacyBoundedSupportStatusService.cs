@@ -143,10 +143,11 @@ public sealed class PrivacyBoundedSupportStatusService
         DateTimeOffset now,
         string locale)
     {
-        string route = feedbackPacket?.DestinationRoute ?? "/participate?source=feedback#public-feedback";
-        if (string.Equals(route, "/participate?source=feedback#public-feedback", StringComparison.OrdinalIgnoreCase))
+        string route = feedbackPacket?.DestinationRoute ?? "/participate?productlift=feedback#productlift-feedback";
+        if (string.Equals(route, "/participate?source=feedback#public-feedback", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(route, "/participate?productlift=feedback#productlift-feedback", StringComparison.OrdinalIgnoreCase))
         {
-            route = "/participate?source=feedback#public-feedback";
+            route = "/participate?productlift=feedback#productlift-feedback";
         }
         string summary = feedbackPacket is null
             ? "Feedback stays privacy-bounded until it is classified on the governed Participate lane and absorbed into canon."

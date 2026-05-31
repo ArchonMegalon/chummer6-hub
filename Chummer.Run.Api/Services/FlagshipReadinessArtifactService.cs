@@ -61,6 +61,7 @@ public sealed class FlagshipReadinessArtifactService
         var candidates = new[]
             {
                 Path.GetFullPath(Path.Combine("/docker/fleet", relativePath)),
+                Path.GetFullPath(Path.Combine("/docker/chummercomplete/chummer.run-services", relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath)),
                 Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", relativePath)),
                 Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath)),
@@ -76,26 +77,31 @@ public sealed class FlagshipReadinessArtifactService
     {
         string? selectedPath = null;
         DateTimeOffset? selectedGeneratedAt = null;
+        bool selectedIsPass = false;
         foreach (string candidate in candidates)
         {
-            if (!TryReadGeneratedAt(candidate, out DateTimeOffset generatedAt))
+            if (!TryReadMetadata(candidate, out DateTimeOffset generatedAt, out bool isPass))
             {
                 continue;
             }
 
-            if (selectedGeneratedAt is null || generatedAt > selectedGeneratedAt.Value)
+            if (selectedGeneratedAt is null
+                || (isPass && !selectedIsPass)
+                || (isPass == selectedIsPass && generatedAt > selectedGeneratedAt.Value))
             {
                 selectedPath = candidate;
                 selectedGeneratedAt = generatedAt;
+                selectedIsPass = isPass;
             }
         }
 
         return selectedPath;
     }
 
-    private static bool TryReadGeneratedAt(string path, out DateTimeOffset generatedAt)
+    private static bool TryReadMetadata(string path, out DateTimeOffset generatedAt, out bool isPass)
     {
         generatedAt = default;
+        isPass = false;
         if (!File.Exists(path))
         {
             return false;
@@ -121,6 +127,8 @@ public sealed class FlagshipReadinessArtifactService
                 rawGeneratedAt = camelGeneratedAtElement.GetString();
             }
 
+            isPass = root.TryGetProperty("status", out JsonElement statusElement)
+                && string.Equals(statusElement.GetString(), "pass", StringComparison.OrdinalIgnoreCase);
             return DateTimeOffset.TryParse(rawGeneratedAt, out generatedAt);
         }
         catch

@@ -2,18 +2,18 @@ product: chummer
 surface: chummer.run
 version: 1
 primary_nav:
-  - label: Product
-    href: /what-is-chummer
-  - label: Downloads
+  - label: Home
+    href: /
+  - label: Get Chummer
     href: /downloads
   - label: What works today
     href: /now
-  - label: Roadmap
-    href: /horizons
-  - label: Artifacts
-    href: /artifacts
-  - label: Participate
-    href: /participate
+  - label: Worlds
+    href: /ledger
+  - label: Account
+    href: /signup
+  - label: Help
+    href: /help
 public_signal_nav:
   - label: Feedback
     href: /feedback

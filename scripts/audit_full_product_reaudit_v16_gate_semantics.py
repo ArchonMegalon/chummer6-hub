@@ -44,6 +44,20 @@ def run(command: list[str]) -> dict[str, Any]:
     }
 
 
+def comparable_design_text(path: Path, relative_path: str) -> str:
+    text = read_text(path)
+    if relative_path != "WEEKLY_PRODUCT_PULSE.generated.json" or not text:
+        return text
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    if isinstance(payload, dict):
+        payload["generated_at"] = "__normalized_generated_at__"
+        return json.dumps(payload, indent=2, sort_keys=False)
+    return text
+
+
 def ffprobe(path: Path) -> dict[str, Any]:
     completed = subprocess.run(
         [
@@ -78,6 +92,52 @@ def check(condition: bool, name: str, details: dict[str, Any] | None = None) -> 
 
 def main() -> int:
     checks: list[dict[str, Any]] = []
+
+    unit_tests = run(["dotnet", "test", "Chummer.Run.sln", "--no-restore"])
+    checks.append(check(unit_tests["pass"], "Full .NET product test suite passes", unit_tests))
+
+    canonical_root = WORKSPACE / "chummer-design" / "products" / "chummer"
+    mirror_root = RUN_SERVICES / ".codex-design" / "product"
+    for relative_path in (
+        "PUBLIC_LANDING_MANIFEST.yaml",
+        "PUBLIC_FEATURE_REGISTRY.yaml",
+        "PUBLIC_NAVIGATION.yaml",
+        "PUBLIC_RELEASE_EXPERIENCE.yaml",
+        "PUBLIC_DOWNLOADS_POLICY.md",
+        "PUBLIC_LANDING_POLICY.md",
+        "WEEKLY_PRODUCT_PULSE.generated.json",
+        "NEXT_90_DAY_PRODUCT_ADVANCE_REGISTRY.yaml",
+        "NEXT_90_DAY_QUEUE_STAGING.generated.yaml",
+        "horizons/black-ledger.md",
+    ):
+        canonical_path = canonical_root / relative_path
+        mirror_path = mirror_root / relative_path
+        checks.append(check(
+            canonical_path.is_file() and mirror_path.is_file(),
+            f"{relative_path} exists in canonical design and run-services mirror",
+            {"canonical": str(canonical_path), "mirror": str(mirror_path)}))
+        checks.append(check(
+            comparable_design_text(canonical_path, relative_path) == comparable_design_text(mirror_path, relative_path),
+            f"{relative_path} has no canonical design mirror drift",
+            {"canonical": str(canonical_path), "mirror": str(mirror_path)}))
+
+    navigation_text = read_text(mirror_root / "PUBLIC_NAVIGATION.yaml")
+    expected_nav = [
+        "label: Home\n    href: /",
+        "label: Get Chummer\n    href: /downloads",
+        "label: What works today\n    href: /now",
+        "label: Worlds\n    href: /ledger",
+        "label: Account\n    href: /signup",
+        "label: Help\n    href: /help",
+    ]
+    checks.append(check(all(item in navigation_text for item in expected_nav), "Flagship public navigation matches original product chrome", {"expected_nav": expected_nav}))
+
+    manifest_text = read_text(mirror_root / "PUBLIC_LANDING_MANIFEST.yaml")
+    feature_registry_text = read_text(mirror_root / "PUBLIC_FEATURE_REGISTRY.yaml")
+    checks.append(check("path: /ledger" in manifest_text and "purpose: public_worlds_entry" in manifest_text, "Manifest publishes the Worlds/Black Ledger public entry"))
+    checks.append(check("path: /progress" in manifest_text, "Manifest publishes the progress route used by public proof surfaces"))
+    checks.append(check("/auth/google/start?next=%2Fparticipate%2Fcodex" in manifest_text, "Guided contribution fallback stays on Google start handoff"))
+    checks.append(check("href: /account/participation" in feature_registry_text and "registered_href: /account/participation" in feature_registry_text, "Feature registry points guided contribution at the signed-in participation dashboard"))
 
     release = read_json(OUT / "RELEASE_TRUTH_MATRIX.generated.json")
     checks.append(check(release.get("status") == "pass", "release truth matrix status is pass", release))

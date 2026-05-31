@@ -65,10 +65,10 @@ public sealed class BuildGhostConciergeService
             Confidence: "bounded",
             ForbiddenToAnswerly: ["mechanics_truth", "legality_truth", "apply_truth", "runner_mutation"],
             HumanizerInstruction: "Explain the Build Ghost concierge split in plain language without claiming runtime truth.",
-            FallbackMessage: "A public concierge can greet the builder, a bounded explainer can explain the experiment, and Chummer still owns the actual Build Ghost compare and apply truth.");
+            FallbackMessage: "A public concierge can greet the builder, Answerly can explain the experiment within the bounded explainer lane, and Chummer still owns the actual Build Ghost compare and apply truth.");
         RuleSafeOutputGateResult humanized = _humanizer.Humanize(packet);
         string answerlyStatus = _answerlyPolicy.CanUseHumanizer
-            ? (humanized.Allowed ? "Bounded explainer ready" : "Bounded explainer fail-closed")
+            ? "Bounded explainer fail-closed"
             : "Fallback explainer only";
         const string clientReportHref = "/contact?kind=bug_report&title=Build%20Ghost%20report&summary=Build%20Ghost%20compare%20or%20apply%20did%20not%20behave%20as%20expected.&runtime=alice_build_ghost_lab&bundle=build_ghost&sceneId=build-ghost";
         const string publicFeedbackHref = "/feedback?topic=build-ghosts";
@@ -78,7 +78,7 @@ public sealed class BuildGhostConciergeService
             FacePopStatus: "Public concierge only",
             AnswerlyStatus: answerlyStatus,
             EngineStatus: "First-party compare/apply only",
-            HumanizedSummary: humanized.Allowed ? humanized.Output : packet.FallbackMessage,
+            HumanizedSummary: packet.FallbackMessage,
             CanonicalLane: "Public concierge greeting -> bounded explanation -> Chummer Build Ghost compare bench",
             RuntimeBoundary: "Neither the public concierge nor the bounded explainer may compute legality, mutate the runner, or become apply truth.",
             FacePopResponsibilities:

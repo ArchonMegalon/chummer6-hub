@@ -11964,6 +11964,7 @@ def main() -> int:
                 "A character and campaign companion.",
                 "Players, GMs, and returning groups.",
                 "Start with Downloads",
+                "Create account to install",
                 "Open What Works Today"),
             expects_header_count=1),
         AuditRoute(
