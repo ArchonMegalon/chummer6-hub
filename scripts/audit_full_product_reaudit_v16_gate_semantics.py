@@ -110,7 +110,11 @@ def main() -> int:
     magicfit_receipt = read_json(RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / "chummer6-flagship-promo.receipt.json")
     checks.append(check("MAGICFIT_PROVIDER_ADAPTER_READY" in magicfit_text and magicfit_provider.get("status") == "verified", "MagicFit provider verdict is backed by verified provider receipt"))
     checks.append(check(magicfit_source.get("status") == "pass" and magicfit_source.get("found_scene_count") == 12, "MagicFit flagship source audit proves 12 scenes"))
-    checks.append(check(magicfit_receipt.get("status") == "published" and magicfit_receipt.get("faction_assets_used") is False, "MagicFit public promo receipt is published and faction-free"))
+    checks.append(check(magicfit_receipt.get("status") == "published" and magicfit_receipt.get("faction_assets_used") is False, "Flagship public promo receipt is published and faction-free"))
+    checks.append(check(magicfit_receipt.get("magicfit_claim_allowed") is False and magicfit_receipt.get("visual_scene_count") == 12, "Flagship promo receipt is honest about first-party 12-scene final reel"))
+
+    flagship_reel = run(["python3", "scripts/verify_flagship_promo_12_scene_reel.py", "--asset", "chummer6-flagship-promo"])
+    checks.append(check(flagship_reel["pass"], "Flagship promo has 12 visually distinct sampled scenes", flagship_reel))
 
     for asset_id in ("chummer6-flagship-promo", "every-wonder-horizon-promo"):
         mp4 = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "promo" / f"{asset_id}.mp4"

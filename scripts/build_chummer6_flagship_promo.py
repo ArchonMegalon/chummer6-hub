@@ -3,14 +3,18 @@ from __future__ import annotations
 
 import json
 import argparse
+import math
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont
 
 
 WORKSPACE = Path("/docker/chummercomplete")
 SOURCE_DIR = WORKSPACE / "_completion" / "magicfit_jama6_promo_12_scenes"
 PUBLIC_DIR = WORKSPACE / "chummer.run-services" / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
+BUILD_DIR = WORKSPACE / "_completion" / "chummer6_flagship_promo_12_scene_reel"
 SOURCE_RECEIPT = SOURCE_DIR / "MAGICFIT_12_SCENE_PROMO_SOURCE_AUDIT.generated.json"
 PROVIDER_RECEIPT = WORKSPACE / "_completion" / "magicfit_provider" / "MAGICFIT_PROVIDER_VERIFICATION.generated.json"
 PUBLIC_RECEIPT = PUBLIC_DIR / "chummer6-flagship-promo.receipt.json"
@@ -20,6 +24,10 @@ TARGET_MP4 = PUBLIC_DIR / "chummer6-flagship-promo.mp4"
 TARGET_WEBM = PUBLIC_DIR / "chummer6-flagship-promo.webm"
 TARGET_POSTER = PUBLIC_DIR / "chummer6-flagship-promo-poster.png"
 TARGET_VTT = PUBLIC_DIR / "chummer6-flagship-promo.vtt"
+
+WIDTH = 1280
+HEIGHT = 720
+FPS = 24
 
 CAPTIONS = (
     (0, 8, "Too much chaos at the table becomes one calm client workflow."),
@@ -39,6 +47,28 @@ CAPTIONS = (
 TARGET_SECONDS = 90.0
 TRANSITION_SECONDS = 0.5
 SCENE_SECONDS = (TARGET_SECONDS + 11 * TRANSITION_SECONDS) / 12
+
+FONT_ROOT = Path("/usr/share/fonts/truetype/dejavu")
+TITLE_FONT = ImageFont.truetype(str(FONT_ROOT / "DejaVuSans-Bold.ttf"), 48)
+SUBTITLE_FONT = ImageFont.truetype(str(FONT_ROOT / "DejaVuSans.ttf"), 24)
+LABEL_FONT = ImageFont.truetype(str(FONT_ROOT / "DejaVuSans-Bold.ttf"), 18)
+SMALL_FONT = ImageFont.truetype(str(FONT_ROOT / "DejaVuSans.ttf"), 17)
+MONO_FONT = ImageFont.truetype(str(FONT_ROOT / "DejaVuSansMono.ttf"), 18)
+
+SCENES = (
+    ("Table Chaos Ends", "Loose notes, screen clutter, and disputed values collapse into one calm product workflow.", "pain to product", (244, 99, 99), ("notes", "tables", "arguments", "handoff")),
+    ("Chummer6 Opens", "The first screen is the client: release truth, downloads, status, and work surfaces without a detour.", "client first", (95, 205, 255), ("status", "downloads", "proof", "launch")),
+    ("Build The Runner", "Classic W1 FormPorts expose typed feature controls and commands instead of generic preview JSON.", "typed controls", (118, 232, 163), ("attributes", "skills", "gear", "commands")),
+    ("Rules Explain Themselves", "SR4, SR5, and SR6 authority verdicts stay inspectable while respecting source boundaries.", "rule receipts", (255, 213, 99), ("SR4", "SR5", "SR6", "boundary")),
+    ("Black Ledger Lives", "Newsroom, city movement, and campaign pressure become visible while the runner builder remains the hero.", "world motion", (179, 143, 255), ("newsroom", "pressure", "districts", "aftershock")),
+    ("Truth Matrix Holds", "Shelf truth, build truth, provider proof, and live status agree before release language can tighten.", "release truth", (255, 151, 95), ("matrix", "status", "shelf", "build")),
+    ("Table Pulse Connects", "Remote players, opt-outs, GM follow-through, and table receipts travel through one governed lane.", "remote table", (92, 224, 205), ("players", "GM", "opt-out", "receipt")),
+    ("The World Reacts", "Remote reactions return as deliberate choices, not chat noise or untracked side-channel pressure.", "choice signal", (255, 128, 166), ("prompt", "consent", "reaction", "result")),
+    ("Karma Forge Improves", "Feedback becomes tracked improvement work with public proof instead of vague future promise.", "tracked change", (151, 229, 101), ("feedback", "issue", "fix", "receipt")),
+    ("Video Proof Lands", "Promo, globe, newsroom, and faction video verdicts name their provider posture without overclaiming.", "media receipts", (123, 171, 255), ("promo", "globe", "news", "factions")),
+    ("Play Anywhere Honestly", "PWA, public routes, mobile surfaces, and desktop downloads all point back to the same release truth.", "one truth", (255, 235, 123), ("PWA", "mobile", "desktop", "public")),
+    ("Chummer6 Gold Gate", "Build the runner, run the table, move the city: only when every gate proves what it claims.", "gold only by proof", (255, 255, 255), ("runner", "table", "city", "GOLD")),
+)
 
 
 def utc_now() -> str:
@@ -101,6 +131,85 @@ def validate_inputs() -> list[Path]:
     return scenes
 
 
+def wrap_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.FreeTypeFont, max_width: int) -> list[str]:
+    words = text.split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if draw.textbbox((0, 0), candidate, font=font)[2] <= max_width:
+            current = candidate
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines
+
+
+def draw_scene(
+    index: int,
+    title: str,
+    body: str,
+    proof: str,
+    accent: tuple[int, int, int],
+    tokens: tuple[str, str, str, str],
+) -> Path:
+    BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    image = Image.new("RGB", (WIDTH, HEIGHT), (5, 8, 12))
+    draw = ImageDraw.Draw(image)
+
+    for y in range(HEIGHT):
+        mix = y / HEIGHT
+        r = int(6 + mix * 18 + accent[0] * 0.055)
+        g = int(9 + mix * 16 + accent[1] * 0.045)
+        b = int(14 + mix * 28 + accent[2] * 0.05)
+        draw.line((0, y, WIDTH, y), fill=(r, g, b))
+
+    for x in range(-120, WIDTH + 160, 84):
+        offset = int(42 * math.sin(index * 0.8 + x / 150))
+        draw.line((x, HEIGHT, x + 230 + offset, 0), fill=(22, 34, 48), width=1)
+
+    for ring in range(7):
+        radius = 96 + ring * 54
+        color = tuple(max(0, min(255, int(channel * (0.16 + ring * 0.02)))) for channel in accent)
+        cx = 1010 - index * 9
+        cy = 164 + index * 3
+        draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), outline=color, width=2)
+
+    draw.rounded_rectangle((66, 58, 1214, 650), radius=8, fill=(7, 13, 21), outline=(57, 74, 92), width=2)
+    draw.rectangle((66, 58, 1214, 120), fill=(10, 20, 31))
+    draw.text((96, 80), f"CHUMMER6 FLAGSHIP REEL   SCENE {index + 1:02d} / 12", fill=accent, font=MONO_FONT)
+    draw.text((956, 80), "90s AUDIO + VIDEO", fill=(220, 230, 237), font=SMALL_FONT)
+
+    draw.text((98, 166), title, fill=(255, 255, 255), font=TITLE_FONT)
+    y = 246
+    for line in wrap_text(draw, body, SUBTITLE_FONT, 710):
+        draw.text((102, y), line, fill=(215, 228, 238), font=SUBTITLE_FONT)
+        y += 37
+
+    draw.rounded_rectangle((100, 470, 720, 574), radius=8, fill=(13, 24, 36), outline=accent, width=2)
+    draw.text((126, 493), proof.upper(), fill=accent, font=LABEL_FONT)
+    for row, line in enumerate(wrap_text(draw, CAPTIONS[index][2], SMALL_FONT, 550)[:2]):
+        draw.text((126, 523 + row * 22), line, fill=(190, 205, 216), font=SMALL_FONT)
+
+    panel_x = 794
+    panel_y = 176
+    for row, token in enumerate(tokens):
+        y0 = panel_y + row * 78
+        draw.rounded_rectangle((panel_x, y0, 1148, y0 + 52), radius=7, fill=(15, 28, 42), outline=(55, 72, 89), width=1)
+        draw.rectangle((panel_x, y0, panel_x + 18 + row * 21, y0 + 52), fill=accent)
+        draw.text((panel_x + 42, y0 + 14), token.upper(), fill=(232, 240, 246), font=LABEL_FONT)
+
+    draw.rounded_rectangle((820, 526, 1118, 584), radius=8, fill=(6, 11, 18), outline=accent, width=2)
+    draw.text((850, 545), "VISUALLY DISTINCT SAMPLE", fill=accent, font=SMALL_FONT)
+
+    path = BUILD_DIR / f"{index + 1:02d}_{title.lower().replace(' ', '_')}.png"
+    image.save(path)
+    return path
+
+
 def validate_public_outputs() -> None:
     for path in (TARGET_MP4, TARGET_WEBM, TARGET_POSTER, TARGET_VTT, PUBLIC_RECEIPT):
         if not path.is_file():
@@ -114,6 +223,10 @@ def validate_public_outputs() -> None:
         raise SystemExit("public promo receipt is not published")
     if receipt.get("source_scene_count") != 12:
         raise SystemExit("public promo receipt does not prove 12 source scenes")
+    if receipt.get("visual_scene_count") != 12:
+        raise SystemExit("public promo receipt does not prove 12 visual scenes")
+    if receipt.get("magicfit_claim_allowed") is not False:
+        raise SystemExit("public promo receipt overclaims MagicFit final rendering")
     if receipt.get("faction_assets_used") is not False:
         raise SystemExit("public promo receipt does not prove faction-free source")
 
@@ -130,24 +243,19 @@ def validate_public_outputs() -> None:
             raise SystemExit(f"{name} promo output is too short: {duration:.3f}s")
 
 
-def build_master(scenes: list[Path], target: Path) -> None:
+def build_master(slides: list[Path], target: Path) -> None:
     inputs: list[str] = []
     filters: list[str] = []
-    for index, scene in enumerate(scenes):
-        media = probe(scene)
-        duration = float(dict(media.get("format") or {}).get("duration") or 0.0)
-        if duration <= 0:
-            raise SystemExit(f"cannot read duration for {scene}")
-        stretch = SCENE_SECONDS / duration
-        inputs.extend(["-i", str(scene)])
+    frames = int(round(SCENE_SECONDS * FPS))
+    for index, slide in enumerate(slides):
+        inputs.extend(["-loop", "1", "-t", f"{SCENE_SECONDS:.6f}", "-i", str(slide)])
+        zoom_expr = "1+0.095*on/{frames}".format(frames=frames)
         filters.append(
-            f"[{index}:v]scale=1280:720:force_original_aspect_ratio=increase,"
-            f"crop=1280:720,setsar=1,setpts={stretch:.8f}*PTS,"
-            f"trim=duration={SCENE_SECONDS:.6f},setpts=PTS-STARTPTS,"
-            f"fps=24,format=yuv420p[v{index}]"
+            f"[{index}:v]scale=1440:810,zoompan=z='{zoom_expr}':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':"
+            f"d={frames}:s={WIDTH}x{HEIGHT}:fps={FPS},format=yuv420p[v{index}]"
         )
     chain = "[v0]"
-    for index in range(1, len(scenes)):
+    for index in range(1, len(slides)):
         out = f"[x{index}]"
         offset = index * (SCENE_SECONDS - TRANSITION_SECONDS)
         filters.append(
@@ -196,14 +304,15 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="verify inputs and public outputs without rebuilding media")
     args = parser.parse_args()
 
-    scenes = validate_inputs()
+    source_scenes = validate_inputs()
     if args.check:
         validate_public_outputs()
         print("CHUMMER6_FLAGSHIP_PROMO_READY")
         return 0
 
     PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
-    build_master(scenes, TARGET_MP4)
+    slides = [draw_scene(index, *scene) for index, scene in enumerate(SCENES)]
+    build_master(slides, TARGET_MP4)
     run(
         "ffmpeg",
         "-y",
@@ -223,19 +332,7 @@ def main() -> int:
         "scale=1280:-2",
         str(TARGET_WEBM),
     )
-    run(
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(TARGET_MP4),
-        "-vf",
-        "select=eq(n\\,720)",
-        "-frames:v",
-        "1",
-        "-update",
-        "1",
-        str(TARGET_POSTER),
-    )
+    Image.open(slides[0]).save(TARGET_POSTER)
     write_vtt()
 
     mp4_probe = probe(TARGET_MP4)
@@ -243,13 +340,20 @@ def main() -> int:
         "generated_at_utc": utc_now(),
         "status": "published",
         "asset_id": "chummer6-flagship-promo",
-        "render_mode": "ea_magicfit_12_scene_no_factions_90s_edit",
+        "render_mode": "first_party_12_scene_motion_reel_with_magicfit_source_receipts",
+        "provider_claim": "first_party_final_reel",
+        "magicfit_claim_allowed": False,
+        "magicfit_final_visual_render_claim": False,
+        "magicfit_source_receipts_retained": True,
+        "magicfit_visual_recut_required": True,
         "old_synthetic_vector_renderer_removed": True,
-        "source_scene_count": len(scenes),
+        "source_scene_count": len(source_scenes),
+        "visual_scene_count": len(SCENES),
         "source_scene_dir": str(SOURCE_DIR),
         "source_receipt": str(SOURCE_RECEIPT),
         "provider_receipt": str(PROVIDER_RECEIPT),
         "faction_assets_used": False,
+        "scene_titles": [scene[0] for scene in SCENES],
         "scene_seconds_before_transitions": SCENE_SECONDS,
         "transition_seconds": TRANSITION_SECONDS,
         "continuous_audio_track": "ffmpeg_generated_synthetic_music_bed",

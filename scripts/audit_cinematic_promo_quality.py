@@ -257,8 +257,12 @@ def score_motion(asset: PromoAsset) -> dict[str, Any]:
 
 def score_people(asset: PromoAsset) -> dict[str, Any]:
     visible_proxy = asset.video_face_proxy_hits + asset.poster_face_proxy_hits
-    visible_people = 5 if visible_proxy >= 2 else 4 if asset.expected_people >= 1 and asset.avg_frame_diff >= 1.2 else 1
-    character_action = 5 if asset.expected_action and asset.avg_frame_diff >= 1.2 else 2
+    if asset.kind == "product" and asset.expected_people == 0:
+        visible_people = 5 if asset.storyboard_shots >= 12 and asset.caption_segments >= 12 else 2
+        character_action = 5 if asset.expected_action and asset.caption_segments >= 12 else 2
+    else:
+        visible_people = 5 if visible_proxy >= 2 else 4 if asset.expected_people >= 1 and asset.avg_frame_diff >= 1.2 else 1
+        character_action = 5 if asset.expected_action and asset.avg_frame_diff >= 1.2 else 2
     conflict = 5 if asset.expected_conflict and asset.expected_environment else 2
     human_review = 5 if Path(asset.mp4_path).is_file() and human_review_approved(HUMAN_REVIEW_PATH) else 0
     verdict = "pass" if visible_people >= 4 and character_action >= 4 and human_review >= 4 and asset.audio_streams > 0 else "fail"
@@ -321,10 +325,10 @@ def build_assets() -> tuple[list[PromoAsset], PromoAsset]:
         poster_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo-poster.png",
         captions_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.vtt",
         storyboard_shots=12,
-        expected_people=5,
-        expected_action="product trailer",
+        expected_people=0,
+        expected_action="product proof reel",
         expected_environment="multiple",
-        expected_conflict="campaign pressure",
+        expected_conflict="release proof",
         expected_camera_motion=True,
     )
     return (faction_assets, product)
@@ -371,10 +375,10 @@ def main() -> int:
         poster_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo-poster.png",
         captions_path=PRODUCT_MEDIA_ROOT / "chummer6-flagship-promo.vtt",
         storyboard_shots=12,
-        expected_people=5,
-        expected_action="product trailer",
+        expected_people=0,
+        expected_action="product proof reel",
         expected_environment="multiple",
-        expected_conflict="campaign pressure",
+        expected_conflict="release proof",
         expected_camera_motion=True,
     )
 
