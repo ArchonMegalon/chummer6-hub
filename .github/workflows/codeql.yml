@@ -126,6 +126,18 @@ jobs:
           New-Item -ItemType Junction -Path $mediaLink -Target (Join-Path $repoRoot "compat/chummer-media-factory") | Out-Null
         }
 
+        $completeRoot = Join-Path $actionsRoot "chummercomplete"
+        New-Item -ItemType Directory -Force -Path $completeRoot | Out-Null
+        $completeLinks = @(
+          @{ Path = Join-Path $completeRoot "chummer.run-services"; Target = $repoRoot },
+          @{ Path = Join-Path $completeRoot "chummer-hub-registry"; Target = Join-Path $repoRoot "compat/chummer-hub-registry" }
+        )
+        foreach ($link in $completeLinks) {
+          if (-not (Test-Path $link.Path)) {
+            New-Item -ItemType Junction -Path $link.Path -Target $link.Target | Out-Null
+          }
+        }
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
