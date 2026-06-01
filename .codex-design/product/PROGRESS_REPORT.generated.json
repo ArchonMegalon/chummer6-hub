@@ -1,7 +1,7 @@
 {
   "contract_name": "fleet.public_progress_report",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-06-01T13:44:23Z",
+  "generated_at": "2026-06-01T15:07:08Z",
   "as_of": "2026-06-01",
   "history_snapshot_count": 36,
   "brand": "Chummer6",
@@ -9,7 +9,7 @@
   "active_wave_status": "complete",
   "active_slice": "Next 12 Biggest Wins",
   "headline": "Progress report for a product becoming a build machine.",
-  "overall_status": "active",
+  "overall_status": "complete",
   "progress_percent": 100,
   "percent_complete": 100,
   "percent_inflight": 0,
@@ -19,10 +19,6 @@
     "summary": "Core Engine is currently setting the delivery pace."
   },
   "top_risks": [
-    {
-      "key": "completion_frontier",
-      "summary": "Completion frontier closeout proof is still failing. linux desktop exit gate did not record a built Linux desktop binary"
-    },
     {
       "key": "full_product_queue",
       "summary": "3 open milestones remain in the full-product frontier."
@@ -47,8 +43,8 @@
     }
   },
   "release_readiness": {
-    "status": "warning",
-    "summary": "Completion frontier closeout proof is still failing. linux desktop exit gate did not record a built Linux desktop binary. Mapped public parts are at zero open milestone weight, but there are still 3 open milestones in the full-product frontier.",
+    "status": "tracked",
+    "summary": "Mapped public parts are at zero open milestone weight, but there are still 3 open milestones in the full-product frontier.",
     "blocking_parts": []
   },
   "parity": {
@@ -174,18 +170,18 @@
       "route": "/roadmap",
       "title": "Governance and rollout posture",
       "semantic_family": "governance",
-      "proof_state": "preview-bounded",
+      "proof_state": "implemented",
       "proof_badge": {
-        "state": "preview-bounded",
-        "label": "Preview bounded",
-        "tone": "preview"
+        "state": "implemented",
+        "label": "Implemented",
+        "tone": "implemented"
       },
       "summary": "Governance cards describe launch, canary, rollback, and claim-safety posture. They do not imply immediate rollout just because a proposal exists.",
-      "detail": "linux desktop exit gate did not record a built Linux desktop binary",
+      "detail": "trusted completion receipt plus whole-product release proof and Linux desktop exit gate are ready",
       "evidence": [
-        "Completion audit: fail",
-        "Launch expand: blocked",
-        "Freeze launch: active",
+        "Completion audit: pass",
+        "Launch expand: allowed",
+        "Freeze launch: available",
         "Canary: ready",
         "Rollback: armed",
         "Journey summary: ready"
@@ -342,7 +338,7 @@
           "body": "Complete desktop/browser workbench with accessibility, localization, and polished shared components."
         }
       ],
-      "recent_commit_count_7d": 97,
+      "recent_commit_count_7d": 99,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -375,13 +371,13 @@
           "repo_slug": "chummer6-ui",
           "path": "/docker/chummercomplete/chummer6-ui",
           "lifecycle": "live",
-          "recent_commit_count_7d": 86,
+          "recent_commit_count_7d": 88,
           "design_total_weight": 56,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-06-01T13:25:03.228157Z",
+            "published_at": "2026-06-01T14:49:26.271029Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -607,7 +603,7 @@
           "body": "A cohesive hosted community and publication stack ready for real public participation."
         }
       ],
-      "recent_commit_count_7d": 116,
+      "recent_commit_count_7d": 124,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -640,7 +636,7 @@
           "repo_slug": "chummer6-hub",
           "path": "/docker/chummercomplete/chummer6-hub",
           "lifecycle": "live",
-          "recent_commit_count_7d": 89,
+          "recent_commit_count_7d": 95,
           "design_total_weight": 60,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
@@ -699,13 +695,13 @@
           "repo_slug": "chummer6-hub-registry",
           "path": "/docker/chummercomplete/chummer-hub-registry",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 26,
+          "recent_commit_count_7d": 28,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-06-01T11:34:50.581552Z",
+            "published_at": "2026-06-01T14:59:09.223548Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -783,7 +779,7 @@
           "body": "One authoritative public story, compiled cleanly into every downstream surface."
         }
       ],
-      "recent_commit_count_7d": 59,
+      "recent_commit_count_7d": 78,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -816,7 +812,7 @@
           "repo_slug": "chummer6-design",
           "path": "/docker/chummercomplete/chummer-design",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 36,
+          "recent_commit_count_7d": 55,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
