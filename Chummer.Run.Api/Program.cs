@@ -181,6 +181,15 @@ app.UseHubRequestObservability();
 app.UseHubApiRuntimeGuardrails();
 app.UseAuthorization();
 
+app.MapGet("/api/health", () => Results.Json(new
+{
+    ok = true,
+    service = "chummer.run.api",
+    status = "pass",
+    generatedAt = DateTimeOffset.UtcNow
+}));
+app.MapGet("/docs/", GetSelfHostedDocs);
+
 app.MapControllers();
 
 app.Run();
@@ -222,4 +231,32 @@ static bool HasHttpsListenerConfiguration(IConfiguration configuration)
     }
 
     return !string.IsNullOrWhiteSpace(configuration["HTTPS_PORTS"]);
+}
+
+static IResult GetSelfHostedDocs()
+{
+    const string html = """
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chummer API Docs</title>
+</head>
+<body>
+  <main>
+    <h1>Self-hosted OpenAPI explorer</h1>
+    <p>Chummer Hub exposes first-party health, release, account, campaign, support, and public proof routes from this host.</p>
+    <ul>
+      <li><a href="/api/health">Health JSON</a></li>
+      <li><a href="/downloads/releases.json">Public release manifest</a></li>
+      <li><a href="/downloads/RELEASE_CHANNEL.generated.json">Canonical release channel</a></li>
+      <li><a href="/status">Release status</a></li>
+    </ul>
+  </main>
+</body>
+</html>
+""";
+
+    return Results.Content(html, "text/html; charset=utf-8");
 }
