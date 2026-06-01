@@ -66,6 +66,48 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Checkout core compatibility tree
+      uses: actions/checkout@v4
+      with:
+        repository: ArchonMegalon/chummer6-core
+        path: compat/chummer-core-engine
+
+    - name: Checkout hub registry compatibility tree
+      uses: actions/checkout@v4
+      with:
+        repository: ArchonMegalon/chummer6-hub-registry
+        path: compat/chummer-hub-registry
+
+    - name: Checkout media factory compatibility tree
+      uses: actions/checkout@v4
+      with:
+        repository: ArchonMegalon/chummer6-media-factory
+        path: compat/chummer-media-factory
+
+    - name: Link compatibility tree layout
+      shell: pwsh
+      run: |
+        $repoRoot = $env:GITHUB_WORKSPACE
+        $runRoot = Split-Path -Parent $repoRoot
+        $actionsRoot = Split-Path -Parent $runRoot
+
+        $links = @(
+          @{ Path = Join-Path $runRoot "chummer-core-engine"; Target = Join-Path $repoRoot "compat/chummer-core-engine" },
+          @{ Path = Join-Path $runRoot "chummer-hub-registry"; Target = Join-Path $repoRoot "compat/chummer-hub-registry" }
+        )
+        foreach ($link in $links) {
+          if (-not (Test-Path $link.Path)) {
+            New-Item -ItemType Junction -Path $link.Path -Target $link.Target | Out-Null
+          }
+        }
+
+        $fleetRepos = Join-Path $actionsRoot "fleet/repos"
+        New-Item -ItemType Directory -Force -Path $fleetRepos | Out-Null
+        $mediaLink = Join-Path $fleetRepos "chummer-media-factory"
+        if (-not (Test-Path $mediaLink)) {
+          New-Item -ItemType Junction -Path $mediaLink -Target (Join-Path $repoRoot "compat/chummer-media-factory") | Out-Null
+        }
+
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
