@@ -70,6 +70,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<ReusableAccountFlowService>();
         services.AddSingleton<RewardService>();
         services.AddSingleton<EntitlementService>();
+        services.AddSingleton<PayFunnelsBillingStore>();
+        services.AddSingleton<PayFunnelsBillingService>();
         services.AddSingleton<LeaderboardService>();
         services.AddSingleton<LedgerService>();
         services.AddHttpClient<ParticipationOperatorNotificationService>();
@@ -95,6 +97,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<GmSessionVenueService>();
         services.AddSingleton<GmSessionVideoFoundryStore>();
         services.AddSingleton<GmSessionVideoFoundryService>();
+        services.AddSingleton<PromptFoundryStore>();
+        services.AddSingleton<PromptFoundryService>();
         services.AddSingleton<CampaignFederationOrchestrationService>();
         services.AddSingleton<CampaignWorkspaceServerPlaneService>();
         services.AddSingleton<CampaignFederationOrchestrationService>();
