@@ -248,7 +248,7 @@ public sealed class BlackLedgerWorldTickBriefingService
             : mp4Href;
         string posterHref = BuildVersionedMediaHref(Path.Combine(relativeRoot, $"{slug}-poster.png"));
         string captionsHref = BuildVersionedMediaHref(Path.Combine(relativeRoot, $"{slug}.vtt"));
-        string watchHref = $"{ledgerBasePath.TrimEnd('/')}/turns/{tick.Turn}#newsreel-player";
+        string watchHref = $"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}";
         string transcriptHref = $"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}/transcript";
         string receiptsHref = $"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}/receipts";
         string publishedLabel = new DateTimeOffset(File.GetLastWriteTimeUtc(mp4Path)).ToString("MMMM d, yyyy HH:mm 'UTC'", CultureInfo.InvariantCulture);
