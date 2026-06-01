@@ -165,8 +165,10 @@ jobs:
 
     - run: |
         echo "Run, Build Application using script"
-        dotnet restore ./Chummer.Run.sln
-        dotnet build --configuration Release --no-restore ./Chummer.Run.sln
+        dotnet restore ./Chummer.Run.Api/Chummer.Run.Api.csproj
+        dotnet build --configuration Release --no-restore ./Chummer.Run.Api/Chummer.Run.Api.csproj
+        dotnet restore ./Chummer.Run.Identity/Chummer.Run.Identity.csproj
+        dotnet build --configuration Release --no-restore ./Chummer.Run.Identity/Chummer.Run.Identity.csproj
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
