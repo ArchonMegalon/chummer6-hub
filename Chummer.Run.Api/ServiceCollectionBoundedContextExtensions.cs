@@ -93,6 +93,8 @@ internal static class ServiceCollectionBoundedContextExtensions
         services.AddSingleton<GmSessionVenueStore>();
         services.AddSingleton<IGmSessionVenueAdapter, BeHumanGmSessionVenueAdapter>();
         services.AddSingleton<GmSessionVenueService>();
+        services.AddSingleton<GmSessionVideoFoundryStore>();
+        services.AddSingleton<GmSessionVideoFoundryService>();
         services.AddSingleton<CampaignFederationOrchestrationService>();
         services.AddSingleton<CampaignWorkspaceServerPlaneService>();
         services.AddSingleton<CampaignFederationOrchestrationService>();

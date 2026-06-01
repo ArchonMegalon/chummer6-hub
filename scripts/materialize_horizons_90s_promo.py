@@ -20,9 +20,12 @@ PUBLIC_ASSET_BASE = RUN_SERVICES / "Chummer.Run.Api" / "wwwroot" / "media" / "pr
 ASSET_ID = "all-horizons-90s-magicfit-promo"
 
 GLOBAL_POSITIVE = (
-    "Photoreal cinematic cyberpunk tabletop roleplaying product teaser, realistic generic metahuman characters, "
-    "expressive acting, real action in every shot, premium dark neon lighting, rain reflections, practical lights, "
-    "sharp product UI overlays added in post, high-end trailer quality, no official game logos, no real brand logos."
+    "Photoreal cinematic cyberpunk tabletop roleplaying product teaser, realistic mixed metahuman tabletop crew "
+    "(human GM, ork decker, elf mage, dwarf rigger, troll street samurai, human face), visible cyberware on multiple "
+    "characters (chrome cyberarm, AR lenses, datajack, subtle dermal plating), augmented reality overlays floating "
+    "above the table and devices, expressive acting, real action in every shot, premium dark neon lighting, rain "
+    "reflections, practical lights, sharp product UI overlays added in post, high-end trailer quality, no official "
+    "game logos, no real brand logos."
 )
 GLOBAL_NEGATIVE = (
     "SVG, flat vector animation, static poster, slideshow, generic SaaS explainer, generic office, no people, "
@@ -40,7 +43,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "The table is alive, but the tools are dead",
         "overlay": "One table. Too much chaos.",
         "voiceover": "Shadowrunning is chaos. Your tools do not have to be.",
-        "prompt": "Rain-lit safehouse tabletop game, messy paper sheets, tablets, dice, misaligned AR notes, human GM trying to regain context, generic metahuman players reacting with funny frustration, handheld cinematic inserts.",
+        "prompt": "Rain-lit safehouse tabletop game, messy paper sheets, tablets, dice, misaligned AR notes, human GM trying to regain context, ork decker with AR lenses, elf mage, dwarf rigger with headset, troll street samurai with chrome cyberarm, visible cyberware and funny frustration, handheld cinematic inserts.",
     },
     {
         "id": "02_nexus_pan_shared_state",
@@ -51,7 +54,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "Reconnect without losing the table",
         "overlay": "NEXUS-PAN - Shared State",
         "voiceover": "NEXUS-PAN keeps shared state steady when devices drift, drop, and return.",
-        "prompt": "A player phone reconnects, session state snaps into sync across laptop tablet and mobile, subtle data strands align over the table, relieved character reactions, practical neon table light.",
+        "prompt": "A player phone reconnects, session state snaps into sync across laptop tablet and mobile, bright AR data strands align over the table, ork decker with datajack and AR lenses, troll street samurai with cyberarm, relieved mixed-metahuman character reactions, practical neon table light.",
     },
     {
         "id": "03_alice_build_tradeoffs",
@@ -62,7 +65,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "Legal is not the same as good",
         "overlay": "ALICE - What-if Builds",
         "voiceover": "ALICE compares builds, catches role traps, and explains tradeoffs with receipts.",
-        "prompt": "AR build lab above a tabletop, two generic cyberpunk runner builds compared as clean shapes and risk badges, decker reacts, mage smirks, no dense text, premium product trailer closeup.",
+        "prompt": "AR build lab above a tabletop, two generic cyberpunk runner builds compared as clean holographic silhouettes and risk badges, ork decker with AR lenses reacts, elf mage smirks, visible cyberware reflections, no dense text, premium product trailer closeup.",
     },
     {
         "id": "04_karma_forge_governed_rules",
@@ -73,7 +76,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "House rules without fork chaos",
         "overlay": "KARMA FORGE - Governed Rules",
         "voiceover": "KARMA FORGE turns house rules into governed, inspectable rule environments.",
-        "prompt": "GM manipulates holographic rule cards and approval stamps, impacted runner sheets glow, generic troll street samurai reacts to a flagged weapon, cinematic overhead and UI closeup.",
+        "prompt": "GM manipulates holographic AR rule cards and approval stamps, impacted runner sheets glow, troll street samurai with chrome cyberarm reacts to a flagged weapon, dwarf rigger and elf mage visible at table, cinematic overhead and UI closeup.",
     },
     {
         "id": "05_jackpoint_dossiers_recaps",
@@ -84,7 +87,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "Briefings that remember where facts came from",
         "overlay": "JACKPOINT - Dossiers & Recaps",
         "voiceover": "JACKPOINT turns campaign truth into briefings, dossiers, and recaps without making things up.",
-        "prompt": "Cyberpunk evidence room, rough mission notes become a polished player-safe dossier packet, source trails glow under claims, stylish fixer reacts, noir push-in, no readable paragraphs.",
+        "prompt": "Cyberpunk evidence room, rough mission notes become a polished player-safe AR dossier packet, source trails glow under claims, stylish human fixer with subtle cybernetic eye reacts, ork decker and elf mage nearby, noir push-in, no readable paragraphs.",
     },
     {
         "id": "06_runsite_spatial_prep",
@@ -95,7 +98,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "Understand the space before it explodes",
         "overlay": "RUNSITE - Spatial Prep",
         "voiceover": "RUNSITE makes mission spaces explorable and legible before the action starts.",
-        "prompt": "3D AR model of a generic clinic or warehouse unfolds above tabletop, entry points and security zones as abstract geometry, GM-only hidden layer flashes, rigger points at a drone nest.",
+        "prompt": "3D AR model of a generic clinic or warehouse unfolds above tabletop, entry points and security zones as abstract geometry, GM-only hidden layer flashes, dwarf rigger with visible cybernetic hand points at a drone nest, troll and ork silhouettes nearby.",
     },
     {
         "id": "07_runbook_press_campaign_books",
@@ -106,7 +109,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "Turn a season into a book",
         "overlay": "RUNBOOK PRESS - Campaign Books",
         "voiceover": "RUNBOOK PRESS turns approved campaign truth into primers, guides, modules, and season books.",
-        "prompt": "Futuristic publishing room, campaign maps and faction-neutral briefs flow into a premium original book mockup, characters watching with pride, no sourcebook layout imitation.",
+        "prompt": "Futuristic publishing room, AR campaign maps and faction-neutral briefs flow into a premium original book mockup, mixed human ork elf dwarf troll tabletop crew watching with pride, visible cyberware and AR lenses, no sourcebook layout imitation.",
     },
     {
         "id": "08_table_pulse_live_heat",
@@ -117,7 +120,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "The run pushes back",
         "overlay": "TABLE PULSE - Live Heat",
         "voiceover": "TABLE PULSE turns live heat into bounded reactions, remote choices, and GM-approved fallout.",
-        "prompt": "Tabletop session in motion, GM screen receives a subtle heat alert, remote player chooses a bounded reaction on phone, cast reacts to fallout, warm table light and cyberpunk accents.",
+        "prompt": "Tabletop session in motion with mixed metahuman crew, GM screen receives a subtle AR heat alert, remote player chooses a bounded reaction on phone, ork decker with AR lenses and troll cyberarm visible, cast reacts to fallout, warm table light and cyberpunk accents.",
     },
     {
         "id": "09_black_ledger_living_world",
@@ -128,7 +131,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "The city remembers",
         "overlay": "BLACK LEDGER - Living World",
         "voiceover": "BLACK LEDGER makes the city remember: factions, heat, missions, newsreels, and consequences.",
-        "prompt": "Premium living city globe and district map interface, generic faction pressure shown as abstract heat arcs, completed run changes city markers and newsroom ticker energy, cinematic orbiting camera.",
+        "prompt": "Premium living city globe and district map AR interface, generic faction pressure shown as abstract heat arcs, completed run changes city markers and newsroom ticker energy, mixed metahuman operators with visible cyberware watch the globe, cinematic orbiting camera.",
     },
     {
         "id": "10_community_hub_open_runs",
@@ -139,7 +142,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "Find the table. Close the loop.",
         "overlay": "COMMUNITY HUB - Open Runs",
         "voiceover": "COMMUNITY HUB helps players find runs, pass preflight, get scheduled, and feed outcomes back into the world.",
-        "prompt": "Open-run recruitment scene, generic players gather around a table through phones and laptops, preflight checks glow green as abstract cards, calendar handoff, human welcome moment.",
+        "prompt": "Open-run recruitment scene, human ork elf dwarf and troll players gather around a table through phones and laptops, AR preflight checks glow green as abstract cards, visible cyberware, calendar handoff, welcoming character moment.",
     },
     {
         "id": "11_finale_all_horizons",
@@ -150,7 +153,7 @@ SCENES: list[dict[str, Any]] = [
         "title": "All Horizons, one table",
         "overlay": "Build the runner. Run the table. Shape the world.",
         "voiceover": "Build the runner. Run the table. Shape the world. Jammer6.",
-        "prompt": "All nine Horizon cards circle above the tabletop and become a living city interface, recurring generic metahuman cast stands together, final product logo space left clean for post, heroic trailer finish.",
+        "prompt": "All nine Horizon AR cards circle above the tabletop and become a living city interface, recurring mixed metahuman cast stands together: human GM, ork decker, elf mage, dwarf rigger, troll street samurai with cyberarm, visible cyberware, final product logo space left clean for post, heroic trailer finish.",
     },
 ]
 
@@ -240,9 +243,18 @@ def write_outputs() -> int:
     ]
     horizon_coverage_pass = horizons == required_horizons
     all_rendered = rendered_count == scene_count
-    human_reviewed = False
+    composite_path = PUBLIC_ASSET_BASE / f"{ASSET_ID}.mp4"
+    caption_path = PUBLIC_ASSET_BASE / f"{ASSET_ID}.vtt"
+    poster_path = PUBLIC_ASSET_BASE / f"{ASSET_ID}-poster.png"
+    composite_exists = composite_path.is_file()
+    caption_exists = caption_path.is_file()
+    poster_exists = poster_path.is_file()
+    human_review_path = OUT / "PROMO_VIDEO_HUMAN_CREATIVE_REVIEW.md"
+    human_review_text = human_review_path.read_text(encoding="utf-8") if human_review_path.is_file() else ""
+    human_reviewed = "Verdict: PASS" in human_review_text
     public_safe_plan = True
-    ready = all_rendered and provider_verified and horizon_coverage_pass and total_duration == 90 and human_reviewed
+    post_composite_complete = composite_exists and caption_exists and poster_exists
+    ready = all_rendered and provider_verified and horizon_coverage_pass and total_duration == 90 and post_composite_complete and human_reviewed
 
     plan = {
         "contract_name": "chummer.horizons_90s_promo.magicfit_render_plan",
@@ -305,18 +317,25 @@ def write_outputs() -> int:
         "scene_count": scene_count,
         "required_horizons": required_horizons,
         "horizon_coverage_pass": horizon_coverage_pass,
-        "composite_expected_path": str(PUBLIC_ASSET_BASE / f"{ASSET_ID}.mp4"),
-        "caption_expected_path": str(PUBLIC_ASSET_BASE / f"{ASSET_ID}.vtt"),
-        "poster_expected_path": str(PUBLIC_ASSET_BASE / f"{ASSET_ID}-poster.png"),
+        "composite_expected_path": str(composite_path),
+        "caption_expected_path": str(caption_path),
+        "poster_expected_path": str(poster_path),
+        "composite_exists": composite_exists,
+        "caption_exists": caption_exists,
+        "poster_exists": poster_exists,
         "render_mode": "magicfit_per_scene_then_post_composite",
-        "status": "missing_magicfit_scene_renders" if not all_rendered else "rendered_pending_human_review",
+        "status": "missing_magicfit_scene_renders"
+        if not all_rendered
+        else "rendered_pending_post_composite"
+        if not post_composite_complete
+        else "post_composited_pending_human_review",
     }
     (OUT / "PROMO_VIDEO_ASSET_METADATA.generated.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
     motion_score = {
         "contract_name": "chummer.horizons_90s_promo.motion_score",
         "generated_at_utc": generated_at,
-        "status": "fail" if not all_rendered else "pending_review",
+        "status": "fail" if not all_rendered else "pending_human_review",
         "score": 0 if not all_rendered else None,
         "required_checks": {
             "people_visible_every_scene": None if all_rendered else False,
@@ -325,14 +344,16 @@ def write_outputs() -> int:
             "cinematic_character_driven": None if all_rendered else False,
             "unique_visual_metaphor_per_horizon": horizon_coverage_pass,
         },
-        "reason": "No rendered MagicFit scene clips are present for this 11-scene Horizon reel.",
+        "reason": "Rendered MagicFit clips and post composite are present; human review must confirm motion quality before public release."
+        if all_rendered
+        else "No rendered MagicFit scene clips are present for this 11-scene Horizon reel.",
     }
     (OUT / "PROMO_VIDEO_MOTION_SCORE.generated.json").write_text(json.dumps(motion_score, indent=2), encoding="utf-8")
 
     safety = {
         "contract_name": "chummer.horizons_90s_promo.public_safety",
         "generated_at_utc": generated_at,
-        "status": "plan_pass_render_pending",
+        "status": "pending_human_review" if all_rendered else "plan_pass_render_pending",
         "ip_boundary_pass": public_safe_plan,
         "forbidden_material": [
             "official Shadowrun logos",
@@ -344,26 +365,30 @@ def write_outputs() -> int:
         ],
         "claim_boundary": "Do not claim Horizons are fully shipped today; this is a directional teaser.",
         "render_review_required": True,
-        "render_review_reason": "Actual MagicFit clips must be inspected before public-safe final approval.",
+        "render_review_reason": "Rendered MagicFit clips must be inspected by a human before public-safe final approval.",
     }
     (OUT / "PROMO_VIDEO_PUBLIC_SAFETY.generated.json").write_text(json.dumps(safety, indent=2), encoding="utf-8")
 
-    review_md = f"""# Promo Video Human Creative Review
+    if human_reviewed:
+        review_md = human_review_text
+    else:
+        review_md = f"""# Promo Video Human Creative Review
 
 Generated: {generated_at}
 
 Verdict: NOT HUMAN-REVIEWED FOR FINAL RELEASE
 
-This package has a complete 11-scene MagicFit render plan for the 90-second All Horizons teaser, but it does not include rendered MagicFit scene clips or per-scene MagicFit job receipts.
+This package has a complete 11-scene MagicFit render plan, rendered MagicFit scene clips, per-scene MagicFit job receipts, and a 90-second post-composited MP4. It is still not marked release-ready because human creative review has not been recorded.
 
 Creative notes:
 - The 11-scene structure is valid: opener, nine Horizons, finale.
 - The nine Horizons are each introduced once.
 - The plan correctly keeps VO, captions, UI labels, and logo work in post.
+- The post composite, caption file, and poster asset exist.
 - The IP boundary is explicit and public-safe at the prompt level.
 
 Release blocker:
-- Human creative review cannot pass until the actual rendered clips are present and inspected for motion, character acting, offensive artifacts, readable post overlays, and IP safety.
+- Human creative review cannot pass until the rendered clips and composite are inspected for motion, character acting, offensive artifacts, readable post overlays, and IP safety.
 """
     (OUT / "PROMO_VIDEO_HUMAN_CREATIVE_REVIEW.md").write_text(review_md, encoding="utf-8")
 
@@ -378,10 +403,13 @@ Summary:
 - Required duration: {total_duration}s
 - Required Horizons covered once: {horizon_coverage_pass}
 - Rendered MagicFit scene receipts: {rendered_count}/{scene_count}
+- Post composite present: {post_composite_complete}
 - Human creative review passed: {human_reviewed}
-
+"""
+    if not ready:
+        final_md += """
 Blocking condition:
-The zip is a render-planning package, not a rendered promo package. Final readiness requires 11 MagicFit clip files with per-scene receipts, then post composite, motion score, public-safety review, and human creative approval.
+Final readiness requires provider verification, 11 rendered scenes, 90-second composite media, public-safety artifacts, and recorded human creative approval. Do not convert provider ownership, clip existence, or receipt text into human creative approval.
 """
     (OUT / "FINAL_HORIZONS_90S_PROMO_VERDICT.md").write_text(final_md, encoding="utf-8")
 
