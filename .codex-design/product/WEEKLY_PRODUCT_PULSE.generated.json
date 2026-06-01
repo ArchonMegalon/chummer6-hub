@@ -1,7 +1,7 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-01T13:06:19Z",
+  "generated_at": "2026-06-01T13:44:28Z",
   "as_of": "2026-06-01",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",

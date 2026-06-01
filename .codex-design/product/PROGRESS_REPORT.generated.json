@@ -1,7 +1,7 @@
 {
   "contract_name": "fleet.public_progress_report",
   "contract_version": "2026-03-23",
-  "generated_at": "2026-06-01T13:06:13Z",
+  "generated_at": "2026-06-01T13:44:23Z",
   "as_of": "2026-06-01",
   "history_snapshot_count": 36,
   "brand": "Chummer6",
@@ -342,7 +342,7 @@
           "body": "Complete desktop/browser workbench with accessibility, localization, and polished shared components."
         }
       ],
-      "recent_commit_count_7d": 96,
+      "recent_commit_count_7d": 97,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -375,13 +375,13 @@
           "repo_slug": "chummer6-ui",
           "path": "/docker/chummercomplete/chummer6-ui",
           "lifecycle": "live",
-          "recent_commit_count_7d": 85,
+          "recent_commit_count_7d": 86,
           "design_total_weight": 56,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-06-01T13:05:46.342267Z",
+            "published_at": "2026-06-01T13:25:03.228157Z",
             "stages": {
               "capacity_compile": true,
               "design_compile": true,
@@ -607,7 +607,7 @@
           "body": "A cohesive hosted community and publication stack ready for real public participation."
         }
       ],
-      "recent_commit_count_7d": 117,
+      "recent_commit_count_7d": 116,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -640,13 +640,13 @@
           "repo_slug": "chummer6-hub",
           "path": "/docker/chummercomplete/chummer6-hub",
           "lifecycle": "live",
-          "recent_commit_count_7d": 90,
+          "recent_commit_count_7d": 89,
           "design_total_weight": 60,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
           "uncovered_scope_count": 0,
           "compile": {
-            "published_at": "2026-06-01T04:31:02.119520Z",
+            "published_at": "2026-06-01T13:37:11.159588Z",
             "stages": {
               "design_compile": true,
               "policy_compile": true,
@@ -783,7 +783,7 @@
           "body": "One authoritative public story, compiled cleanly into every downstream surface."
         }
       ],
-      "recent_commit_count_7d": 58,
+      "recent_commit_count_7d": 59,
       "remaining_open_weight": 0,
       "remaining_open_milestones": 0,
       "uncovered_scope_count": 0,
@@ -816,7 +816,7 @@
           "repo_slug": "chummer6-design",
           "path": "/docker/chummercomplete/chummer-design",
           "lifecycle": "dispatchable",
-          "recent_commit_count_7d": 35,
+          "recent_commit_count_7d": 36,
           "design_total_weight": 44,
           "remaining_open_weight": 0,
           "remaining_open_milestones": 0,
