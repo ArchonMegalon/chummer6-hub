@@ -1,12 +1,12 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-01T13:44:28Z",
+  "generated_at": "2026-06-01T16:45:31Z",
   "as_of": "2026-06-01",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
-  "summary": "Next 12 Biggest Wins is materially closed as the latest recommended closeout wave; journey proof is ready; flagship replacement readiness is ready; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
+  "summary": "Next 12 Biggest Wins is materially closed as the latest recommended closeout wave; journey proof is ready; flagship replacement readiness is ready; overall progress is 100% in 'In progress'; the longest pole remains No active release pole; support closure is clear.",
   "active_wave": "Next 12 Biggest Wins",
   "active_wave_status": "complete",
   "release_health": {
@@ -58,7 +58,7 @@
     },
     {
       "cluster_id": "long_pole_visibility",
-      "summary": "The current longest pole is Core Engine, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
+      "summary": "The current longest pole is No active release pole, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
       "source_paths": [
         "products/chummer/PROGRESS_REPORT.generated.json",
         "products/chummer/RELEASE_EVIDENCE_PACK.md"
@@ -72,20 +72,20 @@
     {
       "decision_id": "2026-06-01-focus-next-12-biggest-wins",
       "action": "focus_shift",
-      "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 36 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
+      "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'In progress', history depth has reached 36 snapshots, and the pacing risk remains concentrated in No active release pole while trust/publication/utility closure still needs measured completion on the active registry.",
       "cited_signals": [
         "overall_progress_percent=100",
         "history_snapshot_count=36",
         "oldest_blocker_days=0",
-        "phase_label=Public-fit polish",
-        "longest_pole=Core Engine",
+        "phase_label=In progress",
+        "longest_pole=No active release pole",
         "active_wave_status=complete"
       ]
     },
     {
       "decision_id": "2026-06-01-launch-governance",
-      "action": "freeze_launch",
-      "reason": "Freeze launch expansion until the whole-product final claim returns to pass (current: fail).",
+      "action": "launch_expand",
+      "reason": "Launch expansion is approved for the next bounded window while canaries and support closure remain clear.",
       "cited_signals": [
         "journey_gate_state=ready",
         "journey_gate_blocked_count=0",
@@ -97,7 +97,7 @@
         "successor_dependency_state=ready",
         "successor_open_dependency_ids=",
         "successor_open_dependency_work_task_ids=",
-        "status_plane_final_claim_status=fail"
+        "status_plane_final_claim_status=pass"
       ]
     }
   ],
@@ -152,7 +152,7 @@
       },
       {
         "cluster_id": "long_pole_visibility",
-        "summary": "The current longest pole is Core Engine, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
+        "summary": "The current longest pole is No active release pole, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
         "source_paths": [
           "products/chummer/PROGRESS_REPORT.generated.json",
           "products/chummer/RELEASE_EVIDENCE_PACK.md"
@@ -166,20 +166,20 @@
       {
         "decision_id": "2026-06-01-focus-next-12-biggest-wins",
         "action": "focus_shift",
-        "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 36 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
+        "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'In progress', history depth has reached 36 snapshots, and the pacing risk remains concentrated in No active release pole while trust/publication/utility closure still needs measured completion on the active registry.",
         "cited_signals": [
           "overall_progress_percent=100",
           "history_snapshot_count=36",
           "oldest_blocker_days=0",
-          "phase_label=Public-fit polish",
-          "longest_pole=Core Engine",
+          "phase_label=In progress",
+          "longest_pole=No active release pole",
           "active_wave_status=complete"
         ]
       },
       {
         "decision_id": "2026-06-01-launch-governance",
-        "action": "freeze_launch",
-        "reason": "Freeze launch expansion until the whole-product final claim returns to pass (current: fail).",
+        "action": "launch_expand",
+        "reason": "Launch expansion is approved for the next bounded window while canaries and support closure remain clear.",
         "cited_signals": [
           "journey_gate_state=ready",
           "journey_gate_blocked_count=0",
@@ -191,7 +191,7 @@
           "successor_dependency_state=ready",
           "successor_open_dependency_ids=",
           "successor_open_dependency_work_task_ids=",
-          "status_plane_final_claim_status=fail"
+          "status_plane_final_claim_status=pass"
         ]
       }
     ],
@@ -200,10 +200,10 @@
   "supporting_signals": {
     "current_recommended_wave": "Next 12 Biggest Wins",
     "overall_progress_percent": 100,
-    "phase_label": "Public-fit polish",
+    "phase_label": "In progress",
     "history_snapshot_count": 36,
-    "longest_pole": "Core Engine",
-    "launch_readiness": "Hold launch expansion until the whole-product final claim returns to pass (current: fail).",
+    "longest_pole": "No active release pole",
+    "launch_readiness": "Route-canary validation is green; widen launch only while support fallout remains stable.",
     "provider_route_stewardship": {
       "default_status": "Pilot defaults are governed",
       "canary_status": "Canary green on all active lanes",
