@@ -21,8 +21,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        
+
+      - name: Check wiki repository
+        id: wiki
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-remote "https://github.com/${GITHUB_REPOSITORY}.wiki.git" HEAD >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::GitHub wiki repository ${GITHUB_REPOSITORY}.wiki.git is unavailable; skipping wiki publish."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to GitHub Wiki
+        if: steps.wiki.outputs.available == 'true'
         uses: Andrew-Chen-Wang/github-wiki-action@v5
         with:
           path: Chummer/docs/wiki
