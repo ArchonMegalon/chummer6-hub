@@ -18,7 +18,7 @@ permissions:
 jobs:
   nightly-build:
     if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
-    runs-on: windows-2025
+    runs-on: windows-2025-vs2026
     timeout-minutes: 60 # Prevent stuck builds
     
     steps:
