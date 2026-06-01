@@ -66,23 +66,41 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Enable Windows long paths
+      shell: pwsh
+      run: git config --system core.longpaths true
+
     - name: Checkout core compatibility tree
       uses: actions/checkout@v4
       with:
         repository: ArchonMegalon/chummer6-core
         path: compat/chummer-core-engine
+        sparse-checkout: |
+          Chummer.Contracts
+          Directory.Build.props
+          global.json
 
     - name: Checkout hub registry compatibility tree
       uses: actions/checkout@v4
       with:
         repository: ArchonMegalon/chummer6-hub-registry
         path: compat/chummer-hub-registry
+        sparse-checkout: |
+          Chummer.Hub.Registry.Contracts
+          Chummer.Run.Registry
+          Directory.Build.props
+          global.json
 
     - name: Checkout media factory compatibility tree
       uses: actions/checkout@v4
       with:
         repository: ArchonMegalon/chummer6-media-factory
         path: compat/chummer-media-factory
+        sparse-checkout: |
+          src/Chummer.Media.Contracts
+          src/Chummer.Media.Factory.Runtime
+          Directory.Build.props
+          global.json
 
     - name: Link compatibility tree layout
       shell: pwsh
