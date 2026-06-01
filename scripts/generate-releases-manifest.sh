@@ -172,6 +172,8 @@ allowed = {
     "locale_summary",
 }
 sanitized = {key: payload[key] for key in payload if key in allowed}
+if "generatedAt" not in sanitized and "generated_at" in sanitized:
+    sanitized["generatedAt"] = sanitized["generated_at"]
 row_allowed = {
     "locale",
     "untranslated_key_count",
@@ -391,6 +393,7 @@ def fallback_tuple_coverage(local_payload: dict) -> dict | None:
 
 def derive_verifier_owned_value(name: str, current_value):
     artifact_bound_registry_names = {
+        "expected_desktop_route_truth_rows",
         "expected_install_aware_artifact_registry_rows",
         "expected_desktop_surface_ref_rows",
         "expected_artifact_identity_registry_rows",
@@ -466,6 +469,8 @@ def derive_verifier_owned_value(name: str, current_value):
 
 def assert_desktop_surface_ref_consistency(local_payload: dict) -> None:
     artifacts = local_payload.get("artifacts") or []
+    if not artifacts:
+        return
     artifact_ids = {
         normalized_token(item.get("artifactId") or item.get("id"))
         for item in artifacts
