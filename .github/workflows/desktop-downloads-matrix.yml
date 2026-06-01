@@ -37,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout sibling repositories
         shell: bash
@@ -68,7 +68,7 @@ jobs:
           test -f "$GITHUB_WORKSPACE/compat/Chummer.Media.Contracts.dll"
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
@@ -100,7 +100,7 @@ jobs:
           tar -C out/api -czf dist/chummer-run-api-portable.tar.gz .
 
       - name: Upload API artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-api-portable
           path: dist/chummer-run-api-portable.tar.gz
@@ -117,7 +117,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout hub-registry sibling
         shell: bash
@@ -172,7 +172,7 @@ jobs:
           bash scripts/generate-releases-manifest.sh
 
       - name: Upload manifest bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: desktop-download-bundle
           path: dist
@@ -225,7 +225,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout hub-registry sibling
         shell: bash
@@ -252,7 +252,7 @@ jobs:
           test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/verify_public_release_channel.py"
 
       - name: Download manifest bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: desktop-download-bundle
           path: dist
@@ -307,7 +307,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout hub-registry sibling
         shell: bash
@@ -334,7 +334,7 @@ jobs:
           test -f "$CHUMMER_HUB_REGISTRY_ROOT/scripts/verify_public_release_channel.py"
 
       - name: Download manifest bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: desktop-download-bundle
           path: dist

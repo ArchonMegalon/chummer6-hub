@@ -46,7 +46,7 @@ jobs:
     #   - https://gh.io/supported-runners-and-hardware-resources
     #   - https://gh.io/using-larger-runners
     # Consider using larger runners for possible analysis time improvements.
-    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'windows-latest' }}
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'windows-2025' }}
     timeout-minutes: ${{ (matrix.language == 'swift' && 120) || 360 }}
     permissions:
       actions: read
@@ -64,14 +64,14 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Enable Windows long paths
       shell: pwsh
       run: git config --system core.longpaths true
 
     - name: Checkout core compatibility tree
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: ArchonMegalon/chummer6-core
         path: compat/chummer-core-engine
@@ -81,7 +81,7 @@ jobs:
           global.json
 
     - name: Checkout hub registry compatibility tree
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: ArchonMegalon/chummer6-hub-registry
         path: compat/chummer-hub-registry
@@ -92,7 +92,7 @@ jobs:
           global.json
 
     - name: Checkout media factory compatibility tree
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         repository: ArchonMegalon/chummer6-media-factory
         path: compat/chummer-media-factory
@@ -140,7 +140,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v3
+      uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
         build-mode: manual
@@ -155,7 +155,7 @@ jobs:
     # Autobuild attempts to build any compiled languages (C/C++, C#, Go, Java, or Swift).
     # If this step fails, then you should remove it and run the build manually (see below)
     # - name: Autobuild
-    #   uses: github/codeql-action/autobuild@v3
+    #   uses: github/codeql-action/autobuild@v4
 
     # ℹ️ Command-line programs to run using the OS shell.
     # 📚 See https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
@@ -171,6 +171,6 @@ jobs:
         dotnet build --configuration Release --no-restore ./Chummer.Run.Identity/Chummer.Run.Identity.csproj
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v3
+      uses: github/codeql-action/analyze@v4
       with:
         category: "/language:${{matrix.language}}"

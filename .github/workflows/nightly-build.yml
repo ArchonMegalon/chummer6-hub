@@ -18,24 +18,24 @@ permissions:
 jobs:
   nightly-build:
     if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 60 # Prevent stuck builds
     
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0 # Need full history for version calculation
     
     - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         # .NET SDK needed to build SDK-style .NET Framework 4.8 projects
         # Any recent SDK version works for building .NET Framework projects
         dotnet-version: '8.0.x'
     
     - name: Cache NuGet packages
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.nuget/packages
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/packages.config', '**/project.json') }}
@@ -250,7 +250,7 @@ jobs:
     
     - name: Publish test results
       if: steps.check_commit.outputs.skip != 'true' && always()
-      uses: dorny/test-reporter@v1
+      uses: dorny/test-reporter@v3
       with:
         name: Test Results
         path: '**/*.trx'
@@ -285,7 +285,7 @@ jobs:
     
     - name: Upload build artifacts
       if: steps.check_commit.outputs.skip != 'true'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: nightly-build-${{ steps.update_version.outputs.nightly_tag }}
         path: ${{ steps.create_zip.outputs.zip_file }}
@@ -318,7 +318,7 @@ jobs:
     
     - name: Create GitHub Release
       if: steps.check_commit.outputs.skip != 'true' && steps.check_release.outputs.exists != 'true'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       with:
         tag_name: ${{ steps.update_version.outputs.nightly_tag }}
         name: Nightly Build ${{ steps.update_version.outputs.nightly_tag }}
@@ -336,7 +336,7 @@ jobs:
     
     - name: Notify Discord on failure
       if: failure() && github.event_name == 'schedule'
-      uses: Ilshidur/action-discord@master
+      uses: Ilshidur/action-discord@0.4.0
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       with:
