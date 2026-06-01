@@ -11993,7 +11993,7 @@ def main() -> int:
             "/status",
             "What works today",
             required_texts=(
-                "Build run-20260530-184515",
+                "Gold-ready on Public release Build run-",
                 "Gold-ready on Public release",
                 "Windows",
                 "Linux",
