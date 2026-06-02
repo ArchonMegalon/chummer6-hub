@@ -3,26 +3,26 @@
     bool followThroughReady = Model.CloseoutDispatchSentCount > 0 && !string.IsNullOrWhiteSpace(Model.ReleaseProofReceiptId);
     bool publicSignalLive = Model.ReceiptCount > 0 || Model.CategoryCount > 0;
     string followThroughHeading = followThroughReady
-        ? "First-party follow-up examples are visible now."
-        : "First-party follow-up is still preview-only on this host.";
+        ? "Chummer follow-up examples are visible now."
+        : "Chummer follow-up is still preview-only on this host.";
     string followThroughSummary = followThroughReady
-        ? $"{Model.CloseoutDispatchSentCount} follow-up receipt(s) have already landed, and shipped proof stays tied to /changelog."
+        ? $"{Model.CloseoutDispatchSentCount} follow-up record(s) have already landed, and shipped updates stay tied to /changelog."
         : Model.CloseoutQueueReadyCount > 0
-            ? $"{Model.CloseoutQueueReadyCount} follow-up candidate(s) are ready, but nothing is posted as sent until shipped proof and first-party closeout receipts are both real."
-            : "Public feedback can still show demand, but account-backed follow-up stays off until shipped proof and first-party closeout receipts are both real on this host.";
-    string readinessTag = followThroughReady ? "Posted closeout examples" : "Preview-only follow-up";
+            ? $"{Model.CloseoutQueueReadyCount} follow-up candidate(s) are ready, but nothing is posted as sent until the shipped update path is ready."
+            : "Public feedback can still show demand, but account-backed follow-up waits until the shipped update path is ready on this host.";
+    string readinessTag = followThroughReady ? "Posted follow-up examples" : "Preview-only follow-up";
 }
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Public loop status</p>
-        <h2 class="editorial-title">Keep signal, planning, shipped proof, and private help on separate pages.</h2>
+        <h2 class="editorial-title">Keep signal, planning, shipped updates, and private help on separate pages.</h2>
         <p class="editorial-copy">This rail stays honest when it shows public demand clearly, leaves private follow-up to Help, and waits for Changelog before it treats anything as shipped.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">Hosted page promotion</span>
-            <h3>@(publicSignalLive ? "Public signal is live on first-party pages." : "Public signal is still warming up on this host.")</h3>
+            <h3>@(publicSignalLive ? "Public signal is live on Chummer pages." : "Public signal is still warming up on this host.")</h3>
             <p>@Model.CategoryCount category@(Model.CategoryCount == 1 ? string.Empty : "ies") keep ideas, safe public bugs, and likely misroutes separated before they blur into support or roadmap claims.</p>
             <div class="route-choice-card__proof">
                 <span>@Model.CategoryCount public category@(Model.CategoryCount == 1 ? string.Empty : "ies")</span>
@@ -32,24 +32,24 @@
             <a class="editorial-strip__action" href="/roadmap">Open roadmap</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Closeout follow-up</span>
+            <span class="tag">Shipped follow-up</span>
             <h3>@followThroughHeading</h3>
             <p>@followThroughSummary</p>
             <div class="route-choice-card__proof">
-                <span>@Model.CloseoutDispatchSentCount posted follow-up receipt@(Model.CloseoutDispatchSentCount == 1 ? string.Empty : "s")</span>
+                <span>@Model.CloseoutDispatchSentCount posted follow-up record@(Model.CloseoutDispatchSentCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.CloseoutQueueReadyCount ready follow-up candidate@(Model.CloseoutQueueReadyCount == 1 ? string.Empty : "s")</span>
                 <span>@Model.JourneyReceiptCount follow-up signals</span>
             </div>
             <a class="editorial-strip__action" href="/changelog">Open changelog</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Ingress and closeout</span>
+            <span class="tag">Intake and follow-up</span>
             <h3>Private help still leaves this page immediately.</h3>
             <p>Crashes, installs, logs, account repair, and private campaign detail should move to Help or Contact before they become public board noise.</p>
             <div class="route-choice-card__proof">
                 <span>Help for private follow-up</span>
                 <span>Roadmap for planned movement</span>
-                <span>Changelog for shipped proof</span>
+                <span>Changelog for shipped updates</span>
             </div>
             <a class="editorial-strip__action" href="/contact#support-intake">Open private support</a>
         </article>
@@ -60,7 +60,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Category routing</p>
         <h2 class="editorial-title">Signal routing and public follow-up stay explicit.</h2>
-        <p class="editorial-copy">Public signals follow a first-party routing board, with clear paths for follow-up and closeout.</p>
+        <p class="editorial-copy">Public signals follow a Chummer routing board, with clear paths for follow-up and shipped updates.</p>
     </div>
     <p class="muted-copy">Public signal routing stays transparent; private follow-up goes through Help.</p>
 </section>
