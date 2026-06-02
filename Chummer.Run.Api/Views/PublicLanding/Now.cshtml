@@ -88,7 +88,7 @@
     </div>
 </section>
 
-<section class="status-decision-strip" aria-label="Readiness and proof decisions">
+<section class="status-decision-strip" aria-label="Readiness and release decisions">
     <article class="status-decision-strip__card">
         <span class="tag">Ready to install?</span>
         <h2>Start from downloads when you want the recommended build and the calmest first-run path for this device.</h2>
@@ -97,14 +97,14 @@
     </article>
     <article class="status-decision-strip__card">
         <span class="tag">What you can verify now</span>
-        <h2>The proof cards below should answer the normal trust questions without forcing a full roadmap tour.</h2>
+        <h2>The release checks below should answer the normal trust questions without forcing a full roadmap tour.</h2>
         <p>Use them when you want one concrete result, one visible trail, and one clear next step before you commit a device.</p>
-        <a class="button-like button-like--ghost" href="#now-proof">Open proof cards</a>
+        <a class="button-like button-like--ghost" href="#now-proof">Open release checks</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag tag--amber">Need caution</span>
         <h2>Known issues, install help, and support stay close to downloads.</h2>
-        <p>Wait, route around, or ask for help from first-party surfaces instead of decoding internal product language or public planning pages.</p>
+        <p>Wait, route around, or ask for help from Chummer support instead of decoding internal product language or public planning pages.</p>
         <a class="button-like button-like--ghost" href="/help">Open help</a>
     </article>
 </section>
@@ -112,7 +112,7 @@
 <section class="release-footnote">
     <div class="route-callout" role="status" aria-live="polite">
         <h3>Want one short guided release branch first?</h3>
-        <p>The release concierge keeps changelog, release notes, update help, and human escalation on one bounded wrapper without turning it into the source of release truth.</p>
+        <p>The release concierge keeps changelog, release notes, update help, and human escalation in one guided wrapper without replacing the download page.</p>
         <div class="route-callout__actions">
             <a class="inline-link" href="/now/concierge">Open release concierge</a>
             <a class="inline-link" href="/changelog">Open changelog</a>
@@ -169,8 +169,8 @@
 <section class="workflow-band" id="now-proof">
     <div class="workflow-band__lead">
         <p class="eyebrow">What you can verify now</p>
-        <h2 class="editorial-title">Three proof cards that show the release is more than a landing page story</h2>
-        <p class="editorial-copy">These cards stay focused on real product behavior: builder truth, explanation trail, and continuity under drift.</p>
+        <h2 class="editorial-title">Three release checks that show what works beyond the landing page</h2>
+        <p class="editorial-copy">These cards stay focused on real product behavior: builder results, explanation trail, and continuity under drift.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var card in Model.ProofModules)
@@ -201,7 +201,7 @@
 {
     <section class="release-shelf release-shelf--manual">
         <details class="release-accordion">
-            <summary>More proof you can inspect today</summary>
+            <summary>More release detail you can inspect today</summary>
             <div class="release-accordion__body">
                 <div class="evidence-row-list">
                     @foreach (var card in supportingProof)

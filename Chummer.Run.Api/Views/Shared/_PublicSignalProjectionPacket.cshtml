@@ -32,6 +32,13 @@
         }
 
         return value
+            .Replace("Canonical Roadmap Truth", "Roadmap decisions", StringComparison.OrdinalIgnoreCase)
+            .Replace("Release Truth", "Release status", StringComparison.OrdinalIgnoreCase)
+            .Replace("Support Case Truth", "Support cases", StringComparison.OrdinalIgnoreCase)
+            .Replace("Implementation Priority", "Implementation priority", StringComparison.OrdinalIgnoreCase)
+            .Replace("projection-only", "public-view only", StringComparison.OrdinalIgnoreCase)
+            .Replace("projection", "public view", StringComparison.OrdinalIgnoreCase)
+            .Replace("canonical patch or milestone", "product record or milestone", StringComparison.OrdinalIgnoreCase)
             .Replace("Product Governor", "governed product decision", StringComparison.OrdinalIgnoreCase)
             .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
             .Replace("EA synthesis", "product review", StringComparison.OrdinalIgnoreCase)
@@ -80,20 +87,20 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
-            <h3>Public page and first-party fallback stay paired.</h3>
+            <h3>Public page and Chummer help stay paired.</h3>
             <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
             <div class="route-choice-card__proof">
                 <span>Role: @Model.Role</span>
                 <span>Public page: @Model.PublicPath</span>
-                <span>First-party fallback: @Model.FallbackPath</span>
-                <span>@Model.TruthPosture</span>
+                <span>Chummer path: @Model.FallbackPath</span>
+                <span>@SanitizeProjectionText(Model.TruthPosture)</span>
             </div>
-            <a class="editorial-strip__action" href="@Model.FallbackPath">Open first-party fallback</a>
+            <a class="editorial-strip__action" href="@Model.FallbackPath">Open Chummer path</a>
         </article>
         <article class="route-choice-card">
             <span class="tag">Core rule</span>
             <h3>@Model.CoreRule</h3>
-            <p>Hosted projection can collect visible demand, but it stays downstream of Chummer-owned review, canon, implementation, and proof.</p>
+            <p>The public board can collect visible demand, but Chummer review still decides what changes.</p>
             @if (authorityFlow.Length > 0)
             {
                 <div class="compact-rail">
@@ -110,9 +117,9 @@
             }
         </article>
         <article class="route-choice-card">
-            <span class="tag">Boundary conditions</span>
-            <h3>Decision paths and forbidden claims stay explicit.</h3>
-            <p>Public signal can move into named review tracks, but it must not turn into support truth, release truth, or canon by itself.</p>
+            <span class="tag">Boundaries</span>
+            <h3>Decision paths stay explicit.</h3>
+            <p>Public signal can move into review tracks, but it cannot become support, roadmap, or release status by itself.</p>
             @if (decisionRoutes.Length > 0)
             {
                 <div class="route-choice-card__proof">
@@ -127,7 +134,7 @@
                 <div class="compact-rail">
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Forbidden on this page</h3>
+                            <h3>Not handled here</h3>
                             <p>@string.Join(" / ", forbidden.Select(SanitizeProjectionText))</p>
                         </div>
                     </article>
@@ -136,16 +143,16 @@
             <div class="compact-rail">
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
-                        <h3>Required public warning</h3>
+                        <h3>Public warning</h3>
                         <p>@SanitizeProjectionText(Model.PublicWarning)</p>
                     </div>
                 </article>
             </div>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Source signals</span>
-            <h3>Canonical sources and closeout gates still sit upstream of the hosted surface.</h3>
-            <p>These Chummer-owned receipts keep the projection honest even while the hosted board handles visibility and voter follow-up.</p>
+            <span class="tag">Review signals</span>
+            <h3>Product records and shipped-update checks stay behind the public board.</h3>
+            <p>These records keep the public board connected to real product review while the page handles visibility and follow-up.</p>
             @if (sourceReceipts.Length > 0)
             {
                 <div class="route-choice-card__proof">
@@ -160,7 +167,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Canonical sources</h3>
+                            <h3>Product records</h3>
                             <p>@string.Join(" / ", canonicalSources)</p>
                         </div>
                     </article>
@@ -178,7 +185,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Shipped closeout gate</h3>
+                            <h3>Shipped update checks</h3>
                             <p>@string.Join(" / ", Model.CloseoutRequirements.Select(SanitizeProjectionText))</p>
                         </div>
                     </article>
@@ -187,7 +194,7 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Journey-proof refs</h3>
+                            <h3>Journey refs</h3>
                             <p>@string.Join(" / ", journeyProofEvents.Select(item => SanitizeProjectionText(item.EventKey)))</p>
                         </div>
                     </article>
