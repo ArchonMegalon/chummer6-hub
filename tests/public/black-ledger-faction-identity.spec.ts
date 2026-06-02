@@ -13,11 +13,11 @@ const factions = [
 
 test('faction pages carry logos, backdrops, ledgers, and one clear public CTA', async ({ page }) => {
   const visited: Array<Record<string, unknown>> = [];
-  await page.goto(`${baseUrl}/ledger/factions`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/ledger/factions`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('.faction-profile-card')).toHaveCount(6);
 
   for (const faction of factions) {
-    await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#ledger-faction-file')).toContainText(faction.name);
     await expect(page.locator('.faction-detail-hero__logo')).toBeVisible();
     await expect(page.locator('.score-ledger-grid .route-choice-card')).toHaveCount(4);

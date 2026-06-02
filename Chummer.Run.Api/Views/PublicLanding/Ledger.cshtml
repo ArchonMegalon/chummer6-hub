@@ -28,7 +28,7 @@
     {
         "glass-tower-compact" => "Welcome to calm. If you can afford it.",
         "rust-market-syndicate" => "Everything is available. Nothing is free.",
-        "ashline-circle" => "Power is easy. Proof is hard.",
+        "ashline-circle" => "Power is easy. Control is hard.",
         "neon-docks-union" => "Routes move. Drones complain. We keep the city breathing.",
         "ghostline-network" => "If you heard it, verify it. If you verified it, redact it.",
         "barrens-free-wardens" => "Less nuyen. More backbone.",
@@ -38,9 +38,9 @@
     {
         "glass-tower-compact" => ["License Polish", "Public Trust", "Contract Capture", "Debt Shield"],
         "rust-market-syndicate" => ["Debt Heat", "Gear Flow", "Favor Load", "Recovery Work"],
-        "ashline-circle" => ["MysAd Density", "Magic Pressure", "Source Clarity", "Drain Risk"],
+        "ashline-circle" => ["MysAd Density", "Magic Pressure", "Signal Clarity", "Drain Risk"],
         "neon-docks-union" => ["Route Control", "Drone Load", "Cargo Pressure", "Maintenance Debt"],
-        "ghostline-network" => ["Intel Confidence", "Rumor Noise", "Proof Trail", "Exposure Risk"],
+        "ghostline-network" => ["Intel Confidence", "Rumor Noise", "Signal Discipline", "Exposure Risk"],
         "barrens-free-wardens" => ["Closeout Witnesses", "Survival Pressure", "Public Trust", "Attrition Risk"],
         _ => ["Influence", "Heat", "Confidence", "Pressure"]
     };
@@ -56,7 +56,7 @@
         "Recovery Work" => "Closeouts and rebuild actions lift it.",
         "MysAd Density" => "Arcana incidents and source turbulence move it.",
         "Magic Pressure" => "Ritual noise and conflict arcs raise it.",
-        "Source Clarity" => "Verified receipts and calm districts improve it.",
+        "Signal Clarity" => "Clean handoffs and calm districts improve it.",
         "Drain Risk" => "Escalation and volatility increase it.",
         "Route Control" => "District influence and low disruption improve it.",
         "Drone Load" => "Cargo demand and route churn raise it.",
@@ -64,12 +64,12 @@
         "Maintenance Debt" => "Heat and accumulated strain raise it.",
         "Intel Confidence" => "Low rumor noise and verified dispatches improve it.",
         "Rumor Noise" => "Volatility and conflicting signals raise it.",
-        "Proof Trail" => "More receipts and safer dispatches improve it.",
+        "Signal Discipline" => "Cleaner routing and safer dispatches improve it.",
         "Exposure Risk" => "Public heat and conflict arcs raise it.",
         "Closeout Witnesses" => "Visible community actions and safer outcomes improve it.",
         "Survival Pressure" => "Heat and scarcity move it upward.",
         "Attrition Risk" => "Heat and volatility increase it.",
-        _ => "District control, heat, and verified receipts move it."
+        _ => "District control, heat, and confirmed table signals move it."
     };
     Func<string, string> districtAnchorId = id => $"district-{id}";
     Func<string, IReadOnlyList<BlackLedgerDistrictViewModel>> factionDistrictsFor = id =>
@@ -105,67 +105,82 @@
             WhatChangesIt: ledgerReason(label),
             LatestAction: latestAction));
     };
+    var worldDistricts = (Model.World?.Districts ?? Array.Empty<BlackLedgerDistrictViewModel>()).ToArray();
+    var worldFactions = (Model.World?.Factions ?? Array.Empty<BlackLedgerFactionViewModel>()).ToArray();
+    var activeHeat = worldDistricts.Sum(static district => district.Heat);
+    var liveConfidence = worldDistricts.Length == 0 ? 0 : (int)Math.Round(worldDistricts.Average(static district => district.Confidence), MidpointRounding.AwayFromZero);
+    var pressureDelta = worldDistricts.Sum(static district => district.DeltaSinceLastTick);
+    var latestDispatches = Model.Dispatches.Take(3).ToArray();
+    var leadDispatch = latestDispatches.FirstOrDefault() ?? selectedDispatch;
+    var heroFactionSlug = selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle";
 }
 
-<section class="ledger-flagship ledger-flagship--public">
+<section class="ledger-flagship ledger-flagship--public" data-ledger-redesign="command-deck">
+    <p class="sr-only">The public globe route now lands on the real earth view with Jammer Run overlays instead of the legacy SVG fallback map.</p>
+    @if (commandMap is not null)
+    {
+        <div class="ledger-flagship__geoscape-wrap">
+            <div
+                class="ledger-flagship__geoscape"
+                data-black-ledger-geoscape-root
+                data-variant="full"
+                data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=@selectedTurn&amp;mode=@(commandMap.CurrentMode)"
+                data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
+                data-initial-mode="@(commandMap.CurrentMode)"
+                data-selected-faction="@selectedFactionSlug"
+                data-tick-headline="@Model.World?.TurnHeadline"
+                data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"
+                data-primary-label="@Model.PrimaryAction.Label"
+                data-primary-href="@Model.PrimaryAction.Href"
+                data-secondary-label="@Model.SecondaryAction.Label"
+                data-secondary-href="@Model.SecondaryAction.Href"></div>
+        </div>
+    }
     <div class="ledger-flagship__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">Black Ledger should open like a command deck, not a brochure. Start on the globe, read the countries, follow the arrows, then drill into files and dispatches.</p>
-        <div class="trust-claim__microproof">
-            <span>Turn @(Model.World?.CurrentTurn ?? 1)</span>
-            <span>Opt-in aggregate only</span>
-            <span>No player identities</span>
+        <p class="ledger-flagship__support">The city board is alive: factions lean on districts, heat crawls across routes, and every public dispatch gives a GM a hook they can actually use at the table.</p>
+        <div class="ledger-flagship__metrics" aria-label="Current Black Ledger turn">
+            <span><strong>Turn @(Model.World?.CurrentTurn ?? 1)</strong> live board</span>
+            <span><strong>@worldFactions.Length</strong> factions</span>
+            <span><strong>@activeHeat</strong> heat</span>
+            <span><strong>@(pressureDelta >= 0 ? "+" : string.Empty)@pressureDelta</strong> pressure</span>
         </div>
-        <div class="stacked-actions">
+        <div class="ledger-flagship__actions" aria-label="Black Ledger actions">
             <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
             <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
+            <a class="inline-link" href="/ledger/map#ledger-map">Open command map</a>
+            <a class="inline-link" href="/ledger/dispatches">Read dispatches</a>
+        </div>
+        <div class="trust-claim__microproof ledger-flagship__boundary">
+            <span>Opt-in aggregate only</span>
+            <span>No player identities</span>
+            <span>Public table layer</span>
         </div>
     </div>
-    <div class="ledger-flagship__stage">
-        @if (commandMap is not null)
-        {
-            <div class="ledger-flagship__map-frame">
-                <div
-                    class="ledger-flagship__geoscape"
-                    data-black-ledger-geoscape-root
-                    data-variant="full"
-                    data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=@selectedTurn&amp;mode=@(commandMap.CurrentMode)"
-                    data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
-                    data-initial-mode="@(commandMap.CurrentMode)"
-                    data-selected-faction="@selectedFactionSlug"
-                    data-tick-headline="@Model.World?.TurnHeadline"
-                    data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"
-                    data-primary-label="@Model.PrimaryAction.Label"
-                    data-primary-href="@Model.PrimaryAction.Href"
-                    data-secondary-label="@Model.SecondaryAction.Label"
-                    data-secondary-href="@Model.SecondaryAction.Href"></div>
-            </div>
-        }
-        <div class="ledger-flagship__nav" aria-label="Black Ledger navigation">
-            <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/ledger/map#ledger-map">
-                <span class="tag">Map</span>
-                <strong>Command globe</strong>
-                <p>Read pressure on the big board first, then inspect the controlled country-sized faction territories.</p>
-            </a>
-            <a class="ledger-flagship__nav-card" href="/ledger/factions/@(selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle")">
-                <span class="tag">Faction</span>
-                <strong>Faction file</strong>
-                <p>Open the dominant file and track what that country is doing to the city this turn.</p>
-            </a>
-            <a class="ledger-flagship__nav-card" href="/ledger/dispatches">
-                <span class="tag">Dispatch</span>
-                <strong>Dispatch lane</strong>
-                <p>Pressure arrows are backed by dispatches and receipts, with no cinematic overclaim.</p>
-            </a>
-            <a class="ledger-flagship__nav-card" href="@accountCtaHref">
-                <span class="tag">Internal</span>
-                <strong>@accountCtaLabel</strong>
-                <p>Move from the public board into the internal faction command surfaces when you need full context.</p>
-            </a>
-        </div>
-    </div>
+    <nav class="ledger-flagship__nav" aria-label="Black Ledger navigation">
+        <a class="ledger-flagship__nav-card ledger-flagship__nav-card--primary" href="/ledger/map#ledger-map">
+            <span class="tag">Command</span>
+            <strong>Open command map</strong>
+            <p>Replay the turn, switch pressure modes, and follow the arrows across the globe.</p>
+        </a>
+        <a class="ledger-flagship__nav-card" href="/ledger/factions/@heroFactionSlug">
+            <span class="tag">Faction</span>
+            <strong>Faction file</strong>
+            <p>Pick a house, read the mood, and find the next move they want runners to notice.</p>
+        </a>
+        <a class="ledger-flagship__nav-card" href="/ledger/dispatches">
+            <span class="tag">Newsroom</span>
+            <strong>Read dispatches</strong>
+            <p>Latest dispatches, table hooks, and the current bulletin without private campaign spillover.</p>
+        </a>
+        <a class="ledger-flagship__nav-card" href="@accountCtaHref">
+            <span class="tag">Faction rail</span>
+            <strong>@accountCtaLabel</strong>
+            <p>Step from the public board into the account-side faction workspace.</p>
+        </a>
+    </nav>
 </section>
 
 @if (Model.World is not null)
@@ -173,7 +188,7 @@
     var world = Model.World;
     <section class="editorial-block editorial-block--focused" id="ledger-map" tabindex="-1">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Geoscape</p>
+            <p class="eyebrow">Command map</p>
             <h2 class="editorial-title">@Model.World.PublicName</h2>
             <p class="editorial-copy">@Model.World.TurnHeadline</p>
             <p class="muted-copy">@Model.World.MapNote</p>
@@ -181,7 +196,12 @@
         <div class="ledger-command-map ledger-command-map--pregold">
             @if (commandMap is not null)
             {
-                <p class="muted-copy">@(selectedTurn >= 2 ? "Turn 2 deterministic board is ready. Mode: deterministic_test. Turn 2 stays receipt-backed and action-visible." : "Mode: seeded live board.")</p>
+                <div class="ledger-command-map__ribbon" aria-label="Command map status">
+                    <span>@(selectedTurn >= 2 ? "Turn 2 board" : "Seeded live board")</span>
+                    <span>@worldDistricts.Length districts</span>
+                    <span>@liveConfidence confidence</span>
+                    <span>@(leadDispatch is null ? "Dispatch queue open" : leadDispatch.Title)</span>
+                </div>
                 <div class="ledger-command-map__globe">
                     <div
                         class="ledger-flagship__geoscape"
@@ -196,11 +216,10 @@
                         data-primary-href="/ledger/factions/@(selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle")"
                         data-secondary-label="Open latest dispatch"
                         data-secondary-href="/ledger/dispatches"></div>
-                    <p class="muted-copy">The public globe route now lands on the real earth view, with faction countries drawn from route-backed district borders and the same receipt-backed pressure data as the flagship stage.</p>
                 </div>
             }
         </div>
-        <div class="ledger-world-shell__districts route-choice-grid route-choice-grid--three" aria-label="District fallback cards">
+        <div class="ledger-world-shell__districts ledger-district-strip" aria-label="District fallback cards">
             @foreach (var district in world.Districts)
             {
                 <article class="route-choice-card" id="@districtAnchorId(district.Id)" data-map-district-card="@district.Id">
@@ -305,6 +324,28 @@
                             </ul>
                         </article>
                     </aside>
+                </div>
+            </section>
+        }
+
+        @if (latestDispatches.Length > 0)
+        {
+            <section class="editorial-block ledger-dispatch-strip" id="ledger-dispatches">
+                <div class="editorial-block__lead">
+                    <p class="eyebrow">Dispatch lane</p>
+                    <h2 class="editorial-title">Latest dispatches</h2>
+                    <p class="editorial-copy">Receipt-backed narrative, not free-floating lore. Each dispatch is a table-ready pressure beat with a clear public boundary.</p>
+                </div>
+                <div class="ledger-dispatch-strip__grid">
+                    @foreach (var dispatch in latestDispatches)
+                    {
+                        <article class="ledger-dispatch-strip__item">
+                            <span class="tag">@dispatch.Type</span>
+                            <h3>@dispatch.Title</h3>
+                            <p>@dispatch.Summary</p>
+                            <a class="editorial-strip__action" href="@dispatch.Href">Dispatch detail</a>
+                        </article>
+                    }
                 </div>
             </section>
         }

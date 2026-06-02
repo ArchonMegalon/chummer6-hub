@@ -24,5 +24,6 @@ test('package browser keeps product-quality proof and route ownership explicit',
   expect(controller).toContain('[HttpGet("/packages/{packageId}/vote")]');
   expect(controller).toContain('[HttpGet("/packages/{packageId}/follow")]');
 
-  expect(registry).toContain('action_label: Open package browser');
+  expect(registry).toContain('href: /packages');
+  expect(registry).toContain('title: Package browser');
 });

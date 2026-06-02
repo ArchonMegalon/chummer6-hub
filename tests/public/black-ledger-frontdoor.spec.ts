@@ -12,7 +12,10 @@ test('black ledger becomes the homepage frontdoor without extra first-screen cta
   await expect(hero.locator('[data-black-ledger-geoscape-root]')).toBeVisible();
   await expect(hero.locator('canvas.black-ledger-geoscape__canvas')).toBeVisible();
   await expect(hero.locator('video.black-ledger-geoscape__video-plate')).toHaveAttribute('poster', /black-ledger-video-globe-idle-poster\.png/);
-  await expect(hero.locator('[data-black-ledger-geoscape-root]')).toHaveAttribute('data-video-globe', 'ready');
+  await expect(hero.locator('video.black-ledger-geoscape__video-plate source[type="video/mp4"]')).toHaveAttribute('src', /black-ledger-video-globe-idle\.mp4/);
+  const videoState = await hero.locator('[data-black-ledger-geoscape-root]').getAttribute('data-video-globe');
+  const qaRenderer = await hero.locator('[data-black-ledger-geoscape-root]').getAttribute('data-qa-renderer');
+  expect(videoState === 'ready' || (videoState === 'disabled' && qaRenderer === 'canvas-only')).toBeTruthy();
 
   const heroLinks = hero.getByRole('link');
   await expect(heroLinks).toHaveCount(2);

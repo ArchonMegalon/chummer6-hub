@@ -6,7 +6,7 @@ const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 test('service worker caches the public shell strongly enough for offline mobile replay fallback', async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
-  await page.goto(`${baseUrl}/mobile`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
 
   await page.evaluate(async () => {
     if ('serviceWorker' in navigator) {
@@ -16,7 +16,9 @@ test('service worker caches the public shell strongly enough for offline mobile 
 
   await context.setOffline(true);
   await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('body')).toContainText('Mobile play shell preview; installability proof pending.');
+  await expect(page.locator('body')).toContainText('Installable app shell live');
+  await expect(page.locator('body')).toContainText('Offline and reconnect lane cached');
+  await expect(page.locator('body')).not.toContainText('installability proof pending');
 
   writeJsonArtifact('PWA_OFFLINE_CACHE.generated.json', {
     generated_at_utc: new Date().toISOString(),

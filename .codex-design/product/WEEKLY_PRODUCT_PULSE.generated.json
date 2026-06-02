@@ -1,12 +1,12 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-02T06:11:10Z",
+  "generated_at": "2026-06-02T18:06:58Z",
   "as_of": "2026-06-02",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
-  "summary": "Next 12 Biggest Wins is materially closed as the latest recommended closeout wave; journey proof is ready; flagship replacement readiness is ready; overall progress is 100% in 'In progress'; the longest pole remains No active release pole; support closure is clear.",
+  "summary": "Next 12 Biggest Wins is materially closed as the latest recommended closeout wave; journey proof is ready; flagship replacement readiness is ready; overall progress is 100% in 'Public-fit polish'; the longest pole remains Core Engine; support closure is clear.",
   "active_wave": "Next 12 Biggest Wins",
   "active_wave_status": "complete",
   "release_health": {
@@ -58,7 +58,7 @@
     },
     {
       "cluster_id": "long_pole_visibility",
-      "summary": "The current longest pole is No active release pole, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
+      "summary": "The current longest pole is Core Engine, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
       "source_paths": [
         "products/chummer/PROGRESS_REPORT.generated.json",
         "products/chummer/RELEASE_EVIDENCE_PACK.md"
@@ -72,13 +72,13 @@
     {
       "decision_id": "2026-06-02-focus-next-12-biggest-wins",
       "action": "focus_shift",
-      "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'In progress', history depth has reached 36 snapshots, and the pacing risk remains concentrated in No active release pole while trust/publication/utility closure still needs measured completion on the active registry.",
+      "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 37 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
       "cited_signals": [
         "overall_progress_percent=100",
-        "history_snapshot_count=36",
+        "history_snapshot_count=37",
         "oldest_blocker_days=0",
-        "phase_label=In progress",
-        "longest_pole=No active release pole",
+        "phase_label=Public-fit polish",
+        "longest_pole=Core Engine",
         "active_wave_status=complete"
       ]
     },
@@ -152,7 +152,7 @@
       },
       {
         "cluster_id": "long_pole_visibility",
-        "summary": "The current longest pole is No active release pole, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
+        "summary": "The current longest pole is Core Engine, so release, support, and publication decisions should assume that this lane still sets the pacing risk for the broader public product.",
         "source_paths": [
           "products/chummer/PROGRESS_REPORT.generated.json",
           "products/chummer/RELEASE_EVIDENCE_PACK.md"
@@ -166,13 +166,13 @@
       {
         "decision_id": "2026-06-02-focus-next-12-biggest-wins",
         "action": "focus_shift",
-        "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'In progress', history depth has reached 36 snapshots, and the pacing risk remains concentrated in No active release pole while trust/publication/utility closure still needs measured completion on the active registry.",
+        "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 37 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
         "cited_signals": [
           "overall_progress_percent=100",
-          "history_snapshot_count=36",
+          "history_snapshot_count=37",
           "oldest_blocker_days=0",
-          "phase_label=In progress",
-          "longest_pole=No active release pole",
+          "phase_label=Public-fit polish",
+          "longest_pole=Core Engine",
           "active_wave_status=complete"
         ]
       },
@@ -200,9 +200,9 @@
   "supporting_signals": {
     "current_recommended_wave": "Next 12 Biggest Wins",
     "overall_progress_percent": 100,
-    "phase_label": "In progress",
-    "history_snapshot_count": 36,
-    "longest_pole": "No active release pole",
+    "phase_label": "Public-fit polish",
+    "history_snapshot_count": 37,
+    "longest_pole": "Core Engine",
     "launch_readiness": "Route-canary validation is green; widen launch only while support fallout remains stable.",
     "provider_route_stewardship": {
       "default_status": "Pilot defaults are governed",
@@ -255,22 +255,18 @@
       "local_release_proof_status": "passed",
       "proven_journey_count": 5,
       "proven_route_count": 10,
-      "history_snapshot_count": 36,
-      "summary": "Current local edge proof passed. 5 journey proofs and 10 trust routes are on record. 36 weekly snapshots are on record for the current public trust posture."
+      "history_snapshot_count": 37,
+      "summary": "Current local edge proof passed. 5 journey proofs and 10 trust routes are on record. 37 weekly snapshots are on record for the current public trust posture."
     },
     "progress_trend": {
       "state": "steady",
       "direction": "flat",
       "delta_percent": 0,
-      "from_as_of": "2026-05-30",
-      "to_as_of": "2026-06-01",
-      "summary": "Flat trend 0% from 2026-05-30 to 2026-06-01. Trend window: 2026-05-13 100% -> 2026-05-16 100% -> 2026-05-19 100% -> 2026-05-21 100% -> 2026-05-22 100% -> 2026-05-29 100% -> 2026-05-30 100% -> 2026-06-01 100%.",
+      "from_as_of": "2026-06-01",
+      "to_as_of": "2026-06-02",
+      "summary": "Flat trend 0% from 2026-06-01 to 2026-06-02. Trend window: 2026-05-16 100% -> 2026-05-19 100% -> 2026-05-21 100% -> 2026-05-22 100% -> 2026-05-29 100% -> 2026-05-30 100% -> 2026-06-01 100% -> 2026-06-02 100%.",
       "sample_count": 8,
       "samples": [
-        {
-          "as_of": "2026-05-13",
-          "overall_progress_percent": 100
-        },
         {
           "as_of": "2026-05-16",
           "overall_progress_percent": 100
@@ -297,6 +293,10 @@
         },
         {
           "as_of": "2026-06-01",
+          "overall_progress_percent": 100
+        },
+        {
+          "as_of": "2026-06-02",
           "overall_progress_percent": 100
         }
       ]

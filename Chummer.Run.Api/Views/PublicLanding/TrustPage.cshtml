@@ -18,8 +18,8 @@
         ? Model.Chrome.PublicPrimaryCta!.Href
         : "/downloads";
     var policyFacts = new List<(string Tag, string Heading, string Summary, string Href)>();
-    var helpRouteChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
-    var contactRouteChoices = new List<(string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
+    var helpRouteChoices = new List<(string Id, string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
+    var contactRouteChoices = new List<(string Id, string Badge, string Title, string Summary, string Href, string Label, string[] Proof)>();
 
     string ContextualPreviewHref(string? href)
     {
@@ -71,6 +71,7 @@
             var fallbackAction = HelpFallbackActionFor(pageSection.Id, Model.Chrome.Authenticated);
             var routeAction = quickAction ?? fallbackAction ?? new TrustPageActionViewModel("Open details", $"#{pageSection.Id}", "ghost");
             helpRouteChoices.Add((
+                Id: pageSection.Id,
                 Badge: pageSection.Eyebrow,
                 Title: pageSection.Heading,
                 Summary: pageSection.Body,
@@ -93,6 +94,7 @@
             ? Model.SupportIntake.InstallAccessLabel
             : Model.SupportIntake.InstallRailLabel!;
         contactRouteChoices.Add((
+            Id: "public-issues",
             Badge: "Public signal",
             Title: "Safe public feedback should start on the public feedback page",
             Summary: "Feature requests, safe public bugs, and confusing public copy belong on the public feedback page. Install failures, account issues, logs, and private campaign detail do not.",
@@ -100,6 +102,7 @@
             Label: "Open feedback",
             Proof: new[] { "Public by default", "Votes inform demand", "No private logs" }));
         contactRouteChoices.Add((
+            Id: "right-lane",
             Badge: "Private support",
             Title: "Use the support form when the issue needs private or account-linked follow-up",
             Summary: "First-party support is the normal path for crashes, install recovery, broken behavior, and anything that needs logs, support history, or a quieter follow-up loop.",
@@ -107,6 +110,7 @@
             Label: "Open support intake",
             Proof: new[] { "Support-owned", "Tracked return", "Private by default" }));
         contactRouteChoices.Add((
+            Id: "tracked-support",
             Badge: "Tracked return",
             Title: "Create an account when you want support history in one place",
             Summary: "Guest submissions are allowed, but account-backed follow-up keeps the case, recovery state, and later replies attached to the same Chummer return path.",
@@ -114,6 +118,7 @@
             Label: Model.SupportIntake.AccountSupportLabel,
             Proof: new[] { "Guest allowed", "History in Account", "No GitHub required" }));
         contactRouteChoices.Add((
+            Id: "install-continuity",
             Badge: "Install continuity",
             Title: installTitle,
             Summary: installSummary,
@@ -126,6 +131,7 @@
                 "Browser handoff, not claim ritual"
             }));
         contactRouteChoices.Add((
+            Id: "guided-routing",
             Badge: "Guided routing",
             Title: "Open one bounded wrapper when you want the next safe help branch first",
             Summary: "The routing concierge keeps public feedback, private support, install continuity, and human escalation separate without replacing any first-party truth lane.",
@@ -221,7 +227,7 @@
         <div class="route-choice-grid">
             @foreach (var choice in helpRouteChoices)
             {
-                <article class="route-choice-card">
+                <article class="route-choice-card" id="@choice.Id">
                     <span class="tag">@choice.Badge</span>
                     <h3>@choice.Title</h3>
                     <p>@choice.Summary</p>
@@ -251,7 +257,7 @@
             {
                 var quickAction = HelpActionFor(pageSection.Id, Model.Chrome.Authenticated);
                 var fallbackAction = HelpFallbackActionFor(pageSection.Id, Model.Chrome.Authenticated);
-                <article class="workflow-card">
+                <article class="workflow-card" id="@pageSection.Id">
                     <div class="workflow-card__copy">
                         <span class="tag">@pageSection.Eyebrow</span>
                         <h3>@pageSection.Heading</h3>
@@ -438,7 +444,7 @@ else if (!contactPage)
             <div class="route-choice-grid">
                 @foreach (var choice in contactRouteChoices)
                 {
-                    <article class="route-choice-card">
+                    <article class="route-choice-card" id="@choice.Id">
                         <span class="tag">@choice.Badge</span>
                         <h3>@choice.Title</h3>
                         <p>@choice.Summary</p>

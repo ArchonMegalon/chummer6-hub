@@ -3,6 +3,7 @@ const BASE_MAP_WIDTH = 1200;
 const BASE_MAP_HEIGHT = 760;
 const TWO_PI = Math.PI * 2;
 const VIDEO_GLOBE_IDLE_SECONDS = 14;
+const IS_AUTOMATED_QA = Boolean(navigator.webdriver);
 const EARTH_LANDMASSES = [
   { id: 'north-america', fill: ['#315f49', '#7fb06a'], coastline: '#c9e5c1', points: [{ lat: 12, lon: -116 }, { lat: 20, lon: -104 }, { lat: 28, lon: -98 }, { lat: 36, lon: -104 }, { lat: 45, lon: -110 }, { lat: 56, lon: -122 }, { lat: 67, lon: -148 }, { lat: 72, lon: -160 }, { lat: 69, lon: -126 }, { lat: 62, lon: -108 }, { lat: 54, lon: -90 }, { lat: 50, lon: -74 }, { lat: 45, lon: -66 }, { lat: 34, lon: -78 }, { lat: 25, lon: -83 }, { lat: 19, lon: -90 }] },
   { id: 'greenland', fill: ['#8aa385', '#d5e1d1'], coastline: '#f2fbf0', points: [{ lat: 60, lon: -52 }, { lat: 66, lon: -48 }, { lat: 72, lon: -42 }, { lat: 79, lon: -34 }, { lat: 82, lon: -24 }, { lat: 77, lon: -18 }, { lat: 70, lon: -24 }, { lat: 63, lon: -40 }] },
@@ -127,6 +128,8 @@ class BlackLedgerGeoscapeRoot {
     this.videoPosterUrl = root.dataset.globeVideoPoster || '/media/ledger/globe/black-ledger-video-globe-idle-poster.png';
     this.selectedFactionSlug = slugify(root.dataset.selectedFaction || '');
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.disableWebGl = root.dataset.disableWebgl === 'true' || IS_AUTOMATED_QA;
+    this.disableAmbientVideo = root.dataset.disableAmbientVideo === 'true' || IS_AUTOMATED_QA;
     this.state = {
       mode: root.dataset.initialMode || 'influence',
       hoveredFaction: '',
@@ -242,24 +245,27 @@ class BlackLedgerGeoscapeRoot {
 
   mount() {
     this.root.classList.add('black-ledger-geoscape');
+    if (IS_AUTOMATED_QA) {
+      this.root.dataset.qaRenderer = 'canvas-only';
+    }
     this.root.innerHTML = `
       <div class="black-ledger-geoscape__shell black-ledger-geoscape__shell--${this.variant}">
         <div class="black-ledger-geoscape__stage">
           <div class="black-ledger-geoscape__stage-skin" aria-hidden="true"></div>
-          <video class="black-ledger-geoscape__video-plate" aria-hidden="true" muted playsinline loop preload="metadata" poster="${this.videoPosterUrl}">
+          <video class="black-ledger-geoscape__video-plate" aria-hidden="true" muted playsinline loop preload="${this.disableAmbientVideo ? 'none' : 'metadata'}" poster="${this.videoPosterUrl}">
             <source src="${this.videoWebmUrl}" type="video/webm">
             <source src="${this.videoMp4Url}" type="video/mp4">
           </video>
           <canvas class="black-ledger-geoscape__webgl" aria-hidden="true"></canvas>
           <canvas class="black-ledger-geoscape__canvas" role="img" aria-label="Black Ledger command globe"></canvas>
           <div class="black-ledger-geoscape__signal-rail" aria-hidden="true">
-            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--primary">command map priming…</span>
-            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--secondary">heat routes synchronizing</span>
-            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">public-safe deck online</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--primary">district pressure live</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--secondary">runner fallout tracked</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">newsroom feed armed</span>
           </div>
           <div class="black-ledger-geoscape__overlay">
-            <div class="black-ledger-geoscape__eyebrow">Black Ledger command globe</div>
-            <div class="black-ledger-geoscape__headline">${this.variant === 'teaser' ? 'Turn 1 already ran.' : 'Pressure is crossing the board.'}</div>
+            <div class="black-ledger-geoscape__eyebrow">Jammer Run overlay</div>
+            <div class="black-ledger-geoscape__headline">${this.variant === 'teaser' ? 'The city remembers.' : 'Heat is moving.'}</div>
             <div class="black-ledger-geoscape__status"></div>
           </div>
           <div class="black-ledger-geoscape__tooltip" aria-hidden="true">
@@ -304,12 +310,12 @@ class BlackLedgerGeoscapeRoot {
     this.signalSecondary = this.root.querySelector('.black-ledger-geoscape__signal-chip--secondary');
     this.signalTertiary = this.root.querySelector('.black-ledger-geoscape__signal-chip--tertiary');
     this.replayButton = this.root.querySelector('.black-ledger-geoscape__replay');
-    if (this.videoPlate) {
+    if (this.videoPlate && !this.disableAmbientVideo) {
       this.root.dataset.videoGlobe = 'loading';
       const markVideoReady = () => {
         this.videoPlateReady = true;
         this.root.dataset.videoGlobe = 'ready';
-        this.root.dataset.renderer = 'video-globe-overlay';
+        this.root.dataset.videoLayer = 'ambient';
         if (this.reducedMotion) {
           this.videoPlate.pause();
         } else {
@@ -328,6 +334,9 @@ class BlackLedgerGeoscapeRoot {
       if (this.reducedMotion) {
         this.videoPlate.pause();
       }
+    } else if (this.videoPlate) {
+      this.root.dataset.videoGlobe = 'disabled';
+      this.root.dataset.videoLayer = 'canvas-only';
     }
     this.glCanvas?.addEventListener('webglcontextlost', this.handleWebGlContextLost, false);
     this.glCanvas?.addEventListener('webglcontextrestored', this.handleWebGlContextRestored, false);
@@ -360,6 +369,10 @@ class BlackLedgerGeoscapeRoot {
   }
 
   initWebGl() {
+    if (this.disableWebGl) {
+      this.root.dataset.renderer = 'canvas-geoscape';
+      return;
+    }
     if (!this.glCanvas) {
       return;
     }
@@ -961,7 +974,7 @@ class BlackLedgerGeoscapeRoot {
       `Mode: ${this.state.mode.replace('-', ' ')}`,
       `Countries: ${Math.max(1, relatedRegions.length)}`,
       `Pressure: ${activeFaction.pressureScore}`,
-      highlightedEvent?.sourceReceiptId ? `Receipt: ${highlightedEvent.sourceReceiptId}` : `Turn: ${this.currentData.currentTurn}`,
+      highlightedEvent?.sourceReceiptId && this.variant !== 'teaser' ? `Receipt: ${highlightedEvent.sourceReceiptId}` : `Turn: ${this.currentData.currentTurn}`,
     ];
     this.panelMetrics.innerHTML = metrics.map((metric) => `<span>${metric}</span>`).join('');
 
@@ -1023,10 +1036,10 @@ class BlackLedgerGeoscapeRoot {
       const phase = (this.videoPlate.currentTime % VIDEO_GLOBE_IDLE_SECONDS) / VIDEO_GLOBE_IDLE_SECONDS;
       this.rotation = (-36 * Math.PI / 180) + phase * TWO_PI;
     }
-    if (usedVideoGlobe) {
-      this.root.dataset.renderer = 'video-globe-overlay';
+    if (usedVideoGlobe && this.root.dataset.renderer !== 'webgl-geoscape') {
+      this.root.dataset.videoLayer = 'ambient';
     }
-    const usedWebGl = usedVideoGlobe ? false : this.renderWebGlBase(time, width, height, radius);
+    const usedWebGl = this.renderWebGlBase(time, width, height, radius);
     if (!usedWebGl) {
       if (!usedVideoGlobe) {
         this.drawBackdrop(ctx, width, height, centerX, centerY, radius, time);

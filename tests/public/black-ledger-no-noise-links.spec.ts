@@ -6,7 +6,7 @@ const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ page }) => {
   const failures: string[] = [];
 
-  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   const hero = page.locator('[data-homepage-section="hero"]');
   await expect(hero).toContainText('The city is moving.');
   await expect(hero.locator('[data-black-ledger-geoscape-root]')).toBeVisible();
@@ -27,11 +27,11 @@ test('black ledger teaser and routes avoid dead links and noisy CTAs', async ({ 
   );
   failures.push(...badLinks.map((item) => `bad link: ${item}`));
 
-  await page.goto(`${baseUrl}/ledger`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/ledger`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('link', { name: 'Open command map' }).first()).toHaveAttribute('href', '/ledger/map#ledger-map');
   await expect(page.getByRole('link', { name: 'Read dispatches' }).first()).toHaveAttribute('href', '/ledger/dispatches');
 
-  await page.goto(`${baseUrl}/ledger/factions/ashline-circle`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/ledger/factions/ashline-circle`, { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#ledger-faction-file')).toContainText('Ashline Circle');
   await expect(page.locator('#ledger-faction-file').getByRole('link', { name: 'Open faction video' })).toHaveAttribute('href', '/ledger/factions/ashline-circle/promo');
   await expect(page.locator('#ledger-faction-file').getByRole('link', { name: 'Promo page' })).toHaveAttribute('href', '/ledger/factions/ashline-circle/promo');

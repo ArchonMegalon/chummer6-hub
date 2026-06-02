@@ -6,7 +6,7 @@ const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 test('black ledger globe mode switching and replay produce visible state changes', async ({ page }) => {
   await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'domcontentloaded' });
 
-  const root = page.locator('[data-black-ledger-geoscape-root]').first();
+  const root = page.locator('.ledger-command-map__globe [data-black-ledger-geoscape-root]').first();
   await expect(root).toBeVisible();
   const initialSignature = await root.getAttribute('data-render-signature');
   await root.getByRole('button', { name: 'Conflict' }).click();
@@ -36,7 +36,7 @@ test('black ledger globe honors reduced motion with step replay', async ({ page 
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'domcontentloaded' });
 
-  const root = page.locator('[data-black-ledger-geoscape-root]').first();
+  const root = page.locator('.ledger-command-map__globe [data-black-ledger-geoscape-root]').first();
   await expect(root).toHaveAttribute('data-reduced-motion', 'true');
 
   const states: string[] = [];

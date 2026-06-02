@@ -2,6 +2,7 @@ using Chummer.Run.Api.ViewModels;
 using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -376,7 +377,33 @@ public sealed class BlackLedgerPublicStatsService
     }
 
     public BlackLedgerDispatchViewModel? LoadDispatch(string dispatchId, int? requestedTurn = null, string? factionId = null)
-        => ListDispatches(requestedTurn, factionId).FirstOrDefault(item => string.Equals(item.DispatchId, dispatchId, StringComparison.OrdinalIgnoreCase));
+    {
+        BlackLedgerDispatchViewModel? dispatch = ListDispatches(requestedTurn, factionId)
+            .FirstOrDefault(item => string.Equals(item.DispatchId, dispatchId, StringComparison.OrdinalIgnoreCase));
+        if (dispatch is not null || requestedTurn.HasValue)
+        {
+            return dispatch;
+        }
+
+        int? inferredTurn = TryInferTurnFromDispatchId(dispatchId);
+        return inferredTurn.HasValue
+            ? ListDispatches(inferredTurn.Value, factionId)
+                .FirstOrDefault(item => string.Equals(item.DispatchId, dispatchId, StringComparison.OrdinalIgnoreCase))
+            : null;
+    }
+
+    private static int? TryInferTurnFromDispatchId(string? dispatchId)
+    {
+        if (string.IsNullOrWhiteSpace(dispatchId))
+        {
+            return null;
+        }
+
+        Match match = Regex.Match(dispatchId, @"(?:^|_)turn_(\d{1,6})(?:_|$)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success && int.TryParse(match.Groups[1].Value, out int turn) && turn >= 0
+            ? turn
+            : null;
+    }
 
     public BlackLedgerWorldSeedDocument? LoadSeedDocument()
         => TryLoadSeed();
@@ -540,7 +567,7 @@ public sealed class BlackLedgerPublicStatsService
                     summary: "Awakened build demand rose because the paperwork stayed murkier than the intent.",
                     body:
                         $"{effect.PublicReason}\n\n" +
-                        "The Circle did not argue about power. It argued about proof. Clean intent with dirty paperwork pushed MysAd density upward and nudged package demand toward explainers instead of swagger.\n\n" +
+                        "The Circle did not argue about power. It argued about control. Clean intent with dirty paperwork pushed MysAd density upward and nudged package demand toward explainers instead of swagger.\n\n" +
                         $"Generated from {tick.ReceiptId} · public-safe flagship seeded board · no private table data.",
                     involvedFactions: ["Ashline Circle"],
                     involvedDistricts: ["Ashline Ward"],
@@ -1124,7 +1151,7 @@ public sealed class BlackLedgerPublicStatsService
         {
             var regionById = world.Districts.ToDictionary(static item => item.Id, StringComparer.OrdinalIgnoreCase);
             var dispatchesById = ListDispatches(world.CurrentTurn).ToDictionary(static item => item.DispatchId, StringComparer.OrdinalIgnoreCase);
-            return GetEventDocuments(seed)
+            var seededEvents = GetEventDocuments(seed)
                 .Where(item => item.Turn == world.CurrentTurn)
                 .Select(item =>
                 {
@@ -1146,6 +1173,10 @@ public sealed class BlackLedgerPublicStatsService
                         !string.IsNullOrWhiteSpace(item.DispatchId) && dispatchesById.TryGetValue(item.DispatchId, out var dispatch) ? dispatch.Href : null);
                 })
                 .ToArray();
+            if (seededEvents.Length > 0)
+            {
+                return seededEvents;
+            }
         }
 
         BlackLedgerTickReceiptViewModel tick = world.LastTick ?? throw new InvalidOperationException("World preview is missing the last tick.");
@@ -1185,7 +1216,7 @@ public sealed class BlackLedgerPublicStatsService
         BlackLedgerWorldSeedDocument? seed = LoadSeedDocument();
         if (seed is not null && GetArcDocuments(seed).Count > 0)
         {
-            return GetArcDocuments(seed)
+            var seededArcs = GetArcDocuments(seed)
                 .Where(item => item.Turn == world.CurrentTurn)
                 .Select(item => new BlackLedgerMapArcViewModel(
                     item.ArcId,
@@ -1196,6 +1227,10 @@ public sealed class BlackLedgerPublicStatsService
                     item.Direction,
                     $"{item.ArcType} pressure from {item.SourceRegionId} to {item.TargetRegionId}."))
                 .ToArray();
+            if (seededArcs.Length > 0)
+            {
+                return seededArcs;
+            }
         }
 
         var arcs = new List<BlackLedgerMapArcViewModel>();

@@ -4,15 +4,15 @@ import { writeJsonArtifact } from './ux-artifacts';
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
 test('black ledger globe mode switching and replay produce visible state changes', async ({ page }) => {
-  await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'domcontentloaded' });
 
-  const root = page.locator('[data-black-ledger-geoscape-root]');
+  const root = page.locator('#ledger-map [data-black-ledger-geoscape-root]').first();
   await expect(root).toBeVisible();
   await expect(page.locator('#ledger-map')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Influence' })).toBeVisible();
-  const modeButtons = page.locator('.black-ledger-geoscape__modes button');
+  await expect(root.getByRole('button', { name: 'Influence' })).toBeVisible();
+  const modeButtons = root.locator('.black-ledger-geoscape__modes button');
   await expect(modeButtons).toHaveCount(7);
-  await expect(page.getByRole('button', { name: 'Replay pressure' })).toBeVisible();
+  await expect(root.getByRole('button', { name: 'Replay pressure' })).toBeVisible();
 
   const initialSignature = await root.getAttribute('data-render-signature');
   const alternateMode = modeButtons.nth(1);
@@ -24,7 +24,7 @@ test('black ledger globe mode switching and replay produce visible state changes
   const alternateSignature = await root.getAttribute('data-render-signature');
   expect(alternateSignature).not.toEqual(initialSignature);
 
-  await page.getByRole('button', { name: 'Replay pressure' }).click();
+  await root.getByRole('button', { name: 'Replay pressure' }).click();
   await page.waitForTimeout(900);
   const replayState = await root.getAttribute('data-replay-state');
   expect(replayState).not.toEqual('idle');
@@ -46,14 +46,14 @@ test('black ledger globe mode switching and replay produce visible state changes
 
 test('black ledger globe honors reduced motion with step replay', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'domcontentloaded' });
 
-  const root = page.locator('[data-black-ledger-geoscape-root]');
+  const root = page.locator('#ledger-map [data-black-ledger-geoscape-root]').first();
   await expect(root).toHaveAttribute('data-reduced-motion', 'true');
 
   const states: string[] = [];
   for (let index = 0; index < 3; index += 1) {
-    await page.getByRole('button', { name: 'Replay pressure' }).click();
+    await root.getByRole('button', { name: 'Replay pressure' }).click();
     states.push((await root.getAttribute('data-replay-state')) ?? '');
   }
 

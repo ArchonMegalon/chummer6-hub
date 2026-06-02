@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import { writeJsonArtifact, writeMarkdownArtifact } from './ux-artifacts';
 
-const baseUrl = 'https://chummer.run';
+const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
 test('homepage keeps the intended live CTA hierarchy on desktop and mobile', async ({ browser }) => {
   test.setTimeout(120000);
@@ -14,7 +14,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
 
   for (const viewport of viewports) {
     const page = await browser.newPage({ baseURL: baseUrl, viewport });
-    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
     const heroActions = page.locator('.launch-hero__actions a.button-like');
     const texts = await heroActions.allTextContents();
@@ -27,7 +27,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       heroBoxes.push(await heroActions.nth(index).boundingBox());
     }
 
-    const supportSection = page.locator('[data-homepage-section="footer"]');
+    const supportSection = page.locator('[data-public-section="footer"]');
     const supportPrimary = supportSection.locator('.button-like--primary');
     const supportPrimaryTop = (await supportPrimary.boundingBox())?.y ?? 0;
     const heroPrimaryTop = heroBoxes[0]?.y ?? 0;
@@ -59,7 +59,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       '# Homepage Simplification Changelog',
       '',
       '- Hero keeps two ranked CTAs: `Open Black Ledger`, `Download Chummer`.',
-      '- Homepage remains on the five-section model: hero, score-strip, factions, play-downloads, footer.',
+      '- Homepage remains on the five-section model: hero, score-strip, factions, flagship-promo, play-downloads.',
       '- Proof and release posture stay off the first screen and live on Status instead.',
       '- Support/help CTAs remain lower on the page instead of competing with the hero path.',
     ].join('\n'),

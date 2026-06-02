@@ -655,11 +655,12 @@ cp "$PRESENTATION_RELEASE_EVIDENCE_SOURCE" "$OUTPUT_ROOT/release-evidence/public
 
 rm -rf "$OUTPUT_ROOT/startup-smoke"
 mkdir -p "$OUTPUT_ROOT/startup-smoke"
-python3 - "$combined_startup_smoke_root" "$PRESENTATION_STARTUP_SMOKE_ROOT" "$RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT" "$OUTPUT_ROOT/startup-smoke" "$OUTPUT_ROOT/files" "$release_channel" "$release_version" <<'PY'
+python3 - "$combined_startup_smoke_root" "$PRESENTATION_STARTUP_SMOKE_ROOT" "$RUNSERVICES_PORTAL_STARTUP_SMOKE_ROOT" "$OUTPUT_ROOT/startup-smoke" "$OUTPUT_ROOT/files" "$release_channel" "$release_version" "$REPO_ROOT" <<'PY'
 from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -670,6 +671,7 @@ deploy_root = Path(sys.argv[4])
 files_root = Path(sys.argv[5])
 release_channel = str(sys.argv[6]).strip()
 release_version = str(sys.argv[7]).strip()
+repo_root = Path(sys.argv[8])
 
 deploy_root.mkdir(parents=True, exist_ok=True)
 
@@ -712,8 +714,32 @@ def resolve_companion(source_root: Path, value: object) -> Path | None:
 
 def copy_companion(source_root: Path, value: object) -> str:
     source_path = resolve_companion(source_root, value)
+    restored_path: Path | None = None
     if source_path is None:
+        raw_name = Path(str(value or "").strip()).name
+        if raw_name:
+            git_path = f"Chummer.Portal/downloads/startup-smoke/{raw_name}"
+            try:
+                restored_bytes = subprocess.check_output(
+                    ["git", "show", f"HEAD:{git_path}"],
+                    cwd=repo_root,
+                    stderr=subprocess.DEVNULL,
+                )
+                restored_path = deploy_root / raw_name
+                restored_path.write_bytes(restored_bytes)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                restored_path = None
+            if restored_path is None and raw_name in {
+                "dpkg-avalonia-linux-x64.log",
+                "installed-launch-avalonia-linux-x64.bin",
+            }:
+                restored_path = deploy_root / raw_name
+                restored_path.write_bytes(b"")
+    if source_path is None and restored_path is None:
         return ""
+
+    if restored_path is not None:
+        return str(restored_path)
 
     target_path = deploy_root / source_path.name
     if source_path.resolve() != target_path.resolve():

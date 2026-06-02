@@ -217,6 +217,23 @@ def main() -> int:
     unit_tests = run(["dotnet", "test", "Chummer.Run.sln", "--no-restore"])
     checks.append(check(unit_tests["pass"], "Full .NET product test suite passes", unit_tests))
 
+    browseract_adapter = read_text(RUN_SERVICES / "Chummer.Run.AI" / "Services" / "Gateway" / "HttpProviderAdapters.cs")
+    browseract_tests = read_text(RUN_SERVICES / "Chummer.Tests" / "BrowserActGatewaySafetyTests.cs")
+    checks.append(check(
+        "BrowserActSafetyPolicy.ThrowIfUnsafeConfiguration(configuration)" in browseract_adapter
+        and "ProxyRotation" in browseract_adapter
+        and "RefreshCredentials" in browseract_adapter
+        and "RefreshCredits" in browseract_adapter
+        and "OneMinAiCreditRefresh" in browseract_adapter
+        and "BrowserAct_rejects_proxy_or_credit_refresh_configuration" in browseract_tests
+        and "BrowserAct_allows_bounded_capture_without_proxy_or_credit_refresh" in browseract_tests,
+        "BrowserAct stays bounded and rejects proxy rotation or credit-refresh automation",
+        {
+            "adapter": "Chummer.Run.AI/Services/Gateway/HttpProviderAdapters.cs",
+            "tests": "Chummer.Tests/BrowserActGatewaySafetyTests.cs",
+            "boundary": "bounded capture only; no proxy rotation, credential refresh, or One Minute AI credit refresh automation",
+        }))
+
     canonical_root = WORKSPACE / "chummer-design" / "products" / "chummer"
     mirror_root = RUN_SERVICES / ".codex-design" / "product"
     public_guide_root = canonical_root / "public-guide"

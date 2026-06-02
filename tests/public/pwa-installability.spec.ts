@@ -3,10 +3,12 @@ import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
-test('public play shell exposes manifest, service worker, and truthful installability copy', async ({ page, request }) => {
-  await page.goto(`${baseUrl}/play`, { waitUntil: 'networkidle' });
+test('public play shell exposes manifest, service worker, notifications, and live installability copy', async ({ page, request }) => {
+  await page.goto(`${baseUrl}/play`, { waitUntil: 'domcontentloaded' });
 
-  await expect(page.locator('body')).toContainText('Mobile play shell preview; installability proof pending.');
+  await expect(page.locator('body')).toContainText('Installable app shell live');
+  await expect(page.locator('body')).toContainText('Offline and reconnect lane cached');
+  await expect(page.locator('body')).not.toContainText('installability proof pending');
   const manifestHref = await page.locator('link[rel="manifest"]').getAttribute('href');
   expect(manifestHref).toBeTruthy();
 
@@ -46,10 +48,18 @@ test('public play shell exposes manifest, service worker, and truthful installab
 
   writeJsonArtifact('PWA_SERVICE_WORKER_LIVE.generated.json', {
     generated_at_utc: new Date().toISOString(),
-    status: swText.includes('self.addEventListener("fetch"') ? 'pass' : 'fail',
+    status: swText.includes('self.addEventListener("fetch"')
+      && swText.includes('self.addEventListener("push"')
+      && swText.includes('self.addEventListener("notificationclick"')
+      && swText.includes('self.addEventListener("notificationclose"')
+      ? 'pass'
+      : 'fail',
     base_url: baseUrl,
     path: '/service-worker.js',
     has_fetch_handler: swText.includes('self.addEventListener("fetch"'),
+    has_push_handler: swText.includes('self.addEventListener("push"'),
+    has_notification_click_handler: swText.includes('self.addEventListener("notificationclick"'),
+    has_notification_close_handler: swText.includes('self.addEventListener("notificationclose"'),
     has_precache: swText.includes('PRECACHE_URLS'),
     registration: serviceWorkerState,
   });
@@ -59,8 +69,8 @@ test('public play shell exposes manifest, service worker, and truthful installab
     status: serviceWorkerState.supported ? 'pass' : 'fail',
     base_url: baseUrl,
     route: '/play',
-    truthful_copy: 'Mobile play shell preview; installability proof pending.',
-    installability_posture: 'preview_demoted',
+    truthful_copy: 'Installable app shell live; offline and reconnect lane cached.',
+    installability_posture: 'live_public_installable_shell',
     registration: serviceWorkerState,
   });
 });

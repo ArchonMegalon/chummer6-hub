@@ -132,6 +132,10 @@ public sealed record PublicReleaseManifestDto(
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? DesktopTupleCoverage { get; init; }
 
+    [JsonPropertyName("registryBoundaryCoverage")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonElement? RegistryBoundaryCoverage { get; init; }
+
     [JsonPropertyName("publicTrustMetrics")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public JsonElement? PublicTrustMetrics { get; init; }

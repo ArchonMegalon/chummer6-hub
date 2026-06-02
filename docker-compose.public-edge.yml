@@ -111,6 +111,8 @@ services:
       FLEET_INTERNAL_API_TOKEN: ${FLEET_INTERNAL_API_TOKEN:-}
       CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID: ${CHUMMER_PARTICIPATION_DEFAULT_PROJECT_ID:-hub}
       CHUMMER_DOWNLOADS_SOURCE_ROOT: /downloads-source
+      CHUMMER_HUB_LOCAL_RELEASE_PROOF_FILE: /proofs/HUB_LOCAL_RELEASE_PROOF.generated.json
+      CHUMMER_PUBLIC_LOCAL_RELEASE_PROOF_FILE: /proofs/HUB_LOCAL_RELEASE_PROOF.generated.json
       CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS: ${CHUMMER_PUBLIC_FORCE_ACCOUNT_REQUIRED_DOWNLOADS:-false}
       CHUMMER_API_READ_RATE_LIMIT_PER_MINUTE: ${CHUMMER_API_READ_RATE_LIMIT_PER_MINUTE:-5000}
       CHUMMER_API_PUBLIC_RATE_LIMIT_PER_MINUTE: ${CHUMMER_API_PUBLIC_RATE_LIMIT_PER_MINUTE:-5000}
@@ -191,6 +193,7 @@ services:
       - chummer-run-api-state:/app/state
       - /docker/fleet/.codex-studio/published:/fleet-artifacts:ro
       - /docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source
+      - /docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json:/proofs/HUB_LOCAL_RELEASE_PROOF.generated.json:ro
     ports:
       - "${CHUMMER_PUBLIC_EDGE_PORT:-8091}:8080"
     networks:

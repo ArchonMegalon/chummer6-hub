@@ -392,9 +392,52 @@ public sealed class PublicReleaseManifestService
     }
 
     private string ResolveDownloadsRoot()
-        => _configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]?.Trim() is { Length: > 0 } configured
-            ? configured
-            : DefaultRoot;
+    {
+        if (_configuration["CHUMMER_DOWNLOADS_SOURCE_ROOT"]?.Trim() is { Length: > 0 } configured)
+        {
+            return configured;
+        }
+
+        foreach (string candidate in ResolveDefaultDownloadsRootCandidates())
+        {
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return DefaultRoot;
+    }
+
+    private IEnumerable<string> ResolveDefaultDownloadsRootCandidates()
+    {
+        if (_configuration[PublicCanonRootKey]?.Trim() is { Length: > 0 } canonRoot)
+        {
+            yield return Path.Combine(canonRoot, "Chummer.Portal", "downloads");
+        }
+
+        foreach (string candidate in ResolveAncestorPortalDownloadsRoots(Directory.GetCurrentDirectory()))
+        {
+            yield return candidate;
+        }
+
+        foreach (string candidate in ResolveAncestorPortalDownloadsRoots(AppContext.BaseDirectory))
+        {
+            yield return candidate;
+        }
+
+        yield return DefaultRoot;
+    }
+
+    private static IEnumerable<string> ResolveAncestorPortalDownloadsRoots(string start)
+    {
+        string? current = Path.GetFullPath(start);
+        for (int depth = 0; depth < 6 && !string.IsNullOrWhiteSpace(current); depth++)
+        {
+            yield return Path.Combine(current, "Chummer.Portal", "downloads");
+            current = Directory.GetParent(current)?.FullName;
+        }
+    }
 
     private PublicReleaseManifestDto ApplyLocalReleaseProofFallback(PublicReleaseManifestDto manifest)
     {
@@ -622,6 +665,9 @@ public sealed class PublicReleaseManifestService
             DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
                 ? desktopTupleCoverage.Clone()
                 : null,
+            RegistryBoundaryCoverage = parsed.RegistryBoundaryCoverage is JsonElement registryBoundaryCoverage
+                ? registryBoundaryCoverage.Clone()
+                : null,
             PublicTrustMetrics = parsed.PublicTrustMetrics is JsonElement publicTrustMetrics
                 ? publicTrustMetrics.Clone()
                 : null
@@ -666,6 +712,9 @@ public sealed class PublicReleaseManifestService
                 : null,
             DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
                 ? desktopTupleCoverage.Clone()
+                : null,
+            RegistryBoundaryCoverage = parsed.RegistryBoundaryCoverage is JsonElement registryBoundaryCoverage
+                ? registryBoundaryCoverage.Clone()
                 : null,
             PublicTrustMetrics = parsed.PublicTrustMetrics is JsonElement publicTrustMetrics
                 ? publicTrustMetrics.Clone()
@@ -2090,6 +2139,7 @@ public sealed class PublicReleaseManifestService
         string? FixAvailabilitySummary,
         RegistryReleaseProof? ReleaseProof,
         JsonElement? DesktopTupleCoverage,
+        JsonElement? RegistryBoundaryCoverage,
         JsonElement? PublicTrustMetrics,
         IReadOnlyList<RegistryReleaseArtifact>? Artifacts);
 
@@ -2123,6 +2173,7 @@ public sealed class PublicReleaseManifestService
         string? ContractName,
         [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
         JsonElement? DesktopTupleCoverage,
+        JsonElement? RegistryBoundaryCoverage,
         JsonElement? PublicTrustMetrics);
 
     private sealed record CompatibilityReleaseProof(

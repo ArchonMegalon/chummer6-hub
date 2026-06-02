@@ -37,7 +37,7 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   expect(shortcutUrls.has('/play')).toBeTruthy();
   expect(shortcutUrls.has('/play/continuity')).toBeTruthy();
 
-  await page.goto(`${baseUrl}/mobile`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/mobile`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Mobile and PWA entry' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Install this app' })).toBeVisible();
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute('href', /manifest\.(json|webmanifest)/);

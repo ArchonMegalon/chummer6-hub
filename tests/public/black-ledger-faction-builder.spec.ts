@@ -8,7 +8,7 @@ const repoRoot = process.cwd();
 const builderView = readFileSync(path.join(repoRoot, 'Chummer.Run.Api/Views/PublicLanding/LedgerFactionCreate.cshtml'), 'utf8');
 
 test('black ledger faction builder stays interactive and visible in source while guest-gated live', async ({ page }) => {
-  const response = await page.goto(`${baseUrl}/account/ledger/factions/create?charterType=challenger`, { waitUntil: 'networkidle' });
+  const response = await page.goto(`${baseUrl}/account/ledger/factions/create?charterType=challenger`, { waitUntil: 'domcontentloaded' });
   expect(response?.status()).toBe(200);
   expect(page.url()).toContain('/login?next=');
 

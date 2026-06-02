@@ -429,13 +429,23 @@ internal static class CompatibilityVerification
 
         var solutionPath = Path.Combine(RepoRoot, "Chummer.Run.sln");
         var solutionText = File.ReadAllText(solutionPath);
-        var solutionProjectPaths = solutionText
+        var solutionProjects = solutionText
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(static line => line.StartsWith("Project(", StringComparison.Ordinal) && line.Contains(".csproj", StringComparison.Ordinal))
             .Select(static line => line.Split('"'))
             .Where(static parts => parts.Length >= 6)
-            .Select(static parts => parts[5].Replace('/', '\\'))
+            .Select(static parts => new SolutionProject(parts[3], parts[5].Replace('/', '\\')))
             .ToArray();
+        var solutionProjectPaths = solutionProjects
+            .Select(static project => project.Path)
+            .ToArray();
+        var externalOwnerProjectPathPrefixes = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["Chummer.Hub.Registry.Contracts"] = new[] { "..\\chummer-hub-registry\\Chummer.Hub.Registry.Contracts\\" },
+            ["Chummer.Run.Registry"] = new[] { "..\\chummer-hub-registry\\Chummer.Run.Registry\\" },
+            ["Chummer.Media.Contracts"] = new[] { "..\\..\\fleet\\repos\\chummer-media-factory\\Chummer.Media.Contracts\\" },
+            ["Chummer.Media.Factory.Runtime"] = new[] { "..\\..\\fleet\\repos\\chummer-media-factory\\Chummer.Media.Factory.Runtime\\" }
+        };
 
         foreach (var projectName in expectedHostedProjects)
         {
@@ -445,8 +455,25 @@ internal static class CompatibilityVerification
         foreach (var externalOwnerPackage in externalOwnerPackages)
         {
             VerificationAssert.True(
-                !solutionText.Contains($" = \"{externalOwnerPackage}\", ", StringComparison.Ordinal),
-                $"Hosted solution must not include external owner package '{externalOwnerPackage}'.");
+                externalOwnerProjectPathPrefixes.ContainsKey(externalOwnerPackage),
+                $"Boundary verifier must declare approved sibling owner-repo paths for external owner package '{externalOwnerPackage}'.");
+            VerificationAssert.True(
+                !Directory.Exists(Path.Combine(RepoRoot, externalOwnerPackage)),
+                $"Hosted repository must not contain a local copy of external owner package '{externalOwnerPackage}'.");
+
+            var externalSolutionProjects = solutionProjects
+                .Where(project => string.Equals(project.Name, externalOwnerPackage, StringComparison.Ordinal))
+                .ToArray();
+            foreach (var externalSolutionProject in externalSolutionProjects)
+            {
+                var allowedPrefixes = externalOwnerProjectPathPrefixes[externalOwnerPackage];
+                VerificationAssert.True(
+                    allowedPrefixes.Any(prefix => externalSolutionProject.Path.StartsWith(prefix, StringComparison.Ordinal)),
+                    $"Hosted solution must reference external owner package '{externalOwnerPackage}' through its sibling owner repo path, not a hosted copy or binary seam.");
+            }
+            VerificationAssert.True(
+                !solutionProjectPaths.Any(projectPath => projectPath.StartsWith(externalOwnerPackage + "\\", StringComparison.Ordinal)),
+                $"Hosted solution must not include hosted-repo project path for external owner package '{externalOwnerPackage}'.");
         }
 
         foreach (var oracleRoot in oracleRoots)
@@ -514,6 +541,8 @@ internal static class CompatibilityVerification
             .OrderBy(static entry => entry, StringComparer.Ordinal)
             .ToArray();
     }
+
+    private sealed record SolutionProject(string Name, string Path);
 
     private static string ResolveRepoRoot()
     {

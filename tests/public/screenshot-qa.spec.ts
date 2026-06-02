@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import { completionPath, writeJsonArtifact, writeMarkdownArtifact } from './ux-artifacts';
 
-const baseUrl = 'https://chummer.run';
+const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 const viewports = [
   { width: 390, height: 844 },
   { width: 412, height: 915 },
@@ -18,11 +18,11 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
 
   for (const viewport of viewports) {
     const page = await browser.newPage({ baseURL: baseUrl, viewport });
-    await page.goto(baseUrl, { waitUntil: 'networkidle' });
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
     const heroTitle = page.locator('.launch-hero__title');
     const primaryCta = page.locator('.launch-hero__actions a.button-like').first();
-    const footer = page.locator('[data-homepage-section="footer"]');
+    const footer = page.locator('[data-public-section="footer"]');
     const factions = page.locator('[data-homepage-section="factions"]');
     const playDownloads = page.locator('[data-homepage-section="play-downloads"]');
     const sidebar = page.locator('.site-sidebar');

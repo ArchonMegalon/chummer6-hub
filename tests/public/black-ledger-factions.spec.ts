@@ -13,7 +13,7 @@ const factions = [
 ];
 
 test('black ledger faction index and dedicated pages exist for the seeded six', async ({ page }) => {
-  await page.goto(`${baseUrl}/ledger/factions`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/ledger/factions`, { waitUntil: 'domcontentloaded' });
 
   for (const faction of factions) {
     await expect(page.locator(`[data-faction-card="${faction.slug}"] [data-faction-file-link="${faction.slug}"]`)).toHaveCount(1);
@@ -22,7 +22,7 @@ test('black ledger faction index and dedicated pages exist for the seeded six', 
 
   const visited: string[] = [];
   for (const faction of factions) {
-    await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}/ledger/factions/${faction.slug}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#ledger-faction-file')).toContainText(faction.name);
     await expect(page.locator('#ledger-faction-file')).toContainText('Package pressure');
     await expect(page.locator('#ledger-faction-file')).toContainText('Safety: public-safe');

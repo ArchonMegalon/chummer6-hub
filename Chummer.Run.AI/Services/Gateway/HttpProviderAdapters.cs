@@ -32,6 +32,7 @@ public sealed class BrowserActGatewayAdapter : IProviderAdapter
     {
         _httpClientFactory = httpClientFactory;
         _enabled = GatewayProviderAdapterParsing.ResolveProviderEnabled(configuration, AiProvider.BrowserAct, defaultEnabled: false);
+        BrowserActSafetyPolicy.ThrowIfUnsafeConfiguration(configuration);
     }
 
     public AiProvider Provider => AiProvider.BrowserAct;
@@ -55,6 +56,39 @@ public sealed class BrowserActGatewayAdapter : IProviderAdapter
         if (!_enabled)
         {
             throw new InvalidOperationException($"{Provider} is disabled in this environment.");
+        }
+    }
+}
+
+public static class BrowserActSafetyPolicy
+{
+    private static readonly string[] ForbiddenKeys =
+    [
+        "AiGateway:Providers:BrowserAct:Proxy",
+        "AiGateway:Providers:BrowserAct:ProxyUrl",
+        "AiGateway:Providers:BrowserAct:ProxyList",
+        "AiGateway:Providers:BrowserAct:ProxyRotation",
+        "AiGateway:Providers:BrowserAct:RefreshCredentials",
+        "AiGateway:Providers:BrowserAct:RefreshCredits",
+        "AiGateway:Providers:BrowserAct:OneMinAiCreditRefresh",
+        "Providers:BrowserAct:Proxy",
+        "Providers:BrowserAct:ProxyUrl",
+        "Providers:BrowserAct:ProxyList",
+        "Providers:BrowserAct:ProxyRotation",
+        "Providers:BrowserAct:RefreshCredentials",
+        "Providers:BrowserAct:RefreshCredits",
+        "Providers:BrowserAct:OneMinAiCreditRefresh"
+    ];
+
+    public static void ThrowIfUnsafeConfiguration(IConfiguration configuration)
+    {
+        foreach (string key in ForbiddenKeys)
+        {
+            if (!string.IsNullOrWhiteSpace(configuration[key]))
+            {
+                throw new InvalidOperationException(
+                    "BrowserAct provider configuration must not use proxy rotation, credential refresh, or credit refresh automation.");
+            }
         }
     }
 }

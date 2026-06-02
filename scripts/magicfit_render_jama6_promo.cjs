@@ -34,82 +34,96 @@ const GLOBAL_NEGATIVE = [
   'no copied rulebook pages',
   'no flat vector graphics',
   'no corporate SaaS explainer look',
+  'no cartoon',
+  'no animation',
+  'no animated movie',
+  'no 3d cartoon',
+  'no toy figures',
+  'no Lego',
+  'no plastic figurines',
+  'no children show style',
+  'no mascot characters',
+  'no bobblehead proportions',
   'no unreadable UI text',
+  'no product name text',
+  'no generated logos',
+  'no title card text',
+  'no misspelled interface labels',
   'no watermark',
 ].join(', ');
 
 const SCENES = [
   {
     id: '01_old_way_pain',
-    title: 'The old way is pain',
+    title: 'Table chaos before the run',
     duration: 6,
-    prompt: 'Photoreal cinematic cyberpunk safehouse at night, rain on windows, cluttered tabletop with paper character sheets and old laptops, diverse shadowrunner-style RPG team frustrated by scattered notes, expressive acting, comic timing, handheld camera energy, moody practical lighting, premium movie trailer look.',
+    prompt: 'Photoreal cinematic cyberpunk tabletop RPG session at night, rain on windows, cluttered table with dice, maps, old laptops, character sheets, snacks, and tense players trying to start a run, diverse metahuman-inspired cast with subtle cyberware, expressive acting, handheld trailer energy, moody practical lighting, no readable product text anywhere.',
   },
   {
     id: '02_chummer6_reveal',
-    title: 'Chummer6 enters',
+    title: 'The campaign console opens',
     duration: 6,
-    prompt: 'Photoreal product hero reveal in the same rainy cyberpunk safehouse, a focused decker opens a sleek dark desktop client named Chummer6, clean compact JAMA 5 style interface glow reflected on faces, team shifts from chaos to relief, cinematic push-in, premium software trailer energy.',
+    prompt: 'Photoreal product hero reveal in the same rainy cyberpunk safehouse, a focused decker opens a sleek dark tabletop campaign desktop client with no readable product name, compact character and session panels glow on faces, the team shifts from chaos to confidence, cinematic push-in, premium roleplaying trailer energy, no generated words or logos.',
   },
   {
     id: '03_build_runner',
-    title: 'Build your runner',
+    title: 'Build the runner',
     duration: 8,
-    prompt: 'Photoreal over-the-shoulder desktop workflow montage, compact character builder UI for a cyberpunk RPG, attributes, skills, cyberware, spells, gear and derived stats updating in a dense Windows desktop client, mouse-driven edits, practical monitor light, sharp premium commercial cinematography.',
+    prompt: 'Strict photoreal live-action cyberpunk tabletop product trailer, over-the-shoulder workflow montage at a real dark gaming table, adult metahuman-inspired runners and a GM in practical costumes, visible cyberware implants, compact desktop character builder UI with attributes, skills, cyberware, magic choices, contacts, gear, and derived stats updating on a dense monitor, mouse-driven edits, practical monitor light, sharp premium commercial cinematography, serious grounded actors, no readable labels.',
   },
   {
     id: '04_explain_values',
-    title: 'Explain every value',
+    title: 'Know why the number changed',
     duration: 8,
-    prompt: 'Photoreal cinematic product demo, elf mage user clicks an Explain button in Chummer6, a clean side panel shows a derived value breakdown as abstract readable blocks without copyrighted source text, the user nods, compact desktop interface, elegant motion and restrained dark UI.',
+    prompt: 'Strict photoreal live-action cinematic product demo at the same cyberpunk tabletop, elf-inspired mage player with subtle prosthetic ears and AR contact lens inspects a value change on a compact dark desktop UI, a clean side panel unfolds with abstract calculation blocks and highlighted dependencies, no copyrighted source text, the player nods because the sheet finally makes sense, elegant restrained UI, real actors, practical neon and table light, no readable labels.',
   },
   {
     id: '05_black_ledger_alive',
-    title: 'Black Ledger is alive',
+    title: 'The city wakes up',
     duration: 8,
-    prompt: 'Photoreal cyberpunk command room with a massive high-end rotating Earth globe interface, glowing cities, heat arcs, incident markers and risk pulses, no faction branding, team watching world pressure come alive, dramatic reveal, strategy-game scale, cinematic orbiting camera.',
+    prompt: 'Strict photoreal live-action cyberpunk GM command room, adult tabletop crew and GM around a real command table, a massive high-end living city map interface floats above the table with glowing districts, heat arcs, job seeds, incident markers and pressure pulses, no faction branding, the table watches the campaign world react to their run, dramatic reveal, strategy-game scale, cinematic orbiting camera, practical smoke and neon, no readable text.',
   },
   {
     id: '06_release_truth',
-    title: 'Release truth',
+    title: 'Prep without rummaging',
     duration: 8,
-    prompt: 'Photoreal premium operations dashboard inside Chummer6, release truth matrix, provider receipts, proof freshness and audit gates visualized as clean compact status rows, no faction material, no marketing fluff, a developer and GM review green proof receipts with mouse pointer focus, serious release-control atmosphere.',
+    prompt: 'Photoreal GM prep montage in a cyberpunk tabletop command interface, session notes, NPC cards, loot, scene clocks, opposition, maps, and handouts snap into one clean workspace, seasoned GM smiles because prep is finally under control, premium dramatic lighting, practical mouse and keyboard actions, no audit dashboard, no release dashboard, no readable text.',
   },
   {
     id: '07_table_pulse',
     title: 'Table Pulse',
     duration: 8,
-    prompt: 'Photoreal tabletop RPG session in progress, players around a real table with dice, maps and laptops, GM screen receives subtle Chummer6 Table Pulse alert showing heat and consequence as abstract UI, expressive reactions, cinematic closeups, warm table light and cyberpunk accents.',
+    prompt: 'Photoreal tabletop RPG session in progress, players around a real table with dice, tactical maps, minis, and laptops, GM screen receives a subtle abstract heat-and-consequence alert, players react to the table pressure, cinematic closeups, warm table light and cyberpunk accents, no readable labels.',
   },
   {
     id: '08_world_reacts',
-    title: 'The world reacts back',
+    title: 'The world pushes back',
     duration: 8,
-    prompt: 'Photoreal split-scene cyberpunk gameplay moment, remote player on phone receives a stylish campaign reaction notification, taps a response, GM desktop receives a clean world-reaction receipt, product feature focus, crisp minimal UI overlays, cinematic tension, no faction identities.',
+    prompt: 'Photoreal split-scene cyberpunk gameplay moment, remote player with visible cyberware receives an abstract campaign reaction on phone, taps a response, GM desktop updates with a consequence card, product feature focus, crisp minimal AR overlays, cinematic tension, no faction identities, no readable text.',
   },
   {
     id: '09_karma_forge',
     title: 'Karma Forge',
     duration: 8,
-    prompt: 'Photoreal premium product scene focused on Karma Forge governance inside Chummer6, proposal, vote, comparison, review and approval flow in a compact desktop client, bad idea rejected with visible but abstract UI state, cast reacts, grounded elegant product cinematography.',
+    prompt: 'Photoreal premium tabletop product scene showing a house-rule packet being proposed, compared, reviewed, and accepted at the table, compact desktop UI with abstract cards and toggles, players debate and laugh, GM keeps control, grounded elegant product cinematography, no readable labels.',
   },
   {
     id: '10_newsroom',
     title: 'Newsreels',
     duration: 8,
-    prompt: 'Photoreal premium futuristic newsroom, charismatic ork news anchor delivers satirical fallout of a tabletop run, giant incident screens and ticker style visuals behind anchor, polished broadcast lighting, true TV-news framing, no canon logos, no faction content.',
+    prompt: 'Photoreal premium futuristic in-world newsroom, charismatic ork-inspired news anchor delivers satirical fallout of a tabletop run, giant incident screens and ticker-like abstract visuals behind anchor, polished broadcast lighting, true TV-news framing, no canon logos, no faction content, no readable text.',
   },
   {
     id: '11_play_anywhere',
     title: 'Play anywhere',
     duration: 6,
-    prompt: 'Photoreal device continuity montage showing Chummer6 runner and campaign state moving from compact Windows desktop client to tablet and phone PWA, same data preserved, mouse and touch interactions visible, restrained premium UI, crisp transitions, no marketing page look.',
+    prompt: 'Strict photoreal live-action device continuity montage, adult cyberpunk tabletop players with visible cyberware pass campaign state from compact Windows desktop client to tablet and phone PWA, same runner sheet and campaign state preserved, mouse and touch interactions visible, restrained premium dark UI, real devices, cinematic closeups, no marketing page look, no readable product names.',
   },
   {
     id: '12_hero_ending',
-    title: 'Chummer6 hero ending',
+    title: 'The crew hits the street',
     duration: 8,
-    prompt: 'Photoreal cinematic hero ending on rainy neon cyberpunk city street at night, recurring RPG team walks out confident after using Chummer6, reflections, chrome, subtle holographic glow, final product-title energy for Chummer6, emotional but witty finish, premium trailer quality.',
+    prompt: 'Photoreal cinematic hero ending on rainy neon cyberpunk city street at night, recurring tabletop crew steps out confident and ready for the next run, reflections, chrome, subtle holographic glow, confident roleplaying-table energy, emotional but witty finish, premium trailer quality, no generated product title or readable text.',
   },
 ];
 
@@ -178,7 +192,7 @@ function download(url, file) {
 }
 
 function collectCdnVideoUrlsFromText(text) {
-  return [...new Set((text.match(/https:\/\/cdn\.pushowl\.com\/magicfit\/[^"'\s<>]+?\.(?:mp4|webm)/g) || [])
+  return [...new Set((text.match(/https:\/\/(?:cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/[^"'\s<>]+?\.(?:mp4|webm)/g) || [])
     .map((url) => url.replace(/\\u0026/g, '&').replace(/[),\]]+$/, '')))];
 }
 
@@ -193,7 +207,7 @@ async function collectVisibleMagicFitVideoUrls(page) {
   for (const found of collectCdnVideoUrlsFromText(html)) urls.add(found);
   const videos = await page.locator('video').evaluateAll((nodes) => nodes.map((v) => v.currentSrc || v.src).filter(Boolean)).catch(() => []);
   for (const found of videos) {
-    if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)/.test(found)) urls.add(found);
+    if (/(?:cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/.*\.(mp4|webm)/.test(found)) urls.add(found);
   }
   return urls;
 }
@@ -224,7 +238,7 @@ async function renderScene(page, scene) {
     if (!url.includes('magicfit') && !url.includes('pushowl')) return;
     const item = { status: response.status(), url, contentType: response.headers()['content-type'] || '' };
     events.push(item);
-    if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)(?:$|\?)/.test(url)) seenVideoUrls.add(url);
+    if (/(?:cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/.*\.(mp4|webm)(?:$|\?)/.test(url)) seenVideoUrls.add(url);
     const ct = item.contentType;
     if (/json|script|text/.test(ct)) {
       const text = await response.text().catch(() => '');
@@ -258,7 +272,7 @@ async function renderScene(page, scene) {
     for (const found of collectCdnVideoUrlsFromText(html)) seenVideoUrls.add(found);
     const videos = await page.locator('video').evaluateAll((nodes) => nodes.map((v) => v.currentSrc || v.src).filter(Boolean)).catch(() => []);
     for (const found of videos) {
-      if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)/.test(found)) seenVideoUrls.add(found);
+      if (/(?:cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/.*\.(mp4|webm)/.test(found)) seenVideoUrls.add(found);
     }
     videoUrl = chooseNewestVideoUrl(seenVideoUrls, baselineVideoUrls, submittedAtMs);
     if (!videoUrl) console.log(`poll ${scene.id}: waiting`);

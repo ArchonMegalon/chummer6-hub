@@ -1,0 +1,109 @@
+{
+  "generated_at_utc": "2026-06-02T11:49:35Z",
+  "status": "published",
+  "asset_id": "all-horizons-90s-magicfit-promo",
+  "title": "All Horizons 90s MagicFit Promo",
+  "render_mode": "magicfit_per_scene_rebuild_with_spoken_narration",
+  "source_claim": "11 MagicFit-rendered Horizon scene clips rebuilt with cleaner spoken narration",
+  "visual_source": "MagicFit scene clips only",
+  "narration_provider": "edge-tts",
+  "voice": "en-US-AndrewNeural",
+  "scene_count": 11,
+  "duration_seconds": 90.0,
+  "continuous_audio_track": "spoken_narration_plus_low_music_bed",
+  "scene_narration": [
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/01_cold_open_table_chaos.mp4",
+      "duration_seconds": 6.0,
+      "caption": "The table is alive, but the tools are fighting the table.",
+      "narration": "The table is alive, but the tools are fighting it. Chummer6 turns that chaos into one campaign operating surface."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/02_nexus_pan_shared_state.mp4",
+      "duration_seconds": 8.0,
+      "caption": "NEXUS-PAN keeps shared state steady across devices.",
+      "narration": "NEXUS-PAN keeps shared state steady when devices drift, drop, and return mid-session."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/03_alice_build_tradeoffs.mp4",
+      "duration_seconds": 8.0,
+      "caption": "ALICE explains build tradeoffs before they break play.",
+      "narration": "ALICE compares builds, catches role traps, and explains tradeoffs with receipts before play starts."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/04_karma_forge_governed_rules.mp4",
+      "duration_seconds": 8.0,
+      "caption": "KARMA FORGE makes house rules governed and reversible.",
+      "narration": "KARMA FORGE turns house rules into governed packages with impact, history, and rollback."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/05_jackpoint_dossiers_recaps.mp4",
+      "duration_seconds": 8.0,
+      "caption": "JACKPOINT turns table memory into sharp briefings.",
+      "narration": "JACKPOINT turns what happened at the table into briefings, dossiers, and recaps players actually want to read."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/06_runsite_spatial_prep.mp4",
+      "duration_seconds": 8.0,
+      "caption": "RUNSITE makes mission spaces legible before danger starts.",
+      "narration": "RUNSITE makes mission spaces explorable and legible before the action starts."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/07_runbook_press_campaign_books.mp4",
+      "duration_seconds": 8.0,
+      "caption": "RUNBOOK PRESS turns campaign material into books.",
+      "narration": "RUNBOOK PRESS turns campaign material into primers, guides, modules, and season books the table can carry forward."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/08_table_pulse_live_heat.mp4",
+      "duration_seconds": 8.0,
+      "caption": "TABLE PULSE turns heat into bounded GM-approved reactions.",
+      "narration": "TABLE PULSE turns live heat into bounded reactions, remote choices, and GM-approved fallout."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/09_black_ledger_living_world.mp4",
+      "duration_seconds": 10.0,
+      "caption": "BLACK LEDGER makes the city remember consequences.",
+      "narration": "BLACK LEDGER makes the city remember: factions, heat, missions, newsreels, and consequences."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/10_community_hub_open_runs.mp4",
+      "duration_seconds": 8.0,
+      "caption": "COMMUNITY HUB helps players find runs and close the loop.",
+      "narration": "COMMUNITY HUB helps players find runs, pass preflight, get scheduled, and feed outcomes back into the world."
+    },
+    {
+      "clip": "/docker/chummercomplete/_completion/horizons_90s_promo/magicfit_clips/11_finale_all_horizons.mp4",
+      "duration_seconds": 10.0,
+      "caption": "All Horizons return to one table and one campaign.",
+      "narration": "All Horizons point back to the same table: build the runner, run the scene, shape the world, and make the next session easier to start."
+    }
+  ],
+  "public_files": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo-poster.png",
+    "captions": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/all-horizons-90s-magicfit-promo.vtt"
+  },
+  "mp4_probe": {
+    "programs": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 720
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "48000",
+        "channels": 1
+      }
+    ],
+    "format": {
+      "duration": "90.000000",
+      "size": "47682836"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import { expect, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
-const baseUrl = 'https://chummer.run';
+const baseUrl = (process.env.BASE_URL ?? process.env.CHUMMER_HUB_BASE_URL ?? 'https://chummer.run').replace(/\/$/, '');
 const routes = [
   '/',
   '/downloads',
@@ -42,7 +42,7 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
 
   for (const route of routes) {
     const page = await browser.newPage({ baseURL: baseUrl, viewport: { width: 1366, height: 900 } });
-    await page.goto(`${baseUrl}${route}`, { waitUntil: 'networkidle' });
+    await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
 
     const collect = async (state: 'normal' | 'hover' | 'focus') => {
       const rows = await page.locator('a, button, .button-like, h1, h2, h3, h4, p, li, label, .muted-copy, .proof-chip, .site-sidebar__nav a').evaluateAll((elements, currentState) => {
@@ -162,8 +162,7 @@ test('public front-door surfaces meet computed contrast thresholds', async ({ br
 
     const firstInteractive = page.locator('a, button, .button-like').filter({ hasNotText: 'Skip to content' }).first();
     if (await firstInteractive.count() > 0) {
-      await firstInteractive.scrollIntoViewIfNeeded();
-      await firstInteractive.hover({ force: true });
+      await firstInteractive.hover({ force: true, timeout: 5000 });
       await collect('hover');
       await firstInteractive.focus();
       await collect('focus');

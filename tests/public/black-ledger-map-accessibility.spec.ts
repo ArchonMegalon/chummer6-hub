@@ -4,7 +4,7 @@ import { writeMapJsonArtifact } from './black-ledger-map-artifacts';
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
 test('black ledger map keeps keyboard and fallback access visible', async ({ page }) => {
-  await page.goto(`${baseUrl}/ledger/map`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/ledger/map`, { waitUntil: 'domcontentloaded' });
 
   await page.keyboard.press('Tab');
   await expect(page.locator(':focus')).toBeVisible();

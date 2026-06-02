@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Chummer.Run.Api.Services;
+using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
@@ -21,6 +22,102 @@ public sealed class PublicReleaseManifestServiceTests
         Assert.NotNull(manifest.ProofGeneratedAt);
         Assert.Equal(["install_claim_restore_continue", "build_explain_publish"], manifest.ProofJourneys);
         Assert.Equal(["/downloads/install/avalonia-linux-x64-installer", "/account/support"], manifest.ProofRoutes);
+    }
+
+    [Fact]
+    public void LoadManifestUsesRepoLocalPortalDownloadsWhenNoDownloadsRootIsConfigured()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "public-release-default-root-tests", Guid.NewGuid().ToString("N"));
+        try
+        {
+            string downloadsRoot = Path.Combine(root, "Chummer.Portal", "downloads");
+            Directory.CreateDirectory(downloadsRoot);
+            File.WriteAllText(
+                Path.Combine(downloadsRoot, "releases.json"),
+                JsonSerializer.Serialize(
+                    new PublicReleaseManifestDto(
+                        Version: "repo-local-preview",
+                        Channel: "preview",
+                        PublishedAt: new DateTimeOffset(2026, 6, 2, 12, 0, 0, TimeSpan.Zero),
+                        Downloads:
+                        [
+                            new PublicReleaseArtifactDto(
+                                Id: "repo-local-avalonia-osx-arm64",
+                                Platform: "osx-arm64",
+                                Url: "/downloads/files/chummer-avalonia-osx-arm64.tar.gz",
+                                Sha256: new string('a', 64),
+                                SizeBytes: 1234)
+                        ],
+                        Source: "repo-local",
+                        Status: "published",
+                        Message: "Repo-local portal bundle is available.",
+                        HasFallbackSource: false),
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["CHUMMER_PUBLIC_CANON_ROOT"] = root
+                })
+                .Build();
+
+            var manifest = new PublicReleaseManifestService(configuration).LoadManifest();
+
+            Assert.Equal("repo-local-preview", manifest.Version);
+            Assert.Contains(manifest.Downloads, item => string.Equals(item.Id, "repo-local-avalonia-osx-arm64", StringComparison.Ordinal));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void LoadManifestPreservesRegistryBoundaryCoverageFromRegistryManifest()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "preview",
+            ["version"] = "run-boundary-smoke",
+            ["publishedAt"] = "2026-06-02T12:00:00Z",
+            ["status"] = "published",
+            ["registryBoundaryCoverage"] = new Dictionary<string, object?>
+            {
+                ["compatibility"] = new Dictionary<string, object?>
+                {
+                    ["compatibleArtifactCount"] = 4,
+                    ["unknownArtifactCount"] = 0
+                }
+            },
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-osx-arm64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "macos",
+                    ["rid"] = "osx-arm64",
+                    ["arch"] = "arm64",
+                    ["kind"] = "dmg",
+                    ["fileName"] = "chummer-avalonia-osx-arm64-installer.dmg",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+                    ["sha256"] = new string('b', 64),
+                    ["sizeBytes"] = 1234L
+                }
+            }
+        });
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        JsonElement coverage = Assert.IsType<JsonElement>(manifest.RegistryBoundaryCoverage);
+        JsonElement compatibility = coverage.GetProperty("compatibility");
+        Assert.Equal(4, compatibility.GetProperty("compatibleArtifactCount").GetInt32());
+        Assert.Equal(0, compatibility.GetProperty("unknownArtifactCount").GetInt32());
     }
 
     [Fact]

@@ -8,7 +8,7 @@ const repoRoot = process.cwd();
 const onboardingView = readFileSync(path.join(repoRoot, 'Chummer.Run.Api/Views/PublicLanding/LedgerOnboarding.cshtml'), 'utf8');
 
 test('black ledger onboarding wizard is route-backed and guest-gated cleanly', async ({ page }) => {
-  const response = await page.goto(`${baseUrl}/account/ledger/onboarding?step=allegiance`, { waitUntil: 'networkidle' });
+  const response = await page.goto(`${baseUrl}/account/ledger/onboarding?step=allegiance`, { waitUntil: 'domcontentloaded' });
   expect(response?.status()).toBe(200);
   expect(page.url()).toContain('/login?next=');
 

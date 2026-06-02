@@ -52,7 +52,12 @@ public sealed class InternalReleaseBundlesControllerTests
         await UploadFileAsync(fixture.Controller, created.SessionId, "startup-smoke/startup-smoke-avalonia-macos-arm64.receipt.json", "application/json", BuildStartupSmokeReceipt());
 
         ActionResult<ReleaseBundlePromotionResult> completeResult = await fixture.Controller.CompleteUploadSession(created.SessionId, CancellationToken.None);
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(completeResult.Result);
+        ObjectResult ok = Assert.IsAssignableFrom<ObjectResult>(completeResult.Result);
+        Assert.True(
+            ok.StatusCode == StatusCodes.Status200OK,
+            ok.Value is ProblemDetails problem
+                ? $"Expected 200 but got {ok.StatusCode}: {problem.Detail}"
+                : $"Expected 200 but got {ok.StatusCode}: {ok.Value}");
         ReleaseBundlePromotionResult promoted = Assert.IsType<ReleaseBundlePromotionResult>(ok.Value);
         Assert.Contains("avalonia-osx-arm64-dmg", promoted.PromotedArtifactIds);
         Assert.NotNull(promoted.SignedInInstallClaims);
@@ -284,6 +289,16 @@ public sealed class InternalReleaseBundlesControllerTests
   "version": "run-test",
   "channel": "preview",
   "publishedAt": "2026-04-02T06:00:00Z",
+  "registryBoundaryCoverage": {
+    "compatibility": {
+      "compatibleArtifactCount": 1,
+      "compatibleRuntimeBundleHeadCount": 0,
+      "compatibleExchangeArtifactCount": 0,
+      "unknownArtifactCount": 0,
+      "unknownRuntimeBundleHeadCount": 0,
+      "summary": "Compatibility boundary tracks 1 compatible artifact, 0 compatible runtime bundle heads, and 0 compatible exchange-lineage rows while 0 artifact rows and 0 runtime bundle heads remain unknown."
+    }
+  },
   "downloads": [
     {
       "id": "avalonia-osx-arm64-dmg",
@@ -311,6 +326,16 @@ public sealed class InternalReleaseBundlesControllerTests
   "version": "run-test",
   "publishedAt": "2026-04-02T06:00:00Z",
   "status": "published",
+  "registryBoundaryCoverage": {
+    "compatibility": {
+      "compatibleArtifactCount": 1,
+      "compatibleRuntimeBundleHeadCount": 0,
+      "compatibleExchangeArtifactCount": 0,
+      "unknownArtifactCount": 0,
+      "unknownRuntimeBundleHeadCount": 0,
+      "summary": "Compatibility boundary tracks 1 compatible artifact, 0 compatible runtime bundle heads, and 0 compatible exchange-lineage rows while 0 artifact rows and 0 runtime bundle heads remain unknown."
+    }
+  },
   "artifacts": [
     {
       "artifactId": "avalonia-osx-arm64-dmg",

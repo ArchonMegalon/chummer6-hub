@@ -431,6 +431,9 @@ public sealed class ReleaseBundlePromotionService
                     : null,
                 DesktopTupleCoverage = parsed.DesktopTupleCoverage is JsonElement desktopTupleCoverage
                     ? desktopTupleCoverage.Clone()
+                    : null,
+                RegistryBoundaryCoverage = parsed.RegistryBoundaryCoverage is JsonElement registryBoundaryCoverage
+                    ? registryBoundaryCoverage.Clone()
                     : null
             };
         return manifest ?? throw new InvalidDataException($"compatibility release manifest could not be parsed: {manifestPath}");
@@ -783,8 +786,52 @@ public sealed class ReleaseBundlePromotionService
         normalizedCanonicalManifest["supportabilitySummary"] = supportabilitySummary;
         normalizedCanonicalManifest["knownIssueSummary"] = knownIssueSummary;
         normalizedCanonicalManifest["fixAvailabilitySummary"] = fixAvailabilitySummary;
+        JsonObject registryBoundaryCoverage = NormalizeRegistryBoundaryCoverage(
+            normalizedCanonicalManifest["registryBoundaryCoverage"] as JsonObject,
+            normalizedCompatibilityManifest.Downloads.Count);
+        normalizedCanonicalManifest["registryBoundaryCoverage"] = registryBoundaryCoverage.DeepClone();
+        normalizedCompatibilityManifest = normalizedCompatibilityManifest with
+        {
+            RegistryBoundaryCoverage = JsonSerializer.SerializeToElement(registryBoundaryCoverage, JsonOptions)
+        };
 
         return (normalizedCompatibilityManifest, normalizedCanonicalManifest);
+    }
+
+    private static JsonObject NormalizeRegistryBoundaryCoverage(JsonObject? sourceCoverage, int publishedArtifactCount)
+    {
+        JsonObject coverage = sourceCoverage?.DeepClone().AsObject() ?? new JsonObject();
+        JsonObject compatibility = coverage["compatibility"] as JsonObject ?? new JsonObject();
+        int compatibleRuntimeBundleHeadCount = GetJsonInt32(compatibility["compatibleRuntimeBundleHeadCount"]);
+        int compatibleExchangeArtifactCount = GetJsonInt32(compatibility["compatibleExchangeArtifactCount"]);
+        int unknownRuntimeBundleHeadCount = GetJsonInt32(compatibility["unknownRuntimeBundleHeadCount"]);
+        compatibility["compatibleArtifactCount"] = publishedArtifactCount;
+        compatibility["compatibleRuntimeBundleHeadCount"] = compatibleRuntimeBundleHeadCount;
+        compatibility["compatibleExchangeArtifactCount"] = compatibleExchangeArtifactCount;
+        compatibility["unknownArtifactCount"] = 0;
+        compatibility["unknownRuntimeBundleHeadCount"] = unknownRuntimeBundleHeadCount;
+        compatibility["summary"] =
+            $"Compatibility boundary tracks {publishedArtifactCount} compatible artifacts, " +
+            $"{compatibleRuntimeBundleHeadCount} compatible runtime bundle heads, and " +
+            $"{compatibleExchangeArtifactCount} compatible exchange-lineage rows while " +
+            $"0 artifact rows and {unknownRuntimeBundleHeadCount} runtime bundle heads remain unknown.";
+        coverage["compatibility"] = compatibility;
+        return coverage;
+    }
+
+    private static int GetJsonInt32(JsonNode? node)
+    {
+        if (node is null)
+        {
+            return 0;
+        }
+
+        if (node is JsonValue jsonValue && jsonValue.TryGetValue<int>(out int value))
+        {
+            return value;
+        }
+
+        return int.TryParse(GetJsonString(node), out value) ? value : 0;
     }
 
     private static JsonArray BuildInstallAwareArtifactRegistry(
@@ -2144,8 +2191,36 @@ public sealed class ReleaseBundlePromotionService
             }
         }
 
+        ValidateRegistryBoundaryCompatibilityCounts(liveCompatibilityManifest, liveCanonicalManifest);
         ReleaseSelectionService releaseSelection = new(new PublicCanonFileLoader(_configuration));
         return releaseSelection.ApplyAccessPolicy(liveCompatibilityManifest);
+    }
+
+    private static void ValidateRegistryBoundaryCompatibilityCounts(
+        PublicReleaseManifestDto compatibilityManifest,
+        JsonObject canonicalManifest)
+    {
+        int publishedArtifactCount = compatibilityManifest.Downloads.Count;
+        JsonObject? canonicalCoverage = canonicalManifest["registryBoundaryCoverage"] as JsonObject;
+        JsonObject? canonicalCompatibility = canonicalCoverage?["compatibility"] as JsonObject;
+        JsonObject? compatibilityCoverage = compatibilityManifest.RegistryBoundaryCoverage is JsonElement compatibilityCoverageElement
+            && compatibilityCoverageElement.ValueKind == JsonValueKind.Object
+            ? JsonNode.Parse(compatibilityCoverageElement.GetRawText())?.AsObject()
+            : null;
+        JsonObject? compatibilityBoundary = compatibilityCoverage?["compatibility"] as JsonObject;
+        int canonicalCompatible = GetJsonInt32(canonicalCompatibility?["compatibleArtifactCount"]);
+        int compatibilityCompatible = GetJsonInt32(compatibilityBoundary?["compatibleArtifactCount"]);
+        if (canonicalCompatible != publishedArtifactCount)
+        {
+            throw new InvalidOperationException(
+                $"RELEASE_CHANNEL.generated.json preview_supported release must keep registryBoundaryCoverage.compatibility.compatibleArtifactCount equal to published artifact count ({publishedArtifactCount}), got {canonicalCompatible}");
+        }
+
+        if (compatibilityCompatible != publishedArtifactCount)
+        {
+            throw new InvalidOperationException(
+                $"dist/releases.json preview_supported release must keep registryBoundaryCoverage.compatibility.compatibleArtifactCount equal to published artifact count ({publishedArtifactCount}), got {compatibilityCompatible}");
+        }
     }
 
     private sealed record CanonicalArtifactState(
@@ -2184,7 +2259,8 @@ public sealed class ReleaseBundlePromotionService
         [property: JsonPropertyName("generated_at")] DateTimeOffset? GeneratedAtAlias,
         string? ContractName,
         [property: JsonPropertyName("contract_name")] string? ContractNameAlias,
-        JsonElement? DesktopTupleCoverage);
+        JsonElement? DesktopTupleCoverage,
+        JsonElement? RegistryBoundaryCoverage);
 
     private sealed record CompatibilityProofPayload(
         string? Status,

@@ -68,10 +68,14 @@ def main() -> int:
         scene_reasons = []
         if str(payload.get("provider") or "").strip().lower() != "magicfit":
             scene_reasons.append("missing_magicfit_provider_sidecar")
-        if not str(payload.get("video_output_url") or "").startswith("https://cdn.pushowl.com/magicfit/"):
+        video_output_url = str(payload.get("video_output_url") or "")
+        if not (
+            video_output_url.startswith("https://cdn.pushowl.com/magicfit/")
+            or video_output_url.startswith("https://media.powlcdn.com/magicfit/")
+        ):
             scene_reasons.append("missing_magicfit_cdn_source")
         else:
-            urls.append(str(payload.get("video_output_url")))
+            urls.append(video_output_url)
         if payload.get("faction_assets_used") is not False:
             scene_reasons.append("faction_free_source_not_proven")
         file_hashes.append(hashlib.sha256(path.read_bytes()).hexdigest())

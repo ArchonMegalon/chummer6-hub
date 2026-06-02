@@ -49,6 +49,19 @@ public sealed class BlackLedgerDispatchTests
     }
 
     [Fact]
+    public void BlackLedgerDispatch_detail_lookup_infers_turn_from_generated_dispatch_id()
+    {
+        var service = new BlackLedgerPublicStatsService(BuildSeedConfiguration());
+
+        var dispatch = service.LoadDispatch("ledger_dispatch_emerald-sprawl-prelude_turn_0002");
+
+        Assert.NotNull(dispatch);
+        Assert.Equal("ledger_dispatch_emerald-sprawl-prelude_turn_0002", dispatch!.DispatchId);
+        Assert.Equal(2, dispatch.Turn);
+        Assert.Equal("ledger_tick_0002_flagship_seeded", dispatch.SourceReceiptId);
+    }
+
+    [Fact]
     public void BlackLedgerDispatch_faction_archive_filters_to_requested_faction()
     {
         var service = new BlackLedgerPublicStatsService(BuildSeedConfiguration());

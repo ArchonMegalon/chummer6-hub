@@ -362,20 +362,7 @@ def materialize_final_gold(generated: str) -> dict[str, Any]:
         "failing_gates": failing,
     }
     write_json(OUT / "FINAL_GOLD_JANITOR.generated.json", payload)
-    lines = [
-        "GOLD_READY" if gold_ready else "NOT_GOLD",
-        "",
-        f"Generated: {generated}",
-        "",
-        "Gate summary:",
-    ]
-    for name, result in sorted(gate_results.items()):
-        lines.append(f"- {name}: {'pass' if result['pass'] else 'fail'}")
-    if missing:
-        lines.extend(["", "Missing gates:", *[f"- {name}" for name in missing]])
-    if failing:
-        lines.extend(["", "Failing gates:", *[f"- {name}" for name in failing]])
-    write_text(OUT / "FINAL_GOLD_VERDICT.md", "\n".join(lines))
+    write_text(OUT / "FINAL_GOLD_VERDICT.md", f"{payload['verdict']}\n")
     return payload
 
 
