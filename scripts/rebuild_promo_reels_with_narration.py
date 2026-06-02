@@ -151,6 +151,26 @@ def render_flite_tts(text: str, output: Path) -> None:
     )
 
 
+def cinematic_bed_filter(target_len: float, *, mode: str) -> str:
+    fade_in = min(1.4 if mode == "continuous" else 0.55, max(target_len / 3.0, 0.15))
+    fade_out = min(2.8 if mode == "continuous" else 0.75, max(target_len / 3.0, 0.2))
+    tremolo_freq = 0.16 if mode == "continuous" else 0.24
+    tremolo_depth = 0.18 if mode == "continuous" else 0.12
+    return (
+        "aevalsrc="
+        f"'0.030*sin(2*PI*(43+1.7*sin(2*PI*0.05*t))*t)+"
+        "0.018*sin(2*PI*(86+2.4*sin(2*PI*0.037*t))*t)+"
+        "0.011*sin(2*PI*129*t)+0.007*sin(2*PI*172*t)+0.004*sin(2*PI*258*t)'"
+        f":s=48000:d={target_len:.3f},"
+        "highpass=f=32,lowpass=f=3600,bass=g=2.8:f=94:w=0.8,"
+        f"tremolo=f={tremolo_freq:.3f}:d={tremolo_depth:.3f},"
+        "acompressor=threshold=-30dB:ratio=1.8:attack=30:release=280:makeup=1.5,"
+        f"afade=t=in:st=0:d={fade_in:.3f},"
+        f"afade=t=out:st={max(target_len - fade_out, 0):.3f}:d={fade_out:.3f},"
+        "volume=1.32[bed]"
+    )
+
+
 async def render_narration_files(reel: Reel, work: Path) -> tuple[list[Path], str]:
     narration_dir = work / "narration"
     narration_dir.mkdir(parents=True, exist_ok=True)
@@ -192,13 +212,13 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
     if narration_len > target_vo_len:
         speed = min(max(narration_len / target_vo_len, 1.0), 1.55)
         vo_filter = f"atempo={speed:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
+    elif narration_len and narration_len < target_vo_len * 0.94:
+        stretch = max(narration_len / target_vo_len, 0.88)
+        vo_filter = f"atempo={stretch:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
     filters = [
-        f"[0:a]{vo_filter},highpass=f=85,lowpass=f=11800,acompressor=threshold=-20dB:ratio=2.6:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]",
-        (
-            "aevalsrc='0.014*sin(2*PI*44*t)+0.009*sin(2*PI*88*t)+"
-            f"0.005*sin(2*PI*176*t)':s=48000:d={target_len:.3f}[bed]"
-        ),
-        f"[vo0]adelay=900|900,apad,atrim=0:{target_len:.3f},volume=1.16[vo]",
+        f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,highpass=f=85,lowpass=f=11800,acompressor=threshold=-20dB:ratio=2.6:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]",
+        cinematic_bed_filter(target_len, mode="continuous"),
+        f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=1.12[vo]",
         f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]",
     ]
     run(
@@ -219,23 +239,23 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
 def make_audio_segment(narration: Path, scene: Scene, output: Path) -> None:
     scene_len = scene.duration
     narration_len = duration(narration)
-    target_vo_len = max(scene_len - 0.7, 1.0)
+    target_vo_len = max(scene_len - 0.35, 1.0)
     filters: list[str] = []
     vo_label = "vo0"
     if narration_len > target_vo_len:
         speed = min(max(narration_len / target_vo_len, 1.0), 2.0)
         filters.append(f"[0:a]atempo={speed:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS[rawvo]")
+    elif narration_len and narration_len < target_vo_len * 0.94:
+        stretch = max(narration_len / target_vo_len, 0.88)
+        filters.append(f"[0:a]atempo={stretch:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS[rawvo]")
     else:
         filters.append(f"[0:a]atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS[rawvo]")
     if scene.voice_treatment == "ork_news":
-        filters.append("[rawvo]atempo=0.84,rubberband=pitch=0.70,highpass=f=58,lowpass=f=5900,bass=g=5:f=105:w=0.55,acompressor=threshold=-19dB:ratio=3.8:attack=18:release=230:makeup=4.2,alimiter=limit=0.90[vo0]")
+        filters.append(f"[rawvo]atempo=0.84,rubberband=pitch=0.70,afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=58,lowpass=f=5900,bass=g=5:f=105:w=0.55,acompressor=threshold=-19dB:ratio=3.8:attack=18:release=230:makeup=4.2,alimiter=limit=0.90[vo0]")
     else:
-        filters.append("[rawvo]highpass=f=85,lowpass=f=11800,acompressor=threshold=-20dB:ratio=2.3:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]")
-    filters.append(
-        "aevalsrc='0.018*sin(2*PI*55*t)+0.010*sin(2*PI*110*t)+"
-        f"0.006*sin(2*PI*220*t)':s=48000:d={scene_len:.3f}[bed]"
-    )
-    filters.append(f"[{vo_label}]adelay=220|220,apad,atrim=0:{scene_len:.3f},volume=1.22[vo]")
+        filters.append(f"[rawvo]afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=85,lowpass=f=11800,acompressor=threshold=-20dB:ratio=2.3:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]")
+    filters.append(cinematic_bed_filter(scene_len, mode="scene"))
+    filters.append(f"[{vo_label}]adelay=120|120,apad,atrim=0:{scene_len:.3f},volume=1.14[vo]")
     filters.append(f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]")
     run(
         "ffmpeg",

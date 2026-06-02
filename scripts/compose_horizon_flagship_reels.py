@@ -231,6 +231,26 @@ def duration(path: Path) -> float:
     return float(dict(payload.get("format") or {}).get("duration") or 0.0)
 
 
+def cinematic_bed_filter(target_len: float, *, mode: str) -> str:
+    fade_in = min(0.8 if mode == "scene" else 1.4, max(target_len / 3.0, 0.15))
+    fade_out = min(0.9 if mode == "scene" else 2.6, max(target_len / 3.0, 0.2))
+    tremolo_freq = 0.24 if mode == "scene" else 0.16
+    tremolo_depth = 0.11 if mode == "scene" else 0.18
+    return (
+        "aevalsrc="
+        f"'0.030*sin(2*PI*(43+1.7*sin(2*PI*0.05*t))*t)+"
+        "0.018*sin(2*PI*(86+2.4*sin(2*PI*0.037*t))*t)+"
+        "0.011*sin(2*PI*129*t)+0.007*sin(2*PI*172*t)+0.004*sin(2*PI*258*t)'"
+        f":s=48000:d={target_len:.3f},"
+        "highpass=f=32,lowpass=f=3600,bass=g=2.8:f=94:w=0.8,"
+        f"tremolo=f={tremolo_freq:.3f}:d={tremolo_depth:.3f},"
+        "acompressor=threshold=-30dB:ratio=1.8:attack=30:release=280:makeup=1.5,"
+        f"afade=t=in:st=0:d={fade_in:.3f},"
+        f"afade=t=out:st={max(target_len - fade_out, 0):.3f}:d={fade_out:.3f},"
+        "volume=1.32[bed]"
+    )
+
+
 def clean_id(value: str) -> str:
     value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value)
     return re.sub(r"_+", "_", value).strip("_")
@@ -331,25 +351,24 @@ async def render_narration_files(asset_id: str, scenes: list[ScenePlan], work: P
 def make_audio_segment(narration: Path, scene: ScenePlan, output: Path) -> None:
     target = scene.duration
     source = duration(narration)
-    target_vo = max(target - 0.65, 1.0)
-    speed = min(max(source / target_vo, 1.0), 1.85)
+    target_vo = max(target - 0.35, 1.0)
     if source > target_vo:
+        speed = min(max(source / target_vo, 1.0), 1.85)
         start = f"[0:a]atempo={speed:.4f},atrim=0:{target_vo:.3f},asetpts=PTS-STARTPTS[rawvo]"
+    elif source and source < target_vo * 0.94:
+        stretch = max(source / target_vo, 0.88)
+        start = f"[0:a]atempo={stretch:.4f},atrim=0:{target_vo:.3f},asetpts=PTS-STARTPTS[rawvo]"
     else:
         start = f"[0:a]atrim=0:{target_vo:.3f},asetpts=PTS-STARTPTS[rawvo]"
     if scene.treatment == "field_reporter":
-        treatment = "[rawvo]rubberband=pitch=0.86,highpass=f=75,lowpass=f=7200,acompressor=threshold=-18dB:ratio=3.1:attack=12:release=150:makeup=3.2,alimiter=limit=0.90[vo0]"
+        treatment = f"[rawvo]rubberband=pitch=0.86,afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo - 0.28, 0):.3f}:d=0.28,highpass=f=75,lowpass=f=7200,acompressor=threshold=-18dB:ratio=3.1:attack=12:release=150:makeup=3.2,alimiter=limit=0.90[vo0]"
     else:
-        treatment = "[rawvo]highpass=f=85,lowpass=f=11200,acompressor=threshold=-20dB:ratio=2.4:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]"
-    bed = (
-        "aevalsrc='0.014*sin(2*PI*48*t)+0.008*sin(2*PI*96*t)+"
-        f"0.004*sin(2*PI*192*t)':s=48000:d={target:.3f}[bed]"
-    )
+        treatment = f"[rawvo]afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo - 0.28, 0):.3f}:d=0.28,highpass=f=85,lowpass=f=11200,acompressor=threshold=-20dB:ratio=2.4:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]"
     filters = [
         start,
         treatment,
-        bed,
-        f"[vo0]adelay=180|180,apad,atrim=0:{target:.3f},volume=1.20[vo]",
+        cinematic_bed_filter(target, mode="scene"),
+        f"[vo0]adelay=120|120,apad,atrim=0:{target:.3f},volume=1.14[vo]",
         "[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]",
     ]
     run("ffmpeg", "-y", "-i", str(narration), "-filter_complex", ";".join(filters), "-map", "[a]", "-c:a", "pcm_s16le", str(output))

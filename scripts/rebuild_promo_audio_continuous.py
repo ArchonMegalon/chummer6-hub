@@ -214,6 +214,22 @@ def render_fallback_tts(text: str, output: Path) -> None:
     run("ffmpeg", "-y", "-f", "lavfi", "-i", f"flite=text='{escaped}':voice=slt", "-ar", "48000", "-ac", "1", str(output))
 
 
+def cinematic_bed_filter(target_duration: float) -> str:
+    fade_out = min(2.8, max(target_duration / 3.0, 0.3))
+    return (
+        "aevalsrc="
+        f"'0.030*sin(2*PI*(43+1.7*sin(2*PI*0.05*t))*t)+"
+        "0.018*sin(2*PI*(86+2.4*sin(2*PI*0.037*t))*t)+"
+        "0.011*sin(2*PI*129*t)+0.007*sin(2*PI*172*t)+0.004*sin(2*PI*258*t)'"
+        f":s=48000:d={target_duration:.3f},"
+        "highpass=f=32,lowpass=f=3600,bass=g=2.8:f=94:w=0.8,"
+        "tremolo=f=0.16:d=0.18,acompressor=threshold=-30dB:ratio=1.8:attack=30:release=280:makeup=1.5,"
+        f"afade=t=in:st=0:d={min(1.4, max(target_duration / 3.0, 0.2)):.3f},"
+        f"afade=t=out:st={max(target_duration - fade_out, 0):.3f}:d={fade_out:.3f},"
+        "volume=1.32[bed]"
+    )
+
+
 def audio_filter_for(narration: Path, target_duration: float) -> str:
     source_duration = duration(narration)
     target_vo = max(target_duration - 3.6, 1.0)
@@ -221,6 +237,10 @@ def audio_filter_for(narration: Path, target_duration: float) -> str:
         tempo = min(max(source_duration / target_vo, 1.0), 1.18)
         prep = f"atempo={tempo:.5f},atrim=0:{target_vo:.3f},asetpts=PTS-STARTPTS"
         fit_mode = f"sped_up_{tempo:.3f}"
+    elif source_duration and source_duration < target_vo * 0.94:
+        tempo = max(source_duration / target_vo, 0.88)
+        prep = f"atempo={tempo:.5f},atrim=0:{target_vo:.3f},asetpts=PTS-STARTPTS"
+        fit_mode = f"stretched_{tempo:.3f}"
     else:
         prep = f"atrim=0:{target_vo:.3f},asetpts=PTS-STARTPTS"
         fit_mode = "natural_slow"
@@ -229,8 +249,7 @@ def audio_filter_for(narration: Path, target_duration: float) -> str:
         "highpass=f=78,lowpass=f=9800,bass=g=1.7:f=118:w=0.55,"
         "acompressor=threshold=-21dB:ratio=2.2:attack=22:release=260:makeup=2.0,alimiter=limit=0.88[vo0];"
         f"[vo0]adelay=1200|1200,apad,atrim=0:{target_duration:.3f},volume=1.12[vo];"
-        "aevalsrc='0.010*sin(2*PI*42*t)+0.006*sin(2*PI*84*t)+0.003*sin(2*PI*168*t)'"
-        f":s=48000:d={target_duration:.3f},afade=t=in:st=0:d=1.2,afade=t=out:st={max(target_duration - 1.4, 0):.3f}:d=1.4[bed];"
+        f"{cinematic_bed_filter(target_duration)};"
         "[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.91[a]"
         f" # {fit_mode}"
     )
