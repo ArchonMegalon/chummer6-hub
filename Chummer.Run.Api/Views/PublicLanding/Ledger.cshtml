@@ -36,7 +36,7 @@
     };
     Func<string, string[]> ledgerLabels = id => factionSlug(id) switch
     {
-        "glass-tower-compact" => ["License Polish", "Public Trust", "Contract Capture", "Debt Shield"],
+        "glass-tower-compact" => ["Permit Leverage", "Public Trust", "Contract Capture", "Debt Shield"],
         "rust-market-syndicate" => ["Debt Heat", "Gear Flow", "Favor Load", "Recovery Work"],
         "ashline-circle" => ["MysAd Density", "Magic Pressure", "Signal Clarity", "Drain Risk"],
         "neon-docks-union" => ["Route Control", "Drone Load", "Cargo Pressure", "Maintenance Debt"],
@@ -46,7 +46,7 @@
     };
     Func<string, string> ledgerReason = label => label switch
     {
-        "License Polish" => "Contract wins, district calm, and public-facing cleanups raise it.",
+        "Permit Leverage" => "Contract wins, district calm, and public-facing cleanups raise it.",
         "Public Trust" => "Receipts, low heat, and successful dispatches push it upward.",
         "Contract Capture" => "District control and package pressure wins move it.",
         "Debt Shield" => "Low debt heat and stable holdings improve it.",
@@ -116,7 +116,7 @@
 }
 
 <section class="ledger-flagship ledger-flagship--public" data-ledger-redesign="command-deck">
-    <p class="sr-only">The public globe route now lands on the real earth view with Jammer Run overlays instead of the legacy SVG fallback map.</p>
+    <p class="sr-only">The public globe route shows the Black Ledger command map with live district overlays.</p>
     @if (commandMap is not null)
     {
         <div class="ledger-flagship__geoscape-wrap">
@@ -156,7 +156,7 @@
         <div class="trust-claim__microproof ledger-flagship__boundary">
             <span>Opt-in aggregate only</span>
             <span>No player identities</span>
-            <span>Public table layer</span>
+            <span>Table-ready city layer</span>
         </div>
     </div>
     <nav class="ledger-flagship__nav" aria-label="Black Ledger navigation">
@@ -334,7 +334,7 @@
                 <div class="editorial-block__lead">
                     <p class="eyebrow">Dispatch lane</p>
                     <h2 class="editorial-title">Latest dispatches</h2>
-                    <p class="editorial-copy">Receipt-backed narrative, not free-floating lore. Each dispatch is a table-ready pressure beat with a clear public boundary.</p>
+                    <p class="editorial-copy">Each dispatch is a table-ready pressure beat with a clear public boundary.</p>
                 </div>
                 <div class="ledger-dispatch-strip__grid">
                     @foreach (var dispatch in latestDispatches)

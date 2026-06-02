@@ -264,7 +264,7 @@ class BlackLedgerGeoscapeRoot {
             <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">newsroom feed armed</span>
           </div>
           <div class="black-ledger-geoscape__overlay">
-            <div class="black-ledger-geoscape__eyebrow">Jammer Run overlay</div>
+            <div class="black-ledger-geoscape__eyebrow">Black Ledger overlay</div>
             <div class="black-ledger-geoscape__headline">${this.variant === 'teaser' ? 'The city remembers.' : 'Heat is moving.'}</div>
             <div class="black-ledger-geoscape__status"></div>
           </div>

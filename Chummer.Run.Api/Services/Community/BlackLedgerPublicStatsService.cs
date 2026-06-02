@@ -71,10 +71,10 @@ public sealed class BlackLedgerPublicStatsService
             sampleCount: 3,
             confidenceKey: "seeded",
             confidence: "Seeded",
-            privacyNote: "Proof-backed demand, not roadmap truth",
+            privacyNote: "Demand signal, not a ship promise",
             sourceKind: "package_registry",
             sourceLabel: "Package registry pressure lanes",
-            sourceSummary: "Summarizes seeded package-pressure lanes and keeps release truth separate from demand signals.",
+            sourceSummary: "Summarizes package-pressure lanes without turning demand into a ship promise.",
             status: "seeded",
             href: "/ledger/packages"),
         CreatePublicStat(
@@ -89,18 +89,18 @@ public sealed class BlackLedgerPublicStatsService
             privacyNote: "Playful fictional labels only; never point at real people.",
             sourceKind: "seeded_board",
             sourceLabel: "Canonical seed world",
-            sourceSummary: "Uses district heat from the canonical public-safe seed and fails closed if the source becomes unsafe.",
+            sourceSummary: "Uses fictional district heat from the Emerald Sprawl board.",
             status: "seeded",
             href: "/ledger/factions#chaos-index"),
     ];
 
     private static readonly BlackLedgerModuleViewModel[] Modules =
     [
-        new("faction-intel", "Faction Intel", "Read public-safe faction pressure without exposing private tables or runner identities.", "/ledger/factions", "Opt-in aggregate"),
-        new("runner-archetypes", "Runner Archetype Stats", "See archetype pressure, chrome load, and role-shift signals as public-safe aggregates.", "/ledger/stats", "Seeded board"),
+        new("faction-intel", "Faction Intel", "Read faction pressure without exposing private tables or runner identities.", "/ledger/factions", "Opt-in aggregate"),
+        new("runner-archetypes", "Runner Archetype Stats", "See archetype pressure, chrome load, and role-shift signals as publishable aggregates.", "/ledger/stats", "Seeded board"),
         new("package-pressure", "Package Pressure", "Track followed package demand and compatibility heat without claiming shipped status early.", "/ledger/packages", "Governed watch"),
         new("karma-forge-candidates", "Karma Forge Candidate Feed", "See which discovery lanes are generating governed package candidates and closeout motion.", "/karma-forge", "Discovery-linked"),
-        new("closeout-feed", "Closeout Feed", "Follow proof-backed closeout motion after public-safe review, not before.", "/ledger/closeouts", "Proof-backed only"),
+        new("closeout-feed", "Closeout Feed", "Follow reviewed closeout motion after it is ready for the public board.", "/ledger/closeouts", "Reviewed only"),
     ];
 
     private static readonly BlackLedgerCloseoutViewModel[] Closeouts =
@@ -815,7 +815,7 @@ public sealed class BlackLedgerPublicStatsService
                 privacyNote: "Fictional runner/campaign statistics only",
                 sourceKind: "seeded_board",
                 sourceLabel: "Canonical seed world",
-                sourceSummary: "Computed from the public-safe seed and last applied tick receipt, never from support or account-linked traffic.",
+                sourceSummary: "Computed from the fictional city board, never from support or account-linked traffic.",
                 status: "seeded",
                 href: "/ledger/stats#debt-heat"),
             CreatePublicStat(
@@ -827,10 +827,10 @@ public sealed class BlackLedgerPublicStatsService
                 sampleCount: packagePressure.Count,
                 confidenceKey: packagePressureConfidenceKey,
                 confidence: packagePressureConfidenceKey == "enough_data" ? "Enough data" : "Seeded",
-                privacyNote: "Proof-backed demand, not roadmap truth",
+                privacyNote: "Demand signal, not a ship promise",
                 sourceKind: "package_registry",
                 sourceLabel: "Package registry pressure lanes",
-                sourceSummary: "Uses the seed-backed package-pressure lane set and stays seeded until live public-safe sample thresholds are satisfied.",
+                sourceSummary: "Uses the package-pressure lane set until opted-in live samples are large enough to publish.",
                 status: "seeded",
                 href: "/ledger/packages"),
             CreatePublicStat(

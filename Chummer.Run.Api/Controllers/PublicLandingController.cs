@@ -9401,20 +9401,20 @@ echo "Help: ${HELP_URL}"
                 string.Equals(faction.Id, selectedFactionId, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(faction.Id.Replace('_', '-'), selectedFactionId, StringComparison.OrdinalIgnoreCase));
         var intro = world?.DeterministicPreview == true
-            ? "This deterministic turn-two board shows how AI interim stewards stay bounded, receipt-backed, and subordinate to verified human takeover."
-            : "A fictional, public-safe seed world with six factions, visible pressure zones, and bounded dispatches.";
+            ? "This turn-two board shows the city reacting to pressure: cleaner routes, harder heat, and faction moves a GM can use."
+            : "A fictional city board with six factions, visible pressure zones, and bounded dispatches.";
         if (selectedFaction is not null)
         {
-            intro = $"Receipt-backed faction page for {selectedFaction.PublicName}. This lane stays public-safe, route-backed, and never publishes private labels or free-floating lore.";
+            intro = $"{selectedFaction.PublicName} faction page. This lane shows public pressure, table hooks, and city movement without exposing private table labels.";
         }
         else if (string.Equals(selectedRulesetId, "anarchy", StringComparison.OrdinalIgnoreCase)
             || string.Equals(selectedRulesetId, AnarchyPreviewService.RulesetId, StringComparison.OrdinalIgnoreCase))
         {
-            intro = "This Anarchy lens reads the same public-safe Black Ledger dispatch receipts through a rules-light play profile. It does not invent separate unsupported fiction or flatten Anarchy into an SR5/SR6 toggle.";
+            intro = "This Anarchy lens reads the same Black Ledger dispatches through a rules-light play profile. It does not invent a separate city or flatten Anarchy into an SR5/SR6 toggle.";
         }
         else if (mapFocused)
         {
-            intro = "Focused command-map view for the seeded Emerald Sprawl world. District pressure, event arcs, and replay controls stay public-safe, route-backed, and visibly distinct from the broader ledger overview.";
+            intro = "Focused command-map view for Emerald Sprawl. District pressure, event arcs, and replay controls stay visibly distinct from the broader ledger overview.";
         }
 
         int newsTurn = requestedTurn ?? world?.CurrentTurn ?? 1;
@@ -9430,7 +9430,7 @@ echo "Help: ${HELP_URL}"
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 selectedFaction?.PublicName ?? "Black Ledger",
-                "Public-safe campaign pressure, package heat, and proof-backed closeout movement.",
+                "Fictional campaign pressure, package heat, and closeout movement.",
                 currentPath,
                 cancellationToken),
             Eyebrow: mapFocused ? "Black Ledger command map" : selectedFaction is null ? "Black Ledger command deck" : "Black Ledger faction file",
