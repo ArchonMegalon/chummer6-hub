@@ -1,6 +1,6 @@
 {
   "contractName": "chummer.run.desktop_release_publication",
-  "generatedAt": "2026-06-02T19:59:54Z",
+  "generatedAt": "2026-06-02T20:55:45Z",
   "artifacts": [
     {
       "artifactId": "avalonia-linux-x64-installer",
@@ -9,12 +9,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.XabaIBTYIF/startup-smoke-avalonia-linux-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.T7L0Osg70e/startup-smoke-avalonia-linux-x64.receipt.json",
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "79168078ad8f61ed8b230cc7cdcf586bd1d9f523a4dfa98a066e3de78c8dcf86",
-      "artifactSizeBytes": 35143640,
+      "artifactSha256": "e1ca88958567c00a7368237d6ef298879e897437238f08caa20bfd9bcf5d8cc8",
+      "artifactSizeBytes": 35144186,
       "kind": "installer"
     },
     {
@@ -24,12 +24,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.XabaIBTYIF/startup-smoke-avalonia-osx-arm64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.T7L0Osg70e/startup-smoke-avalonia-osx-arm64.receipt.json",
       "signingReceiptPath": "/home/runner/work/chummer6-ui/chummer6-ui/dist/signing/signing-avalonia-osx-arm64.receipt.json",
       "signingStatus": "skipped_preview",
       "notarizationStatus": "skipped_preview",
-      "artifactSha256": "cc037322eb725b74df04ac280441e1f674749032e59da2dc955a118f5b691e1f",
-      "artifactSizeBytes": 51690374,
+      "artifactSha256": "570b6af444c6bf947252b7e52d85585ea7f829f826c8fe56c3ef354eef28c4d7",
+      "artifactSizeBytes": 51690382,
       "kind": "installer"
     },
     {
@@ -39,12 +39,12 @@
       "promotionStatus": "pass",
       "startupSmokeStatus": "pass",
       "startupSmokeReason": "",
-      "startupSmokeReceiptPath": "/tmp/tmp.XabaIBTYIF/startup-smoke-avalonia-win-x64.receipt.json",
+      "startupSmokeReceiptPath": "/tmp/tmp.T7L0Osg70e/startup-smoke-avalonia-win-x64.receipt.json",
       "signingReceiptPath": "/home/runner/work/chummer6-ui/chummer6-ui/dist/signing/signing-avalonia-win-x64.receipt.json",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "a81fd1999d75b37c80226750e85437e74274f443169d747b3ada391c3e7c4bed",
-      "artifactSizeBytes": 142401940,
+      "artifactSha256": "369aaf4b41ad41c07e62699a9262ef0048579905d2d6bec08a8e62e7bd56d518",
+      "artifactSizeBytes": 142401849,
       "kind": "installer"
     },
     {
@@ -58,8 +58,8 @@
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "a177589b930c7824867e42ae3081b8ceca1ff3c7ccac4376715f241a0d5ffa85",
-      "artifactSizeBytes": 41018301,
+      "artifactSha256": "1a732a5bfa0717bc0d62832a9db3911eccedf89e9e40161cb4b1e339bf51e711",
+      "artifactSizeBytes": 41018242,
       "kind": "archive"
     },
     {
@@ -73,8 +73,8 @@
       "signingReceiptPath": "",
       "signingStatus": null,
       "notarizationStatus": null,
-      "artifactSha256": "2a832013de912b8cd1d91d471ee5f151a6464b4786762343372977123704dab2",
-      "artifactSizeBytes": 43281178,
+      "artifactSha256": "81f52c91e934a9c563229450daf8fdbc6b2b1b8557e28194ba739aa256ef2027",
+      "artifactSizeBytes": 43281131,
       "kind": "archive"
     },
     {
@@ -88,8 +88,8 @@
       "signingReceiptPath": "/home/runner/work/chummer6-ui/chummer6-ui/dist/signing/signing-avalonia-osx-arm64.receipt.json",
       "signingStatus": "skipped_preview",
       "notarizationStatus": "skipped_preview",
-      "artifactSha256": "18c761de56a6751d1b49710f8051f729512ee4f5281b4eca65a48676f4c465fe",
-      "artifactSizeBytes": 45760072,
+      "artifactSha256": "7ee3a7a6b8451c6485ed4d96b8798dcef1da26c67c1fde0872c56a0ab3014645",
+      "artifactSizeBytes": 45760081,
       "kind": "archive"
     },
     {
@@ -103,7 +103,7 @@
       "signingReceiptPath": "/home/runner/work/chummer6-ui/chummer6-ui/dist/signing/signing-avalonia-win-arm64.receipt.json",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "780e882db30109634cadc1a23b00f9c95cf492ba06d40f2dfc2a56620bdb408b",
+      "artifactSha256": "f21ecc4ae67420de1346785156d5ea5e0976cce451b3403e2f4984db71062ff8",
       "artifactSizeBytes": 116287229,
       "kind": "portable"
     },
@@ -118,8 +118,8 @@
       "signingReceiptPath": "/home/runner/work/chummer6-ui/chummer6-ui/dist/signing/signing-avalonia-win-arm64.receipt.json",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "be51100d5565120bcc3718c793ed9464bd5b2ea36590938fef66dfe462344f81",
-      "artifactSizeBytes": 43364599,
+      "artifactSha256": "5c0b0e78ff57832ed260ad424be7ff705edbe67fb7dce7a8b55b31b4fe99030b",
+      "artifactSizeBytes": 43364592,
       "kind": "archive"
     },
     {
@@ -133,7 +133,7 @@
       "signingReceiptPath": "/home/runner/work/chummer6-ui/chummer6-ui/dist/signing/signing-avalonia-win-x64.receipt.json",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "20337d633baf6e55dba54e3e3c2b8c6e0d8176b60863c37bec56038be372c0ca",
+      "artifactSha256": "bc3fb9e8df2366a48fbaecd8c5f64396ad931e035445853fdd84c67ed6702f87",
       "artifactSizeBytes": 108852971,
       "kind": "portable"
     },
@@ -148,8 +148,8 @@
       "signingReceiptPath": "/home/runner/work/chummer6-ui/chummer6-ui/dist/signing/signing-avalonia-win-x64.receipt.json",
       "signingStatus": "skipped_preview",
       "notarizationStatus": null,
-      "artifactSha256": "7d590e904fc8a9d2f1fe508dc71407f62671f0d4f39e5ff2340b13f4dd6209a0",
-      "artifactSizeBytes": 45265646,
+      "artifactSha256": "8884ad3a46bf582b6a70074bd03fb14a6b43c0f553d8cae3997f3faf8b2b9ae3",
+      "artifactSizeBytes": 45265597,
       "kind": "archive"
     }
   ]
