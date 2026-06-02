@@ -77,7 +77,9 @@ public sealed class BlackLedgerMapTests
         string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
 
         Assert.Contains("id=\"ledger-map\"", view, StringComparison.Ordinal);
-        Assert.Contains("The public globe route now lands on the real earth view", view, StringComparison.Ordinal);
+        Assert.Contains("data-black-ledger-geoscape-root", view, StringComparison.Ordinal);
+        Assert.Contains("data-variant=\"full\"", view, StringComparison.Ordinal);
+        Assert.Contains("data-map-url=\"/api/v1/ledger/worlds/emerald-sprawl-prelude/map", view, StringComparison.Ordinal);
         Assert.DoesNotContain("tactical fallback map", view, StringComparison.Ordinal);
         Assert.DoesNotContain("<svg viewBox=\"0 0 1200 760\"", view, StringComparison.Ordinal);
     }
@@ -86,7 +88,13 @@ public sealed class BlackLedgerMapTests
     public void BlackLedgerMap_geoscape_script_draws_faction_country_borders_from_region_polygons()
     {
         string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "black-ledger-geoscape.js"));
+        string css = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css"));
 
+        Assert.Contains("black-ledger-video-globe-idle.mp4", script, StringComparison.Ordinal);
+        Assert.Contains("black-ledger-video-globe-idle.webm", script, StringComparison.Ordinal);
+        Assert.Contains("black-ledger-video-globe-idle-poster.png", script, StringComparison.Ordinal);
+        Assert.Contains("magicfit-primary", script, StringComparison.Ordinal);
+        Assert.Contains("magicfit-video-globe-with-chummer-overlays", script, StringComparison.Ordinal);
         Assert.Contains("EARTH_LANDMASSES", script, StringComparison.Ordinal);
         Assert.Contains("EARTH_MOUNTAIN_RANGES", script, StringComparison.Ordinal);
         Assert.Contains("getContext('webgl'", script, StringComparison.Ordinal);
@@ -105,6 +113,9 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("drawFactionCountry", script, StringComparison.Ordinal);
         Assert.Contains("countryShapes", script, StringComparison.Ordinal);
         Assert.DoesNotContain("svg_tactical", script, StringComparison.Ordinal);
+        Assert.Contains(".black-ledger-geoscape[data-video-globe=\"ready\"] .black-ledger-geoscape__video-plate", css, StringComparison.Ordinal);
+        Assert.Contains("opacity: 0.94", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("opacity: 0.24", css, StringComparison.Ordinal);
     }
 
     private static IConfiguration BuildSeedConfiguration()

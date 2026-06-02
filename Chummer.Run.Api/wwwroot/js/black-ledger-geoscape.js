@@ -315,7 +315,8 @@ class BlackLedgerGeoscapeRoot {
       const markVideoReady = () => {
         this.videoPlateReady = true;
         this.root.dataset.videoGlobe = 'ready';
-        this.root.dataset.videoLayer = 'ambient';
+        this.root.dataset.videoLayer = 'magicfit-primary';
+        this.root.dataset.rendererContract = 'magicfit-video-globe-with-chummer-overlays';
         if (this.reducedMotion) {
           this.videoPlate.pause();
         } else {
@@ -1037,7 +1038,7 @@ class BlackLedgerGeoscapeRoot {
       this.rotation = (-36 * Math.PI / 180) + phase * TWO_PI;
     }
     if (usedVideoGlobe && this.root.dataset.renderer !== 'webgl-geoscape') {
-      this.root.dataset.videoLayer = 'ambient';
+      this.root.dataset.videoLayer = 'magicfit-primary';
     }
     const usedWebGl = this.renderWebGlBase(time, width, height, radius);
     if (!usedWebGl) {

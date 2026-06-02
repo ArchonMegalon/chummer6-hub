@@ -7078,24 +7078,41 @@ body {
 }
 
 .black-ledger-geoscape__webgl {
-  z-index: 1;
+  z-index: 2;
+  opacity: 0.28;
+  mix-blend-mode: screen;
+  pointer-events: none;
 }
 
 .black-ledger-geoscape__video-plate {
-  z-index: 0;
+  z-index: 1;
   object-fit: cover;
   opacity: 0;
-  filter: saturate(1.04) contrast(1.05) brightness(0.56) blur(0.5px);
+  filter: saturate(1.12) contrast(1.08) brightness(0.92);
   transition: opacity 220ms ease;
 }
 
 .black-ledger-geoscape[data-video-globe="ready"] .black-ledger-geoscape__video-plate {
-  opacity: 0.24;
+  opacity: 0.94;
+}
+
+.black-ledger-geoscape[data-video-globe="ready"] .black-ledger-geoscape__stage-skin {
+  opacity: 0.08;
+}
+
+.black-ledger-geoscape[data-video-globe="ready"] .black-ledger-geoscape__webgl {
+  opacity: 0.18;
 }
 
 .black-ledger-geoscape__canvas {
   min-height: 470px;
-  z-index: 2;
+  z-index: 3;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.black-ledger-geoscape[data-video-globe="ready"] .black-ledger-geoscape__canvas {
+  opacity: 0.72;
 }
 
 .black-ledger-geoscape__overlay {
