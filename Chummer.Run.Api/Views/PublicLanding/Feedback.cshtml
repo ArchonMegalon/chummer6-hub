@@ -35,7 +35,7 @@
         {
             Badge = "Changelog",
             Title = "Check what is actually available now",
-            Summary = "When you need to know whether something is ready today, switch to the changelog backed by releases, live pages, guides, and proof.",
+            Summary = "When you need to know whether something is ready today, switch to the changelog backed by releases, live pages, and guides.",
             Href = "/changelog",
             Label = "Open changelog",
             Proof = new[] { "Evidence first", "User-available", "Release-linked" }
@@ -44,7 +44,7 @@
         {
             Badge = "Private help",
             Title = "Installs, crashes, account issues, and private table detail leave this page",
-            Summary = "Use first-party help when the problem needs logs, recovery, support history, or any private account or campaign detail that should not sit on a public board.",
+            Summary = "Use Chummer help when the problem needs logs, recovery, support history, or any private account or campaign detail that should not sit on a public board.",
             Href = "/contact#support-intake",
             Label = "Need private help instead?",
             Proof = new[] { "Support-owned", "Tracked return", "Private by default" }
@@ -83,8 +83,8 @@
         {
             Badge = "Take it private",
             Title = "Move to help when the issue stops being public",
-            Summary = "If the issue needs recovery, logs, support follow-through, or account detail, push it onto the first-party help path early instead of keeping it on a public signal page.",
-            Proof = "Private help stays first-party even while the hosted public mirror catches up.",
+            Summary = "If the issue needs recovery, logs, support follow-through, or account detail, move it to Chummer help early instead of keeping it on a public signal page.",
+            Proof = "Private help stays in Chummer even while the hosted public mirror catches up.",
             Href = "/help",
             Label = "Open help"
         }
@@ -111,7 +111,7 @@
         {
             Badge = "Private boundary",
             Title = "Move off the board as soon as the issue stops being public",
-            Summary = "Crashes, logs, account repair, install recovery, and private campaign detail belong on first-party help before they leak into public comments.",
+            Summary = "Crashes, logs, account repair, install recovery, and private campaign detail belong on Chummer help before they leak into public comments.",
             Href = "/contact#support-intake",
             Label = "Open private support"
         }
@@ -122,9 +122,9 @@
 {
     <section class="editorial-block">
         <div class="editorial-block__lead">
-            <p class="eyebrow">Projection boundary</p>
-            <h2 class="editorial-title">Public feedback can show direction without pretending to be release truth.</h2>
-            <p class="editorial-copy">This packet keeps the public board subordinate to first-party truth, fallback, and shipped closeout before feature demand becomes public celebration.</p>
+            <p class="eyebrow">Feedback boundary</p>
+            <h2 class="editorial-title">Public feedback can show direction without pretending something already shipped.</h2>
+            <p class="editorial-copy">This packet keeps the public board connected to Chummer review before feature demand becomes public celebration.</p>
         </div>
         <div class="support-operations-panel">
             @await Html.PartialAsync("~/Views/Shared/_PublicSignalProjectionPacket.cshtml", signalProjection)
@@ -137,8 +137,8 @@
     <section class="editorial-block">
         <div class="editorial-block__lead">
             <p class="eyebrow">Operations packet</p>
-            <h2 class="editorial-title">Hosted signal promotion still needs ingress, routing, and closeout discipline.</h2>
-            <p class="editorial-copy">The public board earns trust only when promotion, taxonomy, intake, and closeout routes remain inspectable instead of becoming vibes.</p>
+            <h2 class="editorial-title">Hosted signal promotion still needs intake, routing, and follow-through discipline.</h2>
+            <p class="editorial-copy">The public board earns trust only when promotion, taxonomy, intake, and update routes remain inspectable instead of becoming vibes.</p>
         </div>
         <div class="support-operations-panel">
             @await Html.PartialAsync("~/Views/Shared/_PublicSignalOperationsPacket.cshtml", signalOperations)
@@ -176,7 +176,7 @@
     <article class="status-decision-strip__card">
         <span class="tag">Shipped today</span>
         <h2>@signalLoop.ShippedFollowUpCount live example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show what people can use now.</h2>
-        <p>When the question is what works today, switch to the changelog and current proof instead of staying on the feedback page.</p>
+        <p>When the question is what works today, switch to the changelog and current release notes instead of staying on the feedback page.</p>
         <a class="button-like button-like--ghost" href="/changelog">Open changelog</a>
     </article>
     <article class="status-decision-strip__card">
@@ -190,7 +190,7 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Pick the right page</p>
-        <h2 class="editorial-title">Public signal, roadmap direction, shipped proof, and private support should not blur together.</h2>
+        <h2 class="editorial-title">Public signal, roadmap direction, shipped updates, and private support should not blur together.</h2>
         <p class="editorial-copy">The experience is calmer when each job has one page and one promise. Feedback starts the conversation; it is not the shipped status page or the private support inbox.</p>
     </div>
     <div class="route-choice-grid">
@@ -216,7 +216,7 @@
     <div class="workflow-band__lead">
         <p class="eyebrow">Signal loop</p>
         <h2 class="editorial-title">A public signal should start in one place and end on a page people can actually use.</h2>
-        <p class="editorial-copy">This keeps public feedback visible without pretending that comments are the same thing as roadmap commitments, shipped proof, or private support. Public feedback can still show demand, but account-backed follow-up stays off until shipped proof and first-party closeout receipts are both real on this host.</p>
+        <p class="editorial-copy">This keeps public feedback visible without pretending that comments are the same thing as roadmap commitments, shipped updates, or private support. Public feedback can still show demand, while account-backed follow-up waits until the shipped path is available on this host.</p>
     </div>
     <div class="workflow-grid">
         @foreach (var stage in signalStages)
@@ -236,9 +236,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Closeout posture</p>
+        <p class="eyebrow">Follow-through posture</p>
         <h2 class="editorial-title">Shipped follow-through stays upstream of public celebration.</h2>
-        <p class="editorial-copy">First-party follow-up is still preview-only on this host. The public board can show demand now, but shipped follow-through only lands after shipped proof and first-party receipts agree.</p>
+        <p class="editorial-copy">Chummer follow-up is still preview-only on this host. The public board can show demand now, but shipped follow-through only lands after the update path is ready.</p>
     </div>
 </section>
 
@@ -260,7 +260,7 @@
             <div class="lane-strip__copy">
                 <span class="tag">Current public pages</span>
                 <h2>Safe public signal starts here</h2>
-                <p>These first-party pages keep feedback visible and easy to follow without bouncing people across aliases or private support paths.</p>
+                <p>These Chummer pages keep feedback visible and easy to follow without bouncing people across aliases or private support paths.</p>
                 <div class="compact-rail">
                     @foreach (var card in Model.PublicLane)
                     {
@@ -312,7 +312,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Follow-through</p>
         <h2 class="editorial-title">One public signal should connect to a roadmap page, a shipped page, or a help page.</h2>
-        <p class="editorial-copy">Public feedback stays first-party. Follow-through can stay visible without turning this page into an operations board.</p>
+        <p class="editorial-copy">Public feedback stays in Chummer. Follow-through can stay visible without turning this page into an operations board.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -339,7 +339,7 @@
         <article class="route-choice-card">
             <span class="tag">What might come next</span>
             <h3>What public movement looks like before anything is called shipped</h3>
-            <p>The next public explanation should land on a named horizon with a truthful next page, not as a promise buried in feedback replies.</p>
+            <p>The next public explanation should land on a named horizon with a clear next page, not as a promise buried in feedback replies.</p>
             @if (roadmapFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -360,7 +360,7 @@
         <article class="route-choice-card">
             <span class="tag">What works today</span>
             <h3>What a real shipped example already looks like</h3>
-            <p>Public signal only closes when a release, live page, or guide lets a person actually reach the result. That evidence lives here, not in a vote count.</p>
+            <p>Public signal only closes when a release, live page, or guide lets a person actually reach the result. That record lives here, not in a vote count.</p>
             @if (shippedFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -390,5 +390,5 @@
         <a class="cta-link cta-link--secondary" href="/roadmap">Open roadmap</a>
         <a class="cta-link cta-link--ghost" href="/help">Open help</a>
     </div>
-    <p class="muted-copy">Truth stays split on purpose: <a class="inline-link" href="/feedback">public signal</a>, <a class="inline-link" href="/roadmap">projected movement</a>, <a class="inline-link" href="/changelog">shipped updates</a>, and <a class="inline-link" href="/help">private follow-up</a>.</p>
+    <p class="muted-copy">The paths stay split on purpose: <a class="inline-link" href="/feedback">public signal</a>, <a class="inline-link" href="/roadmap">planned movement</a>, <a class="inline-link" href="/changelog">shipped updates</a>, and <a class="inline-link" href="/help">private follow-up</a>.</p>
 </section>

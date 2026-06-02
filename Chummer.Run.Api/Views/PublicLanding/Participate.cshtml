@@ -24,7 +24,7 @@
             Id = "public-feedback-lane",
             Eyebrow = "Field Reports",
             Title = "Public ideas and safe bug reports",
-            Summary = "Use the public signal page for feature requests, safe public bugs, and help-copy gaps. Keep crashes, install failures, account issues, and private campaign details on first-party help pages instead.",
+            Summary = "Use the public signal page for feature requests, safe public bugs, and help-copy gaps. Keep crashes, install failures, account issues, and private campaign details on Chummer help pages instead.",
             Href = "/feedback",
             Label = "Open public feedback",
             Proof = new[] { "Public posts", "No private logs", "Category routing" }
@@ -37,17 +37,17 @@
             Summary = "Roadmap cards show where the product may move next. Votes help show demand, but they do not decide priority by themselves.",
             Href = "/roadmap",
             Label = "Open roadmap",
-            Proof = new[] { "Direction only", "First-party fallback", "No vote authority" }
+            Proof = new[] { "Direction only", "Chummer help path", "No vote authority" }
         },
         new
         {
             Id = "public-changelog-lane",
             Eyebrow = "Shipped updates",
             Title = "Shipped means user-available, not only merged",
-            Summary = "Release notes and public follow-up should only move after real release, guide, live page, or proof evidence exists. The changelog should stay attached to what works today.",
+            Summary = "Release notes and public follow-up should only move after a real release, guide, or live page exists. The changelog should stay attached to what works today.",
             Href = "/changelog",
             Label = "Open shipped updates",
-            Proof = new[] { "Closeout evidence", "User availability", "Release-linked" }
+            Proof = new[] { "Reviewed update", "User availability", "Release-linked" }
         }
     };
     var signalStages = new[]
@@ -63,28 +63,28 @@
         },
         new
         {
-            Badge = "Governed review",
+            Badge = "Chummer review",
             Title = "Review and decide before promising anything",
-            Summary = "First-party triage decides whether the signal becomes follow-up, research, milestone work, or a public decline with reason.",
+            Summary = "Chummer triage decides whether the signal becomes follow-up, research, milestone work, or a public decline with reason.",
             Proof = "Votes inform demand; they do not decide the roadmap by themselves.",
             Href = "/roadmap",
             Label = "See public direction"
         },
         new
         {
-            Badge = "Availability proof",
-            Title = "Prove real user availability",
-            Summary = "A planned or shipped public claim needs Chummer-owned evidence, not only enthusiasm or merged code.",
-            Proof = "Release, guide, Hub page, or artifact proof must exist.",
+            Badge = "Availability check",
+            Title = "Show real user availability",
+            Summary = "A planned or shipped public claim needs a reachable release, guide, or live page, not only enthusiasm or merged code.",
+            Proof = "Release, guide, or Hub page must exist.",
             Href = "/now",
             Label = "Open what works today"
         },
         new
         {
-            Badge = "Closeout",
-            Title = "Notify and document after the proof exists",
+            Badge = "Follow-through",
+            Title = "Notify and document after the update exists",
             Summary = "Only then should the public changelog, voter notices, and help copy close the loop back to the original request.",
-            Proof = "First-party help and status pages stay live even if hosted mirroring is down.",
+            Proof = "Chummer help and status pages stay live even if hosted mirroring is down.",
             Href = "/help",
             Label = "Open help hub"
         }
@@ -104,16 +104,16 @@
         {
             Badge = "Follow movement",
             Title = "Want to know whether an idea is moving",
-            Summary = "Use the roadmap projection when you need public direction and readiness posture, not a promise that votes alone decide priority.",
+            Summary = "Use the roadmap when you need public direction and readiness posture, not a promise that votes alone decide priority.",
             Href = "/roadmap",
             Label = "Open roadmap",
             Proof = new[] { "Direction only", "Milestone-backed", "No vote authority" }
         },
         new
         {
-            Badge = "Need shipped proof",
+            Badge = "Need shipped status",
             Title = "Need to know whether something is real today",
-            Summary = "Use shipped updates when you need release truth, guide proof, or user-available evidence instead of merged-code optimism.",
+            Summary = "Use shipped updates when you need release status, guides, or user-available results instead of merged-code optimism.",
             Href = "/changelog",
             Label = "Open shipped updates",
             Proof = new[] { "Release-linked", "Guide-backed", "Available now" }
@@ -139,7 +139,7 @@
         <a class="button-like button-like--secondary" href="/contact#support-intake">Report a problem</a>
         <a class="button-like button-like--ghost" href="@betaHref">Join beta waitlist</a>
     </div>
-    <p class="muted-copy">Follow an item to hear when it actually changes. Votes show demand; Chummer-owned proof decides what ships. Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
+    <p class="muted-copy">Follow an item to hear when it actually changes. Votes show demand; Chummer review decides what ships. Guided contribution and other signed-in programs stay below the fold so the public next step stays obvious.</p>
 </section>
 
 <section class="status-decision-strip" aria-label="Participation loop snapshot">
@@ -156,9 +156,9 @@
         <a class="button-like button-like--ghost" href="/roadmap#roadmap-horizons">Browse horizons</a>
     </article>
     <article class="status-decision-strip__card">
-        <span class="tag">Closeout exists</span>
-        <h2>@signalLoop.ShippedFollowUpCount reviewed closeout example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show the loop can finish honestly.</h2>
-        <p>The public board is not just intake. It already has a separate shipped updates page where evidence-backed outcomes can land.</p>
+        <span class="tag">Shipped path exists</span>
+        <h2>@signalLoop.ShippedFollowUpCount reviewed shipped example@(signalLoop.ShippedFollowUpCount == 1 ? string.Empty : "s") already show the loop can finish clearly.</h2>
+        <p>The public board is not just intake. It already has a separate shipped updates page where finished outcomes can land.</p>
         <a class="button-like button-like--ghost" href="/changelog">Open shipped updates</a>
     </article>
 </section>
@@ -167,7 +167,7 @@
     <div class="trust-claims__lead">
         <p class="eyebrow">Public loop</p>
         <h2 class="editorial-title">Feedback, roadmap, and shipped updates stay visible without pretending to be the same thing.</h2>
-        <p class="editorial-copy">This page keeps the broader participation story visible while the dedicated pages stay honest about what they can promise today and how they connect back to help, release truth, and current proof.</p>
+        <p class="editorial-copy">This page keeps the broader participation story visible while the dedicated pages stay honest about what they can promise today and how they connect back to help, shipped updates, and what works now.</p>
         @if (fromFeedbackAlias)
         {
             <div class="route-callout" role="status" aria-live="polite">
@@ -176,7 +176,7 @@
                 <div class="route-callout__proof">
                     <span>Public by default</span>
                     <span>No private logs</span>
-                    <span>Support stays first-party</span>
+                    <span>Support stays in Chummer</span>
                 </div>
                 <div class="route-callout__actions">
                     <a class="inline-link" href="/feedback">Open feedback</a>
@@ -209,7 +209,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Pick the right page</p>
         <h2 class="editorial-title">Use the public page only when the work can stay public.</h2>
-        <p class="editorial-copy">This cut reduces misrouted public-board posts and keeps support, release truth, and roadmap interpretation on the calmer first-party pages that can actually carry them.</p>
+        <p class="editorial-copy">This cut reduces misrouted public-board posts and keeps support, shipped status, and roadmap interpretation on the calmer Chummer pages that can actually carry them.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -242,7 +242,7 @@
             <article class="route-choice-card">
                 <span class="tag">@buildGhost.StatusLabel</span>
                 <h3>Public concierge and boundary explainer can help open the lane</h3>
-                <p>The actual Build Ghost compare and apply truth still stays inside first-party Chummer runtime and receipts.</p>
+                <p>The actual Build Ghost compare and apply behavior still stays inside the Chummer runtime and account records.</p>
                 <div class="route-choice-card__proof">
                     @foreach (var item in buildGhost.ProofPoints)
                     {
@@ -258,7 +258,7 @@
 <section class="workflow-band">
     <div class="workflow-band__lead">
         <p class="eyebrow">Public loop</p>
-        <h2 class="editorial-title">Keep the public loop visible, but keep authority inside Chummer-owned truth.</h2>
+        <h2 class="editorial-title">Keep the public loop visible, but keep authority inside Chummer.</h2>
         <p class="editorial-copy">The public path should feel simple: one place to post signal, one place to follow movement, and one honest shipped update path when the feature is actually available.</p>
     </div>
     <div class="workflow-grid">
@@ -282,7 +282,7 @@
     <section class="editorial-block" id="behuman-event-posture">
         <div class="editorial-block__lead">
             <p class="eyebrow">Community event venue boundary</p>
-            <h2 class="editorial-title">BeHuman can help host public community events, but it does not get product truth.</h2>
+        <h2 class="editorial-title">BeHuman can help host public community events, but it does not get product authority.</h2>
             <p class="editorial-copy">@beHuman.Summary</p>
         </div>
         <div class="route-choice-grid">
@@ -297,7 +297,7 @@
                     }
                     else
                     {
-                        <span>Capacity stays unclaimed until a verified first-party receipt exists.</span>
+                        <span>Capacity stays unclaimed until Chummer has a verified record.</span>
                     }
                 </p>
             </article>
@@ -312,7 +312,7 @@
                 </div>
             </article>
             <article class="route-choice-card">
-                <span class="tag">Forbidden truth domains</span>
+                <span class="tag">Not delegated</span>
                 <h3>Chummer keeps the authority</h3>
                 <div class="route-choice-card__proof">
                     @foreach (var truthDomain in beHuman.ForbiddenTruthDomains)
@@ -328,8 +328,8 @@
 <section class="editorial-block">
     <div class="editorial-block__lead">
         <p class="eyebrow">Loop in motion</p>
-        <h2 class="editorial-title">Participation is easier to trust when the public loop points at live milestones, named horizons, and reviewed closeout.</h2>
-        <p class="editorial-copy">This keeps participation grounded in the same first-party pages that already carry product decisions instead of reading like a detached community shell.</p>
+        <h2 class="editorial-title">Participation is easier to trust when the public loop points at live milestones, named horizons, and reviewed shipped updates.</h2>
+        <p class="editorial-copy">This keeps participation grounded in the same Chummer pages that already carry product decisions instead of reading like a detached community shell.</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -375,9 +375,9 @@
             <a class="editorial-strip__action" href="/roadmap#roadmap-horizons">Browse horizons</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Real closeout</span>
-            <h3>Proof that the loop can actually close</h3>
-            <p>These shipped examples keep participation honest by showing what evidence-backed closeout already looks like on the public surface.</p>
+            <span class="tag">Shipped updates</span>
+            <h3>Examples that show the loop can actually finish</h3>
+            <p>These shipped examples keep participation honest by showing what reviewed outcomes already look like on the public surface.</p>
             @if (shippedFollowUp.Length > 0)
             {
                 <div class="compact-rail">
@@ -452,10 +452,10 @@
 <section class="release-footnote">
     <p class="eyebrow">Current page posture</p>
     <h2 class="editorial-title">Broader participation stays separate from the dedicated public-signal loop.</h2>
-    <p class="editorial-copy">The current Chummer-owned loop is explicit now: public feedback lives on <code class="mono-receipt">/feedback</code>, projected movement lives on <code class="mono-receipt">/roadmap</code>, and shipped updates live on <code class="mono-receipt">/changelog</code>. This page stays focused on broader participation and optional signed-in paths while hosted mirroring remains downstream of first-party proof.</p>
+    <p class="editorial-copy">The current Chummer loop is explicit now: public feedback lives on <code class="mono-receipt">/feedback</code>, planned movement lives on <code class="mono-receipt">/roadmap</code>, and shipped updates live on <code class="mono-receipt">/changelog</code>. This page stays focused on broader participation and optional signed-in paths while hosted mirroring remains downstream of Chummer review.</p>
     <p class="muted-copy">
         Need public signal? <a class="inline-link" href="/feedback">Open feedback</a>.
-        Need current release truth? <a class="inline-link" href="/changelog">Open shipped updates</a>.
+        Need current release status? <a class="inline-link" href="/changelog">Open shipped updates</a>.
         Need public direction? <a class="inline-link" href="/roadmap">Open roadmap</a>.
     </p>
 </section>

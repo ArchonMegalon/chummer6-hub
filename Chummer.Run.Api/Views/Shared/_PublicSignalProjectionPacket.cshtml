@@ -36,10 +36,14 @@
             .Replace("Release Truth", "Release status", StringComparison.OrdinalIgnoreCase)
             .Replace("Support Case Truth", "Support cases", StringComparison.OrdinalIgnoreCase)
             .Replace("Implementation Priority", "Implementation priority", StringComparison.OrdinalIgnoreCase)
+            .Replace("Public Signal To Canon Pipeline", "Public Signal Review Pipeline", StringComparison.OrdinalIgnoreCase)
+            .Replace("Canon is decided by Chummer", "Product decisions happen in Chummer", StringComparison.OrdinalIgnoreCase)
+            .Replace("canonical patch or milestone", "product record or milestone", StringComparison.OrdinalIgnoreCase)
+            .Replace("canonical", "product record", StringComparison.OrdinalIgnoreCase)
+            .Replace("canon", "product decisions", StringComparison.OrdinalIgnoreCase)
             .Replace("projection-only", "public-view only", StringComparison.OrdinalIgnoreCase)
             .Replace("projection", "public view", StringComparison.OrdinalIgnoreCase)
-            .Replace("canonical patch or milestone", "product record or milestone", StringComparison.OrdinalIgnoreCase)
-            .Replace("Product Governor", "governed product decision", StringComparison.OrdinalIgnoreCase)
+            .Replace("Product Governor", "product decision", StringComparison.OrdinalIgnoreCase)
             .Replace("ProductLift", "public feedback board", StringComparison.OrdinalIgnoreCase)
             .Replace("EA synthesis", "product review", StringComparison.OrdinalIgnoreCase)
             .Replace("productlift_idea_clustered", "public feedback signal", StringComparison.OrdinalIgnoreCase)
@@ -80,9 +84,9 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">@Model.Eyebrow</p>
-        <h2 class="editorial-title">@Model.Heading</h2>
-        <p class="editorial-copy">@Model.Summary</p>
+        <p class="eyebrow">@SanitizeProjectionText(Model.Eyebrow)</p>
+        <h2 class="editorial-title">@SanitizeProjectionText(Model.Heading)</h2>
+        <p class="editorial-copy">@SanitizeProjectionText(Model.Summary)</p>
     </div>
     <div class="route-choice-grid">
         <article class="route-choice-card">
@@ -99,7 +103,7 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Core rule</span>
-            <h3>@Model.CoreRule</h3>
+            <h3>@SanitizeProjectionText(Model.CoreRule)</h3>
             <p>The public board can collect visible demand, but Chummer review still decides what changes.</p>
             @if (authorityFlow.Length > 0)
             {
