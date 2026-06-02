@@ -1056,8 +1056,19 @@ public sealed class BlackLedgerPublicStatsService
         => (faction.Stats ?? new Dictionary<string, int>())
             .OrderByDescending(static pair => pair.Value)
             .Take(3)
-            .Select(static pair => $"{pair.Key.Replace('_', ' ')} {pair.Value}")
+            .Select(static pair => $"{ResolvePublicMetricLabel(pair.Key)} {pair.Value}")
             .ToArray();
+
+    private static string ResolvePublicMetricLabel(string metric)
+        => metric switch
+        {
+            "license_polish" => "permit leverage",
+            "proof_trail_strength" => "signal discipline",
+            "mysad_density" => "mystic density",
+            "vehicle_package_demand" => "vehicle demand",
+            "closeout_witnesses" => "street witnesses",
+            _ => metric.Replace('_', ' '),
+        };
 
     private static string BuildDistrictSummary(BlackLedgerDistrictDocument district)
         => $"{district.Name} is led by {GetDominantFactionId(district).Replace('_', ' ')} with influence {district.Influence} and heat {district.Heat}.";
