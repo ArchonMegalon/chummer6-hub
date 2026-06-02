@@ -62,10 +62,10 @@ def _flagship_readiness_path() -> Path:
     raw = str(os.environ.get("CHUMMER_FLAGSHIP_PRODUCT_READINESS_PATH") or "").strip()
     if raw:
         return Path(raw)
-    if FALLBACK_FLAGSHIP_READINESS_PATH.is_file():
-        return FALLBACK_FLAGSHIP_READINESS_PATH
     if DEFAULT_FLAGSHIP_READINESS_PATH.is_file():
         return DEFAULT_FLAGSHIP_READINESS_PATH
+    if FALLBACK_FLAGSHIP_READINESS_PATH.is_file():
+        return FALLBACK_FLAGSHIP_READINESS_PATH
     return FALLBACK_FLAGSHIP_READINESS_PATH
 
 

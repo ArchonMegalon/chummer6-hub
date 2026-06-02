@@ -202,7 +202,9 @@ public sealed class BlackLedgerStatsViewTests
         var deterministicBriefing = service.BuildWorldTurnBriefing(2);
         Assert.NotNull(deterministicBriefing);
         Assert.Equal(2, deterministicBriefing!.ToTurn);
-        Assert.Equal("/ledger/turns/2#newsreel-player", deterministicBriefing.Broadcast!.WatchHref);
+        Assert.Equal("/ledger/newsroom/turn-2-newsreel", deterministicBriefing.Broadcast!.WatchHref);
+        Assert.Equal("/ledger/newsroom/turn-2-newsreel/transcript", deterministicBriefing.Broadcast.TranscriptHref);
+        Assert.Equal("/ledger/newsroom/turn-2-newsreel/receipts", deterministicBriefing.Broadcast.ReceiptsHref);
         Assert.Contains("/media/ledger/newsreels/turn-2-newsreel.mp4", deterministicBriefing.Broadcast.VideoMp4Href, System.StringComparison.Ordinal);
     }
 

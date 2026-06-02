@@ -329,6 +329,8 @@ def derive_verifier_owned_value(name: str, current_value):
 
 def assert_desktop_surface_ref_consistency(local_payload: dict) -> None:
     artifacts = local_payload.get("artifacts") or []
+    if not artifacts:
+        return
     artifact_ids = {
         normalized_token(item.get("artifactId") or item.get("id"))
         for item in artifacts

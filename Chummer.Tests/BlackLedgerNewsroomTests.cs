@@ -31,7 +31,9 @@ public sealed class BlackLedgerNewsroomTests
         Assert.Contains("ReconstructionNote", siteViewModels, StringComparison.Ordinal);
         Assert.Contains("FeedbackHref", siteViewModels, StringComparison.Ordinal);
 
-        Assert.Contains("string watchHref = $\"{ledgerBasePath.TrimEnd('/')}/turns/{tick.Turn}#newsreel-player\";", briefingService, StringComparison.Ordinal);
+        Assert.Contains("string watchHref = $\"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}\";", briefingService, StringComparison.Ordinal);
+        Assert.Contains("string transcriptHref = $\"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}/transcript\";", briefingService, StringComparison.Ordinal);
+        Assert.Contains("string receiptsHref = $\"{ledgerBasePath.TrimEnd('/')}/newsroom/{slug}/receipts\";", briefingService, StringComparison.Ordinal);
         Assert.Contains("Public-safe bulletin built from aggregate Black Ledger world receipts.", briefingService, StringComparison.Ordinal);
         Assert.Contains("Some footage is reconstructed from public-safe receipts.", briefingService, StringComparison.Ordinal);
     }
