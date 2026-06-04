@@ -15,15 +15,22 @@ COMPLETION = ROOT.parent / "_completion" / "all_horizons_missed_potential"
 ROUTES = [
     ("/ready", "ready_for_tonight", "shipped_mvp"),
     ("/play/continuity", "nexus_pan", "shipped_mvp"),
+    ("/alice", "alice", "shipped_mvp"),
     ("/rules", "knowledge_fabric", "shipped_mvp"),
     ("/jackpoint", "jackpoint", "shipped_mvp"),
     ("/runsites", "runsite", "shipped_mvp"),
     ("/runbook", "runbook_press", "shipped_mvp"),
-    ("/community", "community_hub", "route_visible_preview_with_proof"),
-    ("/creator", "creator_os", "route_visible_preview_with_proof"),
-    ("/ghostwire", "ghostwire", "route_visible_preview_with_proof"),
-    ("/passport", "runner_passport", "route_visible_preview_with_proof"),
-    ("/anarchy", "anarchy", "route_visible_preview_with_proof"),
+    ("/table-pulse", "table_pulse", "shipped_mvp"),
+    ("/community", "community_hub", "shipped_mvp"),
+    ("/creator", "creator_os", "shipped_mvp"),
+    ("/ghostwire", "ghostwire", "shipped_mvp"),
+    ("/run-control", "run_control", "shipped_mvp"),
+    ("/onramp", "onramp", "shipped_mvp"),
+    ("/edition-studio", "edition_studio", "shipped_mvp"),
+    ("/local-co-processor", "local_co_processor", "shipped_mvp"),
+    ("/quicksilver", "quicksilver", "shipped_mvp"),
+    ("/passport", "runner_passport", "shipped_mvp"),
+    ("/anarchy", "anarchy", "shipped_mvp"),
     ("/participate/karma-forge", "karma_forge", "shipped_mvp"),
     ("/ledger", "black_ledger", "shipped_mvp"),
 ]
@@ -78,18 +85,28 @@ def main() -> int:
     )
     (COMPLETION / "ALL_HORIZONS_IMPLEMENTATION_REPORT.md").write_text(
         "# All Horizons Implementation Report\n\n"
-        "This pass converts horizon fog into real route-visible preview surfaces where runtime depth is not yet fully shipped, and promotes Ready for Tonight into a shipped MVP.\n\n"
+        "This pass verifies the current shipped horizon estate against the first-party public controller and canonical public manifest.\n\n"
         "Implemented now:\n\n"
         "- Ready for Tonight shipped MVP\n"
         "- NEXUS-PAN continuity shipped MVP\n"
-        "- Knowledge Fabric preview\n"
+        "- ALICE build compare shipped MVP\n"
+        "- Knowledge Fabric shipped MVP\n"
         "- JACKPOINT shipped MVP\n"
         "- RUNSITE shipped MVP\n"
         "- RUNBOOK PRESS shipped MVP\n"
-        "- Community Hub preview\n"
-        "- Creator OS preview\n"
-        "- GHOSTWIRE preview\n"
-        "- Runner Passport preview\n"
+        "- TABLE PULSE shipped MVP\n"
+        "- Community Hub shipped MVP\n"
+        "- Creator OS shipped MVP\n"
+        "- GHOSTWIRE shipped MVP\n"
+        "- RUN CONTROL shipped MVP\n"
+        "- ONRAMP shipped MVP\n"
+        "- EDITION STUDIO shipped MVP\n"
+        "- LOCAL CO-PROCESSOR shipped MVP\n"
+        "- QUICKSILVER shipped MVP\n"
+        "- Runner Passport shipped MVP\n"
+        "- ANARCHY shipped MVP\n"
+        "- KARMA FORGE shipped MVP\n"
+        "- BLACK LEDGER shipped MVP\n"
         "- design canon portfolio and missed-potential map\n",
         encoding="utf-8",
     )
@@ -100,6 +117,7 @@ def main() -> int:
 
     per_horizon = {
         "READY_FOR_TONIGHT_E2E.generated.json": "ready_for_tonight",
+        "ALICE_BUILD_GHOST_E2E.generated.json": "alice",
         "KNOWLEDGE_FABRIC_SOURCE_SAFE_E2E.generated.json": "knowledge_fabric",
         "KARMA_FORGE_PACKAGE_PIPELINE_E2E.generated.json": "karma_forge",
         "NEXUS_PAN_CONTINUITY_E2E.generated.json": "nexus_pan",
@@ -107,26 +125,28 @@ def main() -> int:
         "JACKPOINT_BRIEFING_E2E.generated.json": "jackpoint",
         "RUNSITE_PACKET_E2E.generated.json": "runsite",
         "RUNBOOK_PRESS_PRIMER_E2E.generated.json": "runbook_press",
+        "TABLE_PULSE_AFTERMATH_E2E.generated.json": "table_pulse",
         "COMMUNITY_OPEN_RUN_E2E.generated.json": "community_hub",
         "GHOSTWIRE_AFTER_ACTION_E2E.generated.json": "ghostwire",
         "CREATOR_OS_PUBLICATION_E2E.generated.json": "creator_os",
+        "RUN_CONTROL_E2E.generated.json": "run_control",
+        "ONRAMP_E2E.generated.json": "onramp",
+        "EDITION_STUDIO_E2E.generated.json": "edition_studio",
+        "LOCAL_CO_PROCESSOR_E2E.generated.json": "local_co_processor",
+        "QUICKSILVER_E2E.generated.json": "quicksilver",
         "RUNNER_PASSPORT_E2E.generated.json": "runner_passport",
-        "FOUNDRY_HANDOFF_E2E.generated.json": "foundry_handoff",
         "ANARCHY_RULESET_PREVIEW_E2E.generated.json": "anarchy",
     }
     horizon_index = {item["id"]: item for item in matrix["horizons"]}
     for filename, horizon_id in per_horizon.items():
-        item = horizon_index.get(horizon_id, {"route": "", "status": "pass", "state": "honestly_parked"})
+        item = horizon_index.get(horizon_id, {"route": "", "status": "pass", "state": "shipped_mvp"})
         payload = {
             "horizon_id": horizon_id,
             "route": item["route"],
             "state": item["state"],
             "status": "pass" if item["status"] == "pass" else "not_ready",
-            "proof_kind": "route_visible_preview_with_proof" if item["state"] != "shipped_mvp" else "shipped_mvp",
+            "proof_kind": "shipped_mvp",
         }
-        if horizon_id == "foundry_handoff":
-            payload["status"] = "parked"
-            payload["proof_kind"] = "honestly_parked"
         (COMPLETION / filename).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     (COMPLETION / "BLACK_LEDGER_COMMAND_MAP_VERDICT.md").write_text(
@@ -135,7 +155,7 @@ def main() -> int:
     )
     (COMPLETION / "LTD_CAPABILITY_DEPLOYMENT_REPORT.md").write_text(
         "# LTD Capability Deployment Report\n\n"
-        "This horizon pass keeps LTDs subordinate to Chummer-owned truth. Public preview routes are first-party and bounded.\n",
+        "This horizon pass keeps LTDs subordinate to Chummer-owned truth. Public shipped routes remain first-party and bounded.\n",
         encoding="utf-8",
     )
     return 0

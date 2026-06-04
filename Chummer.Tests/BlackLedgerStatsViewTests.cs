@@ -187,6 +187,10 @@ public sealed class BlackLedgerStatsViewTests
         Assert.Contains("Turn 0", briefing.TransitionNarrative, System.StringComparison.Ordinal);
         Assert.Contains("newsreel.json", briefing.ValidationJsonHref, System.StringComparison.Ordinal);
         Assert.NotNull(briefing.Broadcast);
+        Assert.Equal("FIRST_PARTY_NEWSREEL", briefing.Broadcast!.ProviderStatus);
+        Assert.Equal("first_party_anchor_bulletin", briefing.Broadcast.RenderMode);
+        Assert.NotEmpty(briefing.Broadcast.ScreenplayScenes);
+        Assert.Contains(briefing.Broadcast.ScreenplayScenes, scene => string.Equals(scene.Label, "Anchor Open", System.StringComparison.Ordinal));
         Assert.Contains("/media/ledger/newsreels/turn-1-newsreel.mp4", briefing.Broadcast!.VideoMp4Href, System.StringComparison.Ordinal);
         Assert.Contains(".vtt", briefing.Broadcast.CaptionsHref, System.StringComparison.Ordinal);
         Assert.True(briefing.Broadcast.ActionBeats.Count >= 5);
@@ -205,6 +209,7 @@ public sealed class BlackLedgerStatsViewTests
         Assert.Equal("/ledger/newsroom/turn-2-newsreel", deterministicBriefing.Broadcast!.WatchHref);
         Assert.Equal("/ledger/newsroom/turn-2-newsreel/transcript", deterministicBriefing.Broadcast.TranscriptHref);
         Assert.Equal("/ledger/newsroom/turn-2-newsreel/receipts", deterministicBriefing.Broadcast.ReceiptsHref);
+        Assert.NotEmpty(deterministicBriefing.Broadcast.ScreenplayScenes);
         Assert.Contains("/media/ledger/newsreels/turn-2-newsreel.mp4", deterministicBriefing.Broadcast.VideoMp4Href, System.StringComparison.Ordinal);
     }
 

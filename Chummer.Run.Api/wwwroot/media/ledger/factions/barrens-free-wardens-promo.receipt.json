@@ -1,0 +1,100 @@
+{
+  "generated_at_utc": "2026-06-04T06:57:47.821136Z",
+  "status": "pass",
+  "provider": "MagicFit",
+  "provider_status": "VERIFIED_PROVIDER",
+  "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+  "narration_provider": "unmixr-short-tts",
+  "voice": "en-US-ChristopherNeural",
+  "slug": "barrens-free-wardens",
+  "title": "Barrens Free Wardens",
+  "captions": [
+    "Closeout Witnesses. Recovery Saves. Safehouse routes.",
+    "Join the Free Wardens. Less nuyen. More backbone."
+  ],
+  "scene_payloads": [
+    {
+      "video_slug": "barrens-free-wardens",
+      "scene_index": 1,
+      "scene_title": "Safehouse kitchen",
+      "prompt": "Photoreal rough safehouse kitchen clinic, street medic with patched jacket checks bandage while lookout watches rainy alley, warm lamps, lived-in details, Chummer 6 closeout witness overlay, human tenderness, dry humor, no gore.",
+      "session_id": "cmppysvww03oyp31ve8hhfue0",
+      "image_generation_id": "cmppysvxn03p4p31v8upnfchb",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343641-1780001343245.png",
+      "video_generation_id": "cmppyudq803pfp31vz22itmen",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001647835-cmppyudq803pfp31vz22itmen.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_01.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_01.mp4",
+      "on_screen_text": "Closeout Witness",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "barrens-free-wardens",
+      "scene_index": 2,
+      "scene_title": "Recovery save",
+      "prompt": "Photoreal safehouse back room, medic uses Chummer 6 tablet to open a safe route, alley map glows, label not the front door, runner grabs bag, warm practical lighting, real motion, premium gritty look.",
+      "session_id": "cmppysvww03oyp31ve8hhfue0",
+      "image_generation_id": "cmppysvxn03p4p31v8upnfchb",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343641-1780001343245.png",
+      "video_generation_id": "cmppyudq803pfp31vz22itmen",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001647835-cmppyudq803pfp31vz22itmen.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_02.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_02.mp4",
+      "on_screen_text": "Recovery Save",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "barrens-free-wardens",
+      "scene_index": 3,
+      "scene_title": "Runner Passport badge",
+      "prompt": "Photoreal safehouse table, phone shows Chummer 6 Runner Passport badge Warden Witness, medic gives tired smile, room is rough but warm, subtle humor, sharp mobile UI.",
+      "session_id": "cmppysvww03oyp31ve8hhfue0",
+      "image_generation_id": "cmppysvxn03p4p31v8upnfchb",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343641-1780001343245.png",
+      "video_generation_id": "cmppyudq803pfp31vz22itmen",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001647835-cmppyudq803pfp31vz22itmen.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_03.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_03.mp4",
+      "on_screen_text": "Warden Witness",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "barrens-free-wardens",
+      "scene_index": 4,
+      "scene_title": "Recruitment",
+      "prompt": "Photoreal in-universe recruitment ad at safehouse doorway, street medic hands one person soup and another ammunition, people move in background, Chummer 6 join Free Wardens overlay, warm gritty comedy, real people.",
+      "session_id": "cmppysvww03oyp31ve8hhfue0",
+      "image_generation_id": "cmppysvxn03p4p31v8upnfchb",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343641-1780001343245.png",
+      "video_generation_id": "cmppyudq803pfp31vz22itmen",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001647835-cmppyudq803pfp31vz22itmen.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_04.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_04.mp4",
+      "on_screen_text": "Join Free Wardens",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "barrens-free-wardens",
+      "scene_index": 5,
+      "scene_title": "Door opens",
+      "prompt": "Photoreal rainy alley at night, safehouse side door opens warm light, runners exit quietly, medic silhouetted in doorway, Chummer 6 escape window open overlay, cinematic emotional close, no melodrama.",
+      "session_id": "cmppysvww03oyp31ve8hhfue0",
+      "image_generation_id": "cmppysvxn03p4p31v8upnfchb",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343641-1780001343245.png",
+      "video_generation_id": "cmppyudq803pfp31vz22itmen",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001647835-cmppyudq803pfp31vz22itmen.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_05.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/scenes/barrens-free-wardens_scene_05.mp4",
+      "on_screen_text": "Escape Window Open",
+      "derived_from_master": true
+    }
+  ],
+  "exports": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.mp4",
+    "mobile_mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo-mobile.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo-poster.png",
+    "audio": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/barrens-free-wardens-promo-audio.m4a"
+  },
+  "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/barrens-free-wardens/video_manifest.generated.json"
+}

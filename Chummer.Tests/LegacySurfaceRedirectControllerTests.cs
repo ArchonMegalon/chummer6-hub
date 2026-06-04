@@ -8,7 +8,6 @@ public sealed class LegacySurfaceRedirectControllerTests
 {
     [Theory]
     [InlineData("support", "/contact")]
-    [InlineData("table-pulse", "/account/ledger/notifications")]
     public void PublicConvenienceRoutesRedirectToLiveFlagshipSurfaces(string route, string expectedUrl)
     {
         var controller = new LegacySurfaceRedirectController();
@@ -16,7 +15,6 @@ public sealed class LegacySurfaceRedirectControllerTests
         IActionResult result = route switch
         {
             "support" => controller.Support(),
-            "table-pulse" => controller.TablePulse(),
             _ => throw new ArgumentOutOfRangeException(nameof(route), route, null)
         };
 

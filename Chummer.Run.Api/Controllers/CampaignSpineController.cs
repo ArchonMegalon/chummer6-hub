@@ -60,6 +60,600 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/quicksilver/command-deck")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMyQuicksilverCommandDeck(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+            BuildLabHandoffProjection? leadHandoff = summary.BuildLabHandoffs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+            CreatorPublicationProjection? leadPublication = summary.CreatorPublications.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+            RulesNavigatorAnswerProjection? leadRule = summary.RulesNavigator.FirstOrDefault();
+
+            return Ok(new
+            {
+                horizon = "quicksilver",
+                status = "shipped_mvp",
+                counts = new
+                {
+                    buildHandoffs = summary.BuildLabHandoffs.Count,
+                    rulesAnswers = summary.RulesNavigator.Count,
+                    workspaces = summary.Workspaces.Count,
+                    publications = summary.CreatorPublications.Count
+                },
+                routes = new
+                {
+                    accountEntryHref = "/account/quicksilver",
+                    accountRedirectHref = "/account/quicksilver/open",
+                    focusHrefTemplate = "/account/quicksilver/{focus}",
+                    jumpTargetsApiHref = "/api/v1/campaign-spine/me/quicksilver/jump-targets"
+                },
+                leadTargets = new
+                {
+                    builds = leadHandoff is null ? "/account/alice" : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
+                    rules = leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    runsites = leadWorkspace is null ? "/account/runsites" : $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}",
+                    creator = leadPublication is null ? "/account/creator" : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}",
+                    briefings = leadPublication is null ? "/account/jackpoint" : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}"
+                },
+                boundary = new
+                {
+                    rulesTruth = "explainability_required",
+                    bulkMutationAuthority = "not_claimed",
+                    backgroundAutomation = "not_claimed",
+                    cacheAuthority = "not_claimed"
+                }
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/quicksilver/jump-targets")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMyQuicksilverJumpTargets(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+            BuildLabHandoffProjection? leadHandoff = summary.BuildLabHandoffs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+            CreatorPublicationProjection? leadPublication = summary.CreatorPublications.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+            RulesNavigatorAnswerProjection? leadRule = summary.RulesNavigator.FirstOrDefault();
+
+            return Ok(new[]
+            {
+                new
+                {
+                    focus = "builds",
+                    label = "Build handoffs",
+                    available = leadHandoff is not null,
+                    href = leadHandoff is null ? "/account/alice" : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
+                    summary = leadHandoff is null ? "ALICE remains ready for the next governed build handoff." : $"{leadHandoff.Title} is the lead build handoff."
+                },
+                new
+                {
+                    focus = "rules",
+                    label = "Rules answers",
+                    available = leadRule is not null,
+                    href = leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    summary = leadRule is null ? "Rules Navigator remains ready for the next typed answer." : leadRule.Question
+                },
+                new
+                {
+                    focus = "runsites",
+                    label = "Prep benches",
+                    available = leadWorkspace is not null,
+                    href = leadWorkspace is null ? "/account/runsites" : $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}",
+                    summary = leadWorkspace is null ? "RUNSITE remains ready for the next governed workspace." : leadWorkspace.CampaignName
+                },
+                new
+                {
+                    focus = "creator",
+                    label = "Creator desk",
+                    available = leadPublication is not null,
+                    href = leadPublication is null ? "/account/creator" : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}",
+                    summary = leadPublication is null ? "Creator OS remains ready for the next publication desk." : leadPublication.Title
+                },
+                new
+                {
+                    focus = "briefings",
+                    label = "JACKPOINT desk",
+                    available = leadPublication is not null,
+                    href = leadPublication is null ? "/account/jackpoint" : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}",
+                    summary = leadPublication is null ? "JACKPOINT remains ready for the next publication-safe briefing desk." : leadPublication.Title
+                }
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/onramp/dashboard")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMyOnrampDashboard(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+            WorkspaceRestoreProjection restore = summary.Restore;
+
+            return Ok(new
+            {
+                horizon = "onramp",
+                status = "shipped_mvp",
+                counts = new
+                {
+                    campaigns = summary.Campaigns.Count,
+                    workspaces = summary.Workspaces.Count,
+                    dossiers = summary.Dossiers.Count,
+                    restoreArtifacts = restore.RecentArtifacts.Count,
+                    restoreConflicts = restore.ConflictSummaries.Count
+                },
+                routes = new
+                {
+                    accountEntryHref = "/account/onramp",
+                    accountRedirectHref = "/account/onramp/open",
+                    accountStarterHref = "/account/onramp/starter",
+                    dashboardApiHref = "/api/v1/campaign-spine/me/onramp/dashboard",
+                    starterApiHref = "/api/v1/campaign-spine/me/onramp/starter",
+                    recoveryApiHref = "/api/v1/campaign-spine/me/onramp/recovery"
+                },
+                starterWorkspace = starterWorkspace is null ? null : new
+                {
+                    starterWorkspace.WorkspaceId,
+                    starterWorkspace.CampaignId,
+                    starterWorkspace.CampaignName,
+                    ruleEnvironment = starterWorkspace.RuleEnvironment.CompatibilityFingerprint,
+                    starterWorkspace.ReturnSummary,
+                    starterWorkspace.NextSafeAction,
+                    accountHref = $"/account/runsites/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}",
+                    apiHref = $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}"
+                },
+                recovery = new
+                {
+                    restore.RestoreId,
+                    recentArtifacts = restore.RecentArtifacts.Count,
+                    recentDossiers = restore.RecentDossiers.Count,
+                    claimedDevices = restore.ClaimedDevices.Count,
+                    conflictCount = restore.ConflictSummaries.Count,
+                    localOnlyNotes = restore.LocalOnlyNotes.Count,
+                    accountHref = "/account/access",
+                    apiHref = "/api/v1/campaign-spine/me/onramp/recovery"
+                },
+                boundary = new
+                {
+                    buildTruth = "core_receipts_only",
+                    hiddenAutomation = "not_claimed",
+                    autoBuildAuthority = "not_claimed",
+                    recoveryAuthority = "signed_in_receipts"
+                }
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/onramp/starter")]
+    [ProducesResponseType<CampaignWorkspaceProjection>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<CampaignWorkspaceProjection>> GetMyOnrampStarter(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? starter = _campaignSpine.GetStarterWorkspace(user, installLinking);
+            return starter is null ? NotFound() : Ok(starter);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/onramp/recovery")]
+    [ProducesResponseType<WorkspaceRestoreProjection>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<WorkspaceRestoreProjection>> GetMyOnrampRecovery(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            return Ok(_campaignSpine.GetRestoreProjection(user, installLinking));
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/edition-studio/heads")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMyEditionStudioHeads(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            EditionStudioHeadSummary[] heads = BuildEditionStudioHeadSummaries(summary);
+
+            return Ok(new
+            {
+                horizon = "edition_studio",
+                status = "shipped_mvp",
+                routes = new
+                {
+                    accountEntryHref = "/account/edition-studio",
+                    accountRedirectHref = "/account/edition-studio/open",
+                    accountHeadHrefTemplate = "/account/edition-studio/{edition}",
+                    headsApiHref = "/api/v1/campaign-spine/me/edition-studio/heads",
+                    headDetailApiHrefTemplate = "/api/v1/campaign-spine/me/edition-studio/heads/{edition}"
+                },
+                heads
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/edition-studio/heads/{edition}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> GetMyEditionStudioHead([FromRoute] string edition, CancellationToken cancellationToken)
+    {
+        try
+        {
+            string normalizedEdition = NormalizeEditionStudioHeadId(edition);
+            if (normalizedEdition is not ("sr4" or "sr5" or "sr6"))
+            {
+                return NotFound();
+            }
+
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            EditionStudioHeadSummary[] heads = BuildEditionStudioHeadSummaries(summary);
+            EditionStudioHeadSummary? head = heads.FirstOrDefault(item => string.Equals(item.Edition, normalizedEdition, StringComparison.OrdinalIgnoreCase));
+            return head is null
+                ? NotFound()
+                : Ok(new
+                {
+                    horizon = "edition_studio",
+                    status = "shipped_mvp",
+                    head
+                });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/local-co-processor/capabilities")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMyLocalCoProcessorCapabilities(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+
+            string preferredProfile = summary.Restore.ClaimedDevices.Count > 0
+                ? "privacy_first"
+                : summary.Workspaces.Count > 0 || summary.Dossiers.Count > 0
+                    ? "hybrid_local"
+                    : "hosted_only";
+
+            return Ok(new
+            {
+                horizon = "local_co_processor",
+                status = "shipped_mvp",
+                counts = new
+                {
+                    workspaces = summary.Workspaces.Count,
+                    dossiers = summary.Dossiers.Count,
+                    claimedDevices = summary.Restore.ClaimedDevices.Count,
+                    profiles = 3
+                },
+                routes = new
+                {
+                    accountEntryHref = "/account/local-co-processor",
+                    accountRedirectHref = "/account/local-co-processor/open",
+                    accountProfileHrefTemplate = "/account/local-co-processor/{profile}",
+                    capabilitiesApiHref = "/api/v1/campaign-spine/me/local-co-processor/capabilities",
+                    policyApiHref = "/api/v1/campaign-spine/me/local-co-processor/policy"
+                },
+                profiles = new[]
+                {
+                    new
+                    {
+                        profile = "hosted_only",
+                        label = "Hosted only",
+                        selected = string.Equals(preferredProfile, "hosted_only", StringComparison.Ordinal),
+                        accountHref = "/account/local-co-processor/hosted_only",
+                        apiHref = "/api/v1/campaign-spine/me/local-co-processor/policy",
+                        summary = "Keep every workflow fully hosted with no local acceleration requirement."
+                    },
+                    new
+                    {
+                        profile = "hybrid_local",
+                        label = "Hybrid local",
+                        selected = string.Equals(preferredProfile, "hybrid_local", StringComparison.Ordinal),
+                        accountHref = "/account/local-co-processor/hybrid_local",
+                        apiHref = "/api/v1/campaign-spine/me/local-co-processor/capabilities",
+                        summary = "Allow optional local acceleration where it improves responsiveness or cost."
+                    },
+                    new
+                    {
+                        profile = "privacy_first",
+                        label = "Privacy first",
+                        selected = string.Equals(preferredProfile, "privacy_first", StringComparison.Ordinal),
+                        accountHref = "/account/local-co-processor/privacy_first",
+                        apiHref = "/api/v1/campaign-spine/me/local-co-processor/capabilities",
+                        summary = "Prefer local handling where it reduces disclosure without breaking hosted fallback."
+                    }
+                },
+                boundary = new
+                {
+                    hostedFirstParity = "required",
+                    localTruthAuthority = "not_claimed",
+                    mandatoryRuntime = "not_claimed",
+                    disableableProfiles = "required"
+                }
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/local-co-processor/policy")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMyLocalCoProcessorPolicy(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+
+            return Ok(new
+            {
+                horizon = "local_co_processor",
+                status = "shipped_mvp",
+                policy = new
+                {
+                    hostedFirstParity = true,
+                    optionalLocalAcceleration = true,
+                    disableableProfiles = true,
+                    mandatoryRuntime = false,
+                    localTruthAuthority = false,
+                    failOpenFallback = true,
+                    claimedDevices = summary.Restore.ClaimedDevices.Count,
+                    recentRuleEnvironments = summary.Restore.RecentRuleEnvironments.Count
+                },
+                routes = new
+                {
+                    accountEntryHref = "/account/local-co-processor",
+                    accountRedirectHref = "/account/local-co-processor/open",
+                    capabilitiesApiHref = "/api/v1/campaign-spine/me/local-co-processor/capabilities",
+                    policyApiHref = "/api/v1/campaign-spine/me/local-co-processor/policy"
+                },
+                boundary = new
+                {
+                    canonicalTruth = "hosted_first",
+                    providerIndependence = "required",
+                    offlineRequirement = "not_claimed",
+                    hiddenDependency = "not_claimed"
+                }
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/run-control/dashboard")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<object>> GetMyRunControlDashboard(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            RunProjection? leadRun = summary.Runs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+            CampaignWorkspaceProjection? leadWorkspace = leadRun is null
+                ? _campaignSpine.GetStarterWorkspace(user, installLinking) ?? summary.Workspaces.FirstOrDefault()
+                : summary.Workspaces.FirstOrDefault(item => item.Runs.Any(run => string.Equals(run.RunId, leadRun.RunId, StringComparison.OrdinalIgnoreCase)))
+                    ?? _campaignSpine.GetStarterWorkspace(user, installLinking)
+                    ?? summary.Workspaces.FirstOrDefault();
+            RunboardContinuityProjection? continuity = leadRun?.RunboardContinuity;
+
+            return Ok(new
+            {
+                horizon = "run_control",
+                status = "shipped_mvp",
+                counts = new
+                {
+                    campaigns = summary.Campaigns.Count,
+                    workspaces = summary.Workspaces.Count,
+                    runs = summary.Runs.Count,
+                    continuityRuns = summary.Runs.Count(item => item.RunboardContinuity is not null)
+                },
+                routes = new
+                {
+                    accountEntryHref = "/account/run-control",
+                    accountRedirectHref = "/account/run-control/open",
+                    accountRunHrefTemplate = "/account/run-control/{runId}",
+                    runIndexApiHref = "/api/v1/campaign-spine/me/runs",
+                    dashboardApiHref = "/api/v1/campaign-spine/me/run-control/dashboard",
+                    runDetailApiHrefTemplate = "/api/v1/campaign-spine/me/run-control/runs/{runId}"
+                },
+                leadRun = leadRun is null ? null : new
+                {
+                    leadRun.RunId,
+                    leadRun.Title,
+                    leadRun.Status,
+                    leadRun.Summary,
+                    leadRun.ActiveSceneId,
+                    activeSceneTitle = leadRun.Scenes.FirstOrDefault(scene => string.Equals(scene.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase))?.Title,
+                    objectiveCount = leadRun.Objectives.Count,
+                    sceneCount = leadRun.Scenes.Count,
+                    accountHref = $"/account/run-control/{Uri.EscapeDataString(leadRun.RunId)}",
+                    apiHref = $"/api/v1/campaign-spine/me/run-control/runs/{Uri.EscapeDataString(leadRun.RunId)}"
+                },
+                leadWorkspace = leadWorkspace is null ? null : new
+                {
+                    leadWorkspace.WorkspaceId,
+                    leadWorkspace.CampaignId,
+                    leadWorkspace.CampaignName,
+                    leadWorkspace.NextSafeAction,
+                    leadWorkspace.ActiveSceneSummary,
+                    accountHref = $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}",
+                    apiHref = $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}"
+                },
+                continuity = continuity is null ? null : new
+                {
+                    continuity.RunTitle,
+                    continuity.ActiveSceneTitle,
+                    continuity.Summary,
+                    handoffSummary = continuity.TurnLedgerHandoff.Summary,
+                    runboardSummary = continuity.RunboardState.Summary,
+                    nextSafeAction = continuity.RunboardState.NextSafeAction,
+                    resolutionDraftStatus = continuity.ResolutionReportDraft.Status
+                },
+                boundary = new
+                {
+                    campaignTruth = "first_party_only",
+                    reconnectAuthority = "receipt_backed",
+                    genericCollaborationReplacement = "not_claimed",
+                    hiddenStateAuthority = "not_claimed"
+                }
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/run-control/runs/{runId}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<object>> GetMyRunControlRun([FromRoute] string runId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            RunProjection? run = _campaignSpine.GetRun(user, runId, installLinking);
+            if (run is null)
+            {
+                return NotFound();
+            }
+
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? workspace = summary.Workspaces.FirstOrDefault(item => item.Runs.Any(candidate => string.Equals(candidate.RunId, run.RunId, StringComparison.OrdinalIgnoreCase)));
+            SceneProjection? activeScene = run.Scenes.FirstOrDefault(scene => string.Equals(scene.SceneId, run.ActiveSceneId, StringComparison.OrdinalIgnoreCase));
+
+            return Ok(new
+            {
+                horizon = "run_control",
+                status = "shipped_mvp",
+                run = new
+                {
+                    run.RunId,
+                    run.CampaignId,
+                    run.Title,
+                    run.Status,
+                    run.Summary,
+                    run.ActiveSceneId,
+                    activeSceneTitle = activeScene?.Title,
+                    activeSceneSummary = activeScene?.Summary,
+                    objectiveCount = run.Objectives.Count,
+                    sceneCount = run.Scenes.Count,
+                    accountHref = $"/account/run-control/{Uri.EscapeDataString(run.RunId)}"
+                },
+                workspace = workspace is null ? null : new
+                {
+                    workspace.WorkspaceId,
+                    workspace.CampaignName,
+                    workspace.ReturnSummary,
+                    workspace.NextSafeAction,
+                    workspace.ActiveSceneSummary,
+                    accountHref = $"/account/runsites/{Uri.EscapeDataString(workspace.WorkspaceId)}"
+                },
+                continuity = run.RunboardContinuity is null ? null : new
+                {
+                    run.RunboardContinuity.ContinuityId,
+                    run.RunboardContinuity.Summary,
+                    run.RunboardContinuity.ActiveSceneTitle,
+                    turnLedgerSummary = run.RunboardContinuity.TurnLedgerHandoff.Summary,
+                    runboardSummary = run.RunboardContinuity.RunboardState.Summary,
+                    blockers = run.RunboardContinuity.RunboardState.Blockers,
+                    resolutionNextSafeAction = run.RunboardContinuity.ResolutionReportDraft.NextSafeAction
+                },
+                objectives = run.Objectives.Select(objective => new
+                {
+                    objective.ObjectiveId,
+                    objective.Title,
+                    objective.Status,
+                    objective.Pressure,
+                    objective.Summary
+                }),
+                scenes = run.Scenes.Select(scene => new
+                {
+                    scene.SceneId,
+                    scene.Title,
+                    scene.Status,
+                    scene.Summary,
+                    isActive = string.Equals(scene.SceneId, run.ActiveSceneId, StringComparison.OrdinalIgnoreCase)
+                })
+            });
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/organizer-ops")]
     [ProducesResponseType<OrganizerOperationsDashboardProjection>(StatusCodes.Status200OK)]
     public async Task<ActionResult<OrganizerOperationsDashboardProjection>> GetMyOrganizerOperations(CancellationToken cancellationToken)
@@ -1071,6 +1665,42 @@ public sealed class CampaignSpineController : ControllerBase
         }
     }
 
+    [HttpGet("me/runs")]
+    [ProducesResponseType<IReadOnlyList<RunProjection>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<RunProjection>>> GetMyRuns(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var runs = _campaignSpine.GetAccountSummary(user, installLinking).Runs;
+            return Ok(runs);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/build-handoffs")]
+    [ProducesResponseType<IReadOnlyList<BuildLabHandoffProjection>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<BuildLabHandoffProjection>>> GetMyBuildLabHandoffs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var handoffs = _campaignSpine.GetAccountSummary(user, installLinking).BuildLabHandoffs;
+            return Ok(handoffs);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
     [HttpGet("me/build-handoffs/{handoffId}")]
     [ProducesResponseType<BuildLabHandoffProjection>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -1122,6 +1752,25 @@ public sealed class CampaignSpineController : ControllerBase
             var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
             var publication = _campaignSpine.GetCreatorPublication(user, publicationId, installLinking);
             return publication is null ? NotFound() : Ok(publication);
+        }
+        catch (HubRequestAuthException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
+    }
+
+    [HttpGet("me/publications")]
+    [ProducesResponseType<IReadOnlyList<CreatorPublicationProjection>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<CreatorPublicationProjection>>> GetMyCreatorPublications(CancellationToken cancellationToken)
+    {
+        try
+        {
+            ApplyImportRouteParityHeaders("/api/v1/campaign-spine/me/publications");
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var publications = _campaignSpine.GetAccountSummary(user, installLinking).CreatorPublications;
+            return Ok(publications);
         }
         catch (HubRequestAuthException ex)
         {
@@ -1186,6 +1835,55 @@ public sealed class CampaignSpineController : ControllerBase
             null);
     }
 
+    private static EditionStudioHeadSummary[] BuildEditionStudioHeadSummaries(AccountCampaignSummary summary)
+    {
+        RuleEnvironmentRef[] environments = summary.Workspaces.Select(static item => item.RuleEnvironment)
+            .Concat(summary.Dossiers.Select(static item => item.RuleEnvironment))
+            .Concat(summary.Restore.RecentRuleEnvironments)
+            .ToArray();
+
+        return
+        [
+            BuildEditionStudioHeadSummary("sr4", "SR4", "Dense veteran-first posture for legacy muscle memory and BP-era expectations.", environments),
+            BuildEditionStudioHeadSummary("sr5", "SR5", "The flagship density rail where legality, explain, and veteran speed stay authored together.", environments),
+            BuildEditionStudioHeadSummary("sr6", "SR6", "Campaign-approved modern rail where simplified pace stays distinct from older heads.", environments)
+        ];
+    }
+
+    private static EditionStudioHeadSummary BuildEditionStudioHeadSummary(string edition, string label, string summary, IReadOnlyList<RuleEnvironmentRef> environments)
+    {
+        RuleEnvironmentRef[] matching = environments
+            .Where(environment => string.Equals(NormalizeEditionStudioHeadId(environment.CompatibilityFingerprint), edition, StringComparison.OrdinalIgnoreCase)
+                || environment.SourcePacks.Any(pack => string.Equals(NormalizeEditionStudioHeadId(pack), edition, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        return new EditionStudioHeadSummary(
+            Edition: edition,
+            Label: label,
+            Summary: summary,
+            EnvironmentCount: matching.Length,
+            Fingerprints: matching.Select(static item => item.CompatibilityFingerprint).Distinct(StringComparer.OrdinalIgnoreCase).Take(3).ToArray(),
+            AccountHref: $"/account/edition-studio/{edition}",
+            PacketJsonHref: $"/edition-studio/packets/{edition}_head.json",
+            PacketMarkdownHref: $"/edition-studio/packets/{edition}_head.md");
+    }
+
+    private static string NormalizeEditionStudioHeadId(string? candidate)
+    {
+        string normalized = string.IsNullOrWhiteSpace(candidate) ? string.Empty : candidate.Trim().ToLowerInvariant();
+        if (normalized.Contains("sr4", StringComparison.Ordinal))
+        {
+            return "sr4";
+        }
+
+        if (normalized.Contains("sr5", StringComparison.Ordinal))
+        {
+            return "sr5";
+        }
+
+        return normalized.Contains("sr6", StringComparison.Ordinal) ? "sr6" : normalized;
+    }
+
     private static CampaignFederationRouteReceiptProjection? BuildRouteReceiptPayload(LocalProofReceiptMatch? routeReceipt)
         => routeReceipt is null
             ? null
@@ -1203,4 +1901,14 @@ public sealed class CampaignSpineController : ControllerBase
         string State,
         CampaignFederationRouteReceiptProjection? RouteReceipt,
         string? BoundedFailureReason);
+
+    private sealed record EditionStudioHeadSummary(
+        string Edition,
+        string Label,
+        string Summary,
+        int EnvironmentCount,
+        IReadOnlyList<string> Fingerprints,
+        string AccountHref,
+        string PacketJsonHref,
+        string PacketMarkdownHref);
 }

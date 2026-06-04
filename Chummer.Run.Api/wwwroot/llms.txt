@@ -27,6 +27,10 @@ Direction and feedback routes
 - /feedback/operations : bounded public operations artifact for the feedback loop
 - /changelog : shipped closeout and release-backed proof
 - /ledger : public-safe Black Ledger hub for aggregate pressure and closeout motion
+- /alice : ALICE build compare and Build Ghost public entry
+- /table-pulse : Table Pulse live and aftermath public split
+- /quicksilver : Quicksilver expert-speed command deck and jump-target lane
+- /local-co-processor : Local Co-Processor hosted-first optional-acceleration lane
 - /black-ledger : short alias for the Black Ledger hub
 - /participate : broader participation entry
 - /karma-forge : short alias for governed discovery intake

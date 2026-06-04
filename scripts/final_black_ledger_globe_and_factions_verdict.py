@@ -14,11 +14,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPLETION_ROOT = Path(
     os.environ.get(
         "CHUMMER_COMPLETION_DIR",
-        REPO_ROOT.parent / "_completion" / "black_ledger_globe_faction_closure",
+        REPO_ROOT / "_completion" / "black_ledger_globe_faction_closure",
     )
 )
 VERDICT_PATH = COMPLETION_ROOT / "FINAL_BLACK_LEDGER_GLOBE_AND_FACTIONS_VERDICT.md"
 MANAGEMENT_PATH = COMPLETION_ROOT / "BLACK_LEDGER_FACTION_MANAGEMENT.generated.json"
+FACTION_VIDEO_PROOF_PATH = REPO_ROOT / "chummer.run-services" / ".codex-studio" / "published" / "BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json"
 BASE_URL = os.environ.get("BASE_URL", "https://chummer.run").rstrip("/")
 
 FACTIONS = [
@@ -45,6 +46,17 @@ def load_json(path: Path) -> dict[str, Any] | None:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def copy_live_faction_video_proof() -> dict[str, Any] | None:
+    if not FACTION_VIDEO_PROOF_PATH.is_file():
+        return None
+    payload = json.loads(FACTION_VIDEO_PROOF_PATH.read_text(encoding="utf-8"))
+    if str(payload.get("status") or "").strip().lower() != "pass":
+        return payload
+    target = COMPLETION_ROOT / "BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json"
+    write_json(target, payload)
+    return payload
+
+
 def fetch_status(path: str) -> tuple[int, str]:
     request = Request(f"{BASE_URL}{path}", headers={"User-Agent": "codex-black-ledger-closure/1.0"})
     try:
@@ -63,6 +75,7 @@ def main() -> int:
     command_map = load_json(COMPLETION_ROOT / "BLACK_LEDGER_COMMAND_MAP_RENDER.generated.json")
     faction_pages = load_json(COMPLETION_ROOT / "BLACK_LEDGER_FACTION_PAGES.generated.json")
     no_noise = load_json(COMPLETION_ROOT / "BLACK_LEDGER_NO_NOISE_LINK_AUDIT.generated.json")
+    faction_video = copy_live_faction_video_proof()
 
     route_checks: list[dict[str, Any]] = []
     failures: list[str] = []
@@ -106,6 +119,7 @@ def main() -> int:
         "frontdoor": frontdoor and frontdoor.get("status") == "pass",
         "command_map": command_map and command_map.get("status") == "pass",
         "faction_pages": faction_pages and faction_pages.get("status") == "pass",
+        "faction_video": faction_video and faction_video.get("status") == "pass" and str(faction_video.get("base_url") or "").rstrip("/") == BASE_URL,
         "no_noise": no_noise and no_noise.get("status") == "pass",
         "faction_management": management_payload["status"] == "pass",
     }
@@ -115,6 +129,8 @@ def main() -> int:
         failures.append("command map proof missing or failed")
     if not artifact_statuses["faction_pages"]:
         failures.append("faction pages proof missing or failed")
+    if not artifact_statuses["faction_video"]:
+        failures.append("live faction video proof missing, failed, or bound to the wrong base URL")
     if not artifact_statuses["no_noise"]:
         failures.append("no-noise proof missing or failed")
 
@@ -127,6 +143,7 @@ def main() -> int:
         f"- frontdoor: `{'pass' if artifact_statuses['frontdoor'] else 'fail'}`\n"
         f"- command_map: `{'pass' if artifact_statuses['command_map'] else 'fail'}`\n"
         f"- faction_pages: `{'pass' if artifact_statuses['faction_pages'] else 'fail'}`\n"
+        f"- faction_video: `{'pass' if artifact_statuses['faction_video'] else 'fail'}`\n"
         f"- faction_management: `{'pass' if artifact_statuses['faction_management'] else 'fail'}`\n"
         f"- no_noise: `{'pass' if artifact_statuses['no_noise'] else 'fail'}`\n\n"
         + ("Failures:\n" + "\n".join(f"- {failure}" for failure in failures) + "\n" if failures else "Failures: none\n"),

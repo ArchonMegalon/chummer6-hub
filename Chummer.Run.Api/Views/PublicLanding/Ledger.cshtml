@@ -129,6 +129,11 @@
                 data-initial-mode="@(commandMap.CurrentMode)"
                 data-selected-faction="@selectedFactionSlug"
                 data-tick-headline="@Model.World?.TurnHeadline"
+                data-overlay-eyebrow="Seattle command deck"
+                data-overlay-headline="Track who is moving first."
+                data-signal-primary="district heat live"
+                data-signal-secondary="faction motion tracked"
+                data-signal-tertiary="dispatch board armed"
                 data-auto-replay="@(Context.Request.Query.ContainsKey("replay") ? "true" : "false")"
                 data-primary-label="@Model.PrimaryAction.Label"
                 data-primary-href="@Model.PrimaryAction.Href"
@@ -140,13 +145,25 @@
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
         <p class="page-copy">@Model.Intro</p>
-        <p class="ledger-flagship__support">The city board is alive: factions lean on districts, heat crawls across routes, and every public dispatch gives a GM a hook they can actually use at the table.</p>
+        <p class="ledger-flagship__support">Black Ledger should read like a live command desk, not a generic map widget. Watch the city breathe, see which bloc is leaning on which district, and lift a usable hook straight into the next scene.</p>
         <div class="ledger-flagship__metrics" aria-label="Current Black Ledger turn">
             <span><strong>Turn @(Model.World?.CurrentTurn ?? 1)</strong> live board</span>
             <span><strong>@worldFactions.Length</strong> factions</span>
             <span><strong>@activeHeat</strong> heat</span>
             <span><strong>@(pressureDelta >= 0 ? "+" : string.Empty)@pressureDelta</strong> pressure</span>
         </div>
+        <section class="ledger-flagship__briefing" aria-label="Command briefing">
+            <article class="ledger-flagship__briefing-card">
+                <span class="tag">Lead dispatch</span>
+                <strong>@(leadDispatch?.Title ?? "Dispatch queue open")</strong>
+                <p>@(leadDispatch?.Summary ?? "Public board hooks are staged and ready for the next turn.")</p>
+            </article>
+            <article class="ledger-flagship__briefing-card">
+                <span class="tag">Focus faction</span>
+                <strong>@(selectedFaction?.PublicName ?? "Ashline Circle")</strong>
+                <p>@(selectedFaction is null ? "Start on the board, then drop into the faction file that is actually moving the city." : introLine(selectedFaction.Id))</p>
+            </article>
+        </section>
         <div class="ledger-flagship__actions" aria-label="Black Ledger actions">
             <a class="button-like button-like--@Model.PrimaryAction.Tone" href="@Model.PrimaryAction.Href">@Model.PrimaryAction.Label</a>
             <a class="button-like button-like--@Model.SecondaryAction.Tone" href="@Model.SecondaryAction.Href">@Model.SecondaryAction.Label</a>
@@ -212,6 +229,11 @@
                         data-initial-mode="@(commandMap.CurrentMode)"
                         data-selected-faction="@selectedFactionSlug"
                         data-tick-headline="@Model.World?.TurnHeadline"
+                        data-overlay-eyebrow="Public pressure board"
+                        data-overlay-headline="Read the board before you pick a side."
+                        data-signal-primary="pressure vectors active"
+                        data-signal-secondary="open jobs mutating"
+                        data-signal-tertiary="newsroom bulletins linked"
                         data-primary-label="Open faction file"
                         data-primary-href="/ledger/factions/@(selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle")"
                         data-secondary-label="Open latest dispatch"

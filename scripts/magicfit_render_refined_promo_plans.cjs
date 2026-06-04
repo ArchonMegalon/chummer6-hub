@@ -118,7 +118,7 @@ function download(url, file) {
 }
 
 function collectCdnVideoUrlsFromText(text) {
-  return [...new Set((text.match(/https:\/\/cdn\.pushowl\.com\/magicfit\/[^"'\s<>]+?\.(?:mp4|webm)/g) || [])
+  return [...new Set((text.match(/https:\/\/(?:cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/[^"'\s<>]+?\.(?:mp4|webm)(?:[^"'\s<>]*)?/g) || [])
     .map((url) => url.replace(/\\u0026/g, '&').replace(/[),\]]+$/, '')))];
 }
 
@@ -133,7 +133,7 @@ async function collectVisibleMagicFitVideoUrls(page) {
   for (const found of collectCdnVideoUrlsFromText(html)) urls.add(found);
   const videos = await page.locator('video').evaluateAll((nodes) => nodes.map((v) => v.currentSrc || v.src).filter(Boolean)).catch(() => []);
   for (const found of videos) {
-    if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)/.test(found)) urls.add(found);
+    if (/(cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/.*\.(mp4|webm)/.test(found)) urls.add(found);
   }
   return urls;
 }
@@ -164,7 +164,7 @@ async function renderScene(page, asset, scene) {
     if (!url.includes('magicfit') && !url.includes('pushowl')) return;
     const item = { status: response.status(), url, contentType: response.headers()['content-type'] || '' };
     events.push(item);
-    if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)(?:$|\?)/.test(url)) seenVideoUrls.add(url);
+    if (/(cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/.*\.(mp4|webm)(?:$|\?)/.test(url)) seenVideoUrls.add(url);
     if (/json|script|text/.test(item.contentType)) {
       const text = await response.text().catch(() => '');
       for (const found of collectCdnVideoUrlsFromText(text)) seenVideoUrls.add(found);
@@ -200,7 +200,7 @@ async function renderScene(page, asset, scene) {
       for (const found of collectCdnVideoUrlsFromText(html)) seenVideoUrls.add(found);
       const videos = await page.locator('video').evaluateAll((nodes) => nodes.map((v) => v.currentSrc || v.src).filter(Boolean)).catch(() => []);
       for (const found of videos) {
-        if (/cdn\.pushowl\.com\/magicfit\/.*\.(mp4|webm)/.test(found)) seenVideoUrls.add(found);
+        if (/(cdn\.pushowl\.com|media\.powlcdn\.com)\/magicfit\/.*\.(mp4|webm)/.test(found)) seenVideoUrls.add(found);
       }
       videoUrl = chooseNewestVideoUrl(seenVideoUrls, baselineVideoUrls, submittedAtMs);
       if (!videoUrl) console.log(`poll ${asset.asset_id}/${scene.id}: waiting`);

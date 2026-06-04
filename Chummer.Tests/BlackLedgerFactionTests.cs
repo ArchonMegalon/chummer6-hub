@@ -32,4 +32,22 @@ public sealed class BlackLedgerFactionTests
         Assert.Contains("[HttpGet(\"/account/ledger/factions/{factionId}/private-lore\")]", publicLanding, StringComparison.Ordinal);
         Assert.Contains("return Redirect($\"/login?next={Uri.EscapeDataString(currentPath)}\")", publicLanding, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void BlackLedgerFaction_promo_route_exposes_cinematic_screenplay_metadata()
+    {
+        string publicLanding = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs"));
+        string promoView = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerFactionPromo.cshtml"));
+        string service = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Services", "Community", "BlackLedgerFactionOnboardingService.cs"));
+
+        Assert.Contains("storyline_summary = promo.StorylineSummary", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("narrator_posture = promo.NarratorPosture", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("render_pipeline = promo.RenderPipelineLabel", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("screenplay_scenes = promo.ScreenplayScenes.Select", publicLanding, StringComparison.Ordinal);
+        Assert.Contains("TryLoadPublicMagicFitFactionReceipt", service, StringComparison.Ordinal);
+        Assert.Contains("-promo.receipt.json", service, StringComparison.Ordinal);
+        Assert.Contains("How the reel is structured", promoView, StringComparison.Ordinal);
+        Assert.Contains("@Model.Promo.RenderPipelineLabel", promoView, StringComparison.Ordinal);
+        Assert.Contains("@foreach (var scene in Model.Promo.ScreenplayScenes)", promoView, StringComparison.Ordinal);
+    }
 }

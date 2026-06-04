@@ -14,6 +14,9 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/feedback", doc, StringComparison.Ordinal);
         Assert.Contains("/changelog", doc, StringComparison.Ordinal);
         Assert.Contains("/ledger", doc, StringComparison.Ordinal);
+        Assert.Contains("/alice", doc, StringComparison.Ordinal);
+        Assert.Contains("/table-pulse", doc, StringComparison.Ordinal);
+        Assert.Contains("/quicksilver", doc, StringComparison.Ordinal);
         Assert.Contains("/karma-forge", doc, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge", doc, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", doc, StringComparison.Ordinal);
@@ -35,6 +38,10 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/feedback", llms, StringComparison.Ordinal);
         Assert.Contains("/changelog", llms, StringComparison.Ordinal);
         Assert.Contains("/ledger", llms, StringComparison.Ordinal);
+        Assert.Contains("/alice", llms, StringComparison.Ordinal);
+        Assert.Contains("/table-pulse", llms, StringComparison.Ordinal);
+        Assert.Contains("/quicksilver", llms, StringComparison.Ordinal);
+        Assert.Contains("/local-co-processor", llms, StringComparison.Ordinal);
         Assert.Contains("/karma-forge", llms, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge", llms, StringComparison.Ordinal);
         Assert.Contains("/llms.txt", ai, StringComparison.Ordinal);
@@ -59,6 +66,23 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/progress", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations/lookup", manifest, StringComparison.Ordinal);
+        Assert.Contains("/alice", manifest, StringComparison.Ordinal);
+        Assert.Contains("/alice/receipts/build-ghost.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/table-pulse", manifest, StringComparison.Ordinal);
+        Assert.Contains("/table-pulse/receipts/live-and-aftermath.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/onramp", manifest, StringComparison.Ordinal);
+        Assert.Contains("/onramp/receipts/guided-starter.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/edition-studio", manifest, StringComparison.Ordinal);
+        Assert.Contains("/edition-studio/receipts/ruleset-heads.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/quicksilver", manifest, StringComparison.Ordinal);
+        Assert.Contains("/quicksilver/receipts/command-network.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/local-co-processor", manifest, StringComparison.Ordinal);
+        Assert.Contains("/local-co-processor/receipts/optional-acceleration.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ledger/factions/{factionId}", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ledger/factions/{factionId}/promo", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ledger/factions/{factionId}/promo.json", manifest, StringComparison.Ordinal);
+        Assert.Contains("/ledger/factions/{factionId}/promo.vtt", manifest, StringComparison.Ordinal);
+        Assert.Contains("verification_path: /ledger/factions/ashline-circle/promo.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/contact/submitted/{caseId}", manifest, StringComparison.Ordinal);
         Assert.Contains("/participate/karma-forge/submitted/{submissionId}", manifest, StringComparison.Ordinal);
         Assert.Contains("verification_mode: controller_contract", manifest, StringComparison.Ordinal);
@@ -96,5 +120,140 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.DoesNotContain("Lunacal", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("Product Governor", combined, StringComparison.Ordinal);
         Assert.DoesNotContain("OpenAI account in ChatGPT", combined, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HorizonRegistryMatchesTheShippedPortfolioForImplementedHorizons()
+    {
+        string registryPath = RepoPaths.FromRoot(".codex-design", "product", "HORIZON_REGISTRY.yaml");
+        string statusMatrixPath = RepoPaths.FromRoot("..", "_completion", "all_horizons_missed_potential", "HORIZON_STATUS_MATRIX.generated.yaml");
+
+        string registry = File.ReadAllText(registryPath);
+        string statusMatrix = File.ReadAllText(statusMatrixPath);
+
+        string[] shippedIds =
+        {
+            "nexus-pan",
+            "alice",
+            "karma-forge",
+            "knowledge-fabric",
+            "jackpoint",
+            "black-ledger",
+            "community-hub",
+            "runsite",
+            "runbook-press",
+            "onramp",
+            "edition-studio",
+            "run-control",
+            "local-co-processor",
+            "ghostwire",
+            "table-pulse",
+            "quicksilver"
+        };
+
+        foreach (string shippedId in shippedIds)
+        {
+            string marker = $"- id: {shippedId}";
+            int start = registry.IndexOf(marker, StringComparison.Ordinal);
+            Assert.True(start >= 0, $"Missing registry block for {shippedId}.");
+            int next = registry.IndexOf("\n- id: ", start + marker.Length, StringComparison.Ordinal);
+            string block = next >= 0 ? registry[start..next] : registry[start..];
+
+            Assert.Contains("status: shipped_mvp", block, StringComparison.Ordinal);
+            Assert.Contains("current_state: shipped_mvp", block, StringComparison.Ordinal);
+            Assert.Contains($"{shippedId.Replace('-', '_')}", statusMatrix.Replace('-', '_'), StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.DoesNotContain("Public copy may describe JACKPOINT as a bounded horizon and preview lane only", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("Public copy may show runsite as a preview artifact lane only", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("Public copy may describe Community Hub as a bounded horizon and curated preview only", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("Public copy may describe Ghostwire as a receipt-backed replay and forensics horizon only", registry, StringComparison.Ordinal);
+        Assert.DoesNotContain("Public copy may describe Table Pulse as a bounded GM-governed live heat and private aftermath horizon only", registry, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicGuideShippedHorizonsDoNotPresentAsFutureConcepts()
+    {
+        string[] shippedGuideFiles =
+        {
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "jackpoint.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "runsite.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "runbook-press.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "table-pulse.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "community-hub.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "onramp.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "edition-studio.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "run-control.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "local-co-processor.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "public-guide", "HORIZONS", "quicksilver.md"),
+        };
+
+        string combined = string.Join("\n", shippedGuideFiles.Select(File.ReadAllText));
+
+        Assert.DoesNotContain("Today: Future concept.", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("Next: Research and prototypes.", combined, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CanonicalShippedHorizonDocsDoNotPresentAsNotReady()
+    {
+        string[] shippedHorizonDocs =
+        {
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "nexus-pan.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "knowledge-fabric.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "runbook-press.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "table-pulse.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "onramp.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "edition-studio.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "run-control.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "local-co-processor.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "jackpoint.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "runsite.md"),
+            RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "horizons", "quicksilver.md"),
+        };
+
+        string combined = string.Join("\n", shippedHorizonDocs.Select(File.ReadAllText));
+
+        Assert.DoesNotContain("## Why it is not ready yet", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("is still a horizon", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("remains a horizon rather than a product promise", combined, StringComparison.Ordinal);
+        Assert.DoesNotContain("signed-in command lane is live", combined, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicFeatureRegistryMarksImplementedHorizonsAsShipped()
+    {
+        string registryPath = RepoPaths.FromRoot("..", "chummer-design", "products", "chummer", "PUBLIC_FEATURE_REGISTRY.yaml");
+        string registry = File.ReadAllText(registryPath);
+        (string id, string href, string badge)[] shippedCards =
+        {
+            ("lane_creator", "/creator", "Shipped MVP"),
+            ("real_mobile_projection", "/mobile", "Live now"),
+            ("horizon_nexus_pan", "/play/continuity", "Shipped MVP"),
+            ("horizon_knowledge_fabric", "/rules", "Shipped MVP"),
+            ("horizon_karma_forge", "/participate/karma-forge", "Shipped MVP"),
+            ("horizon_onramp", "/onramp", "Shipped MVP"),
+            ("horizon_edition_studio", "/edition-studio", "Shipped MVP"),
+            ("horizon_run_control", "/run-control", "Shipped MVP"),
+            ("horizon_local_co_processor", "/local-co-processor", "Shipped MVP"),
+            ("horizon_runbook_press", "/runbook", "Shipped MVP"),
+            ("horizon_black_ledger", "/ledger", "Shipped MVP"),
+            ("horizon_quicksilver", "/quicksilver", "Shipped MVP"),
+        };
+
+        foreach ((string id, string href, string badge) in shippedCards)
+        {
+            string marker = $"- id: {id}";
+            int start = registry.IndexOf(marker, StringComparison.Ordinal);
+            Assert.True(start >= 0, $"Missing public feature card for {id}.");
+            int next = registry.IndexOf("\n  - id: ", start + marker.Length, StringComparison.Ordinal);
+            string block = next >= 0 ? registry[start..next] : registry[start..];
+
+            Assert.Contains($"href: {href}", block, StringComparison.Ordinal);
+            Assert.Contains($"badge: {badge}", block, StringComparison.Ordinal);
+            Assert.DoesNotContain("badge: Preparing", block, StringComparison.Ordinal);
+            Assert.DoesNotContain("badge: Research", block, StringComparison.Ordinal);
+            Assert.DoesNotContain("badge: Preview lane", block, StringComparison.Ordinal);
+        }
     }
 }

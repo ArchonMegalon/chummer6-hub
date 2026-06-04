@@ -126,6 +126,11 @@ class BlackLedgerGeoscapeRoot {
     this.videoMp4Url = root.dataset.globeVideoMp4 || '/media/ledger/globe/black-ledger-video-globe-idle.mp4';
     this.videoWebmUrl = root.dataset.globeVideoWebm || '/media/ledger/globe/black-ledger-video-globe-idle.webm';
     this.videoPosterUrl = root.dataset.globeVideoPoster || '/media/ledger/globe/black-ledger-video-globe-idle-poster.png';
+    this.overlayEyebrow = root.dataset.overlayEyebrow || 'Black Ledger command deck';
+    this.overlayHeadline = root.dataset.overlayHeadline || (this.variant === 'teaser' ? 'The city remembers.' : 'Heat is moving.');
+    this.primarySignalLabel = root.dataset.signalPrimary || 'district pressure live';
+    this.secondarySignalLabel = root.dataset.signalSecondary || 'runner fallout tracked';
+    this.tertiarySignalLabel = root.dataset.signalTertiary || 'newsroom feed armed';
     this.selectedFactionSlug = slugify(root.dataset.selectedFaction || '');
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.disableWebGl = root.dataset.disableWebgl === 'true' || IS_AUTOMATED_QA;
@@ -259,13 +264,13 @@ class BlackLedgerGeoscapeRoot {
           <canvas class="black-ledger-geoscape__webgl" aria-hidden="true"></canvas>
           <canvas class="black-ledger-geoscape__canvas" role="img" aria-label="Black Ledger command globe"></canvas>
           <div class="black-ledger-geoscape__signal-rail" aria-hidden="true">
-            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--primary">district pressure live</span>
-            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--secondary">runner fallout tracked</span>
-            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">newsroom feed armed</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--primary">${this.primarySignalLabel}</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--secondary">${this.secondarySignalLabel}</span>
+            <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">${this.tertiarySignalLabel}</span>
           </div>
           <div class="black-ledger-geoscape__overlay">
-            <div class="black-ledger-geoscape__eyebrow">Black Ledger overlay</div>
-            <div class="black-ledger-geoscape__headline">${this.variant === 'teaser' ? 'The city remembers.' : 'Heat is moving.'}</div>
+            <div class="black-ledger-geoscape__eyebrow">${this.overlayEyebrow}</div>
+            <div class="black-ledger-geoscape__headline">${this.overlayHeadline}</div>
             <div class="black-ledger-geoscape__status"></div>
           </div>
           <div class="black-ledger-geoscape__tooltip" aria-hidden="true">

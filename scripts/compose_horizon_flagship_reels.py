@@ -4,9 +4,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import re
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,18 +25,21 @@ TTS_PYTHON = WORKSPACE / "_completion" / "promo_video_rework_20260602" / "tts_ve
 WIDTH = 1280
 HEIGHT = 720
 FPS = 24
+UNMIXR_API_URL = "https://unmixr.com/api/v1/short-tts/"
 
+
+DOCUMENTARY_VOICE = "en-GB-ThomasNeural"
 
 HORIZON_VOICE: dict[str, str] = {
-    "NEXUS-PAN": "en-US-AndrewNeural",
-    "ALICE": "en-US-AvaNeural",
-    "KARMA FORGE": "en-US-BrianNeural",
-    "JACKPOINT": "en-US-SteffanNeural",
-    "RUNSITE": "en-US-RogerNeural",
-    "RUNBOOK PRESS": "en-GB-RyanNeural",
-    "TABLE PULSE": "en-US-EmmaNeural",
-    "BLACK LEDGER": "en-US-RogerNeural",
-    "COMMUNITY HUB": "en-US-BrianNeural",
+    "NEXUS-PAN": DOCUMENTARY_VOICE,
+    "ALICE": DOCUMENTARY_VOICE,
+    "KARMA FORGE": DOCUMENTARY_VOICE,
+    "JACKPOINT": DOCUMENTARY_VOICE,
+    "RUNSITE": DOCUMENTARY_VOICE,
+    "RUNBOOK PRESS": DOCUMENTARY_VOICE,
+    "TABLE PULSE": DOCUMENTARY_VOICE,
+    "BLACK LEDGER": DOCUMENTARY_VOICE,
+    "COMMUNITY HUB": DOCUMENTARY_VOICE,
 }
 
 CUSTOM_NARRATION: dict[str, list[str]] = {
@@ -125,9 +131,9 @@ CUSTOM_NARRATION: dict[str, list[str]] = {
         "Some pressure belongs at the table. Some pressure belongs after the table. TABLE PULSE exists to keep that boundary clear.",
         "Heat should feel alive without becoming a scorecard for players.",
         "The GM sees the signal, chooses the packet, and decides whether the scene needs a nudge or needs silence.",
-        "Remote players can answer the moment without hijacking the room. A reaction, a vote, a pressure choice, then back to play.",
+        "Players who are not physically at the table can still matter when they join an opposing faction. If they opt in, they can receive a bounded notification, send a reaction, and answer the pressure without hijacking the room.",
         "Consent, quiet hours, opt-outs, and table policy are not afterthoughts. They decide what the system is allowed to do.",
-        "After the session, the useful packet is private: what hit, what dragged, what needs care, and what the GM might try next time.",
+        "After the session, they can also receive a bounded summary of the run, the result, and the fallout that belongs to their faction.",
         "The goal is not surveillance. It is pacing support for a table that already trusts its GM.",
         "When the heat rises, the system should help the scene breathe instead of making the room perform for a dashboard.",
         "A good pulse is felt in play and barely noticed as software.",
@@ -178,7 +184,7 @@ HORIZON_INTROS: dict[str, str] = {
     "JACKPOINT": "JACKPOINT is for the night after the run, when the table needs a clean recap instead of six contradictory memories.",
     "RUNSITE": "RUNSITE is for mission spaces that should feel playable before the first door opens.",
     "RUNBOOK PRESS": "RUNBOOK PRESS is for turning campaign material into something a real table can read, share, and use again.",
-    "TABLE PULSE": "TABLE PULSE is for live pressure: heat, reactions, remote choices, and aftermath without turning players into a scoreboard.",
+    "TABLE PULSE": "TABLE PULSE is for live pressure: faction opt-in reactions, bounded notifications, and aftermath without turning players into a scoreboard.",
     "BLACK LEDGER": "BLACK LEDGER is for a city that does not reset after the crew leaves the scene.",
     "COMMUNITY HUB": "COMMUNITY HUB is for finding the right table, proving the runner is ready, and closing the loop after the job.",
 }
@@ -229,6 +235,60 @@ def probe(path: Path) -> dict[str, Any]:
 def duration(path: Path) -> float:
     payload = probe(path)
     return float(dict(payload.get("format") or {}).get("duration") or 0.0)
+
+
+def unmixr_config() -> dict[str, str] | None:
+    api_key = os.environ.get("UNMIXR_API_KEY", "").strip()
+    voice_id = os.environ.get("UNMIXR_VOICE_ID", "").strip()
+    if not api_key or not voice_id:
+        return None
+    return {
+        "api_key": api_key,
+        "voice_id": voice_id,
+        "language": os.environ.get("UNMIXR_LANGUAGE", "en-US").strip() or "en-US",
+        "speaking_rate": os.environ.get("UNMIXR_SPEAKING_RATE", "medium").strip() or "medium",
+        "speaking_pitch": os.environ.get("UNMIXR_SPEAKING_PITCH", "low").strip() or "low",
+        "speaking_volume": os.environ.get("UNMIXR_SPEAKING_VOLUME", "medium").strip() or "medium",
+    }
+
+
+def render_unmixr_tts(text: str, output: Path) -> bool:
+    config = unmixr_config()
+    if config is None:
+        return False
+    payload = json.dumps(
+        {
+            "text": text,
+            "voice_id": config["voice_id"],
+            "language": config["language"],
+            "speaking_rate": config["speaking_rate"],
+            "speaking_pitch": config["speaking_pitch"],
+            "speaking_volume": config["speaking_volume"],
+            "output_type": output.suffix.lstrip(".") or "mp3",
+            "response_type": "url",
+        }
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        UNMIXR_API_URL,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {config['api_key']}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        audio_url = str(body.get("audio_url") or "").strip()
+        if not audio_url:
+            return False
+        with urllib.request.urlopen(audio_url, timeout=120) as audio_response:
+            output.write_bytes(audio_response.read())
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return False
+    return output.exists() and output.stat().st_size > 0
 
 
 def cinematic_bed_filter(target_len: float, *, mode: str) -> str:
@@ -299,7 +359,7 @@ async def render_edge_tts(text: str, voice: str, output: Path) -> bool:
         "import asyncio, edge_tts, pathlib, sys\n"
         "async def main():\n"
         "    voice, text, output = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])\n"
-        "    await edge_tts.Communicate(text=text, voice=voice, rate='-4%', pitch='-1Hz').save(str(output))\n"
+        "    await edge_tts.Communicate(text=text, voice=voice, rate='-8%', pitch='-7Hz').save(str(output))\n"
         "asyncio.run(main())\n",
         encoding="utf-8",
     )
@@ -326,7 +386,11 @@ async def render_narration_files(asset_id: str, scenes: list[ScenePlan], work: P
     provider = "edge-tts"
     for index, scene in enumerate(scenes, start=1):
         output = narration_dir / f"{index:02}.mp3"
-        ok = await render_edge_tts(scene.narration, scene.voice, output)
+        ok = render_unmixr_tts(scene.narration, output)
+        if ok:
+            provider = "unmixr-short-tts"
+        else:
+            ok = await render_edge_tts(scene.narration, scene.voice, output)
         if not ok:
             provider = "ffmpeg-flite"
             output = narration_dir / f"{index:02}.wav"
@@ -423,7 +487,7 @@ def horizon_name(asset: dict[str, Any]) -> str:
 
 def build_scene_plan(asset: dict[str, Any]) -> list[ScenePlan]:
     horizon = horizon_name(asset)
-    base_voice = HORIZON_VOICE.get(horizon.upper(), "en-US-AndrewNeural")
+    base_voice = HORIZON_VOICE.get(horizon.upper(), DOCUMENTARY_VOICE)
     scenes: list[ScenePlan] = []
     source_scenes = asset["scenes"]
     total = len(source_scenes)
@@ -446,7 +510,7 @@ def build_scene_plan(asset: dict[str, Any]) -> list[ScenePlan]:
         else:
             narration = f"{title}. Show the useful part, keep the GM in control, and get the table back to the scene."
         treatment = "field_reporter" if index == total - 1 else "trailer"
-        voice = "en-US-RogerNeural" if treatment == "field_reporter" else base_voice
+        voice = DOCUMENTARY_VOICE if treatment == "field_reporter" else base_voice
         scenes.append(
             ScenePlan(
                 scene_id=str(raw["id"]),
@@ -531,7 +595,7 @@ def compose_asset(asset: dict[str, Any]) -> dict[str, Any]:
         "source_magicfit_scene_count": len(scenes),
         "render_mode": "magicfit_clip_composite_with_flagship_meta_game_voiceover",
         "narration_provider": narration_provider,
-        "field_reporter_voice": "en-US-RogerNeural with lower ork-news processing",
+        "field_reporter_voice": "en-GB-ThomasNeural with lower ork-news processing",
         "meta_game_overlay": ["subtle trace status", "remote eyes indicator", "trace lost indicator"],
         "mp4_probe": probe(output),
         "public_safe_boundary": "No official Shadowrun logos, sourcebook pages, canonical characters, or provider-direct publishing.",

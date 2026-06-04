@@ -651,9 +651,9 @@ public sealed class PublicLandingController : Controller
         var model = await BuildAnarchyPageModel(
             currentPath: "/anarchy",
             currentSection: "overview",
-            eyebrow: "Dedicated ruleset preview",
+            eyebrow: "Dedicated ruleset lane",
             heading: "Shadowrun Anarchy",
-            intro: "A dedicated rules-light lane for mobile play, dispatches, faction consequence, and fast continuity. This is a playable preview, not full book-level rules completeness.",
+            intro: "A shipped rules-light lane for mobile play, dispatches, faction consequence, and fast continuity. Chummer treats Anarchy as its own first-party ruleset profile without claiming full dense-book completeness.",
             primaryAction: new TrustPageActionViewModel("Open Anarchy play shell", "/play/anarchy", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open Anarchy ledger lane", "/ledger/anarchy", "secondary"),
             cancellationToken: cancellationToken);
@@ -685,6 +685,51 @@ public sealed class PublicLandingController : Controller
     [Produces("application/json")]
     public IActionResult AnarchyExplainReceiptJson()
         => Content(_waveEightHorizons.BuildAnarchyExplainJson(), "application/json");
+
+    [HttpGet("/anarchy/receipts/runtime.json")]
+    [Produces("application/json")]
+    public IActionResult AnarchyRuntimeReceiptJson()
+    {
+        var profile = _anarchyPreview.LoadFeaturedProfile();
+        var explain = _anarchyPreview.BuildExplainReceipt();
+        var dispatches = _anarchyPreview.ListDispatches();
+        return Ok(new
+        {
+            Horizon = "anarchy",
+            Status = "shipped_mvp",
+            RulesetId = AnarchyPreviewService.RulesetId,
+            PlayShell = new
+            {
+                OverviewHref = "/anarchy",
+                PlayHref = "/play/anarchy",
+                LedgerHref = "/ledger/anarchy"
+            },
+            ExportLane = new
+            {
+                ExportJsonHref = "/anarchy/export/runner.json",
+                ExplainReceiptHref = "/anarchy/receipts/explain.json",
+                ExplainReceiptId = explain.ReceiptId
+            },
+            PublicProfile = new
+            {
+                Handle = profile.Handle,
+                VerdictLabel = "Shipped rules-light lane",
+                ScopeLabel = "Dedicated ruleset lane"
+            },
+            DispatchLane = new
+            {
+                DispatchCount = dispatches.Count,
+                ReceiptAnchored = dispatches.All(item => string.Equals(item.SourceReceiptId, "ledger_tick_0001_preseeded", StringComparison.Ordinal)),
+                DispatchHrefTemplate = "/ledger/dispatches?ruleset=anarchy"
+            },
+            Boundary = new
+            {
+                DenseBookCompleteness = "Not claimed",
+                SourcebookProse = "Not shipped",
+                WorldTruth = "Black Ledger receipts only"
+            }
+        });
+    }
 
     [HttpGet("/downloads/release-upload")]
     [Produces("text/html")]
@@ -1453,10 +1498,49 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> BuildGhostConciergePage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken));
 
+    [HttpGet("/alice")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AlicePage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken, currentPath: "/alice", title: "ALICE", eyebrow: "Shipped compare bench", heading: "ALICE keeps compare, tradeoffs, and apply truth on first-party rails.", intro: "ALICE is now the named public entry for Chummer's Build Ghost compare bench. Public-safe intake and explanation stay bounded, while compare, legality explanation, receipts, discard, and apply remain first-party runtime work." ));
+
     [HttpGet("/participate/build-ghosts.json")]
     [Produces("application/json")]
     public IActionResult BuildGhostConciergeJson()
         => Ok(_buildGhostConcierge.Build());
+
+    [HttpGet("/alice/receipts/build-ghost.json")]
+    [Produces("application/json")]
+    public IActionResult AliceReceiptJson()
+    {
+        BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
+        return Ok(new
+        {
+            projection.FacePopEntryHref,
+            projection.FacePopStatus,
+            projection.AnswerlyStatus,
+            projection.EngineStatus,
+            projection.HumanizedSummary,
+            projection.CanonicalLane,
+            projection.RuntimeBoundary,
+            projection.FacePopResponsibilities,
+            projection.AnswerlyResponsibilities,
+            projection.ChummerResponsibilities,
+            projection.CompareArtifacts,
+            projection.ClientReportHref,
+            projection.PublicFeedbackHref,
+            projection.Actions,
+            SignedInBench = new
+            {
+                AccountEntryHref = "/account/alice",
+                AccountRedirectHref = "/account/alice/open",
+                AccountFallbackHref = "/account/work",
+                HandoffDetailHrefTemplate = "/account/alice/{handoffId}",
+                HandoffIndexApiHref = "/api/v1/campaign-spine/me/build-handoffs",
+                HandoffDetailApiHrefTemplate = "/api/v1/campaign-spine/me/build-handoffs/{handoffId}",
+                Summary = "Signed-in ALICE opens the first-party build handoff bench, where compare follow-through, planner coverage, tradeoffs, and apply-safe outputs stay on account-owned rails."
+            }
+        });
+    }
 
     [HttpGet("/ready")]
     [Produces("text/html")]
@@ -1501,6 +1585,10 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/KnowledgeFabric.cshtml", model);
     }
 
+    [HttpGet("/roadmap/knowledge-fabric")]
+    public IActionResult KnowledgeFabricRoadmapAlias()
+        => Redirect("/rules");
+
     [HttpGet("/knowledge")]
     public IActionResult KnowledgeAliasPage()
         => Redirect("/rules");
@@ -1520,6 +1608,10 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> ContinuityPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/NexusPanContinuity.cshtml", await BuildNexusPanContinuityPageModel(cancellationToken));
 
+    [HttpGet("/roadmap/nexus-pan")]
+    public IActionResult NexusPanRoadmapAlias()
+        => Redirect("/play/continuity");
+
     [HttpGet("/play/continuity/receipts")]
     [Produces("application/json")]
     public IActionResult NexusPanReceiptIndex()
@@ -1530,6 +1622,101 @@ public sealed class PublicLandingController : Controller
     public IActionResult NexusPanReceiptJson([FromRoute] string receiptId)
         => Content(_nexusPan.BuildReceiptJson(receiptId), "application/json");
 
+    [HttpGet("/table-pulse")]
+    [Produces("text/html")]
+    public async Task<IActionResult> TablePulsePage(CancellationToken cancellationToken)
+    {
+        TrustPageViewModel model = await BuildHorizonPreviewPageModel(
+            pageId: "table-pulse",
+            title: "TABLE PULSE",
+            description: "Governed live heat and GM-private aftermath stay on separate first-party rails.",
+            currentPath: "/table-pulse",
+            eyebrow: "Shipped split rail",
+            heading: "TABLE PULSE separates live heat from private aftermath.",
+            intro: "TABLE PULSE is now a real product surface, not just a redirect. Live pressure stays on the signed-in command lane. GM-private aftermath packages stay on a separate receipt-backed rail so heat, recap, and follow-through do not collapse into surveillance or vague drama text.",
+            sections:
+            [
+                new TrustPageSectionViewModel(
+                    "table_pulse_live",
+                    "Live rail",
+                    "What is live now",
+                    "The live rail is the in-world packet and reaction system.",
+                    [
+                        "GM-controlled heat packets on the signed-in ledger notifications route.",
+                        "Bounded remote reaction submissions with explicit GM adjudication.",
+                        "World pressure remains inspectable before it affects the wider city."
+                    ]),
+                new TrustPageSectionViewModel(
+                    "table_pulse_aftermath",
+                    "Aftermath rail",
+                    "What the aftermath lane owns",
+                    "The aftermath rail is a separate GM-private recap and carry-forward packet system.",
+                    [
+                        "Workspace aftermath recap packages stay receipt-backed.",
+                        "Downtime, carry-forward, and campaign-memory cues stay on one governed return lane.",
+                        "The rail is private GM follow-through, not public scoring or moderation truth."
+                    ]),
+                new TrustPageSectionViewModel(
+                    "table_pulse_boundary",
+                    "Boundary",
+                    "What this horizon does not claim",
+                    "The live rail and the aftermath rail are deliberately separate.",
+                    [
+                        "No automatic canon mutation.",
+                        "No player surveillance or public trust scoring.",
+                        "No claim that a provider-side coach outranks first-party campaign truth."
+                    ])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Open live notifications", "/account/ledger/notifications", "primary"),
+                new TrustPageActionViewModel("Open aftermath rail", "/account/work#aftermath-packages", "secondary"),
+                new TrustPageActionViewModel("Open Black Ledger", "/ledger", "ghost")
+            ],
+            cancellationToken: cancellationToken,
+            summaryPoints:
+            [
+                "Live heat packets are real now",
+                "GM-private aftermath packages are real now",
+                "The two rails stay separate on purpose"
+            ]);
+        return View("~/Views/PublicLanding/TrustPage.cshtml", model);
+    }
+
+    [HttpGet("/table-pulse/receipts/live-and-aftermath.json")]
+    [Produces("application/json")]
+    public IActionResult TablePulseReceiptJson()
+        => Ok(new
+        {
+            Horizon = "table_pulse",
+            Status = "shipped_mvp",
+            SeparationStatus = "pass",
+            LiveRail = new
+            {
+                Status = "live",
+                NotificationsHref = "/account/ledger/notifications",
+                ReactionPostHref = "/account/ledger/notifications/table-pulse/react",
+                Summary = "GM-controlled heat packets, bounded reactions, and adjudicated fallout stay on the signed-in command lane."
+            },
+            AftermathRail = new
+            {
+                Status = "live",
+                WorkspaceHref = "/account/work#aftermath-packages",
+                ApiRoutes = new[]
+                {
+                    "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
+                    "/api/v1/campaign-spine/me/workspaces/{workspaceId}/downtime-aftermath"
+                },
+                Summary = "GM-private aftermath recap, downtime carry-forward, and campaign-memory follow-through remain receipt-backed and separate from the live rail."
+            },
+            Boundaries = new[]
+            {
+                "no_automatic_world_authority",
+                "no_player_scoring",
+                "no_public_surveillance_truth"
+            }
+        });
+
     [HttpGet("/mobile/pwa.json")]
     [Produces("application/json")]
     public IActionResult MobilePwaJson()
@@ -1539,6 +1726,44 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> JackpointPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildJackpointPageModel(cancellationToken));
+
+    [HttpGet("/jackpoint/receipts/briefing-network.json")]
+    [Produces("application/json")]
+    public IActionResult JackpointReceiptJson()
+    {
+        IReadOnlyList<MediaArtifactDocument> briefings = _mediaHorizons?.ListJackpointBriefings() ?? Array.Empty<MediaArtifactDocument>();
+        string firstBriefingMarkdownHref = briefings.FirstOrDefault()?.MarkdownRoute ?? "/jackpoint/briefings/emerald-sprawl-briefing.md";
+        string firstBriefingJsonHref = briefings.FirstOrDefault()?.JsonRoute ?? "/jackpoint/briefings/emerald-sprawl-briefing.json";
+        return Ok(new
+        {
+            Horizon = "jackpoint",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                FirstBriefingMarkdownHref = firstBriefingMarkdownHref,
+                FirstBriefingJsonHref = firstBriefingJsonHref,
+                BriefingCount = briefings.Count == 0 ? 2 : briefings.Count,
+                Summary = "Public JACKPOINT keeps player-safe briefing and dossier packets on first-party markdown and JSON rails."
+            },
+            SignedInDesk = new
+            {
+                AccountEntryHref = "/account/jackpoint",
+                AccountRedirectHref = "/account/jackpoint/open",
+                AccountPublicationHrefTemplate = "/account/jackpoint/{publicationId}",
+                PublicationIndexApiHref = "/api/v1/campaign-spine/me/publications",
+                PublicationDetailApiHrefTemplate = "/api/v1/campaign-spine/me/publications/{publicationId}",
+                ArtifactDetailHrefTemplate = "/artifacts/publications/{publicationId}",
+                Summary = "Signed-in JACKPOINT keeps publication review, public-shelf truth, and campaign-return publication follow-through on first-party rails."
+            },
+            Boundary = new
+            {
+                PublicAudience = "player_safe_only",
+                GmSpoilerPackets = "signed_in_only",
+                PublicationTruth = "chummer_owned",
+                ExternalNarrationAuthority = "not_claimed"
+            }
+        });
+    }
 
     [HttpGet("/jackpoint/briefings/{briefingId}.md")]
     [Produces("text/markdown")]
@@ -1554,10 +1779,54 @@ public sealed class PublicLandingController : Controller
     public IActionResult BriefingsAliasPage()
         => Redirect("/jackpoint");
 
+    [HttpGet("/roadmap/jackpoint")]
+    public IActionResult JackpointRoadmapAlias()
+        => Redirect("/jackpoint");
+
     [HttpGet("/runsites")]
     [Produces("text/html")]
     public async Task<IActionResult> RunsitePreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunsitePageModel(cancellationToken));
+
+    [HttpGet("/runsites/receipts/prep-network.json")]
+    [Produces("application/json")]
+    public IActionResult RunsiteReceiptJson()
+    {
+        IReadOnlyList<MediaArtifactDocument> packs = _mediaHorizons?.ListRunsitePacks() ?? Array.Empty<MediaArtifactDocument>();
+        string firstPackMarkdownHref = packs.FirstOrDefault()?.MarkdownRoute ?? "/runsites/packs/redmond-dockyard-pack.md";
+        string firstPackJsonHref = packs.FirstOrDefault()?.JsonRoute ?? "/runsites/packs/redmond-dockyard-pack.json";
+        return Ok(new
+        {
+            Horizon = "runsite",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                FirstPackMarkdownHref = firstPackMarkdownHref,
+                FirstPackJsonHref = firstPackJsonHref,
+                PackCount = packs.Count == 0 ? 2 : packs.Count,
+                Summary = "Public RUNSITE keeps inspectable pack, route, and threat-clock rails visible before any signed-in prep lane opens."
+            },
+            SignedInBench = new
+            {
+                AccountEntryHref = "/account/runsites",
+                AccountRedirectHref = "/account/runsites/open",
+                AccountWorkspaceHrefTemplate = "/account/runsites/{workspaceId}",
+                WorkspaceIndexApiHref = "/api/v1/campaign-spine/me/workspace-digests",
+                WorkspaceDetailApiHrefTemplate = "/api/v1/campaign-spine/me/workspaces/{workspaceId}",
+                PrepLibraryApiHrefTemplate = "/api/v1/campaign-spine/me/workspaces/{workspaceId}/prep-library",
+                RunIndexApiHref = "/api/v1/campaign-spine/me/runs",
+                RunDetailApiHrefTemplate = "/api/v1/campaign-spine/me/runs/{runId}",
+                Summary = "Signed-in RUNSITE keeps workspace prep, runboard continuity, and governed prep-library launch on first-party campaign-spine rails."
+            },
+            Boundary = new
+            {
+                TacticalAuthority = "not_claimed",
+                VttReplacement = "not_claimed",
+                PrepTruth = "first_party_workspace_and_run_rails",
+                ProviderTours = "secondary_only"
+            }
+        });
+    }
 
     [HttpGet("/runsites/packs/{packId}.md")]
     [Produces("text/markdown")]
@@ -1569,10 +1838,170 @@ public sealed class PublicLandingController : Controller
     public IActionResult RunsitePackJson([FromRoute] string packId)
         => Content(_mediaHorizons.BuildDocumentJson(_mediaHorizons.GetRunsitePack(packId), "runsite", "Spatial-prep packet only. This route does not claim a full overlay, VTT, or tactical authority stack."), "application/json");
 
+    [HttpGet("/roadmap/runsite")]
+    public IActionResult RunsiteRoadmapAlias()
+        => Redirect("/runsites");
+
+    [HttpGet("/onramp")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OnrampPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildOnrampPageModel(cancellationToken));
+
+    [HttpGet("/onramp/receipts/guided-starter.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> OnrampReceiptJson(CancellationToken cancellationToken)
+        => Ok(BuildOnrampReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/onramp", cancellationToken)));
+
+    [HttpGet("/onramp/packets/{packetId}.md")]
+    [Produces("text/markdown")]
+    public async Task<IActionResult> OnrampPacketMarkdown([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownOnrampPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildOnrampPacketMarkdownAsync(packetId, cancellationToken), "text/markdown");
+    }
+
+    [HttpGet("/onramp/packets/{packetId}.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> OnrampPacketJson([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownOnrampPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildOnrampPacketJsonAsync(packetId, cancellationToken), "application/json");
+    }
+
+    [HttpGet("/roadmap/onramp")]
+    public IActionResult OnrampRoadmapAlias()
+        => Redirect("/onramp");
+
+    [HttpGet("/edition-studio")]
+    [Produces("text/html")]
+    public async Task<IActionResult> EditionStudioPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildEditionStudioPageModel(cancellationToken));
+
+    [HttpGet("/edition-studio/receipts/ruleset-heads.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> EditionStudioReceiptJson(CancellationToken cancellationToken)
+        => Ok(BuildEditionStudioReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/edition-studio", cancellationToken)));
+
+    [HttpGet("/edition-studio/packets/{packetId}.md")]
+    [Produces("text/markdown")]
+    public async Task<IActionResult> EditionStudioPacketMarkdown([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownEditionStudioPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildEditionStudioPacketMarkdownAsync(packetId, cancellationToken), "text/markdown");
+    }
+
+    [HttpGet("/edition-studio/packets/{packetId}.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> EditionStudioPacketJson([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownEditionStudioPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildEditionStudioPacketJsonAsync(packetId, cancellationToken), "application/json");
+    }
+
+    [HttpGet("/roadmap/edition-studio")]
+    public IActionResult EditionStudioRoadmapAlias()
+        => Redirect("/edition-studio");
+
+    [HttpGet("/local-co-processor")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LocalCoProcessorPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildLocalCoProcessorPageModel(cancellationToken));
+
+    [HttpGet("/local-co-processor/receipts/optional-acceleration.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> LocalCoProcessorReceiptJson(CancellationToken cancellationToken)
+        => Ok(BuildLocalCoProcessorReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/local-co-processor", cancellationToken)));
+
+    [HttpGet("/local-co-processor/packets/{packetId}.md")]
+    [Produces("text/markdown")]
+    public async Task<IActionResult> LocalCoProcessorPacketMarkdown([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownLocalCoProcessorPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildLocalCoProcessorPacketMarkdownAsync(packetId, cancellationToken), "text/markdown");
+    }
+
+    [HttpGet("/local-co-processor/packets/{packetId}.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> LocalCoProcessorPacketJson([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownLocalCoProcessorPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildLocalCoProcessorPacketJsonAsync(packetId, cancellationToken), "application/json");
+    }
+
+    [HttpGet("/roadmap/local-co-processor")]
+    public IActionResult LocalCoProcessorRoadmapAlias()
+        => Redirect("/local-co-processor");
+
+    [HttpGet("/run-control")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunControlPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunControlPageModel(cancellationToken));
+
+    [HttpGet("/run-control/receipts/control-network.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> RunControlReceiptJson(CancellationToken cancellationToken)
+        => Ok(BuildRunControlReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/run-control", cancellationToken)));
+
+    [HttpGet("/run-control/packets/{packetId}.md")]
+    [Produces("text/markdown")]
+    public async Task<IActionResult> RunControlPacketMarkdown([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownRunControlPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildRunControlPacketMarkdownAsync(packetId, cancellationToken), "text/markdown");
+    }
+
+    [HttpGet("/run-control/packets/{packetId}.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> RunControlPacketJson([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownRunControlPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildRunControlPacketJsonAsync(packetId, cancellationToken), "application/json");
+    }
+
+    [HttpGet("/roadmap/run-control")]
+    public IActionResult RunControlRoadmapAlias()
+        => Redirect("/run-control");
+
     [HttpGet("/runbook")]
     [Produces("text/html")]
     public async Task<IActionResult> RunbookPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunbookPageModel(cancellationToken));
+
+    [HttpGet("/roadmap/runbook-press")]
+    public IActionResult RunbookPressRoadmapAlias()
+        => Redirect("/runbook");
 
     [HttpGet("/runbook/primers/{primerId}.md")]
     [Produces("text/markdown")]
@@ -1592,6 +2021,10 @@ public sealed class PublicLandingController : Controller
     [Produces("text/html")]
     public async Task<IActionResult> CommunityPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildCommunityHubPageModel(cancellationToken));
+
+    [HttpGet("/roadmap/community-hub")]
+    public IActionResult CommunityHubRoadmapAlias()
+        => Redirect("/community");
 
     [HttpGet("/community/runs/{runId}/venue")]
     [Produces("text/html")]
@@ -1682,10 +2115,91 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> CreatorPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildCreatorOsPageModel(cancellationToken));
 
+    [HttpGet("/roadmap/creator-os")]
+    public IActionResult CreatorOsRoadmapAlias()
+        => Redirect("/creator");
+
+    [HttpGet("/quicksilver")]
+    [Produces("text/html")]
+    public async Task<IActionResult> QuicksilverPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildQuicksilverPageModel(cancellationToken));
+
+    [HttpGet("/roadmap/quicksilver")]
+    public IActionResult QuicksilverRoadmapAlias()
+        => Redirect("/quicksilver");
+
+    [HttpGet("/quicksilver/receipts/command-network.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> QuicksilverCommandNetworkReceiptJson(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/quicksilver", cancellationToken);
+        QuicksilverCommandDeckReceipt payload = BuildQuicksilverCommandDeckReceipt(subject);
+        return Ok(payload);
+    }
+
+    [HttpGet("/quicksilver/packets/{packetId}.md")]
+    [Produces("text/markdown")]
+    public async Task<IActionResult> QuicksilverPacketMarkdown([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownQuicksilverPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildQuicksilverPacketMarkdownAsync(packetId, cancellationToken), "text/markdown");
+    }
+
+    [HttpGet("/quicksilver/packets/{packetId}.json")]
+    [Produces("application/json")]
+    public async Task<IActionResult> QuicksilverPacketJson([FromRoute] string packetId, CancellationToken cancellationToken)
+    {
+        if (!IsKnownQuicksilverPacketId(packetId))
+        {
+            return NotFound();
+        }
+
+        return Content(await BuildQuicksilverPacketJsonAsync(packetId, cancellationToken), "application/json");
+    }
+
     [HttpGet("/ghostwire")]
     [Produces("text/html")]
     public async Task<IActionResult> GhostwirePreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildGhostwirePageModel(cancellationToken));
+
+    [HttpGet("/roadmap/ghostwire")]
+    public IActionResult GhostwireRoadmapAlias()
+        => Redirect("/ghostwire");
+
+    [HttpGet("/ghostwire/receipts/replay-network.json")]
+    [Produces("application/json")]
+    public IActionResult GhostwireReplayNetworkReceiptJson()
+    {
+        GhostwirePublicSummary summary = _waveEightHorizons.BuildGhostwireSummary();
+        return Ok(new
+        {
+            Horizon = "ghostwire",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                ReplayTimelineMarkdownHref = "/ghostwire/after-action/replay_timeline.md",
+                ReplayTimelineJsonHref = "/ghostwire/after-action/replay_timeline.json",
+                AfterActionReportMarkdownHref = "/ghostwire/after-action/after_action_report.md",
+                AfterActionReportJsonHref = "/ghostwire/after-action/after_action_report.json",
+                ConsequenceChainMarkdownHref = "/ghostwire/after-action/consequence_chain.md",
+                ConsequenceChainJsonHref = "/ghostwire/after-action/consequence_chain.json",
+                PackageCount = summary.Packages.Count,
+                AfterActionCount = summary.AfterActionCount,
+                ReplayCount = summary.ReplayCount,
+                DowntimeCount = summary.DowntimeCount
+            },
+            Boundaries = new
+            {
+                TranscriptTruth = "Not claimed",
+                RetrospectiveFiction = "Not claimed",
+                WorldTruth = "Receipt-backed aftermath packets only"
+            }
+        });
+    }
 
     [HttpGet("/ghostwire/after-action/{packetId}.md")]
     [Produces("text/markdown")]
@@ -1734,6 +2248,48 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> RunnerPassportPreviewPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/MediaArtifactHorizon.cshtml", await BuildRunnerPassportPageModel(cancellationToken));
 
+    [HttpGet("/passport/receipts/identity-network.json")]
+    [Produces("application/json")]
+    public IActionResult RunnerPassportIdentityNetworkReceiptJson()
+    {
+        RunnerPassportPublicSummary summary = _communityCreatorHorizons.BuildPassportSummary();
+        return Ok(new
+        {
+            Horizon = "runner_passport",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                RunnerReturnMarkdownHref = "/passport/receipts/runner_return_posture.md",
+                RunnerReturnJsonHref = "/passport/receipts/runner_return_posture.json",
+                CrossTableBoundaryMarkdownHref = "/passport/receipts/cross_table_identity_boundary.md",
+                CrossTableBoundaryJsonHref = "/passport/receipts/cross_table_identity_boundary.json",
+                PrivacySafeParticipationMarkdownHref = "/passport/receipts/privacy_safe_participation_proof.md",
+                PrivacySafeParticipationJsonHref = "/passport/receipts/privacy_safe_participation_proof.json",
+                ActiveInstallationCount = summary.ActiveInstallationCount,
+                OpenRunCount = summary.OpenRunCount,
+                PendingJoinCount = summary.PendingJoinCount,
+                ParticipationNotificationCount = summary.ParticipationNotificationCount
+            },
+            SignedInBench = new
+            {
+                AccountEntryHref = "/account/passport",
+                AccountRedirectHref = "/account/passport/open",
+                AccountFallbackHref = "/account/work#aftermath-packages",
+                LiveNotificationsHref = "/account/ledger/notifications",
+                LeaderBriefingHrefTemplate = "/account/ledger/factions/{factionId}/leader-briefing",
+                AftermathHref = "/account/work#aftermath-packages",
+                Summary = "Signed-in Runner Passport keeps public-safe trust posture connected to the first-party Table Pulse live inbox, leader command, and aftermath return rail."
+            },
+            Boundary = new
+            {
+                ReputationTruth = "Not claimed",
+                Surveillance = "Not claimed",
+                ModerationTruth = "Signed-in only",
+                IdentityRecovery = "Signed-in only"
+            }
+        });
+    }
+
     [HttpGet("/signal-deck")]
     [Produces("text/html")]
     public async Task<IActionResult> SignalDeckPreviewPage(CancellationToken cancellationToken)
@@ -1754,6 +2310,49 @@ public sealed class PublicLandingController : Controller
     public IActionResult CommunityOpenRunPacketJson([FromRoute] string packetId)
         => Content(_communityCreatorHorizons.BuildCommunityJson(packetId), "application/json");
 
+    [HttpGet("/community/receipts/open-run-network.json")]
+    [Produces("application/json")]
+    public IActionResult CommunityHubReceiptJson()
+    {
+        CommunityHubPublicSummary summary = _communityCreatorHorizons.BuildCommunitySummary();
+        return Ok(new
+        {
+            Horizon = "community_hub",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                BoardMarkdownHref = "/community/open-runs/open_run_board.md",
+                BoardJsonHref = "/community/open-runs/open_run_board.json",
+                OpenRunCount = summary.OpenRuns.Count,
+                PendingJoinCount = summary.PendingJoinCount,
+                ScheduledCount = summary.ScheduledCount,
+                CloseoutCount = summary.CloseoutCount
+            },
+            SignedInBench = new
+            {
+                AccountEntryHref = "/account/community",
+                AccountRedirectHref = "/account/community/open",
+                AccountFallbackHref = "/account/work#community-ops",
+                OpenRunIndexApiHref = "/api/v1/campaign-spine/me/open-runs",
+                OpenRunDetailApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}",
+                OpenRunCreateApiHrefTemplate = "/api/v1/campaign-spine/me/workspaces/{workspaceId}/open-runs",
+                JoinRequestApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/join-requests",
+                JoinReviewApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/join-requests/{requestId}/reviews",
+                ScheduleApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/schedule",
+                MeetingHandoffApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/meeting-handoff",
+                CloseoutApiHrefTemplate = "/api/v1/campaign-spine/me/open-runs/{openRunId}/closeout",
+                Summary = "Signed-in Community Hub keeps open-run listing, join review, scheduling, meeting handoff, and closeout on first-party campaign-spine rails."
+            },
+            Boundary = new
+            {
+                MeetingTools = "Projection only",
+                RuleTruth = "Chummer-owned",
+                WorldTruth = "Chummer-owned",
+                Surveillance = "Not claimed"
+            }
+        });
+    }
+
     [HttpGet("/creator/packets/{packetId}.md")]
     [Produces("text/markdown")]
     public IActionResult CreatorPacketMarkdown([FromRoute] string packetId)
@@ -1763,6 +2362,43 @@ public sealed class PublicLandingController : Controller
     [Produces("application/json")]
     public IActionResult CreatorPacketJson([FromRoute] string packetId)
         => Content(_communityCreatorHorizons.BuildCreatorJson(packetId), "application/json");
+
+    [HttpGet("/creator/receipts/publication-network.json")]
+    [Produces("application/json")]
+    public IActionResult CreatorOsReceiptJson()
+    {
+        CreatorOsPublicSummary summary = _communityCreatorHorizons.BuildCreatorSummary();
+        return Ok(new
+        {
+            Horizon = "creator_os",
+            Status = "shipped_mvp",
+            PublicBoard = new
+            {
+                BoardMarkdownHref = "/creator/packets/publication_board.md",
+                BoardJsonHref = "/creator/packets/publication_board.json",
+                PublicationCount = summary.Publications.Count,
+                CuratedLiveCount = summary.CuratedLiveCount,
+                ApprovalBackedCount = summary.ApprovalBackedCount,
+                ReturnLoopCount = summary.ReturnLoopCount
+            },
+            SignedInBench = new
+            {
+                AccountEntryHref = "/account/creator",
+                AccountRedirectHref = "/account/creator/open",
+                AccountFallbackHref = "/account/work",
+                PublicationDetailHrefTemplate = "/account/creator/{publicationId}",
+                PublicationFallbackDetailHrefTemplate = "/account/work/publications/{publicationId}",
+                PublicDetailHrefTemplate = "/artifacts/publications/{publicationId}",
+                Summary = "Signed-in Creator OS keeps publication draft, review, publish, and campaign-return follow-through on first-party account rails."
+            },
+            Boundary = new
+            {
+                ProviderDashboards = "Not truth",
+                PublicationTruth = "Chummer-owned",
+                ReviewState = "Signed-in only"
+            }
+        });
+    }
 
     [HttpGet("/passport/receipts/{receiptId}.md")]
     [Produces("text/markdown")]
@@ -1796,6 +2432,10 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/karma-forge")]
     public IActionResult KarmaForgeAliasPage()
+        => Redirect("/participate/karma-forge");
+
+    [HttpGet("/roadmap/karma-forge")]
+    public IActionResult KarmaForgeRoadmapAlias()
         => Redirect("/participate/karma-forge");
 
     [HttpGet("/participate/karma-forge")]
@@ -1899,6 +2539,10 @@ public sealed class PublicLandingController : Controller
 
     [HttpGet("/black-ledger")]
     public IActionResult LedgerAliasPage()
+        => Redirect("/ledger");
+
+    [HttpGet("/roadmap/black-ledger")]
+    public IActionResult BlackLedgerRoadmapAlias()
         => Redirect("/ledger");
 
     [HttpGet("/ledger/stats")]
@@ -2151,6 +2795,9 @@ public sealed class PublicLandingController : Controller
                 provider_status = promo.ProviderStatus,
                 render_mode = promo.RenderMode,
                 fallback_render_mode = promo.FallbackRenderMode,
+                storyline_summary = promo.StorylineSummary,
+                narrator_posture = promo.NarratorPosture,
+                render_pipeline = promo.RenderPipelineLabel,
                 formats = promo.FormatLabels,
                 static_card_label = promo.StaticCardLabel,
                 playback_label = promo.PlaybackLabel,
@@ -2165,6 +2812,15 @@ public sealed class PublicLandingController : Controller
                     visual_hook = frame.VisualHook,
                     action_beat = frame.ActionBeat,
                     proof_payoff = frame.ProofPayoff,
+                }),
+                screenplay_scenes = promo.ScreenplayScenes.Select(scene => new
+                {
+                    scene_id = scene.SceneId,
+                    label = scene.Label,
+                    duration = scene.DurationLabel,
+                    purpose = scene.Purpose,
+                    visual_direction = scene.VisualDirection,
+                    narrator_line = scene.NarratorLine,
                 }),
                 html_href = promo.HtmlHref,
                 captions_href = promo.CaptionsHref,
@@ -3893,36 +4549,197 @@ public sealed class PublicLandingController : Controller
     }
 
     private async Task<MediaArtifactHorizonPageViewModel> BuildJackpointPageModel(CancellationToken cancellationToken)
-        => await BuildMediaArtifactHorizonPageModel(
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/jackpoint", cancellationToken);
+        IReadOnlyList<MediaArtifactDocument> briefings = _mediaHorizons.ListJackpointBriefings();
+        return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/jackpoint",
             title: "JACKPOINT briefings",
-            description: "Player-safe dossier cards, mission briefs, and first-party artifact packets.",
-            eyebrow: "Media horizon",
+            description: "Player-safe dossier cards, mission briefs, and first-party publication follow-through.",
+            eyebrow: "Publication horizon",
             heading: "JACKPOINT briefings",
-            intro: "JACKPOINT is now a real packet lane: dossier cards and mission briefs can be opened as first-party markdown or JSON instead of surviving only as horizon prose.",
-            boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers and private campaign notes stay off the public rail.",
-            summaryPoints: ["Dossier cards", "Mission brief packets", "Public-safe artifact rail"],
-            documents: _mediaHorizons.ListJackpointBriefings(),
-            primaryAction: new TrustPageActionViewModel("Open first briefing", "/jackpoint/briefings/emerald-sprawl-briefing.md", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open JSON packet", "/jackpoint/briefings/emerald-sprawl-briefing.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open artifacts", "/artifacts", "ghost"),
-            cancellationToken: cancellationToken);
+            intro: "JACKPOINT now ships a real first-party briefing network: public-safe dossier and mission packets stay readable on the open rail, while signed-in publication review and campaign-return publication follow-through stay on named account routes.",
+            boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers, draft publication notes, and private campaign return state stay signed-in.",
+            summaryPoints: ["Dossier cards", "Mission brief packets", "Signed-in publication desk"],
+            documents: briefings,
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for JACKPOINT" : "Open JACKPOINT", subject is null ? "/login?next=%2Faccount%2Fjackpoint" : "/account/jackpoint", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open briefing receipt", "/jackpoint/receipts/briefing-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open first briefing", briefings[0].MarkdownRoute, "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildJackpointConnectedLanePacket(subject));
+    }
 
     private async Task<MediaArtifactHorizonPageViewModel> BuildRunsitePageModel(CancellationToken cancellationToken)
-        => await BuildMediaArtifactHorizonPageModel(
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/runsites", cancellationToken);
+        IReadOnlyList<MediaArtifactDocument> packs = _mediaHorizons.ListRunsitePacks();
+        return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/runsites",
             title: "RUNSITE packets",
-            description: "Site cards, threat clocks, and first-party runsite packets.",
-            eyebrow: "Packet horizon",
+            description: "Site cards, threat clocks, governed prep rails, and first-party runsite packets.",
+            eyebrow: "Prep horizon",
             heading: "RUNSITE packets",
-            intro: "RUNSITE now ships as a packet lane: site cards, pressure clocks, and entry/exit notes live on real routes instead of generic preview copy.",
+            intro: "RUNSITE now ships as a real prep network: inspectable pack routes stay public-safe, while signed-in workspace prep, runboard continuity, and governed prep-library launch stay on named first-party rails.",
             boundaryLine: "Spatial-prep packet only. This rail does not claim tactical overlays, live map authority, or full VTT integration.",
-            summaryPoints: ["Site cards", "Threat clocks", "Entry and exit notes"],
-            documents: _mediaHorizons.ListRunsitePacks(),
-            primaryAction: new TrustPageActionViewModel("Open first runsite pack", "/runsites/packs/redmond-dockyard-pack.md", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open JSON pack", "/runsites/packs/redmond-dockyard-pack.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open runbook", "/runbook", "ghost"),
-            cancellationToken: cancellationToken);
+            summaryPoints: ["Site cards", "Threat clocks", "Signed-in prep bench"],
+            documents: packs,
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUNSITE" : "Open RUNSITE", subject is null ? "/login?next=%2Faccount%2Frunsites" : "/account/runsites", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open prep receipt", "/runsites/receipts/prep-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open first runsite pack", packs[0].MarkdownRoute, "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildRunsiteConnectedLanePacket(subject));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildRunControlPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/run-control", cancellationToken);
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/run-control",
+            title: "RUN CONTROL",
+            description: "Session board, active-scene continuity, reconnect posture, and first-party GM operations follow-through.",
+            eyebrow: "GM operations horizon",
+            heading: "RUN CONTROL",
+            intro: "RUN CONTROL now ships a real first-party GM operations lane: public-safe board posture stays readable, while signed-in session control, active-scene continuity, reconnect-safe run follow-through, and recap return stay on named campaign-spine rails.",
+            boundaryLine: "GM-control surface only. RUN CONTROL does not replace the rules engine, become a generic chat suite, or let hidden state outrank campaign truth.",
+            summaryPoints: ["Session board packet", "Continuity packet", "Signed-in control desk"],
+            documents:
+            [
+                new MediaArtifactDocument(
+                    "session_board",
+                    "Session board packet",
+                    "Inspect the public-safe session-board contract before treating Run Control like a generic operations console.",
+                    "/run-control/packets/session_board.md",
+                    "/run-control/packets/session_board.json",
+                    ["Session posture", "Active scene", "Next safe action", "Signed-in desk"]),
+                new MediaArtifactDocument(
+                    "continuity_board",
+                    "Continuity packet",
+                    "Inspect the reconnect and recovery contract that keeps live GM operations anchored to first-party continuity.",
+                    "/run-control/packets/continuity_board.md",
+                    "/run-control/packets/continuity_board.json",
+                    ["Reconnect posture", "Runboard continuity", "Recovery boundary"])
+            ],
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for RUN CONTROL" : "Open RUN CONTROL", subject is null ? "/login?next=%2Faccount%2Frun-control" : "/account/run-control", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open control receipt", "/run-control/receipts/control-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open session board packet", "/run-control/packets/session_board.md", "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildRunControlConnectedLanePacket(subject, BuildRunControlReceipt(subject)));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildOnrampPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/onramp", cancellationToken);
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/onramp",
+            title: "ONRAMP",
+            description: "Guided starter lane, recovery posture, and first-session follow-through without fake automation.",
+            eyebrow: "Guided mastery horizon",
+            heading: "ONRAMP",
+            intro: "ONRAMP now ships a bounded first-party starter lane: public-safe starter and recovery packets stay readable, while signed-in starter workspace, continuity restore, and first-session follow-through stay on named campaign-spine rails.",
+            boundaryLine: "Guided starter surface only. ONRAMP does not auto-build characters, invent legality, or let tutorial theater outrank core receipts and signed-in restore truth.",
+            summaryPoints: ["Starter lane packet", "Recovery lane packet", "Signed-in starter desk"],
+            documents:
+            [
+                new MediaArtifactDocument(
+                    "starter_lane",
+                    "Starter lane packet",
+                    "Inspect the public-safe starter contract before treating ONRAMP like an automatic build wizard.",
+                    "/onramp/packets/starter_lane.md",
+                    "/onramp/packets/starter_lane.json",
+                    ["Starter workspace", "First playable session", "Next safe action", "Signed-in desk"]),
+                new MediaArtifactDocument(
+                    "recovery_lane",
+                    "Recovery lane packet",
+                    "Inspect the restore and continuity contract that keeps guided setup tied to first-party account truth.",
+                    "/onramp/packets/recovery_lane.md",
+                    "/onramp/packets/recovery_lane.json",
+                    ["Restore posture", "Claimed devices", "Conflict summaries", "Recovery boundary"])
+            ],
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for ONRAMP" : "Open ONRAMP", subject is null ? "/login?next=%2Faccount%2Fonramp" : "/account/onramp", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open starter receipt", "/onramp/receipts/guided-starter.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open starter packet", "/onramp/packets/starter_lane.md", "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildOnrampConnectedLanePacket(subject, BuildOnrampReceipt(subject)));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildEditionStudioPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/edition-studio", cancellationToken);
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/edition-studio",
+            title: "EDITION STUDIO",
+            description: "Distinct SR4, SR5, and SR6 ruleset-head posture without splitting the product into disconnected apps.",
+            eyebrow: "Edition expression horizon",
+            heading: "EDITION STUDIO",
+            intro: "EDITION STUDIO now ships a bounded first-party ruleset-head lane: SR4, SR5, and SR6 head packets stay readable in public, while signed-in edition focus stays attached to the same account-owned workbench.",
+            boundaryLine: "Ruleset-head surface only. EDITION STUDIO does not create three disconnected apps, replace core truth with styling, or claim visual flavor as authority.",
+            summaryPoints: ["SR4 head packet", "SR5 head packet", "SR6 head packet"],
+            documents:
+            [
+                new MediaArtifactDocument(
+                    "sr4_head",
+                    "SR4 head packet",
+                    "Inspect the SR4 posture before treating Edition Studio like decorative theming.",
+                    "/edition-studio/packets/sr4_head.md",
+                    "/edition-studio/packets/sr4_head.json",
+                    ["Legacy muscle memory", "Dense posture", "Signed-in edition focus"]),
+                new MediaArtifactDocument(
+                    "sr5_head",
+                    "SR5 head packet",
+                    "Inspect the flagship density rail that keeps veteran speed and explainability authored together.",
+                    "/edition-studio/packets/sr5_head.md",
+                    "/edition-studio/packets/sr5_head.json",
+                    ["Flagship density", "Explain posture", "Signed-in edition focus"]),
+                new MediaArtifactDocument(
+                    "sr6_head",
+                    "SR6 head packet",
+                    "Inspect the modern ruleset-head rail without flattening it into older mental models.",
+                    "/edition-studio/packets/sr6_head.md",
+                    "/edition-studio/packets/sr6_head.json",
+                    ["Campaign-approved rail", "Modern pace", "Signed-in edition focus"])
+            ],
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for EDITION STUDIO" : "Open EDITION STUDIO", subject is null ? "/login?next=%2Faccount%2Fedition-studio" : "/account/edition-studio", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open ruleset-head receipt", "/edition-studio/receipts/ruleset-heads.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open SR5 head packet", "/edition-studio/packets/sr5_head.md", "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildEditionStudioConnectedLanePacket(subject, BuildEditionStudioReceipt(subject)));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildLocalCoProcessorPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/local-co-processor", cancellationToken);
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/local-co-processor",
+            title: "LOCAL CO-PROCESSOR",
+            description: "Optional local acceleration, explicit hosted-first parity, and disableable profiles that never become hidden requirements.",
+            eyebrow: "Optional acceleration horizon",
+            heading: "LOCAL CO-PROCESSOR",
+            intro: "LOCAL CO-PROCESSOR now ships a bounded first-party optional-acceleration lane: public-safe capability and policy packets stay readable, while signed-in profile choice and account-owned local posture stay on named first-party rails.",
+            boundaryLine: "Optional acceleration surface only. LOCAL CO-PROCESSOR does not move truth into local runtime, make desktop compute mandatory, or turn external helpers into hidden product prerequisites.",
+            summaryPoints: ["Capability matrix packet", "Policy boundary packet", "Signed-in optional profile desk"],
+            documents:
+            [
+                new MediaArtifactDocument(
+                    "capability_matrix",
+                    "Capability matrix packet",
+                    "Inspect the hosted-first capability contract before treating local compute like an unbounded fast path.",
+                    "/local-co-processor/packets/capability_matrix.md",
+                    "/local-co-processor/packets/capability_matrix.json",
+                    ["Hosted-first parity", "Optional local help", "Disableable profiles", "Signed-in desk"]),
+                new MediaArtifactDocument(
+                    "policy_boundary",
+                    "Policy boundary packet",
+                    "Inspect the privacy and fail-open boundary that keeps local acceleration optional and governed.",
+                    "/local-co-processor/packets/policy_boundary.md",
+                    "/local-co-processor/packets/policy_boundary.json",
+                    ["No local truth owner", "No mandatory runtime", "Fail-open fallback", "Privacy posture"])
+            ],
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for LOCAL CO-PROCESSOR" : "Open LOCAL CO-PROCESSOR", subject is null ? "/login?next=%2Faccount%2Flocal-co-processor" : "/account/local-co-processor", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open acceleration receipt", "/local-co-processor/receipts/optional-acceleration.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open capability packet", "/local-co-processor/packets/capability_matrix.md", "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildLocalCoProcessorConnectedLanePacket(subject, BuildLocalCoProcessorReceipt(subject)));
+    }
 
     private async Task<MediaArtifactHorizonPageViewModel> BuildRunbookPageModel(CancellationToken cancellationToken)
         => await BuildMediaArtifactHorizonPageModel(
@@ -3943,14 +4760,15 @@ public sealed class PublicLandingController : Controller
     private async Task<MediaArtifactHorizonPageViewModel> BuildCommunityHubPageModel(CancellationToken cancellationToken)
     {
         CommunityHubPublicSummary summary = _communityCreatorHorizons.BuildCommunitySummary();
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/community", cancellationToken);
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/community",
             title: "Community Hub",
             description: "Open-run board, organizer closeout posture, and moderation-safe public rails.",
             eyebrow: "Community horizon",
             heading: "Community Hub",
-            intro: "Community Hub now ships first-party packet rails: open-run board posture, organizer closeout proof, and moderation boundaries live on real markdown and JSON routes.",
-            boundaryLine: "Public route shows board posture and safety boundaries only. Private roster notes, meeting access, and case handling stay signed-in.",
+            intro: "Community Hub now ships a real first-party open-run network: public board posture and safety boundaries stay readable, while signed-in listing, join review, scheduling, meeting handoff, and closeout stay on the same governed campaign-spine rail.",
+            boundaryLine: "Public route shows board posture, safety boundaries, and receipts. Private roster notes, meeting access, and case handling stay signed-in and Chummer-owned.",
             summaryPoints:
             [
                 $"{summary.OpenRuns.Count} open runs visible",
@@ -3958,23 +4776,25 @@ public sealed class PublicLandingController : Controller
                 $"{summary.CloseoutCount} closeouts on record"
             ],
             documents: _communityCreatorHorizons.ListCommunityDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            primaryAction: new TrustPageActionViewModel("Open run board packet", "/community/open-runs/open_run_board.md", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open JSON board", "/community/open-runs/open_run_board.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open participate", "/participate", "ghost"),
-            cancellationToken: cancellationToken);
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Community Hub" : "Open Community Hub", subject is null ? "/login?next=%2Faccount%2Fcommunity" : "/account/community", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open network receipt", "/community/receipts/open-run-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open run board packet", "/community/open-runs/open_run_board.md", "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildCommunityHubConnectedLanePacket(subject, summary));
     }
 
     private async Task<MediaArtifactHorizonPageViewModel> BuildCreatorOsPageModel(CancellationToken cancellationToken)
     {
         CreatorOsPublicSummary summary = _communityCreatorHorizons.BuildCreatorSummary();
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/creator", cancellationToken);
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/creator",
             title: "Creator OS",
             description: "Governed publication discovery, trust posture, and campaign return loops.",
             eyebrow: "Creator horizon",
             heading: "Creator OS",
-            intro: "Creator OS now ships first-party publication packets: governed discovery, trust-boundary receipts, and campaign-return posture on real routes.",
-            boundaryLine: "Creator truth comes from Chummer-owned publication receipts. Private review state and provider dashboards stay off the public lane.",
+            intro: "Creator OS now ships a real first-party publication network: governed discovery stays public-safe, while signed-in draft review, publication state, and campaign-return follow-through stay on named account rails.",
+            boundaryLine: "Creator truth comes from Chummer-owned publication receipts and signed-in review state. Provider dashboards, external shelves, and asset hosts stay off the truth lane.",
             summaryPoints:
             [
                 $"{summary.Publications.Count} discoverable publications",
@@ -3982,10 +4802,53 @@ public sealed class PublicLandingController : Controller
                 $"{summary.ReturnLoopCount} with campaign return summaries"
             ],
             documents: _communityCreatorHorizons.ListCreatorDocuments().Select(item => new MediaArtifactDocument(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            primaryAction: new TrustPageActionViewModel("Open publication board", "/creator/packets/publication_board.md", "primary"),
-            secondaryAction: new TrustPageActionViewModel("Open publication JSON", "/creator/packets/publication_board.json", "secondary"),
-            tertiaryAction: new TrustPageActionViewModel("Open artifacts", "/artifacts", "ghost"),
-            cancellationToken: cancellationToken);
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Creator OS" : "Open Creator OS", subject is null ? "/login?next=%2Faccount%2Fcreator" : "/account/creator", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open publication receipt", "/creator/receipts/publication-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open publication board", "/creator/packets/publication_board.md", "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildCreatorOsConnectedLanePacket(subject, summary));
+    }
+
+    private async Task<MediaArtifactHorizonPageViewModel> BuildQuicksilverPageModel(CancellationToken cancellationToken)
+    {
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync("/quicksilver", cancellationToken);
+        QuicksilverCommandDeckReceipt receipt = BuildQuicksilverCommandDeckReceipt(subject);
+        return await BuildMediaArtifactHorizonPageModel(
+            currentPath: "/quicksilver",
+            title: "Quicksilver",
+            description: "Expert-speed command deck, jump targets, and bounded first-party focus lanes.",
+            eyebrow: "Speed horizon",
+            heading: "Quicksilver",
+            intro: "Quicksilver now ships a real first-party command deck: build compare, rules answers, prep rails, and publication desks stay one jump apart without flattening legality, explainability, or account-owned truth.",
+            boundaryLine: "Quicksilver is a speed surface for the same trusted product. It does not hide legality, invent background automation, or turn stale cached views into authority.",
+            summaryPoints:
+            [
+                "Command deck packet",
+                "Typed jump targets",
+                "Signed-in focus rail"
+            ],
+            documents:
+            [
+                new MediaArtifactDocument(
+                    "command_deck",
+                    "Command deck",
+                    "Inspect the bounded quick-jump contract before treating Quicksilver like a generic launcher.",
+                    "/quicksilver/packets/command_deck.md",
+                    "/quicksilver/packets/command_deck.json",
+                    ["Builds", "Rules", "Prep", "Publications"]),
+                new MediaArtifactDocument(
+                    "jump_targets",
+                    "Jump targets",
+                    "Inspect the named targets and focus routes that keep expert speed on first-party rails.",
+                    "/quicksilver/packets/jump_targets.md",
+                    "/quicksilver/packets/jump_targets.json",
+                    ["Focus routes", "API deck", "Account-owned follow-through"])
+            ],
+            primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Quicksilver" : "Open Quicksilver", subject is null ? "/login?next=%2Faccount%2Fquicksilver" : "/account/quicksilver", "primary"),
+            secondaryAction: new TrustPageActionViewModel("Open command receipt", "/quicksilver/receipts/command-network.json", "secondary"),
+            tertiaryAction: new TrustPageActionViewModel("Open command deck packet", "/quicksilver/packets/command_deck.md", "ghost"),
+            cancellationToken: cancellationToken,
+            connectedLanePacket: BuildQuicksilverConnectedLanePacket(subject, receipt));
     }
 
     private async Task<MediaArtifactHorizonPageViewModel> BuildRunnerPassportPageModel(CancellationToken cancellationToken)
@@ -4014,7 +4877,7 @@ public sealed class PublicLandingController : Controller
             Chrome: chrome,
             Eyebrow: "Identity horizon",
             Heading: "Runner Passport",
-            Intro: "Runner Passport now ships real public-safe receipts: runner return posture, bounded cross-table trust, and privacy-safe participation proof on first-party routes.",
+            Intro: "Runner Passport now ships a real first-party continuity lane: public-safe trust posture, bounded cross-table participation proof, and signed-in return rails stay connected instead of collapsing into ad hoc organizer memory.",
             BoundaryLine: "The public lane exposes aggregate readiness and trust boundaries only. Private identity links, moderation state, and account recovery stay signed-in.",
             SummaryPoints:
             [
@@ -4023,9 +4886,9 @@ public sealed class PublicLandingController : Controller
                 $"{summary.PendingJoinCount} pending join requests"
             ],
             Documents: _communityCreatorHorizons.ListPassportDocuments().Select(item => new MediaArtifactCardViewModel(item.Id, item.Label, item.Summary, item.MarkdownRoute, item.JsonRoute, item.Highlights)).ToArray(),
-            PrimaryAction: new TrustPageActionViewModel("Open runner return receipt", "/passport/receipts/runner_return_posture.md", "primary"),
-            SecondaryAction: new TrustPageActionViewModel("Open receipt JSON", "/passport/receipts/runner_return_posture.json", "secondary"),
-            TertiaryAction: new TrustPageActionViewModel("Open community", "/community", "ghost"),
+            PrimaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Runner Passport" : "Open Runner Passport", subject is null ? "/login?next=%2Faccount%2Fpassport" : "/account/passport", "primary"),
+            SecondaryAction: new TrustPageActionViewModel("Open identity-network receipt", "/passport/receipts/identity-network.json", "secondary"),
+            TertiaryAction: new TrustPageActionViewModel("Open runner return receipt", "/passport/receipts/runner_return_posture.md", "ghost"),
             ConnectedLanePacket: BuildRunnerPassportConnectedLanePacket(summary, workspaceServerPlane, factionId, _blackLedgerBriefings.BuildWorldTurnBriefing(1)),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
@@ -4162,7 +5025,8 @@ public sealed class PublicLandingController : Controller
         TrustPageActionViewModel primaryAction,
         TrustPageActionViewModel secondaryAction,
         TrustPageActionViewModel tertiaryAction,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        BlackLedgerConnectedLanePacketViewModel? connectedLanePacket = null)
     {
         AuthenticatedHubSubject? subject = await TryGetOptionalSubjectAsync(cancellationToken);
         HubUserDto? user = subject is null ? null : _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
@@ -4182,9 +5046,1766 @@ public sealed class PublicLandingController : Controller
             PrimaryAction: primaryAction,
             SecondaryAction: secondaryAction,
             TertiaryAction: tertiaryAction,
+            ConnectedLanePacket: connectedLanePacket,
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: user is null ? null : _signedInTrustStatus.Build(user, manifest, releaseExperience));
     }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildCommunityHubConnectedLanePacket(
+        AuthenticatedHubSubject? subject,
+        CommunityHubPublicSummary publicSummary)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in board",
+                    Summary: "Sign in to open the governed Community Hub board where open-run listing, join review, scheduling, and closeout stay on one first-party rail.",
+                    Href: "/login?next=%2Faccount%2Fcommunity",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public board packet",
+                    Summary: $"{publicSummary.OpenRuns.Count} public open run(s), {publicSummary.PendingJoinCount} pending join request(s), and {publicSummary.CloseoutCount} closeout receipt(s) are already visible without leaking private roster state.",
+                    Href: "/community/open-runs/open_run_board.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Network receipt",
+                    Summary: "Inspect the named signed-in and API lanes before treating Community Hub as just another forum or meeting-tool shell.",
+                    Href: "/community/receipts/open-run-network.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "Community Hub connected lane",
+                Summary: "Public board posture is readable without an account, but the governed open-run board, join review, scheduling, and closeout loop stay on the signed-in Community Hub rail.",
+                BoundaryLine: "Meeting tools and public venues are handoff lanes only. Chummer owns run, roster, scheduling receipt, and closeout truth.",
+                Cues: guestCues);
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        IReadOnlyList<OpenRunListingProjection> openRuns = _campaignSpine
+            .GetOpenRuns(user, installLinking)
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .ToArray();
+        OpenRunListingProjection? leadOpenRun = openRuns.FirstOrDefault();
+        OpenRunOrchestrationProjection? leadDetail = leadOpenRun is null ? null : _campaignSpine.GetOpenRun(user, leadOpenRun.OpenRunId, installLinking);
+        string detailApiHref = leadOpenRun is null
+            ? "/api/v1/campaign-spine/me/open-runs"
+            : $"/api/v1/campaign-spine/me/open-runs/{Uri.EscapeDataString(leadOpenRun.OpenRunId)}";
+        string venueHref = leadOpenRun is null
+            ? "/community/runs/open-run/venue"
+            : $"/community/runs/{Uri.EscapeDataString(leadOpenRun.RunId)}/venue";
+
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in board",
+                Summary: openRuns.Count == 0
+                    ? "No governed open run is attached to this account yet. Community Hub is ready to open the named board as soon as a workspace publishes one."
+                    : $"{openRuns.Count} open run(s) are already visible on your governed board, with listing, join review, scheduling, and closeout attached to the same account rail.",
+                Href: "/account/community",
+                StatusLabel: openRuns.Count == 0 ? "Ready" : "Signed-in"),
+            new(
+                Label: "Lead open run contract",
+                Summary: leadDetail is null
+                    ? "Use the typed API index when you want the governed open-run contract before a public packet becomes a real table."
+                    : $"{leadDetail.JoinRequests.Count} join request(s), {leadDetail.Roster.Count} roster seat(s), and {(leadDetail.Schedule is null ? "no" : "a")} scheduling receipt are attached to {leadDetail.Listing.ListingTitle}.",
+                Href: detailApiHref,
+                StatusLabel: leadDetail is null ? "API" : "Typed"),
+            new(
+                Label: "Venue and handoff boundary",
+                Summary: leadDetail?.MeetingHandoff is null
+                    ? "Public venue posture can be shown without leaking private room truth, and meeting-provider automation still remains a projection-only lane."
+                    : $"{leadDetail.MeetingHandoff.ProviderLabel} handoff exists for the lead open run, but Chummer still owns accepted roster and run truth.",
+                Href: venueHref,
+                StatusLabel: leadDetail?.MeetingHandoff is null ? "Boundary" : "Handoff")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "Community Hub connected lane",
+            Summary: "The named Community Hub rail now carries governed open-run board posture, join review, scheduling, meeting handoff, and closeout on one first-party campaign-spine path.",
+            BoundaryLine: "Community Hub can project venue posture and provider handoff, but it does not hand run truth, roster truth, or consequence truth to chat tools, meeting tools, or public boards.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildCreatorOsConnectedLanePacket(
+        AuthenticatedHubSubject? subject,
+        CreatorOsPublicSummary publicSummary)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in publication desk",
+                    Summary: "Sign in to open the governed Creator OS desk where publication review, publish state, and campaign-return follow-through stay on first-party rails.",
+                    Href: "/login?next=%2Faccount%2Fcreator",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public publication board",
+                    Summary: $"{publicSummary.Publications.Count} discoverable publication(s), {publicSummary.CuratedLiveCount} curated live, and {publicSummary.ReturnLoopCount} campaign-return loop(s) are already visible without leaking draft state.",
+                    Href: "/creator/packets/publication_board.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Publication receipt",
+                    Summary: "Inspect the named account and public publication lanes before treating Creator OS as an external creator shelf.",
+                    Href: "/creator/receipts/publication-network.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "Creator OS connected lane",
+                Summary: "Public publication discovery is readable without an account, but draft review, publish state, and campaign return stay on the signed-in Creator OS rail.",
+                BoundaryLine: "External creator tools may assist rendering or promotion, but Chummer owns publication truth, moderation posture, and campaign return state.",
+                Cues: guestCues);
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        IReadOnlyList<CreatorPublicationProjection> publications = _campaignSpine
+            .GetAccountSummary(user, installLinking)
+            .CreatorPublications
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .ToArray();
+        CreatorPublicationProjection? leadPublication = publications.FirstOrDefault();
+        string leadPublicationHref = leadPublication is null
+            ? "/account/creator"
+            : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}";
+        string publicPublicationHref = leadPublication is null
+            ? "/artifacts"
+            : $"/artifacts/publications/{Uri.EscapeDataString(leadPublication.PublicationId)}";
+
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in publication desk",
+                Summary: publications.Count == 0
+                    ? "No governed publication is attached to this account yet. Creator OS is ready to open the named desk as soon as a workspace publishes one."
+                    : $"{publications.Count} publication(s) are already visible on your signed-in rail, with review, publish state, and campaign-return follow-through on one account path.",
+                Href: "/account/creator",
+                StatusLabel: publications.Count == 0 ? "Ready" : "Signed-in"),
+            new(
+                Label: "Lead publication detail",
+                Summary: leadPublication is null
+                    ? "Use the publication board and public shelf until a governed publication is attached to the signed-in desk."
+                    : $"{leadPublication.PublicationStatus} · {leadPublication.TrustBand}. {leadPublication.CampaignReturnSummary ?? "Campaign-return posture stays attached to the publication."}",
+                Href: leadPublicationHref,
+                StatusLabel: leadPublication is null ? "Desk" : "Typed"),
+            new(
+                Label: "Public shelf boundary",
+                Summary: leadPublication is null
+                    ? "Public creator discovery is live, but draft review and provider-side state remain off the public lane."
+                    : $"{leadPublication.Title} is discoverable on the public shelf, but Chummer still owns publication receipts and review state.",
+                Href: publicPublicationHref,
+                StatusLabel: leadPublication is null ? "Public-safe" : "Shelf-linked")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "Creator OS connected lane",
+            Summary: "The named Creator OS rail now carries governed publication discovery, signed-in publication detail, and campaign-return follow-through on one first-party path.",
+            BoundaryLine: "Creator OS can expose public-safe publication detail, but it does not hand publication truth, review state, or campaign return to provider dashboards or generic asset shelves.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildQuicksilverConnectedLanePacket(
+        AuthenticatedHubSubject? subject,
+        QuicksilverCommandDeckReceipt receipt)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in command deck",
+                    Summary: "Sign in to open the named Quicksilver bench where jump targets stay attached to first-party build, rules, prep, and publication rails.",
+                    Href: "/login?next=%2Faccount%2Fquicksilver",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public command packet",
+                    Summary: "The public command packet shows the bounded jump contract without pretending expert speed is a secret local-only mode.",
+                    Href: "/quicksilver/packets/command_deck.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Command receipt",
+                    Summary: "Inspect the named account route, typed command APIs, and focus boundaries before treating Quicksilver like a generic launcher.",
+                    Href: "/quicksilver/receipts/command-network.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "Quicksilver connected lane",
+                Summary: "Public command posture is readable without an account, but the actual fast-jump follow-through stays on signed-in first-party rails.",
+                BoundaryLine: "Quicksilver speeds up access to trusted Chummer lanes; it does not become a separate rules engine, a hidden automation surface, or a stale cache authority.",
+                Cues: guestCues);
+        }
+
+        QuicksilverFocusTarget? leadFocus = receipt.FocusTargets.FirstOrDefault(static item => item.Available);
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in command deck",
+                Summary: $"{receipt.Counts.BuildHandoffs} build handoff(s), {receipt.Counts.RulesAnswers} rules answer(s), {receipt.Counts.Workspaces} workspace(s), and {receipt.Counts.Publications} publication(s) are currently reachable on one governed speed rail.",
+                Href: "/account/quicksilver",
+                StatusLabel: "Signed-in"),
+            new(
+                Label: "Typed command API",
+                Summary: "Use the typed command deck when you want the governed jump contract before opening a single build, rule, workspace, or publication surface.",
+                Href: "/api/v1/campaign-spine/me/quicksilver/command-deck",
+                StatusLabel: "API"),
+            new(
+                Label: "Lead focus route",
+                Summary: leadFocus is null
+                    ? "Quicksilver stays ready even when no focus target is populated yet."
+                    : $"{leadFocus.Label} is currently the lead jump target, and it opens a named first-party lane instead of dropping you into a generic shelf.",
+                Href: leadFocus?.FocusHref ?? "/account/work",
+                StatusLabel: leadFocus is null ? "Ready" : "Focus")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "Quicksilver connected lane",
+            Summary: "The named Quicksilver rail now carries expert-speed jump targets across builds, rules, prep, and publication desks on one first-party path.",
+            BoundaryLine: "Quicksilver can reduce click friction and preserve context, but it does not hide legality, flatten meaning, or let background automation outrank explicit account-owned state.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildJackpointConnectedLanePacket(
+        AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in JACKPOINT desk",
+                    Summary: "Sign in to open the governed JACKPOINT publication desk where review, publication truth, and campaign-return follow-through stay on first-party rails.",
+                    Href: "/login?next=%2Faccount%2Fjackpoint",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public-safe briefing packet",
+                    Summary: $"{_mediaHorizons.ListJackpointBriefings().Count} public-safe briefing packet(s) are already readable without opening the signed-in publication rail.",
+                    Href: "/jackpoint/briefings/emerald-sprawl-briefing.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Briefing receipt",
+                    Summary: "Inspect the named account and typed publication lanes before treating JACKPOINT like a generic export shelf.",
+                    Href: "/jackpoint/receipts/briefing-network.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "JACKPOINT connected lane",
+                Summary: "Public dossier and briefing packets are readable without an account, but publication review and campaign-return follow-through stay on signed-in first-party rails.",
+                BoundaryLine: "Narration, export, or promotion helpers may assist packaging, but Chummer owns publication truth, provenance, and spoiler boundaries.",
+                Cues: guestCues);
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        IReadOnlyList<CreatorPublicationProjection> publications = _campaignSpine
+            .GetAccountSummary(user, installLinking)
+            .CreatorPublications
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .ToArray();
+        CreatorPublicationProjection? leadPublication = publications.FirstOrDefault();
+        string detailApiHref = leadPublication is null
+            ? "/api/v1/campaign-spine/me/publications"
+            : $"/api/v1/campaign-spine/me/publications/{Uri.EscapeDataString(leadPublication.PublicationId)}";
+        string detailAccountHref = leadPublication is null
+            ? "/account/jackpoint"
+            : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}";
+
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in publication desk",
+                Summary: publications.Count == 0
+                    ? "No governed publication is attached to this account yet. JACKPOINT is ready to open the named desk as soon as a publication-safe output lands."
+                    : $"{publications.Count} publication-safe output(s) are already attached to this account, with review and return posture still on first-party rails.",
+                Href: "/account/jackpoint",
+                StatusLabel: publications.Count == 0 ? "Ready" : "Signed-in"),
+            new(
+                Label: "Lead publication contract",
+                Summary: leadPublication is null
+                    ? "Use the typed publication index when you want the governed publication contract before opening a single artifact page."
+                    : $"{leadPublication.Title} stays on the governed publication rail with {leadPublication.PublicationStatus} status and {leadPublication.Visibility} visibility.",
+                Href: detailApiHref,
+                StatusLabel: leadPublication is null ? "API" : "Typed"),
+            new(
+                Label: "Open named desk route",
+                Summary: leadPublication is null
+                    ? "The named JACKPOINT desk opens to the first signed-in publication-safe rail, not to a generic docs shelf."
+                    : $"Open the named JACKPOINT desk for {leadPublication.Title} when the next job is publication review or campaign-return follow-through.",
+                Href: detailAccountHref,
+                StatusLabel: leadPublication is null ? "Desk" : "Follow-through")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "JACKPOINT connected lane",
+            Summary: "The named JACKPOINT rail now carries public-safe briefing packets, publication review, and publication-safe campaign return on one first-party path.",
+            BoundaryLine: "JACKPOINT can package and publish, but it does not hand provenance, spoiler truth, or publication authority to external shelves or media adapters.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildRunsiteConnectedLanePacket(
+        AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in RUNSITE bench",
+                    Summary: "Sign in to open the governed RUNSITE bench where workspace prep, runboard continuity, and prep-library launch stay on first-party rails.",
+                    Href: "/login?next=%2Faccount%2Frunsites",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public runsite pack",
+                    Summary: $"{_mediaHorizons.ListRunsitePacks().Count} inspectable runsite pack(s) are already readable without opening the signed-in prep lane.",
+                    Href: "/runsites/packs/redmond-dockyard-pack.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Prep receipt",
+                    Summary: "Inspect the named workspace, run, and prep-library lanes before treating RUNSITE like a static map gallery.",
+                    Href: "/runsites/receipts/prep-network.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "RUNSITE connected lane",
+                Summary: "Public runsite packs are inspectable without an account, but governed prep and runboard continuity stay on signed-in workspace and run rails.",
+                BoundaryLine: "Route overlays, host clips, and tours may assist orientation, but Chummer owns prep truth, runboard truth, and workspace continuity.",
+                Cues: guestCues);
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        AccountCampaignSummary accountSummary = _campaignSpine.GetAccountSummary(user, installLinking);
+        CampaignWorkspaceProjection? leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+            ?? accountSummary.Workspaces.FirstOrDefault();
+        RunProjection? leadRun = leadWorkspace?.Runs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault()
+            ?? accountSummary.Runs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+        string workspaceHref = leadWorkspace is null
+            ? "/account/runsites"
+            : $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}";
+        string prepLibraryApiHref = leadWorkspace is null
+            ? "/api/v1/campaign-spine/me/workspace-digests"
+            : $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}/prep-library";
+        string runApiHref = leadRun is null
+            ? "/api/v1/campaign-spine/me/runs"
+            : $"/api/v1/campaign-spine/me/runs/{Uri.EscapeDataString(leadRun.RunId)}";
+
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in prep bench",
+                Summary: leadWorkspace is null
+                    ? "No governed workspace is attached to this account yet. RUNSITE is ready to open the named prep bench as soon as a workspace returns."
+                    : $"{leadWorkspace.CampaignName} is already on the governed prep rail with {leadWorkspace.Runs.Count} run(s), {leadWorkspace.RecapShelf.Count} publication-safe recap item(s), and continuity receipts attached.",
+                Href: workspaceHref,
+                StatusLabel: leadWorkspace is null ? "Ready" : "Signed-in"),
+            new(
+                Label: "Workspace and prep contract",
+                Summary: leadWorkspace is null
+                    ? "Use the typed workspace index when you want the governed prep contract before a single runsite pack becomes table prep."
+                    : $"The typed workspace and prep-library APIs stay attached to {leadWorkspace.CampaignName} instead of collapsing prep into a media-only lane.",
+                Href: prepLibraryApiHref,
+                StatusLabel: leadWorkspace is null ? "API" : "Typed"),
+            new(
+                Label: "Lead run continuity",
+                Summary: leadRun is null
+                    ? "RUNSITE can still open the governed run index before a live run exists."
+                    : $"{leadRun.Title} keeps active-scene, objective, and continuity state on the same first-party run rail as the prep lane.",
+                Href: runApiHref,
+                StatusLabel: leadRun is null ? "Index" : "Run")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "RUNSITE connected lane",
+            Summary: "The named RUNSITE rail now carries public pack inspection, signed-in workspace prep, runboard continuity, and governed prep-library launch on one first-party path.",
+            BoundaryLine: "RUNSITE can orient a crew before the run starts, but it does not become tactical authority, a live-map replacement, or an off-platform truth source.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildRunControlConnectedLanePacket(
+        AuthenticatedHubSubject? subject,
+        RunControlReceipt receipt)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in control desk",
+                    Summary: "Sign in to open the named RUN CONTROL desk where runboard continuity, active scene, and recap follow-through stay on first-party campaign rails.",
+                    Href: "/login?next=%2Faccount%2Frun-control",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public session packet",
+                    Summary: "The public packet shows the bounded session-board and continuity contract without pretending GM control is only a private mystery surface.",
+                    Href: "/run-control/packets/session_board.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Control receipt",
+                    Summary: "Inspect the named account routes and typed control APIs before treating RUN CONTROL like a generic ops dashboard.",
+                    Href: "/run-control/receipts/control-network.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "RUN CONTROL connected lane",
+                Summary: "Public board posture is readable without an account, but the live session-control follow-through stays on signed-in first-party rails.",
+                BoundaryLine: "RUN CONTROL can summarize session posture and continuity, but it does not replace campaign truth, the rules engine, or the dedicated workbench rails.",
+                Cues: guestCues);
+        }
+
+        RunControlTarget? leadRun = receipt.LeadRun;
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in control desk",
+                Summary: $"{receipt.Counts.Campaigns} campaign(s), {receipt.Counts.Workspaces} workspace(s), and {receipt.Counts.Runs} run(s) are currently visible on the governed GM operations rail.",
+                Href: "/account/run-control",
+                StatusLabel: "Signed-in"),
+            new(
+                Label: "Typed control API",
+                Summary: "Use the typed dashboard and run-detail APIs when you want the current session-control contract before opening the full account workbench.",
+                Href: "/api/v1/campaign-spine/me/run-control/dashboard",
+                StatusLabel: "API"),
+            new(
+                Label: "Lead run route",
+                Summary: leadRun is null
+                    ? "RUN CONTROL stays ready even when no governed run is attached to the account yet."
+                    : $"{leadRun.Title} is the current lead run, with {(string.IsNullOrWhiteSpace(leadRun.ActiveSceneTitle) ? "no active scene yet" : $"{leadRun.ActiveSceneTitle} active")} and explicit next-step continuity.",
+                Href: leadRun?.AccountHref ?? "/account/work",
+                StatusLabel: leadRun is null ? "Ready" : "Run")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "RUN CONTROL connected lane",
+            Summary: "The named RUN CONTROL rail now carries session board posture, active-scene continuity, reconnect-safe follow-through, and recap return on one first-party path.",
+            BoundaryLine: "RUN CONTROL can help a GM operate the table, but it does not become hidden state, a generic collaboration suite, or a truth source outside the campaign spine.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildOnrampConnectedLanePacket(
+        AuthenticatedHubSubject? subject,
+        OnrampReceipt receipt)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in starter desk",
+                    Summary: "Sign in to open the named ONRAMP desk where starter workspace, first playable session, and restore follow-through stay on first-party account rails.",
+                    Href: "/login?next=%2Faccount%2Fonramp",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public starter packet",
+                    Summary: "The public packet shows the bounded starter and recovery contract without pretending the product is an auto-build wizard.",
+                    Href: "/onramp/packets/starter_lane.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Starter receipt",
+                    Summary: "Inspect the named account routes and starter/recovery APIs before treating ONRAMP like generic tutorial chrome.",
+                    Href: "/onramp/receipts/guided-starter.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "ONRAMP connected lane",
+                Summary: "Public starter posture is readable without an account, but actual starter workspace and restore follow-through stay on signed-in first-party rails.",
+                BoundaryLine: "ONRAMP can guide the first playable session and recovery path, but it does not replace rules truth, hide complexity, or turn background hints into authority.",
+                Cues: guestCues);
+        }
+
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in starter desk",
+                Summary: $"{receipt.Counts.Campaigns} campaign(s), {receipt.Counts.Workspaces} workspace(s), and {receipt.Counts.Dossiers} dossier(s) are currently visible on the starter lane.",
+                Href: "/account/onramp",
+                StatusLabel: "Signed-in"),
+            new(
+                Label: "Typed starter API",
+                Summary: "Use the typed dashboard and starter/recovery APIs when you want the bounded guided-mastery contract before opening the broader workbench.",
+                Href: "/api/v1/campaign-spine/me/onramp/dashboard",
+                StatusLabel: "API"),
+            new(
+                Label: "Lead starter route",
+                Summary: receipt.LeadStarter is null
+                    ? "ONRAMP stays ready even when no governed starter workspace is attached to the account yet."
+                    : $"{receipt.LeadStarter.CampaignName} is the lead starter workspace. Next safe action: {receipt.LeadStarter.NextSafeAction}",
+                Href: receipt.LeadStarter?.AccountHref ?? "/ready",
+                StatusLabel: receipt.LeadStarter is null ? "Ready" : "Starter")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "ONRAMP connected lane",
+            Summary: "The named ONRAMP rail now carries starter workspace, recovery posture, and first playable follow-through on one first-party path.",
+            BoundaryLine: "ONRAMP can reduce first-session friction, but it does not auto-build characters, hide legality, or become a separate authority outside the campaign spine.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildEditionStudioConnectedLanePacket(
+        AuthenticatedHubSubject? subject,
+        EditionStudioReceipt receipt)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in edition desk",
+                    Summary: "Sign in to open the named EDITION STUDIO desk where SR4, SR5, and SR6 focus routes stay attached to one account-owned workbench.",
+                    Href: "/login?next=%2Faccount%2Fedition-studio",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public ruleset-head packet",
+                    Summary: "The public packets show the bounded SR4, SR5, and SR6 posture without pretending styling itself is rules truth.",
+                    Href: "/edition-studio/packets/sr5_head.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Ruleset-head receipt",
+                    Summary: "Inspect the named account routes and typed edition-head APIs before treating EDITION STUDIO like decorative skinning.",
+                    Href: "/edition-studio/receipts/ruleset-heads.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "EDITION STUDIO connected lane",
+                Summary: "Public ruleset-head posture is readable without an account, but signed-in edition focus stays on the same first-party workbench.",
+                BoundaryLine: "EDITION STUDIO can preserve semantic posture across SR4, SR5, and SR6, but it does not replace core rules truth or split the product into disconnected apps.",
+                Cues: guestCues);
+        }
+
+        EditionStudioHeadTarget? leadHead = receipt.Heads.OrderByDescending(item => item.EnvironmentCount).FirstOrDefault();
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in edition desk",
+                Summary: $"{receipt.Counts.Workspaces} workspace(s), {receipt.Counts.Dossiers} dossier(s), and {receipt.Counts.RuleEnvironments} rule environments currently feed the authored edition heads.",
+                Href: "/account/edition-studio",
+                StatusLabel: "Signed-in"),
+            new(
+                Label: "Typed edition API",
+                Summary: "Use the typed edition-head APIs when you want current SR4, SR5, and SR6 posture before opening the full account workbench.",
+                Href: "/api/v1/campaign-spine/me/edition-studio/heads",
+                StatusLabel: "API"),
+            new(
+                Label: "Lead edition focus",
+                Summary: leadHead is null
+                    ? "EDITION STUDIO stays ready even when no rule environments are attached yet."
+                    : $"{leadHead.Label} currently leads with {leadHead.EnvironmentCount} matching environment(s).",
+                Href: leadHead?.AccountHref ?? "/account/work",
+                StatusLabel: leadHead is null ? "Ready" : "Focus")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "EDITION STUDIO connected lane",
+            Summary: "The named EDITION STUDIO rail now carries authored SR4, SR5, and SR6 head posture on one first-party path.",
+            BoundaryLine: "EDITION STUDIO can express edition differences clearly, but it does not let styling outrank core semantics or split the product into three separate authorities.",
+            Cues: cues);
+    }
+
+    private BlackLedgerConnectedLanePacketViewModel BuildLocalCoProcessorConnectedLanePacket(
+        AuthenticatedHubSubject? subject,
+        LocalCoProcessorReceipt receipt)
+    {
+        if (subject is null)
+        {
+            BlackLedgerFollowThroughCueViewModel[] guestCues =
+            [
+                new(
+                    Label: "Signed-in profile desk",
+                    Summary: "Sign in to open the named LOCAL CO-PROCESSOR desk where optional profiles and fail-open posture stay attached to your account instead of hiding in local-only assumptions.",
+                    Href: "/login?next=%2Faccount%2Flocal-co-processor",
+                    StatusLabel: "Sign-in"),
+                new(
+                    Label: "Public capability packet",
+                    Summary: "The public packet shows which workloads may accelerate locally while keeping hosted-only parity real.",
+                    Href: "/local-co-processor/packets/capability_matrix.json",
+                    StatusLabel: "Public-safe"),
+                new(
+                    Label: "Acceleration receipt",
+                    Summary: "Inspect the named account routes and typed capability/policy APIs before treating optional acceleration like a hidden requirement.",
+                    Href: "/local-co-processor/receipts/optional-acceleration.json",
+                    StatusLabel: "Receipt-backed")
+            ];
+
+            return new BlackLedgerConnectedLanePacketViewModel(
+                Heading: "LOCAL CO-PROCESSOR connected lane",
+                Summary: "Public optional-acceleration posture is readable without an account, but actual profile choice and governed fallback stay on signed-in first-party rails.",
+                BoundaryLine: "LOCAL CO-PROCESSOR can improve cost, privacy, or responsiveness where available, but it does not become mandatory infrastructure or a separate truth owner.",
+                Cues: guestCues);
+        }
+
+        LocalCoProcessorProfileTarget? leadProfile = receipt.Profiles.FirstOrDefault();
+        BlackLedgerFollowThroughCueViewModel[] cues =
+        [
+            new(
+                Label: "Signed-in profile desk",
+                Summary: $"{receipt.Counts.Workspaces} workspace(s), {receipt.Counts.Dossiers} dossier(s), and {receipt.Counts.ClaimedDevices} claimed device(s) stay compatible with hosted-only fallback.",
+                Href: "/account/local-co-processor",
+                StatusLabel: "Signed-in"),
+            new(
+                Label: "Typed capability API",
+                Summary: "Use typed capability and policy APIs when you want the current local-acceleration contract before opening the broader account settings rail.",
+                Href: "/api/v1/campaign-spine/me/local-co-processor/capabilities",
+                StatusLabel: "API"),
+            new(
+                Label: "Lead profile route",
+                Summary: leadProfile is null
+                    ? "LOCAL CO-PROCESSOR stays valid even when no optional profile is selected yet."
+                    : $"{leadProfile.Label} keeps optional local help enabled only where it improves the product without becoming required.",
+                Href: leadProfile?.AccountHref ?? "/account/advanced?localCoProcessor=hosted_only",
+                StatusLabel: leadProfile is null ? "Ready" : "Profile")
+        ];
+
+        return new BlackLedgerConnectedLanePacketViewModel(
+            Heading: "LOCAL CO-PROCESSOR connected lane",
+            Summary: "The named LOCAL CO-PROCESSOR rail now carries optional acceleration policy, profile posture, and fail-open fallback on one first-party path.",
+            BoundaryLine: "LOCAL CO-PROCESSOR can accelerate certain workloads, but it does not move campaign truth off the hosted lane, require special hardware, or hide provider ownership.",
+            Cues: cues);
+    }
+
+    private QuicksilverCommandDeckReceipt BuildQuicksilverCommandDeckReceipt(AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            return new QuicksilverCommandDeckReceipt(
+                Horizon: "quicksilver",
+                Status: "shipped_mvp",
+                PublicBoard: new QuicksilverPublicBoard(
+                    CommandDeckMarkdownHref: "/quicksilver/packets/command_deck.md",
+                    CommandDeckJsonHref: "/quicksilver/packets/command_deck.json",
+                    JumpTargetsMarkdownHref: "/quicksilver/packets/jump_targets.md",
+                    JumpTargetsJsonHref: "/quicksilver/packets/jump_targets.json"),
+                SignedInBench: new QuicksilverSignedInBench(
+                    AccountEntryHref: "/account/quicksilver",
+                    AccountRedirectHref: "/account/quicksilver/open",
+                    FocusHrefTemplate: "/account/quicksilver/{focus}",
+                    CommandDeckApiHref: "/api/v1/campaign-spine/me/quicksilver/command-deck",
+                    JumpTargetsApiHref: "/api/v1/campaign-spine/me/quicksilver/jump-targets",
+                    Summary: "Signed-in Quicksilver opens the named command deck where builds, rules, prep, and publication desks stay one governed jump apart."),
+                Counts: new QuicksilverCounts(0, 0, 0, 0),
+                FocusTargets:
+                [
+                    new QuicksilverFocusTarget("builds", "Build handoffs", false, "/account/quicksilver/builds", "/api/v1/campaign-spine/me/build-handoffs", "Jump straight into the governed ALICE follow-through rail."),
+                    new QuicksilverFocusTarget("rules", "Rules answers", false, "/account/quicksilver/rules", "/account/work", "Jump into the rules answer lane without flattening provenance."),
+                    new QuicksilverFocusTarget("runsites", "Prep benches", false, "/account/quicksilver/runsites", "/api/v1/campaign-spine/me/workspace-digests", "Jump into governed prep and workspace continuity."),
+                    new QuicksilverFocusTarget("creator", "Creator desk", false, "/account/quicksilver/creator", "/api/v1/campaign-spine/me/publications", "Jump into signed-in publication desks without leaving first-party rails."),
+                    new QuicksilverFocusTarget("briefings", "JACKPOINT desk", false, "/account/quicksilver/briefings", "/api/v1/campaign-spine/me/publications", "Jump into briefing-safe publication follow-through.")
+                ],
+                Boundary: new QuicksilverBoundary(
+                    RulesTruth: "Explainability required",
+                    BulkMutationAuthority: "Not claimed",
+                    BackgroundAutomation: "Not claimed",
+                    CacheAuthority: "Not claimed"));
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+        BuildLabHandoffProjection? leadHandoff = summary.BuildLabHandoffs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+        RulesNavigatorAnswerProjection? leadRule = summary.RulesNavigator.FirstOrDefault();
+        CampaignWorkspaceProjection? leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+            ?? summary.Workspaces.FirstOrDefault();
+        CreatorPublicationProjection? leadPublication = summary.CreatorPublications.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+
+        return new QuicksilverCommandDeckReceipt(
+            Horizon: "quicksilver",
+            Status: "shipped_mvp",
+            PublicBoard: new QuicksilverPublicBoard(
+                CommandDeckMarkdownHref: "/quicksilver/packets/command_deck.md",
+                CommandDeckJsonHref: "/quicksilver/packets/command_deck.json",
+                JumpTargetsMarkdownHref: "/quicksilver/packets/jump_targets.md",
+                JumpTargetsJsonHref: "/quicksilver/packets/jump_targets.json"),
+            SignedInBench: new QuicksilverSignedInBench(
+                AccountEntryHref: "/account/quicksilver",
+                AccountRedirectHref: "/account/quicksilver/open",
+                FocusHrefTemplate: "/account/quicksilver/{focus}",
+                CommandDeckApiHref: "/api/v1/campaign-spine/me/quicksilver/command-deck",
+                JumpTargetsApiHref: "/api/v1/campaign-spine/me/quicksilver/jump-targets",
+                Summary: "Signed-in Quicksilver keeps the governed speed deck on first-party rails: ALICE, rules answers, RUNSITE, Creator OS, and JACKPOINT stay one deliberate jump apart."),
+            Counts: new QuicksilverCounts(
+                summary.BuildLabHandoffs.Count,
+                summary.RulesNavigator.Count,
+                summary.Workspaces.Count,
+                summary.CreatorPublications.Count),
+            FocusTargets:
+            [
+                new QuicksilverFocusTarget(
+                    "builds",
+                    "Build handoffs",
+                    leadHandoff is not null,
+                    leadHandoff is null ? "/account/alice" : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
+                    leadHandoff is null ? "/api/v1/campaign-spine/me/build-handoffs" : $"/api/v1/campaign-spine/me/build-handoffs/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
+                    leadHandoff is null ? "ALICE remains the follow-through lane for governed build compare and apply." : $"{leadHandoff.Title} is ready on the ALICE rail for the next safe jump."),
+                new QuicksilverFocusTarget(
+                    "rules",
+                    "Rules answers",
+                    leadRule is not null,
+                    leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}",
+                    leadRule is null ? "Rules Navigator remains available when the next trustworthy answer appears." : $"Lead rules answer: {leadRule.Question}"),
+                new QuicksilverFocusTarget(
+                    "runsites",
+                    "Prep benches",
+                    leadWorkspace is not null,
+                    leadWorkspace is null ? "/account/runsites" : $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}",
+                    leadWorkspace is null ? "/api/v1/campaign-spine/me/workspace-digests" : $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}/prep-library",
+                    leadWorkspace is null ? "RUNSITE remains ready for governed prep and continuity launch." : $"{leadWorkspace.CampaignName} is ready on the RUNSITE prep rail."),
+                new QuicksilverFocusTarget(
+                    "creator",
+                    "Creator desk",
+                    leadPublication is not null,
+                    leadPublication is null ? "/account/creator" : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}",
+                    leadPublication is null ? "/api/v1/campaign-spine/me/publications" : $"/api/v1/campaign-spine/me/publications/{Uri.EscapeDataString(leadPublication.PublicationId)}",
+                    leadPublication is null ? "Creator OS remains the governed publication desk." : $"{leadPublication.Title} is ready on the Creator OS desk."),
+                new QuicksilverFocusTarget(
+                    "briefings",
+                    "JACKPOINT desk",
+                    leadPublication is not null,
+                    leadPublication is null ? "/account/jackpoint" : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}",
+                    leadPublication is null ? "/api/v1/campaign-spine/me/publications" : $"/api/v1/campaign-spine/me/publications/{Uri.EscapeDataString(leadPublication.PublicationId)}",
+                    leadPublication is null ? "JACKPOINT remains ready for publication-safe briefings." : $"{leadPublication.Title} is also reachable through the JACKPOINT briefing desk.")
+            ],
+            Boundary: new QuicksilverBoundary(
+                RulesTruth: "Explainability required",
+                BulkMutationAuthority: "Not claimed",
+                BackgroundAutomation: "Not claimed",
+                CacheAuthority: "Not claimed"));
+    }
+
+    private OnrampReceipt BuildOnrampReceipt(AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            return new OnrampReceipt(
+                Horizon: "onramp",
+                Status: "shipped_mvp",
+                PublicBoard: new OnrampPublicBoard(
+                    StarterLaneMarkdownHref: "/onramp/packets/starter_lane.md",
+                    StarterLaneJsonHref: "/onramp/packets/starter_lane.json",
+                    RecoveryLaneMarkdownHref: "/onramp/packets/recovery_lane.md",
+                    RecoveryLaneJsonHref: "/onramp/packets/recovery_lane.json"),
+                SignedInDesk: new OnrampSignedInDesk(
+                    AccountEntryHref: "/account/onramp",
+                    AccountRedirectHref: "/account/onramp/open",
+                    AccountStarterHref: "/account/onramp/starter",
+                    DashboardApiHref: "/api/v1/campaign-spine/me/onramp/dashboard",
+                    StarterApiHref: "/api/v1/campaign-spine/me/onramp/starter",
+                    RecoveryApiHref: "/api/v1/campaign-spine/me/onramp/recovery",
+                    Summary: "Signed-in ONRAMP keeps starter workspace, restore posture, and first-session follow-through on first-party rails."),
+                Counts: new OnrampCounts(0, 0, 0, 0),
+                LeadStarter: null,
+                Recovery: new OnrampRecoveryTarget(
+                    RestoreId: "signed_in_only",
+                    ClaimedDevices: 0,
+                    RecentArtifacts: 0,
+                    ConflictCount: 0,
+                    AccountHref: "/account/access",
+                    ApiHref: "/api/v1/campaign-spine/me/onramp/recovery"),
+                Boundary: new OnrampBoundary(
+                    BuildTruth: "Core receipts only",
+                    HiddenAutomation: "Not claimed",
+                    AutoBuildAuthority: "Not claimed",
+                    RecoveryAuthority: "Signed-in receipts"));
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+        CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+            ?? summary.Workspaces.FirstOrDefault();
+        WorkspaceRestoreProjection restore = summary.Restore;
+
+        return new OnrampReceipt(
+            Horizon: "onramp",
+            Status: "shipped_mvp",
+            PublicBoard: new OnrampPublicBoard(
+                StarterLaneMarkdownHref: "/onramp/packets/starter_lane.md",
+                StarterLaneJsonHref: "/onramp/packets/starter_lane.json",
+                RecoveryLaneMarkdownHref: "/onramp/packets/recovery_lane.md",
+                RecoveryLaneJsonHref: "/onramp/packets/recovery_lane.json"),
+            SignedInDesk: new OnrampSignedInDesk(
+                AccountEntryHref: "/account/onramp",
+                AccountRedirectHref: "/account/onramp/open",
+                AccountStarterHref: "/account/onramp/starter",
+                DashboardApiHref: "/api/v1/campaign-spine/me/onramp/dashboard",
+                StarterApiHref: "/api/v1/campaign-spine/me/onramp/starter",
+                RecoveryApiHref: "/api/v1/campaign-spine/me/onramp/recovery",
+                Summary: "Signed-in ONRAMP keeps starter workspace, restore posture, and first playable follow-through attached to named first-party rails."),
+            Counts: new OnrampCounts(
+                summary.Campaigns.Count,
+                summary.Workspaces.Count,
+                summary.Dossiers.Count,
+                restore.RecentArtifacts.Count),
+            LeadStarter: starterWorkspace is null
+                ? null
+                : new OnrampStarterTarget(
+                    starterWorkspace.WorkspaceId,
+                    starterWorkspace.CampaignName,
+                    starterWorkspace.RuleEnvironment.CompatibilityFingerprint,
+                    starterWorkspace.NextSafeAction ?? "Open the starter workspace to continue.",
+                    $"/account/runsites/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}",
+                    $"/api/v1/campaign-spine/me/workspaces/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}"),
+            Recovery: new OnrampRecoveryTarget(
+                RestoreId: restore.RestoreId,
+                ClaimedDevices: restore.ClaimedDevices.Count,
+                RecentArtifacts: restore.RecentArtifacts.Count,
+                ConflictCount: restore.ConflictSummaries.Count,
+                AccountHref: "/account/access",
+                ApiHref: "/api/v1/campaign-spine/me/onramp/recovery"),
+            Boundary: new OnrampBoundary(
+                BuildTruth: "Core receipts only",
+                HiddenAutomation: "Not claimed",
+                AutoBuildAuthority: "Not claimed",
+                RecoveryAuthority: "Signed-in receipts"));
+    }
+
+    private EditionStudioReceipt BuildEditionStudioReceipt(AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            return new EditionStudioReceipt(
+                Horizon: "edition_studio",
+                Status: "shipped_mvp",
+                PublicBoard: new EditionStudioPublicBoard(
+                    Sr4HeadMarkdownHref: "/edition-studio/packets/sr4_head.md",
+                    Sr4HeadJsonHref: "/edition-studio/packets/sr4_head.json",
+                    Sr5HeadMarkdownHref: "/edition-studio/packets/sr5_head.md",
+                    Sr5HeadJsonHref: "/edition-studio/packets/sr5_head.json",
+                    Sr6HeadMarkdownHref: "/edition-studio/packets/sr6_head.md",
+                    Sr6HeadJsonHref: "/edition-studio/packets/sr6_head.json"),
+                SignedInDesk: new EditionStudioSignedInDesk(
+                    AccountEntryHref: "/account/edition-studio",
+                    AccountRedirectHref: "/account/edition-studio/open",
+                    AccountHeadHrefTemplate: "/account/edition-studio/{edition}",
+                    HeadsApiHref: "/api/v1/campaign-spine/me/edition-studio/heads",
+                    HeadDetailApiHrefTemplate: "/api/v1/campaign-spine/me/edition-studio/heads/{edition}",
+                    Summary: "Signed-in EDITION STUDIO keeps authored SR4, SR5, and SR6 head focus on the same first-party workbench."),
+                Counts: new EditionStudioCounts(0, 0, 0),
+                Heads:
+                [
+                    new EditionStudioHeadTarget("sr4", "SR4", 0, Array.Empty<string>(), "/account/edition-studio/sr4", "/api/v1/campaign-spine/me/edition-studio/heads/sr4", "Legacy veteran-first posture."),
+                    new EditionStudioHeadTarget("sr5", "SR5", 0, Array.Empty<string>(), "/account/edition-studio/sr5", "/api/v1/campaign-spine/me/edition-studio/heads/sr5", "Flagship density rail."),
+                    new EditionStudioHeadTarget("sr6", "SR6", 0, Array.Empty<string>(), "/account/edition-studio/sr6", "/api/v1/campaign-spine/me/edition-studio/heads/sr6", "Campaign-approved modern rail.")
+                ],
+                Boundary: new EditionStudioBoundary(
+                    RulesTruth: "Core semantics only",
+                    DecorativeThemingAuthority: "Not claimed",
+                    AppForkAuthority: "Not claimed",
+                    VisualFlavorAuthority: "Not claimed"));
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+        RuleEnvironmentRef[] environments = summary.Workspaces.Select(static item => item.RuleEnvironment)
+            .Concat(summary.Dossiers.Select(static item => item.RuleEnvironment))
+            .Concat(summary.Restore.RecentRuleEnvironments)
+            .ToArray();
+
+        return new EditionStudioReceipt(
+            Horizon: "edition_studio",
+            Status: "shipped_mvp",
+            PublicBoard: new EditionStudioPublicBoard(
+                Sr4HeadMarkdownHref: "/edition-studio/packets/sr4_head.md",
+                Sr4HeadJsonHref: "/edition-studio/packets/sr4_head.json",
+                Sr5HeadMarkdownHref: "/edition-studio/packets/sr5_head.md",
+                Sr5HeadJsonHref: "/edition-studio/packets/sr5_head.json",
+                Sr6HeadMarkdownHref: "/edition-studio/packets/sr6_head.md",
+                Sr6HeadJsonHref: "/edition-studio/packets/sr6_head.json"),
+            SignedInDesk: new EditionStudioSignedInDesk(
+                AccountEntryHref: "/account/edition-studio",
+                AccountRedirectHref: "/account/edition-studio/open",
+                AccountHeadHrefTemplate: "/account/edition-studio/{edition}",
+                HeadsApiHref: "/api/v1/campaign-spine/me/edition-studio/heads",
+                HeadDetailApiHrefTemplate: "/api/v1/campaign-spine/me/edition-studio/heads/{edition}",
+                Summary: "Signed-in EDITION STUDIO keeps authored SR4, SR5, and SR6 head posture attached to one first-party workbench."),
+            Counts: new EditionStudioCounts(summary.Workspaces.Count, summary.Dossiers.Count, environments.Length),
+            Heads:
+            [
+                BuildEditionStudioHeadTarget("sr4", "SR4", "Dense veteran-first posture for legacy muscle memory and BP-era expectations.", environments),
+                BuildEditionStudioHeadTarget("sr5", "SR5", "The flagship density rail where legality, explain, and veteran speed stay authored together.", environments),
+                BuildEditionStudioHeadTarget("sr6", "SR6", "Campaign-approved modern rail where simplified pace stays distinct from older heads.", environments)
+            ],
+            Boundary: new EditionStudioBoundary(
+                RulesTruth: "Core semantics only",
+                DecorativeThemingAuthority: "Not claimed",
+                AppForkAuthority: "Not claimed",
+                VisualFlavorAuthority: "Not claimed"));
+    }
+
+    private LocalCoProcessorReceipt BuildLocalCoProcessorReceipt(AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            return new LocalCoProcessorReceipt(
+                Horizon: "local_co_processor",
+                Status: "shipped_mvp",
+                PublicBoard: new LocalCoProcessorPublicBoard(
+                    CapabilityMatrixMarkdownHref: "/local-co-processor/packets/capability_matrix.md",
+                    CapabilityMatrixJsonHref: "/local-co-processor/packets/capability_matrix.json",
+                    PolicyBoundaryMarkdownHref: "/local-co-processor/packets/policy_boundary.md",
+                    PolicyBoundaryJsonHref: "/local-co-processor/packets/policy_boundary.json"),
+                SignedInDesk: new LocalCoProcessorSignedInDesk(
+                    AccountEntryHref: "/account/local-co-processor",
+                    AccountRedirectHref: "/account/local-co-processor/open",
+                    AccountProfileHrefTemplate: "/account/local-co-processor/{profile}",
+                    CapabilitiesApiHref: "/api/v1/campaign-spine/me/local-co-processor/capabilities",
+                    PolicyApiHref: "/api/v1/campaign-spine/me/local-co-processor/policy",
+                    Summary: "Signed-in LOCAL CO-PROCESSOR keeps optional local profiles, hosted-first parity, and fail-open fallback on first-party rails."),
+                Counts: new LocalCoProcessorCounts(0, 0, 0, 3),
+                Profiles:
+                [
+                    new LocalCoProcessorProfileTarget("hosted_only", "Hosted only", false, "/account/local-co-processor/hosted_only", "/api/v1/campaign-spine/me/local-co-processor/policy", "Keep every workflow fully hosted with no local acceleration requirement."),
+                    new LocalCoProcessorProfileTarget("hybrid_local", "Hybrid local", false, "/account/local-co-processor/hybrid_local", "/api/v1/campaign-spine/me/local-co-processor/capabilities", "Allow optional local acceleration where it improves responsiveness or cost."),
+                    new LocalCoProcessorProfileTarget("privacy_first", "Privacy first", false, "/account/local-co-processor/privacy_first", "/api/v1/campaign-spine/me/local-co-processor/capabilities", "Prefer local handling where it reduces disclosure without breaking hosted fallback.")
+                ],
+                Boundary: new LocalCoProcessorBoundary(
+                    HostedFirstParity: "Required",
+                    MandatoryRuntime: "Not claimed",
+                    LocalTruthAuthority: "Not claimed",
+                    DisableableProfiles: "Required"));
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+        string preferredProfile = summary.Restore.ClaimedDevices.Count > 0
+            ? "privacy_first"
+            : summary.Workspaces.Count > 0 || summary.Dossiers.Count > 0
+                ? "hybrid_local"
+                : "hosted_only";
+
+        LocalCoProcessorProfileTarget[] profiles =
+        [
+            new("hosted_only", "Hosted only", string.Equals(preferredProfile, "hosted_only", StringComparison.Ordinal), "/account/local-co-processor/hosted_only", "/api/v1/campaign-spine/me/local-co-processor/policy", "Keep every workflow fully hosted with no local acceleration requirement."),
+            new("hybrid_local", "Hybrid local", string.Equals(preferredProfile, "hybrid_local", StringComparison.Ordinal), "/account/local-co-processor/hybrid_local", "/api/v1/campaign-spine/me/local-co-processor/capabilities", "Allow optional local acceleration where it improves responsiveness or cost."),
+            new("privacy_first", "Privacy first", string.Equals(preferredProfile, "privacy_first", StringComparison.Ordinal), "/account/local-co-processor/privacy_first", "/api/v1/campaign-spine/me/local-co-processor/capabilities", "Prefer local handling where it reduces disclosure without breaking hosted fallback.")
+        ];
+
+        return new LocalCoProcessorReceipt(
+            Horizon: "local_co_processor",
+            Status: "shipped_mvp",
+            PublicBoard: new LocalCoProcessorPublicBoard(
+                CapabilityMatrixMarkdownHref: "/local-co-processor/packets/capability_matrix.md",
+                CapabilityMatrixJsonHref: "/local-co-processor/packets/capability_matrix.json",
+                PolicyBoundaryMarkdownHref: "/local-co-processor/packets/policy_boundary.md",
+                PolicyBoundaryJsonHref: "/local-co-processor/packets/policy_boundary.json"),
+            SignedInDesk: new LocalCoProcessorSignedInDesk(
+                AccountEntryHref: "/account/local-co-processor",
+                AccountRedirectHref: "/account/local-co-processor/open",
+                AccountProfileHrefTemplate: "/account/local-co-processor/{profile}",
+                CapabilitiesApiHref: "/api/v1/campaign-spine/me/local-co-processor/capabilities",
+                PolicyApiHref: "/api/v1/campaign-spine/me/local-co-processor/policy",
+                Summary: "Signed-in LOCAL CO-PROCESSOR keeps optional local profiles, hosted-first parity, and fail-open fallback on named first-party rails."),
+            Counts: new LocalCoProcessorCounts(summary.Workspaces.Count, summary.Dossiers.Count, summary.Restore.ClaimedDevices.Count, profiles.Length),
+            Profiles: profiles,
+            Boundary: new LocalCoProcessorBoundary(
+                HostedFirstParity: "Required",
+                MandatoryRuntime: "Not claimed",
+                LocalTruthAuthority: "Not claimed",
+                DisableableProfiles: "Required"));
+    }
+
+    private static EditionStudioHeadTarget BuildEditionStudioHeadTarget(string edition, string label, string summary, IReadOnlyList<RuleEnvironmentRef> environments)
+    {
+        RuleEnvironmentRef[] matching = environments
+            .Where(environment => string.Equals(NormalizeEditionStudioHeadId(environment.CompatibilityFingerprint), edition, StringComparison.OrdinalIgnoreCase)
+                || environment.SourcePacks.Any(pack => string.Equals(NormalizeEditionStudioHeadId(pack), edition, StringComparison.OrdinalIgnoreCase)))
+            .ToArray();
+
+        return new EditionStudioHeadTarget(
+            Edition: edition,
+            Label: label,
+            EnvironmentCount: matching.Length,
+            Fingerprints: matching.Select(static item => item.CompatibilityFingerprint).Distinct(StringComparer.OrdinalIgnoreCase).Take(3).ToArray(),
+            AccountHref: $"/account/edition-studio/{edition}",
+            ApiHref: $"/api/v1/campaign-spine/me/edition-studio/heads/{edition}",
+            Summary: summary);
+    }
+
+    private static string NormalizeEditionStudioHeadId(string? candidate)
+    {
+        string normalized = string.IsNullOrWhiteSpace(candidate) ? string.Empty : candidate.Trim().ToLowerInvariant();
+        if (normalized.Contains("sr4", StringComparison.Ordinal))
+        {
+            return "sr4";
+        }
+
+        if (normalized.Contains("sr5", StringComparison.Ordinal))
+        {
+            return "sr5";
+        }
+
+        return normalized.Contains("sr6", StringComparison.Ordinal) ? "sr6" : "sr6";
+    }
+
+    private static string NormalizeLocalCoProcessorProfileId(string? candidate)
+    {
+        string normalized = string.IsNullOrWhiteSpace(candidate) ? string.Empty : candidate.Trim().ToLowerInvariant().Replace('-', '_');
+        if (normalized.Contains("privacy", StringComparison.Ordinal))
+        {
+            return "privacy_first";
+        }
+
+        if (normalized.Contains("hybrid", StringComparison.Ordinal) || normalized.Contains("local", StringComparison.Ordinal))
+        {
+            return "hybrid_local";
+        }
+
+        return "hosted_only";
+    }
+
+    private RunControlReceipt BuildRunControlReceipt(AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            return new RunControlReceipt(
+                Horizon: "run_control",
+                Status: "shipped_mvp",
+                PublicBoard: new RunControlPublicBoard(
+                    SessionBoardMarkdownHref: "/run-control/packets/session_board.md",
+                    SessionBoardJsonHref: "/run-control/packets/session_board.json",
+                    ContinuityBoardMarkdownHref: "/run-control/packets/continuity_board.md",
+                    ContinuityBoardJsonHref: "/run-control/packets/continuity_board.json"),
+                SignedInDesk: new RunControlSignedInDesk(
+                    AccountEntryHref: "/account/run-control",
+                    AccountRedirectHref: "/account/run-control/open",
+                    AccountRunHrefTemplate: "/account/run-control/{runId}",
+                    DashboardApiHref: "/api/v1/campaign-spine/me/run-control/dashboard",
+                    RunIndexApiHref: "/api/v1/campaign-spine/me/runs",
+                    RunDetailApiHrefTemplate: "/api/v1/campaign-spine/me/run-control/runs/{runId}",
+                    Summary: "Signed-in RUN CONTROL keeps live session board, active-scene continuity, and reconnect-safe follow-through on first-party rails."),
+                Counts: new RunControlCounts(0, 0, 0, 0),
+                LeadRun: null,
+                Boundary: new RunControlBoundary(
+                    CampaignTruth: "First-party only",
+                    ReconnectAuthority: "Receipt-backed",
+                    CollaborationReplacement: "Not claimed",
+                    HiddenStateAuthority: "Not claimed"));
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+        RunProjection? leadRun = summary.Runs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+        CampaignWorkspaceProjection? workspace = leadRun is null
+            ? _campaignSpine.GetStarterWorkspace(user, installLinking) ?? summary.Workspaces.FirstOrDefault()
+            : summary.Workspaces.FirstOrDefault(item => item.Runs.Any(candidate => string.Equals(candidate.RunId, leadRun.RunId, StringComparison.OrdinalIgnoreCase)))
+                ?? _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+        SceneProjection? activeScene = leadRun?.Scenes.FirstOrDefault(scene => string.Equals(scene.SceneId, leadRun.ActiveSceneId, StringComparison.OrdinalIgnoreCase));
+
+        return new RunControlReceipt(
+            Horizon: "run_control",
+            Status: "shipped_mvp",
+            PublicBoard: new RunControlPublicBoard(
+                SessionBoardMarkdownHref: "/run-control/packets/session_board.md",
+                SessionBoardJsonHref: "/run-control/packets/session_board.json",
+                ContinuityBoardMarkdownHref: "/run-control/packets/continuity_board.md",
+                ContinuityBoardJsonHref: "/run-control/packets/continuity_board.json"),
+            SignedInDesk: new RunControlSignedInDesk(
+                AccountEntryHref: "/account/run-control",
+                AccountRedirectHref: "/account/run-control/open",
+                AccountRunHrefTemplate: "/account/run-control/{runId}",
+                DashboardApiHref: "/api/v1/campaign-spine/me/run-control/dashboard",
+                RunIndexApiHref: "/api/v1/campaign-spine/me/runs",
+                RunDetailApiHrefTemplate: "/api/v1/campaign-spine/me/run-control/runs/{runId}",
+                Summary: "Signed-in RUN CONTROL keeps session board, active-scene continuity, and recap-safe GM follow-through on named first-party rails."),
+            Counts: new RunControlCounts(
+                summary.Campaigns.Count,
+                summary.Workspaces.Count,
+                summary.Runs.Count,
+                summary.Runs.Count(item => item.RunboardContinuity is not null)),
+            LeadRun: leadRun is null
+                ? null
+                : new RunControlTarget(
+                    leadRun.RunId,
+                    leadRun.Title,
+                    leadRun.Status,
+                    activeScene?.Title,
+                    workspace?.NextSafeAction ?? leadRun.RunboardContinuity?.RunboardState.NextSafeAction ?? "Open the signed-in run desk to continue.",
+                    $"/account/run-control/{Uri.EscapeDataString(leadRun.RunId)}",
+                    $"/api/v1/campaign-spine/me/run-control/runs/{Uri.EscapeDataString(leadRun.RunId)}"),
+            Boundary: new RunControlBoundary(
+                CampaignTruth: "First-party only",
+                ReconnectAuthority: "Receipt-backed",
+                CollaborationReplacement: "Not claimed",
+                HiddenStateAuthority: "Not claimed"));
+    }
+
+    private async Task<string> BuildOnrampPacketMarkdownAsync(string packetId, CancellationToken cancellationToken)
+    {
+        OnrampReceipt receipt = BuildOnrampReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/onramp", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "starter_lane" : packetId.Trim().ToLowerInvariant();
+        if (normalizedPacketId == "recovery_lane")
+        {
+            return $$"""
+# ONRAMP recovery packet
+
+ONRAMP keeps guided recovery on first-party rails.
+
+## Public board
+
+* Starter lane packet: `{{receipt.PublicBoard.StarterLaneJsonHref}}`
+* Recovery lane packet: `{{receipt.PublicBoard.RecoveryLaneJsonHref}}`
+
+## Signed-in desk
+
+* Account desk: `{{receipt.SignedInDesk.AccountEntryHref}}`
+* Direct open route: `{{receipt.SignedInDesk.AccountRedirectHref}}`
+* Recovery API: `{{receipt.SignedInDesk.RecoveryApiHref}}`
+
+## Recovery posture
+
+* Restore id: `{{receipt.Recovery.RestoreId}}`
+* Claimed devices: {{receipt.Recovery.ClaimedDevices}}
+* Recent restore artifacts: {{receipt.Recovery.RecentArtifacts}}
+* Conflict summaries: {{receipt.Recovery.ConflictCount}}
+
+## Boundary
+
+ONRAMP does not claim hidden automation, auto-build authority, or off-account recovery truth.
+""";
+        }
+
+        return $$"""
+# ONRAMP starter packet
+
+ONRAMP now ships a first-party guided starter lane.
+
+## Public board
+
+* Starter lane packet: `{{receipt.PublicBoard.StarterLaneJsonHref}}`
+* Recovery lane packet: `{{receipt.PublicBoard.RecoveryLaneJsonHref}}`
+
+## Signed-in desk
+
+* Account desk: `{{receipt.SignedInDesk.AccountEntryHref}}`
+* Direct open route: `{{receipt.SignedInDesk.AccountRedirectHref}}`
+* Starter route: `{{receipt.SignedInDesk.AccountStarterHref}}`
+* Dashboard API: `{{receipt.SignedInDesk.DashboardApiHref}}`
+* Starter API: `{{receipt.SignedInDesk.StarterApiHref}}`
+
+## Counts
+
+* Campaigns: {{receipt.Counts.Campaigns}}
+* Workspaces: {{receipt.Counts.Workspaces}}
+* Dossiers: {{receipt.Counts.Dossiers}}
+* Restore artifacts: {{receipt.Counts.RestoreArtifacts}}
+
+## Lead starter workspace
+
+{{(receipt.LeadStarter is null
+    ? "No lead starter workspace is attached yet. Use the signed-in desk to move into the first playable session lane when the first governed workspace returns."
+    : $"{receipt.LeadStarter.CampaignName} is the lead starter workspace. Ruleset: {receipt.LeadStarter.RuleEnvironment}. Next safe action: {receipt.LeadStarter.NextSafeAction}")}}
+""";
+    }
+
+    private async Task<string> BuildOnrampPacketJsonAsync(string packetId, CancellationToken cancellationToken)
+    {
+        OnrampReceipt receipt = BuildOnrampReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/onramp", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "starter_lane" : packetId.Trim().ToLowerInvariant();
+        object payload = normalizedPacketId == "recovery_lane"
+            ? new
+            {
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                packet = "recovery_lane",
+                publicBoard = receipt.PublicBoard,
+                signedInDesk = receipt.SignedInDesk,
+                recovery = receipt.Recovery,
+                boundary = receipt.Boundary
+            }
+            : new
+            {
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                packet = "starter_lane",
+                publicBoard = receipt.PublicBoard,
+                signedInDesk = receipt.SignedInDesk,
+                counts = receipt.Counts,
+                leadStarter = receipt.LeadStarter,
+                recovery = receipt.Recovery,
+                boundary = receipt.Boundary
+            };
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    }
+
+    private static bool IsKnownOnrampPacketId(string? packetId)
+    {
+        string normalized = string.IsNullOrWhiteSpace(packetId) ? string.Empty : packetId.Trim().ToLowerInvariant();
+        return normalized is "starter_lane" or "recovery_lane";
+    }
+
+    private async Task<string> BuildEditionStudioPacketMarkdownAsync(string packetId, CancellationToken cancellationToken)
+    {
+        EditionStudioReceipt receipt = BuildEditionStudioReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/edition-studio", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "sr5_head" : packetId.Trim().ToLowerInvariant();
+        EditionStudioHeadTarget head = receipt.Heads.First(item => string.Equals(item.Edition, NormalizeEditionStudioHeadId(normalizedPacketId), StringComparison.OrdinalIgnoreCase));
+
+        return $$"""
+# EDITION STUDIO {{head.Label}} head
+
+EDITION STUDIO keeps {{head.Label}} authored as a distinct ruleset head on first-party rails.
+
+## Public board
+
+* SR4 head packet: `{{receipt.PublicBoard.Sr4HeadJsonHref}}`
+* SR5 head packet: `{{receipt.PublicBoard.Sr5HeadJsonHref}}`
+* SR6 head packet: `{{receipt.PublicBoard.Sr6HeadJsonHref}}`
+
+## Signed-in desk
+
+* Account desk: `{{receipt.SignedInDesk.AccountEntryHref}}`
+* Direct open route: `{{receipt.SignedInDesk.AccountRedirectHref}}`
+* Head route: `{{head.AccountHref}}`
+* Head API: `{{head.ApiHref}}`
+
+## Head posture
+
+* Matching environments: {{head.EnvironmentCount}}
+* Fingerprints: {{(head.Fingerprints.Count == 0 ? "none yet" : string.Join(", ", head.Fingerprints))}}
+
+## Boundary
+
+EDITION STUDIO does not claim decorative theming authority, app-fork authority, or visual flavor as rules truth.
+""";
+    }
+
+    private async Task<string> BuildEditionStudioPacketJsonAsync(string packetId, CancellationToken cancellationToken)
+    {
+        EditionStudioReceipt receipt = BuildEditionStudioReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/edition-studio", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "sr5_head" : packetId.Trim().ToLowerInvariant();
+        EditionStudioHeadTarget head = receipt.Heads.First(item => string.Equals(item.Edition, NormalizeEditionStudioHeadId(normalizedPacketId), StringComparison.OrdinalIgnoreCase));
+        object payload = new
+        {
+            horizon = receipt.Horizon,
+            status = receipt.Status,
+            packet = $"{head.Edition}_head",
+            publicBoard = receipt.PublicBoard,
+            signedInDesk = receipt.SignedInDesk,
+            counts = receipt.Counts,
+            head,
+            boundary = receipt.Boundary
+        };
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    }
+
+    private static bool IsKnownEditionStudioPacketId(string? packetId)
+    {
+        string normalized = string.IsNullOrWhiteSpace(packetId) ? string.Empty : packetId.Trim().ToLowerInvariant();
+        return normalized is "sr4_head" or "sr5_head" or "sr6_head";
+    }
+
+    private async Task<string> BuildLocalCoProcessorPacketMarkdownAsync(string packetId, CancellationToken cancellationToken)
+    {
+        LocalCoProcessorReceipt receipt = BuildLocalCoProcessorReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/local-co-processor", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "capability_matrix" : packetId.Trim().ToLowerInvariant();
+        if (normalizedPacketId == "policy_boundary")
+        {
+            return $$"""
+# LOCAL CO-PROCESSOR policy boundary
+
+LOCAL CO-PROCESSOR keeps local acceleration optional and fail-open.
+
+## Public board
+
+* Capability matrix packet: `{{receipt.PublicBoard.CapabilityMatrixJsonHref}}`
+* Policy boundary packet: `{{receipt.PublicBoard.PolicyBoundaryJsonHref}}`
+
+## Signed-in desk
+
+* Account desk: `{{receipt.SignedInDesk.AccountEntryHref}}`
+* Direct open route: `{{receipt.SignedInDesk.AccountRedirectHref}}`
+* Policy API: `{{receipt.SignedInDesk.PolicyApiHref}}`
+
+## Boundary
+
+* Hosted-first parity: {{receipt.Boundary.HostedFirstParity}}
+* Mandatory runtime: {{receipt.Boundary.MandatoryRuntime}}
+* Local truth authority: {{receipt.Boundary.LocalTruthAuthority}}
+* Disableable profiles: {{receipt.Boundary.DisableableProfiles}}
+
+LOCAL CO-PROCESSOR does not turn desktop compute into a requirement, does not move canonical truth into local runtime, and does not require a provider-specific helper to keep the product working.
+""";
+        }
+
+        LocalCoProcessorProfileTarget leadProfile = receipt.Profiles.FirstOrDefault(static item => item.IsSelected) ?? receipt.Profiles.First();
+        return $$"""
+# LOCAL CO-PROCESSOR capability matrix
+
+LOCAL CO-PROCESSOR now ships a bounded optional-acceleration lane.
+
+## Public board
+
+* Capability matrix packet: `{{receipt.PublicBoard.CapabilityMatrixJsonHref}}`
+* Policy boundary packet: `{{receipt.PublicBoard.PolicyBoundaryJsonHref}}`
+
+## Signed-in desk
+
+* Account desk: `{{receipt.SignedInDesk.AccountEntryHref}}`
+* Direct open route: `{{receipt.SignedInDesk.AccountRedirectHref}}`
+* Profile route template: `{{receipt.SignedInDesk.AccountProfileHrefTemplate}}`
+* Capabilities API: `{{receipt.SignedInDesk.CapabilitiesApiHref}}`
+
+## Counts
+
+* Workspaces: {{receipt.Counts.Workspaces}}
+* Dossiers: {{receipt.Counts.Dossiers}}
+* Claimed devices: {{receipt.Counts.ClaimedDevices}}
+* Profiles: {{receipt.Counts.Profiles}}
+
+## Lead profile
+
+{{leadProfile.Label}} is the current lead profile. {{leadProfile.Summary}}
+""";
+    }
+
+    private async Task<string> BuildLocalCoProcessorPacketJsonAsync(string packetId, CancellationToken cancellationToken)
+    {
+        LocalCoProcessorReceipt receipt = BuildLocalCoProcessorReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/local-co-processor", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "capability_matrix" : packetId.Trim().ToLowerInvariant();
+        object payload = normalizedPacketId == "policy_boundary"
+            ? new
+            {
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                packet = "policy_boundary",
+                publicBoard = receipt.PublicBoard,
+                signedInDesk = receipt.SignedInDesk,
+                boundary = receipt.Boundary
+            }
+            : new
+            {
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                packet = "capability_matrix",
+                publicBoard = receipt.PublicBoard,
+                signedInDesk = receipt.SignedInDesk,
+                counts = receipt.Counts,
+                profiles = receipt.Profiles,
+                boundary = receipt.Boundary
+            };
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    }
+
+    private static bool IsKnownLocalCoProcessorPacketId(string? packetId)
+    {
+        string normalized = string.IsNullOrWhiteSpace(packetId) ? string.Empty : packetId.Trim().ToLowerInvariant();
+        return normalized is "capability_matrix" or "policy_boundary";
+    }
+
+    private async Task<string> BuildRunControlPacketMarkdownAsync(string packetId, CancellationToken cancellationToken)
+    {
+        RunControlReceipt receipt = BuildRunControlReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/run-control", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "session_board" : packetId.Trim().ToLowerInvariant();
+        if (normalizedPacketId == "continuity_board")
+        {
+            return $$"""
+# Run Control continuity packet
+
+RUN CONTROL keeps reconnect-safe GM follow-through on first-party rails.
+
+## Public board
+
+* Session board packet: `{{receipt.PublicBoard.SessionBoardJsonHref}}`
+* Continuity packet: `{{receipt.PublicBoard.ContinuityBoardJsonHref}}`
+
+## Signed-in desk
+
+* Account desk: `{{receipt.SignedInDesk.AccountEntryHref}}`
+* Direct open route: `{{receipt.SignedInDesk.AccountRedirectHref}}`
+* Dashboard API: `{{receipt.SignedInDesk.DashboardApiHref}}`
+
+## Lead continuity posture
+
+{{(receipt.LeadRun is null
+    ? "No lead run is attached yet. RUN CONTROL stays ready to open the named GM desk as soon as a governed run returns."
+    : $"{receipt.LeadRun.Title} is the lead run. Active scene: {receipt.LeadRun.ActiveSceneTitle ?? "none yet"}. Next safe action: {receipt.LeadRun.NextSafeAction}")}}
+
+## Boundary
+
+RUN CONTROL does not claim hidden-state authority, generic collaboration replacement, or off-spine truth.
+""";
+        }
+
+        return $$"""
+# Run Control session board
+
+RUN CONTROL now ships a first-party GM operations lane.
+
+## Public board
+
+* Session board packet: `{{receipt.PublicBoard.SessionBoardJsonHref}}`
+* Continuity packet: `{{receipt.PublicBoard.ContinuityBoardJsonHref}}`
+
+## Signed-in desk
+
+* Account desk: `{{receipt.SignedInDesk.AccountEntryHref}}`
+* Direct open route: `{{receipt.SignedInDesk.AccountRedirectHref}}`
+* Run detail template: `{{receipt.SignedInDesk.AccountRunHrefTemplate}}`
+* Dashboard API: `{{receipt.SignedInDesk.DashboardApiHref}}`
+* Run index API: `{{receipt.SignedInDesk.RunIndexApiHref}}`
+
+## Counts
+
+* Campaigns: {{receipt.Counts.Campaigns}}
+* Workspaces: {{receipt.Counts.Workspaces}}
+* Runs: {{receipt.Counts.Runs}}
+* Continuity-backed runs: {{receipt.Counts.ContinuityRuns}}
+
+## Lead run
+
+{{(receipt.LeadRun is null
+    ? "No lead run is attached yet. Use the signed-in desk to open the campaign workbench when the first governed session returns."
+    : $"{receipt.LeadRun.Title} is the lead run. Status: {receipt.LeadRun.Status}. Active scene: {receipt.LeadRun.ActiveSceneTitle ?? "none yet"}.")}}
+""";
+    }
+
+    private async Task<string> BuildRunControlPacketJsonAsync(string packetId, CancellationToken cancellationToken)
+    {
+        RunControlReceipt receipt = BuildRunControlReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/run-control", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "session_board" : packetId.Trim().ToLowerInvariant();
+        object payload = normalizedPacketId == "continuity_board"
+            ? new
+            {
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                packet = "continuity_board",
+                publicBoard = receipt.PublicBoard,
+                signedInDesk = receipt.SignedInDesk,
+                leadRun = receipt.LeadRun,
+                boundary = receipt.Boundary
+            }
+            : new
+            {
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                packet = "session_board",
+                publicBoard = receipt.PublicBoard,
+                signedInDesk = receipt.SignedInDesk,
+                counts = receipt.Counts,
+                leadRun = receipt.LeadRun,
+                boundary = receipt.Boundary
+            };
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    }
+
+    private static bool IsKnownRunControlPacketId(string? packetId)
+    {
+        string normalized = string.IsNullOrWhiteSpace(packetId) ? string.Empty : packetId.Trim().ToLowerInvariant();
+        return normalized is "session_board" or "continuity_board";
+    }
+
+    private async Task<string> BuildQuicksilverPacketMarkdownAsync(string packetId, CancellationToken cancellationToken)
+    {
+        QuicksilverCommandDeckReceipt receipt = BuildQuicksilverCommandDeckReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/quicksilver", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "command_deck" : packetId.Trim().ToLowerInvariant();
+        if (normalizedPacketId == "jump_targets")
+        {
+            return $$"""
+# Quicksilver jump targets
+
+The typed command deck stays bounded:
+
+{{string.Join("\n", receipt.FocusTargets.Select(target => $"- {target.Label}: focus {target.FocusHref} | api {target.ApiHref} | {(target.Available ? "live" : "ready")}"))}}
+""";
+        }
+
+        return $$"""
+# Quicksilver command deck
+
+Quicksilver keeps expert-speed jumps on first-party rails.
+
+- Build handoffs: {{receipt.FocusTargets[0].FocusHref}}
+- Rules answers: {{receipt.FocusTargets[1].FocusHref}}
+- Prep benches: {{receipt.FocusTargets[2].FocusHref}}
+- Creator desk: {{receipt.FocusTargets[3].FocusHref}}
+- JACKPOINT desk: {{receipt.FocusTargets[4].FocusHref}}
+
+Boundary:
+- legality still visible
+- explainability still required
+- no background mutation authority
+- no cache authority
+""";
+    }
+
+    private async Task<string> BuildQuicksilverPacketJsonAsync(string packetId, CancellationToken cancellationToken)
+    {
+        QuicksilverCommandDeckReceipt receipt = BuildQuicksilverCommandDeckReceipt(await TryGetOptionalPublicSurfaceSubjectAsync("/quicksilver", cancellationToken));
+        string normalizedPacketId = string.IsNullOrWhiteSpace(packetId) ? "command_deck" : packetId.Trim().ToLowerInvariant();
+        object payload = normalizedPacketId switch
+        {
+            "jump_targets" => new
+            {
+                packetId = "jump_targets",
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                targets = receipt.FocusTargets
+            },
+            _ => new
+            {
+                packetId = "command_deck",
+                horizon = receipt.Horizon,
+                status = receipt.Status,
+                publicBoard = receipt.PublicBoard,
+                signedInBench = receipt.SignedInBench,
+                counts = receipt.Counts,
+                focusTargets = receipt.FocusTargets,
+                boundary = receipt.Boundary
+            }
+        };
+
+        return JsonSerializer.Serialize(payload, new JsonSerializerOptions(JsonSerializerDefaults.Web) { WriteIndented = true });
+    }
+
+    private static bool IsKnownQuicksilverPacketId(string? packetId)
+    {
+        string normalized = string.IsNullOrWhiteSpace(packetId) ? string.Empty : packetId.Trim().ToLowerInvariant();
+        return normalized is "command_deck" or "jump_targets";
+    }
+
+    private sealed record RunControlPublicBoard(
+        string SessionBoardMarkdownHref,
+        string SessionBoardJsonHref,
+        string ContinuityBoardMarkdownHref,
+        string ContinuityBoardJsonHref);
+
+    private sealed record OnrampPublicBoard(
+        string StarterLaneMarkdownHref,
+        string StarterLaneJsonHref,
+        string RecoveryLaneMarkdownHref,
+        string RecoveryLaneJsonHref);
+
+    private sealed record OnrampSignedInDesk(
+        string AccountEntryHref,
+        string AccountRedirectHref,
+        string AccountStarterHref,
+        string DashboardApiHref,
+        string StarterApiHref,
+        string RecoveryApiHref,
+        string Summary);
+
+    private sealed record OnrampCounts(
+        int Campaigns,
+        int Workspaces,
+        int Dossiers,
+        int RestoreArtifacts);
+
+    private sealed record OnrampStarterTarget(
+        string WorkspaceId,
+        string CampaignName,
+        string RuleEnvironment,
+        string NextSafeAction,
+        string AccountHref,
+        string ApiHref);
+
+    private sealed record OnrampRecoveryTarget(
+        string RestoreId,
+        int ClaimedDevices,
+        int RecentArtifacts,
+        int ConflictCount,
+        string AccountHref,
+        string ApiHref);
+
+    private sealed record OnrampBoundary(
+        string BuildTruth,
+        string HiddenAutomation,
+        string AutoBuildAuthority,
+        string RecoveryAuthority);
+
+    private sealed record OnrampReceipt(
+        string Horizon,
+        string Status,
+        OnrampPublicBoard PublicBoard,
+        OnrampSignedInDesk SignedInDesk,
+        OnrampCounts Counts,
+        OnrampStarterTarget? LeadStarter,
+        OnrampRecoveryTarget Recovery,
+        OnrampBoundary Boundary);
+
+    private sealed record EditionStudioPublicBoard(
+        string Sr4HeadMarkdownHref,
+        string Sr4HeadJsonHref,
+        string Sr5HeadMarkdownHref,
+        string Sr5HeadJsonHref,
+        string Sr6HeadMarkdownHref,
+        string Sr6HeadJsonHref);
+
+    private sealed record EditionStudioSignedInDesk(
+        string AccountEntryHref,
+        string AccountRedirectHref,
+        string AccountHeadHrefTemplate,
+        string HeadsApiHref,
+        string HeadDetailApiHrefTemplate,
+        string Summary);
+
+    private sealed record EditionStudioCounts(
+        int Workspaces,
+        int Dossiers,
+        int RuleEnvironments);
+
+    private sealed record EditionStudioHeadTarget(
+        string Edition,
+        string Label,
+        int EnvironmentCount,
+        IReadOnlyList<string> Fingerprints,
+        string AccountHref,
+        string ApiHref,
+        string Summary);
+
+    private sealed record EditionStudioBoundary(
+        string RulesTruth,
+        string DecorativeThemingAuthority,
+        string AppForkAuthority,
+        string VisualFlavorAuthority);
+
+    private sealed record EditionStudioReceipt(
+        string Horizon,
+        string Status,
+        EditionStudioPublicBoard PublicBoard,
+        EditionStudioSignedInDesk SignedInDesk,
+        EditionStudioCounts Counts,
+        IReadOnlyList<EditionStudioHeadTarget> Heads,
+        EditionStudioBoundary Boundary);
+
+    private sealed record LocalCoProcessorPublicBoard(
+        string CapabilityMatrixMarkdownHref,
+        string CapabilityMatrixJsonHref,
+        string PolicyBoundaryMarkdownHref,
+        string PolicyBoundaryJsonHref);
+
+    private sealed record LocalCoProcessorSignedInDesk(
+        string AccountEntryHref,
+        string AccountRedirectHref,
+        string AccountProfileHrefTemplate,
+        string CapabilitiesApiHref,
+        string PolicyApiHref,
+        string Summary);
+
+    private sealed record LocalCoProcessorCounts(
+        int Workspaces,
+        int Dossiers,
+        int ClaimedDevices,
+        int Profiles);
+
+    private sealed record LocalCoProcessorProfileTarget(
+        string Profile,
+        string Label,
+        bool IsSelected,
+        string AccountHref,
+        string ApiHref,
+        string Summary);
+
+    private sealed record LocalCoProcessorBoundary(
+        string HostedFirstParity,
+        string MandatoryRuntime,
+        string LocalTruthAuthority,
+        string DisableableProfiles);
+
+    private sealed record LocalCoProcessorReceipt(
+        string Horizon,
+        string Status,
+        LocalCoProcessorPublicBoard PublicBoard,
+        LocalCoProcessorSignedInDesk SignedInDesk,
+        LocalCoProcessorCounts Counts,
+        IReadOnlyList<LocalCoProcessorProfileTarget> Profiles,
+        LocalCoProcessorBoundary Boundary);
+
+    private sealed record RunControlSignedInDesk(
+        string AccountEntryHref,
+        string AccountRedirectHref,
+        string AccountRunHrefTemplate,
+        string DashboardApiHref,
+        string RunIndexApiHref,
+        string RunDetailApiHrefTemplate,
+        string Summary);
+
+    private sealed record RunControlCounts(
+        int Campaigns,
+        int Workspaces,
+        int Runs,
+        int ContinuityRuns);
+
+    private sealed record RunControlTarget(
+        string RunId,
+        string Title,
+        string Status,
+        string? ActiveSceneTitle,
+        string NextSafeAction,
+        string AccountHref,
+        string ApiHref);
+
+    private sealed record RunControlBoundary(
+        string CampaignTruth,
+        string ReconnectAuthority,
+        string CollaborationReplacement,
+        string HiddenStateAuthority);
+
+    private sealed record RunControlReceipt(
+        string Horizon,
+        string Status,
+        RunControlPublicBoard PublicBoard,
+        RunControlSignedInDesk SignedInDesk,
+        RunControlCounts Counts,
+        RunControlTarget? LeadRun,
+        RunControlBoundary Boundary);
+
+    private sealed record QuicksilverPublicBoard(
+        string CommandDeckMarkdownHref,
+        string CommandDeckJsonHref,
+        string JumpTargetsMarkdownHref,
+        string JumpTargetsJsonHref);
+
+    private sealed record QuicksilverSignedInBench(
+        string AccountEntryHref,
+        string AccountRedirectHref,
+        string FocusHrefTemplate,
+        string CommandDeckApiHref,
+        string JumpTargetsApiHref,
+        string Summary);
+
+    private sealed record QuicksilverCounts(
+        int BuildHandoffs,
+        int RulesAnswers,
+        int Workspaces,
+        int Publications);
+
+    private sealed record QuicksilverFocusTarget(
+        string Focus,
+        string Label,
+        bool Available,
+        string FocusHref,
+        string ApiHref,
+        string Summary);
+
+    private sealed record QuicksilverBoundary(
+        string RulesTruth,
+        string BulkMutationAuthority,
+        string BackgroundAutomation,
+        string CacheAuthority);
+
+    private sealed record QuicksilverCommandDeckReceipt(
+        string Horizon,
+        string Status,
+        QuicksilverPublicBoard PublicBoard,
+        QuicksilverSignedInBench SignedInBench,
+        QuicksilverCounts Counts,
+        IReadOnlyList<QuicksilverFocusTarget> FocusTargets,
+        QuicksilverBoundary Boundary);
 
     private PackageCatalogEntryViewModel BuildPackageCatalogEntry(PublicPackageDefinition package, string detailBasePath)
         => new(
@@ -5270,9 +7891,9 @@ public sealed class PublicLandingController : Controller
     {
         BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
         return new BuildGhostConciergeTeaserViewModel(
-            StatusLabel: "Build Ghost pilot boundary",
+            StatusLabel: "ALICE compare bench",
             Summary: projection.HumanizedSummary,
-            Href: "/participate/build-ghosts",
+            Href: "/alice",
             ProofPoints:
             [
                 projection.FacePopStatus,
@@ -5281,24 +7902,83 @@ public sealed class PublicLandingController : Controller
             ]);
     }
 
-    private async Task<BuildGhostConciergePageViewModel> BuildBuildGhostConciergePageModel(CancellationToken cancellationToken)
+    private async Task<BuildGhostConciergePageViewModel> BuildBuildGhostConciergePageModel(
+        CancellationToken cancellationToken,
+        string currentPath = "/participate/build-ghosts",
+        string title = "Build Ghost concierge",
+        string eyebrow = "Bounded public pilot",
+        string heading = "FacePop can greet. Answerly can explain. Chummer still owns Build Ghost truth.",
+        string intro = "This page is the safe public front door for ALICE Build Ghost experiments. It explains the split cleanly instead of pretending the concierge, the explainer, and the compare engine are the same thing.")
     {
         BuildGhostConciergeProjection projection = _buildGhostConcierge.Build();
+        AuthenticatedHubSubject? subject = await TryGetOptionalPublicSurfaceSubjectAsync(currentPath, cancellationToken);
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
-            "Build Ghost concierge",
+            title,
             "Bounded public intake and explanation for ALICE Build Ghosts without surrendering runtime truth.",
-            "/participate/build-ghosts",
+            currentPath,
             cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
         return new BuildGhostConciergePageViewModel(
             Chrome: chrome,
-            Eyebrow: "Bounded public pilot",
-            Heading: "FacePop can greet. Answerly can explain. Chummer still owns Build Ghost truth.",
-            Intro: "This page is the safe public front door for ALICE Build Ghost experiments. It explains the split cleanly instead of pretending the concierge, the explainer, and the compare engine are the same thing.",
+            Eyebrow: eyebrow,
+            Heading: heading,
+            Intro: intro,
             Projection: projection,
+            SignedInBench: BuildBuildGhostSignedInBench(subject),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
+    }
+
+    private BuildGhostSignedInBenchViewModel? BuildBuildGhostSignedInBench(AuthenticatedHubSubject? subject)
+    {
+        if (subject is null)
+        {
+            return null;
+        }
+
+        HubUserDto user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+        InstallLinkingSummaryDto installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+        BuildLabHandoffProjection? leadHandoff = _campaignSpine
+            .GetAccountSummary(user, installLinking)
+            .BuildLabHandoffs
+            .OrderByDescending(item => item.UpdatedAtUtc)
+            .FirstOrDefault();
+
+        if (leadHandoff is null)
+        {
+            return new BuildGhostSignedInBenchViewModel(
+                StatusLabel: "Signed in, waiting for a build handoff",
+                Summary: "ALICE is ready to open your first-party build bench as soon as a runner, workspace, or guided build path has produced a governed handoff.",
+                EntryHref: "/account/alice/open",
+                EntryLabel: "Open ALICE workbench",
+                LeadHandoffHref: "/account/work",
+                LeadHandoffTitle: "No build handoff yet",
+                LeadHandoffSummary: "Create or restore a runner, then return here to inspect compare follow-through, planner coverage, and apply-safe output lanes.",
+                ProofPoints:
+                [
+                    "Account-owned handoff lane",
+                    "No provider-side apply authority",
+                    "Receipts stay first-party"
+                ]);
+        }
+
+        string[] proofPoints =
+        [
+            leadHandoff.NextSafeAction ?? "Reviewed variants stay bounded until you deliberately continue.",
+            leadHandoff.PlannerCoverageSummary ?? "Planner coverage stays attached to the build handoff.",
+            leadHandoff.RuntimeCompatibilitySummary ?? "Runtime compatibility stays on the first-party build handoff."
+        ];
+
+        return new BuildGhostSignedInBenchViewModel(
+            StatusLabel: "Signed-in ALICE bench ready",
+            Summary: "Your account already has a governed build handoff. Open the named ALICE bench to inspect tradeoffs, planner coverage, rule-environment diff, and output follow-through on the first-party account rail.",
+            EntryHref: "/account/alice/open",
+            EntryLabel: "Open ALICE workbench",
+            LeadHandoffHref: $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
+            LeadHandoffTitle: leadHandoff.Title,
+            LeadHandoffSummary: leadHandoff.Summary,
+            ProofPoints: proofPoints.Where(static item => !string.IsNullOrWhiteSpace(item)).ToArray());
     }
 
     private BeHumanEventAdapterPanelViewModel BuildBeHumanEventAdapterPanel()
@@ -9401,7 +12081,7 @@ echo "Help: ${HELP_URL}"
                 string.Equals(faction.Id, selectedFactionId, StringComparison.OrdinalIgnoreCase)
                 || string.Equals(faction.Id.Replace('_', '-'), selectedFactionId, StringComparison.OrdinalIgnoreCase));
         var intro = world?.DeterministicPreview == true
-            ? "This turn-two board shows the city reacting to pressure: cleaner routes, harder heat, and faction moves a GM can use."
+            ? "This deterministic turn-two board shows how AI interim stewards stay bounded while the city reacts to pressure: cleaner routes, harder heat, and faction moves a GM can use."
             : "A fictional city board with six factions, visible pressure zones, and bounded dispatches.";
         if (selectedFaction is not null)
         {
@@ -10387,15 +13067,15 @@ echo "Help: ${HELP_URL}"
         return new BlackLedgerFactionPromoPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
                 $"{promo.PublicName} war bulletin",
-                "Public-safe faction war-bulletin artifacts with an explicit first-party motion-video contract and storyboard fallback.",
+                "Public-safe faction war-bulletin artifacts with an explicit cinematic render contract, narration posture, and storyboard fallback.",
                 $"/ledger/factions/{promo.FactionId}/promo",
                 cancellationToken),
             Heading: $"{promo.PublicName} mobilization bulletin",
-            Intro: "This route ships an honest first-party motion video with visible characters, action, captions, a route-backed JSON brief, and a storyboard fallback. It is supposed to hit like propaganda while still staying subordinate to proof.",
+            Intro: "This route ships an honest cinematic faction reel with visible characters, action, captions, a route-backed JSON brief, and a storyboard fallback. It is supposed to hit like propaganda while still staying subordinate to proof.",
             Promo: promo,
             DeliveryNotes:
             [
-                "The first-party motion video is the shipped public contract for this lane.",
+                "The shipped video contract stays subordinate to the same faction and world-turn receipts as the rest of Black Ledger.",
                 "Storyboard fallback remains available if motion playback is unavailable, but it still has to carry the same scene-driven command-bulletin energy.",
                 "No official lore text and no provider branding appear here.",
                 "These links are route-backed shipped artifacts, not empty buttons.",
@@ -10427,7 +13107,7 @@ echo "Help: ${HELP_URL}"
             Intro: intro,
             CurrentSection: currentSection,
             RulesetId: AnarchyPreviewService.RulesetId,
-            VerdictLabel: "Playable preview",
+            VerdictLabel: "Shipped rules-light lane",
             ScopeLabel: "Dedicated ruleset lane",
             FeaturedProfile: _anarchyPreview.LoadFeaturedProfile(),
             LedgerStats: _anarchyPreview.BuildLedgerStats(),

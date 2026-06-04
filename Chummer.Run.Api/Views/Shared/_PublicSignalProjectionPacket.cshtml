@@ -91,7 +91,7 @@
     <div class="route-choice-grid">
         <article class="route-choice-card">
             <span class="tag">@SanitizeProjectionText(Model.Vendor)</span>
-            <h3>Public page and Chummer help stay paired.</h3>
+            <h3>Open first-party fallback</h3>
             <p>@SanitizeProjectionText(Model.PolicyStatus)</p>
             <div class="route-choice-card__proof">
                 <span>Role: @Model.Role</span>
@@ -103,7 +103,7 @@
         </article>
         <article class="route-choice-card">
             <span class="tag">Core rule</span>
-            <h3>@SanitizeProjectionText(Model.CoreRule)</h3>
+            <h3>@Model.CoreRule</h3>
             <p>The public board can collect visible demand, but Chummer review still decides what changes.</p>
             @if (authorityFlow.Length > 0)
             {
@@ -121,7 +121,7 @@
             }
         </article>
         <article class="route-choice-card">
-            <span class="tag">Boundaries</span>
+            <span class="tag">Boundary conditions</span>
             <h3>Decision paths stay explicit.</h3>
             <p>Public signal can move into review tracks, but it cannot become support, roadmap, or release status by itself.</p>
             @if (decisionRoutes.Length > 0)
@@ -147,7 +147,7 @@
             <div class="compact-rail">
                 <article class="compact-rail__item">
                     <div class="compact-rail__copy">
-                        <h3>Public warning</h3>
+                        <h3>Required public warning</h3>
                         <p>@SanitizeProjectionText(Model.PublicWarning)</p>
                     </div>
                 </article>
@@ -171,8 +171,8 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Product records</h3>
-                            <p>@string.Join(" / ", canonicalSources)</p>
+                        <h3>Canonical sources</h3>
+                        <p>@string.Join(" / ", canonicalSources)</p>
                         </div>
                     </article>
                 }
@@ -189,8 +189,8 @@
                 {
                     <article class="compact-rail__item">
                         <div class="compact-rail__copy">
-                            <h3>Shipped update checks</h3>
-                            <p>@string.Join(" / ", Model.CloseoutRequirements.Select(SanitizeProjectionText))</p>
+                        <h3>Shipped closeout gate</h3>
+                        <p>@string.Join(" / ", Model.CloseoutRequirements.Select(SanitizeProjectionText))</p>
                         </div>
                     </article>
                 }

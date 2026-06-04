@@ -213,6 +213,768 @@ public sealed class AccountsController : Controller
         }
     }
 
+    [HttpGet("/account/alice/{handoffId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AliceBenchDetailPage(
+        [FromRoute] string handoffId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/alice/{Uri.EscapeDataString(handoffId)}";
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+
+        return await AccountPage(
+            section: "work",
+            caseId: null,
+            cancellationToken: cancellationToken,
+            workspaceId: null,
+            runId: null,
+            handoffId: handoffId,
+            entryId: null,
+            publicationId: null,
+            prepQuery: null);
+    }
+
+    [HttpGet("/account/alice")]
+    [Produces("text/html")]
+    public async Task<IActionResult> AliceBenchPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/alice")}");
+        }
+
+        return await OpenAliceBench(cancellationToken);
+    }
+
+    [HttpGet("/account/alice/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenAliceBench(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var leadHandoff = _campaignSpine
+                .GetAccountSummary(user, installLinking)
+                .BuildLabHandoffs
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+
+            return Redirect(leadHandoff is null
+                ? "/account/work"
+                : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/alice/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "ALICE bench could not confirm the signed-in identity.");
+            return Redirect("/alice");
+        }
+    }
+
+    [HttpGet("/account/community")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CommunityHubPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/community")}");
+        }
+
+        return await OpenCommunityHub(cancellationToken);
+    }
+
+    [HttpGet("/account/community/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenCommunityHub(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var leadOpenRun = _campaignSpine
+                .GetOpenRuns(user, installLinking)
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+
+            if (leadOpenRun is not null)
+            {
+                return Redirect($"/account/work/runs/{Uri.EscapeDataString(leadOpenRun.RunId)}#community-ops");
+            }
+
+            return Redirect("/account/work#community-ops");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/community/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Community Hub could not confirm the signed-in identity.");
+            return Redirect("/community");
+        }
+    }
+
+    [HttpGet("/account/creator/{publicationId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CreatorPublicationPage(
+        [FromRoute] string publicationId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/creator/{Uri.EscapeDataString(publicationId)}";
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+
+        return await AccountPage(
+            section: "work",
+            caseId: null,
+            cancellationToken: cancellationToken,
+            workspaceId: null,
+            runId: null,
+            handoffId: null,
+            entryId: null,
+            publicationId: publicationId,
+            prepQuery: null);
+    }
+
+    [HttpGet("/account/creator")]
+    [Produces("text/html")]
+    public async Task<IActionResult> CreatorOsPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/creator")}");
+        }
+
+        return await OpenCreatorOs(cancellationToken);
+    }
+
+    [HttpGet("/account/creator/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenCreatorOs(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var leadPublication = _campaignSpine
+                .GetAccountSummary(user, installLinking)
+                .CreatorPublications
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+
+            return Redirect(leadPublication is null
+                ? "/account/work"
+                : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/creator/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Creator OS could not confirm the signed-in identity.");
+            return Redirect("/creator");
+        }
+    }
+
+    [HttpGet("/account/jackpoint/{publicationId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> JackpointPublicationPage(
+        [FromRoute] string publicationId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/jackpoint/{Uri.EscapeDataString(publicationId)}";
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+
+        return await AccountPage(
+            section: "work",
+            caseId: null,
+            cancellationToken: cancellationToken,
+            workspaceId: null,
+            runId: null,
+            handoffId: null,
+            entryId: null,
+            publicationId: publicationId,
+            prepQuery: null);
+    }
+
+    [HttpGet("/account/jackpoint")]
+    [Produces("text/html")]
+    public async Task<IActionResult> JackpointDeskPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/jackpoint")}");
+        }
+
+        return await OpenJackpointDesk(cancellationToken);
+    }
+
+    [HttpGet("/account/jackpoint/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenJackpointDesk(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var leadPublication = _campaignSpine
+                .GetAccountSummary(user, installLinking)
+                .CreatorPublications
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+
+            return Redirect(leadPublication is null
+                ? "/account/creator"
+                : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/jackpoint/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "JACKPOINT desk could not confirm the signed-in identity.");
+            return Redirect("/jackpoint");
+        }
+    }
+
+    [HttpGet("/account/runsites/{workspaceId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunsiteWorkspacePage(
+        [FromRoute] string workspaceId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/runsites/{Uri.EscapeDataString(workspaceId)}";
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+
+        return await AccountPage(
+            section: "work",
+            caseId: null,
+            cancellationToken: cancellationToken,
+            workspaceId: workspaceId,
+            runId: null,
+            handoffId: null,
+            entryId: null,
+            publicationId: null,
+            prepQuery: null);
+    }
+
+    [HttpGet("/account/runsites")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunsiteBenchPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/runsites")}");
+        }
+
+        return await OpenRunsiteBench(cancellationToken);
+    }
+
+    [HttpGet("/account/runsites/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenRunsiteBench(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var leadWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? _campaignSpine.GetAccountSummary(user, installLinking)
+                    .Workspaces
+                    .FirstOrDefault();
+
+            return Redirect(leadWorkspace is null
+                ? "/account/work"
+                : $"/account/runsites/{Uri.EscapeDataString(leadWorkspace.WorkspaceId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/runsites/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "RUNSITE bench could not confirm the signed-in identity.");
+            return Redirect("/runsites");
+        }
+    }
+
+    [HttpGet("/account/run-control/{runId}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunControlRunPage(
+        [FromRoute] string runId,
+        CancellationToken cancellationToken)
+    {
+        string currentPath = $"/account/run-control/{Uri.EscapeDataString(runId)}";
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+
+        return await AccountPage(
+            section: "work",
+            caseId: null,
+            cancellationToken: cancellationToken,
+            workspaceId: null,
+            runId: runId,
+            handoffId: null,
+            entryId: null,
+            publicationId: null,
+            prepQuery: null);
+    }
+
+    [HttpGet("/account/run-control")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunControlDeskPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/run-control")}");
+        }
+
+        return await OpenRunControlDesk(cancellationToken);
+    }
+
+    [HttpGet("/account/run-control/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenRunControlDesk(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            RunProjection? leadRun = _campaignSpine
+                .GetAccountSummary(user, installLinking)
+                .Runs
+                .OrderByDescending(item => item.UpdatedAtUtc)
+                .FirstOrDefault();
+
+            return Redirect(leadRun is null
+                ? "/account/work"
+                : $"/account/run-control/{Uri.EscapeDataString(leadRun.RunId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/run-control/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "RUN CONTROL desk could not confirm the signed-in identity.");
+            return Redirect("/run-control");
+        }
+    }
+
+    [HttpGet("/account/onramp/starter")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OnrampStarterPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking);
+
+            return Redirect(starterWorkspace is null
+                ? "/ready"
+                : $"/account/runsites/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/onramp/starter")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "ONRAMP starter route could not confirm the signed-in identity.");
+            return Redirect("/onramp");
+        }
+    }
+
+    [HttpGet("/account/onramp")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OnrampPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/onramp")}");
+        }
+
+        return await OpenOnramp(cancellationToken);
+    }
+
+    [HttpGet("/account/onramp/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenOnramp(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+
+            if (starterWorkspace is not null)
+            {
+                return Redirect("/account/onramp/starter");
+            }
+
+            if (summary.Restore.ClaimedDevices.Count > 0
+                || summary.Restore.RecentArtifacts.Count > 0
+                || summary.Restore.ConflictSummaries.Count > 0)
+            {
+                return Redirect("/account/access");
+            }
+
+            return Redirect("/ready");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/onramp/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "ONRAMP could not confirm the signed-in identity.");
+            return Redirect("/onramp");
+        }
+    }
+
+    [HttpGet("/account/edition-studio")]
+    [Produces("text/html")]
+    public async Task<IActionResult> EditionStudioPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/edition-studio")}");
+        }
+
+        return await OpenEditionStudio(cancellationToken);
+    }
+
+    [HttpGet("/account/edition-studio/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenEditionStudio(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            string preferredEdition = ResolvePreferredEditionStudioHead(summary);
+            return Redirect($"/account/edition-studio/{Uri.EscapeDataString(preferredEdition)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/edition-studio/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Edition Studio could not confirm the signed-in identity.");
+            return Redirect("/edition-studio");
+        }
+    }
+
+    [HttpGet("/account/edition-studio/{edition}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> EditionStudioHeadPage([FromRoute] string edition, CancellationToken cancellationToken)
+    {
+        string normalizedEdition = ResolveNormalizedEditionStudioHeadId(edition);
+        string requestedPath = $"/account/edition-studio/{Uri.EscapeDataString(edition)}";
+
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(requestedPath)}");
+        }
+
+        return Redirect($"/account/work?edition={Uri.EscapeDataString(normalizedEdition)}");
+    }
+
+    [HttpGet("/account/local-co-processor")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LocalCoProcessorPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/local-co-processor")}");
+        }
+
+        return await OpenLocalCoProcessor(cancellationToken);
+    }
+
+    [HttpGet("/account/local-co-processor/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenLocalCoProcessor(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            string preferredProfile = ResolvePreferredLocalCoProcessorProfile(summary);
+            return Redirect($"/account/local-co-processor/{Uri.EscapeDataString(preferredProfile)}");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/local-co-processor/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Local Co-Processor could not confirm the signed-in identity.");
+            return Redirect("/local-co-processor");
+        }
+    }
+
+    [HttpGet("/account/local-co-processor/{profile}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> LocalCoProcessorProfilePage([FromRoute] string profile, CancellationToken cancellationToken)
+    {
+        string normalizedProfile = ResolveNormalizedLocalCoProcessorProfileId(profile);
+        string requestedPath = $"/account/local-co-processor/{Uri.EscapeDataString(profile)}";
+
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(requestedPath)}");
+        }
+
+        return Redirect($"/account/advanced?localCoProcessor={Uri.EscapeDataString(normalizedProfile)}");
+    }
+
+    [HttpGet("/account/passport")]
+    [Produces("text/html")]
+    public async Task<IActionResult> RunnerPassportPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/passport")}");
+        }
+
+        return await OpenRunnerPassport(cancellationToken);
+    }
+
+    [HttpGet("/account/passport/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenRunnerPassport(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            var accountSummary = _campaignSpine.GetAccountSummary(user, installLinking);
+
+            if (accountSummary.Workspaces.Count > 0)
+            {
+                return Redirect("/account/work#aftermath-packages");
+            }
+
+            return Redirect("/account/access");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/passport/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Runner Passport could not confirm the signed-in identity.");
+            return Redirect("/passport");
+        }
+    }
+
+    [HttpGet("/account/quicksilver")]
+    [Produces("text/html")]
+    public async Task<IActionResult> QuicksilverPage(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _identity.RequireSubjectAsync(Request, cancellationToken);
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/quicksilver")}");
+        }
+
+        return await OpenQuicksilver(cancellationToken);
+    }
+
+    [HttpGet("/account/quicksilver/open")]
+    [Produces("text/html")]
+    public async Task<IActionResult> OpenQuicksilver(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+
+            if (summary.BuildLabHandoffs.Count > 0)
+            {
+                return Redirect("/account/quicksilver/builds");
+            }
+
+            if (summary.RulesNavigator.Count > 0)
+            {
+                return Redirect("/account/quicksilver/rules");
+            }
+
+            if (starterWorkspace is not null)
+            {
+                return Redirect("/account/quicksilver/runsites");
+            }
+
+            if (summary.CreatorPublications.Count > 0)
+            {
+                return Redirect("/account/quicksilver/creator");
+            }
+
+            return Redirect("/account/work");
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString("/account/quicksilver/open")}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Quicksilver bench could not confirm the signed-in identity.");
+            return Redirect("/quicksilver");
+        }
+    }
+
+    [HttpGet("/account/quicksilver/{focus}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> QuicksilverFocusPage([FromRoute] string focus, CancellationToken cancellationToken)
+    {
+        string normalizedFocus = string.IsNullOrWhiteSpace(focus) ? "builds" : focus.Trim().ToLowerInvariant();
+        string currentPath = $"/account/quicksilver/{Uri.EscapeDataString(normalizedFocus)}";
+
+        try
+        {
+            var subject = await _identity.RequireSubjectAsync(Request, cancellationToken);
+            var user = _accounts.EnsureUser(subject.SubjectId, subject.DisplayName, subject.Email);
+            var installLinking = _installLinking.GetSummary(user.UserId, subject.SubjectId);
+            AccountCampaignSummary summary = _campaignSpine.GetAccountSummary(user, installLinking);
+            CampaignWorkspaceProjection? starterWorkspace = _campaignSpine.GetStarterWorkspace(user, installLinking)
+                ?? summary.Workspaces.FirstOrDefault();
+            BuildLabHandoffProjection? leadHandoff = summary.BuildLabHandoffs.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+            CreatorPublicationProjection? leadPublication = summary.CreatorPublications.OrderByDescending(item => item.UpdatedAtUtc).FirstOrDefault();
+            RulesNavigatorAnswerProjection? leadRule = summary.RulesNavigator.FirstOrDefault();
+
+            return normalizedFocus switch
+            {
+                "builds" => Redirect(leadHandoff is null ? "/account/alice" : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}"),
+                "rules" => Redirect(leadRule is null ? "/account/work" : $"/account/work/rules/{Uri.EscapeDataString(leadRule.EntryId)}"),
+                "runsites" => Redirect(starterWorkspace is null ? "/account/runsites" : $"/account/runsites/{Uri.EscapeDataString(starterWorkspace.WorkspaceId)}"),
+                "creator" => Redirect(leadPublication is null ? "/account/creator" : $"/account/creator/{Uri.EscapeDataString(leadPublication.PublicationId)}"),
+                "briefings" => Redirect(leadPublication is null ? "/account/jackpoint" : $"/account/jackpoint/{Uri.EscapeDataString(leadPublication.PublicationId)}"),
+                _ => Redirect("/account/quicksilver/open")
+            };
+        }
+        catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
+        {
+            return Redirect($"/login?next={Uri.EscapeDataString(currentPath)}");
+        }
+        catch (HubRequestAuthException ex)
+        {
+            _logger.LogWarning(ex, "Quicksilver focus route {Focus} could not confirm the signed-in identity.", normalizedFocus);
+            return Redirect("/quicksilver");
+        }
+    }
+
     [HttpPost("/account/work/publications/{publicationId}/submit")]
     [ValidateAntiForgeryToken]
     [Produces("text/html")]
@@ -264,6 +1026,74 @@ public sealed class AccountsController : Controller
             notes,
             cancellationToken,
             static (bridge, user, publication, workspace, mutationNotes) => bridge.RejectReview(user, publication, workspace, mutationNotes));
+
+    private static string ResolvePreferredEditionStudioHead(AccountCampaignSummary summary)
+    {
+        string[] candidates = summary.Workspaces.Select(item => item.RuleEnvironment.CompatibilityFingerprint)
+            .Concat(summary.Dossiers.Select(item => item.RuleEnvironment.CompatibilityFingerprint))
+            .Concat(summary.Restore.RecentRuleEnvironments.Select(item => item.CompatibilityFingerprint))
+            .Select(ResolveNormalizedEditionStudioHeadId)
+            .ToArray();
+
+        if (candidates.Any(static item => string.Equals(item, "sr5", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "sr5";
+        }
+
+        if (candidates.Any(static item => string.Equals(item, "sr4", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "sr4";
+        }
+
+        return candidates.FirstOrDefault(static item => item is "sr4" or "sr5" or "sr6") ?? "sr6";
+    }
+
+    private static string ResolveNormalizedEditionStudioHeadId(string? candidate)
+    {
+        string normalized = string.IsNullOrWhiteSpace(candidate) ? string.Empty : candidate.Trim().ToLowerInvariant();
+        if (normalized.Contains("sr4", StringComparison.Ordinal))
+        {
+            return "sr4";
+        }
+
+        if (normalized.Contains("sr5", StringComparison.Ordinal))
+        {
+            return "sr5";
+        }
+
+        return normalized.Contains("sr6", StringComparison.Ordinal) ? "sr6" : "sr6";
+    }
+
+    private static string ResolvePreferredLocalCoProcessorProfile(AccountCampaignSummary summary)
+    {
+        if (summary.Restore.ClaimedDevices.Count > 0)
+        {
+            return "privacy_first";
+        }
+
+        if (summary.Workspaces.Count > 0 || summary.Dossiers.Count > 0)
+        {
+            return "hybrid_local";
+        }
+
+        return "hosted_only";
+    }
+
+    private static string ResolveNormalizedLocalCoProcessorProfileId(string? candidate)
+    {
+        string normalized = string.IsNullOrWhiteSpace(candidate) ? string.Empty : candidate.Trim().ToLowerInvariant().Replace('-', '_');
+        if (normalized.Contains("privacy", StringComparison.Ordinal))
+        {
+            return "privacy_first";
+        }
+
+        if (normalized.Contains("hybrid", StringComparison.Ordinal) || normalized.Contains("local", StringComparison.Ordinal))
+        {
+            return "hybrid_local";
+        }
+
+        return "hosted_only";
+    }
 
     private static bool HasWorkSelection(
         string? workspaceId,

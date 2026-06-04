@@ -1,0 +1,100 @@
+{
+  "generated_at_utc": "2026-06-04T07:00:25.111756Z",
+  "status": "pass",
+  "provider": "MagicFit",
+  "provider_status": "VERIFIED_PROVIDER",
+  "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+  "narration_provider": "unmixr-short-tts",
+  "voice": "en-US-BrianNeural",
+  "slug": "neon-docks-union",
+  "title": "Neon Docks Union",
+  "captions": [
+    "Route Control. Drone Status. Escape windows.",
+    "Join Neon Docks. Keep the city moving."
+  ],
+  "scene_payloads": [
+    {
+      "video_slug": "neon-docks-union",
+      "scene_index": 1,
+      "scene_title": "The city moves boxes",
+      "prompt": "Photoreal industrial dockyard at night, rain, forklifts, cargo drones, dwarf drone dispatcher in grease-stained jacket uses tablet to reroute drones, Chummer 6 route control overlay, cinematic tracking shot, practical worker humor.",
+      "session_id": "cmppysvx803p0p31vxd5ghbsx",
+      "image_generation_id": "cmppysvxv03p6p31v95ukjeac",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001346813-1780001346692.png",
+      "video_generation_id": "cmppyuidv03plp31v17dj0zic",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001659849-cmppyuidv03plp31v17dj0zic.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_01.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_01.mp4",
+      "on_screen_text": "Route Control",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "neon-docks-union",
+      "scene_index": 2,
+      "scene_title": "Drone complaint",
+      "prompt": "Photoreal cyberpunk drone repair bench at dockyard, small cargo drone sparks, dwarf dispatcher taps it with wrench and drone stabilizes, Chummer 6 drone status overlay, realistic movement, funny practical tone.",
+      "session_id": "cmppysvx803p0p31vxd5ghbsx",
+      "image_generation_id": "cmppysvxv03p6p31v95ukjeac",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001346813-1780001346692.png",
+      "video_generation_id": "cmppyuidv03plp31v17dj0zic",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001659849-cmppyuidv03plp31v17dj0zic.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_02.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_02.mp4",
+      "on_screen_text": "Drone Status",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "neon-docks-union",
+      "scene_index": 3,
+      "scene_title": "Escape route",
+      "prompt": "Photoreal wet cargo lane, runners sprint between containers as automated gate opens, dwarf dispatcher watches on tablet, Chummer 6 escape route opened overlay, kinetic cinematic movement, no clutter.",
+      "session_id": "cmppysvx803p0p31vxd5ghbsx",
+      "image_generation_id": "cmppysvxv03p6p31v95ukjeac",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001346813-1780001346692.png",
+      "video_generation_id": "cmppyuidv03plp31v17dj0zic",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001659849-cmppyuidv03plp31v17dj0zic.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_03.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_03.mp4",
+      "on_screen_text": "Escape Route Opened",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "neon-docks-union",
+      "scene_index": 4,
+      "scene_title": "Recruitment",
+      "prompt": "Photoreal recruitment ad in dock dispatch booth, dwarf dispatcher with headset speaks to camera while cargo moves behind glass, Chummer 6 join Neon Docks overlay, exhausted comedy, real environment depth.",
+      "session_id": "cmppysvx803p0p31vxd5ghbsx",
+      "image_generation_id": "cmppysvxv03p6p31v95ukjeac",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001346813-1780001346692.png",
+      "video_generation_id": "cmppyuidv03plp31v17dj0zic",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001659849-cmppyuidv03plp31v17dj0zic.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_04.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_04.mp4",
+      "on_screen_text": "Join Neon Docks",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "neon-docks-union",
+      "scene_index": 5,
+      "scene_title": "Route heat",
+      "prompt": "Photoreal dockyard drone shot rising into cinematic Chummer 6 route map overlay, cargo paths pulse, one route turns red, dispatcher visible below reacting, premium strategy UI mixed with real footage.",
+      "session_id": "cmppysvx803p0p31vxd5ghbsx",
+      "image_generation_id": "cmppysvxv03p6p31v95ukjeac",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001346813-1780001346692.png",
+      "video_generation_id": "cmppyuidv03plp31v17dj0zic",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001659849-cmppyuidv03plp31v17dj0zic.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_05.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/scenes/neon-docks-union_scene_05.mp4",
+      "on_screen_text": "Route Heat Rising",
+      "derived_from_master": true
+    }
+  ],
+  "exports": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.mp4",
+    "mobile_mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo-mobile.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo-poster.png",
+    "audio": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/neon-docks-union-promo-audio.m4a"
+  },
+  "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/neon-docks-union/video_manifest.generated.json"
+}

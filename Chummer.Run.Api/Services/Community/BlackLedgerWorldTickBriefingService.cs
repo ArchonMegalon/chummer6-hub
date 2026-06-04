@@ -270,11 +270,47 @@ public sealed class BlackLedgerWorldTickBriefingService
             $"{world.Districts.OrderByDescending(static district => Math.Abs(district.DeltaSinceLastTick)).First().Name} biggest move",
             "No player identities or private table state"
         ];
+        IReadOnlyList<BlackLedgerCinematicSceneViewModel> screenplayScenes =
+        [
+            new(
+                SceneId: $"turn-{tick.Turn}-anchor-open",
+                Label: "Anchor Open",
+                DurationLabel: "00:08",
+                Purpose: "Open on the turn boundary and establish why this board move matters now.",
+                VisualDirection: $"Anchor desk, city incident wall, and receipt {tick.ReceiptId} already live on the lower third.",
+                NarratorLine: $"{transitionLabel} for {world.PublicName}. {newsreelLead}"),
+            new(
+                SceneId: $"turn-{tick.Turn}-field-pressure",
+                Label: "Field Pressure",
+                DurationLabel: "00:08",
+                Purpose: "Translate abstract board pressure into something a player can feel as consequence.",
+                VisualDirection: actionBeats.FirstOrDefault()?.VisualHook ?? "Public field pressure moves behind the reporter.",
+                NarratorLine: actionBeats.FirstOrDefault()?.ConsequenceLine ?? "Pressure is visible, local, and no longer hypothetical."),
+            new(
+                SceneId: $"turn-{tick.Turn}-command-rundown",
+                Label: "Command Rundown",
+                DurationLabel: "00:08",
+                Purpose: "Show who moved, what changed, and which lane is heating fastest.",
+                VisualDirection: BuildStateSummary(world),
+                NarratorLine: BuildStateSummary(world)),
+            new(
+                SceneId: $"turn-{tick.Turn}-validation-close",
+                Label: "Validation Close",
+                DurationLabel: "00:06",
+                Purpose: "Close on the receipts and keep the bulletin subordinate to proof.",
+                VisualDirection: "Validation packet, receipts lane, and captions route remain visible in frame.",
+                NarratorLine: "The bulletin can be dramatic, but the receipts still get the last word.")
+        ];
 
         return new BlackLedgerNewsreelBroadcastViewModel(
             PackageLabel: "First-party anchor package",
             AnchorName: "Mara Quill",
             DeskLabel: "Black Ledger Network",
+            ProviderStatus: "FIRST_PARTY_NEWSREEL",
+            RenderMode: "first_party_anchor_bulletin",
+            StorylineSummary: "Each turn bulletin opens on the boundary, translates pressure into visible consequences, and closes on the validation lane.",
+            NarratorPosture: "Continuous newsroom narration over a ducked synthetic score bed.",
+            RenderPipelineLabel: "First-party bulletin render -> narration mix -> captions -> public newsroom route",
             WatchHref: watchHref,
             TranscriptHref: transcriptHref,
             ReceiptsHref: receiptsHref,
@@ -287,12 +323,13 @@ public sealed class BlackLedgerWorldTickBriefingService
             DurationLabel: "00:16",
             PublishedLabel: publishedLabel,
             EpisodeTypeLabel: "Turn newsreel",
-            PublicSafetyNote: "Fictional city bulletin built from Black Ledger world movement. No private campaign table data or sourcebook text is exposed here.",
-            ReconstructionNote: "Some footage is reconstructed from the public board state. Source records stay available for review.",
+            PublicSafetyNote: "Public-safe bulletin built from aggregate Black Ledger world receipts. No private campaign table data or sourcebook text is exposed here.",
+            ReconstructionNote: "Some footage is reconstructed from public-safe receipts. Source records stay available for review.",
             FeedbackHref: "/feedback",
             ActionBeats: actionBeats,
             Rundown: rundown,
-            TickerItems: ticker);
+            TickerItems: ticker,
+            ScreenplayScenes: screenplayScenes);
     }
 
     private static IReadOnlyList<BlackLedgerActionBeatViewModel> BuildActionBeats(

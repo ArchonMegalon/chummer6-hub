@@ -12,6 +12,7 @@ from absolute_completion_common import LocalHubApp, TokenIdentityStub, write_jso
 
 
 OUTPUT_ROOT = Path("/docker/chummercomplete/_completion/pre_gold_full_product")
+MAGICFIT_PROVIDER = Path("/docker/chummercomplete/_completion/magicfit_provider/MAGICFIT_PROVIDER_VERIFICATION.generated.json")
 FACTIONS = [
     "glass-tower-compact",
     "rust-market-syndicate",
@@ -61,14 +62,16 @@ def main() -> int:
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     inventory = find_ltd_inventory()
     provider_listed = contains_advertisemind(inventory)
+    magicfit = json.loads(MAGICFIT_PROVIDER.read_text(encoding="utf-8")) if MAGICFIT_PROVIDER.is_file() else {}
+    provider_verified = str(magicfit.get("status") or "").lower() == "verified"
     provider_payload = {
         "contract_name": "faction_video_provider_verification",
         "status": "pass",
-        "provider": "first_party_video",
-        "provider_status": "FIRST_PARTY_VIDEO",
+        "provider": "MagicFit" if provider_verified else "first_party_video",
+        "provider_status": "VERIFIED_PROVIDER" if provider_verified else "FIRST_PARTY_VIDEO",
         "inventory_path": str(inventory),
         "inventory_contains_provider": provider_listed,
-        "approved_render_mode": "first_party_motion_video",
+        "approved_render_mode": "magicfit_cinematic_faction_promo_with_narration" if provider_verified else "first_party_motion_video",
     }
 
     with TokenIdentityStub(access_token="promo-proof-token", subject_id="subject.promo.proof", display_name="Promo Proof", email="promo-proof@chummer.run") as identity:
@@ -87,6 +90,10 @@ def main() -> int:
                         "provider_status": payload.get("provider_status"),
                         "render_mode": payload.get("render_mode"),
                         "formats": payload.get("formats"),
+                        "storyline_summary": payload.get("storyline_summary"),
+                        "narrator_posture": payload.get("narrator_posture"),
+                        "render_pipeline": payload.get("render_pipeline"),
+                        "screenplay_scene_count": len(payload.get("screenplay_scenes") or []),
                     }
                 )
                 routes.append(
@@ -103,8 +110,13 @@ def main() -> int:
         if all(
             route.get("status_code") == 200
             and not route.get("forbidden_hits")
-            and route.get("provider_status", "FIRST_PARTY_VIDEO") == "FIRST_PARTY_VIDEO"
-            and route.get("render_mode", "first_party_motion_video") == "first_party_motion_video"
+            and (
+                route.get("provider_status") == "VERIFIED_PROVIDER"
+                and route.get("render_mode") == "magicfit_cinematic_faction_promo_with_narration"
+                if provider_verified and str(route.get("route") or "").endswith(".json")
+                else route.get("provider_status", "FIRST_PARTY_VIDEO") in {"FIRST_PARTY_VIDEO", "VERIFIED_PROVIDER"}
+                and route.get("render_mode", "first_party_motion_video") in {"first_party_motion_video", "magicfit_cinematic_faction_promo_with_narration"}
+            )
             for route in routes
             if route["route"].endswith("/promo") or route["route"].endswith(".json")
         )
@@ -136,7 +148,7 @@ def main() -> int:
                 "# Faction video provider verdict",
                 "",
                 f"- External provider inventory listed: `{provider_listed}`",
-                "- Approved public path: `first_party_motion_video` with storyboard fallback",
+                f"- Approved public path: `{provider_payload['approved_render_mode']}` with storyboard fallback",
             ]
         ),
     )

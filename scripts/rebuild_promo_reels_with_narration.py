@@ -16,7 +16,7 @@ WORKSPACE = Path("/docker/chummercomplete")
 PUBLIC_DIR = WORKSPACE / "chummer.run-services" / "Chummer.Run.Api" / "wwwroot" / "media" / "promo"
 OUT = WORKSPACE / "_completion" / "promo_video_rework_20260602"
 TTS_PYTHON = OUT / "tts_venv" / "bin" / "python"
-VOICE = "en-US-GuyNeural"
+VOICE = "en-GB-ThomasNeural"
 WIDTH = 1280
 HEIGHT = 720
 FPS = 24
@@ -39,7 +39,7 @@ class Reel:
     render_mode: str
     source_claim: str
     scenes: tuple[Scene, ...]
-    voice: str = "en-US-AndrewNeural"
+    voice: str = "en-GB-ThomasNeural"
     continuous_voiceover: bool = False
 
 
@@ -99,7 +99,7 @@ async def render_edge_tts(text: str, output: Path) -> bool:
         "import asyncio, edge_tts, pathlib, sys\n"
         "async def main():\n"
         "    voice, text, output = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3])\n"
-        "    communicate = edge_tts.Communicate(text=text, voice=voice, rate='-5%', pitch='-2Hz')\n"
+        "    communicate = edge_tts.Communicate(text=text, voice=voice, rate='-8%', pitch='-7Hz')\n"
         "    await communicate.save(str(output))\n"
         "asyncio.run(main())\n"
     )
@@ -216,9 +216,9 @@ def make_continuous_audio_track(narration: Path, reel: Reel, output: Path) -> No
         stretch = max(narration_len / target_vo_len, 0.88)
         vo_filter = f"atempo={stretch:.4f},atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS"
     filters = [
-        f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,highpass=f=85,lowpass=f=11800,acompressor=threshold=-20dB:ratio=2.6:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]",
+        f"[0:a]{vo_filter},afade=t=in:st=0:d=0.24,afade=t=out:st={max(target_vo_len - 0.55, 0):.3f}:d=0.55,highpass=f=72,lowpass=f=9000,bass=g=2.4:f=110:w=0.65,acompressor=threshold=-22dB:ratio=2.5:attack=20:release=280:makeup=2.2,alimiter=limit=0.87[vo0]",
         cinematic_bed_filter(target_len, mode="continuous"),
-        f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=1.12[vo]",
+        f"[vo0]adelay=760|760,apad,atrim=0:{target_len:.3f},volume=1.10[vo]",
         f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]",
     ]
     run(
@@ -251,11 +251,11 @@ def make_audio_segment(narration: Path, scene: Scene, output: Path) -> None:
     else:
         filters.append(f"[0:a]atrim=0:{target_vo_len:.3f},asetpts=PTS-STARTPTS[rawvo]")
     if scene.voice_treatment == "ork_news":
-        filters.append(f"[rawvo]atempo=0.84,rubberband=pitch=0.70,afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=58,lowpass=f=5900,bass=g=5:f=105:w=0.55,acompressor=threshold=-19dB:ratio=3.8:attack=18:release=230:makeup=4.2,alimiter=limit=0.90[vo0]")
+        filters.append(f"[rawvo]atempo=0.84,rubberband=pitch=0.70,afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=54,lowpass=f=5400,bass=g=5.8:f=102:w=0.60,acompressor=threshold=-20dB:ratio=3.9:attack=18:release=240:makeup=4.4,alimiter=limit=0.89[vo0]")
     else:
-        filters.append(f"[rawvo]afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=85,lowpass=f=11800,acompressor=threshold=-20dB:ratio=2.3:attack=18:release=180:makeup=2.0,alimiter=limit=0.88[vo0]")
+        filters.append(f"[rawvo]afade=t=in:st=0:d=0.10,afade=t=out:st={max(target_vo_len - 0.28, 0):.3f}:d=0.28,highpass=f=72,lowpass=f=9000,bass=g=2.4:f=110:w=0.65,acompressor=threshold=-22dB:ratio=2.5:attack=20:release=280:makeup=2.2,alimiter=limit=0.87[vo0]")
     filters.append(cinematic_bed_filter(scene_len, mode="scene"))
-    filters.append(f"[{vo_label}]adelay=120|120,apad,atrim=0:{scene_len:.3f},volume=1.14[vo]")
+    filters.append(f"[{vo_label}]adelay=120|120,apad,atrim=0:{scene_len:.3f},volume=1.11[vo]")
     filters.append(f"[bed][vo]amix=inputs=2:duration=first:dropout_transition=0,alimiter=limit=0.92[a]")
     run(
         "ffmpeg",
@@ -529,7 +529,7 @@ def flagship_reel() -> Reel:
             float(duration),
             captions[i],
             narration[i],
-            voice="en-US-GuyNeural" if clip == "10_newsroom.mp4" else None,
+            voice="en-GB-ThomasNeural" if clip == "10_newsroom.mp4" else None,
             voice_treatment="ork_news" if clip == "10_newsroom.mp4" else "trailer",
         )
         for i, (clip, duration) in enumerate(zip(clips, durations))
@@ -540,7 +540,7 @@ def flagship_reel() -> Reel:
         render_mode="magicfit_fresh_rerender_with_scene_timed_trailer_and_ork_news_voiceover",
         source_claim="12 freshly rerendered MagicFit flagship scene clips with no generated product-name text, scene-timed trailer voiceover, and separate ork newsroom voice",
         scenes=scenes,
-        voice="en-US-AndrewNeural",
+        voice="en-GB-ThomasNeural",
         continuous_voiceover=False,
     )
 

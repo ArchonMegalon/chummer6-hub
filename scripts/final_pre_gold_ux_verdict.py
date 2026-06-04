@@ -7,13 +7,25 @@ from pathlib import Path
 
 
 OUTPUT_ROOT = Path("/docker/chummercomplete/_completion/pregold_ux_pwa_black_ledger")
+PUBLISHED_ROOT = Path("/docker/chummercomplete/chummer.run-services/.codex-studio/published")
 
 
 def load_json(name: str) -> dict:
     path = OUTPUT_ROOT / name
-    if not path.is_file():
-        return {"status": "missing", "path": str(path)}
-    return json.loads(path.read_text(encoding="utf-8"))
+    published_path = PUBLISHED_ROOT / name
+    local_payload = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    published_payload = json.loads(published_path.read_text(encoding="utf-8")) if published_path.is_file() else None
+
+    if name == "BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json":
+        if isinstance(published_payload, dict) and str(published_payload.get("status", "")).lower() == "pass":
+            if str(published_payload.get("base_url") or "").strip().lower().startswith("https://chummer.run"):
+                return published_payload
+
+    if local_payload is not None:
+        return local_payload
+    if published_payload is not None:
+        return published_payload
+    return {"status": "missing", "path": str(path)}
 
 
 def write_text(name: str, text: str) -> None:

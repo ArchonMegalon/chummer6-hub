@@ -327,6 +327,11 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
         errors.append("release channel is missing installAwareArtifactRegistry[]")
         return
 
+    if not identity_registry:
+        errors.append("artifactIdentityRegistry must contain tuple rows")
+    if not install_registry:
+        errors.append("installAwareArtifactRegistry must contain tuple rows")
+
     identity_by_tuple = {
         normalize(item.get("tupleId")): item
         for item in identity_registry
@@ -337,6 +342,55 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
         for item in install_registry
         if isinstance(item, dict) and normalize(item.get("tupleId"))
     }
+
+    route_truth_by_tuple = {
+        normalize(route_entry.get("tupleId")): route_entry
+        for route_entry in route_truth
+        if isinstance(route_entry, dict) and normalize(route_entry.get("tupleId"))
+    }
+
+    for entry in identity_registry:
+        if not isinstance(entry, dict):
+            errors.append("artifactIdentityRegistry contains a non-object row")
+            continue
+        tuple_id = normalize(entry.get("tupleId"))
+        if not tuple_id:
+            errors.append("artifactIdentityRegistry contains row without tupleId")
+            continue
+        route_entry = route_truth_by_tuple.get(tuple_id)
+        if route_entry is None:
+            errors.append(f"artifactIdentityRegistry tuple {tuple_id} has no matching desktopRouteTruth row")
+            continue
+        if normalize(entry.get("publicInstallRoute")) != normalize(route_entry.get("publicInstallRoute")):
+            errors.append(f"artifactIdentityRegistry tuple {tuple_id} drifted from desktopRouteTruth publicInstallRoute")
+        if not normalize(entry.get("signedInShelfRef")).startswith("shelf:signed-in:"):
+            errors.append(f"artifactIdentityRegistry tuple {tuple_id} is missing signedInShelfRef")
+        if not normalize(entry.get("publicShelfRef")).startswith("shelf:public:"):
+            errors.append(f"artifactIdentityRegistry tuple {tuple_id} is missing publicShelfRef")
+
+    for entry in install_registry:
+        if not isinstance(entry, dict):
+            errors.append("installAwareArtifactRegistry contains a non-object row")
+            continue
+        tuple_id = normalize(entry.get("tupleId"))
+        if not tuple_id:
+            errors.append("installAwareArtifactRegistry contains row without tupleId")
+            continue
+        route_entry = route_truth_by_tuple.get(tuple_id)
+        if route_entry is None:
+            errors.append(f"installAwareArtifactRegistry tuple {tuple_id} has no matching desktopRouteTruth row")
+            continue
+        recovery_refs = entry.get("recoveryProofRefs")
+        if not isinstance(recovery_refs, list):
+            errors.append(f"installAwareArtifactRegistry tuple {tuple_id} is missing recoveryProofRefs[]")
+            continue
+
+        marker = f"desktopTupleCoverage.desktopRouteTruth[{tuple_id}]"
+        public_install_route = normalize(route_entry.get("publicInstallRoute"))
+        if public_install_route not in {normalize(ref) for ref in recovery_refs}:
+            errors.append(f"installAwareArtifactRegistry tuple {tuple_id} recoveryProofRefs missing {public_install_route}")
+        if marker not in {normalize(ref) for ref in recovery_refs}:
+            errors.append(f"installAwareArtifactRegistry tuple {tuple_id} recoveryProofRefs missing {marker}")
 
     missing_tuple_receipts = {
         normalize(item)
@@ -353,10 +407,10 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
         artifact_id = normalize(route_entry.get("artifactId"))
         promotion_state = normalize(route_entry.get("promotionState"))
         install_posture = normalize(route_entry.get("installPosture"))
-        if promotion_state == "proof_required" or install_posture == "proof_capture_required":
+        if not artifact_id and (promotion_state == "proof_required" or install_posture == "proof_capture_required"):
             # Fallback lanes are still route-truth rows, but they do not get
-            # artifact identity/install registry entries until artifact bytes
-            # and startup-smoke proof exist for that fallback tuple.
+            # artifact identity/install registry rows until artifact bytes and
+            # startup-smoke proof exist for that fallback tuple.
             continue
 
         if not tuple_id:
@@ -392,7 +446,7 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
 
         artifact = artifact_by_id.get(artifact_id)
         if not artifact_id:
-            if promotion_state == "proof_required":
+            if promotion_state == "proof_required" or install_posture == "proof_capture_required":
                 continue
             errors.append(f"desktopRouteTruth[{tuple_id}] is missing artifactId")
             continue
@@ -401,20 +455,24 @@ def verify_release_channel_alignment(errors: list[str]) -> None:
             continue
 
         receipt_path = STARTUP_SMOKE_ROOT / f"startup-smoke-{normalize(route_entry.get('head'))}-{normalize(route_entry.get('rid'))}.receipt.json"
-        if receipt_path.is_file():
-            receipt = load_json(receipt_path)
-            release_sha = normalize(artifact.get("sha256"))
-            receipt_sha = normalize(receipt.get("artifactSha256") or receipt.get("artifactDigest")).removeprefix("sha256:")
-            if release_sha and receipt_sha and release_sha != receipt_sha:
-                supportability_state = normalize(payload.get("supportabilityState"))
-                rollout_state = normalize(payload.get("rolloutState"))
-                message = normalize(payload.get("message"))
-                if supportability_state != "review_required":
-                    errors.append(f"release channel must stay review_required when tuple {tuple_id} startup-smoke digest drifts")
-                if rollout_state != "coverage_incomplete":
-                    errors.append(f"release channel must stay coverage_incomplete when tuple {tuple_id} startup-smoke digest drifts")
-                if "startup-smoke proof" not in message.lower():
-                    errors.append(f"release channel message must mention startup-smoke proof when tuple {tuple_id} digest drifts")
+        if not receipt_path.is_file():
+            continue
+
+        receipt = load_json(receipt_path)
+        release_sha = normalize(
+            artifact.get("sha256") or artifact.get("artifactSha256") or artifact.get("artifactDigest")
+        ).removeprefix("sha256:")
+        receipt_sha = normalize(receipt.get("artifactSha256") or receipt.get("artifactDigest") or receipt.get("artifactDigest")).removeprefix("sha256:")
+        if receipt_sha and release_sha and release_sha != receipt_sha:
+            supportability_state = normalize(payload.get("supportabilityState"))
+            rollout_state = normalize(payload.get("rolloutState"))
+            message = normalize(payload.get("message"))
+            if supportability_state != "review_required":
+                errors.append(f"release channel must stay review_required when tuple {tuple_id} startup-smoke digest drifts")
+            if rollout_state != "coverage_incomplete":
+                errors.append(f"release channel must stay coverage_incomplete when tuple {tuple_id} startup-smoke digest drifts")
+            if "startup-smoke proof" not in message.lower():
+                errors.append(f"release channel message must mention startup-smoke proof when tuple {tuple_id} digest drifts")
 
 
 def verify_source_markers(errors: list[str]) -> None:

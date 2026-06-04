@@ -25,8 +25,12 @@ def main() -> int:
         errors.append("seed_receipts must be true")
     if int(summary.get("failed_count") or 0) != 0:
         errors.append("route proof contains failed positive routes")
-    if int(summary.get("seeded_receipt_count") or 0) <= 0:
-        errors.append("seeded_receipt_count must be greater than zero")
+    seed_required_count = int(summary.get("seed_required_count") or 0)
+    seeded_receipt_count = int(summary.get("seeded_receipt_count") or 0)
+    if seed_required_count > 0 and seeded_receipt_count <= 0:
+        errors.append("seeded_receipt_count must be greater than zero when seed-required routes exist")
+    if seeded_receipt_count > seed_required_count:
+        errors.append("seeded_receipt_count cannot exceed seed_required_count")
     if int(summary.get("negative_path_count") or 0) <= 0:
         errors.append("negative_path_count must be greater than zero")
     if int(summary.get("negative_path_failed_count") or 0) != 0:

@@ -14,6 +14,7 @@ Hosted relationship, campaign, control, and play API boundary for Chummer6.
 - orchestration-side registry and media adapters
 - user accounts, groups, access/support state, and the canonical community ledger
 - the `chummer.run` landing page, proof shelf, downloads/support/account surfaces, and thin signed-in home overlay
+- grant-bound install continuity surfaces, including account-scoped roaming workspace snapshots for claimed desktop installs
 
 ## What this repo is not
 

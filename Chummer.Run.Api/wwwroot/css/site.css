@@ -7068,8 +7068,7 @@ body {
   background:
     radial-gradient(circle at 70% 20%, rgba(25, 223, 241, 0.22), transparent 24%),
     radial-gradient(circle at 18% 70%, rgba(255, 119, 31, 0.18), transparent 20%),
-    linear-gradient(180deg, rgba(2, 8, 12, 0.18), rgba(2, 8, 12, 0.64)),
-    url('/images/black-ledger-scene.webp') center/cover no-repeat;
+    linear-gradient(180deg, rgba(2, 8, 12, 0.18), rgba(2, 8, 12, 0.64));
   filter: saturate(1.18) contrast(1.12) brightness(0.72);
   transform: scale(1.05);
   opacity: 0.5;
@@ -7434,7 +7433,9 @@ body {
   min-height: clamp(540px, 64vh, 790px);
   border-radius: 0;
   border-color: rgba(184, 200, 216, 0.12);
-  background: #03070a;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(19, 45, 56, 0.36), transparent 38%),
+    linear-gradient(180deg, #020508, #05090c);
 }
 
 .ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__panel {
@@ -7449,6 +7450,20 @@ body {
   box-shadow: 0 22px 58px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(16px);
   z-index: 6;
+}
+
+.ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__panel-title {
+  font-size: clamp(1.8rem, 2.8vw, 2.45rem);
+}
+
+.ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__signal-chip {
+  min-height: 34px;
+  padding-inline: 0.82rem;
+  background: rgba(3, 7, 10, 0.8);
+}
+
+.ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__overlay {
+  max-width: min(52ch, calc(100% - 2rem));
 }
 
 .ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__fallback-list {
@@ -7471,6 +7486,16 @@ body {
   border-left: 1px solid rgba(184, 200, 216, 0.12);
   background:
     linear-gradient(180deg, rgba(8, 11, 14, 0.2), rgba(2, 5, 8, 0.68));
+}
+
+.ledger-flagship__copy > .eyebrow {
+  margin: 0;
+  color: rgba(241, 198, 128, 0.88);
+}
+
+.ledger-flagship[data-ledger-redesign="command-deck"] .ledger-flagship__copy > .page-title,
+.ledger-flagship[data-ledger-redesign="command-deck"] .ledger-flagship__copy > .page-copy {
+  max-width: 12ch;
 }
 
 .ledger-flagship__support {
@@ -7505,6 +7530,37 @@ body {
   font-family: var(--font-family-display);
   font-size: clamp(1.2rem, 2vw, 1.75rem);
   line-height: 1;
+}
+
+.ledger-flagship__briefing {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.ledger-flagship__briefing-card {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  min-height: 152px;
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(184, 200, 216, 0.14);
+  border-left: 3px solid rgba(245, 181, 85, 0.38);
+  background:
+    linear-gradient(180deg, rgba(17, 21, 25, 0.9), rgba(6, 9, 12, 0.96));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.ledger-flagship__briefing-card strong {
+  color: rgba(248, 242, 228, 0.96);
+  font-family: var(--font-family-display);
+  font-size: clamp(1.15rem, 1.8vw, 1.6rem);
+  line-height: 1.02;
+}
+
+.ledger-flagship__briefing-card p {
+  margin: 0;
+  color: rgba(219, 228, 222, 0.78);
 }
 
 .ledger-flagship__actions {
@@ -7622,6 +7678,10 @@ body {
   .ledger-dispatch-strip__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .ledger-flagship__briefing {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {
@@ -7651,6 +7711,10 @@ body {
 
   .ledger-flagship[data-ledger-redesign="command-deck"] .ledger-flagship__nav,
   .ledger-dispatch-strip__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ledger-flagship__briefing {
     grid-template-columns: 1fr;
   }
 

@@ -479,21 +479,22 @@ public sealed class FactionCharterBuilderTests
     }
 
     [Fact]
-    public void FactionPromoArtifact_ships_as_first_party_motion_video()
+    public void FactionPromoArtifact_prefers_magicfit_receipt_backed_cinematic_package()
     {
         var service = BlackLedgerFactionAllegianceTests.CreateService();
 
         BlackLedgerFactionPromoArtifactViewModel? promo = service.GetPromoArtifact("ashline-circle");
 
         Assert.NotNull(promo);
-        Assert.Equal("FIRST_PARTY_VIDEO", promo!.ProviderStatus);
-        Assert.Equal("first_party_motion_video", promo.RenderMode);
+        Assert.Equal("VERIFIED_PROVIDER", promo!.ProviderStatus);
+        Assert.Equal("magicfit_cinematic_faction_promo_with_narration", promo.RenderMode);
         Assert.Equal("first_party_storyboard", promo.FallbackRenderMode);
         Assert.Contains("/ledger/factions/ashline-circle/promo", promo.HtmlHref, StringComparison.Ordinal);
         Assert.Equal("Scene-driven faction mobilization bulletin", promo.StaticCardLabel);
-        Assert.Equal("Playable first-party cinematic war bulletin", promo.PlaybackLabel);
+        Assert.Equal("Playable MagicFit-rendered faction reel", promo.PlaybackLabel);
         Assert.Contains(".mp4", promo.VideoMp4Href, StringComparison.Ordinal);
         Assert.Contains(".webm", promo.VideoWebmHref, StringComparison.Ordinal);
+        Assert.Contains("MagicFit-rendered 16:9 MP4", promo.FormatLabels, StringComparer.Ordinal);
         Assert.Contains("Captions required", promo.FormatLabels, StringComparer.Ordinal);
         Assert.Contains("world tick", promo.AudiencePromise, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/account/ledger/factions/ashline-circle/leader-briefing", promo.ValidationHref, StringComparison.Ordinal);
@@ -502,5 +503,9 @@ public sealed class FactionCharterBuilderTests
         Assert.Equal("Anchor Open", promo.StoryboardFrames[0].Label);
         Assert.Contains("pressure", promo.StoryboardFrames[0].VisualHook, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("world tick", promo.StoryboardFrames[0].ProofPayoff, StringComparison.OrdinalIgnoreCase);
+        Assert.NotEmpty(promo.ScreenplayScenes);
+        Assert.Contains(promo.ScreenplayScenes, scene => scene.Label.Contains("Turn 1", StringComparison.OrdinalIgnoreCase)
+            || scene.Label.Contains("scene", StringComparison.OrdinalIgnoreCase)
+            || scene.NarratorLine.Contains("keep the faction problem visible", StringComparison.OrdinalIgnoreCase));
     }
 }

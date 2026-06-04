@@ -1,0 +1,100 @@
+{
+  "generated_at_utc": "2026-06-04T06:56:59.680680Z",
+  "status": "pass",
+  "provider": "MagicFit",
+  "provider_status": "VERIFIED_PROVIDER",
+  "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+  "narration_provider": "unmixr-short-tts",
+  "voice": "en-US-AvaNeural",
+  "slug": "ashline-circle",
+  "title": "Ashline Circle",
+  "captions": [
+    "MysAd Density. Magic Heat. Source Clarity.",
+    "Join Ashline. Power is easy. Proof is hard."
+  ],
+  "scene_payloads": [
+    {
+      "video_slug": "ashline-circle",
+      "scene_index": 1,
+      "scene_title": "Wellness, but dangerous",
+      "prompt": "Photoreal ritual-tech room mixing candles, monitors, practical instruments, elf mystic consultant adjusting a ritual focus beside laptop, violet light pulse, Chummer 6 overlay MysAd Density, serene but weird corporate wellness humor, cinematic.",
+      "session_id": "cmppysvmr03oqp31v42bk8mse",
+      "image_generation_id": "cmppysvnn03owp31vl5a5o244",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343434-1780001343287.png",
+      "video_generation_id": "cmppyufl003php31v9yryd7qf",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001650607-cmppyufl003php31v9yryd7qf.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_01.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_01.mp4",
+      "on_screen_text": "MysAd Density",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ashline-circle",
+      "scene_index": 2,
+      "scene_title": "Magic heat spike",
+      "prompt": "Photoreal magical cyberpunk room, subtle watcher-like shimmer flickers over table, Chummer 6 Table Pulse magic heat alert on small device, elf mystic annoyed but composed, realistic actors, violet light, no fantasy cosplay.",
+      "session_id": "cmppysvmr03oqp31v42bk8mse",
+      "image_generation_id": "cmppysvnn03owp31vl5a5o244",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343434-1780001343287.png",
+      "video_generation_id": "cmppyufl003php31v9yryd7qf",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001650607-cmppyufl003php31v9yryd7qf.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_02.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_02.mp4",
+      "on_screen_text": "Magic Heat: Alert",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ashline-circle",
+      "scene_index": 3,
+      "scene_title": "Source clarity",
+      "prompt": "Photoreal elf mystic in ritual-tech analysis room, wall of notes and abstract arcane signal diagrams, crosses out wrong theories, Chummer 6 source clarity indicator, dry humor, premium cinematic lighting.",
+      "session_id": "cmppysvmr03oqp31v42bk8mse",
+      "image_generation_id": "cmppysvnn03owp31vl5a5o244",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343434-1780001343287.png",
+      "video_generation_id": "cmppyufl003php31v9yryd7qf",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001650607-cmppyufl003php31v9yryd7qf.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_03.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_03.mp4",
+      "on_screen_text": "Source Clarity",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ashline-circle",
+      "scene_index": 4,
+      "scene_title": "Recruitment",
+      "prompt": "Photoreal faction recruitment ad, elf mystic in soft-lit ritual circle with office chairs, one chair levitates subtly, Chummer 6 join Ashline overlay, funny restrained performance, realistic motion, no cartoon.",
+      "session_id": "cmppysvmr03oqp31v42bk8mse",
+      "image_generation_id": "cmppysvnn03owp31vl5a5o244",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343434-1780001343287.png",
+      "video_generation_id": "cmppyufl003php31v9yryd7qf",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001650607-cmppyufl003php31v9yryd7qf.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_04.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_04.mp4",
+      "on_screen_text": "Join Ashline",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ashline-circle",
+      "scene_index": 5,
+      "scene_title": "Astral response",
+      "prompt": "Photoreal night rooftop, elf mystic sends subtle watcher-like violet shimmer over city skyline, Chummer 6 magic pulse overlay, cinematic wind, real body movement, premium mood.",
+      "session_id": "cmppysvmr03oqp31v42bk8mse",
+      "image_generation_id": "cmppysvnn03owp31vl5a5o244",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001343434-1780001343287.png",
+      "video_generation_id": "cmppyufl003php31v9yryd7qf",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001650607-cmppyufl003php31v9yryd7qf.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_05.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/scenes/ashline-circle_scene_05.mp4",
+      "on_screen_text": "Watcher Sent",
+      "derived_from_master": true
+    }
+  ],
+  "exports": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.mp4",
+    "mobile_mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo-mobile.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo-poster.png",
+    "audio": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ashline-circle-promo-audio.m4a"
+  },
+  "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/ashline-circle/video_manifest.generated.json"
+}

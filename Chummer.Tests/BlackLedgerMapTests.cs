@@ -85,6 +85,25 @@ public sealed class BlackLedgerMapTests
     }
 
     [Fact]
+    public void BlackLedgerMap_view_keeps_command_deck_overlay_and_briefing_contracts()
+    {
+        string view = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Ledger.cshtml"));
+        string css = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "css", "site.css"));
+        string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "black-ledger-geoscape.js"));
+
+        Assert.Contains("data-overlay-eyebrow=\"Seattle command deck\"", view, StringComparison.Ordinal);
+        Assert.Contains("data-overlay-headline=\"Track who is moving first.\"", view, StringComparison.Ordinal);
+        Assert.Contains("data-signal-primary=\"district heat live\"", view, StringComparison.Ordinal);
+        Assert.Contains("ledger-flagship__briefing", view, StringComparison.Ordinal);
+        Assert.Contains("ledger-flagship__briefing-card", view, StringComparison.Ordinal);
+        Assert.Contains("Black Ledger should read like a live command desk", view, StringComparison.Ordinal);
+        Assert.Contains(".ledger-flagship__briefing", css, StringComparison.Ordinal);
+        Assert.Contains(".ledger-flagship__briefing-card", css, StringComparison.Ordinal);
+        Assert.Contains("this.overlayEyebrow = root.dataset.overlayEyebrow", script, StringComparison.Ordinal);
+        Assert.Contains("this.primarySignalLabel = root.dataset.signalPrimary", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BlackLedgerMap_geoscape_script_draws_faction_country_borders_from_region_polygons()
     {
         string script = File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "wwwroot", "js", "black-ledger-geoscape.js"));

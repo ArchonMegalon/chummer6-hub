@@ -1,0 +1,91 @@
+{
+  "generated_at_utc": "2026-06-04T08:34:22.366Z",
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "results": [
+    {
+      "faction": "glass-tower-compact",
+      "page": 200,
+      "json": 200,
+      "vtt": 200,
+      "provider_status": "VERIFIED_PROVIDER",
+      "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+      "magicfit_required": true,
+      "fallback_render_mode": "first_party_storyboard",
+      "narrator_posture": "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite.",
+      "validation_href": "/account/ledger/factions/glass-tower-compact/leader-briefing",
+      "video_mp4_href": "/media/ledger/factions/glass-tower-compact-promo-mobile.mp4?v=1780556345",
+      "storyboard_shot_count": 3
+    },
+    {
+      "faction": "rust-market-syndicate",
+      "page": 200,
+      "json": 200,
+      "vtt": 200,
+      "provider_status": "VERIFIED_PROVIDER",
+      "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+      "magicfit_required": true,
+      "fallback_render_mode": "first_party_storyboard",
+      "narrator_posture": "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite.",
+      "validation_href": "/account/ledger/factions/rust-market-syndicate/leader-briefing",
+      "video_mp4_href": "/media/ledger/factions/rust-market-syndicate-promo-mobile.mp4?v=1780556442",
+      "storyboard_shot_count": 3
+    },
+    {
+      "faction": "ashline-circle",
+      "page": 200,
+      "json": 200,
+      "vtt": 200,
+      "provider_status": "VERIFIED_PROVIDER",
+      "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+      "magicfit_required": true,
+      "fallback_render_mode": "first_party_storyboard",
+      "narrator_posture": "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite.",
+      "validation_href": "/account/ledger/factions/ashline-circle/leader-briefing",
+      "video_mp4_href": "/media/ledger/factions/ashline-circle-promo-mobile.mp4?v=1780556157",
+      "storyboard_shot_count": 3
+    },
+    {
+      "faction": "neon-docks-union",
+      "page": 200,
+      "json": 200,
+      "vtt": 200,
+      "provider_status": "VERIFIED_PROVIDER",
+      "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+      "magicfit_required": true,
+      "fallback_render_mode": "first_party_storyboard",
+      "narrator_posture": "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite.",
+      "validation_href": "/account/ledger/factions/neon-docks-union/leader-briefing",
+      "video_mp4_href": "/media/ledger/factions/neon-docks-union-promo-mobile.mp4?v=1780556391",
+      "storyboard_shot_count": 3
+    },
+    {
+      "faction": "ghostline-network",
+      "page": 200,
+      "json": 200,
+      "vtt": 200,
+      "provider_status": "VERIFIED_PROVIDER",
+      "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+      "magicfit_required": true,
+      "fallback_render_mode": "first_party_storyboard",
+      "narrator_posture": "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite.",
+      "validation_href": "/account/ledger/factions/ghostline-network/leader-briefing",
+      "video_mp4_href": "/media/ledger/factions/ghostline-network-promo-mobile.mp4?v=1780556286",
+      "storyboard_shot_count": 3
+    },
+    {
+      "faction": "barrens-free-wardens",
+      "page": 200,
+      "json": 200,
+      "vtt": 200,
+      "provider_status": "VERIFIED_PROVIDER",
+      "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+      "magicfit_required": true,
+      "fallback_render_mode": "first_party_storyboard",
+      "narrator_posture": "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite.",
+      "validation_href": "/account/ledger/factions/barrens-free-wardens/leader-briefing",
+      "video_mp4_href": "/media/ledger/factions/barrens-free-wardens-promo-mobile.mp4?v=1780556238",
+      "storyboard_shot_count": 3
+    }
+  ]
+}

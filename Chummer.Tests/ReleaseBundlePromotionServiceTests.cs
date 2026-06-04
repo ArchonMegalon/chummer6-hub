@@ -459,7 +459,12 @@ public sealed class ReleaseBundlePromotionServiceTests
             .OrderBy(static value => value, StringComparer.Ordinal)
             .ToArray();
         Assert.Equal(["avalonia:macos:osx-arm64"], promotedTupleIds);
-        Assert.Equal(["macos"], coverage.GetProperty("requiredDesktopPlatforms").EnumerateArray().Select(item => item.GetString()).ToArray());
+        Assert.Equal(
+            ["macos"],
+            coverage.GetProperty("requiredDesktopPlatforms")
+                .EnumerateArray()
+                .Select(item => item.GetString()!)
+                .ToArray());
         Assert.Equal("promoted_preview", compatibility.RootElement.GetProperty("rolloutState").GetString());
         Assert.Equal("preview_supported", compatibility.RootElement.GetProperty("supportabilityState").GetString());
     }
@@ -595,16 +600,18 @@ public sealed class ReleaseBundlePromotionServiceTests
             .EnumerateArray()
             .ToArray();
 
-        JsonElement primary = Assert.Single(rows.Where(row =>
-            row.GetProperty("artifactId").GetString() == "avalonia-osx-arm64-installer"));
+        JsonElement primary = Assert.Single(
+            rows,
+            row => row.GetProperty("artifactId").GetString() == "avalonia-osx-arm64-installer");
         Assert.True(primary.GetProperty("currentForInstalledBuild").GetBoolean());
         Assert.Contains(
             "primary-route avalonia:macos:osx-arm64 current",
             primary.GetProperty("channelRationale").GetString(),
             StringComparison.Ordinal);
 
-        JsonElement fallback = Assert.Single(rows.Where(row =>
-            row.GetProperty("artifactId").GetString() == "blazor-desktop-osx-arm64-installer"));
+        JsonElement fallback = Assert.Single(
+            rows,
+            row => row.GetProperty("artifactId").GetString() == "blazor-desktop-osx-arm64-installer");
         Assert.False(fallback.GetProperty("currentForInstalledBuild").GetBoolean());
     }
 

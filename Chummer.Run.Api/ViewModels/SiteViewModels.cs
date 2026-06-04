@@ -519,6 +519,11 @@ public sealed record BlackLedgerNewsreelBroadcastViewModel(
     string PackageLabel,
     string AnchorName,
     string DeskLabel,
+    string ProviderStatus,
+    string RenderMode,
+    string StorylineSummary,
+    string NarratorPosture,
+    string RenderPipelineLabel,
     string WatchHref,
     string TranscriptHref,
     string ReceiptsHref,
@@ -536,7 +541,8 @@ public sealed record BlackLedgerNewsreelBroadcastViewModel(
     string FeedbackHref,
     IReadOnlyList<BlackLedgerActionBeatViewModel> ActionBeats,
     IReadOnlyList<string> Rundown,
-    IReadOnlyList<string> TickerItems);
+    IReadOnlyList<string> TickerItems,
+    IReadOnlyList<BlackLedgerCinematicSceneViewModel> ScreenplayScenes);
 
 public sealed record BlackLedgerFactionLeaderDigestViewModel(
     string FactionId,
@@ -562,6 +568,9 @@ public sealed record BlackLedgerFactionPromoArtifactViewModel(
     string ProviderStatus,
     string RenderMode,
     string FallbackRenderMode,
+    string StorylineSummary,
+    string NarratorPosture,
+    string RenderPipelineLabel,
     string HtmlHref,
     string JsonHref,
     string CaptionsHref,
@@ -576,13 +585,22 @@ public sealed record BlackLedgerFactionPromoArtifactViewModel(
     string AudiencePromise,
     string ValidationHref,
     IReadOnlyList<string> StoryboardShots,
-    IReadOnlyList<BlackLedgerStoryboardFrameViewModel> StoryboardFrames);
+    IReadOnlyList<BlackLedgerStoryboardFrameViewModel> StoryboardFrames,
+    IReadOnlyList<BlackLedgerCinematicSceneViewModel> ScreenplayScenes);
 
 public sealed record BlackLedgerStoryboardFrameViewModel(
     string Label,
     string VisualHook,
     string ActionBeat,
     string ProofPayoff);
+
+public sealed record BlackLedgerCinematicSceneViewModel(
+    string SceneId,
+    string Label,
+    string DurationLabel,
+    string Purpose,
+    string VisualDirection,
+    string NarratorLine);
 
 public sealed record BlackLedgerWorldPreviewViewModel(
     string WorldId,
@@ -1282,8 +1300,19 @@ public sealed record BuildGhostConciergePageViewModel(
     string Heading,
     string Intro,
     BuildGhostConciergeProjection Projection,
+    BuildGhostSignedInBenchViewModel? SignedInBench = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record BuildGhostSignedInBenchViewModel(
+    string StatusLabel,
+    string Summary,
+    string EntryHref,
+    string EntryLabel,
+    string? LeadHandoffHref = null,
+    string? LeadHandoffTitle = null,
+    string? LeadHandoffSummary = null,
+    IReadOnlyList<string>? ProofPoints = null);
 
 public sealed record GmSessionVenuePageViewModel(
     SiteChromeViewModel Chrome,

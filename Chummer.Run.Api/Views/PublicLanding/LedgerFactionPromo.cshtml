@@ -31,15 +31,17 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">First-party motion bulletin</p>
+        <p class="eyebrow">Cinematic faction reel</p>
         <h2 class="editorial-title">@Model.Promo.StaticCardLabel</h2>
         <p class="editorial-copy">@Model.Promo.CampaignHook</p>
+        <p class="editorial-copy">@Model.Promo.StorylineSummary</p>
     </div>
     <div id="promo-player" class="route-choice-card" data-storyboard-player>
         <div class="trust-claim__microproof">
             <span>Mode: @Model.Promo.PlaybackLabel</span>
             <span>Captions: included</span>
-            <span>Formats: MP4 + WebM</span>
+            <span>Narration: @Model.Promo.NarratorPosture</span>
+            <span>Pipeline: @Model.Promo.RenderPipelineLabel</span>
         </div>
         <video class="faction-promo-video"
                controls
@@ -84,17 +86,18 @@
 
 <section class="editorial-block">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Ad promise</p>
-        <h2 class="editorial-title">What this promo may and may not claim</h2>
+        <p class="eyebrow">Screenplay</p>
+        <h2 class="editorial-title">How the reel is structured</h2>
         <p class="editorial-copy">@Model.Promo.AudiencePromise</p>
     </div>
     <div class="route-choice-grid route-choice-grid--three">
-        @foreach (var shot in Model.Promo.StoryboardFrames)
+        @foreach (var scene in Model.Promo.ScreenplayScenes)
         {
             <article class="route-choice-card">
-                <span class="tag">@shot.Label</span>
-                <p>@shot.VisualHook</p>
-                <p>@shot.ActionBeat</p>
+                <span class="tag">@scene.Label · @scene.DurationLabel</span>
+                <p>@scene.Purpose</p>
+                <p>@scene.VisualDirection</p>
+                <p>@scene.NarratorLine</p>
             </article>
         }
     </div>

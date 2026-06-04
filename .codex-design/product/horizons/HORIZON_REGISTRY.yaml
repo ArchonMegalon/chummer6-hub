@@ -1,0 +1,262 @@
+version: 1
+last_reviewed: 2026-06-04
+source_registry: products/chummer/HORIZON_REGISTRY.yaml
+purpose: Derived machine-readable registry for public-guide routing and future-capability lanes. The root HORIZON_REGISTRY.yaml is the canonical source of truth.
+
+foundation_capabilities:
+  - id: expert_speed_substrate
+    summary: Explicit latency budgets, keyboard seams, batch-safe edits, undo, and dense-state performance.
+  - id: edition_expression_substrate
+    summary: Ruleset-specific terminology, composition seams, inspectors, and theming without flattening SR4, SR5, and SR6.
+  - id: guided_mastery_substrate
+    summary: Explain, legality, sample-build, and recommendation seams that can support coaching without inventing truth.
+  - id: gm_operations_substrate
+    summary: Campaign, roster, recap, device-role, and prep/run state strong enough for real table operations.
+  - id: continuity_and_degraded_state_substrate
+    summary: Offline, reconnect, receipt, replay, and conflict-resolution posture that remains trustworthy under stress.
+  - id: publication_and_prestige_substrate
+    summary: Preview-first publication, manifests, provenance, theming, and premium artifact rendering.
+  - id: evaluation_substrate
+    summary: Import oracles, user-facing acceptance gates, and machine-readable proof surfaces.
+
+horizons:
+  - id: nexus-pan
+    file: nexus-pan.md
+    family: session continuity
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-core
+      - chummer6-mobile
+      - chummer6-hub
+    foundation_dependencies:
+      - continuity_and_degraded_state_substrate
+      - gm_operations_substrate
+    why_horizon: Deepen cross-device continuity, replay receipts, and degraded-state recovery without widening trust beyond the current shipped continuity lane.
+
+  - id: alice
+    file: alice.md
+    family: build and simulation
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-core
+      - chummer6-ui
+      - chummer6-hub
+    foundation_dependencies:
+      - expert_speed_substrate
+      - guided_mastery_substrate
+      - evaluation_substrate
+    why_horizon: Deepen compare-and-explain coverage without turning assistive guidance into rules truth.
+
+  - id: karma-forge
+    file: karma-forge.md
+    family: governed rules evolution
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-core
+      - chummer6-hub-registry
+      - chummer6-hub
+    foundation_dependencies:
+      - edition_expression_substrate
+      - evaluation_substrate
+    why_horizon: Deepen governed package, approval, and compatibility workflows without letting alternate rulesets outrun proof.
+
+  - id: knowledge-fabric
+    file: knowledge-fabric.md
+    family: knowledge fabric and explainability
+    state: shipped_mvp
+    public_guide_allowed: false
+    likely_owners:
+      - chummer6-core
+      - chummer6-hub
+    foundation_dependencies:
+      - guided_mastery_substrate
+      - evaluation_substrate
+    why_horizon: Deepen cited answers and explain projections without letting derived knowledge become truth authority.
+
+  - id: jackpoint
+    file: jackpoint.md
+    family: artifact studio
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-hub-registry
+      - chummer6-media-factory
+    foundation_dependencies:
+      - gm_operations_substrate
+      - publication_and_prestige_substrate
+      - continuity_and_degraded_state_substrate
+    why_horizon: Deepen dossiers, recaps, and editorial follow-through now that the shipped publication lane exists.
+
+  - id: black-ledger
+    file: black-ledger.md
+    family: campaign world-state
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-core
+      - chummer6-ui
+      - chummer6-mobile
+      - chummer6-media-factory
+      - chummer6-hub-registry
+      - executive-assistant
+    foundation_dependencies:
+      - publication_and_prestige_substrate
+      - guided_mastery_substrate
+      - evaluation_substrate
+      - continuity_and_degraded_state_substrate
+    why_horizon: Deepen world-memory, faction pressure, and aftermath follow-through without widening truth beyond the shipped ledger lane.
+
+  - id: community-hub
+    file: community-hub.md
+    family: campaign world-state
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-ui
+      - chummer6-mobile
+      - fleet
+      - executive-assistant
+      - chummer6-media-factory
+    foundation_dependencies:
+      - publication_and_prestige_substrate
+      - guided_mastery_substrate
+      - evaluation_substrate
+      - continuity_and_degraded_state_substrate
+    why_horizon: Deepen scheduling, organizer receipts, and closeout follow-through now that the shipped community lane exists.
+
+  - id: runsite
+    file: runsite.md
+    family: spatial exploration
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-media-factory
+    foundation_dependencies:
+      - gm_operations_substrate
+      - publication_and_prestige_substrate
+    why_horizon: Deepen prep packets, workspace navigation, and operator receipts without turning spatial projections into unverifiable spectacle.
+
+  - id: runbook-press
+    file: runbook-press.md
+    family: creator press
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-hub-registry
+      - chummer6-media-factory
+    foundation_dependencies:
+      - publication_and_prestige_substrate
+      - evaluation_substrate
+    why_horizon: Deepen long-form publication, manifests, and export polish without weakening publication truth.
+
+  - id: ghostwire
+    file: ghostwire.md
+    family: replay and forensics
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-core
+      - chummer6-mobile
+      - chummer6-hub
+      - chummer6-media-factory
+    foundation_dependencies:
+      - continuity_and_degraded_state_substrate
+      - evaluation_substrate
+      - publication_and_prestige_substrate
+    why_horizon: Deepen replay and after-action depth while keeping reconstruction append-only and receipt-grounded.
+
+  - id: table-pulse
+    file: table-pulse.md
+    family: live heat and private aftermath
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-media-factory
+    foundation_dependencies:
+      - gm_operations_substrate
+      - publication_and_prestige_substrate
+    why_horizon: Deepen live heat and aftermath coaching while keeping consent, privacy, and GM authority provable.
+
+  - id: run-control
+    file: run-control.md
+    family: gm operations control
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-mobile
+      - chummer6-core
+      - chummer6-media-factory
+    foundation_dependencies:
+      - gm_operations_substrate
+      - continuity_and_degraded_state_substrate
+      - publication_and_prestige_substrate
+    why_horizon: Deepen session board, continuity, and recap follow-through without turning GM control into generic collaboration theater.
+
+  - id: onramp
+    file: onramp.md
+    family: guided mastery
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-ui
+      - chummer6-core
+    foundation_dependencies:
+      - guided_mastery_substrate
+      - continuity_and_degraded_state_substrate
+      - evaluation_substrate
+    why_horizon: Deepen starter workspace, first playable follow-through, and restore posture without letting guided copy outrun receipts.
+
+  - id: edition-studio
+    file: edition-studio.md
+    family: edition expression
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-ui
+      - chummer6-core
+      - chummer6-hub
+    foundation_dependencies:
+      - edition_expression_substrate
+      - guided_mastery_substrate
+      - evaluation_substrate
+    why_horizon: Deepen authored SR4, SR5, and SR6 heads without turning styling into truth or splitting the product into disconnected apps.
+
+  - id: local-co-processor
+    file: local-co-processor.md
+    family: optional local acceleration
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-ui
+      - chummer6-core
+    foundation_dependencies:
+      - expert_speed_substrate
+      - evaluation_substrate
+    why_horizon: Keep optional local acceleration bounded, hosted-first, and disableable without turning it into a hidden requirement.
+
+  - id: quicksilver
+    file: quicksilver.md
+    family: speed deck and jump targeting
+    state: shipped_mvp
+    public_guide_allowed: true
+    likely_owners:
+      - chummer6-hub
+      - chummer6-ui
+      - chummer6-core
+    foundation_dependencies:
+      - expert_speed_substrate
+      - guided_mastery_substrate
+      - gm_operations_substrate
+    why_horizon: Deepen the command deck and bounded jump targeting without replacing first-party truth lanes with shortcuts.

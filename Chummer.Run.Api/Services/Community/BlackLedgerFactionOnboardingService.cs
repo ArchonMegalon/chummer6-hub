@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.Community;
 using Microsoft.Extensions.Configuration;
@@ -45,6 +46,75 @@ public sealed class BlackLedgerFactionOnboardingService
 
         var version = new DateTimeOffset(File.GetLastWriteTimeUtc(absolute)).ToUnixTimeSeconds();
         return $"{relativePath}?v={version}";
+    }
+
+    private static bool MagicFitFactionProviderVerified()
+    {
+        string path = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "_completion", "magicfit_provider", "MAGICFIT_PROVIDER_VERIFICATION.generated.json"));
+        if (!File.Exists(path))
+        {
+            path = "/docker/chummercomplete/_completion/magicfit_provider/MAGICFIT_PROVIDER_VERIFICATION.generated.json";
+        }
+
+        if (!File.Exists(path))
+        {
+            return false;
+        }
+
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path, Encoding.UTF8));
+        return string.Equals(document.RootElement.GetProperty("status").GetString(), "verified", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static JsonElement? TryLoadPublicMagicFitFactionReceipt(string normalizedFactionId)
+    {
+        string receiptRelativePath = $"media/ledger/factions/{normalizedFactionId}-promo.receipt.json";
+        string resolved = ResolveMediaFile(receiptRelativePath);
+        if (!File.Exists(resolved))
+        {
+            return null;
+        }
+
+        JsonElement receipt = JsonDocument.Parse(File.ReadAllText(resolved, Encoding.UTF8)).RootElement.Clone();
+        if (!receipt.TryGetProperty("status", out JsonElement status) ||
+            !string.Equals(status.GetString(), "pass", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        if (!receipt.TryGetProperty("provider", out JsonElement provider) ||
+            !string.Equals(provider.GetString(), "MagicFit", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return receipt;
+    }
+
+    private static JsonElement? TryLoadMagicFitFactionManifest(string normalizedFactionId)
+    {
+        string path = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..",
+            "..",
+            "..",
+            "..",
+            "..",
+            "_completion",
+            "faction_video_series",
+            "generated",
+            normalizedFactionId,
+            "video_manifest.generated.json"));
+        if (!File.Exists(path))
+        {
+            path = $"/docker/chummercomplete/_completion/faction_video_series/generated/{normalizedFactionId}/video_manifest.generated.json";
+        }
+
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        return JsonDocument.Parse(File.ReadAllText(path, Encoding.UTF8)).RootElement.Clone();
     }
 
     public BlackLedgerFactionOnboardingService(
@@ -480,12 +550,38 @@ public sealed class BlackLedgerFactionOnboardingService
             ),
         ];
 
+        JsonElement? publicMagicFitReceipt = TryLoadPublicMagicFitFactionReceipt(normalizedFactionId);
+        JsonElement? magicFitManifest = publicMagicFitReceipt ?? TryLoadMagicFitFactionManifest(normalizedFactionId);
+        bool useMagicFit = magicFitManifest is { } manifest
+            && (
+                publicMagicFitReceipt is not null
+                || MagicFitFactionProviderVerified()
+            )
+            && manifest.TryGetProperty("exports", out JsonElement exports)
+            && (exports.TryGetProperty("mp4", out _) || exports.TryGetProperty("mobile_mp4", out _))
+            && File.Exists(ResolveMediaFile($"media/ledger/factions/{normalizedFactionId}-promo-mobile.mp4"))
+            && File.Exists(ResolveMediaFile($"media/ledger/factions/{normalizedFactionId}-promo.webm"))
+            && File.Exists(ResolveMediaFile($"media/ledger/factions/{normalizedFactionId}-promo-poster.png"));
+
+        IReadOnlyList<BlackLedgerCinematicSceneViewModel> screenplayScenes = useMagicFit && magicFitManifest is { } cinematicManifest
+            ? BuildMagicFitScreenplayScenes(cinematicManifest)
+            : BuildFallbackScreenplayScenes(storyboardFrames, captions);
+
         return new BlackLedgerFactionPromoArtifactViewModel(
             FactionId: normalizedFactionId,
             PublicName: detail.PublicName,
-            ProviderStatus: "FIRST_PARTY_VIDEO",
-            RenderMode: "first_party_motion_video",
+            ProviderStatus: useMagicFit ? "VERIFIED_PROVIDER" : "FIRST_PARTY_VIDEO",
+            RenderMode: useMagicFit ? "magicfit_cinematic_faction_promo_with_narration" : "first_party_motion_video",
             FallbackRenderMode: "first_party_storyboard",
+            StorylineSummary: useMagicFit
+                ? $"{detail.PublicName} now runs as a five-scene cinematic faction reel: motive, pressure, field proof, command claim, and a closing faction hook."
+                : $"{detail.PublicName} currently runs as a three-beat bulletin: anchor claim, field proof, and action close.",
+            NarratorPosture: useMagicFit
+                ? "Cinematic narrator with a low-pressure music bed over a MagicFit-rendered scene composite."
+                : "Anchor-led bulletin with first-party narration and captions.",
+            RenderPipelineLabel: useMagicFit
+                ? "MagicFit scene render -> Chummer narration/mix -> public route package"
+                : "First-party motion bulletin -> captions -> storyboard fallback",
             HtmlHref: $"/ledger/factions/{normalizedFactionId}/promo",
             JsonHref: $"/ledger/factions/{normalizedFactionId}/promo.json",
             CaptionsHref: $"/ledger/factions/{normalizedFactionId}/promo.vtt",
@@ -493,11 +589,17 @@ public sealed class BlackLedgerFactionOnboardingService
             VideoMp4Href: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo-mobile.mp4"),
             VideoWebmHref: BuildVersionedMediaHref($"/media/ledger/factions/{normalizedFactionId}-promo.webm"),
             StaticCardLabel: "Scene-driven faction mobilization bulletin",
-            PlaybackLabel: "Playable first-party cinematic war bulletin",
-            FormatLabels: ["16:9 MP4", "16:9 WebM", "Storyboard fallback", "Captions required"],
+            PlaybackLabel: useMagicFit ? "Playable MagicFit-rendered faction reel" : "Playable first-party cinematic war bulletin",
+            FormatLabels: useMagicFit
+                ? ["MagicFit-rendered 16:9 MP4", "MagicFit-rendered 16:9 WebM", "Storyboard fallback", "Captions required", "Narration mixed in post"]
+                : ["16:9 MP4", "16:9 WebM", "Storyboard fallback", "Captions required"],
             CaptionLines: captions,
-            CampaignHook: $"{detail.PublicName} now opens on a glamour-news anchor, cuts to an orkish field correspondent in the district, and closes on a visible faction lead changing the scene before the next turn can judge the claim.",
-            AudiencePromise: "This lane is now a first-party nightly bulletin with visible people, camera motion, and action on screen. It is still allowed to feel like propaganda, but it loses immediately if the world tick, dispatch receipts, faction file, and visible action disagree.",
+            CampaignHook: useMagicFit
+                ? $"{detail.PublicName} now opens on a faction-defining problem, moves through field pressure, and closes on a visible command claim before the next turn can judge the boast."
+                : $"{detail.PublicName} now opens on a glamour-news anchor, cuts to an orkish field correspondent in the district, and closes on a visible faction lead changing the scene before the next turn can judge the claim.",
+            AudiencePromise: useMagicFit
+                ? "This lane is a rendered cinematic faction reel with narration, camera motion, and metahuman action on screen. It can be stylish, but it still loses immediately if the world tick, dispatch receipts, faction file, and visible action disagree."
+                : "This lane is now a first-party nightly bulletin with visible people, camera motion, and action on screen. It is still allowed to feel like propaganda, but it loses immediately if the world tick, dispatch receipts, faction file, and visible action disagree.",
             ValidationHref: $"/account/ledger/factions/{normalizedFactionId}/leader-briefing",
             StoryboardShots:
             [
@@ -505,7 +607,52 @@ public sealed class BlackLedgerFactionOnboardingService
                 "Field report with an orkish correspondent inside the district while pressure, civilians, or infrastructure move behind him.",
                 "Action close on the faction lead changing the conflict in frame and handing the claim back to the validation lanes."
             ],
-            StoryboardFrames: storyboardFrames);
+            StoryboardFrames: storyboardFrames,
+            ScreenplayScenes: screenplayScenes);
+    }
+
+    private static IReadOnlyList<BlackLedgerCinematicSceneViewModel> BuildFallbackScreenplayScenes(
+        IReadOnlyList<BlackLedgerStoryboardFrameViewModel> storyboardFrames,
+        IReadOnlyList<string> captions)
+    {
+        return storyboardFrames.Select((frame, index) => new BlackLedgerCinematicSceneViewModel(
+            SceneId: $"fallback-scene-{index + 1}",
+            Label: frame.Label,
+            DurationLabel: "00:06",
+            Purpose: frame.ProofPayoff,
+            VisualDirection: frame.VisualHook,
+            NarratorLine: index < captions.Count ? captions[index] : frame.ActionBeat)).ToArray();
+    }
+
+    private static IReadOnlyList<BlackLedgerCinematicSceneViewModel> BuildMagicFitScreenplayScenes(JsonElement manifest)
+    {
+        if (!manifest.TryGetProperty("scene_payloads", out JsonElement payloads) || payloads.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<BlackLedgerCinematicSceneViewModel>();
+        }
+
+        return payloads.EnumerateArray()
+            .Select(scene => new BlackLedgerCinematicSceneViewModel(
+                SceneId: scene.TryGetProperty("scene_index", out JsonElement index) ? $"scene-{index.GetInt32():00}" : "scene",
+                Label: scene.TryGetProperty("scene_title", out JsonElement title) ? title.GetString() ?? "Scene" : "Scene",
+                DurationLabel: "00:04",
+                Purpose: scene.TryGetProperty("on_screen_text", out JsonElement screenText) ? $"Carry the faction hook `{screenText.GetString() ?? string.Empty}` without breaking the public-safe claim boundary." : "Carry the faction hook without breaking the public-safe claim boundary.",
+                VisualDirection: scene.TryGetProperty("prompt", out JsonElement prompt) ? prompt.GetString() ?? string.Empty : string.Empty,
+                NarratorLine: scene.TryGetProperty("scene_title", out JsonElement narrator) ? $"{narrator.GetString()}: keep the faction problem visible and the payoff legible." : "Keep the faction problem visible and the payoff legible."))
+            .ToArray();
+    }
+
+    private static string ResolveMediaFile(string relativePath)
+    {
+        string normalized = relativePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        string[] candidates =
+        [
+            Path.Combine(AppContext.BaseDirectory, "wwwroot", normalized),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Chummer.Run.Api", "wwwroot", normalized)),
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "Chummer.Run.Api", "wwwroot", normalized)),
+        ];
+
+        return candidates.FirstOrDefault(File.Exists) ?? candidates[0];
     }
 
     public IReadOnlyList<BlackLedgerFactionActionDefinitionDto> GetActionDefinitions(string factionId)

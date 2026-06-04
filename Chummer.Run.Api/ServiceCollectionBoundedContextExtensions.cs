@@ -137,6 +137,8 @@ internal static class ServiceCollectionBoundedContextExtensions
     {
         services.AddSingleton<InstallLinkingStore>();
         services.AddSingleton<InstallLinkingService>();
+        services.AddSingleton<InstallLinkedWorkspaceSnapshotStore>();
+        services.AddSingleton<InstallLinkedWorkspaceSnapshotService>();
         services.AddSingleton<PersonalizedInstallScriptService>();
         services.AddSingleton<InstallBootstrapTicketService>();
         services.AddSingleton<ReleaseBundlePromotionService>();

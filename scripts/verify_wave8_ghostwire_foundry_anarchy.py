@@ -45,22 +45,6 @@ def main() -> int:
     }
     write_json("GHOSTWIRE_AFTER_ACTION_E2E.generated.json", ghostwire_payload)
 
-    foundry_targets = [
-        ("/exports/foundry", "Honestly parked"),
-    ]
-    foundry_checks = []
-    for path, needle in foundry_targets:
-        status, body = fetch(base + path)
-        foundry_checks.append({"path": path, "status_code": status, "ok": status == 200 and needle in body, "contains": needle})
-    foundry_payload = {
-        "horizon_id": "foundry_handoff",
-        "route": "/exports/foundry",
-        "state": "honestly_parked",
-        "status": "parked" if all(item["ok"] for item in foundry_checks) else "not_ready",
-        "checks": foundry_checks,
-    }
-    write_json("FOUNDRY_HANDOFF_E2E.generated.json", foundry_payload)
-
     anarchy_targets = [
         ("/anarchy", "Shadowrun Anarchy"),
         ("/play/anarchy", "Anarchy play shell"),
@@ -81,7 +65,7 @@ def main() -> int:
     }
     write_json("ANARCHY_RULESET_PREVIEW_E2E.generated.json", anarchy_payload)
 
-    return 0 if ghostwire_payload["status"] == "pass" and foundry_payload["status"] == "parked" and anarchy_payload["status"] == "pass" else 1
+    return 0 if ghostwire_payload["status"] == "pass" and anarchy_payload["status"] == "pass" else 1
 
 
 if __name__ == "__main__":

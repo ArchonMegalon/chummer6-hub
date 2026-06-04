@@ -115,10 +115,10 @@ public sealed class BuildGhostConciergeService
                     "primary",
                     "Start the first-party intake that can feed a future ghost-comparison packet."),
                 new BuildGhostConciergeActionProjection(
-                    "Open ALICE roadmap",
-                    "/roadmap/alice",
+                    "Open ALICE",
+                    "/alice",
                     "secondary",
-                    "Inspect the horizon and proof posture before treating the lane as shipped runtime."),
+                    "Open the public ALICE route and inspect the bounded compare lane before jumping into a signed-in handoff."),
                 new BuildGhostConciergeActionProjection(
                     "Open public concierge",
                     facePopHref,

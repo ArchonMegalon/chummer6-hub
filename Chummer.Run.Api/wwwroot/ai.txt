@@ -8,7 +8,7 @@ Fast split
 - Invite orientation: /join/primer
 - Creator and public proof wrappers: /artifacts/publications/{publicationId}/concierge, /testimonials/concierge
 - Future direction: /roadmap, /horizons
-- Public signal: /feedback, /ledger, /karma-forge, /participate/karma-forge
+- Public signal: /feedback, /ledger, /alice, /table-pulse, /quicksilver, /local-co-processor, /karma-forge, /participate/karma-forge
 - Private help: /help, /contact
 - Signed-in follow-through: /home, /account
 

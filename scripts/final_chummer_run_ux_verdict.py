@@ -9,6 +9,8 @@ from pathlib import Path
 DEFAULT_COMPLETION_DIR = Path("/docker/chummercomplete/_completion/chummer_run_redesign_closure")
 REPO_ROOT = Path("/docker/chummercomplete/chummer.run-services")
 ROUTE_PROOF_PATH = REPO_ROOT / ".codex-studio" / "published" / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
+LIVE_ROUTE_PROOF_PATH = REPO_ROOT / ".codex-studio" / "published" / "CHUMMER_PUBLIC_ROUTE_PROOF.live.generated.json"
+FACTION_VIDEO_PROOF_PATH = REPO_ROOT / ".codex-studio" / "published" / "BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json"
 
 
 def completion_root() -> Path:
@@ -57,10 +59,23 @@ def parse_screenshot_report(path: Path) -> tuple[bool, list[str]]:
 
 
 def copy_route_proof(root: Path) -> Path | None:
-    if not ROUTE_PROOF_PATH.is_file():
+    source = ROUTE_PROOF_PATH
+    if LIVE_ROUTE_PROOF_PATH.is_file():
+        live_payload = read_json(LIVE_ROUTE_PROOF_PATH)
+        if route_proof_passes(live_payload) and str(live_payload.get("base_url") or "").strip().lower() == "https://chummer.run":
+            source = LIVE_ROUTE_PROOF_PATH
+    if not source.is_file():
         return None
     target = root / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json"
-    target.write_text(ROUTE_PROOF_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    return target
+
+
+def copy_faction_video_proof(root: Path) -> Path | None:
+    if not FACTION_VIDEO_PROOF_PATH.is_file():
+        return None
+    target = root / "BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json"
+    target.write_text(FACTION_VIDEO_PROOF_PATH.read_text(encoding="utf-8"), encoding="utf-8")
     return target
 
 
@@ -91,14 +106,17 @@ def main() -> int:
         "PUBLIC_OPERATOR_LEAK_SCAN.generated.json": root / "PUBLIC_OPERATOR_LEAK_SCAN.generated.json",
     }
     route_proof_artifact = copy_route_proof(root)
+    faction_video_artifact = copy_faction_video_proof(root)
 
     for label, path in required_files.items():
         if not path.is_file():
             failures.append(f"missing artifact: {label}")
     if route_proof_artifact is None:
         failures.append("missing artifact: CHUMMER_PUBLIC_ROUTE_PROOF.generated.json")
+    if faction_video_artifact is None:
+        failures.append("missing artifact: BLACK_LEDGER_FACTION_VIDEO_CARD_PROOF.generated.json")
 
-    link_payload = contrast_payload = cta_payload = asset_payload = forbidden_payload = operator_payload = route_payload = None
+    link_payload = contrast_payload = cta_payload = asset_payload = forbidden_payload = operator_payload = route_payload = faction_video_payload = None
     if not failures:
         link_payload = read_json(required_files["LIVE_LINK_AUDIT.generated.json"])
         contrast_payload = read_json(required_files["CONTRAST_AUDIT.generated.json"])
@@ -107,6 +125,7 @@ def main() -> int:
         forbidden_payload = read_json(required_files["PUBLIC_FORBIDDEN_STRING_SCAN.generated.json"])
         operator_payload = read_json(required_files["PUBLIC_OPERATOR_LEAK_SCAN.generated.json"])
         route_payload = read_json(route_proof_artifact)
+        faction_video_payload = read_json(faction_video_artifact)
 
         if link_payload.get("status") != "pass":
             failures.append("visible link audit did not pass")
@@ -122,6 +141,12 @@ def main() -> int:
             failures.append("public operator leak scan did not pass")
         if not route_proof_passes(route_payload):
             failures.append("public route proof did not pass")
+        if str(route_payload.get("base_url") or "").strip().lower() != "https://chummer.run":
+            failures.append("public route proof is not bound to https://chummer.run")
+        if faction_video_payload.get("status") != "pass":
+            failures.append("live Black Ledger faction video proof did not pass")
+        if str(faction_video_payload.get("base_url") or "").strip().lower() != "https://chummer.run":
+            failures.append("live Black Ledger faction video proof is not bound to https://chummer.run")
 
         noise_status = parse_status_line(required_files["NOISE_BUDGET_REPORT.md"])
         if noise_status != "pass":
@@ -157,6 +182,7 @@ def main() -> int:
                 "- Public forbidden-string scan passed.",
                 "- Public operator-leak scan passed.",
                 "- Public route proof passed.",
+                "- Live Black Ledger faction promo proof passed.",
             ]
         )
     else:

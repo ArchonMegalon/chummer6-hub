@@ -1,0 +1,100 @@
+{
+  "generated_at_utc": "2026-06-04T06:58:42.585967Z",
+  "status": "pass",
+  "provider": "MagicFit",
+  "provider_status": "VERIFIED_PROVIDER",
+  "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+  "narration_provider": "unmixr-short-tts",
+  "voice": "en-US-DavisNeural",
+  "slug": "ghostline-network",
+  "title": "Ghostline Network",
+  "captions": [
+    "Intel Confidence. Rumor Noise. Stay dark.",
+    "Join Ghostline. Verify, redact, survive."
+  ],
+  "scene_payloads": [
+    {
+      "video_slug": "ghostline-network",
+      "scene_index": 1,
+      "scene_title": "Redaction room",
+      "prompt": "Photoreal cyberpunk decker hideout, masked operator with AR lenses traces signal across multiple screens, screens self-redact with abstract blocks, coffee mug blurred, Chummer 6 intel confidence overlay, green/cyan light, cinematic paranoia.",
+      "session_id": "cmppysvxj03p2p31v6y483ff3",
+      "image_generation_id": "cmppysvy603p8p31v5ggyma9v",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001339999-1780001339638.png",
+      "video_generation_id": "cmppyucnz03pbp31vopfsb03v",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001554476-cmppyucnz03pbp31vopfsb03v.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_01.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_01.mp4",
+      "on_screen_text": "Intel Confidence",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ghostline-network",
+      "scene_index": 2,
+      "scene_title": "Rumor noise",
+      "prompt": "Photoreal decker workspace, operator uses Chummer 6 Signal Deck to sort rumors into verified, false, unknown, two holographic rumor cards dissolve, realistic hands and screens, dry humor, no unreadable text.",
+      "session_id": "cmppysvxj03p2p31v6y483ff3",
+      "image_generation_id": "cmppysvy603p8p31v5ggyma9v",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001339999-1780001339638.png",
+      "video_generation_id": "cmppyucnz03pbp31vopfsb03v",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001554476-cmppyucnz03pbp31vopfsb03v.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_02.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_02.mp4",
+      "on_screen_text": "Rumor Noise -2",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ghostline-network",
+      "scene_index": 3,
+      "scene_title": "Remote reaction",
+      "prompt": "Photoreal close-up of mobile Chummer 6 notification in dark cyberpunk room, remote mini-game options Trace Signal and Stay Dark, masked operator chooses Stay Dark, AR lenses reflect UI, cinematic tension.",
+      "session_id": "cmppysvxj03p2p31v6y483ff3",
+      "image_generation_id": "cmppysvy603p8p31v5ggyma9v",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001339999-1780001339638.png",
+      "video_generation_id": "cmppyucnz03pbp31vopfsb03v",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001554476-cmppyucnz03pbp31vopfsb03v.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_03.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_03.mp4",
+      "on_screen_text": "Stay Dark",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ghostline-network",
+      "scene_index": 4,
+      "scene_title": "Recruitment",
+      "prompt": "Photoreal in-universe faction recruitment ad, masked decker in dark booth, screen behind them redacts their own name, Chummer 6 join Ghostline overlay, stylish paranoid humor, realistic face/hand motion.",
+      "session_id": "cmppysvxj03p2p31v6y483ff3",
+      "image_generation_id": "cmppysvy603p8p31v5ggyma9v",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001339999-1780001339638.png",
+      "video_generation_id": "cmppyucnz03pbp31vopfsb03v",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001554476-cmppyucnz03pbp31vopfsb03v.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_04.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_04.mp4",
+      "on_screen_text": "Join Ghostline",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "ghostline-network",
+      "scene_index": 5,
+      "scene_title": "Signal trace",
+      "prompt": "Photoreal decker face reflected in transparent network map, signal branches across city and gets cut with a clean gesture, Chummer 6 Black Ledger intel overlay, cinematic, real character movement.",
+      "session_id": "cmppysvxj03p2p31v6y483ff3",
+      "image_generation_id": "cmppysvy603p8p31v5ggyma9v",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001339999-1780001339638.png",
+      "video_generation_id": "cmppyucnz03pbp31vopfsb03v",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001554476-cmppyucnz03pbp31vopfsb03v.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_05.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/scenes/ghostline-network_scene_05.mp4",
+      "on_screen_text": "Signal Killed",
+      "derived_from_master": true
+    }
+  ],
+  "exports": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.mp4",
+    "mobile_mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo-mobile.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo-poster.png",
+    "audio": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/ghostline-network-promo-audio.m4a"
+  },
+  "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/ghostline-network/video_manifest.generated.json"
+}

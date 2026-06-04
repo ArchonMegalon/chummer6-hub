@@ -8,6 +8,7 @@ using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Run.Contracts.Identity;
+using Chummer.Run.Registry.Services;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -392,6 +393,137 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public void AliceReceiptJsonReturnsBoundedSplitContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.AliceReceiptJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("/participate", payload.RootElement.GetProperty("FacePopEntryHref").GetString());
+        Assert.Equal("Public concierge only", payload.RootElement.GetProperty("FacePopStatus").GetString());
+        Assert.Equal("First-party compare/apply only", payload.RootElement.GetProperty("EngineStatus").GetString());
+        Assert.Contains("/alice", payload.RootElement.GetProperty("Actions").EnumerateArray().Select(item => item.GetProperty("Href").GetString()), StringComparer.Ordinal);
+        Assert.Equal("/account/alice", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
+        Assert.Equal("/account/alice/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/build-handoffs", payload.RootElement.GetProperty("SignedInBench").GetProperty("HandoffIndexApiHref").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/build-handoffs/{handoffId}", payload.RootElement.GetProperty("SignedInBench").GetProperty("HandoffDetailApiHrefTemplate").GetString());
+    }
+
+    [Fact]
+    public void TablePulseReceiptJsonReturnsSeparateLiveAndAftermathContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.TablePulseReceiptJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("table_pulse", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("pass", payload.RootElement.GetProperty("SeparationStatus").GetString());
+        Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("LiveRail").GetProperty("NotificationsHref").GetString());
+        Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("AftermathRail").GetProperty("WorkspaceHref").GetString());
+        Assert.Equal(2, payload.RootElement.GetProperty("AftermathRail").GetProperty("ApiRoutes").GetArrayLength());
+    }
+
+    [Fact]
+    public void RunnerPassportReceiptJsonReturnsSignedInContinuityContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.RunnerPassportIdentityNetworkReceiptJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("runner_passport", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/passport/receipts/runner_return_posture.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("RunnerReturnMarkdownHref").GetString());
+        Assert.Equal("/passport/receipts/runner_return_posture.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("RunnerReturnJsonHref").GetString());
+        Assert.Equal("/account/passport", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
+        Assert.Equal("/account/passport/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
+        Assert.Equal("/account/ledger/notifications", payload.RootElement.GetProperty("SignedInBench").GetProperty("LiveNotificationsHref").GetString());
+        Assert.Equal("/account/work#aftermath-packages", payload.RootElement.GetProperty("SignedInBench").GetProperty("AftermathHref").GetString());
+    }
+
+    [Fact]
+    public void JackpointReceiptJsonReturnsSignedInPublicationContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.JackpointReceiptJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("jackpoint", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/jackpoint/briefings/emerald-sprawl-briefing.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("FirstBriefingMarkdownHref").GetString());
+        Assert.Equal("/jackpoint/briefings/emerald-sprawl-briefing.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("FirstBriefingJsonHref").GetString());
+        Assert.Equal("/account/jackpoint", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountEntryHref").GetString());
+        Assert.Equal("/account/jackpoint/open", payload.RootElement.GetProperty("SignedInDesk").GetProperty("AccountRedirectHref").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/publications", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PublicationIndexApiHref").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/publications/{publicationId}", payload.RootElement.GetProperty("SignedInDesk").GetProperty("PublicationDetailApiHrefTemplate").GetString());
+    }
+
+    [Fact]
+    public void RunsiteReceiptJsonReturnsSignedInPrepContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.RunsiteReceiptJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("runsite", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("FirstPackMarkdownHref").GetString());
+        Assert.Equal("/runsites/packs/redmond-dockyard-pack.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("FirstPackJsonHref").GetString());
+        Assert.Equal("/account/runsites", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountEntryHref").GetString());
+        Assert.Equal("/account/runsites/open", payload.RootElement.GetProperty("SignedInBench").GetProperty("AccountRedirectHref").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/workspace-digests", payload.RootElement.GetProperty("SignedInBench").GetProperty("WorkspaceIndexApiHref").GetString());
+        Assert.Equal("/api/v1/campaign-spine/me/runs", payload.RootElement.GetProperty("SignedInBench").GetProperty("RunIndexApiHref").GetString());
+    }
+
+    [Fact]
+    public void AnarchyRuntimeReceiptJsonReturnsShippedRulesLightContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.AnarchyRuntimeReceiptJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("anarchy", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("shadowrun_anarchy", payload.RootElement.GetProperty("RulesetId").GetString());
+        Assert.Equal("/play/anarchy", payload.RootElement.GetProperty("PlayShell").GetProperty("PlayHref").GetString());
+        Assert.Equal("/ledger/anarchy", payload.RootElement.GetProperty("PlayShell").GetProperty("LedgerHref").GetString());
+        Assert.Equal("/anarchy/export/runner.json", payload.RootElement.GetProperty("ExportLane").GetProperty("ExportJsonHref").GetString());
+        Assert.Equal("/anarchy/receipts/explain.json", payload.RootElement.GetProperty("ExportLane").GetProperty("ExplainReceiptHref").GetString());
+        Assert.Equal("Shipped rules-light lane", payload.RootElement.GetProperty("PublicProfile").GetProperty("VerdictLabel").GetString());
+        Assert.True(payload.RootElement.GetProperty("DispatchLane").GetProperty("ReceiptAnchored").GetBoolean());
+    }
+
+    [Fact]
+    public void GhostwireReplayReceiptJsonReturnsShippedAfterActionContract()
+    {
+        using Fixture fixture = new();
+
+        IActionResult result = fixture.Controller.GhostwireReplayNetworkReceiptJson();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        using JsonDocument payload = JsonSerializer.SerializeToDocument(ok.Value);
+        Assert.Equal("ghostwire", payload.RootElement.GetProperty("Horizon").GetString());
+        Assert.Equal("shipped_mvp", payload.RootElement.GetProperty("Status").GetString());
+        Assert.Equal("/ghostwire/after-action/replay_timeline.md", payload.RootElement.GetProperty("PublicBoard").GetProperty("ReplayTimelineMarkdownHref").GetString());
+        Assert.Equal("/ghostwire/after-action/replay_timeline.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("ReplayTimelineJsonHref").GetString());
+        Assert.Equal("/ghostwire/after-action/after_action_report.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("AfterActionReportJsonHref").GetString());
+        Assert.Equal("/ghostwire/after-action/consequence_chain.json", payload.RootElement.GetProperty("PublicBoard").GetProperty("ConsequenceChainJsonHref").GetString());
+        Assert.Equal("Not claimed", payload.RootElement.GetProperty("Boundaries").GetProperty("TranscriptTruth").GetString());
+    }
+
+    [Fact]
     public async Task SignedInWorldTickValidationJsonReturnsReceiptBackedPacket()
     {
         using Fixture fixture = new(authenticated: true);
@@ -772,6 +904,10 @@ public sealed class PublicLandingDownloadDispatchTests
             IDataProtectionProvider dataProtectionProvider = DataProtectionProvider.Create(new DirectoryInfo(Path.Combine(_root, "keys")));
             InstallBootstrapTickets = new InstallBootstrapTicketService(dataProtectionProvider, Configuration);
             PersonalizedInstallScripts = new PersonalizedInstallScriptService(InstallLinkingStore, Configuration);
+            HubPublicationDraftService draftService = new();
+            PublicCreatorPublicationDiscoveryService publicCreatorDiscovery = new(Accounts, campaignSpine, draftService);
+            CommunityCreatorHorizonsService communityCreatorHorizons = new(communityStore, InstallLinkingStore, publicCreatorDiscovery);
+            WaveEightHorizonsService waveEightHorizons = new(communityStore, anarchyPreview);
             Controller = new PublicLandingController(
                 landing: null!,
                 flagshipCoverage: null!,
@@ -791,8 +927,8 @@ public sealed class PublicLandingDownloadDispatchTests
 	                knowledgeFabric: null!,
 	                nexusPan: null!,
 	                mediaHorizons: null!,
-	                communityCreatorHorizons: null!,
-		                waveEightHorizons: null!,
+		                communityCreatorHorizons: communityCreatorHorizons,
+		                waveEightHorizons: waveEightHorizons,
 		                karmaForge: new KarmaForgeDiscoveryService(new KarmaForgeStore(Configuration, NullLogger<KarmaForgeStore>.Instance), Configuration),
                         buildGhostConcierge: buildGhostConcierge,
 		                blackLedgerStats: blackLedgerStats,
@@ -805,7 +941,7 @@ public sealed class PublicLandingDownloadDispatchTests
                         gmSessionVenues: gmSessionVenues,
 	                anarchyPreview: anarchyPreview,
                 packageCatalog: new PublicPackageCatalogService(),
-                publicCreatorDiscovery: null!,
+                publicCreatorDiscovery: publicCreatorDiscovery,
                 chrome: null!,
                 trustContent: null!,
                 privacyBoundaries: null!,

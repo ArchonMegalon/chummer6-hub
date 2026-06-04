@@ -1,6 +1,6 @@
 @model BuildGhostConciergePageViewModel
 @{
-    ViewData["Title"] = "Build Ghost concierge";
+    ViewData["Title"] = Model.Chrome.Title;
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-participate";
     var projection = Model.Projection;
@@ -111,6 +111,41 @@
         }
     </div>
 </section>
+
+@if (Model.SignedInBench is not null)
+{
+    var signedInBench = Model.SignedInBench;
+    <section class="editorial-block">
+        <div class="editorial-block__lead">
+            <p class="eyebrow">Signed-in ALICE</p>
+            <h2 class="editorial-title">The real compare bench is now a named account lane.</h2>
+            <p class="editorial-copy">@signedInBench.Summary</p>
+            <div class="stacked-actions">
+                <a class="button-like button-like--primary" href="@signedInBench.EntryHref">@signedInBench.EntryLabel</a>
+                @if (!string.IsNullOrWhiteSpace(signedInBench.LeadHandoffHref))
+                {
+                    <a class="button-like button-like--secondary" href="@signedInBench.LeadHandoffHref">Open lead build handoff</a>
+                }
+            </div>
+        </div>
+        <div class="route-choice-grid">
+            <article class="route-choice-card">
+                <span class="tag">@signedInBench.StatusLabel</span>
+                <h3>@(signedInBench.LeadHandoffTitle ?? "ALICE workbench")</h3>
+                <p>@(signedInBench.LeadHandoffSummary ?? "Signed-in ALICE keeps tradeoffs, rule diffs, and governed output follow-through on the account rail.")</p>
+                @if (signedInBench.ProofPoints is { Count: > 0 })
+                {
+                    <div class="route-choice-card__proof">
+                        @foreach (var point in signedInBench.ProofPoints)
+                        {
+                            <span>@point</span>
+                        }
+                    </div>
+                }
+            </article>
+        </div>
+    </section>
+}
 
 <section class="editorial-block">
     <div class="editorial-block__lead">

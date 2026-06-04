@@ -234,6 +234,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("The experiment should leave behind receipts, not vibes.", view, StringComparison.Ordinal);
         Assert.Contains("Use the public tools to guide the experiment, not to own it.", view, StringComparison.Ordinal);
+        Assert.Contains("Signed-in ALICE", view, StringComparison.Ordinal);
+        Assert.Contains("The real compare bench is now a named account lane.", view, StringComparison.Ordinal);
+        Assert.Contains("@signedInBench.EntryLabel", view, StringComparison.Ordinal);
+        Assert.Contains("Open lead build handoff", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -251,15 +255,26 @@ public sealed class PublicLandingReleaseTrustViewTests
     public void BuildGhostConciergeControllerAndServicesWireTheBoundedRoute()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
         string servicesPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
 
         string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
         string services = File.ReadAllText(servicesPath);
 
         Assert.Contains("BuildGhostConciergeService", services, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/participate/build-ghosts\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/participate/build-ghosts.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/alice\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/alice/receipts/build-ghost.json\")]", controller, StringComparison.Ordinal);
         Assert.Contains("BuildGhostConcierge.cshtml", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/alice\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/alice/{handoffId}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/alice/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/build-handoffs\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/build-handoffs/{handoffId}\")]", campaignSpineController, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -276,6 +291,204 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open public feedback", view, StringComparison.Ordinal);
         Assert.Contains("/contact?kind=bug_report", service, StringComparison.Ordinal);
         Assert.Contains("/feedback?topic=build-ghosts", service, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TablePulseRouteUsesTheSharedTrustShellInsteadOfLegacyRedirectOnly()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string legacyControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "LegacySurfaceRedirectController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string legacyController = File.ReadAllText(legacyControllerPath);
+
+        Assert.Contains("[HttpGet(\"/table-pulse\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/table-pulse/receipts/live-and-aftermath.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("TABLE PULSE separates live heat from private aftermath.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("[HttpGet(\"/table-pulse\")]", legacyController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CommunityHubUsesNamedPublicReceiptAndSignedInBoardRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/community\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/community/receipts/open-run-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("Community Hub now ships a real first-party open-run network", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/community\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/community/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/open-runs\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/open-runs/{openRunId}\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"me/workspaces/{workspaceId}/open-runs\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"me/open-runs/{openRunId}/schedule\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"me/open-runs/{openRunId}/meeting-handoff\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpPost(\"me/open-runs/{openRunId}/closeout\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CreatorOsUsesNamedPublicReceiptAndSignedInPublicationDeskRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+
+        Assert.Contains("[HttpGet(\"/creator\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/creator/receipts/publication-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("Creator OS now ships a real first-party publication network", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/creator\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/creator/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/creator/{publicationId}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/artifacts/publications/{publicationId}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/api/v1/public/artifacts/publications/{publicationId}\")]", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void JackpointUsesNamedPublicReceiptAndSignedInPublicationRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/jackpoint\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/jackpoint/receipts/briefing-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("JACKPOINT now ships a real first-party briefing network", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/jackpoint\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/jackpoint/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/jackpoint/{publicationId}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/publications\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/publications/{publicationId}\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunsiteUsesNamedPublicReceiptAndSignedInPrepRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/runsites\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/runsites/receipts/prep-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("RUNSITE now ships as a real prep network", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/runsites\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/runsites/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/runsites/{workspaceId}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/workspace-digests\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/runs\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/runs/{runId}\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/workspaces/{workspaceId}/prep-library\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunControlUsesNamedPublicReceiptSignedInDeskAndTypedControlRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/run-control\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/roadmap/run-control\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/run-control/receipts/control-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/run-control/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/run-control/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("RUN CONTROL now ships a real first-party GM operations lane", controller, StringComparison.Ordinal);
+        Assert.Contains("IsKnownRunControlPacketId", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/run-control\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/run-control/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/run-control/{runId}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/run-control/dashboard\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/run-control/runs/{runId}\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RunnerPassportUsesNamedPublicReceiptAndSignedInContinuityRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+
+        Assert.Contains("[HttpGet(\"/passport\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/passport/receipts/identity-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("Runner Passport now ships a real first-party continuity lane", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/passport\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/passport/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("/account/ledger/notifications", controller, StringComparison.Ordinal);
+        Assert.Contains("/account/work#aftermath-packages", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void QuicksilverUsesNamedPublicReceiptSignedInCommandDeckAndTypedJumpRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/quicksilver\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/roadmap/quicksilver\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/quicksilver/receipts/command-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/quicksilver/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/quicksilver/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("Quicksilver now ships a real first-party command deck", controller, StringComparison.Ordinal);
+        Assert.Contains("IsKnownQuicksilverPacketId", controller, StringComparison.Ordinal);
+        Assert.Contains("return NotFound();", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/quicksilver\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/quicksilver/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/quicksilver/{focus}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/quicksilver/command-deck\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/quicksilver/jump-targets\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnarchyUsesNamedRuntimeReceiptAndShippedRulesLightLanguage()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Anarchy.cshtml");
+
+        string controller = File.ReadAllText(controllerPath);
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("[HttpGet(\"/anarchy/receipts/runtime.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("A shipped rules-light lane for mobile play, dispatches, faction consequence, and fast continuity.", controller, StringComparison.Ordinal);
+        Assert.Contains("VerdictLabel: \"Shipped rules-light lane\"", controller, StringComparison.Ordinal);
+        Assert.Contains("Shipped rules-light lane for Black Ledger, dispatches, and mobile play.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GhostwireUsesNamedReplayReceiptAndShippedPacketLanguage()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("[HttpGet(\"/ghostwire\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/roadmap/ghostwire\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/ghostwire/receipts/replay-network.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("GHOSTWIRE now ships first-party after-action packet rails", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -534,5 +747,81 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("data-bottom-cta-dismiss", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer.bottom_cta.dismissed_routes", script, StringComparison.Ordinal);
         Assert.DoesNotContain("bottomCta.hidden = true", script, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OnrampUsesNamedPublicReceiptSignedInDeskAndTypedStarterRecoveryRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/onramp\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/onramp/receipts/guided-starter.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/onramp/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/onramp/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildOnrampPageModel", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildOnrampReceipt", controller, StringComparison.Ordinal);
+        Assert.Contains("IsKnownOnrampPacketId", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/onramp\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/onramp/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/onramp/starter\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/onramp/dashboard\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/onramp/starter\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/onramp/recovery\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EditionStudioUsesNamedPublicReceiptSignedInDeskAndTypedEditionHeadRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/edition-studio\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/edition-studio/receipts/ruleset-heads.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/edition-studio/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/edition-studio/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildEditionStudioPageModel", controller, StringComparison.Ordinal);
+        Assert.Contains("BuildEditionStudioReceipt", controller, StringComparison.Ordinal);
+        Assert.Contains("IsKnownEditionStudioPacketId", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/edition-studio\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/edition-studio/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/edition-studio/{edition}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/edition-studio/heads\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/edition-studio/heads/{edition}\")]", campaignSpineController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LocalCoProcessorUsesNamedPublicReceiptSignedInDeskAndTypedPolicyRoutes()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string accountsControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "AccountsController.cs");
+        string campaignSpineControllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "CampaignSpineController.cs");
+
+        string controller = File.ReadAllText(controllerPath);
+        string accountsController = File.ReadAllText(accountsControllerPath);
+        string campaignSpineController = File.ReadAllText(campaignSpineControllerPath);
+
+        Assert.Contains("[HttpGet(\"/local-co-processor\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/roadmap/local-co-processor\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/local-co-processor/receipts/optional-acceleration.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/local-co-processor/packets/{packetId}.md\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/local-co-processor/packets/{packetId}.json\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("LOCAL CO-PROCESSOR now ships a bounded first-party optional-acceleration lane", controller, StringComparison.Ordinal);
+        Assert.Contains("IsKnownLocalCoProcessorPacketId", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/local-co-processor\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/local-co-processor/open\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/account/local-co-processor/{profile}\")]", accountsController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/local-co-processor/capabilities\")]", campaignSpineController, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"me/local-co-processor/policy\")]", campaignSpineController, StringComparison.Ordinal);
     }
 }

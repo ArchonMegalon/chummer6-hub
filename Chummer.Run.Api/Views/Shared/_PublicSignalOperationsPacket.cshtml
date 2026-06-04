@@ -4,12 +4,12 @@
     bool publicSignalLive = Model.ReceiptCount > 0 || Model.CategoryCount > 0;
     string followThroughHeading = followThroughReady
         ? "Chummer follow-up examples are visible now."
-        : "Chummer follow-up is still preview-only on this host.";
+        : "First-party follow-up is still preview-only on this host.";
     string followThroughSummary = followThroughReady
         ? $"{Model.CloseoutDispatchSentCount} follow-up record(s) have already landed, and shipped updates stay tied to /changelog."
         : Model.CloseoutQueueReadyCount > 0
             ? $"{Model.CloseoutQueueReadyCount} follow-up candidate(s) are ready, but nothing is posted as sent until the shipped update path is ready."
-            : "Public feedback can still show demand, but account-backed follow-up waits until the shipped update path is ready on this host.";
+            : "Public feedback can still show demand, but account-backed follow-up stays off until shipped proof and first-party closeout receipts are both real on this host.";
     string readinessTag = followThroughReady ? "Posted follow-up examples" : "Preview-only follow-up";
 }
 
@@ -32,7 +32,7 @@
             <a class="editorial-strip__action" href="/roadmap">Open roadmap</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Shipped follow-up</span>
+            <span class="tag">Closeout follow-up</span>
             <h3>@followThroughHeading</h3>
             <p>@followThroughSummary</p>
             <div class="route-choice-card__proof">
@@ -43,7 +43,7 @@
             <a class="editorial-strip__action" href="/changelog">Open changelog</a>
         </article>
         <article class="route-choice-card">
-            <span class="tag">Intake and follow-up</span>
+            <span class="tag">Ingress and closeout</span>
             <h3>Private help still leaves this page immediately.</h3>
             <p>Crashes, installs, logs, account repair, and private campaign detail should move to Help or Contact before they become public board noise.</p>
             <div class="route-choice-card__proof">

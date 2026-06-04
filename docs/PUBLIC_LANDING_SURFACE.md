@@ -44,6 +44,9 @@ Direction, signal, and shipped-closeout rails:
 - `/changelog` for shipped closeout
 - `/ledger`
 - `/black-ledger`
+- `/alice`
+- `/table-pulse`
+- `/quicksilver`
 - `/participate`
 - `/karma-forge`
 - `/participate/karma-forge`

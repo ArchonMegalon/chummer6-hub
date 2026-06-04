@@ -1,0 +1,100 @@
+{
+  "generated_at_utc": "2026-06-04T06:59:33.824216Z",
+  "status": "pass",
+  "provider": "MagicFit",
+  "provider_status": "VERIFIED_PROVIDER",
+  "render_mode": "magicfit_cinematic_faction_promo_with_narration",
+  "narration_provider": "unmixr-short-tts",
+  "voice": "en-US-GuyNeural",
+  "slug": "glass-tower-compact",
+  "title": "Glass Tower Compact",
+  "captions": [
+    "Public Trust. License Polish. Compliance with consequences.",
+    "Join Glass Tower. Become the calm before someone else\u2019s paperwork storm."
+  ],
+  "scene_payloads": [
+    {
+      "video_slug": "glass-tower-compact",
+      "scene_index": 1,
+      "scene_title": "Compliance with teeth",
+      "prompt": "Photoreal cyberpunk corporate boardroom in a glass tower, elf compliance executive in immaculate dark suit slides a glowing contract across a polished table, security camera feeds and faction dashboard behind her, calm smile, sterile cyan-white lighting, premium cinematic ad style, subtle menace, readable Chummer 6 overlay showing Public Trust and License Polish, real person movement, no flat graphics.",
+      "session_id": "cmppysvm903oop31vislvyyyz",
+      "image_generation_id": "cmppysvn803oup31v89gszsyg",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001344980-1780001344581.png",
+      "video_generation_id": "cmppyug0b03pjp31v40pnuc4h",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001543305-cmppyug0b03pjp31v40pnuc4h.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_01.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_01.mp4",
+      "on_screen_text": "Public Trust \u00b7 License Polish",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "glass-tower-compact",
+      "scene_index": 2,
+      "scene_title": "The audit alarm",
+      "prompt": "Photoreal corporate security operations room, multiple analysts in suits calmly respond to a Chummer 6 Table Pulse security breach alert, one nervous intern stamps a document, officer raises eyebrow, cinematic crisp UI, security heat bar, premium serious-comedy tone, realistic people, actual typing and movement.",
+      "session_id": "cmppysvm903oop31vislvyyyz",
+      "image_generation_id": "cmppysvn803oup31v89gszsyg",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001344980-1780001344581.png",
+      "video_generation_id": "cmppyug0b03pjp31v40pnuc4h",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001543305-cmppyug0b03pjp31v40pnuc4h.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_02.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_02.mp4",
+      "on_screen_text": "Security Heat: Breach",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "glass-tower-compact",
+      "scene_index": 3,
+      "scene_title": "Join pitch",
+      "prompt": "Photoreal direct-to-camera cyberpunk recruitment ad, corporate compliance officer in premium glass tower studio, faction crest behind her, clean Chummer 6 join faction button floating subtly, realistic facial movement, professional broadcast lighting, funny understated menace.",
+      "session_id": "cmppysvm903oop31vislvyyyz",
+      "image_generation_id": "cmppysvn803oup31v89gszsyg",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001344980-1780001344581.png",
+      "video_generation_id": "cmppyug0b03pjp31v40pnuc4h",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001543305-cmppyug0b03pjp31v40pnuc4h.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_03.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_03.mp4",
+      "on_screen_text": "Join Glass Tower",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "glass-tower-compact",
+      "scene_index": 4,
+      "scene_title": "Globe claim",
+      "prompt": "Photoreal cyberpunk command room with large rotating Black Ledger globe, corporate faction territory glowing in cyan-white, influence arcs and heat pulses, compliance officer stands beside it with tablet, cinematic strategic-game feel, sharp faction overlay, no clutter.",
+      "session_id": "cmppysvm903oop31vislvyyyz",
+      "image_generation_id": "cmppysvn803oup31v89gszsyg",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001344980-1780001344581.png",
+      "video_generation_id": "cmppyug0b03pjp31v40pnuc4h",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001543305-cmppyug0b03pjp31v40pnuc4h.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_04.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_04.mp4",
+      "on_screen_text": "Influence Sphere",
+      "derived_from_master": true
+    },
+    {
+      "video_slug": "glass-tower-compact",
+      "scene_index": 5,
+      "scene_title": "Absurd close",
+      "prompt": "Photoreal glass tower elevator lobby, calm corporate officer waves as a black-suited security response team enters elevator, Chummer 6 overlay says response team dispatched, clean cinematic humor, realistic movement, polished lighting.",
+      "session_id": "cmppysvm903oop31vislvyyyz",
+      "image_generation_id": "cmppysvn803oup31v89gszsyg",
+      "image_output_url": "https://cdn.pushowl.com/magicfit/1780001344980-1780001344581.png",
+      "video_generation_id": "cmppyug0b03pjp31v40pnuc4h",
+      "video_output_url": "https://cdn.pushowl.com/magicfit/1780001543305-cmppyug0b03pjp31v40pnuc4h.mp4",
+      "png_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_05.png",
+      "mp4_file": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/scenes/glass-tower-compact_scene_05.mp4",
+      "on_screen_text": "Response Team Dispatched",
+      "derived_from_master": true
+    }
+  ],
+  "exports": {
+    "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.mp4",
+    "mobile_mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo-mobile.mp4",
+    "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo.webm",
+    "poster": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo-poster.png",
+    "audio": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/factions/glass-tower-compact-promo-audio.m4a"
+  },
+  "source_manifest": "/docker/chummercomplete/_completion/faction_video_series/generated/glass-tower-compact/video_manifest.generated.json"
+}

@@ -5,6 +5,7 @@ using Chummer.Run.Api.Services.Support;
 using Chummer.Run.Api.ViewModels;
 using Chummer.Control.Contracts.Support;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
+using Chummer.Contracts.Characters;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
@@ -55,6 +56,7 @@ public sealed class InstallLinkingController : ControllerBase
     private readonly PublicReleaseManifestService _releases;
     private readonly SupportCaseService _supportCases;
     private readonly SupportCasePresentationService _supportPresentation;
+    private readonly InstallLinkedWorkspaceSnapshotService _workspaceSnapshots;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
     private readonly LocalReleaseProofArtifactService _localReleaseProof;
@@ -66,7 +68,8 @@ public sealed class InstallLinkingController : ControllerBase
         PublicReleaseManifestService releases,
         SupportCaseService supportCases,
         SupportCasePresentationService supportPresentation,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        InstallLinkedWorkspaceSnapshotService? workspaceSnapshots = null)
     {
         _identity = identity;
         _accounts = accounts;
@@ -74,6 +77,7 @@ public sealed class InstallLinkingController : ControllerBase
         _releases = releases;
         _supportCases = supportCases;
         _supportPresentation = supportPresentation;
+        _workspaceSnapshots = workspaceSnapshots ?? new InstallLinkedWorkspaceSnapshotService(new InstallLinkedWorkspaceSnapshotStore(configuration));
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
         _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
@@ -302,6 +306,73 @@ public sealed class InstallLinkingController : ControllerBase
                 ?? continuation?.SupportContinuation
                 ?? "Support follow-through stays on this claimed install with the current build, channel, and device context attached.",
             SupportCases: supportCases));
+    }
+
+    [HttpPost("continuation/workspaces/list")]
+    [ProducesResponseType<InstallLinkedWorkspaceSnapshotListResponse>(StatusCodes.Status200OK)]
+    public ActionResult<InstallLinkedWorkspaceSnapshotListResponse> ListClaimedInstallWorkspaces([FromBody] DesktopInstallNativeContinuationRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("workspace snapshot list payload is required.");
+        }
+
+        ClaimedInstallationDto? installation = _installLinking.ResolveInstallationForGrant(request.InstallationId, request.AccessToken);
+        if (installation is null)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown or expired.");
+        }
+
+        InstallLinkedWorkspaceSnapshotDto[] snapshots = _workspaceSnapshots.ListForInstallation(installation)
+            .Select(static snapshot => ToSnapshotDto(snapshot))
+            .ToArray();
+        return Ok(new InstallLinkedWorkspaceSnapshotListResponse(snapshots));
+    }
+
+    [HttpPost("continuation/workspaces/upsert")]
+    [ProducesResponseType<InstallLinkedWorkspaceSnapshotUpsertResponse>(StatusCodes.Status200OK)]
+    public ActionResult<InstallLinkedWorkspaceSnapshotUpsertResponse> UpsertClaimedInstallWorkspace([FromBody] InstallLinkedWorkspaceSnapshotUpsertRequest? request)
+    {
+        if (request is null)
+        {
+            return BadRequest("workspace snapshot upsert payload is required.");
+        }
+
+        ClaimedInstallationDto? installation = _installLinking.ResolveInstallationForGrant(request.InstallationId, request.AccessToken);
+        if (installation is null)
+        {
+            return Problem(statusCode: StatusCodes.Status401Unauthorized, detail: "installation grant is unknown or expired.");
+        }
+
+        try
+        {
+            InstallLinkedWorkspaceSnapshotRecord stored = _workspaceSnapshots.UpsertForInstallation(
+                installation,
+                new InstallLinkedWorkspaceSnapshotRecord(
+                    OwnerKey: string.Empty,
+                    WorkspaceId: request.WorkspaceId,
+                    RulesetId: request.RulesetId,
+                    Format: request.Format,
+                    SchemaVersion: request.SchemaVersion,
+                    PayloadKind: request.PayloadKind,
+                    Payload: request.Payload ?? string.Empty,
+                    UpdatedAtUtc: request.UpdatedAtUtc,
+                    OriginInstallationId: request.OriginInstallationId,
+                    Name: request.Name,
+                    Alias: request.Alias,
+                    Metatype: request.Metatype,
+                    BuildMethod: request.BuildMethod,
+                    CreatedVersion: request.CreatedVersion,
+                    AppVersion: request.AppVersion,
+                    Karma: request.Karma,
+                    Nuyen: request.Nuyen,
+                    Created: request.Created));
+            return Ok(new InstallLinkedWorkspaceSnapshotUpsertResponse(ToSnapshotDto(stored)));
+        }
+        catch (InstallLinkingOperationException ex)
+        {
+            return Problem(statusCode: ex.StatusCode, detail: ex.Message);
+        }
     }
 
     [HttpPost("continuation/support")]
@@ -1819,6 +1890,27 @@ public sealed class InstallLinkingController : ControllerBase
     private static string NormalizeResponseValue(string? value)
         => string.IsNullOrWhiteSpace(value) ? "unknown" : value.Trim();
 
+    private static InstallLinkedWorkspaceSnapshotDto ToSnapshotDto(InstallLinkedWorkspaceSnapshotRecord snapshot)
+        => new(
+            WorkspaceId: snapshot.WorkspaceId,
+            RulesetId: snapshot.RulesetId,
+            Format: snapshot.Format,
+            SchemaVersion: snapshot.SchemaVersion,
+            PayloadKind: snapshot.PayloadKind,
+            Payload: snapshot.Payload,
+            UpdatedAtUtc: snapshot.UpdatedAtUtc,
+            OriginInstallationId: snapshot.OriginInstallationId,
+            Summary: new CharacterFileSummary(
+                Name: snapshot.Name ?? snapshot.WorkspaceId,
+                Alias: snapshot.Alias ?? snapshot.Name ?? snapshot.WorkspaceId,
+                Metatype: snapshot.Metatype ?? "Unknown",
+                BuildMethod: snapshot.BuildMethod ?? "Unknown",
+                CreatedVersion: snapshot.CreatedVersion ?? snapshot.RulesetId,
+                AppVersion: snapshot.AppVersion ?? snapshot.RulesetId,
+                Karma: snapshot.Karma,
+                Nuyen: snapshot.Nuyen,
+                Created: snapshot.Created));
+
 }
 
 public sealed record DesktopInstallNativeContinuationRequest(
@@ -1994,3 +2086,41 @@ public sealed record NativeRouteProofStatus(
     string State,
     NativeRouteReceiptDto? RouteReceipt,
     string? BoundedFailureReason);
+
+public sealed record InstallLinkedWorkspaceSnapshotListResponse(
+    IReadOnlyList<InstallLinkedWorkspaceSnapshotDto> Snapshots);
+
+public sealed record InstallLinkedWorkspaceSnapshotUpsertRequest(
+    string InstallationId,
+    string AccessToken,
+    string WorkspaceId,
+    string RulesetId,
+    string Format,
+    int SchemaVersion,
+    string PayloadKind,
+    string Payload,
+    DateTimeOffset UpdatedAtUtc,
+    string? OriginInstallationId,
+    string? Name,
+    string? Alias,
+    string? Metatype,
+    string? BuildMethod,
+    string? CreatedVersion,
+    string? AppVersion,
+    decimal Karma,
+    decimal Nuyen,
+    bool Created);
+
+public sealed record InstallLinkedWorkspaceSnapshotUpsertResponse(
+    InstallLinkedWorkspaceSnapshotDto Snapshot);
+
+public sealed record InstallLinkedWorkspaceSnapshotDto(
+    string WorkspaceId,
+    string RulesetId,
+    string Format,
+    int SchemaVersion,
+    string PayloadKind,
+    string Payload,
+    DateTimeOffset UpdatedAtUtc,
+    string? OriginInstallationId,
+    CharacterFileSummary Summary);
