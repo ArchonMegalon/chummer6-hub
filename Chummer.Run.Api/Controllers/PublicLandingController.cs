@@ -1133,7 +1133,7 @@ public sealed class PublicLandingController : Controller
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return Redirect($"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}");
+            return Redirect($"/login?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}");
         }
         catch (HubRequestAuthException ex)
         {
@@ -11084,7 +11084,7 @@ Boundary:
             }
             catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
             {
-                return (null, Redirect($"/auth/google/start?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}"));
+                return (null, Redirect($"/login?next={Uri.EscapeDataString($"/downloads/install/{artifactId}")}"));
             }
             catch (HubRequestAuthException ex)
             {

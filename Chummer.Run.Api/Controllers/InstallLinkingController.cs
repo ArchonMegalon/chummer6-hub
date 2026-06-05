@@ -213,7 +213,7 @@ public sealed class InstallLinkingController : ControllerBase
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
-            return Redirect($"/auth/google/start?next={Uri.EscapeDataString(returnPath)}");
+            return Redirect($"/login?next={Uri.EscapeDataString(returnPath)}");
         }
         catch (HubRequestAuthException ex)
         {

@@ -7035,6 +7035,8 @@ body {
 
 .black-ledger-geoscape__stage {
   min-height: 470px;
+  --ledger-geoscape-edge-gap: 22px;
+  --ledger-geoscape-panel-width: min(380px, calc(100% - (var(--ledger-geoscape-edge-gap) * 2)));
 }
 
 .black-ledger-geoscape__stage::before {
@@ -7119,6 +7121,7 @@ body {
   top: 20px;
   gap: 0.42rem;
   z-index: 4;
+  max-width: min(46ch, calc(100% - var(--ledger-geoscape-panel-width) - (var(--ledger-geoscape-edge-gap) * 2) - 1.15rem));
 }
 
 .black-ledger-geoscape__eyebrow {
@@ -7140,12 +7143,17 @@ body {
 
 .black-ledger-geoscape__signal-rail {
   position: absolute;
-  inset: 18px 18px auto auto;
+  left: var(--ledger-geoscape-edge-gap);
+  right: auto;
+  top: auto;
+  bottom: 18px;
   display: grid;
   gap: 0.5rem;
-  justify-items: end;
+  justify-items: start;
   pointer-events: none;
   z-index: 4;
+  width: fit-content;
+  max-width: min(18rem, calc(100% - var(--ledger-geoscape-panel-width) - (var(--ledger-geoscape-edge-gap) * 2) - 1rem));
 }
 
 .black-ledger-geoscape__signal-chip {
@@ -7339,8 +7347,12 @@ body {
   }
 
   .black-ledger-geoscape__signal-rail {
-    inset: auto 14px 14px auto;
+    left: 14px;
+    right: auto;
+    top: auto;
+    bottom: 14px;
     justify-items: start;
+    max-width: min(15rem, calc(100% - 28px));
   }
 
   .black-ledger-geoscape__signal-chip {
@@ -7436,6 +7448,8 @@ body {
   background:
     radial-gradient(circle at 50% 50%, rgba(19, 45, 56, 0.36), transparent 38%),
     linear-gradient(180deg, #020508, #05090c);
+  --ledger-geoscape-edge-gap: clamp(1rem, 2vw, 1.45rem);
+  --ledger-geoscape-panel-width: min(380px, calc(100% - (var(--ledger-geoscape-edge-gap) * 2)));
 }
 
 .ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__panel {
@@ -7463,7 +7477,13 @@ body {
 }
 
 .ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__overlay {
-  max-width: min(52ch, calc(100% - 2rem));
+  max-width: min(46ch, calc(100% - var(--ledger-geoscape-panel-width) - (var(--ledger-geoscape-edge-gap) * 2) - 1.25rem));
+}
+
+.ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__signal-rail {
+  left: var(--ledger-geoscape-edge-gap);
+  bottom: var(--ledger-geoscape-edge-gap);
+  max-width: min(17rem, calc(100% - var(--ledger-geoscape-panel-width) - (var(--ledger-geoscape-edge-gap) * 2) - 1rem));
 }
 
 .ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__fallback-list {
@@ -7707,6 +7727,14 @@ body {
     width: auto;
     margin-top: 0;
     border-radius: 0;
+  }
+
+  .ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__overlay {
+    max-width: min(38ch, calc(100% - 2rem));
+  }
+
+  .ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__signal-rail {
+    max-width: min(14rem, calc(100% - 2rem));
   }
 
   .ledger-flagship[data-ledger-redesign="command-deck"] .ledger-flagship__nav,

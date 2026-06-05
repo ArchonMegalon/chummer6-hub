@@ -492,7 +492,7 @@ public sealed class DownloadsCompatibilityController : ControllerBase
     {
         string encodedArtifactId = Uri.EscapeDataString(artifact.Id);
         string nextPath = $"/downloads/install/{encodedArtifactId}";
-        return $"/auth/google/start?next={Uri.EscapeDataString(nextPath)}";
+        return $"/login?next={Uri.EscapeDataString(nextPath)}";
     }
 
     private (PublicReleaseManifestDto Manifest, PublicReleaseArtifactDto? Artifact) ResolveManifestArtifact(string artifactId)

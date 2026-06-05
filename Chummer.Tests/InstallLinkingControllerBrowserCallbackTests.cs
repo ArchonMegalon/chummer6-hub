@@ -42,7 +42,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             cancellationToken: CancellationToken.None);
 
         RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Faccount%2Faccess%2Finstall-link%3FinstallationId%3Dins-unauth", redirect.Url, StringComparison.Ordinal);
     }
 

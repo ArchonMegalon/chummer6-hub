@@ -160,7 +160,7 @@ platforms:
     }
 
     [Fact]
-    public void BuildPublicAccessPostureTreatsPublicStableMacRouteAsGuestReadable()
+    public void BuildPublicAccessPosturePreservesAccountRequiredArtifactsOnPublicStable()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -173,6 +173,7 @@ platforms:
         var manifest = new PublicReleaseManifestDto(
             Version: "run-20260422-101500",
             Channel: "public_stable",
+            Status: "published",
             RolloutState: "public_stable",
             PublishedAt: DateTimeOffset.Parse("2026-04-22T10:15:00Z"),
             Downloads:
@@ -206,15 +207,12 @@ platforms:
         var experience = service.BuildExperience(manifest, userAgent: "Mozilla/5.0 (Macintosh; Apple Silicon Mac OS X 14_4)", authenticated: false);
         var posture = service.BuildPublicAccessPosture(manifest, experience);
 
-        Assert.True(posture.GuestInstallAvailable);
-        Assert.False(posture.AccountRequiredInstallAvailable);
         Assert.Equal("Public release", experience.Display.ChannelLabel);
-        Assert.Contains("public download", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("account-backed install path", posture.DownloadFaqAnswer, StringComparison.OrdinalIgnoreCase);
         var macDownload = Assert.Single(manifest.Downloads, item => item.Id == "avalonia-osx-arm64-installer");
         var macOption = service.BuildOption(manifest, macDownload, authenticated: false, recommended: false);
-        Assert.Equal("open_public", macOption.InstallAccessClass);
-        Assert.Contains("/downloads/install/avalonia-osx-arm64-installer", macOption.DispatchHref, StringComparison.Ordinal);
+        Assert.Equal("account_required", macOption.InstallAccessClass);
+        Assert.StartsWith("/signup?next=", macOption.DispatchHref, StringComparison.Ordinal);
+        Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", macOption.DispatchHref, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -705,8 +703,8 @@ platforms:
         Assert.Equal("macOS (Apple Silicon)", recommended.PlatformLabel);
         Assert.StartsWith("/signup?next=", recommended.DispatchHref, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", recommended.DispatchHref, StringComparison.Ordinal);
-        Assert.Equal("Continue with Google", experience.GuestGateSecondaryLabel);
-        Assert.Equal("/auth/google/start?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", experience.GuestGateSecondaryHref);
+        Assert.Equal("Already have an account? Sign in", experience.GuestGateSecondaryLabel);
+        Assert.Equal("/login?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer", experience.GuestGateSecondaryHref);
         Assert.Contains(experience.PlatformAvailability, item => item.PlatformId == "macos" && item.PubliclyAvailable);
     }
 

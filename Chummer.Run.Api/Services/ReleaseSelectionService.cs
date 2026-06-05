@@ -71,7 +71,6 @@ public sealed class ReleaseSelectionService
         var installSteps = recommendedRequiresAccount
             ? (experience.AccountRequiredInstallSteps?.Count > 0 ? experience.AccountRequiredInstallSteps : experience.InstallSteps) ?? new List<string>()
             : experience.InstallSteps ?? new List<string>();
-        var recommendedUsesMacBootstrap = recommended is not null && UsesMacBootstrapFlow(recommended);
         var guestDownloadAvailable = manifest.Downloads.Any(static artifact =>
             !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
         // macOS preview posture stays on one Terminal command instead of a raw DMG handoff.
@@ -80,13 +79,9 @@ public sealed class ReleaseSelectionService
             ? "/downloads"
             : BuildSignupDispatchHref(recommended);
         var guestGateSignInHref = recommended is null
-            ? "/auth/google/start?next=%2Fdownloads"
-            : recommendedUsesMacBootstrap && !authenticated
-                ? BuildGoogleDispatchHref(recommended)
-                : BuildLoginDispatchHref(recommended);
-        var guestGateSecondaryLabel = recommendedUsesMacBootstrap && !authenticated
-            ? "Continue with Google"
-            : experience.GuestGateSecondaryLabel;
+            ? "/login?next=%2Fdownloads"
+            : BuildLoginDispatchHref(recommended);
+        var guestGateSecondaryLabel = experience.GuestGateSecondaryLabel;
 
         return new ReleaseExperienceViewModel(
             Display: BuildDisplay(manifest, experience),
@@ -359,10 +354,10 @@ public sealed class ReleaseSelectionService
         => $"/signup?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
 
     private static string BuildLoginDispatchHref(PublicReleaseArtifactDto artifact)
-        => $"/auth/google/start?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
+        => $"/login?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
 
     private static string BuildGoogleDispatchHref(PublicReleaseArtifactDto artifact)
-        => $"/auth/google/start?next={Uri.EscapeDataString(BuildSignedInDispatchTarget(artifact))}";
+        => BuildLoginDispatchHref(artifact);
 
     private static string BuildSignedInDispatchTarget(PublicReleaseArtifactDto artifact)
         => $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}";
@@ -373,11 +368,6 @@ public sealed class ReleaseSelectionService
         string? rawAccessClass,
         PublicReleaseExperienceDocument experience)
     {
-        if (string.Equals((rolloutState ?? string.Empty).Trim(), "public_stable", StringComparison.OrdinalIgnoreCase))
-        {
-            return InstallAccessClasses.OpenPublic;
-        }
-
         var guestReadableChannels = ResolveGuestReadableChannels(experience);
         var guestReadableChannel = guestReadableChannels.Contains(channel);
         var normalized = NormalizeInstallAccessClass(rawAccessClass);

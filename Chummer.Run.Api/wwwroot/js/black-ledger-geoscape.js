@@ -255,7 +255,7 @@ class BlackLedgerGeoscapeRoot {
     }
     this.root.innerHTML = `
       <div class="black-ledger-geoscape__shell black-ledger-geoscape__shell--${this.variant}">
-        <div class="black-ledger-geoscape__stage">
+        <div class="black-ledger-geoscape__stage" data-geoscape-stage>
           <div class="black-ledger-geoscape__stage-skin" aria-hidden="true"></div>
           <video class="black-ledger-geoscape__video-plate" aria-hidden="true" muted playsinline loop preload="${this.disableAmbientVideo ? 'none' : 'metadata'}" poster="${this.videoPosterUrl}">
             <source src="${this.videoWebmUrl}" type="video/webm">
@@ -263,12 +263,12 @@ class BlackLedgerGeoscapeRoot {
           </video>
           <canvas class="black-ledger-geoscape__webgl" aria-hidden="true"></canvas>
           <canvas class="black-ledger-geoscape__canvas" role="img" aria-label="Black Ledger command globe"></canvas>
-          <div class="black-ledger-geoscape__signal-rail" aria-hidden="true">
+          <div class="black-ledger-geoscape__signal-rail" data-geoscape-signal-rail aria-hidden="true">
             <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--primary">${this.primarySignalLabel}</span>
             <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--secondary">${this.secondarySignalLabel}</span>
             <span class="black-ledger-geoscape__signal-chip black-ledger-geoscape__signal-chip--tertiary">${this.tertiarySignalLabel}</span>
           </div>
-          <div class="black-ledger-geoscape__overlay">
+          <div class="black-ledger-geoscape__overlay" data-geoscape-overlay>
             <div class="black-ledger-geoscape__eyebrow">${this.overlayEyebrow}</div>
             <div class="black-ledger-geoscape__headline">${this.overlayHeadline}</div>
             <div class="black-ledger-geoscape__status"></div>
@@ -279,7 +279,7 @@ class BlackLedgerGeoscapeRoot {
             <p class="black-ledger-geoscape__tooltip-body">Preparing faction posture.</p>
           </div>
         </div>
-        <aside class="black-ledger-geoscape__panel" aria-live="polite">
+        <aside class="black-ledger-geoscape__panel" data-geoscape-panel aria-live="polite">
           <span class="tag black-ledger-geoscape__panel-tag">Faction pressure</span>
           <h3 class="black-ledger-geoscape__panel-title">Loading geoscape…</h3>
           <p class="black-ledger-geoscape__panel-summary">Pulling the public-safe world state.</p>
@@ -287,13 +287,13 @@ class BlackLedgerGeoscapeRoot {
           <div class="black-ledger-geoscape__panel-actions"></div>
         </aside>
       </div>
-      <div class="black-ledger-geoscape__controls">
+      <div class="black-ledger-geoscape__controls" data-geoscape-controls>
         <div class="black-ledger-geoscape__modes" role="tablist" aria-label="Geoscape modes"></div>
         <div class="black-ledger-geoscape__playback">
           <button type="button" class="black-ledger-geoscape__replay button-like button-like--secondary">Replay pressure</button>
         </div>
       </div>
-      <div class="black-ledger-geoscape__fallback-list" aria-label="Accessible geoscape list"></div>
+      <div class="black-ledger-geoscape__fallback-list" data-geoscape-fallback-list aria-label="Accessible geoscape list"></div>
     `;
 
     this.videoPlate = this.root.querySelector('.black-ledger-geoscape__video-plate');

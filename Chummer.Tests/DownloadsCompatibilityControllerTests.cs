@@ -176,7 +176,7 @@ public sealed class DownloadsCompatibilityControllerTests
         IActionResult result = await fixture.Controller.DownloadResolvedArtifactFile("avalonia-osx-x64-installer", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 
@@ -192,7 +192,7 @@ public sealed class DownloadsCompatibilityControllerTests
         IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-win-x64-installer.exe", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 
@@ -208,7 +208,7 @@ public sealed class DownloadsCompatibilityControllerTests
         IActionResult result = await fixture.Controller.DownloadFile("chummer-avalonia-osx-x64-installer.dmg", CancellationToken.None);
 
         var redirect = Assert.IsType<RedirectResult>(result);
-        Assert.StartsWith("/auth/google/start?next=", redirect.Url, StringComparison.Ordinal);
+        Assert.StartsWith("/login?next=", redirect.Url, StringComparison.Ordinal);
         Assert.Contains("%2Fdownloads%2Finstall%2Favalonia-osx-x64-installer", redirect.Url, StringComparison.Ordinal);
     }
 

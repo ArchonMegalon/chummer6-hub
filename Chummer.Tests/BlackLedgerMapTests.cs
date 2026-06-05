@@ -99,6 +99,12 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("Black Ledger should read like a live command desk", view, StringComparison.Ordinal);
         Assert.Contains(".ledger-flagship__briefing", css, StringComparison.Ordinal);
         Assert.Contains(".ledger-flagship__briefing-card", css, StringComparison.Ordinal);
+        Assert.Contains("data-geoscape-stage", script, StringComparison.Ordinal);
+        Assert.Contains("data-geoscape-overlay", script, StringComparison.Ordinal);
+        Assert.Contains("data-geoscape-signal-rail", script, StringComparison.Ordinal);
+        Assert.Contains("data-geoscape-panel", script, StringComparison.Ordinal);
+        Assert.Contains("--ledger-geoscape-panel-width", css, StringComparison.Ordinal);
+        Assert.Contains(".ledger-flagship__geoscape-wrap > .ledger-flagship__geoscape.black-ledger-geoscape .black-ledger-geoscape__signal-rail", css, StringComparison.Ordinal);
         Assert.Contains("this.overlayEyebrow = root.dataset.overlayEyebrow", script, StringComparison.Ordinal);
         Assert.Contains("this.primarySignalLabel = root.dataset.signalPrimary", script, StringComparison.Ordinal);
     }

@@ -48,6 +48,23 @@ public sealed class PublicLandingDownloadDispatchTests
     }
 
     [Fact]
+    public async Task UnauthenticatedDownloadDispatchPageRedirectsToWebsiteLogin()
+    {
+        using Fixture fixture = new(authenticated: false);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Scheme = "https";
+        fixture.Controller.ControllerContext.HttpContext.Request.Host = new HostString("chummer.run");
+
+        IActionResult result = await fixture.Controller.DownloadDispatchPage("avalonia-win-x64-installer", CancellationToken.None);
+
+        var redirect = Assert.IsType<RedirectResult>(result);
+        Assert.Equal("/login?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer", redirect.Url);
+    }
+
+    [Fact]
     public async Task BootstrapScriptAcceptsInstallTicketWithoutBrowserSession()
     {
         using Fixture fixture = new();
