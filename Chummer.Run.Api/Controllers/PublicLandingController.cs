@@ -2673,7 +2673,7 @@ public sealed class PublicLandingController : Controller
         }
 
         ApplyNoStoreHeaders(Response.Headers);
-        var model = await BuildBlackLedgerPageModel($"/ledger/newsroom/{episodeId}", "map", requestedTurn, cancellationToken);
+        var model = await BuildBlackLedgerPageModel($"/ledger/newsroom/{episodeId}", "newsroom", requestedTurn, cancellationToken);
         return View("~/Views/PublicLanding/Ledger.cshtml", model);
     }
 
@@ -12092,6 +12092,10 @@ echo "Help: ${HELP_URL}"
         {
             intro = "This Anarchy lens reads the same Black Ledger dispatches through a rules-light play profile. It does not invent a separate city or flatten Anarchy into an SR5/SR6 toggle.";
         }
+        else if (string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase))
+        {
+            intro = "Public newsroom view for Emerald Sprawl. Bulletin playback, transcript, and bounded receipts stay distinct from the command map while still pointing back to the same public-safe world state.";
+        }
         else if (mapFocused)
         {
             intro = "Focused command-map view for Emerald Sprawl. District pressure, event arcs, and replay controls stay visibly distinct from the broader ledger overview.";
@@ -12113,9 +12117,17 @@ echo "Help: ${HELP_URL}"
                 "Fictional campaign pressure, package heat, and closeout movement.",
                 currentPath,
                 cancellationToken),
-            Eyebrow: mapFocused ? "Black Ledger command map" : selectedFaction is null ? "Black Ledger command deck" : "Black Ledger faction file",
+            Eyebrow: string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase)
+                ? "Black Ledger newsroom"
+                : mapFocused
+                ? "Black Ledger command map"
+                : selectedFaction is null
+                ? "Black Ledger command deck"
+                : "Black Ledger faction file",
             Heading: selectedFaction is not null
                 ? $"{selectedFaction.PublicName} faction file"
+                : string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase)
+                ? worldTurnBriefing?.Broadcast?.PackageLabel ?? $"{world?.PublicName ?? "Emerald Sprawl: First Pressure"} newsroom"
                 : mapFocused
                 ? $"{world?.PublicName ?? "Emerald Sprawl: First Pressure"} command map"
                 : world?.PublicName ?? "Emerald Sprawl: First Pressure",
@@ -12132,7 +12144,9 @@ echo "Help: ${HELP_URL}"
             WorldTurnBriefing: worldTurnBriefing,
             SelectedFactionPromo: selectedFaction is null ? null : _blackLedgerFactions.GetPromoArtifact(selectedFaction.Id),
             CommandMap: commandMap,
-            PrimaryAction: mapFocused
+            PrimaryAction: string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase)
+                ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
+                : mapFocused
                 ? new TrustPageActionViewModel("Back to ledger overview", "/ledger", "secondary")
                 : new TrustPageActionViewModel("Open command map", "/ledger/map#ledger-map", "primary"),
             SecondaryAction: new TrustPageActionViewModel("Read dispatches", "/ledger/dispatches", "secondary"),
