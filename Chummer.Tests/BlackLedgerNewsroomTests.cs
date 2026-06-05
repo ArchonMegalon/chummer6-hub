@@ -39,5 +39,10 @@ public sealed class BlackLedgerNewsroomTests
         Assert.Contains("Some footage is reconstructed from public-safe receipts.", briefingService, StringComparison.Ordinal);
         Assert.Contains("? $\"Black Ledger newsroom · {worldTurnBriefing?.Broadcast?.PackageLabel", controller, StringComparison.Ordinal);
         Assert.Contains("Turn {newsTurn} anchor package", controller, StringComparison.Ordinal);
+        Assert.Contains("? $\"Black Ledger dispatches · {worldTitle}\"", controller, StringComparison.Ordinal);
+        Assert.Contains("? $\"Black Ledger packages · {worldTitle}\"", controller, StringComparison.Ordinal);
+        Assert.Contains("? $\"Black Ledger closeouts · {worldTitle}\"", controller, StringComparison.Ordinal);
+        Assert.Contains("? $\"Black Ledger world stats · {worldTitle}\"", controller, StringComparison.Ordinal);
+        Assert.Contains("? $\"Black Ledger factions · {worldTitle}\"", controller, StringComparison.Ordinal);
     }
 }

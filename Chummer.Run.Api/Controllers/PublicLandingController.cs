@@ -12110,6 +12110,27 @@ echo "Help: ${HELP_URL}"
             turnHref: $"/ledger/turns/{newsTurn}",
             dispatchHref: string.IsNullOrWhiteSpace(selectedFactionId) ? $"/ledger/turns/{newsTurn}/dispatches" : $"/ledger/factions/{selectedFactionId}/dispatches");
         BlackLedgerWorldTurnBriefingViewModel? worldTurnBriefing = _blackLedgerBriefings.BuildWorldTurnBriefing(newsTurn);
+        string worldTitle = world?.PublicName ?? "Emerald Sprawl: First Pressure";
+        string sectionEyebrow =
+            string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase) ? "Black Ledger newsroom"
+            : mapFocused ? "Black Ledger command map"
+            : string.Equals(currentSection, "dispatches", StringComparison.OrdinalIgnoreCase) ? "Black Ledger dispatch lane"
+            : string.Equals(currentSection, "packages", StringComparison.OrdinalIgnoreCase) ? "Black Ledger package rail"
+            : string.Equals(currentSection, "closeouts", StringComparison.OrdinalIgnoreCase) ? "Black Ledger closeout board"
+            : string.Equals(currentSection, "stats", StringComparison.OrdinalIgnoreCase) ? "Black Ledger world stats"
+            : string.Equals(currentSection, "factions", StringComparison.OrdinalIgnoreCase) && selectedFaction is null ? "Black Ledger faction files"
+            : selectedFaction is null ? "Black Ledger command deck"
+            : "Black Ledger faction file";
+        string sectionHeading =
+            selectedFaction is not null ? $"{selectedFaction.PublicName} faction file"
+            : string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger newsroom · {worldTurnBriefing?.Broadcast?.PackageLabel ?? $"Turn {newsTurn} anchor package"}"
+            : mapFocused ? $"{worldTitle} command map"
+            : string.Equals(currentSection, "dispatches", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger dispatches · {worldTitle}"
+            : string.Equals(currentSection, "packages", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger packages · {worldTitle}"
+            : string.Equals(currentSection, "closeouts", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger closeouts · {worldTitle}"
+            : string.Equals(currentSection, "stats", StringComparison.OrdinalIgnoreCase) ? $"Black Ledger world stats · {worldTitle}"
+            : string.Equals(currentSection, "factions", StringComparison.OrdinalIgnoreCase) && selectedFaction is null ? $"Black Ledger factions · {worldTitle}"
+            : worldTitle;
 
         return new BlackLedgerHubPageViewModel(
             Chrome: await BuildPublicOrAuthenticatedChromeAsync(
@@ -12117,20 +12138,8 @@ echo "Help: ${HELP_URL}"
                 "Fictional campaign pressure, package heat, and closeout movement.",
                 currentPath,
                 cancellationToken),
-            Eyebrow: string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase)
-                ? "Black Ledger newsroom"
-                : mapFocused
-                ? "Black Ledger command map"
-                : selectedFaction is null
-                ? "Black Ledger command deck"
-                : "Black Ledger faction file",
-            Heading: selectedFaction is not null
-                ? $"{selectedFaction.PublicName} faction file"
-                : string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase)
-                ? $"Black Ledger newsroom · {worldTurnBriefing?.Broadcast?.PackageLabel ?? $"Turn {newsTurn} anchor package"}"
-                : mapFocused
-                ? $"{world?.PublicName ?? "Emerald Sprawl: First Pressure"} command map"
-                : world?.PublicName ?? "Emerald Sprawl: First Pressure",
+            Eyebrow: sectionEyebrow,
+            Heading: sectionHeading,
             Intro: intro,
             CurrentSection: currentSection,
             World: world,
