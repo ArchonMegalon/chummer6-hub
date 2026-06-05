@@ -3770,6 +3770,8 @@ public sealed class VerificationEntryPointTests
         Assert.Contains("Chummer.Run.Api/Chummer.Run.Api.csproj", workflow, StringComparison.Ordinal);
         Assert.Contains("Chummer.Run.Api/Dockerfile", compose, StringComparison.Ordinal);
         Assert.Contains("chummer.run:host-gateway", compose, StringComparison.Ordinal);
+        Assert.Contains("/docker/chummercomplete/chummer-hub-registry/.codex-studio/published:/downloads-source:ro", compose, StringComparison.Ordinal);
+        Assert.DoesNotContain("/docker/chummercomplete/chummer.run-services/Chummer.Portal/downloads:/downloads-source", compose, StringComparison.Ordinal);
         Assert.Contains("PublicLandingController.cs", runbook, StringComparison.Ordinal);
         Assert.DoesNotContain("chummer-blazor", migrationLoop, StringComparison.Ordinal);
         Assert.Contains("docker-compose.public-edge.yml", migrationLoop, StringComparison.Ordinal);

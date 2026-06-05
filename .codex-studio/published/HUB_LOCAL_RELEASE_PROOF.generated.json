@@ -878,7 +878,7 @@
       "exit_criterion": "Keep route, support, and publication surfaces from claiming parity for these routes unless the direct proof receipts are current."
     }
   },
-  "base_url": "https://chummer.run",
+  "base_url": "http://127.0.0.1:8091",
   "compose_file": "docker-compose.yml",
   "playwright_timeout_seconds": 120,
   "edge_rebuild_skipped": true,
@@ -1635,6 +1635,6 @@
       ]
     }
   ],
-  "generated_at": "2026-06-02T17:14:57Z",
-  "generatedAt": "2026-06-02T17:14:57Z"
+  "generated_at": "2026-06-05T04:10:25Z",
+  "generatedAt": "2026-06-05T04:10:25Z"
 }
