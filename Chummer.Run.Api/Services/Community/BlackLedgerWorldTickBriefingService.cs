@@ -303,7 +303,7 @@ public sealed class BlackLedgerWorldTickBriefingService
         ];
 
         return new BlackLedgerNewsreelBroadcastViewModel(
-            PackageLabel: "First-party anchor package",
+            PackageLabel: $"Turn {tick.Turn} anchor package",
             AnchorName: "Mara Quill",
             DeskLabel: "Black Ledger Network",
             ProviderStatus: "FIRST_PARTY_NEWSREEL",

@@ -12127,7 +12127,7 @@ echo "Help: ${HELP_URL}"
             Heading: selectedFaction is not null
                 ? $"{selectedFaction.PublicName} faction file"
                 : string.Equals(currentSection, "newsroom", StringComparison.OrdinalIgnoreCase)
-                ? worldTurnBriefing?.Broadcast?.PackageLabel ?? $"{world?.PublicName ?? "Emerald Sprawl: First Pressure"} newsroom"
+                ? $"Black Ledger newsroom · {worldTurnBriefing?.Broadcast?.PackageLabel ?? $"Turn {newsTurn} anchor package"}"
                 : mapFocused
                 ? $"{world?.PublicName ?? "Emerald Sprawl: First Pressure"} command map"
                 : world?.PublicName ?? "Emerald Sprawl: First Pressure",
