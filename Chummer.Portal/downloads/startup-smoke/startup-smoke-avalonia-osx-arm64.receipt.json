@@ -22,7 +22,7 @@
   "recordedAtUtc": "2026-06-03T00:42:06Z",
   "startedAtUtc": "2026-06-03T00:42:06Z",
   "completedAtUtc": "2026-06-03T00:42:06Z",
-  "artifactPath": "/docker/chummercomplete/chummer6-ui/Chummer.Portal/downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
+  "artifactPath": "/docker/chummercomplete/chummer-presentation/Docker/Downloads/files/chummer-avalonia-osx-arm64-installer.dmg",
   "artifactFileName": "chummer-avalonia-osx-arm64-installer.dmg",
   "fileName": "chummer-avalonia-osx-arm64-installer.dmg",
   "artifactRelativePath": "files/chummer-avalonia-osx-arm64-installer.dmg",
