@@ -2216,28 +2216,28 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> FoundryHandoffPage(CancellationToken cancellationToken)
     {
         var model = await BuildHorizonPreviewPageModel(
-            pageId: "foundry-handoff",
-            title: "Foundry handoff",
-            description: "Governed Foundry export remains intentionally parked until packet truth and map metadata transport can be proven together.",
+            pageId: "foundry-export-boundary",
+            title: "Foundry export boundary",
+            description: "Foundry-facing export remains a bounded interoperability surface, not a separate flagship horizon claim.",
             currentPath: "/exports/foundry",
-            eyebrow: "Honestly parked",
-            heading: "Foundry handoff",
-            intro: "Foundry handoff is intentionally parked. Chummer does not currently claim a shipped public Foundry packet lane, and this route exists to make that boundary explicit instead of vague.",
+            eyebrow: "Boundary surface",
+            heading: "Foundry export boundary",
+            intro: "This route exists to make the interoperability boundary explicit. It documents what Chummer can hand off toward Foundry-style targets without pretending that a separate parked horizon still governs the public product story.",
             summaryPoints:
             [
-                "Honestly parked",
-                "No public Foundry packet claim",
-                "Map authority not exported"
+                "Interop boundary",
+                "No separate public Foundry horizon claim",
+                "Export truth stays first-party"
             ],
             sections:
             [
-                new TrustPageSectionViewModel("foundry-boundary", "Boundary", "Do not overclaim the export lane", "Foundry handoff stays parked until first-party export truth, map metadata transport, and moderation-safe publication posture can be proven together.", ["Parked on purpose", "No fake public export", "No third-party truth owner"]),
-                new TrustPageSectionViewModel("foundry-next", "Next real step", "Proof before promotion", "The next honest promotion step is a governed handoff packet with first-party receipts, not roadmap prose alone.", ["Governed packet", "Receipt proof", "Future promotion gate"])
+                new TrustPageSectionViewModel("foundry-boundary", "Boundary", "Do not overclaim the export lane", "Foundry-facing export is an interoperability boundary. Packet truth, moderation posture, and active campaign authority stay first-party even when an external VTT target exists.", ["Interop only", "First-party proof chain", "No third-party truth owner"]),
+                new TrustPageSectionViewModel("foundry-next", "Current posture", "Use the live shipped lanes", "The shipped product story now lives on the active native and public horizons. This route remains as a boundary explainer for export targets, not as a parked roadmap promise.", ["Shipped horizons elsewhere", "Boundary stays explicit", "No stale parked claim"])
             ],
             actions:
             [
                 new TrustPageActionViewModel("Open runsites", "/runsites", "primary"),
-                new TrustPageActionViewModel("Open roadmap", "/roadmap/foundry-vtt-handoff", "secondary")
+                new TrustPageActionViewModel("Open run control", "/run-control", "secondary")
             ],
             cancellationToken: cancellationToken);
         return View("~/Views/PublicLanding/TrustPage.cshtml", model);
@@ -8640,7 +8640,7 @@ Boundary:
         return
         [
             new("Live", BuildLiveLaunchSummary(manifest)),
-            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience)),
+            new("Release", BuildPreviewLaunchSummary(manifest, releaseExperience)),
             new("Fallback", BuildFallbackLaunchSummary(manifest)),
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),

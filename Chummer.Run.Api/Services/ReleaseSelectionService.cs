@@ -967,8 +967,8 @@ public sealed class ReleaseSelectionService
 
         return NormalizePlatformId(platform.Id) switch
         {
-            "macos" => "The Mac setup-script preview is outside the current public shelf. Use downloads for the promoted desktop package and support help for guided Mac setup.",
-            "windows" => "The Windows preview lane is outside the current public shelf. Use downloads for the promoted desktop package and support help for Windows setup.",
+            "macos" => "The Mac setup lane is outside the current promoted public shelf. Use downloads for the promoted desktop package and support help for guided Mac setup.",
+            "windows" => "The Windows lane is outside the current promoted public shelf. Use downloads for the promoted desktop package and support help for Windows setup.",
             "linux" => "The Linux package lane is outside the current public shelf. Use downloads for the promoted desktop package and support help for Linux setup.",
             _ => $"The current public shelf does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform."
         };
@@ -986,7 +986,7 @@ public sealed class ReleaseSelectionService
             "setup_script" => "setup script",
             "installer" => "installer",
             "portable_exe" => "portable EXE",
-            "archive" => "archive package",
+            "archive" => "fallback package",
             "none" => "no public fallback",
             _ => string.IsNullOrWhiteSpace(packageKind) ? "package not specified" : packageKind.Replace('_', ' ')
         };
@@ -996,9 +996,11 @@ public sealed class ReleaseSelectionService
         {
             "primary" => "primary",
             "secondary" => "secondary",
-            "account_gated_setup_script_preview" => "account-gated setup-script preview",
+            "account_gated_setup_script_preview" => "account-gated setup continuity",
             "account_gated_setup_script_release" => "account-gated setup-script release",
-            "signed_notarized_preview" => "signed and notarized preview",
+            "signed_notarized_preview" => "signed and notarized track",
+            "public_archive_preview" => "fallback package track",
+            "signed_notarized_release" => "signed and notarized release",
             _ => string.IsNullOrWhiteSpace(platform?.Supportability) ? "not specified" : platform!.Supportability.Replace('_', ' ')
         };
 

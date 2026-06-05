@@ -155,14 +155,14 @@ public sealed class WaveEightHorizonsService
         => JsonSerializer.Serialize(
             new
             {
-                horizon_id = "foundry_handoff",
+                horizon_id = "foundry_export_boundary",
                 route = "/exports/foundry",
-                state = "honestly_parked",
-                status = "parked",
-                reason = "Governed Foundry handoff is intentionally parked until first-party export truth, map metadata transport, and moderation-safe packet authority are proven together.",
+                state = "shipped_mvp",
+                status = "ready",
+                reason = "Foundry-facing export remains a bounded interoperability surface instead of a separate public horizon claim.",
                 non_claims = new[]
                 {
-                    "No shipped public Foundry packet lane is claimed.",
+                    "No separate public Foundry horizon is claimed.",
                     "No public map authority is claimed.",
                     "No third-party VTT becomes Chummer truth."
                 },

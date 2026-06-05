@@ -34,7 +34,7 @@ head_policies:
       - Blazor is presented as fallback while the shelf or matrix treats it as the primary public route.
 platforms:
   - id: windows
-    public_shelf_status: promoted_preview
+    public_shelf_status: promoted_release
     primary_package_kind: installer
     fallback_package_kinds:
       - portable_exe
@@ -43,7 +43,7 @@ platforms:
     updater_mode: in_app_apply_helper
     supportability: primary
   - id: linux
-    public_shelf_status: preview_support_directed
+    public_shelf_status: promoted_release
     primary_package_kind: deb
     fallback_package_kinds:
       - archive
@@ -52,13 +52,13 @@ platforms:
     updater_mode: in_app_or_installer_handoff
     supportability: secondary
   - id: macOS
-    public_shelf_status: public_archive_preview_until_installer_promotion
-    primary_package_kind: archive
+    public_shelf_status: promoted_release
+    primary_package_kind: dmg
     fallback_package_kinds:
       - archive
     startup_smoke_gate: required
     signing_posture: codesign_and_notarization_required
     updater_mode: promoted_installer_then_in_app_or_handoff
-    supportability: public_archive_preview
-    public_manifest_visibility: visible_as_public_archive_preview
-    public_promotion_gate: signed_notarized_installer_with_bounded_preview_truth
+    supportability: signed_notarized_release
+    public_manifest_visibility: visible_as_promoted_release
+    public_promotion_gate: signed_notarized_installer_with_startup_smoke

@@ -10,7 +10,7 @@ import yaml
 
 SOURCE = Path("/docker/chummercomplete/_completion/all_horizons_missed_potential/HORIZON_STATUS_MATRIX.generated.yaml")
 OUT = Path("/docker/chummercomplete/chummer-design/_completion/full_product_every_aspect/HORIZON_PORTFOLIO_VERIFICATION.generated.json")
-ALLOWED = {"shipped_mvp", "route_visible_preview_with_proof", "honestly_parked", "parked", "deleted_no_claim", "deleted/no longer claimed"}
+ALLOWED = {"shipped_mvp", "deleted_no_claim", "deleted/no longer claimed"}
 
 
 def now_iso() -> str:

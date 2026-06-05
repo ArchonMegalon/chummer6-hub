@@ -54,10 +54,10 @@ public sealed class PublicLandingServiceTests
         var blackLedger = Assert.Single(surface.FeatureCards, static card =>
             string.Equals(card.Id, "horizon_black_ledger", StringComparison.Ordinal));
 
-        Assert.Equal("/roadmap/community-hub", communityHub.DetailRoute);
-        Assert.Equal("/roadmap/black-ledger", communityHub.DetailPrimaryHref);
-        Assert.Equal("/roadmap/black-ledger", blackLedger.DetailRoute);
-        Assert.Equal("/artifacts/replay-after-action", blackLedger.DetailPrimaryHref);
+        Assert.Equal("/community", communityHub.DetailRoute);
+        Assert.Equal("/community/receipts/open-run-network.json", communityHub.DetailPrimaryHref);
+        Assert.Equal("/ledger", blackLedger.DetailRoute);
+        Assert.Equal("/ledger/factions", blackLedger.DetailPrimaryHref);
     }
 
     [Fact]

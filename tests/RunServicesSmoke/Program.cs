@@ -5389,7 +5389,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(statusModel?.LaunchHealthRows?.Select(static row => row.Label).SequenceEqual(new[]
     {
         "Live",
-        "Preview",
+        "Release",
         "Fallback",
         "Revoked",
         "Fixed",
@@ -5398,7 +5398,7 @@ async Task VerifyPublicLandingProjectionAsync()
         "Support pulse",
         "Adoption health",
     }) == true, "status page should preserve the full public launch-health row order.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Preview", StringComparison.Ordinal) && row.Value.Contains("published", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface the current preview posture in launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Release", StringComparison.Ordinal) && row.Value.Contains("published", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface the current release posture in launch-health rows.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Revoked", StringComparison.Ordinal) && row.Value.Contains("revoke", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface revoke posture in launch-health rows.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Fixed", StringComparison.Ordinal) && row.Value.Contains("fix", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface fixed-release follow-through in launch-health rows.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Blocked", StringComparison.Ordinal) && row.Value.Contains("blocked", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface blocked route or journey posture in launch-health rows.");
