@@ -123,6 +123,42 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: proof shelf honesty only
+- path: /docs
+  title: Document Portal
+  audience: public
+  purpose: document_portal
+  requires_auth: false
+  guest_fallback: /docs
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: governed document portal only
+- path: /docs/chummer6-quickstart
+  title: Chummer6 Quickstart Guide
+  audience: public
+  purpose: document_detail
+  requires_auth: false
+  guest_fallback: /docs/chummer6-quickstart
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first safe document route only
+- path: /docs/embed/{slug}
+  title: Document embed boundary
+  audience: public
+  purpose: document_embed_boundary
+  requires_auth: false
+  guest_fallback: /docs
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: explicit viewer boundary only
+- path: /docs/category/{category}
+  title: Document category
+  audience: public
+  purpose: document_category
+  requires_auth: false
+  guest_fallback: /docs
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: governed document category only
 - path: /help
   title: Help
   audience: public

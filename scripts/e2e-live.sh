@@ -100,7 +100,7 @@ if ! printf '%s' "$openapi_json" | grep -q '"openapi"'; then
   echo "OpenAPI document is missing expected marker" >&2
   exit 1
 fi
-docs_html="$(check_get "/docs/")"
+docs_html="$(check_get "/openapi/")"
 if ! printf '%s' "$docs_html" | grep -qi 'Self-hosted OpenAPI explorer'; then
   echo "Docs UI did not return expected self-hosted docs content" >&2
   exit 1

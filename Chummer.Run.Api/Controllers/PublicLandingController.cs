@@ -1501,7 +1501,7 @@ public sealed class PublicLandingController : Controller
     [HttpGet("/alice")]
     [Produces("text/html")]
     public async Task<IActionResult> AlicePage(CancellationToken cancellationToken)
-        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken, currentPath: "/alice", title: "ALICE", eyebrow: "Shipped compare bench", heading: "ALICE keeps compare, tradeoffs, and apply truth on first-party rails.", intro: "ALICE is now the named public entry for Chummer's Build Ghost compare bench. Public-safe intake and explanation stay bounded, while compare, legality explanation, receipts, discard, and apply remain first-party runtime work." ));
+        => View("~/Views/PublicLanding/BuildGhostConcierge.cshtml", await BuildBuildGhostConciergePageModel(cancellationToken, currentPath: "/alice", title: "ALICE", eyebrow: "Shipped compare bench", heading: "ALICE", intro: "ALICE is now the named public entry for Chummer's Build Ghost compare bench. Public-safe intake and explanation stay bounded, while compare, tradeoffs, legality explanation, receipts, discard, and apply remain first-party runtime work." ));
 
     [HttpGet("/participate/build-ghosts.json")]
     [Produces("application/json")]
@@ -1540,6 +1540,47 @@ public sealed class PublicLandingController : Controller
                 Summary = "Signed-in ALICE opens the first-party build handoff bench, where compare follow-through, planner coverage, tradeoffs, and apply-safe outputs stay on account-owned rails."
             }
         });
+    }
+
+    [HttpGet("/docs")]
+    [Produces("text/html")]
+    public async Task<IActionResult> DocumentPortalPage(CancellationToken cancellationToken)
+        => View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalHomePageModel(cancellationToken));
+
+    [HttpGet("/docs/category/{category}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> DocumentPortalCategoryPage([FromRoute] string category, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(category?.Trim(), "quickstart", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalQuickstartCategoryPageModel(cancellationToken));
+    }
+
+    [HttpGet("/docs/embed/{slug}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> DocumentPortalEmbedPage([FromRoute] string slug, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(slug?.Trim(), "chummer6-quickstart", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalEmbedBoundaryPageModel(cancellationToken));
+    }
+
+    [HttpGet("/docs/{slug}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> DocumentPortalDetailPage([FromRoute] string slug, CancellationToken cancellationToken)
+    {
+        if (!string.Equals(slug?.Trim(), "chummer6-quickstart", StringComparison.OrdinalIgnoreCase))
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalQuickstartPageModel(cancellationToken));
     }
 
     [HttpGet("/ready")]
@@ -1632,7 +1673,7 @@ public sealed class PublicLandingController : Controller
             description: "Governed live heat and GM-private aftermath stay on separate first-party rails.",
             currentPath: "/table-pulse",
             eyebrow: "Shipped split rail",
-            heading: "TABLE PULSE separates live heat from private aftermath.",
+            heading: "TABLE PULSE",
             intro: "TABLE PULSE is now a real product surface, not just a redirect. Live pressure stays on the signed-in command lane. GM-private aftermath packages stay on a separate receipt-backed rail so heat, recap, and follow-through do not collapse into surveillance or vague drama text.",
             sections:
             [
@@ -4554,10 +4595,10 @@ public sealed class PublicLandingController : Controller
         IReadOnlyList<MediaArtifactDocument> briefings = _mediaHorizons.ListJackpointBriefings();
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/jackpoint",
-            title: "JACKPOINT briefings",
+            title: "JACKPOINT",
             description: "Player-safe dossier cards, mission briefs, and first-party publication follow-through.",
             eyebrow: "Publication horizon",
-            heading: "JACKPOINT briefings",
+            heading: "JACKPOINT",
             intro: "JACKPOINT now ships a real first-party briefing network: public-safe dossier and mission packets stay readable on the open rail, while signed-in publication review and campaign-return publication follow-through stay on named account routes.",
             boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers, draft publication notes, and private campaign return state stay signed-in.",
             summaryPoints: ["Dossier cards", "Mission brief packets", "Signed-in publication desk"],
@@ -4575,10 +4616,10 @@ public sealed class PublicLandingController : Controller
         IReadOnlyList<MediaArtifactDocument> packs = _mediaHorizons.ListRunsitePacks();
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/runsites",
-            title: "RUNSITE packets",
+            title: "RUNSITE",
             description: "Site cards, threat clocks, governed prep rails, and first-party runsite packets.",
             eyebrow: "Prep horizon",
-            heading: "RUNSITE packets",
+            heading: "RUNSITE",
             intro: "RUNSITE now ships as a real prep network: inspectable pack routes stay public-safe, while signed-in workspace prep, runboard continuity, and governed prep-library launch stay on named first-party rails.",
             boundaryLine: "Spatial-prep packet only. This rail does not claim tactical overlays, live map authority, or full VTT integration.",
             summaryPoints: ["Site cards", "Threat clocks", "Signed-in prep bench"],
@@ -4993,10 +5034,10 @@ public sealed class PublicLandingController : Controller
         GhostwirePublicSummary summary = _waveEightHorizons.BuildGhostwireSummary();
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/ghostwire",
-            title: "GHOSTWIRE after-action",
+            title: "GHOSTWIRE",
             description: "Receipt-backed replay packets, after-action reports, and consequence carry-forward.",
             eyebrow: "Replay horizon",
-            heading: "GHOSTWIRE after-action",
+            heading: "GHOSTWIRE",
             intro: "GHOSTWIRE now ships first-party after-action packet rails: replay timelines, after-action reports, and consequence-chain packets live on real markdown and JSON routes.",
             boundaryLine: "Replay stays receipt-backed and public-safe. No private transcript lane and no retrospective fiction engine are claimed here.",
             summaryPoints:
@@ -8093,6 +8134,186 @@ Boundary:
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
     }
+
+    private async Task<TrustPageViewModel> BuildDocumentPortalHomePageModel(CancellationToken cancellationToken)
+        => await BuildHorizonPreviewPageModel(
+            pageId: "document-portal",
+            title: "Document Portal",
+            description: "Chummer-owned guides, primers, and player-safe packets with a governed publication boundary.",
+            currentPath: "/docs",
+            eyebrow: "Governed publication rail",
+            heading: "Document Portal",
+            intro: "Chummer owns the source document, version, access policy, and safety boundary. FlipLink is the planned viewer layer for approved PDFs, not the truth owner. The first bounded publication lane starts with the Chummer6 Quickstart Guide.",
+            sections:
+            [
+                new TrustPageSectionViewModel(
+                    "document_portal_featured",
+                    "Featured",
+                    "Start with one safe document",
+                    "The first publication lane is intentionally narrow: one original Chummer guide, one named route, and one explicit boundary before broader dossier or campaign packet rollout.",
+                    [
+                        "Chummer6 Quickstart Guide",
+                        "Original Chummer content only",
+                        "No sourcebook prose or private campaign data"
+                    ]),
+                new TrustPageSectionViewModel(
+                    "document_portal_boundary",
+                    "Boundary",
+                    "Viewer, not truth owner",
+                    "Chummer remains the source of truth for document content, version, classification, and release posture. FlipLink may present, embed, and measure approved documents only.",
+                    [
+                        "No sourcebook PDF hosting",
+                        "No entitlement or payment truth",
+                        "No private GM archive by default"
+                    ]),
+                new TrustPageSectionViewModel(
+                    "document_portal_provider_posture",
+                    "Provider posture",
+                    "Operator publication first",
+                    "The initial publication mode is operator-managed. Approved PDFs can be uploaded and linked only after provider verification, privacy/copyright scan, and route proof exist.",
+                    [
+                        "Provider verification pending",
+                        "First publication not yet promoted",
+                        "Embed route stays bounded until proof exists"
+                    ])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Open Quickstart Guide", "/docs/chummer6-quickstart", "primary"),
+                new TrustPageActionViewModel("Quickstart category", "/docs/category/quickstart", "secondary"),
+                new TrustPageActionViewModel("Read publication boundary", "/docs/embed/chummer6-quickstart", "ghost")
+            ],
+            cancellationToken: cancellationToken,
+            summaryPoints:
+            [
+                "Original Chummer guides only",
+                "Governed document classification",
+                "FlipLink planned as viewer layer"
+            ]);
+
+    private async Task<TrustPageViewModel> BuildDocumentPortalQuickstartCategoryPageModel(CancellationToken cancellationToken)
+        => await BuildHorizonPreviewPageModel(
+            pageId: "document-portal-quickstart-category",
+            title: "Quickstart documents",
+            description: "Beginner-safe Chummer guides and starter packets on governed document routes.",
+            currentPath: "/docs/category/quickstart",
+            eyebrow: "Document category",
+            heading: "Quickstart documents",
+            intro: "Quickstart documents are the bounded first category in the Document Portal: newcomer-safe, original Chummer-authored, and suitable for public release without leaking private campaign state or copied rulebook prose.",
+            sections:
+            [
+                new TrustPageSectionViewModel(
+                    "quickstart_documents_current",
+                    "Current document",
+                    "The first document on this rail",
+                    "The Chummer6 Quickstart Guide is the first candidate publication because it can explain install, orientation, and first safe actions without depending on sourcebook excerpts.",
+                    [
+                        "Chummer6 Quickstart Guide",
+                        "Install and orientation focus",
+                        "Safe first publication candidate"
+                    ])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Open Quickstart Guide", "/docs/chummer6-quickstart", "primary"),
+                new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary")
+            ],
+            cancellationToken: cancellationToken);
+
+    private async Task<TrustPageViewModel> BuildDocumentPortalQuickstartPageModel(CancellationToken cancellationToken)
+        => await BuildHorizonPreviewPageModel(
+            pageId: "document-portal-quickstart-guide",
+            title: "Chummer6 Quickstart Guide",
+            description: "Original Chummer quickstart guide with governed publication and viewer boundary.",
+            currentPath: "/docs/chummer6-quickstart",
+            eyebrow: "Chummer-owned guide",
+            heading: "Chummer6 Quickstart Guide",
+            intro: "This route is the Chummer-owned document surface for the first bounded flipbook candidate. This document is generated and owned by Chummer. FlipLink is the viewer once provider verification, publication receipt, and responsive QA are complete.",
+            sections:
+            [
+                new TrustPageSectionViewModel(
+                    "quickstart_scope",
+                    "Scope",
+                    "What this guide is for",
+                    "Use the Quickstart Guide to orient a new player or operator without pushing them into a sourcebook PDF, an unbounded docs pile, or a private campaign packet.",
+                    [
+                        "Install posture",
+                        "First safe actions",
+                        "Public-safe Chummer orientation"
+                    ]),
+                new TrustPageSectionViewModel(
+                    "quickstart_boundary",
+                    "Boundary",
+                    "What this guide must not become",
+                    "This guide must stay original, public-safe, and versioned by Chummer. It must not host copied rulebook prose, private runner sheets, GM-only lore, or entitlement truth.",
+                    [
+                        "No sourcebook prose",
+                        "No private campaign data",
+                        "No release-truth substitution"
+                    ]),
+                new TrustPageSectionViewModel(
+                    "quickstart_publication_posture",
+                    "Publication posture",
+                    "Current provider state",
+                    "The Chummer route is live now. FlipLink publication is still pending provider verification and first-publication proof, so the guide remains on a first-party route until the viewer layer is proven.",
+                    [
+                        "First-party route is current",
+                        "FlipLink publication pending",
+                        "Responsive embed proof still required"
+                    ])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Open Document Portal", "/docs", "primary"),
+                new TrustPageActionViewModel("Open embed boundary", "/docs/embed/chummer6-quickstart", "secondary"),
+                new TrustPageActionViewModel("Open downloads", "/downloads", "ghost")
+            ],
+            cancellationToken: cancellationToken,
+            summaryPoints:
+            [
+                "Original Chummer-authored guide",
+                "First publication candidate",
+                "Viewer proof still pending"
+            ]);
+
+    private async Task<TrustPageViewModel> BuildDocumentPortalEmbedBoundaryPageModel(CancellationToken cancellationToken)
+        => await BuildHorizonPreviewPageModel(
+            pageId: "document-portal-embed-boundary",
+            title: "Quickstart embed boundary",
+            description: "Bounded viewer-layer posture for the Chummer6 Quickstart Guide.",
+            currentPath: "/docs/embed/chummer6-quickstart",
+            eyebrow: "Viewer boundary",
+            heading: "Quickstart embed boundary",
+            intro: "This route exists so the viewer boundary stays explicit. This document is generated and owned by Chummer. FlipLink is the viewer. Until provider verification, publication receipt, unpublish/delete proof, and responsive QA exist, this route must not pretend a live embedded flipbook is already production-ready.",
+            sections:
+            [
+                new TrustPageSectionViewModel(
+                    "embed_boundary_contract",
+                    "Contract",
+                    "What the viewer layer may do",
+                    "The viewer may present, brand, embed, and measure an approved Chummer document. It does not own document truth, rules authority, payment truth, or private campaign memory.",
+                    [
+                        "Presentation only",
+                        "Analytics are engagement-only",
+                        "Chummer remains source of truth"
+                    ]),
+                new TrustPageSectionViewModel(
+                    "embed_boundary_current_state",
+                    "Current state",
+                    "Why this is still bounded",
+                    "Provider verification, first publication, responsive QA, and unpublish/delete proof are still required before a live FlipLink embed can be promoted from candidate lane to trusted document portal viewer.",
+                    [
+                        "Provider verification pending",
+                        "First publication pending",
+                        "Human review still required"
+                    ])
+            ],
+            actions:
+            [
+                new TrustPageActionViewModel("Back to Quickstart Guide", "/docs/chummer6-quickstart", "primary"),
+                new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary")
+            ],
+            cancellationToken: cancellationToken);
 
     private async Task<KarmaForgeIntakePageViewModel> BuildKarmaForgePageModel(
         KarmaForgeSubmissionRequest request,
@@ -12640,7 +12861,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Connected faction command lane",
+            Heading: "Faction command rail",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);
@@ -12700,7 +12921,7 @@ echo "Help: ${HELP_URL}"
                 new(
                     Kind: "validation",
                     Eyebrow: "Validation",
-                    Heading: "World-tick validation packet",
+                    Heading: "World-turn validation",
                     Summary: validationPacket?.Summary ?? "Validate the inbox-safe world turn against the same receipt-backed packet.",
                     Href: "/account/ledger/worldtick/validation",
                     CtaLabel: "Open validation",
@@ -12755,7 +12976,7 @@ echo "Help: ${HELP_URL}"
 
         return new BlackLedgerNotificationsPageViewModel(
             Chrome: chrome,
-            Heading: "World turn inbox and delivery receipts",
+            Heading: "Black Ledger inbox",
             Intro: "This route shows the inbox-safe newsreel, whether delivery actually happened, and the validation packet behind the current world turn for this account.",
             Status: status,
             DeliveryNotes:
@@ -12871,7 +13092,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerTablePulsePacketViewModel(
-            Heading: "Table Pulse Live command packet",
+            Heading: "Table Pulse Live",
             Summary: summary,
             VerdictLabel: verdictLabel,
             BoundaryLine: boundaryLine,
@@ -13054,7 +13275,7 @@ echo "Help: ${HELP_URL}"
                 "/account/ledger/worldtick/validation",
                 user.DisplayName,
                 user.Email),
-            Heading: "World-tick validation packet",
+            Heading: "World-turn validation",
             Intro: "Use this route to validate the inbox newsreel, the public turn packet, and the faction-leader readout against the same receipt-backed world-turn truth.",
             Packet: packet,
             WorldTurnBriefing: _blackLedgerBriefings.BuildWorldTurnBriefing(1),

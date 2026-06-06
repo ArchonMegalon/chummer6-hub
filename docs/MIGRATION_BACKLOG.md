@@ -239,9 +239,9 @@ Progress: `Chummer.Run.Api` now owns the public landing routes, `/downloads/*`, 
 Acceptance criteria: reload/deep-link/reconnect behavior works when the UI is hosted under `/blazor/`.
 Progress: added path-base aware Blazor hosting plus stable `/blazor/` entry semantics under the public edge. The current local-docker proof validates the customer-facing `/blazor/` redirect through the same `docker-compose.public-edge.yml` bridge that serves `/`, `/downloads/`, `/contact`, `/faq`, and the other public routes under one origin.
 
-- [x] `MIG-103` Add OpenAPI + interactive docs surface to `Chummer.Run.Api` and wire through portal `/docs/`.
+- [x] `MIG-103` Add OpenAPI + interactive docs surface to `Chummer.Run.Api` and wire through portal `/openapi/`.
 Acceptance criteria: generated OpenAPI document and interactive docs are reachable and validated in CI.
-Progress: added built-in ASP.NET OpenAPI generation to `Chummer.Run.Api` with `/openapi/v1.json` and a self-hosted interactive `/docs` UI (local assets, no external CDN dependency). The current public-edge release proof no longer treats `/docs/` as part of the calm customer-facing bridge contract, so local-docker release validation now focuses on the stable landing, downloads, participation, support, and redirect routes instead of internal docs exposure.
+Progress: added built-in ASP.NET OpenAPI generation to `Chummer.Run.Api` with `/openapi/v1.json` and a self-hosted interactive `/openapi/` UI (local assets, no external CDN dependency). The current public-edge release proof no longer treats the interactive docs surface as part of the calm customer-facing document portal contract, so local-docker release validation now focuses on the stable landing, downloads, participation, support, redirect routes, and the bounded `/docs/*` document-portal surface instead of older internal docs exposure.
 
 - [x] `MIG-104` Add desktop download manifest + artifacts surface behind portal `/downloads/`.
 Acceptance criteria: platform download matrix is generated from CI artifacts and exposed through a versioned manifest.

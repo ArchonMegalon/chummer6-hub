@@ -19,6 +19,8 @@ Front-door and proof rails:
 - `/now/concierge`
 - `/downloads`
 - `/downloads/concierge`
+- `/docs`
+- `/docs/chummer6-quickstart`
 - `/packages`
 - `/packages/{packageId}`
 - `/packages/{packageId}/vote`
@@ -78,6 +80,7 @@ Guest access to `/home` and `/account` should fall back to `/login?next=...` rat
 Package routes are intentionally split across public browser, account tracking, and operator summary rails so install packages, rules packages, artifact bundles, and governed community proposals do not collapse into one unowned shelf.
 `/mobile`, `/pwa`, `/play`, `/player`, `/gm`, `/observer`, and the legacy `/session` alias keep installability, reconnect posture, and role-aware mobile entry on first-party routes instead of leaving them implicit in docs.
 `/downloads/concierge`, `/now/concierge`, `/contact/concierge`, and `/join/concierge` are bounded wrapper routes: optional guided branching may appear there, but download truth, release truth, support truth, account truth, and governed invite follow-through remain first-party Hub rails.
+`/docs` is a governed document-portal surface: Chummer owns source documents, access policy, and truth; FlipLink is a candidate viewer layer only after provider verification and publication proof exist.
 `/join/primer` keeps first-session invite orientation on a first-party page instead of hiding it behind support, booking, or publication surfaces.
 Discoverable publication pages may still open bounded creator or moderated public-proof follow-up wrappers without turning publication pages, testimonials, or public media lanes into support or install truth.
 Guest access to `/participate/codex` should fall back to `/login?next=...` so the public manifest keeps one signed-in entry rail and leaves provider selection behind the login surface.

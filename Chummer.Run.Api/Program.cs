@@ -188,7 +188,7 @@ app.MapGet("/api/health", () => Results.Json(new
     status = "pass",
     generatedAt = DateTimeOffset.UtcNow
 }));
-app.MapGet("/docs/", GetSelfHostedDocs);
+app.MapGet("/openapi/", GetSelfHostedDocs);
 
 app.MapControllers();
 

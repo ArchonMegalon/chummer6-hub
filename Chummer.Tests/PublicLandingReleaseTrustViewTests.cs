@@ -304,8 +304,26 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("[HttpGet(\"/table-pulse\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/table-pulse/receipts/live-and-aftermath.json\")]", controller, StringComparison.Ordinal);
-        Assert.Contains("TABLE PULSE separates live heat from private aftermath.", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: \"TABLE PULSE\"", controller, StringComparison.Ordinal);
+        Assert.Contains("TABLE PULSE is now a real product surface, not just a redirect.", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("[HttpGet(\"/table-pulse\")]", legacyController, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DocumentPortalUsesNamedPublicRoutesAndKeepsFlipLinkAsViewerBoundaryOnly()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("[HttpGet(\"/docs\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/docs/{slug}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/docs/embed/{slug}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/docs/category/{category}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: \"Document Portal\"", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: \"Chummer6 Quickstart Guide\"", controller, StringComparison.Ordinal);
+        Assert.Contains("FlipLink is the planned viewer layer", controller, StringComparison.Ordinal);
+        Assert.Contains("Chummer owns the source document, version, access policy, and safety boundary.", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: \"Quickstart embed boundary\"", controller, StringComparison.Ordinal);
     }
 
     [Fact]
