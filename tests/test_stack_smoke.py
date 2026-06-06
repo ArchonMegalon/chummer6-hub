@@ -11,8 +11,6 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-import yaml
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_FILE_CANDIDATES = [
@@ -52,6 +50,89 @@ def compose_env():
     return env
 
 
+def strip_yaml_scalar(value: str):
+    stripped = value.strip()
+    if stripped == "{}":
+        return {}
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
+        return stripped[1:-1]
+    return stripped
+
+
+def load_compose_subset(path: Path) -> dict[str, object]:
+    services: dict[str, dict[str, object]] = {}
+    in_services = False
+    current_service: dict[str, object] | None = None
+    current_section: str | None = None
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.rstrip()
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+
+        if not line.startswith(" "):
+            in_services = line.strip() == "services:"
+            current_service = None
+            current_section = None
+            continue
+
+        if not in_services:
+            continue
+
+        if line.startswith("  ") and not line.startswith("    "):
+            key, separator, rest = line.strip().partition(":")
+            if separator and not rest.strip():
+                current_service = {}
+                services[key] = current_service
+                current_section = None
+            continue
+
+        if current_service is None:
+            continue
+
+        if line.startswith("    ") and not line.startswith("      "):
+            key, separator, rest = line.strip().partition(":")
+            if not separator:
+                continue
+            if rest.strip():
+                current_service[key] = strip_yaml_scalar(rest)
+                current_section = None
+                continue
+
+            if key == "volumes":
+                current_service[key] = []
+            else:
+                current_service[key] = {}
+            current_section = key
+            continue
+
+        if current_section is None or not line.startswith("      "):
+            continue
+
+        item = line.strip()
+        if current_section == "volumes" and item.startswith("- "):
+            volumes = current_service.setdefault("volumes", [])
+            if isinstance(volumes, list):
+                volumes.append(strip_yaml_scalar(item[2:]))
+        elif current_section == "environment" and ":" in item:
+            environment = current_service.setdefault("environment", {})
+            if isinstance(environment, dict):
+                key, _, rest = item.partition(":")
+                environment[key.strip()] = strip_yaml_scalar(rest)
+
+    return {"services": services}
+
+
+def load_compose_payload(path: Path) -> dict[str, object]:
+    try:
+        import yaml  # type: ignore[import-not-found]
+
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else {}
+    except ModuleNotFoundError:
+        return load_compose_subset(path)
+
+
 def run_compose(*args: str) -> subprocess.CompletedProcess[str]:
     if COMPOSE_BASE is not None:
         result = subprocess.run(
@@ -76,7 +157,7 @@ def run_compose(*args: str) -> subprocess.CompletedProcess[str]:
 
     compose_path = REPO_ROOT / compose_file
     try:
-        payload = yaml.safe_load(compose_path.read_text(encoding="utf-8")) or {}
+        payload = load_compose_payload(compose_path)
     except Exception as exc:
         return subprocess.CompletedProcess(
             args=["compose-fallback", *args],
@@ -142,7 +223,7 @@ class StackConfigSmokeTests(unittest.TestCase):
         if not public_edge_path.exists():
             self.skipTest("docker-compose.public-edge.yml is not present for this repository slice")
 
-        payload = yaml.safe_load(public_edge_path.read_text(encoding="utf-8")) or {}
+        payload = load_compose_payload(public_edge_path)
         services = payload.get("services") or {}
 
         for service_name in ("chummer-run-identity", "chummer-portal"):
@@ -158,7 +239,7 @@ class StackConfigSmokeTests(unittest.TestCase):
         if not public_edge_path.exists():
             self.skipTest("docker-compose.public-edge.yml is not present for this repository slice")
 
-        payload = yaml.safe_load(public_edge_path.read_text(encoding="utf-8")) or {}
+        payload = load_compose_payload(public_edge_path)
         services = payload.get("services") or {}
         portal = services.get("chummer-portal") or {}
         environment = portal.get("environment") or {}

@@ -480,6 +480,39 @@ def parse_non_negative_int_env(
     return parsed
 
 
+EXECUTABLE_PROOF_FRESHNESS_OVERRIDE_KEYS = {
+    "proof_freshness_max_age_seconds": (
+        "CHUMMER_UI_PARITY_PROOF_MAX_AGE_SECONDS",
+        "CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
+    ),
+    "workflow_parity_proof_max_age_seconds": (
+        "CHUMMER_UI_PARITY_PROOF_MAX_AGE_SECONDS",
+        "CHUMMER_RELEASE_PROOF_MAX_AGE_SECONDS",
+    ),
+    "proof_freshness_max_future_skew_seconds": (
+        "CHUMMER_UI_PARITY_PROOF_MAX_FUTURE_SKEW_SECONDS",
+        "CHUMMER_RELEASE_PROOF_MAX_FUTURE_SKEW_SECONDS",
+    ),
+}
+
+
+def read_executable_proof_freshness_override(key: str, default_value: int) -> int | None:
+    env_keys = EXECUTABLE_PROOF_FRESHNESS_OVERRIDE_KEYS.get(key)
+    if env_keys is None:
+        return None
+
+    for env_key in env_keys:
+        raw_value = os.environ.get(env_key)
+        if raw_value not in (None, ""):
+            return parse_non_negative_int_env(
+                raw_value,
+                default_value=default_value,
+                field_path="/".join(env_keys),
+            )
+
+    return None
+
+
 def parse_allowed_release_proof_base_urls(raw_value: object) -> tuple[str, ...]:
     if raw_value in (None, ""):
         return DEFAULT_ALLOWED_RELEASE_PROOF_BASE_URLS
@@ -1331,6 +1364,10 @@ def read_int_value(
     default_value: int,
     path: pathlib.Path,
 ) -> int:
+    freshness_override = read_executable_proof_freshness_override(key, default_value)
+    if freshness_override is not None:
+        return freshness_override
+
     value = evidence.get(key)
     if value is None:
         return default_value

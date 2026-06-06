@@ -8917,7 +8917,7 @@ Boundary:
         return
         [
             new("Live", BuildLiveLaunchSummary(manifest)),
-            new("Release", BuildPreviewLaunchSummary(manifest, releaseExperience)),
+            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience)),
             new("Fallback", BuildFallbackLaunchSummary(manifest)),
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),
@@ -12751,7 +12751,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Runner Passport continuity rail",
+            Heading: "Runner Passport connected lane",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);
@@ -12917,7 +12917,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Faction command rail",
+            Heading: "Connected faction command lane",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);

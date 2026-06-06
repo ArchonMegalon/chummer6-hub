@@ -190,7 +190,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_table_pulse_connected_lane_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_table_pulse_connected_lane_surface.py", "--base-url", "http://example.test"],
@@ -219,7 +219,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_table_pulse_connected_lane_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_table_pulse_connected_lane_surface.py", "--base-url", "http://example.test"],
@@ -248,7 +248,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_table_pulse_connected_lane_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_table_pulse_connected_lane_surface.py", "--base-url", "http://example.test"],
@@ -274,15 +274,14 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             self.assertEqual(timeout, 30)
             if url == "http://example.test/living-world" and attempts[url] == 0:
                 attempts[url] += 1
-                raise requests.exceptions.ReadTimeout("temporary live read timeout")
+                raise TimeoutError("temporary live read timeout")
             return FakeResponse(route_bodies[url])
 
         script_dir = str(SCRIPT.parent)
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_table_pulse_connected_lane_surface as verifier
-            import requests
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_table_pulse_connected_lane_surface.py", "--base-url", "http://example.test"],

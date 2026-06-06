@@ -1938,6 +1938,7 @@ async Task VerifyPublicLandingProjectionAsync()
     var routes = new PublicRouteCatalogService(canon);
     var actions = new PublicActionResolver();
     var landing = new PublicLandingService(canon, actions);
+    var flipLinkDocumentPortal = new FlipLinkDocumentPortalService(configuration);
     var navigation = new PublicNavigationService(canon, routes);
     var releases = new PublicReleaseManifestService(configuration);
     var releaseSelection = new ReleaseSelectionService(canon);
@@ -2726,14 +2727,14 @@ async Task VerifyPublicLandingProjectionAsync()
         WebRootPath = Path.Combine(tempRoot, "wwwroot")
     };
     var windowsProofInstallers = new WindowsProofInstallerService(configuration);
-    var controller = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var controller = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, identityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = new ControllerContext
         {
             HttpContext = new DefaultHttpContext()
         }
     };
-    var authenticatedLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var authenticatedLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, linkedIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };
@@ -5389,7 +5390,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(statusModel?.LaunchHealthRows?.Select(static row => row.Label).SequenceEqual(new[]
     {
         "Live",
-        "Release",
+        "Preview",
         "Fallback",
         "Revoked",
         "Fixed",
@@ -5398,7 +5399,7 @@ async Task VerifyPublicLandingProjectionAsync()
         "Support pulse",
         "Adoption health",
     }) == true, "status page should preserve the full public launch-health row order.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Release", StringComparison.Ordinal) && row.Value.Contains("published", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface the current release posture in launch-health rows.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Preview", StringComparison.Ordinal) && row.Value.Contains("published", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface the current preview posture in launch-health rows.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Revoked", StringComparison.Ordinal) && row.Value.Contains("revoke", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface revoke posture in launch-health rows.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Fixed", StringComparison.Ordinal) && row.Value.Contains("fix", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface fixed-release follow-through in launch-health rows.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Blocked", StringComparison.Ordinal) && row.Value.Contains("blocked", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface blocked route or journey posture in launch-health rows.");
@@ -5457,7 +5458,7 @@ async Task VerifyPublicLandingProjectionAsync()
         {
             Content = new StringContent("{\"detail\":\"identity-down-secret\"}", Encoding.UTF8, "application/json")
         })), configuration);
-    var unavailableLandingController = new PublicLandingController(landing, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
+    var unavailableLandingController = new PublicLandingController(landing, flipLinkDocumentPortal, flagshipCoverage, releases, campaignOsProof, releaseSelection, actions, accounts, unavailableIdentityClient, identityLinks, experience, participationNotifications, installLinking, campaignSpine, workspaceServerPlane, readyForTonight, knowledgeFabric, nexusPan, mediaHorizons, communityCreatorHorizons, waveEightHorizons, karmaForge, buildGhostConcierge, blackLedgerStats, blackLedgerDispatches, blackLedgerTickNews, blackLedgerFactions, blackLedgerAdvisories, blackLedgerBriefings, beHumanEventAdapterPosture, gmSessionVenues, anarchyPreview, packageCatalog, publicCreatorDiscovery, chrome, trustContent, privacyBoundaries, signalProjection, signalOperations, trustPulse, signedInTrustStatus, supportCases, supportPresentation, configuration, installBootstrapTickets, personalizedInstallScripts, releaseUploadTickets, windowsProofInstallers, publicWebHostEnvironment, loggerFactory.CreateLogger<PublicLandingController>())
     {
         ControllerContext = AuthenticatedControllerContext("subject-token")
     };

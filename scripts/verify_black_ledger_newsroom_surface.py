@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import json
 import os
 import re
 import sys
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import urljoin
-
-import requests
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 
 REPO_ROOT = Path(
@@ -88,6 +89,69 @@ NO_STORE_HEADER_MARKERS: tuple[str, ...] = (
 )
 
 
+@dataclass
+class HttpResponse:
+    url: str
+    status_code: int
+    headers: object
+    body: bytes
+
+    @property
+    def text(self) -> str:
+        charset = None
+        if hasattr(self.headers, "get_content_charset"):
+            charset = self.headers.get_content_charset()
+        return self.body.decode(charset or "utf-8", errors="replace")
+
+    def json(self) -> object:
+        return json.loads(self.text)
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code} for {self.url}")
+
+
+class NoRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[no-untyped-def]
+        return None
+
+
+NO_REDIRECT_OPENER = build_opener(NoRedirectHandler)
+HTTP_HEADERS = {
+    "User-Agent": "chummer-black-ledger-newsroom-verifier/1.0",
+}
+
+
+def read_http_response(response: object) -> HttpResponse:
+    body = response.read()
+    status_code = getattr(response, "status", None)
+    if status_code is None:
+        status_code = response.getcode()
+    return HttpResponse(
+        url=response.geturl(),
+        status_code=status_code,
+        headers=response.headers,
+        body=body,
+    )
+
+
+def http_get(url: str, timeout: int, allow_redirects: bool = True) -> HttpResponse:
+    request = Request(url, headers=HTTP_HEADERS)
+    try:
+        if allow_redirects:
+            with urlopen(request, timeout=timeout) as response:
+                return read_http_response(response)
+        with NO_REDIRECT_OPENER.open(request, timeout=timeout) as response:
+            return read_http_response(response)
+    except HTTPError as exc:
+        return HttpResponse(
+            url=exc.geturl(),
+            status_code=exc.code,
+            headers=exc.headers,
+            body=exc.read(),
+        )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify Black Ledger newsroom source contracts and optionally live public routes.",
@@ -117,7 +181,7 @@ def main() -> int:
 
     if args.base_url:
         base_url = args.base_url.rstrip("/")
-        newsroom_home = requests.get(f"{base_url}/ledger/newsroom", timeout=30, allow_redirects=False)
+        newsroom_home = http_get(f"{base_url}/ledger/newsroom", timeout=30, allow_redirects=False)
         if newsroom_home.status_code not in {301, 302, 303, 307, 308}:
             missing.append("live route /ledger/newsroom missing redirect status")
             current_watch_route = "/ledger/newsroom/turn-1-newsreel"
@@ -132,7 +196,7 @@ def main() -> int:
             if marker not in cache_control:
                 missing.append(f"live route /ledger/newsroom missing cache-control marker: {marker}")
 
-        watch_response = requests.get(f"{base_url}{current_watch_route}", timeout=30)
+        watch_response = http_get(f"{base_url}{current_watch_route}", timeout=30)
         watch_response.raise_for_status()
         watch_body = watch_response.text
         cache_control = watch_response.headers.get("Cache-Control", "")
@@ -148,7 +212,7 @@ def main() -> int:
                 missing.append(f"live route {current_watch_route} missing {asset_label} asset reference")
                 continue
             asset_url = urljoin(f"{base_url}{current_watch_route}", match.group(1))
-            asset_response = requests.get(asset_url, timeout=30)
+            asset_response = http_get(asset_url, timeout=30)
             asset_response.raise_for_status()
             content_type = asset_response.headers.get("Content-Type", "")
             if expected_type not in content_type:
@@ -161,7 +225,7 @@ def main() -> int:
         transcript_route = transcript_match.group(1) if transcript_match else f"{current_watch_route}/transcript"
         receipts_route = receipts_match.group(1) if receipts_match else f"{current_watch_route}/receipts"
 
-        transcript_response = requests.get(
+        transcript_response = http_get(
             f"{base_url}{transcript_route}",
             timeout=30,
             allow_redirects=False,
@@ -177,7 +241,7 @@ def main() -> int:
             if marker not in cache_control:
                 missing.append(f"live route {transcript_route} missing cache-control marker: {marker}")
 
-        receipts_response = requests.get(
+        receipts_response = http_get(
             f"{base_url}{receipts_route}",
             timeout=30,
         )
@@ -210,7 +274,7 @@ def main() -> int:
                     )
 
         for route in NEGATIVE_PATH_EXPECTATIONS:
-            response = requests.get(f"{base_url}{route}", timeout=30, allow_redirects=False)
+            response = http_get(f"{base_url}{route}", timeout=30, allow_redirects=False)
             if response.status_code != 404:
                 missing.append(
                     f"live route {route} expected status 404, got {response.status_code}"

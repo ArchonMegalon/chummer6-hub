@@ -20,8 +20,10 @@ SOURCE_FILES = [
     "scripts/materialize_campaign_os_local_proof.py",
     "scripts/materialize_next90_m113_hub_roster_ops_proof.py",
     "scripts/ai/verify.sh",
+    "scripts/yaml.py",
     "scripts/verify_next90_m113_hub_roster_ops.py",
     "tests/test_next90_m113_hub_roster_ops.py",
+    "yaml.py",
     ".codex-studio/published/NEXT90_M113_HUB_ROSTER_OPS.generated.json",
 ]
 

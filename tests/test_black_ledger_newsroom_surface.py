@@ -109,7 +109,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_black_ledger_newsroom_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
@@ -172,7 +172,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_black_ledger_newsroom_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
@@ -235,7 +235,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_black_ledger_newsroom_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
@@ -305,7 +305,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_black_ledger_newsroom_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
@@ -378,7 +378,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
         with patch.object(sys, "path", [script_dir, *sys.path]):
             import verify_black_ledger_newsroom_surface as verifier
 
-        with patch.object(verifier.requests, "get", side_effect=fake_get), patch.object(
+        with patch.object(verifier, "http_get", side_effect=fake_get), patch.object(
             sys,
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],

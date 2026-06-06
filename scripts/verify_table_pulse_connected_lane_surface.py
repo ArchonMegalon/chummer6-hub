@@ -4,8 +4,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
-
-import requests
+from urllib import error, request
 
 
 REPO_ROOT = Path(
@@ -66,6 +65,17 @@ LIVE_ROUTE_MARKERS: dict[str, tuple[str, ...]] = {
 LIVE_REQUEST_ATTEMPTS = 3
 
 
+class HttpResponse:
+    def __init__(self, url: str, status_code: int, text: str) -> None:
+        self.url = url
+        self.status_code = status_code
+        self.text = text
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code} for {self.url}")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify the connected Table Pulse lane in source and optionally on live public routes.",
@@ -116,16 +126,42 @@ def fetch_live_route(url: str, missing: list[str]) -> str:
     last_error = ""
     for attempt in range(1, LIVE_REQUEST_ATTEMPTS + 1):
         try:
-            response = requests.get(url, timeout=30)
+            response = http_get(url, timeout=30)
             response.raise_for_status()
             return response.text
-        except requests.RequestException as exc:
+        except Exception as exc:
             last_error = f"{type(exc).__name__}: {exc}"
             if attempt == LIVE_REQUEST_ATTEMPTS:
                 break
 
     missing.append(f"live route {url} could not be fetched after {LIVE_REQUEST_ATTEMPTS} attempts: {last_error}")
     return ""
+
+
+def http_get(url: str, timeout: int) -> HttpResponse:
+    http_request = request.Request(
+        url,
+        headers={"User-Agent": "Chummer Table Pulse Connected Lane Verifier/1.0"},
+    )
+    try:
+        with request.urlopen(http_request, timeout=timeout) as response:
+            raw_body = response.read()
+            charset = response.headers.get_content_charset() or "utf-8"
+            return HttpResponse(
+                url=url,
+                status_code=response.getcode(),
+                text=raw_body.decode(charset, errors="replace"),
+            )
+    except error.HTTPError as exc:
+        raw_body = exc.read()
+        charset = exc.headers.get_content_charset() if exc.headers is not None else None
+        return HttpResponse(
+            url=url,
+            status_code=exc.code,
+            text=raw_body.decode(charset or "utf-8", errors="replace"),
+        )
+    except error.URLError as exc:
+        raise RuntimeError(str(exc)) from exc
 
 
 if __name__ == "__main__":

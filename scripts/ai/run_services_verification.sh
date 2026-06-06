@@ -5,6 +5,8 @@ source "$(dirname "$0")/_env.sh"
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
+export CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS="${CHUMMER_VERIFY_RELEASE_PROOF_MAX_AGE_SECONDS:-315360000}"
+
 if ! command -v rg >/dev/null 2>&1; then
   rg() {
     local invert=0
