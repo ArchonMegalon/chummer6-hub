@@ -6531,31 +6531,31 @@ body {
   font-size: 0.9rem;
 }
 
-.launch-hero--pregold {
+.launch-hero--ledger {
   padding-top: clamp(4.5rem, 7vw, 5.8rem);
   padding-bottom: 1.8rem;
 }
 
-.launch-hero--pregold .launch-hero__shell {
+.launch-hero--ledger .launch-hero__shell {
   grid-template-columns: minmax(0, 0.84fr) minmax(480px, 1.16fr);
   gap: 1rem;
 }
 
-.launch-hero--pregold .launch-hero__copy,
-.launch-hero--pregold .launch-hero__stage {
+.launch-hero--ledger .launch-hero__copy,
+.launch-hero--ledger .launch-hero__stage {
   min-height: clamp(480px, 78vh, 820px);
 }
 
-.launch-hero--pregold .launch-hero__copy {
+.launch-hero--ledger .launch-hero__copy {
   gap: 0.8rem;
   padding: clamp(1.35rem, 2vw, 2rem);
 }
 
-.launch-hero--pregold .launch-hero__title {
+.launch-hero--ledger .launch-hero__title {
   font-size: clamp(2.7rem, 5vw, 4.7rem);
 }
 
-.launch-hero--pregold .launch-hero__support {
+.launch-hero--ledger .launch-hero__support {
   max-width: 28rem;
   font-size: 0.98rem;
 }
@@ -6883,7 +6883,7 @@ body {
 }
 
 @media (max-width: 1100px) {
-  .launch-hero--pregold .launch-hero__shell,
+  .launch-hero--ledger .launch-hero__shell,
   .faction-identity-strip,
   .faction-profile-grid,
   .score-ledger-grid,
@@ -6894,7 +6894,7 @@ body {
 }
 
 @media (max-width: 800px) {
-  .launch-hero--pregold .launch-hero__shell,
+  .launch-hero--ledger .launch-hero__shell,
   .launch-hero__metric-strip,
   .ledger-stats-grid--hero,
   .faction-identity-strip,
@@ -6907,8 +6907,8 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .launch-hero--pregold .launch-hero__copy,
-  .launch-hero--pregold .launch-hero__stage {
+  .launch-hero--ledger .launch-hero__copy,
+  .launch-hero--ledger .launch-hero__stage {
     min-height: auto;
   }
 }

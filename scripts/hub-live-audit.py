@@ -11954,8 +11954,8 @@ def main() -> int:
                 "Flagship reel",
                 "/media/promo/chummer6-flagship-promo.receipt.json",
                 "Desktop build",
-                "Mobile play shell preview",
-                "Proof and release posture"),
+                "Mobile play shell",
+                "Release posture"),
             expects_header_count=1),
         AuditRoute(
             "/what-is-chummer",
@@ -11974,14 +11974,14 @@ def main() -> int:
                 "Current release",
                 "Known issues and install help",
                 "Update path",
-                "Three proof cards"),
+                "Three release checks that show what works beyond the landing page"),
             forbidden_texts=("Load Demo Runner",),
             expects_header_count=1),
         AuditRoute(
             "/downloads",
             "Install Chummer",
             required_texts=(
-                "Public downloads are available now on Windows, macOS, and Linux.",
+                "Windows, macOS, and Linux still use a guided install handoff",
                 "Main platform downloads",
                 "Windows",
                 "Linux",

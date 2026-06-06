@@ -17,6 +17,10 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
 
     const heroActions = page.locator('.launch-hero__actions a.button-like');
+    const heroClass = (await page.locator('.launch-hero').first().getAttribute('class')) ?? '';
+    expect(heroClass, `${viewport.name} hero posture class`).toContain('launch-hero--ledger');
+    expect(heroClass, `${viewport.name} retired hero posture class`).not.toContain('launch-hero--pregold');
+
     const texts = await heroActions.allTextContents();
     const normalized = texts.map((text) => text.replace(/\s+/g, ' ').trim());
     const expected = ['Open Black Ledger', 'Download Chummer'];
@@ -37,6 +41,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
 
     results.push({
       viewport: viewport.name,
+      hero_class: heroClass,
       hero_ctas: normalized.slice(0, 2),
       hero_boxes: heroBoxes,
       support_primary_top: supportPrimaryTop,
@@ -60,7 +65,7 @@ test('homepage keeps the intended live CTA hierarchy on desktop and mobile', asy
       '',
       '- Hero keeps two ranked CTAs: `Open Black Ledger`, `Download Chummer`.',
       '- Homepage remains on the five-section model: hero, score-strip, factions, flagship-promo, play-downloads.',
-      '- Proof and release posture stay off the first screen and live on Status instead.',
+      '- Release posture stays off the first screen and lives on Status instead.',
       '- Support/help CTAs remain lower on the page instead of competing with the hero path.',
     ].join('\n'),
   );
