@@ -927,6 +927,7 @@ public sealed class PublicLandingDownloadDispatchTests
             WaveEightHorizonsService waveEightHorizons = new(communityStore, anarchyPreview);
             Controller = new PublicLandingController(
                 landing: null!,
+                flipLinkDocumentPortal: new FlipLinkDocumentPortalService(Configuration),
                 flagshipCoverage: null!,
                 releases: ManifestService,
                 campaignOsProof: null!,

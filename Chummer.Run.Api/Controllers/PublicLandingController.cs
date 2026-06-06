@@ -15,6 +15,7 @@ using Chummer.Run.Contracts.Community;
 using Chummer.Hub.Registry.Contracts.InstallLinking;
 using Chummer.Run.Contracts.PublicSurface;
 using Chummer.Control.Contracts.Support;
+using Chummer.Contracts.Content;
 using Chummer.Run.Api.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
@@ -32,6 +33,7 @@ public sealed class PublicLandingController : Controller
     private const string ReleaseUploadTokenEnvironmentVariable = "CHUMMER_RELEASE_UPLOAD_TOKEN";
 
     private readonly PublicLandingService _landing;
+    private readonly FlipLinkDocumentPortalService _flipLinkDocumentPortal;
     private readonly PublicFlagshipCoverageService _flagshipCoverage;
     private readonly PublicReleaseManifestService _releases;
     private readonly CampaignOsLocalProofService _campaignOsProof;
@@ -86,6 +88,7 @@ public sealed class PublicLandingController : Controller
 
     public PublicLandingController(
         PublicLandingService landing,
+        FlipLinkDocumentPortalService flipLinkDocumentPortal,
         PublicFlagshipCoverageService flagshipCoverage,
         PublicReleaseManifestService releases,
         CampaignOsLocalProofService campaignOsProof,
@@ -136,6 +139,7 @@ public sealed class PublicLandingController : Controller
         ILogger<PublicLandingController> logger)
     {
         _landing = landing;
+        _flipLinkDocumentPortal = flipLinkDocumentPortal;
         _flagshipCoverage = flagshipCoverage;
         _releases = releases;
         _campaignOsProof = campaignOsProof;
@@ -1547,40 +1551,65 @@ public sealed class PublicLandingController : Controller
     public async Task<IActionResult> DocumentPortalPage(CancellationToken cancellationToken)
         => View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalHomePageModel(cancellationToken));
 
-    [HttpGet("/docs/category/{category}")]
-    [Produces("text/html")]
-    public async Task<IActionResult> DocumentPortalCategoryPage([FromRoute] string category, CancellationToken cancellationToken)
+    [HttpGet("/docs/{slug}/receipts/publication.json")]
+    [Produces("application/json")]
+    public IActionResult DocumentPortalPublicationReceipt([FromRoute] string slug)
     {
-        if (!string.Equals(category?.Trim(), "quickstart", StringComparison.OrdinalIgnoreCase))
+        var document = _flipLinkDocumentPortal.TryGetPublicDocument(slug);
+        var publication = document is null ? null : _flipLinkDocumentPortal.TryGetPublication(document.Id);
+        var receipt = _flipLinkDocumentPortal.TryBuildPublicationReceipt(slug);
+
+        if (document is null || publication is null || receipt is null)
         {
             return NotFound();
         }
 
-        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalQuickstartCategoryPageModel(cancellationToken));
+        return Json(new
+        {
+            document,
+            publication,
+            receipt,
+            viewerPosture = "candidate_viewer_only"
+        });
+    }
+
+    [HttpGet("/docs/category/{category}")]
+    [Produces("text/html")]
+    public async Task<IActionResult> DocumentPortalCategoryPage([FromRoute] string category, CancellationToken cancellationToken)
+    {
+        var documents = _flipLinkDocumentPortal.ListCategoryDocuments(category);
+        if (documents.Count == 0)
+        {
+            return NotFound();
+        }
+
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalQuickstartCategoryPageModel(documents[0], cancellationToken));
     }
 
     [HttpGet("/docs/embed/{slug}")]
     [Produces("text/html")]
     public async Task<IActionResult> DocumentPortalEmbedPage([FromRoute] string slug, CancellationToken cancellationToken)
     {
-        if (!string.Equals(slug?.Trim(), "chummer6-quickstart", StringComparison.OrdinalIgnoreCase))
+        var document = _flipLinkDocumentPortal.TryGetPublicDocument(slug);
+        if (document is null)
         {
             return NotFound();
         }
 
-        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalEmbedBoundaryPageModel(cancellationToken));
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalEmbedBoundaryPageModel(document, cancellationToken));
     }
 
     [HttpGet("/docs/{slug}")]
     [Produces("text/html")]
     public async Task<IActionResult> DocumentPortalDetailPage([FromRoute] string slug, CancellationToken cancellationToken)
     {
-        if (!string.Equals(slug?.Trim(), "chummer6-quickstart", StringComparison.OrdinalIgnoreCase))
+        var document = _flipLinkDocumentPortal.TryGetPublicDocument(slug);
+        if (document is null)
         {
             return NotFound();
         }
 
-        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalQuickstartPageModel(cancellationToken));
+        return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalQuickstartPageModel(document, cancellationToken));
     }
 
     [HttpGet("/ready")]
@@ -8136,7 +8165,9 @@ Boundary:
     }
 
     private async Task<TrustPageViewModel> BuildDocumentPortalHomePageModel(CancellationToken cancellationToken)
-        => await BuildHorizonPreviewPageModel(
+    {
+        var firstDocument = _flipLinkDocumentPortal.ListPublicDocuments().First();
+        return await BuildHorizonPreviewPageModel(
             pageId: "document-portal",
             title: "Document Portal",
             description: "Chummer-owned guides, primers, and player-safe packets with a governed publication boundary.",
@@ -8152,7 +8183,7 @@ Boundary:
                     "Start with one safe document",
                     "The first publication lane is intentionally narrow: one original Chummer guide, one named route, and one explicit boundary before broader dossier or campaign packet rollout.",
                     [
-                        "Chummer6 Quickstart Guide",
+                        firstDocument.Title,
                         "Original Chummer content only",
                         "No sourcebook prose or private campaign data"
                     ]),
@@ -8179,9 +8210,9 @@ Boundary:
             ],
             actions:
             [
-                new TrustPageActionViewModel("Open Quickstart Guide", "/docs/chummer6-quickstart", "primary"),
-                new TrustPageActionViewModel("Quickstart category", "/docs/category/quickstart", "secondary"),
-                new TrustPageActionViewModel("Read publication boundary", "/docs/embed/chummer6-quickstart", "ghost")
+                new TrustPageActionViewModel("Open Quickstart Guide", $"/docs/{firstDocument.Slug}", "primary"),
+                new TrustPageActionViewModel("Quickstart category", $"/docs/category/{firstDocument.Category}", "secondary"),
+                new TrustPageActionViewModel("Read publication boundary", $"/docs/embed/{firstDocument.Slug}", "ghost")
             ],
             cancellationToken: cancellationToken,
             summaryPoints:
@@ -8190,13 +8221,14 @@ Boundary:
                 "Governed document classification",
                 "FlipLink planned as viewer layer"
             ]);
+    }
 
-    private async Task<TrustPageViewModel> BuildDocumentPortalQuickstartCategoryPageModel(CancellationToken cancellationToken)
+    private async Task<TrustPageViewModel> BuildDocumentPortalQuickstartCategoryPageModel(ChummerDocument document, CancellationToken cancellationToken)
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-quickstart-category",
             title: "Quickstart documents",
             description: "Beginner-safe Chummer guides and starter packets on governed document routes.",
-            currentPath: "/docs/category/quickstart",
+            currentPath: $"/docs/category/{document.Category}",
             eyebrow: "Document category",
             heading: "Quickstart documents",
             intro: "Quickstart documents are the bounded first category in the Document Portal: newcomer-safe, original Chummer-authored, and suitable for public release without leaking private campaign state or copied rulebook prose.",
@@ -8208,26 +8240,26 @@ Boundary:
                     "The first document on this rail",
                     "The Chummer6 Quickstart Guide is the first candidate publication because it can explain install, orientation, and first safe actions without depending on sourcebook excerpts.",
                     [
-                        "Chummer6 Quickstart Guide",
+                        document.Title,
                         "Install and orientation focus",
                         "Safe first publication candidate"
                     ])
             ],
             actions:
             [
-                new TrustPageActionViewModel("Open Quickstart Guide", "/docs/chummer6-quickstart", "primary"),
+                new TrustPageActionViewModel("Open Quickstart Guide", $"/docs/{document.Slug}", "primary"),
                 new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary")
             ],
             cancellationToken: cancellationToken);
 
-    private async Task<TrustPageViewModel> BuildDocumentPortalQuickstartPageModel(CancellationToken cancellationToken)
+    private async Task<TrustPageViewModel> BuildDocumentPortalQuickstartPageModel(ChummerDocument document, CancellationToken cancellationToken)
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-quickstart-guide",
-            title: "Chummer6 Quickstart Guide",
+            title: document.Title,
             description: "Original Chummer quickstart guide with governed publication and viewer boundary.",
-            currentPath: "/docs/chummer6-quickstart",
+            currentPath: $"/docs/{document.Slug}",
             eyebrow: "Chummer-owned guide",
-            heading: "Chummer6 Quickstart Guide",
+            heading: document.Title,
             intro: "This route is the Chummer-owned document surface for the first bounded flipbook candidate. This document is generated and owned by Chummer. FlipLink is the viewer once provider verification, publication receipt, and responsive QA are complete.",
             sections:
             [
@@ -8259,13 +8291,14 @@ Boundary:
                     [
                         "First-party route is current",
                         "FlipLink publication pending",
-                        "Responsive embed proof still required"
+                        "Responsive embed proof still required",
+                        $"Source hash recorded: {document.SourceHash}"
                     ])
             ],
             actions:
             [
                 new TrustPageActionViewModel("Open Document Portal", "/docs", "primary"),
-                new TrustPageActionViewModel("Open embed boundary", "/docs/embed/chummer6-quickstart", "secondary"),
+                new TrustPageActionViewModel("Open embed boundary", $"/docs/embed/{document.Slug}", "secondary"),
                 new TrustPageActionViewModel("Open downloads", "/downloads", "ghost")
             ],
             cancellationToken: cancellationToken,
@@ -8276,12 +8309,12 @@ Boundary:
                 "Viewer proof still pending"
             ]);
 
-    private async Task<TrustPageViewModel> BuildDocumentPortalEmbedBoundaryPageModel(CancellationToken cancellationToken)
+    private async Task<TrustPageViewModel> BuildDocumentPortalEmbedBoundaryPageModel(ChummerDocument document, CancellationToken cancellationToken)
         => await BuildHorizonPreviewPageModel(
             pageId: "document-portal-embed-boundary",
             title: "Quickstart embed boundary",
             description: "Bounded viewer-layer posture for the Chummer6 Quickstart Guide.",
-            currentPath: "/docs/embed/chummer6-quickstart",
+            currentPath: $"/docs/embed/{document.Slug}",
             eyebrow: "Viewer boundary",
             heading: "Quickstart embed boundary",
             intro: "This route exists so the viewer boundary stays explicit. This document is generated and owned by Chummer. FlipLink is the viewer. Until provider verification, publication receipt, unpublish/delete proof, and responsive QA exist, this route must not pretend a live embedded flipbook is already production-ready.",
@@ -8310,7 +8343,7 @@ Boundary:
             ],
             actions:
             [
-                new TrustPageActionViewModel("Back to Quickstart Guide", "/docs/chummer6-quickstart", "primary"),
+                new TrustPageActionViewModel("Back to Quickstart Guide", $"/docs/{document.Slug}", "primary"),
                 new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary")
             ],
             cancellationToken: cancellationToken);

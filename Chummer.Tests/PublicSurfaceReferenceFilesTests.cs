@@ -36,6 +36,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/downloads", llms, StringComparison.Ordinal);
         Assert.Contains("/docs", llms, StringComparison.Ordinal);
         Assert.Contains("/docs/chummer6-quickstart", llms, StringComparison.Ordinal);
+        Assert.Contains("/docs/chummer6-quickstart/receipts/publication.json", llms, StringComparison.Ordinal);
         Assert.Contains("/roadmap", llms, StringComparison.Ordinal);
         Assert.Contains("/feedback", llms, StringComparison.Ordinal);
         Assert.Contains("/changelog", llms, StringComparison.Ordinal);
@@ -69,6 +70,7 @@ public sealed class PublicSurfaceReferenceFilesTests
         Assert.Contains("/progress", manifest, StringComparison.Ordinal);
         Assert.Contains("/docs", manifest, StringComparison.Ordinal);
         Assert.Contains("/docs/chummer6-quickstart", manifest, StringComparison.Ordinal);
+        Assert.Contains("/docs/{slug}/receipts/publication.json", manifest, StringComparison.Ordinal);
         Assert.Contains("/docs/embed/{slug}", manifest, StringComparison.Ordinal);
         Assert.Contains("/docs/category/{category}", manifest, StringComparison.Ordinal);
         Assert.Contains("/feedback/operations", manifest, StringComparison.Ordinal);

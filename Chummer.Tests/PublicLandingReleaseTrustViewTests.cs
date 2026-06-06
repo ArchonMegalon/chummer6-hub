@@ -313,16 +313,23 @@ public sealed class PublicLandingReleaseTrustViewTests
     public void DocumentPortalUsesNamedPublicRoutesAndKeepsFlipLinkAsViewerBoundaryOnly()
     {
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string servicesPath = RepoPaths.FromRoot("Chummer.Run.Api", "ServiceCollectionBoundedContextExtensions.cs");
         string controller = File.ReadAllText(controllerPath);
+        string services = File.ReadAllText(servicesPath);
 
+        Assert.Contains("FlipLinkDocumentPortalService", services, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/docs\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/docs/{slug}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/docs/{slug}/receipts/publication.json\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/docs/embed/{slug}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/docs/category/{category}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("TryBuildPublicationReceipt", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Document Portal\"", controller, StringComparison.Ordinal);
-        Assert.Contains("heading: \"Chummer6 Quickstart Guide\"", controller, StringComparison.Ordinal);
+        Assert.Contains("title: document.Title", controller, StringComparison.Ordinal);
+        Assert.Contains("heading: document.Title", controller, StringComparison.Ordinal);
         Assert.Contains("FlipLink is the planned viewer layer", controller, StringComparison.Ordinal);
         Assert.Contains("Chummer owns the source document, version, access policy, and safety boundary.", controller, StringComparison.Ordinal);
+        Assert.Contains("This document is generated and owned by Chummer. FlipLink is the viewer.", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Quickstart embed boundary\"", controller, StringComparison.Ordinal);
     }
 

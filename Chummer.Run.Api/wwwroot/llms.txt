@@ -14,6 +14,7 @@ Primary routes
 - /downloads/concierge : bounded setup routing wrapper
 - /docs : governed document portal
 - /docs/chummer6-quickstart : first bounded quickstart guide route
+- /docs/chummer6-quickstart/receipts/publication.json : quickstart publication receipt route
 - /join/concierge : bounded invite and primer routing wrapper
 - /join/primer : first-party campaign invite primer
 - /status : short current release and support posture

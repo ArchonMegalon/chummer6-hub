@@ -21,6 +21,7 @@ Front-door and proof rails:
 - `/downloads/concierge`
 - `/docs`
 - `/docs/chummer6-quickstart`
+- `/docs/chummer6-quickstart/receipts/publication.json`
 - `/packages`
 - `/packages/{packageId}`
 - `/packages/{packageId}/vote`
