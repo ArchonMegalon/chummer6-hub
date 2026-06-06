@@ -4380,7 +4380,7 @@ public sealed class PublicLandingController : Controller
             "~/Views/PublicLanding/PackageReceipt.cshtml",
             new PackageActionReceiptPageViewModel(
                 Chrome: chrome,
-                Eyebrow: "First-party package receipt",
+                Eyebrow: "Package route receipt",
                 Heading: $"{BuildPackageActionLabel(receipt.ActionKind)} recorded",
                 Intro: "This receipt stays inside Chummer-owned package routes so package interest, compatibility posture, and later follow-through do not disappear into an external board or generic support thread.",
                 Package: packageEntry,
@@ -5077,7 +5077,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "Community Hub connected lane",
+                Heading: "Community Hub operations rail",
                 Summary: "Public board posture is readable without an account, but the governed open-run board, join review, scheduling, and closeout loop stay on the signed-in Community Hub rail.",
                 BoundaryLine: "Meeting tools and public venues are handoff lanes only. Chummer owns run, roster, scheduling receipt, and closeout truth.",
                 Cues: guestCues);
@@ -5124,7 +5124,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Community Hub connected lane",
+            Heading: "Community Hub operations rail",
             Summary: "The named Community Hub rail now carries governed open-run board posture, join review, scheduling, meeting handoff, and closeout on one first-party campaign-spine path.",
             BoundaryLine: "Community Hub can project venue posture and provider handoff, but it does not hand run truth, roster truth, or consequence truth to chat tools, meeting tools, or public boards.",
             Cues: cues);
@@ -5156,7 +5156,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "Creator OS connected lane",
+                Heading: "Creator OS publication rail",
                 Summary: "Public publication discovery is readable without an account, but draft review, publish state, and campaign return stay on the signed-in Creator OS rail.",
                 BoundaryLine: "External creator tools may assist rendering or promotion, but Chummer owns publication truth, moderation posture, and campaign return state.",
                 Cues: guestCues);
@@ -5203,7 +5203,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Creator OS connected lane",
+            Heading: "Creator OS publication rail",
             Summary: "The named Creator OS rail now carries governed publication discovery, signed-in publication detail, and campaign-return follow-through on one first-party path.",
             BoundaryLine: "Creator OS can expose public-safe publication detail, but it does not hand publication truth, review state, or campaign return to provider dashboards or generic asset shelves.",
             Cues: cues);
@@ -5235,7 +5235,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "Quicksilver connected lane",
+                Heading: "Quicksilver command rail",
                 Summary: "Public command posture is readable without an account, but the actual fast-jump follow-through stays on signed-in first-party rails.",
                 BoundaryLine: "Quicksilver speeds up access to trusted Chummer lanes; it does not become a separate rules engine, a hidden automation surface, or a stale cache authority.",
                 Cues: guestCues);
@@ -5264,7 +5264,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Quicksilver connected lane",
+            Heading: "Quicksilver command rail",
             Summary: "The named Quicksilver rail now carries expert-speed jump targets across builds, rules, prep, and publication desks on one first-party path.",
             BoundaryLine: "Quicksilver can reduce click friction and preserve context, but it does not hide legality, flatten meaning, or let background automation outrank explicit account-owned state.",
             Cues: cues);
@@ -5295,7 +5295,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "JACKPOINT connected lane",
+                Heading: "JACKPOINT briefing rail",
                 Summary: "Public dossier and briefing packets are readable without an account, but publication review and campaign-return follow-through stay on signed-in first-party rails.",
                 BoundaryLine: "Narration, export, or promotion helpers may assist packaging, but Chummer owns publication truth, provenance, and spoiler boundaries.",
                 Cues: guestCues);
@@ -5342,7 +5342,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "JACKPOINT connected lane",
+            Heading: "JACKPOINT briefing rail",
             Summary: "The named JACKPOINT rail now carries public-safe briefing packets, publication review, and publication-safe campaign return on one first-party path.",
             BoundaryLine: "JACKPOINT can package and publish, but it does not hand provenance, spoiler truth, or publication authority to external shelves or media adapters.",
             Cues: cues);
@@ -5373,7 +5373,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "RUNSITE connected lane",
+                Heading: "RUNSITE prep rail",
                 Summary: "Public runsite packs are inspectable without an account, but governed prep and runboard continuity stay on signed-in workspace and run rails.",
                 BoundaryLine: "Route overlays, host clips, and tours may assist orientation, but Chummer owns prep truth, runboard truth, and workspace continuity.",
                 Cues: guestCues);
@@ -5422,7 +5422,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "RUNSITE connected lane",
+            Heading: "RUNSITE prep rail",
             Summary: "The named RUNSITE rail now carries public pack inspection, signed-in workspace prep, runboard continuity, and governed prep-library launch on one first-party path.",
             BoundaryLine: "RUNSITE can orient a crew before the run starts, but it does not become tactical authority, a live-map replacement, or an off-platform truth source.",
             Cues: cues);
@@ -5454,7 +5454,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "RUN CONTROL connected lane",
+                Heading: "RUN CONTROL operations rail",
                 Summary: "Public board posture is readable without an account, but the live session-control follow-through stays on signed-in first-party rails.",
                 BoundaryLine: "RUN CONTROL can summarize session posture and continuity, but it does not replace campaign truth, the rules engine, or the dedicated workbench rails.",
                 Cues: guestCues);
@@ -5483,7 +5483,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "RUN CONTROL connected lane",
+            Heading: "RUN CONTROL operations rail",
             Summary: "The named RUN CONTROL rail now carries session board posture, active-scene continuity, reconnect-safe follow-through, and recap return on one first-party path.",
             BoundaryLine: "RUN CONTROL can help a GM operate the table, but it does not become hidden state, a generic collaboration suite, or a truth source outside the campaign spine.",
             Cues: cues);
@@ -5515,7 +5515,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "ONRAMP connected lane",
+                Heading: "ONRAMP starter rail",
                 Summary: "Public starter posture is readable without an account, but actual starter workspace and restore follow-through stay on signed-in first-party rails.",
                 BoundaryLine: "ONRAMP can guide the first playable session and recovery path, but it does not replace rules truth, hide complexity, or turn background hints into authority.",
                 Cues: guestCues);
@@ -5543,7 +5543,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "ONRAMP connected lane",
+            Heading: "ONRAMP starter rail",
             Summary: "The named ONRAMP rail now carries starter workspace, recovery posture, and first playable follow-through on one first-party path.",
             BoundaryLine: "ONRAMP can reduce first-session friction, but it does not auto-build characters, hide legality, or become a separate authority outside the campaign spine.",
             Cues: cues);
@@ -5575,7 +5575,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "EDITION STUDIO connected lane",
+                Heading: "EDITION STUDIO edition rail",
                 Summary: "Public ruleset-head posture is readable without an account, but signed-in edition focus stays on the same first-party workbench.",
                 BoundaryLine: "EDITION STUDIO can preserve semantic posture across SR4, SR5, and SR6, but it does not replace core rules truth or split the product into disconnected apps.",
                 Cues: guestCues);
@@ -5604,7 +5604,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "EDITION STUDIO connected lane",
+            Heading: "EDITION STUDIO edition rail",
             Summary: "The named EDITION STUDIO rail now carries authored SR4, SR5, and SR6 head posture on one first-party path.",
             BoundaryLine: "EDITION STUDIO can express edition differences clearly, but it does not let styling outrank core semantics or split the product into three separate authorities.",
             Cues: cues);
@@ -5636,7 +5636,7 @@ public sealed class PublicLandingController : Controller
             ];
 
             return new BlackLedgerConnectedLanePacketViewModel(
-                Heading: "LOCAL CO-PROCESSOR connected lane",
+                Heading: "LOCAL CO-PROCESSOR profile rail",
                 Summary: "Public optional-acceleration posture is readable without an account, but actual profile choice and governed fallback stay on signed-in first-party rails.",
                 BoundaryLine: "LOCAL CO-PROCESSOR can improve cost, privacy, or responsiveness where available, but it does not become mandatory infrastructure or a separate truth owner.",
                 Cues: guestCues);
@@ -5665,7 +5665,7 @@ public sealed class PublicLandingController : Controller
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "LOCAL CO-PROCESSOR connected lane",
+            Heading: "LOCAL CO-PROCESSOR profile rail",
             Summary: "The named LOCAL CO-PROCESSOR rail now carries optional acceleration policy, profile posture, and fail-open fallback on one first-party path.",
             BoundaryLine: "LOCAL CO-PROCESSOR can accelerate certain workloads, but it does not move campaign truth off the hosted lane, require special hardware, or hide provider ownership.",
             Cues: cues);
@@ -8229,7 +8229,7 @@ Boundary:
 
         return new KarmaForgeSubmittedPageViewModel(
             Chrome: chrome,
-            Eyebrow: "Normalized packet receipt",
+            Eyebrow: "KARMA FORGE intake receipt",
             Heading: "KARMA FORGE submission captured",
             Intro: "The intake is now visible as Chummer-owned packet truth, with the next questions and the likely governor route still explicit.",
             SubmissionId: submission.SubmissionId,
@@ -12291,12 +12291,12 @@ echo "Help: ${HELP_URL}"
             "manage" => "Authenticated faction management posture for route-backed campaign stewardship, bounded package pressure, and district coverage.",
             "stewards" => "Human and AI stewardship posts stay explicit here so public summary roles never get confused with private campaign authority.",
             "private-lore" => "Private lore overlays can exist here for campaign context, but public Ledger routes must never render them.",
-            _ => "Authenticated faction workspace for the same Black Ledger seed world, with private labels and management posture kept off public routes.",
+            _ => "Faction command workspace for the same Black Ledger seed world, with private labels and management posture kept off public routes.",
         };
 
         return new BlackLedgerFactionWorkspacePageViewModel(
             Chrome: _chrome.BuildAuthenticatedChrome($"{faction.PublicName} workspace", "Authenticated Black Ledger faction management and private-lore posture.", currentPath, user.DisplayName, user.Email),
-            Eyebrow: "Authenticated faction workspace",
+            Eyebrow: "Faction command workspace",
             Heading: $"{faction.PublicName} workspace",
             Intro: intro,
             CurrentSection: currentSection,
@@ -12308,7 +12308,7 @@ echo "Help: ${HELP_URL}"
             Dispatches: _blackLedgerDispatches.ListPublishedDispatches(world.CurrentTurn, faction.Id),
             Tabs: tabs,
             PublicProfileHref: $"/ledger/factions/{normalizedFactionId}",
-            PrivacyNote: "Authenticated faction workspaces may render private labels and campaign-scoped overlays. Public Ledger routes never do.",
+            PrivacyNote: "Faction command workspaces may render private labels and campaign-scoped overlays. Public Ledger routes never do.",
             Allegiance: _blackLedgerFactions.GetAllegiance(user),
             AvailableActions: string.Equals(currentSection, "manage", StringComparison.OrdinalIgnoreCase) ? _blackLedgerFactions.GetActionDefinitions(faction.Id) : Array.Empty<BlackLedgerFactionActionDefinitionDto>(),
             RecentActionReceipts: _blackLedgerFactions.GetActionReceipts(faction.Id).Take(6).ToArray(),
@@ -12474,7 +12474,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Runner Passport connected lane",
+            Heading: "Runner Passport continuity rail",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);
@@ -12531,7 +12531,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Signal Deck connected lane",
+            Heading: "Signal Deck command rail",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);
@@ -12588,7 +12588,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Living World connected lane",
+            Heading: "Living World continuity rail",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);
