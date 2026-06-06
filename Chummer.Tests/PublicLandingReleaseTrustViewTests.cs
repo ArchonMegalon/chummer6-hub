@@ -329,7 +329,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("heading: \"Document Portal\"", controller, StringComparison.Ordinal);
         Assert.Contains("title: document.Title", controller, StringComparison.Ordinal);
         Assert.Contains("heading: document.Title", controller, StringComparison.Ordinal);
-        Assert.Contains("FlipLink is the planned viewer layer", controller, StringComparison.Ordinal);
+        Assert.Contains("FlipLink is the optional governed viewer layer", controller, StringComparison.Ordinal);
         Assert.Contains("Chummer owns the source document, version, access policy, and safety boundary.", controller, StringComparison.Ordinal);
         Assert.Contains("This document is generated and owned by Chummer. FlipLink is the viewer.", controller, StringComparison.Ordinal);
         Assert.Contains("Download PDF", controller, StringComparison.Ordinal);

@@ -18,14 +18,19 @@ test('document portal keeps Chummer as truth owner and exposes a bounded publica
   expect(pdfResponse.headers()['content-type']).toContain('application/pdf');
 
   const payload = await receiptResponse.json();
-  expect(payload.viewerPosture).toBe('candidate_viewer_only');
+  expect(payload.routePublicationStatus).toBe('published');
+  expect(payload.externalViewerPublicationStatus).toBe('unpublished');
+  expect(payload.externalViewerRequired).toBe(false);
+  expect(payload.readinessPosture).toBe('operator_managed_route_ready');
+  expect(payload.truthOwner).toBe('chummer');
+  expect(payload.viewerPosture).toBe('operator_managed_viewer_optional');
   expect(payload.document.slug).toBe('chummer6-quickstart');
   expect(payload.document.sourceRepo).toBe('chummer6-design');
   expect(payload.document.sourcePath).toBe('products/chummer/public-guides/chummer6-quickstart.md');
   expect(payload.document.sourceHash).toMatch(/^[a-f0-9]{64}$/);
   expect(payload.document.pdfArtifactPath).toBe('/docs/chummer6-quickstart/download.pdf');
   expect(payload.document.pdfSha256).toMatch(/^[a-f0-9]{64}$/);
-  expect(payload.document.status).toBe('approved');
+  expect(payload.document.status).toBe('published');
   expect(payload.publication.provider).toBe('FlipLink.me');
   expect(payload.publication.publicationStatus).toBe('unpublished');
   expect(payload.receipt.embedRoute).toBe('/docs/embed/chummer6-quickstart');

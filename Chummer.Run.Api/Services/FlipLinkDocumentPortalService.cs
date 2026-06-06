@@ -135,9 +135,9 @@ public sealed class FlipLinkDocumentPortalService
             LeadCaptureEnabled: false,
             PasswordProtected: false,
             Version: QuickstartVersion,
-            Status: ChummerDocumentStatuses.Approved,
+            Status: ChummerDocumentStatuses.Published,
             CreatedAtUtc: QuickstartCreatedAtUtc,
-            PublishedAtUtc: null);
+            PublishedAtUtc: QuickstartCreatedAtUtc);
     }
 
     private static string ResolveProductRoot(IConfiguration configuration)
@@ -205,7 +205,7 @@ public sealed class FlipLinkDocumentPortalService
             title,
             string.Empty,
             "Generated and owned by Chummer.",
-            "FlipLink is the planned viewer layer once operator-managed publication proof is complete.",
+            "FlipLink is the optional governed viewer layer; the Chummer route remains the truth owner.",
             string.Empty
         ];
 

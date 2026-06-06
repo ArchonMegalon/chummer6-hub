@@ -1569,7 +1569,12 @@ public sealed class PublicLandingController : Controller
             document,
             publication,
             receipt,
-            viewerPosture = "candidate_viewer_only"
+            routePublicationStatus = document.Status,
+            externalViewerPublicationStatus = publication.PublicationStatus,
+            externalViewerRequired = false,
+            readinessPosture = DocumentPortalReadinessPostures.OperatorManagedRouteReady,
+            truthOwner = "chummer",
+            viewerPosture = DocumentPortalReadinessPostures.OperatorManagedViewerOptional
         });
     }
 
@@ -8187,7 +8192,7 @@ Boundary:
             currentPath: "/docs",
             eyebrow: "Governed publication rail",
             heading: "Document Portal",
-            intro: "Chummer owns the source document, version, access policy, and safety boundary. FlipLink is the planned viewer layer for approved PDFs, not the truth owner. The first bounded publication lane starts with the Chummer6 Quickstart Guide.",
+            intro: "Chummer owns the source document, version, access policy, and safety boundary. FlipLink is the optional governed viewer layer for approved PDFs, not the truth owner. The first bounded publication lane starts with the Chummer6 Quickstart Guide.",
             sections:
             [
                 new TrustPageSectionViewModel(
@@ -8233,7 +8238,7 @@ Boundary:
             [
                 "Original Chummer guides only",
                 "Governed document classification",
-                "FlipLink planned as viewer layer"
+                "FlipLink optional as viewer layer"
             ]);
     }
 
@@ -8252,11 +8257,11 @@ Boundary:
                     "quickstart_documents_current",
                     "Current document",
                     "The first document on this rail",
-                    "The Chummer6 Quickstart Guide is the first candidate publication because it can explain install, orientation, and first safe actions without depending on sourcebook excerpts.",
+                    "The Chummer6 Quickstart Guide is the first route publication because it can explain install, orientation, and first safe actions without depending on sourcebook excerpts.",
                     [
                         document.Title,
                         "Install and orientation focus",
-                        "Safe first publication candidate"
+                        "Safe first publication route"
                     ])
             ],
             actions:
@@ -8321,8 +8326,8 @@ Boundary:
             summaryPoints:
             [
                 "Original Chummer-authored guide",
-                "First publication candidate",
-                "Viewer proof still pending",
+                "First-party route published",
+                "External viewer optional",
                 "Fallback PDF is current"
             ]);
 

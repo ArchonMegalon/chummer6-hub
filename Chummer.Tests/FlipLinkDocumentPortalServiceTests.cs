@@ -31,12 +31,13 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.Equal("/docs/chummer6-quickstart/download.pdf", document.PdfArtifactPath);
         Assert.False(string.IsNullOrWhiteSpace(document.PdfSha256));
         Assert.Equal(64, document.PdfSha256.Length);
-        Assert.Equal(ChummerDocumentStatuses.Approved, document.Status);
+        Assert.Equal(ChummerDocumentStatuses.Published, document.Status);
+        Assert.NotNull(document.PublishedAtUtc);
         Assert.Equal(ChummerDocumentClassifications.Public, document.PublicClassification);
     }
 
     [Fact]
-    public void QuickstartPublicationReceiptStaysCandidateOnlyUntilProviderProofExists()
+    public void QuickstartPublicationSeparatesRouteReadinessFromExternalViewerPublication()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -55,6 +56,7 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.NotNull(receipt);
         Assert.Equal("FlipLink.me", publication!.Provider);
         Assert.Equal(FlipLinkPublicationStatuses.Unpublished, publication.PublicationStatus);
+        Assert.Equal(ChummerDocumentStatuses.Published, document.Status);
         Assert.False(publication.AnalyticsEnabled);
         Assert.False(publication.LeadCaptureEnabled);
         Assert.False(publication.PaywallEnabled);
