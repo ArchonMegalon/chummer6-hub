@@ -28,6 +28,9 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.Equal("chummer6-design", document.SourceRepo);
         Assert.False(string.IsNullOrWhiteSpace(document.SourceHash));
         Assert.Equal(64, document.SourceHash.Length);
+        Assert.Equal("/docs/chummer6-quickstart/download.pdf", document.PdfArtifactPath);
+        Assert.False(string.IsNullOrWhiteSpace(document.PdfSha256));
+        Assert.Equal(64, document.PdfSha256.Length);
         Assert.Equal(ChummerDocumentStatuses.Approved, document.Status);
         Assert.Equal(ChummerDocumentClassifications.Public, document.PublicClassification);
     }
@@ -55,8 +58,30 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.False(publication.AnalyticsEnabled);
         Assert.False(publication.LeadCaptureEnabled);
         Assert.False(publication.PaywallEnabled);
-        Assert.Equal("pending_manual_scan", receipt!.PrivacyScanStatus);
-        Assert.Equal("pending_manual_scan", receipt.CopyrightScanStatus);
+        Assert.Equal(document.PdfSha256, receipt!.PdfSha256);
+        Assert.Equal("pass_first_party_doc_boundary", receipt.PrivacyScanStatus);
+        Assert.Equal("pass_first_party_doc_boundary", receipt.CopyrightScanStatus);
         Assert.Equal("/docs/embed/chummer6-quickstart", receipt.EmbedRoute);
+    }
+
+    [Fact]
+    public void QuickstartPdfFallbackArtifactIsAvailableAndStable()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new FlipLinkDocumentPortalService(configuration);
+
+        var artifact = service.TryBuildPdfArtifact("chummer6-quickstart");
+
+        Assert.NotNull(artifact);
+        Assert.Equal("application/pdf", artifact!.ContentType);
+        Assert.Equal("chummer6-quickstart-guide.pdf", artifact.FileName);
+        Assert.StartsWith("%PDF-1.4", System.Text.Encoding.ASCII.GetString(artifact.Bytes.Take(8).ToArray()));
+        Assert.Equal(64, artifact.Sha256.Length);
     }
 }

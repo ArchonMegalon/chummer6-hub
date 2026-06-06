@@ -4,7 +4,7 @@ Full route guide: /llms.txt
 
 Fast split
 - Live proof now: /now, /downloads, /status, /changelog
-- Document portal: /docs, /docs/chummer6-quickstart, /docs/chummer6-quickstart/receipts/publication.json
+- Document portal: /docs, /docs/chummer6-quickstart, /docs/chummer6-quickstart/receipts/publication.json, /docs/chummer6-quickstart/download.pdf
 - Guided wrappers: /now/concierge, /downloads/concierge, /contact/concierge, /join/concierge
 - Invite orientation: /join/primer
 - Creator and public proof wrappers: /artifacts/publications/{publicationId}/concierge, /testimonials/concierge

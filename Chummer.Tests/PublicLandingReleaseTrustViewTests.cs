@@ -322,14 +322,17 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("[HttpGet(\"/docs/{slug}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/docs/{slug}/receipts/publication.json\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/docs/embed/{slug}\")]", controller, StringComparison.Ordinal);
+        Assert.Contains("[HttpGet(\"/docs/{slug}/download.pdf\")]", controller, StringComparison.Ordinal);
         Assert.Contains("[HttpGet(\"/docs/category/{category}\")]", controller, StringComparison.Ordinal);
         Assert.Contains("TryBuildPublicationReceipt", controller, StringComparison.Ordinal);
+        Assert.Contains("TryBuildPdfArtifact", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Document Portal\"", controller, StringComparison.Ordinal);
         Assert.Contains("title: document.Title", controller, StringComparison.Ordinal);
         Assert.Contains("heading: document.Title", controller, StringComparison.Ordinal);
         Assert.Contains("FlipLink is the planned viewer layer", controller, StringComparison.Ordinal);
         Assert.Contains("Chummer owns the source document, version, access policy, and safety boundary.", controller, StringComparison.Ordinal);
         Assert.Contains("This document is generated and owned by Chummer. FlipLink is the viewer.", controller, StringComparison.Ordinal);
+        Assert.Contains("Download PDF", controller, StringComparison.Ordinal);
         Assert.Contains("heading: \"Quickstart embed boundary\"", controller, StringComparison.Ordinal);
     }
 

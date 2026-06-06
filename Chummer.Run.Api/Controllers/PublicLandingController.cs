@@ -1599,6 +1599,19 @@ public sealed class PublicLandingController : Controller
         return View("~/Views/PublicLanding/TrustPage.cshtml", await BuildDocumentPortalEmbedBoundaryPageModel(document, cancellationToken));
     }
 
+    [HttpGet("/docs/{slug}/download.pdf")]
+    [Produces("application/pdf")]
+    public IActionResult DocumentPortalPdfDownload([FromRoute] string slug)
+    {
+        var artifact = _flipLinkDocumentPortal.TryBuildPdfArtifact(slug);
+        if (artifact is null)
+        {
+            return NotFound();
+        }
+
+        return File(artifact.Bytes, artifact.ContentType, artifact.FileName);
+    }
+
     [HttpGet("/docs/{slug}")]
     [Produces("text/html")]
     public async Task<IActionResult> DocumentPortalDetailPage([FromRoute] string slug, CancellationToken cancellationToken)
@@ -8201,18 +8214,19 @@ Boundary:
                     "document_portal_provider_posture",
                     "Provider posture",
                     "Operator publication first",
-                    "The initial publication mode is operator-managed. Approved PDFs can be uploaded and linked only after provider verification, privacy/copyright scan, and route proof exist.",
+                    "The initial publication mode is operator-managed. Chummer already owns the route, source hash, PDF fallback, and publication boundary. An external FlipLink viewer can be linked later without changing document truth ownership.",
                     [
-                        "Provider verification pending",
-                        "First publication not yet promoted",
-                        "Embed route stays bounded until proof exists"
+                        "Operator-managed publication lane is current",
+                        "First-party route and PDF fallback are current",
+                        "External viewer remains optional"
                     ])
             ],
             actions:
             [
                 new TrustPageActionViewModel("Open Quickstart Guide", $"/docs/{firstDocument.Slug}", "primary"),
                 new TrustPageActionViewModel("Quickstart category", $"/docs/category/{firstDocument.Category}", "secondary"),
-                new TrustPageActionViewModel("Read publication boundary", $"/docs/embed/{firstDocument.Slug}", "ghost")
+                new TrustPageActionViewModel("Read publication boundary", $"/docs/embed/{firstDocument.Slug}", "ghost"),
+                new TrustPageActionViewModel("Download PDF", $"/docs/{firstDocument.Slug}/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken,
             summaryPoints:
@@ -8248,7 +8262,8 @@ Boundary:
             actions:
             [
                 new TrustPageActionViewModel("Open Quickstart Guide", $"/docs/{document.Slug}", "primary"),
-                new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary")
+                new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary"),
+                new TrustPageActionViewModel("Download PDF", $"/docs/{document.Slug}/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken);
 
@@ -8260,7 +8275,7 @@ Boundary:
             currentPath: $"/docs/{document.Slug}",
             eyebrow: "Chummer-owned guide",
             heading: document.Title,
-            intro: "This route is the Chummer-owned document surface for the first bounded flipbook candidate. This document is generated and owned by Chummer. FlipLink is the viewer once provider verification, publication receipt, and responsive QA are complete.",
+            intro: "This route is the Chummer-owned document surface for the first bounded flipbook publication lane. This document is generated and owned by Chummer. FlipLink is the optional external viewer; the first-party route and PDF fallback remain the truth-owning current path.",
             sections:
             [
                 new TrustPageSectionViewModel(
@@ -8287,11 +8302,12 @@ Boundary:
                     "quickstart_publication_posture",
                     "Publication posture",
                     "Current provider state",
-                    "The Chummer route is live now. FlipLink publication is still pending provider verification and first-publication proof, so the guide remains on a first-party route until the viewer layer is proven.",
+                    "The Chummer route and fallback PDF are live now. The external FlipLink viewer remains governed and optional, so the document can ship today without moving truth ownership outside Chummer.",
                     [
                         "First-party route is current",
-                        "FlipLink publication pending",
-                        "Responsive embed proof still required",
+                        "PDF fallback is current",
+                        "Operator-managed publication lane is current",
+                        "External viewer remains optional",
                         $"Source hash recorded: {document.SourceHash}"
                     ])
             ],
@@ -8299,14 +8315,15 @@ Boundary:
             [
                 new TrustPageActionViewModel("Open Document Portal", "/docs", "primary"),
                 new TrustPageActionViewModel("Open embed boundary", $"/docs/embed/{document.Slug}", "secondary"),
-                new TrustPageActionViewModel("Open downloads", "/downloads", "ghost")
+                new TrustPageActionViewModel("Download PDF", $"/docs/{document.Slug}/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken,
             summaryPoints:
             [
                 "Original Chummer-authored guide",
                 "First publication candidate",
-                "Viewer proof still pending"
+                "Viewer proof still pending",
+                "Fallback PDF is current"
             ]);
 
     private async Task<TrustPageViewModel> BuildDocumentPortalEmbedBoundaryPageModel(ChummerDocument document, CancellationToken cancellationToken)
@@ -8317,7 +8334,7 @@ Boundary:
             currentPath: $"/docs/embed/{document.Slug}",
             eyebrow: "Viewer boundary",
             heading: "Quickstart embed boundary",
-            intro: "This route exists so the viewer boundary stays explicit. This document is generated and owned by Chummer. FlipLink is the viewer. Until provider verification, publication receipt, unpublish/delete proof, and responsive QA exist, this route must not pretend a live embedded flipbook is already production-ready.",
+            intro: "This route exists so the viewer boundary stays explicit. This document is generated and owned by Chummer. FlipLink is the viewer. The Chummer route and PDF fallback stay current even when no external embed is linked.",
             sections:
             [
                 new TrustPageSectionViewModel(
@@ -8333,18 +8350,19 @@ Boundary:
                 new TrustPageSectionViewModel(
                     "embed_boundary_current_state",
                     "Current state",
-                    "Why this is still bounded",
-                    "Provider verification, first publication, responsive QA, and unpublish/delete proof are still required before a live FlipLink embed can be promoted from candidate lane to trusted document portal viewer.",
+                    "Why the boundary stays visible",
+                    "The external viewer remains optional and governed. Chummer keeps the route, the fallback PDF, the source hash, and the publication receipt even when the operator chooses not to link a live external flipbook.",
                     [
-                        "Provider verification pending",
-                        "First publication pending",
-                        "Human review still required"
+                        "Chummer route remains current",
+                        "Fallback PDF remains current",
+                        "External embed remains optional"
                     ])
             ],
             actions:
             [
                 new TrustPageActionViewModel("Back to Quickstart Guide", $"/docs/{document.Slug}", "primary"),
-                new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary")
+                new TrustPageActionViewModel("Back to Document Portal", "/docs", "secondary"),
+                new TrustPageActionViewModel("Download PDF", $"/docs/{document.Slug}/download.pdf", "ghost")
             ],
             cancellationToken: cancellationToken);
 

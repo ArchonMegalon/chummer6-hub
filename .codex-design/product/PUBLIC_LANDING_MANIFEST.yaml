@@ -150,6 +150,15 @@ public_routes:
   must_exist: true
   placeholder_allowed: false
   placeholder_requirements: candidate viewer publication receipt only
+- path: /docs/{slug}/download.pdf
+  title: Document PDF fallback
+  audience: public
+  purpose: document_pdf_fallback
+  requires_auth: false
+  guest_fallback: /docs
+  must_exist: true
+  placeholder_allowed: false
+  placeholder_requirements: first-party PDF fallback only
 - path: /docs/embed/{slug}
   title: Document embed boundary
   audience: public
