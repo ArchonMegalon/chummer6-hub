@@ -874,6 +874,11 @@ public sealed class PublicReleaseManifestService
 
     private PublicReleaseManifestDto ApplyImportRouteParityGuard(PublicReleaseManifestDto manifest)
     {
+        if (ShouldPreserveCurrentGoldSupportability(manifest))
+        {
+            return EnsureContractName(manifest);
+        }
+
         ImportRouteParityProofGuardSnapshot importRouteGuard = _importRouteParityProofGuard.Evaluate();
         if (importRouteGuard.IsCurrent || string.IsNullOrWhiteSpace(importRouteGuard.ReviewRequiredReason))
         {
@@ -894,6 +899,29 @@ public sealed class PublicReleaseManifestService
                 manifest.FixAvailabilitySummary,
                 "Use the linked-install recovery and first-party support lane until current translator/XML/Hero Lab/import-route proof receipts are published.")
         });
+    }
+
+    private bool ShouldPreserveCurrentGoldSupportability(PublicReleaseManifestDto manifest)
+    {
+        if (!string.Equals(NormalizeOptional(manifest.SupportabilityState), "gold_supported", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        FlagshipReadinessSnapshot? readiness = _flagshipReadiness.LoadSnapshot();
+        if (readiness is not null
+            && string.Equals(NormalizeOptional(readiness.Status), "pass", StringComparison.OrdinalIgnoreCase)
+            && !readiness.MissingDesktopClientCoverage)
+        {
+            return true;
+        }
+
+        string? normalizedProofStatus = NormalizeOptional(manifest.ProofStatus);
+        bool canonicalProofPassed = !string.IsNullOrWhiteSpace(normalizedProofStatus)
+            && (normalizedProofStatus.Contains("pass", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedProofStatus, "ready", StringComparison.OrdinalIgnoreCase));
+
+        return canonicalProofPassed && manifest.ProofRoutes is { Count: > 0 };
     }
 
     private void ApplyArtifactSuppressionPolicy(JsonObject manifest, IReadOnlySet<string> disabledArtifactIds)

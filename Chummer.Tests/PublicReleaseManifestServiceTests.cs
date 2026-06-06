@@ -170,6 +170,105 @@ public sealed class PublicReleaseManifestServiceTests
     }
 
     [Fact]
+    public void LoadManifestPreservesGoldSupportedCanonicalShelfWhenFlagshipReadinessIsCurrent()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-20260601-070650",
+            ["publishedAt"] = "2026-06-05T05:05:03Z",
+            ["status"] = "published",
+            ["supportabilityState"] = "gold_supported",
+            ["supportabilitySummary"] = "Current shelf is gold-supported.",
+            ["knownIssueSummary"] = "Current release proof is green.",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-win-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "windows",
+                    ["rid"] = "win-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Windows X64 Installer",
+                    ["fileName"] = "chummer-avalonia-win-x64-installer.exe",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    ["sha256"] = "abc123",
+                    ["sizeBytes"] = 123456789L,
+                    ["installAccessClass"] = "account_required"
+                }
+            },
+            ["releaseProof"] = new Dictionary<string, object?>
+            {
+                ["status"] = "registry-passed",
+                ["generatedAt"] = "2026-06-05T05:05:03Z",
+                ["baseUrl"] = "https://registry.chummer.run",
+                ["journeysPassed"] = new[] { "registry_journey" },
+                ["proofRoutes"] = new[] { "/downloads" }
+            }
+        });
+        fixture.WriteFlagshipReadiness(status: "pass");
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("gold_supported", manifest.SupportabilityState);
+        Assert.DoesNotContain("review-required", manifest.SupportabilitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("review-required", manifest.KnownIssueSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void LoadManifestPreservesGoldSupportedCanonicalShelfWhenCanonicalProofIsPassed()
+    {
+        using var fixture = new PublicReleaseManifestFixture();
+        fixture.WriteRegistryManifestRaw(new Dictionary<string, object?>
+        {
+            ["product"] = "chummer",
+            ["channelId"] = "public_stable",
+            ["version"] = "run-20260601-070650",
+            ["publishedAt"] = "2026-06-05T05:05:03Z",
+            ["status"] = "published",
+            ["supportabilityState"] = "gold_supported",
+            ["supportabilitySummary"] = "Current shelf is gold-supported.",
+            ["knownIssueSummary"] = "Current release proof is green.",
+            ["artifacts"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["artifactId"] = "avalonia-win-x64-installer",
+                    ["head"] = "avalonia",
+                    ["platform"] = "windows",
+                    ["rid"] = "win-x64",
+                    ["arch"] = "x64",
+                    ["kind"] = "installer",
+                    ["platformLabel"] = "Avalonia Desktop Windows X64 Installer",
+                    ["fileName"] = "chummer-avalonia-win-x64-installer.exe",
+                    ["downloadUrl"] = "/downloads/files/chummer-avalonia-win-x64-installer.exe",
+                    ["sha256"] = "abc123",
+                    ["sizeBytes"] = 123456789L,
+                    ["installAccessClass"] = "account_required"
+                }
+            },
+            ["releaseProof"] = new Dictionary<string, object?>
+            {
+                ["status"] = "registry-passed",
+                ["generatedAt"] = "2026-06-05T05:05:03Z",
+                ["baseUrl"] = "https://registry.chummer.run",
+                ["journeysPassed"] = new[] { "registry_journey" },
+                ["proofRoutes"] = new[] { "/downloads" }
+            }
+        });
+
+        var manifest = fixture.CreateService().LoadManifest();
+
+        Assert.Equal("gold_supported", manifest.SupportabilityState);
+        Assert.DoesNotContain("review-required", manifest.SupportabilitySummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("review-required", manifest.KnownIssueSummary ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void LoadManifestPreservesRegistryPublicTrustMetricsFlagshipReadinessFields()
     {
         using var fixture = new PublicReleaseManifestFixture();
