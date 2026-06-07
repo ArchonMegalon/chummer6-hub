@@ -1,13 +1,21 @@
 import importlib.util
+import os
 import unittest
 from pathlib import Path
 
 
 SCRIPT_PATH = Path("/docker/chummercomplete/chummer.run-services/scripts/audit_full_product_reaudit_v16_gate_semantics.py")
-SPEC = importlib.util.spec_from_file_location("audit_full_product_reaudit_v16_gate_semantics", SCRIPT_PATH)
-assert SPEC is not None and SPEC.loader is not None
-MODULE = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(MODULE)
+
+
+def load_module():
+    spec = importlib.util.spec_from_file_location("audit_full_product_reaudit_v16_gate_semantics", SCRIPT_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+MODULE = load_module()
 
 
 def statuses(checks):
@@ -15,6 +23,24 @@ def statuses(checks):
 
 
 class FullProductReauditV16GateSemanticTests(unittest.TestCase):
+    def test_surface_verify_base_url_defaults_to_local_runtime(self) -> None:
+        previous = os.environ.pop("CHUMMER_FULL_PRODUCT_REAUDIT_SURFACE_BASE_URL", None)
+        try:
+            module = load_module()
+            self.assertEqual(module.SURFACE_VERIFY_BASE_URL, "http://127.0.0.1:8091")
+            self.assertEqual(
+                module.surface_verify_command("verify_pwa_notification_runtime.py"),
+                [
+                    "python3",
+                    "scripts/verify_pwa_notification_runtime.py",
+                    "--base-url",
+                    "http://127.0.0.1:8091",
+                ],
+            )
+        finally:
+            if previous is not None:
+                os.environ["CHUMMER_FULL_PRODUCT_REAUDIT_SURFACE_BASE_URL"] = previous
+
     def test_public_guide_release_truth_fails_on_stale_macos_copy(self) -> None:
         checks = MODULE.public_guide_release_truth_checks(
             {

@@ -28,7 +28,7 @@ LOCAL_BASE_URL = "http://127.0.0.1:8091"
 BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_BASE_URL", DEFAULT_PUBLIC_BASE_URL).rstrip("/")
 PUBLIC_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_PUBLIC_BASE_URL", DEFAULT_PUBLIC_BASE_URL).rstrip("/")
 PUBLIC_HOST = urllib.parse.urlparse(PUBLIC_BASE_URL).netloc or "chummer.run"
-SURFACE_VERIFY_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_SURFACE_BASE_URL", "").rstrip("/")
+SURFACE_VERIFY_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_SURFACE_BASE_URL", LOCAL_BASE_URL).rstrip("/")
 
 REQUIRED_PUBLIC_PATHS = [
     "/",
@@ -121,6 +121,10 @@ def run(command: list[str], cwd: Path = RUN_SERVICES) -> tuple[bool, str]:
     return completed.returncode == 0, completed.stdout if completed.returncode == 0 else completed.stdout + completed.stderr
 
 
+def surface_verify_command(script_name: str) -> list[str]:
+    return ["python3", f"scripts/{script_name}", "--base-url", SURFACE_VERIFY_BASE_URL]
+
+
 def copy_or_missing(name: str, sources: list[Path], missing_text: str) -> None:
     for source in sources:
         text = read_text(source)
@@ -132,12 +136,9 @@ def copy_or_missing(name: str, sources: list[Path], missing_text: str) -> None:
 
 def write_v16_newsroom_verdict(generated: str) -> None:
     local_ok, local_output = run(["python3", "scripts/verify_black_ledger_newsroom_surface.py"])
-    live_ok = True
-    live_output = "skipped"
-    live_command = "not requested"
-    if SURFACE_VERIFY_BASE_URL:
-        live_command = f"python3 scripts/verify_black_ledger_newsroom_surface.py --base-url {SURFACE_VERIFY_BASE_URL}"
-        live_ok, live_output = run(["python3", "scripts/verify_black_ledger_newsroom_surface.py", "--base-url", SURFACE_VERIFY_BASE_URL])
+    live_command_args = surface_verify_command("verify_black_ledger_newsroom_surface.py")
+    live_command = " ".join(live_command_args)
+    live_ok, live_output = run(live_command_args)
     ready = local_ok and live_ok
     write_text(OUT / "FINAL_BLACK_LEDGER_NEWSROOM_VERDICT.md", f"""{'BLACK_LEDGER_NEWSROOM_READY' if ready else 'NOT_READY'}
 
@@ -157,16 +158,12 @@ This V16 verdict is bounded to source contracts, live watch route proof, media r
 
 def write_v16_table_pulse_verdict(generated: str) -> None:
     local_ok, local_output = run(["python3", "scripts/verify_table_pulse_connected_lane_surface.py"])
-    live_ok = True
-    live_output = "skipped"
-    pwa_ok, pwa_output = run(["python3", "scripts/verify_pwa_notification_runtime.py"])
-    live_command = "not requested"
-    pwa_command = "python3 scripts/verify_pwa_notification_runtime.py"
-    if SURFACE_VERIFY_BASE_URL:
-        live_command = f"python3 scripts/verify_table_pulse_connected_lane_surface.py --base-url {SURFACE_VERIFY_BASE_URL}"
-        pwa_command = f"python3 scripts/verify_pwa_notification_runtime.py --base-url {SURFACE_VERIFY_BASE_URL}"
-        live_ok, live_output = run(["python3", "scripts/verify_table_pulse_connected_lane_surface.py", "--base-url", SURFACE_VERIFY_BASE_URL])
-        pwa_ok, pwa_output = run(["python3", "scripts/verify_pwa_notification_runtime.py", "--base-url", SURFACE_VERIFY_BASE_URL])
+    live_command_args = surface_verify_command("verify_table_pulse_connected_lane_surface.py")
+    pwa_command_args = surface_verify_command("verify_pwa_notification_runtime.py")
+    live_command = " ".join(live_command_args)
+    pwa_command = " ".join(pwa_command_args)
+    live_ok, live_output = run(live_command_args)
+    pwa_ok, pwa_output = run(pwa_command_args)
     ready = local_ok and live_ok and pwa_ok
     write_text(OUT / "FINAL_TABLE_PULSE_OPTOUT_REMOTE_REACTION_VERDICT.md", f"""{'GOLD_READY' if ready else 'NOT_READY'}
 

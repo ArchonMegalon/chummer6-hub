@@ -18,7 +18,11 @@ DEFAULT_PUBLIC_BASE_URL = "https://chummer.run"
 LOCAL_BASE_URL = "http://127.0.0.1:8091"
 BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_BASE_URL", DEFAULT_PUBLIC_BASE_URL).rstrip("/")
 PUBLIC_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_PUBLIC_BASE_URL", DEFAULT_PUBLIC_BASE_URL).rstrip("/")
-SURFACE_VERIFY_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_SURFACE_BASE_URL", "").rstrip("/")
+SURFACE_VERIFY_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_SURFACE_BASE_URL", LOCAL_BASE_URL).rstrip("/")
+
+
+def surface_verify_command(script_name: str) -> list[str]:
+    return ["python3", f"scripts/{script_name}", "--base-url", SURFACE_VERIFY_BASE_URL]
 
 
 def now_iso() -> str:
@@ -371,13 +375,9 @@ def main() -> int:
         checks.append(check(receipt.get("status") == "published", f"{asset_id} has published receipt"))
         checks.append(check(probe.get("status") == "pass" and probe.get("has_video") and probe.get("has_audio") and probe.get("duration", 0) >= 89.5, f"{asset_id} is a 90-second audio/video asset", probe))
 
-    newsroom_command = ["python3", "scripts/verify_black_ledger_newsroom_surface.py"]
-    table_command = ["python3", "scripts/verify_table_pulse_connected_lane_surface.py"]
-    pwa_command = ["python3", "scripts/verify_pwa_notification_runtime.py"]
-    if SURFACE_VERIFY_BASE_URL:
-        newsroom_command.extend(["--base-url", SURFACE_VERIFY_BASE_URL])
-        table_command.extend(["--base-url", SURFACE_VERIFY_BASE_URL])
-        pwa_command.extend(["--base-url", SURFACE_VERIFY_BASE_URL])
+    newsroom_command = surface_verify_command("verify_black_ledger_newsroom_surface.py")
+    table_command = surface_verify_command("verify_table_pulse_connected_lane_surface.py")
+    pwa_command = surface_verify_command("verify_pwa_notification_runtime.py")
     newsroom = run(newsroom_command)
     checks.append(check(newsroom["pass"], "Black Ledger newsroom verifier passes", newsroom))
     table = run(table_command)
