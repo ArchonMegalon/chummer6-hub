@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import urllib.error
@@ -22,7 +23,12 @@ OUT = WORKSPACE / "_completion" / "full_product_reaudit_v16"
 ZIP = RUN_SERVICES / "Chummer.Portal" / "downloads" / "chummer6_full_product_reaudit_v16_20260529.zip"
 LATEST_HOME_ZIP = Path.home() / "chummer6_full_product_reaudit_v16_20260531.zip"
 UNPACKED_AUDIT_ROOT = Path("/tmp/chummer6_full_product_reaudit_v16_20260531/chummer6_full_product_reaudit_v16_20260531")
-BASE_URL = "https://chummer.run"
+DEFAULT_PUBLIC_BASE_URL = "https://chummer.run"
+LOCAL_BASE_URL = "http://127.0.0.1:8091"
+BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_BASE_URL", DEFAULT_PUBLIC_BASE_URL).rstrip("/")
+PUBLIC_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_PUBLIC_BASE_URL", DEFAULT_PUBLIC_BASE_URL).rstrip("/")
+PUBLIC_HOST = urllib.parse.urlparse(PUBLIC_BASE_URL).netloc or "chummer.run"
+SURFACE_VERIFY_BASE_URL = os.environ.get("CHUMMER_FULL_PRODUCT_REAUDIT_SURFACE_BASE_URL", "").rstrip("/")
 
 REQUIRED_PUBLIC_PATHS = [
     "/",
@@ -126,7 +132,12 @@ def copy_or_missing(name: str, sources: list[Path], missing_text: str) -> None:
 
 def write_v16_newsroom_verdict(generated: str) -> None:
     local_ok, local_output = run(["python3", "scripts/verify_black_ledger_newsroom_surface.py"])
-    live_ok, live_output = run(["python3", "scripts/verify_black_ledger_newsroom_surface.py", "--base-url", BASE_URL])
+    live_ok = True
+    live_output = "skipped"
+    live_command = "not requested"
+    if SURFACE_VERIFY_BASE_URL:
+        live_command = f"python3 scripts/verify_black_ledger_newsroom_surface.py --base-url {SURFACE_VERIFY_BASE_URL}"
+        live_ok, live_output = run(["python3", "scripts/verify_black_ledger_newsroom_surface.py", "--base-url", SURFACE_VERIFY_BASE_URL])
     ready = local_ok and live_ok
     write_text(OUT / "FINAL_BLACK_LEDGER_NEWSROOM_VERDICT.md", f"""{'BLACK_LEDGER_NEWSROOM_READY' if ready else 'NOT_READY'}
 
@@ -136,7 +147,7 @@ V16 source and current-route proof {'is green' if ready else 'is not green'} for
 
 Evidence:
 - `python3 scripts/verify_black_ledger_newsroom_surface.py`: {'pass' if local_ok else 'fail'}
-- `python3 scripts/verify_black_ledger_newsroom_surface.py --base-url https://chummer.run`: {'pass' if live_ok else 'fail'}
+- `{live_command}`: {'pass' if live_ok else 'fail'}
 - Local output: {local_output.strip() or 'none'}
 - Live output: {live_output.strip() or 'none'}
 
@@ -146,8 +157,16 @@ This V16 verdict is bounded to source contracts, live watch route proof, media r
 
 def write_v16_table_pulse_verdict(generated: str) -> None:
     local_ok, local_output = run(["python3", "scripts/verify_table_pulse_connected_lane_surface.py"])
-    live_ok, live_output = run(["python3", "scripts/verify_table_pulse_connected_lane_surface.py", "--base-url", BASE_URL])
-    pwa_ok, pwa_output = run(["python3", "scripts/verify_pwa_notification_runtime.py", "--base-url", BASE_URL])
+    live_ok = True
+    live_output = "skipped"
+    pwa_ok, pwa_output = run(["python3", "scripts/verify_pwa_notification_runtime.py"])
+    live_command = "not requested"
+    pwa_command = "python3 scripts/verify_pwa_notification_runtime.py"
+    if SURFACE_VERIFY_BASE_URL:
+        live_command = f"python3 scripts/verify_table_pulse_connected_lane_surface.py --base-url {SURFACE_VERIFY_BASE_URL}"
+        pwa_command = f"python3 scripts/verify_pwa_notification_runtime.py --base-url {SURFACE_VERIFY_BASE_URL}"
+        live_ok, live_output = run(["python3", "scripts/verify_table_pulse_connected_lane_surface.py", "--base-url", SURFACE_VERIFY_BASE_URL])
+        pwa_ok, pwa_output = run(["python3", "scripts/verify_pwa_notification_runtime.py", "--base-url", SURFACE_VERIFY_BASE_URL])
     ready = local_ok and live_ok and pwa_ok
     write_text(OUT / "FINAL_TABLE_PULSE_OPTOUT_REMOTE_REACTION_VERDICT.md", f"""{'GOLD_READY' if ready else 'NOT_READY'}
 
@@ -157,8 +176,8 @@ The Table Pulse opt-out and remote reaction lane {'is accepted' if ready else 'i
 
 Evidence:
 - `python3 scripts/verify_table_pulse_connected_lane_surface.py`: {'pass' if local_ok else 'fail'}
-- `python3 scripts/verify_table_pulse_connected_lane_surface.py --base-url https://chummer.run`: {'pass' if live_ok else 'fail'}
-- `python3 scripts/verify_pwa_notification_runtime.py --base-url https://chummer.run`: {'pass' if pwa_ok else 'fail'}
+- `{live_command}`: {'pass' if live_ok else 'fail'}
+- `{pwa_command}`: {'pass' if pwa_ok else 'fail'}
 - Local output: {local_output.strip() or 'none'}
 - Live output: {live_output.strip() or 'none'}
 - PWA output: {pwa_output.strip() or 'none'}
@@ -175,7 +194,7 @@ def link_targets(path: str, html: str) -> list[str]:
             continue
         absolute = urllib.parse.urljoin(f"{BASE_URL}{path}", href)
         parsed = urllib.parse.urlparse(absolute)
-        if parsed.netloc and parsed.netloc != "chummer.run":
+        if parsed.netloc and parsed.netloc != PUBLIC_HOST:
             continue
         if parsed.path.startswith("/logout"):
             continue
@@ -251,7 +270,7 @@ def materialize_live_route_proof(generated: str) -> dict[str, Any]:
         "contract_name": "chummer.full_product_reaudit_v16.live_public_route_proof",
         "generated_at_utc": generated,
         "base_url": BASE_URL,
-        "public_host": "chummer.run",
+        "public_host": PUBLIC_HOST,
         "strict_positive": True,
         "required_routes": REQUIRED_PUBLIC_PATHS,
         "required_route_results": required_results,

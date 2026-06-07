@@ -214,6 +214,28 @@ public sealed class BlackLedgerStatsViewTests
     }
 
     [Fact]
+    public void SeedBackedWorldBriefingFailsClosedForUnknownTurn()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_BLACK_LEDGER_SEED_PATH"] = Path.GetFullPath(Path.Combine(
+                    "/docker/chummercomplete",
+                    "chummer-hub-registry",
+                    "black-ledger",
+                    "worlds",
+                    "emerald-sprawl-prelude.yaml")),
+            })
+            .Build();
+
+        var stats = new BlackLedgerPublicStatsService(configuration);
+        var factions = BlackLedgerFactionAllegianceTests.CreateService();
+        var service = new BlackLedgerWorldTickBriefingService(stats, factions);
+
+        Assert.Null(service.BuildWorldTurnBriefing(999));
+    }
+
+    [Fact]
     public void SeedBackedStatsFailClosedWhenWorldSafetyFlagsAreBroken()
     {
         string tempFile = Path.Combine(Path.GetTempPath(), $"black-ledger-unsafe-{Guid.NewGuid():N}.yaml");

@@ -937,11 +937,26 @@ public sealed class BlackLedgerPublicStatsService
 
     private static SelectedTurnContext SelectTurn(BlackLedgerWorldSeedDocument seed, int? requestedTurn)
     {
-        var publishedTurn = (seed.Turns ?? [])
-            .Where(turn => !requestedTurn.HasValue || turn.Turn == requestedTurn.Value)
-            .OrderByDescending(static turn => turn.Turn)
-            .FirstOrDefault()
-            ?? (seed.Turns ?? []).OrderByDescending(static turn => turn.Turn).FirstOrDefault();
+        BlackLedgerTurnDocument? publishedTurn;
+        if (requestedTurn.HasValue)
+        {
+            publishedTurn = (seed.Turns ?? [])
+                .Where(turn => turn.Turn == requestedTurn.Value)
+                .OrderByDescending(static turn => turn.Turn)
+                .FirstOrDefault();
+            if (publishedTurn is null && requestedTurn.Value != 2)
+            {
+                return new SelectedTurnContext(
+                    Turn: null,
+                    IsDeterministicPreview: false,
+                    Mode: "missing_turn",
+                    CreatedAtUtc: null);
+            }
+        }
+        else
+        {
+            publishedTurn = (seed.Turns ?? []).OrderByDescending(static turn => turn.Turn).FirstOrDefault();
+        }
         if (requestedTurn == 2)
         {
             var deterministicTurn = seed.DeterministicTestTicks?
