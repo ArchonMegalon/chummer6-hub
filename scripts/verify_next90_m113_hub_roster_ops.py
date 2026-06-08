@@ -131,7 +131,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "python3 scripts/materialize_next90_m113_hub_roster_ops_proof.py",
         "python3 scripts/verify_next90_m113_hub_roster_ops.py",
         "python3 -m unittest tests/test_next90_m113_hub_roster_ops.py",
-        'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter CampaignMovementServiceTests --no-restore',
+        "run_slice_safe_dotnet_test CampaignMovementServiceTests",
     ],
 }
 

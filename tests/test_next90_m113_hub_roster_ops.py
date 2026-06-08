@@ -48,7 +48,7 @@ class Next90M113HubRosterOpsProofTests(unittest.TestCase):
         self.assertIn("python3 scripts/verify_next90_m113_hub_roster_ops.py", verify_script)
         self.assertIn("python3 -m unittest tests/test_next90_m113_hub_roster_ops.py", verify_script)
         self.assertIn(
-            'dotnet test Chummer.Tests/Chummer.Tests.csproj --filter CampaignMovementServiceTests --no-restore',
+            "run_slice_safe_dotnet_test CampaignMovementServiceTests",
             verify_script,
         )
 

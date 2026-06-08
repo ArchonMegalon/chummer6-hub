@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import urljoin
@@ -122,6 +123,28 @@ HTTP_HEADERS = {
 }
 
 
+class _RequestsCompat:
+    @staticmethod
+    def get(url: str, timeout: int, allow_redirects: bool = True) -> HttpResponse:
+        request = Request(url, headers=HTTP_HEADERS)
+        try:
+            if allow_redirects:
+                with urlopen(request, timeout=timeout) as response:
+                    return read_http_response(response)
+            with NO_REDIRECT_OPENER.open(request, timeout=timeout) as response:
+                return read_http_response(response)
+        except HTTPError as exc:
+            return HttpResponse(
+                url=exc.geturl(),
+                status_code=exc.code,
+                headers=exc.headers,
+                body=exc.read(),
+            )
+
+
+requests = SimpleNamespace(get=_RequestsCompat.get)
+
+
 def read_http_response(response: object) -> HttpResponse:
     body = response.read()
     status_code = getattr(response, "status", None)
@@ -136,20 +159,7 @@ def read_http_response(response: object) -> HttpResponse:
 
 
 def http_get(url: str, timeout: int, allow_redirects: bool = True) -> HttpResponse:
-    request = Request(url, headers=HTTP_HEADERS)
-    try:
-        if allow_redirects:
-            with urlopen(request, timeout=timeout) as response:
-                return read_http_response(response)
-        with NO_REDIRECT_OPENER.open(request, timeout=timeout) as response:
-            return read_http_response(response)
-    except HTTPError as exc:
-        return HttpResponse(
-            url=exc.geturl(),
-            status_code=exc.code,
-            headers=exc.headers,
-            body=exc.read(),
-        )
+    return requests.get(url, timeout=timeout, allow_redirects=allow_redirects)
 
 
 def parse_args() -> argparse.Namespace:

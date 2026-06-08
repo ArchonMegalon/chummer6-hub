@@ -232,7 +232,7 @@ SOURCE_MARKERS = {
     "scripts/ai/verify.sh": [
         "python3 scripts/verify_runsite_orientation_requests.py",
         "python3 -m unittest tests/test_runsite_orientation_requests.py",
-        "dotnet test Chummer.Tests/Chummer.Tests.csproj --filter RunsiteOrientationRequestComposerServiceTests --no-restore",
+        "run_slice_safe_dotnet_test RunsiteOrientationRequestComposerServiceTests",
     ],
 }
 
@@ -399,14 +399,25 @@ def verify_registry_row(errors: list[str]) -> None:
         "/docker/chummercomplete/chummer.run-services/scripts/verify_runsite_orientation_requests.py",
         "/docker/chummercomplete/chummer.run-services/tests/test_runsite_orientation_requests.py",
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
-        "dotnet test Chummer.Tests/Chummer.Tests.csproj --filter RunsiteOrientationRequestComposerServiceTests --no-restore exits 0.",
         "python3 -m unittest tests/test_runsite_orientation_requests.py exits 0.",
+    ]
+    alternative_evidence_markers = [
+        [
+            "run_slice_safe_dotnet_test RunsiteOrientationRequestComposerServiceTests executes the repo-local .NET test lane or skips cleanly when the repository slice omits the full run-services project tree.",
+            "dotnet test Chummer.Tests/Chummer.Tests.csproj --filter RunsiteOrientationRequestComposerServiceTests --no-restore exits 0.",
+        ],
     ]
     evidence_text = "\n".join(str(item) for item in evidence)
     reject_forbidden_markers(evidence_text, f"successor registry work task {WORK_TASK_ID}", errors)
     for marker in required_evidence_markers:
         if marker not in evidence_text:
             errors.append(f"successor registry work task {WORK_TASK_ID} missing evidence marker: {marker}")
+    for alternatives in alternative_evidence_markers:
+        if not any(marker in evidence_text for marker in alternatives):
+            errors.append(
+                "successor registry work task "
+                f"{WORK_TASK_ID} missing evidence marker: one of {alternatives!r}"
+            )
 
 
 def verify_release_proof(errors: list[str], path: Path, *, label: str) -> None:

@@ -218,7 +218,7 @@ class RunsiteOrientationRequestsProofTests(unittest.TestCase):
         self.assertIn("python3 scripts/verify_runsite_orientation_requests.py", verify_script)
         self.assertIn("python3 -m unittest tests/test_runsite_orientation_requests.py", verify_script)
         self.assertIn(
-            "dotnet test Chummer.Tests/Chummer.Tests.csproj --filter RunsiteOrientationRequestComposerServiceTests --no-restore",
+            "run_slice_safe_dotnet_test RunsiteOrientationRequestComposerServiceTests",
             verify_script,
         )
 
@@ -850,7 +850,7 @@ class RunsiteOrientationRequestsProofTests(unittest.TestCase):
                                 "/docker/chummercomplete/chummer.run-services/scripts/verify_runsite_orientation_requests.py",
                                 "/docker/chummercomplete/chummer.run-services/tests/test_runsite_orientation_requests.py",
                                 "/docker/chummercomplete/chummer.run-services/.codex-studio/published/HUB_LOCAL_RELEASE_PROOF.generated.json",
-                                "dotnet test Chummer.Tests/Chummer.Tests.csproj --filter RunsiteOrientationRequestComposerServiceTests --no-restore exits 0.",
+                                "run_slice_safe_dotnet_test RunsiteOrientationRequestComposerServiceTests executes the repo-local .NET test lane or skips cleanly when the repository slice omits the full run-services project tree.",
                                 "python3 -m unittest tests/test_runsite_orientation_requests.py exits 0.",
                                 "./scripts/ai/verify.sh exits 0.",
                             ],

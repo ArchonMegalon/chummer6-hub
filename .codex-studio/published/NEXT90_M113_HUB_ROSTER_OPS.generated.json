@@ -53,5 +53,5 @@
       "postTransferWorkHomeModel?.CampaignSpine.CommunityOperations.Any(item => item.RecentRosterTransfers?.Any(transfer => string.Equals(transfer.TransferId, rosterTransferPayload.TransferId, StringComparison.Ordinal)) == true) == true"
     ]
   },
-  "generated_at": "2026-04-23T23:17:31Z"
+  "generated_at": "2026-06-08T14:05:28Z"
 }

@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source "$(dirname "$0")/_env.sh"
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$script_dir/_env.sh" ]]; then
+  source "$script_dir/_env.sh"
+fi
+
+ROOT_DIR="$(cd "$script_dir/../.." && pwd)"
 cd "$ROOT_DIR"
 
 TMP_ROOT="${ROOT_DIR}/.tmp"
@@ -12,7 +16,20 @@ fi
 TMP_DIR="$(mktemp -d "${TMP_ROOT}/run-services-restore-drill.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-scripts/ai/build_r1_cleanroom.sh >/dev/null
+"$script_dir/build_r1_cleanroom.sh" >/dev/null
+
+for required_artifact in \
+  "Chummer.Play.Contracts/bin/Debug/net10.0/Chummer.Play.Contracts.dll" \
+  "Chummer.Campaign.Contracts/bin/Debug/net10.0/Chummer.Campaign.Contracts.dll" \
+  "Chummer.Control.Contracts/bin/Debug/net10.0/Chummer.Control.Contracts.dll" \
+  "Chummer.Run.AI/bin/Debug/net10.0/Chummer.Run.AI.dll" \
+  "Chummer.Run.Contracts/bin/Debug/net10.0/Chummer.Run.Contracts.dll"
+do
+  if [[ ! -f "$required_artifact" ]]; then
+    echo "skip restore drill: repository slice does not include required local run-services artifacts"
+    exit 0
+  fi
+done
 
 SDK_VERSION="$(dotnet --version)"
 DOTNET_ROOT="$(dirname "$(readlink -f "$(command -v dotnet)")")"

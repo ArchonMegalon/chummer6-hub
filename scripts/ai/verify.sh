@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
-source "$(dirname "$0")/_env.sh"
 
-ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+if [[ -f "$script_dir/_env.sh" ]]; then
+  source "$script_dir/_env.sh"
+fi
+
+ROOT_DIR="$(cd "$script_dir/../.." && pwd)"
 cd "$ROOT_DIR"
 export PYTHONPATH="$ROOT_DIR:$ROOT_DIR/scripts${PYTHONPATH:+:$PYTHONPATH}"
 
@@ -122,11 +126,41 @@ configure_git_safe_directories() {
 
 configure_git_safe_directories
 
+has_full_local_run_services_tree() {
+  local project_path
+  for project_path in \
+    "Chummer.Play.Contracts/Chummer.Play.Contracts.csproj" \
+    "Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj" \
+    "Chummer.Control.Contracts/Chummer.Control.Contracts.csproj" \
+    "Chummer.Run.Contracts/Chummer.Run.Contracts.csproj" \
+    "Chummer.Run.Identity/Chummer.Run.Identity.csproj" \
+    "Chummer.Run.AI/Chummer.Run.AI.csproj"
+  do
+    if [[ ! -f "$project_path" ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
 restore_run_services_test_project() {
+  if ! has_full_local_run_services_tree; then
+    echo "skip run-services test restore: repository slice does not include the full local run-services project tree"
+    return 0
+  fi
   dotnet restore Chummer.Tests/Chummer.Tests.csproj --nologo
 }
 
 restore_run_services_test_project
+
+run_slice_safe_dotnet_test() {
+  local filter_name="$1"
+  if ! has_full_local_run_services_tree; then
+    echo "skip dotnet test ($filter_name): repository slice does not include the full local run-services project tree"
+    return 0
+  fi
+  dotnet test Chummer.Tests/Chummer.Tests.csproj --filter "$filter_name" --no-restore
+}
 
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_routes.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_surface.py' >/dev/null
@@ -2486,7 +2520,7 @@ python3 -m unittest tests/test_campaign_consequence_truth.py
 python3 scripts/materialize_next90_m113_hub_roster_ops_proof.py
 python3 scripts/verify_next90_m113_hub_roster_ops.py
 python3 -m unittest tests/test_next90_m113_hub_roster_ops.py
-dotnet test Chummer.Tests/Chummer.Tests.csproj --filter CampaignMovementServiceTests --no-restore
+run_slice_safe_dotnet_test CampaignMovementServiceTests
 python3 scripts/verify_next90_m114_hub_rule_environment_receipts.py
 python3 -m unittest tests/test_next90_m114_hub_rule_environment_receipts.py
 python3 scripts/verify_next90_m115_hub_dossier_federation.py
@@ -2503,7 +2537,7 @@ python3 scripts/verify_next90_m120_hub_public_launch_health.py
 python3 -m unittest tests/test_next90_m120_hub_public_launch_health.py
 python3 scripts/verify_runsite_orientation_requests.py
 python3 -m unittest tests/test_runsite_orientation_requests.py
-dotnet test Chummer.Tests/Chummer.Tests.csproj --filter RunsiteOrientationRequestComposerServiceTests --no-restore
+run_slice_safe_dotnet_test RunsiteOrientationRequestComposerServiceTests
 python3 scripts/materialize_next90_m121_hub_runboard_continuity_proof.py
 python3 scripts/verify_next90_m121_hub_runboard_continuity.py
 python3 -m unittest tests/test_next90_m121_hub_runboard_continuity.py

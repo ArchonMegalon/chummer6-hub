@@ -963,7 +963,14 @@ def repo_relative_anchor_path(proof_item: str) -> Path | None:
     candidate = proof_item.strip().split(maxsplit=1)[0].rstrip(".,")
     if not candidate.startswith(REPO_ABSOLUTE_PREFIX):
         return None
-    return ROOT / candidate.removeprefix(REPO_ABSOLUTE_PREFIX)
+    return proof_repo_root(proof_item) / candidate.removeprefix(REPO_ABSOLUTE_PREFIX)
+
+
+def proof_repo_root(proof_item: str) -> Path:
+    cited_root = Path(REPO_ABSOLUTE_PREFIX.rstrip("/"))
+    if cited_root.exists() and (cited_root / ".git").exists():
+        return cited_root
+    return ROOT
 
 
 def commit_anchor(proof_item: str) -> str | None:
@@ -990,8 +997,9 @@ def verify_proof_anchors_resolve(missing: list[str], label: str, proof_items: ob
         commit = commit_anchor(item)
         if commit is None or not (ROOT / ".git").exists():
             continue
+        proof_root = proof_repo_root(item)
         result = subprocess.run(
-            ["git", "-C", str(ROOT), "cat-file", "-e", f"{commit}^{{commit}}"],
+            ["git", "-C", str(proof_root), "cat-file", "-e", f"{commit}^{{commit}}"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
@@ -1001,14 +1009,14 @@ def verify_proof_anchors_resolve(missing: list[str], label: str, proof_items: ob
             continue
 
         result = subprocess.run(
-            ["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, "HEAD"],
+            ["git", "-C", str(proof_root), "merge-base", "--is-ancestor", commit, "HEAD"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
         )
         if result.returncode != 0:
             replace_result = subprocess.run(
-                ["git", "-C", str(ROOT), "replace", "-l"],
+                ["git", "-C", str(proof_root), "replace", "-l"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 text=True,
