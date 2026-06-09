@@ -1,0 +1,156 @@
+{
+  "generated_at": "2026-05-28T13:14:23Z",
+  "status": "verified",
+  "service": "MagicFit",
+  "account": {
+    "account_user": "tibor.girschele@gmail.com",
+    "account_user_hash": "4a1702ea0e8d9ec5",
+    "license_tier": "License Tier 5",
+    "user_reported": true,
+    "local_credential_present": true,
+    "login_verified": true,
+    "billing_or_license_status": "browser_authenticated_appsumo_tier_5_verified",
+    "remaining_credits_observed": 6240
+  },
+  "verification_checklist": {
+    "account_user": {
+      "verified": true,
+      "value": "tibor.girschele@gmail.com",
+      "source": "browser_authenticated_magicfit_dashboard"
+    },
+    "license_tier": {
+      "verified": true,
+      "value": "License Tier 5",
+      "source": "browser_authenticated_magicfit_dashboard"
+    },
+    "credits_per_month": {
+      "verified": true,
+      "value": 6000,
+      "source": "appsumo_tier_5_offer_plus_live_dashboard_credits"
+    },
+    "text_to_video": {
+      "verified": true,
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/generated/direct_text_to_video_verify.mp4"
+    },
+    "image_to_video": {
+      "verified": true,
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/generated/bakeoff-results.json"
+    },
+    "mp4_download": {
+      "verified": true,
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/generated"
+    },
+    "hd_video_audio": {
+      "verified": true,
+      "value": {
+        "video_codec": "h264",
+        "audio_codec": "aac",
+        "width": 1080,
+        "height": 1920
+      },
+      "source": "ffprobe_generated_mp4s"
+    },
+    "watermark_status": {
+      "verified": true,
+      "value": "no_visible_watermark_in_review_frames",
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/review_frames"
+    },
+    "commercial_use_rights": {
+      "verified": true,
+      "value": "explicitly_allowed",
+      "source": "magicfit_pushowl_faq_question_3"
+    },
+    "model_availability": {
+      "verified": true,
+      "value": [
+        "Seedance 2.0 Fast",
+        "GPT Images v2",
+        "Google Veo 3.1",
+        "Kling 2.5 Turbo Pro"
+      ],
+      "source": "live_dashboard_plus_marketing_site"
+    },
+    "max_duration_resolution": {
+      "verified": true,
+      "value": {
+        "max_duration_seconds_observed_in_ui": 15,
+        "delivered_resolution": "1080x1920"
+      },
+      "source": "live_generate_route_plus_ffprobe"
+    },
+    "deletion_privacy_terms": {
+      "verified": true,
+      "value": "reviewed_via_pushowl_privacy_policy_with_erasure_and_retention language",
+      "source": "https://www.pushowl.com/privacy"
+    }
+  },
+  "capabilities": {
+    "text_to_video": {
+      "verified": true,
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/generated/direct_text_to_video_verify.mp4"
+    },
+    "image_to_video": {
+      "verified": true,
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/generated/bakeoff-results.json"
+    },
+    "download_mp4": {
+      "verified": true,
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/generated"
+    },
+    "hd_video_audio": {
+      "verified": true,
+      "source": "ffprobe_generated_mp4s"
+    },
+    "watermark_free_export": {
+      "verified": true,
+      "source": "/docker/chummercomplete/_completion/magicfit_provider/review_frames"
+    },
+    "commercial_use_rights": {
+      "verified": true,
+      "source": "magicfit_pushowl_faq_question_3"
+    },
+    "deletion_privacy_terms": {
+      "verified": true,
+      "source": "https://www.pushowl.com/privacy"
+    },
+    "api_access_in_ltd": {
+      "verified": true,
+      "value": false,
+      "source": "appsumo_founder_qna"
+    }
+  },
+  "samples_verified": [
+    "photoreal_elf_anchor",
+    "photoreal_orc_field_reporter",
+    "research_facility_breach_broll",
+    "rust_market_faction_scene"
+  ],
+  "sources": [
+    {
+      "label": "MagicFit live authenticated dashboard",
+      "url": "https://magicfit.pushowl.com/home",
+      "facts": [
+        "AppSumo Tier 5 account authenticated",
+        "Generate image and video routes are live",
+        "Image-to-video and text-to-video jobs can be started"
+      ]
+    },
+    {
+      "label": "MagicFit FAQ commercial rights answer",
+      "url": "https://magicfit.pushowl.com/",
+      "facts": [
+        "Everything you create is yours to own and use commercially",
+        "No hidden licensing fees, restrictions, or royalties"
+      ]
+    },
+    {
+      "label": "PushOwl privacy policy",
+      "url": "https://www.pushowl.com/privacy",
+      "facts": [
+        "privacy policy is linked from MagicFit",
+        "erasure and retention language is present"
+      ]
+    }
+  ],
+  "blocking_reasons": []
+}

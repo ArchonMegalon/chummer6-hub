@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-09T11:43:25Z",
+  "generated_at_utc": "2026-06-09T12:06:51Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
@@ -29,7 +29,7 @@
       "path": "/status",
       "url": "https://chummer.run/status",
       "status_code": 200,
-      "sha256": "38e2012243214c5cfe6b6a57bf522042bc62e6971625c0c8bf018542d12b660c",
+      "sha256": "81d853f11b78274a5fd872eef2cd05b331cbe0ff8c51759bbcc6d1b8227b7196",
       "excerpt": "Status \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function () { if (document.querySelector(\"script[data-rybbit='analytics']\")) {",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []
@@ -38,7 +38,7 @@
       "path": "/downloads",
       "url": "https://chummer.run/downloads",
       "status_code": 200,
-      "sha256": "72c860bea55336bdd5f0fb9439424fbf5cc32436f1639452b3647b5cf32982e8",
+      "sha256": "109f659509651a0a9f03d0bc1f22a2bd5c5c8f63eb62e2a150bfcc6c5adf8200",
       "excerpt": "Downloads \u00b7 Chummer (function () { var doNotTrack = window.doNotTrack === \"1\" || navigator.doNotTrack === \"1\" || navigator.msDoNotTrack === \"1\" || navigator.globalPrivacyControl === true; if (doNotTrack || document.querySelector(\"script[data-rybbit='analytics']\")) { return; } var loadRybbit = function () { if (document.querySelector(\"script[data-rybbit='analytics']\")) {",
       "x_robots_tag": "noindex, nofollow, noarchive, nosnippet, noimageindex",
       "forbidden_hits": []

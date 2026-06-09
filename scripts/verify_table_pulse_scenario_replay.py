@@ -33,6 +33,13 @@ def run_command(command: list[str]) -> dict[str, Any]:
 def main() -> int:
     args = parse_args()
     base_url = args.base_url.rstrip("/")
+    subprocess.run(
+        ["python3", "scripts/materialize_fleet_proof_discoverability_mirrors.py"],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
     live_lane = run_command(["python3", "scripts/verify_table_pulse_connected_lane_surface.py", "--base-url", base_url])
     pwa_runtime = run_command(["python3", "scripts/verify_pwa_notification_runtime.py", "--base-url", base_url])
     scenario_exists = FLEET_RECEIPT.is_file()

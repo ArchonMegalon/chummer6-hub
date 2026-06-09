@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,14 @@ def required_artifacts() -> dict[str, list[Path]]:
 
 def main() -> int:
     argparse.ArgumentParser(description="Mirror discoverable provider proof artifacts into the repo-published proof shelf.").parse_known_args()
+
+    subprocess.run(
+        ["python3", "scripts/materialize_fleet_proof_discoverability_mirrors.py"],
+        cwd=RUN_SERVICES_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
     MIRROR_ROOT.mkdir(parents=True, exist_ok=True)
     providers: dict[str, Any] = {}

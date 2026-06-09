@@ -1,0 +1,31 @@
+{
+  "contract_name": "chummer.black_ledger_live_media_proof",
+  "base_url": "https://chummer.run",
+  "status": "pass",
+  "capture_mode": "playwright_screenshot",
+  "stdout": "",
+  "stderr": "",
+  "screenshots": [
+    {
+      "route": "/",
+      "viewport": "desktop",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/home.png"
+    },
+    {
+      "route": "/ledger/map",
+      "viewport": "desktop",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/desktop/ledger-map.png"
+    },
+    {
+      "route": "/",
+      "viewport": "mobile",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/home.png"
+    },
+    {
+      "route": "/ledger/map",
+      "viewport": "mobile",
+      "screenshotPath": "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/live_media/mobile/ledger-map.png"
+    }
+  ],
+  "mirrored_from": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
+}

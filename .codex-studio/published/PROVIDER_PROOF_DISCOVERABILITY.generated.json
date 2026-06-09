@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.provider_proof_discoverability",
-  "status": "fail",
+  "status": "pass",
   "providers": {
     "payfunnels": {
       "status": "pass",
@@ -27,41 +27,37 @@
       "missing_paths": []
     },
     "magicfit": {
-      "status": "fail",
+      "status": "pass",
       "required_paths": [
         "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md",
         "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/MAGICFIT_PROVIDER_VERIFICATION.generated.json"
       ],
-      "mirrored_paths": [],
-      "missing_paths": [
-        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md",
-        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/MAGICFIT_PROVIDER_VERIFICATION.generated.json"
-      ]
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit/FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit/MAGICFIT_PROVIDER_VERIFICATION.generated.json"
+      ],
+      "missing_paths": []
     },
     "table_pulse": {
-      "status": "fail",
+      "status": "pass",
       "required_paths": [
         "/docker/chummercomplete/.integrated/fleet/_completion/table_pulse/TABLE_PULSE_SCENARIO_REPLAY.generated.json"
       ],
-      "mirrored_paths": [],
-      "missing_paths": [
-        "/docker/chummercomplete/.integrated/fleet/_completion/table_pulse/TABLE_PULSE_SCENARIO_REPLAY.generated.json"
-      ]
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/table_pulse/TABLE_PULSE_SCENARIO_REPLAY.generated.json"
+      ],
+      "missing_paths": []
     },
     "black_ledger_media": {
-      "status": "fail",
+      "status": "pass",
       "required_paths": [
         "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
       ],
-      "mirrored_paths": [],
-      "missing_paths": [
-        "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
-      ]
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/black_ledger_media/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
+      ],
+      "missing_paths": []
     }
   },
-  "failures": [
-    "magicfit missing discoverable proof artifacts",
-    "table_pulse missing discoverable proof artifacts",
-    "black_ledger_media missing discoverable proof artifacts"
-  ]
+  "failures": []
 }

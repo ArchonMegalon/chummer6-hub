@@ -1,0 +1,60 @@
+{
+  "contract_name": "fleet.table_pulse_scenario_replay",
+  "generated_at_utc": "2026-06-09T12:07:00Z",
+  "status": "pass",
+  "required_steps": [
+    "heat-event",
+    "opt-in-policy",
+    "remote-notification",
+    "remote-choice",
+    "gm-adjudication",
+    "state-update",
+    "receipt"
+  ],
+  "covered_steps": {
+    "gm-adjudication": true,
+    "heat-event": true,
+    "opt-in-policy": true,
+    "receipt": true,
+    "remote-choice": true,
+    "remote-notification": true,
+    "state-update": true
+  },
+  "source_receipts": {
+    "live_scenario_receipts": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PWA_TABLE_PULSE_SCENARIO_RECEIPTS.generated.json",
+    "legacy_reaudit_receipt": "/docker/chummercomplete/_completion/full_product_reaudit_v19/TABLE_PULSE_SCENARIO_REPLAY.generated.json"
+  },
+  "scenarios": [
+    {
+      "id": "pwa_subscription_delivery_click",
+      "steps": [
+        "subscribe",
+        "server-signs-push",
+        "service-worker-receives",
+        "notification-click-opens-play"
+      ],
+      "result": "pass"
+    },
+    {
+      "id": "table_pulse_remote_reaction_gm_adjudication",
+      "steps": [
+        "opt-in",
+        "remote-reaction-submit",
+        "gm-review",
+        "adjudication-receipt-written"
+      ],
+      "result": "pass"
+    },
+    {
+      "id": "table_pulse_optout_suppression",
+      "steps": [
+        "opt-out",
+        "next-push-suppressed",
+        "audit-row-written"
+      ],
+      "result": "pass"
+    }
+  ],
+  "private_campaign_data_captured": false,
+  "failures": []
+}
