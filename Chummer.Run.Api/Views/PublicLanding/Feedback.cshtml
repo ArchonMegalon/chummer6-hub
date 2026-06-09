@@ -288,7 +288,7 @@
                 <h2>Signed-in contribution lanes stay optional</h2>
                 <p>Public product signal should work without turning this page into a contributor-only or account-gated surface. Signed-in participation remains available when you need the deeper path.</p>
                 <div class="stacked-actions">
-                    <a class="button-like button-like--primary" href="@codexHref">Open codex participation</a>
+                    <a class="button-like button-like--primary" href="@codexHref">@(Model.Chrome.Authenticated ? "Open codex participation" : "Open participation")</a>
                     <a class="button-like button-like--secondary" href="/participate">Open guided contribution</a>
                     <a class="button-like button-like--ghost" href="/participate">Open broader participation</a>
                 </div>
