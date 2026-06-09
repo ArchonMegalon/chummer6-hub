@@ -1,8 +1,8 @@
 {
   "contract_name": "chummer.weekly_product_pulse",
   "contract_version": 3,
-  "generated_at": "2026-06-07T18:01:46Z",
-  "as_of": "2026-06-07",
+  "generated_at": "2026-06-09T04:58:14Z",
+  "as_of": "2026-06-09",
   "scorecard_source": "products/chummer/PRODUCT_HEALTH_SCORECARD.yaml",
   "progress_report_source": "products/chummer/PROGRESS_REPORT.generated.json",
   "progress_history_source": "products/chummer/PROGRESS_HISTORY.generated.json",
@@ -16,10 +16,13 @@
   },
   "flagship_readiness": {
     "state": "watch",
-    "reason": "Published flagship readiness proof is fail. Readiness-plane gaps remain: flagship_ready, feedback_loop_ready, recovery_trust_ready.",
+    "reason": "Published flagship readiness proof is fail. Coverage gaps remain: fleet_and_operator_loop. Readiness-plane gaps remain: structural_ready, flagship_ready, feedback_loop_ready, recovery_trust_ready.",
     "proof_status": "fail",
-    "coverage_gap_keys": [],
+    "coverage_gap_keys": [
+      "fleet_and_operator_loop"
+    ],
     "readiness_plane_gap_keys": [
+      "structural_ready",
       "flagship_ready",
       "feedback_loop_ready",
       "recovery_trust_ready"
@@ -74,7 +77,7 @@
   "public_promise_drift_count": 0,
   "governor_decisions": [
     {
-      "decision_id": "2026-06-07-focus-next-12-biggest-wins",
+      "decision_id": "2026-06-09-focus-next-12-biggest-wins",
       "action": "focus_shift",
       "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 38 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
       "cited_signals": [
@@ -87,7 +90,7 @@
       ]
     },
     {
-      "decision_id": "2026-06-07-launch-governance",
+      "decision_id": "2026-06-09-launch-governance",
       "action": "freeze_launch",
       "reason": "Freeze launch expansion until published flagship readiness proof returns to ready posture.",
       "cited_signals": [
@@ -114,10 +117,13 @@
     },
     "flagship_readiness": {
       "state": "watch",
-      "reason": "Published flagship readiness proof is fail. Readiness-plane gaps remain: flagship_ready, feedback_loop_ready, recovery_trust_ready.",
+      "reason": "Published flagship readiness proof is fail. Coverage gaps remain: fleet_and_operator_loop. Readiness-plane gaps remain: structural_ready, flagship_ready, feedback_loop_ready, recovery_trust_ready.",
       "proof_status": "fail",
-      "coverage_gap_keys": [],
+      "coverage_gap_keys": [
+        "fleet_and_operator_loop"
+      ],
       "readiness_plane_gap_keys": [
+        "structural_ready",
         "flagship_ready",
         "feedback_loop_ready",
         "recovery_trust_ready"
@@ -172,7 +178,7 @@
     "public_promise_drift_count": 0,
     "governor_decisions": [
       {
-        "decision_id": "2026-06-07-focus-next-12-biggest-wins",
+        "decision_id": "2026-06-09-focus-next-12-biggest-wins",
         "action": "focus_shift",
         "reason": "Keep delivery focus on Next 12 Biggest Wins. The pulse shows 100% overall progress in 'Public-fit polish', history depth has reached 38 snapshots, and the pacing risk remains concentrated in Core Engine while trust/publication/utility closure still needs measured completion on the active registry.",
         "cited_signals": [
@@ -185,7 +191,7 @@
         ]
       },
       {
-        "decision_id": "2026-06-07-launch-governance",
+        "decision_id": "2026-06-09-launch-governance",
         "action": "freeze_launch",
         "reason": "Freeze launch expansion until published flagship readiness proof returns to ready posture.",
         "cited_signals": [

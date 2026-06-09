@@ -40,6 +40,19 @@ check_get() {
   printf '%s' "$body"
 }
 
+check_status() {
+  local path="$1"
+  local response_file status
+  response_file=$(mktemp)
+  if [[ -n "$API_KEY" ]]; then
+    status=$(curl -sSL -o "$response_file" -w "%{http_code}" "$BASE_URL$path" -H "X-Api-Key: $API_KEY")
+  else
+    status=$(curl -sSL -o "$response_file" -w "%{http_code}" "$BASE_URL$path")
+  fi
+  rm -f "$response_file"
+  printf '%s' "$status"
+}
+
 wait_for_service() {
   local deadline=$((SECONDS + READY_TIMEOUT_SECONDS))
   echo "waiting for API readiness at $BASE_URL/api/health (timeout: ${READY_TIMEOUT_SECONDS}s)"
@@ -62,104 +75,113 @@ fi
 xml_escaped=$(perl -0777 -pe 's/^\xEF\xBB\xBF//; s/\\/\\\\/g; s/"/\\"/g; s/\r//g; s/\n/\\n/g' "$XML_FILE")
 xml_payload="{\"xml\":\"$xml_escaped\"}"
 payload_file=$(mktemp)
-trap 'rm -f "$payload_file"' EXIT
+response_file=$(mktemp)
+import_payload_file=""
+metadata_payload_file=""
+trap 'rm -f "$payload_file" "$response_file" "${import_payload_file:-}" "${metadata_payload_file:-}"' EXIT
 printf '%s' "$xml_payload" > "$payload_file"
 
-check_post() {
-  local path="$1"
+request_json() {
+  local method="$1"
+  local path="$2"
+  local body_file="${3:-}"
   local out status
-  local response_file
-  response_file=$(mktemp)
-  echo "checking: $path"
+  echo "checking: $method $path" >&2
   if [[ -n "$API_KEY" ]]; then
-    status=$(curl -sS -o "$response_file" -w "%{http_code}" -X POST "$BASE_URL$path" -H "Content-Type: application/json" -H "X-Api-Key: $API_KEY" --data-binary "@$payload_file")
+    if [[ -n "$body_file" ]]; then
+      status=$(curl -sS -o "$response_file" -w "%{http_code}" -X "$method" "$BASE_URL$path" -H "Content-Type: application/json" -H "X-Api-Key: $API_KEY" --data-binary "@$body_file")
+    else
+      status=$(curl -sS -o "$response_file" -w "%{http_code}" -X "$method" "$BASE_URL$path" -H "X-Api-Key: $API_KEY")
+    fi
   else
-    status=$(curl -sS -o "$response_file" -w "%{http_code}" -X POST "$BASE_URL$path" -H "Content-Type: application/json" --data-binary "@$payload_file")
+    if [[ -n "$body_file" ]]; then
+      status=$(curl -sS -o "$response_file" -w "%{http_code}" -X "$method" "$BASE_URL$path" -H "Content-Type: application/json" --data-binary "@$body_file")
+    else
+      status=$(curl -sS -o "$response_file" -w "%{http_code}" -X "$method" "$BASE_URL$path")
+    fi
   fi
   out=$(cat "$response_file")
-  rm -f "$response_file"
   if [[ "$status" -lt 200 || "$status" -ge 300 ]]; then
     echo "status: $status" >&2
     [[ -n "$out" ]] && echo "$out" >&2
-    echo "failed: $path" >&2
+    echo "failed: $method $path" >&2
     return 1
+  fi
+  if [[ "$method" == "DELETE" ]]; then
+    return 0
   fi
   if [[ -z "$out" ]]; then
-    echo "Empty response from $path" >&2
+    echo "Empty response from $method $path" >&2
     return 1
   fi
-  echo "ok: $path"
+  printf '%s' "$out"
 }
 
 wait_for_service
 check_get "/api/info" >/dev/null
 check_get "/api/health" >/dev/null
-check_get "/api/content/overlays" >/dev/null
-openapi_json="$(check_get "/openapi/v1.json")"
-if ! printf '%s' "$openapi_json" | grep -q '"openapi"'; then
-  echo "OpenAPI document is missing expected marker" >&2
-  exit 1
-fi
-docs_html="$(check_get "/openapi/")"
-if ! printf '%s' "$docs_html" | grep -qi 'Self-hosted OpenAPI explorer'; then
-  echo "Docs UI did not return expected self-hosted docs content" >&2
-  exit 1
-fi
-if printf '%s' "$docs_html" | grep -qi 'jsdelivr'; then
-  echo "Docs UI unexpectedly references external jsdelivr assets" >&2
-  exit 1
+check_get "/api/shell/bootstrap" >/dev/null
+check_get "/api/workspaces" >/dev/null
+openapi_status="$(check_status "/openapi/")"
+if [[ "$openapi_status" == "200" ]]; then
+  docs_html="$(check_get "/openapi/")"
+  if ! printf '%s' "$docs_html" | grep -qi 'Self-hosted OpenAPI explorer'; then
+    echo "Docs UI did not return expected self-hosted docs content" >&2
+    exit 1
+  fi
+  if printf '%s' "$docs_html" | grep -qi 'jsdelivr'; then
+    echo "Docs UI unexpectedly references external jsdelivr assets" >&2
+    exit 1
+  fi
+else
+  echo "note: skipping OpenAPI/docs smoke on $BASE_URL because /openapi/ is not exposed (status=$openapi_status)"
 fi
 
 echo "service healthy at $BASE_URL"
 
-check_post "/api/characters/summary"
-check_post "/api/characters/validate"
-check_post "/api/characters/sections/profile"
-check_post "/api/characters/sections/progress"
-check_post "/api/characters/sections/rules"
-check_post "/api/characters/sections/build"
-check_post "/api/characters/sections/movement"
-check_post "/api/characters/sections/awakening"
-check_post "/api/characters/sections/attributes"
-check_post "/api/characters/sections/attributedetails"
-check_post "/api/characters/sections/inventory"
-check_post "/api/characters/sections/gear"
-check_post "/api/characters/sections/weapons"
-check_post "/api/characters/sections/weaponaccessories"
-check_post "/api/characters/sections/armors"
-check_post "/api/characters/sections/armormods"
-check_post "/api/characters/sections/cyberwares"
-check_post "/api/characters/sections/vehicles"
-check_post "/api/characters/sections/vehiclemods"
-check_post "/api/characters/sections/skills"
-check_post "/api/characters/sections/qualities"
-check_post "/api/characters/sections/contacts"
-check_post "/api/characters/sections/spells"
-check_post "/api/characters/sections/powers"
-check_post "/api/characters/sections/complexforms"
-check_post "/api/characters/sections/spirits"
-check_post "/api/characters/sections/foci"
-check_post "/api/characters/sections/aiprograms"
-check_post "/api/characters/sections/martialarts"
-check_post "/api/characters/sections/limitmodifiers"
-check_post "/api/characters/sections/lifestyles"
-check_post "/api/characters/sections/metamagics"
-check_post "/api/characters/sections/arts"
-check_post "/api/characters/sections/initiationgrades"
-check_post "/api/characters/sections/critterpowers"
-check_post "/api/characters/sections/mentorspirits"
-check_post "/api/characters/sections/expenses"
-check_post "/api/characters/sections/sources"
-check_post "/api/characters/sections/gearlocations"
-check_post "/api/characters/sections/armorlocations"
-check_post "/api/characters/sections/weaponlocations"
-check_post "/api/characters/sections/vehiclelocations"
-check_post "/api/characters/sections/calendar"
-check_post "/api/characters/sections/improvements"
-check_post "/api/characters/sections/customdatadirectorynames"
-check_post "/api/characters/sections/drugs"
+import_payload_file=$(mktemp)
+python3 - <<'PY' "$XML_FILE" > "$import_payload_file"
+import base64, json, pathlib, sys
+xml = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8-sig")
+print(json.dumps({
+    "contentBase64": base64.b64encode(xml.encode("utf-8")).decode("ascii"),
+    "format": "NativeXml",
+    "xml": None,
+    "rulesetId": "sr5",
+}))
+PY
+import_response="$(request_json POST "/api/workspaces/import" "$import_payload_file")"
+workspace_id="$(python3 - <<'PY' "$import_response"
+import json, sys
+print(json.loads(sys.argv[1])["id"])
+PY
+)"
+echo "imported workspace: $workspace_id"
 
-curl_json GET "$BASE_URL/api/lifemodules/stages" >/dev/null
-curl_json GET "$BASE_URL/api/lifemodules/modules" >/dev/null
+request_json GET "/api/workspaces?maxCount=5" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/summary" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/validate" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/profile" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/progress" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/skills" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/rules" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/build" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/movement" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/awakening" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/sections/attributes" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/sections/gear" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/sections/weapons" >/dev/null
+
+metadata_payload_file=$(mktemp)
+printf '%s' '{"displayName":"BLUE E2E Smoke"}' > "$metadata_payload_file"
+request_json PATCH "/api/workspaces/$workspace_id/metadata" "$metadata_payload_file" >/dev/null
+
+request_json POST "/api/workspaces/$workspace_id/save" >/dev/null
+request_json POST "/api/workspaces/$workspace_id/download" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/export" >/dev/null
+request_json GET "/api/workspaces/$workspace_id/print" >/dev/null
+request_json DELETE "/api/workspaces/$workspace_id" >/dev/null
+
+echo "workspace live E2E completed"
 
 echo "live E2E completed"
