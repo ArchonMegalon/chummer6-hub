@@ -188,6 +188,7 @@ app.MapGet("/api/health", () => Results.Json(new
     status = "pass",
     generatedAt = DateTimeOffset.UtcNow
 }));
+app.MapMethods("/api/rybbit/{**proxyPath}", new[] { "GET", "POST", "OPTIONS" }, ProxyRybbitAsync);
 app.MapGet("/openapi/", GetSelfHostedDocs);
 
 app.MapControllers();
@@ -217,6 +218,64 @@ static string[] GetCsvValues(string? value)
     return string.IsNullOrWhiteSpace(value)
         ? Array.Empty<string>()
         : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+}
+
+static async Task ProxyRybbitAsync(HttpContext context)
+{
+    string origin = (context.RequestServices.GetRequiredService<IConfiguration>()["RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN"] ?? string.Empty).Trim().TrimEnd('/');
+    if (!Uri.TryCreate(origin, UriKind.Absolute, out Uri? parsedOrigin)
+        || (parsedOrigin.Scheme != Uri.UriSchemeHttp && parsedOrigin.Scheme != Uri.UriSchemeHttps))
+    {
+        context.Response.StatusCode = StatusCodes.Status404NotFound;
+        return;
+    }
+
+    string proxyPath = context.Request.RouteValues.TryGetValue("proxyPath", out object? routeValue)
+        ? Convert.ToString(routeValue) ?? string.Empty
+        : string.Empty;
+    string targetUrl = $"{parsedOrigin.GetLeftPart(UriPartial.Authority)}/api/{proxyPath}{context.Request.QueryString}";
+
+    using var outbound = new HttpRequestMessage(new HttpMethod(context.Request.Method), targetUrl);
+    if (context.Request.ContentLength is > 0 || context.Request.Headers.ContainsKey("Transfer-Encoding"))
+    {
+        outbound.Content = new StreamContent(context.Request.Body);
+        if (!string.IsNullOrWhiteSpace(context.Request.ContentType))
+        {
+            outbound.Content.Headers.TryAddWithoutValidation("Content-Type", context.Request.ContentType);
+        }
+    }
+
+    foreach (var header in context.Request.Headers)
+    {
+        string key = header.Key;
+        if (string.Equals(key, "Host", StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        string[] values = header.Value.ToArray();
+        if (!outbound.Headers.TryAddWithoutValidation(key, values) && outbound.Content is not null)
+        {
+            outbound.Content.Headers.TryAddWithoutValidation(key, values);
+        }
+    }
+
+    using var client = new HttpClient();
+    using HttpResponseMessage response = await client.SendAsync(outbound, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
+    Stream responseStream = await response.Content.ReadAsStreamAsync(context.RequestAborted);
+    foreach (var header in response.Headers)
+    {
+        context.Response.Headers[header.Key] = header.Value.ToArray()!;
+    }
+
+    foreach (var header in response.Content.Headers)
+    {
+        context.Response.Headers[header.Key] = header.Value.ToArray()!;
+    }
+
+    context.Response.Headers.Remove("transfer-encoding");
+    context.Response.StatusCode = (int)response.StatusCode;
+    await responseStream.CopyToAsync(context.Response.Body, context.RequestAborted);
 }
 
 static bool HasHttpsListenerConfiguration(IConfiguration configuration)

@@ -124,9 +124,49 @@
     var clickRankSiteId = requestHost is "chummer.run" or "www.chummer.run"
         ? (System.Environment.GetEnvironmentVariable("CLICKRANK_AI_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
         : string.Empty;
+    var configuredRybbitScriptUrl = (System.Environment.GetEnvironmentVariable("RYBBIT_CHUMMER_RUN_SCRIPT_URL") ?? string.Empty).Trim();
+    var configuredRybbitScriptOrigin = (System.Environment.GetEnvironmentVariable("RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN") ?? "https://app.rybbit.io").Trim().TrimEnd('/');
+    var rybbitAllowSameHostProxy = string.Equals(
+        (System.Environment.GetEnvironmentVariable("RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY") ?? string.Empty).Trim(),
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+    var rybbitScriptUrl = string.Empty;
+    if (requestHost is "chummer.run" or "www.chummer.run")
+    {
+        if (rybbitAllowSameHostProxy
+            && Uri.TryCreate(configuredRybbitScriptUrl, UriKind.Relative, out Uri? relativeRybbitScriptUrl)
+            && !relativeRybbitScriptUrl.IsAbsoluteUri
+            && configuredRybbitScriptUrl.StartsWith('/'))
+        {
+            rybbitScriptUrl = configuredRybbitScriptUrl;
+        }
+        else if (Uri.TryCreate(configuredRybbitScriptUrl, UriKind.Absolute, out Uri? parsedRybbitScriptUrl)
+            && (parsedRybbitScriptUrl.Scheme == Uri.UriSchemeHttps || parsedRybbitScriptUrl.Scheme == Uri.UriSchemeHttp)
+            && (rybbitAllowSameHostProxy || !string.Equals(parsedRybbitScriptUrl.Host.Trim().TrimEnd('.').ToLowerInvariant(), requestHost, StringComparison.Ordinal)))
+        {
+            rybbitScriptUrl = parsedRybbitScriptUrl.ToString();
+        }
+        else if (Uri.TryCreate(configuredRybbitScriptOrigin, UriKind.Absolute, out Uri? parsedRybbitOrigin)
+            && (parsedRybbitOrigin.Scheme == Uri.UriSchemeHttps || parsedRybbitOrigin.Scheme == Uri.UriSchemeHttp)
+            && (rybbitAllowSameHostProxy || !string.Equals(parsedRybbitOrigin.Host.Trim().TrimEnd('.').ToLowerInvariant(), requestHost, StringComparison.Ordinal)))
+        {
+            rybbitScriptUrl = $"{parsedRybbitOrigin.GetLeftPart(UriPartial.Authority).TrimEnd('/')}/api/script.js";
+        }
+    }
+    var rybbitSiteId = requestHost is "chummer.run" or "www.chummer.run"
+        ? (System.Environment.GetEnvironmentVariable("RYBBIT_CHUMMER_RUN_SITE_ID") ?? string.Empty).Trim()
+        : string.Empty;
     var clickRankEligible = !authSurface
         && !chrome.Authenticated
         && !string.IsNullOrWhiteSpace(clickRankSiteId)
+        && (
+            routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
+            || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
+            || routeKey.StartsWith("roadmap-", StringComparison.Ordinal));
+    var rybbitEligible = !authSurface
+        && !chrome.Authenticated
+        && !string.IsNullOrWhiteSpace(rybbitSiteId)
+        && !string.IsNullOrWhiteSpace(rybbitScriptUrl)
         && (
             routeKey is "landing" or "what-is-chummer" or "now" or "horizons" or "roadmap" or "downloads" or "participate" or "feedback" or "changelog" or "help" or "faq" or "contact" or "artifacts" or "status"
             || routeKey.StartsWith("artifacts-", StringComparison.Ordinal)
@@ -152,6 +192,43 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+    @if (rybbitEligible)
+    {
+        <script>
+            (function () {
+                var doNotTrack = window.doNotTrack === "1"
+                    || navigator.doNotTrack === "1"
+                    || navigator.msDoNotTrack === "1"
+                    || navigator.globalPrivacyControl === true;
+                if (doNotTrack || document.querySelector("script[data-rybbit='analytics']")) {
+                    return;
+                }
+
+                var loadRybbit = function () {
+                    if (document.querySelector("script[data-rybbit='analytics']")) {
+                        return;
+                    }
+
+                    var rybbit = document.createElement("script");
+                    rybbit.src = "@rybbitScriptUrl";
+                    rybbit.async = true;
+                    rybbit.dataset.siteId = "@rybbitSiteId";
+                    rybbit.dataset.rybbit = "analytics";
+                    rybbit.dataset.tag = "hub_public_shell";
+                    rybbit.dataset.skipPatterns = '["/account/**","/downloads/file/**","/downloads/files/**","/downloads/get/**","/downloads/install/**","/downloads/release-upload/**","/ledger/newsroom/**","/login","/signup"]';
+                    rybbit.referrerPolicy = "strict-origin-when-cross-origin";
+                    document.head.appendChild(rybbit);
+                };
+
+                if ("requestIdleCallback" in window) {
+                    window.requestIdleCallback(loadRybbit, { timeout: 1500 });
+                    return;
+                }
+
+                window.setTimeout(loadRybbit, 250);
+            })();
+        </script>
+    }
     @if (clickRankEligible)
     {
         <script>

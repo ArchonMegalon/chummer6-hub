@@ -62,6 +62,8 @@ services:
     depends_on:
       - chummer-run-identity
       - support-progress-mock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTPS_PORT: ${ASPNETCORE_HTTPS_PORT:-443}
@@ -126,6 +128,10 @@ services:
       CHUMMER_BLACK_LEDGER_NEWS_EA_PRINCIPAL_ID: ${CHUMMER_BLACK_LEDGER_NEWS_EA_PRINCIPAL_ID:-support-progress-principal}
       CHUMMER_BLACK_LEDGER_NEWS_EA_BINDING_ID: ${CHUMMER_BLACK_LEDGER_NEWS_EA_BINDING_ID:-binding-support-progress}
       CHUMMER_BLACK_LEDGER_NEWS_HASH_SALT: ${CHUMMER_BLACK_LEDGER_NEWS_HASH_SALT:-black-ledger-news}
+      RYBBIT_CHUMMER_RUN_SITE_ID: ${RYBBIT_CHUMMER_RUN_SITE_ID:-}
+      RYBBIT_CHUMMER_RUN_SCRIPT_URL: ${RYBBIT_CHUMMER_RUN_SCRIPT_URL:-}
+      RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN: ${RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN:-https://app.rybbit.io}
+      RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY: ${RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY:-false}
       CHUMMER_EA_DEFAULT_EMAIL: ${CHUMMER_EA_DEFAULT_EMAIL:-}
       CHUMMER_EA_DEFAULT_PASSWORD: ${CHUMMER_EA_DEFAULT_PASSWORD:-}
       CHUMMER_EA_DEFAULT_PASSWORD_ALT: ${CHUMMER_EA_DEFAULT_PASSWORD_ALT:-}
@@ -201,6 +207,17 @@ services:
         aliases:
           - ${CHUMMER_PUBLIC_EDGE_ALIAS:-chummer-portal}
       fleet-origin: {}
+
+  chummer-run-cloudflared:
+    image: "cloudflare/cloudflared:${CHUMMER_CLOUDFLARED_IMAGE_TAG:-2024.6.1}"
+    container_name: chummer-run-cloudflared
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - "${CHUMMER_RUN_CF_TUNNEL_TOKEN:?set CHUMMER_RUN_CF_TUNNEL_TOKEN in an ignored .env file}"
 
 volumes:
   chummer-run-api-state:

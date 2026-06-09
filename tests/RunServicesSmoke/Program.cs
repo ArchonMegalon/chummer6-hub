@@ -2026,6 +2026,14 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!layoutSource.Contains("Truth boundary", StringComparison.Ordinal), "public shell footer should stop projecting canon/projection disclosure copy.");
     Assert(layoutSource.Contains("CLICKRANK_AI_CHUMMER_RUN_SITE_ID", StringComparison.Ordinal), "layout should source the chummer.run ClickRank id from environment instead of hard-coding it.");
     Assert(layoutSource.Contains("requestHost is \"chummer.run\" or \"www.chummer.run\"", StringComparison.Ordinal), "layout should only load ClickRank on the public chummer.run host.");
+    Assert(layoutSource.Contains("RYBBIT_CHUMMER_RUN_SITE_ID", StringComparison.Ordinal), "layout should source the chummer.run Rybbit site id from environment instead of hard-coding it.");
+    Assert(layoutSource.Contains("RYBBIT_CHUMMER_RUN_SCRIPT_URL", StringComparison.Ordinal), "layout should support an explicit Rybbit script URL for self-hosted analytics.");
+    Assert(layoutSource.Contains("RYBBIT_CHUMMER_RUN_SCRIPT_ORIGIN", StringComparison.Ordinal), "layout should support a Rybbit script origin fallback.");
+    Assert(layoutSource.Contains("RYBBIT_CHUMMER_RUN_ALLOW_SAME_HOST_PROXY", StringComparison.Ordinal), "layout should expose the same-host proxy guard for Rybbit.");
+    Assert(layoutSource.Contains("data-rybbit='analytics'", StringComparison.Ordinal), "layout should inject the Rybbit analytics script with a stable marker.");
+    Assert(layoutSource.Contains("data-site-id", StringComparison.Ordinal), "layout should wire the Rybbit script with the configured site id.");
+    Assert(layoutSource.Contains("hub_public_shell", StringComparison.Ordinal), "layout should tag public-shell Rybbit traffic distinctly.");
+    Assert(layoutSource.Contains("/downloads/install/**", StringComparison.Ordinal), "layout should keep install/download paths out of Rybbit tracking by default.");
     var programSource = File.ReadAllText(Path.Combine("/docker/chummercomplete/chummer.run-services", "Chummer.Run.Api", "Program.cs"));
     Assert(programSource.Contains("CHUMMER_FORWARDED_HEADER_TRUSTED_IP_NETWORKS", StringComparison.Ordinal), "startup should honor trusted forwarded-header networks so tunnelled HTTPS stays stable.");
     Assert(programSource.Contains("hubGoogleAuth.ValidateProductionReadiness();", StringComparison.Ordinal), "startup should hard-fail in production when Google OIDC credentials are missing.");
