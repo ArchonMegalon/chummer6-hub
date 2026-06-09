@@ -13,7 +13,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open current release", view, StringComparison.Ordinal);
         Assert.Contains("@release.KnownIssuesLabel", view, StringComparison.Ordinal);
         Assert.Contains("@release.InstallHelpLabel", view, StringComparison.Ordinal);
-        Assert.Contains("Known issues and install help stay nearby. Deeper release evidence lives on the current-release and status surfaces, not in front of the install button.", view, StringComparison.Ordinal);
+        Assert.Contains("Known issues and install help stay nearby. Deeper release detail lives on What works today and Status, not in front of the install button.", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -218,12 +218,26 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.Contains("downloads page right now", controller, StringComparison.Ordinal);
-        Assert.Contains("signed-in setup handoff", controller, StringComparison.Ordinal);
-        Assert.Contains("No blocked public install path or tested journey is mirrored right now.", controller, StringComparison.Ordinal);
+        Assert.Contains("available on downloads right now", controller, StringComparison.Ordinal);
+        Assert.Contains("start with sign-in so recovery and support stay attached", controller, StringComparison.Ordinal);
+        Assert.Contains("No blocked public install path or tested journey is active right now.", controller, StringComparison.Ordinal);
         Assert.Contains("tested journeys and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
         Assert.Contains("Current public release:", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("journey proofs and {routeCount} trust routes", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusPageUsesLaunchHealthRowsForShorterReleaseAndCautionSummaries()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains("FindLaunchHealthValue(\"Preview\")", view, StringComparison.Ordinal);
+        Assert.Contains("FindLaunchHealthValue(\"Proof freshness\")", view, StringComparison.Ordinal);
+        Assert.Contains("FindLaunchHealthValue(\"Support pulse\")", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Current public release</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Install help stays close</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("<h2>Quick release checks</h2>", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -237,6 +251,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Start with the recommended download.", downloadsView, StringComparison.Ordinal);
         Assert.Contains("starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.Contains("preview the bundled", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Use the main install path for this platform.", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Need help choosing a setup path?", downloadsView, StringComparison.Ordinal);
+        Assert.Contains("Deeper release detail lives on What works today and Status", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("guided starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Inspect the bundled", downloadsView, StringComparison.Ordinal);
         Assert.Contains("included example runner", nowView, StringComparison.Ordinal);

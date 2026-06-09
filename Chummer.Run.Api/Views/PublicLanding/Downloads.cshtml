@@ -67,10 +67,10 @@
                     : release.PlatformShelfNoticeSummary
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
-                        ? release.GuestGateSummary
+                        ? "Sign in first only when you want setup return, recovery, and support attached from the first launch."
                         : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
-        <p class="muted-copy">Start with the recommended download. Sign in only when you want setup return, recovery, and support follow-through tied to the same account.</p>
+        <p class="muted-copy">Start with the recommended download. Sign in only when you want setup return, recovery, and support tied to the same account.</p>
         <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
     </div>
 </section>
@@ -126,7 +126,7 @@ else
                             : $"Recommended for {deviceLabel}")
                 </span>
                 <h2>@(requestedPlatformUnavailable ? $"This browser looks like {deviceLabel}" : release.Recommended.Title)</h2>
-                <p>@(requestedPlatformUnavailable ? release.PlatformShelfNoticeSummary : release.Recommended.SupportLine)</p>
+                <p>@(requestedPlatformUnavailable ? release.PlatformShelfNoticeSummary : "Use the main install path for this platform. Choose sign-in when you want recovery, support, and install return attached from the first launch.")</p>
                 <div class="recommended-download__meta">
                     <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
                     @if (!requestedPlatformUnavailable)
@@ -148,7 +148,7 @@ else
                         <strong>@(guestGateRequired ? "Link this copy from the first launch" : "Link this copy on first launch")</strong>
                         <p>
                             @(guestGateRequired
-                                ? "This install path begins from a signed-in setup handoff so recovery and support stay attached from the first launch."
+                                ? "This install path starts with sign-in so recovery and support stay attached from the first launch."
                                 : "You can install now, and Chummer links this copy on first launch before the workspace opens.")
                         </p>
                     </article>
@@ -197,8 +197,8 @@ else
                     }
                 </div>
                 <div class="route-callout" role="status" aria-live="polite">
-                    <h3>Need a guided setup path?</h3>
-                    <p>Open the setup concierge when you want one short branch into downloads, platform help, structured setup help, or a human handoff without losing the first-party fallback.</p>
+                    <h3>Need help choosing a setup path?</h3>
+                    <p>Open setup concierge when you want one short path into downloads, platform help, or a human handoff without losing the first-party fallback.</p>
                     <div class="route-callout__actions">
                         <a class="inline-link" href="/downloads/concierge">Open setup concierge</a>
                         <a class="inline-link" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
@@ -214,8 +214,8 @@ else
                     <details class="release-accordion">
                         <summary>Release notes, known issues, and requirements</summary>
                         <div class="release-accordion__body">
-                            <p class="muted-copy">Known issues and install help stay nearby. Deeper release evidence lives on the current-release and status surfaces, not in front of the install button.</p>
-                            <p class="muted-copy">Release notes and known issues stay tied to this downloads page, so install confidence remains truthful even while release availability evolves.</p>
+                            <p class="muted-copy">Known issues and install help stay nearby. Deeper release detail lives on What works today and Status, not in front of the install button.</p>
+                            <p class="muted-copy">Release notes and known issues stay tied to this downloads page so the install decision stays honest while availability evolves.</p>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="/now">Open current release</a>
                                 <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
@@ -284,7 +284,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>
-                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : accessPosture?.CreateAccountSummary ?? "Sign in when you want recovery, support continuity, and claim-linked install history tied to the same machine.")</strong>
+                                <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in when you want recovery and support tied to this install.")</strong>
                             </article>
                         </div>
                         <div class="stacked-actions">
@@ -296,7 +296,7 @@ else
 
                     <div class="downloads-advanced-group">
                         <h3 class="downloads-subheading">Need more detail?</h3>
-                        <p class="muted-copy">Use Status when you want platform readiness, the current caution, and the technical release trail without crowding the main install decision.</p>
+                        <p class="muted-copy">Use Status when you want platform readiness, the current caution, and the deeper release trail without crowding the main install decision.</p>
                         <div class="stacked-actions">
                             <a class="button-like button-like--ghost" href="/status">Open status</a>
                             <a class="button-like button-like--ghost" href="/now">Open what works today</a>
@@ -307,7 +307,7 @@ else
                     {
                         <div class="downloads-advanced-group" id="signed-in-windows-builds">
                             <h3 class="downloads-subheading">Signed-in Windows builds</h3>
-                            <p class="muted-copy">Windows is not on the guest shelf right now, but signed-in users can still open the latest Windows install handoff here.</p>
+                            <p class="muted-copy">Windows is not available to guests right now, but signed-in users can still open the latest Windows install path here.</p>
                             <div class="evidence-row-list">
                                 @foreach (var option in signedInWindowsBuilds)
                                 {
@@ -333,7 +333,7 @@ else
                     {
                         <div class="downloads-advanced-group" id="windows-verification-rail">
                             <h3 class="downloads-subheading">Windows verification and support path</h3>
-                            <p class="muted-copy">These direct Windows installers stay available for verification and support when a proof or support flow points to a specific build beyond the main platform shelf.</p>
+                            <p class="muted-copy">These direct Windows installers stay available for verification and support when a proof or support flow points to a specific build beyond the main platform list.</p>
                             <div class="evidence-row-list">
                                 @foreach (var proofInstaller in windowsProofInstallers)
                                 {

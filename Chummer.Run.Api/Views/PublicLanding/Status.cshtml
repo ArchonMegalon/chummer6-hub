@@ -51,12 +51,12 @@
         }
     };
     var campaignStatusTitle = Model.CampaignOsProof is null
-        ? "Campaign proof is not mirrored on this request"
+        ? "Campaign detail stays on the longer report"
         : $"Campaign proof is currently {Model.CampaignOsProof.Status}";
     var campaignStatusSummary = Model.CampaignOsProof is null
-        ? "The public status view can stay useful without the deeper campaign proof packet, but the longer progress report is where that gap should stay visible."
+        ? "This page stays useful without the deeper campaign packet. Open the longer report when you need that detail."
         : Model.CampaignOsProof.JourneysPassed.Count == 0
-            ? "The campaign proof packet is mirrored, but no named journeys are listed as passed in the current snapshot."
+            ? "The campaign packet is mirrored, but this snapshot does not list named completed journeys yet."
             : $"Current mirrored journey coverage: {string.Join(", ", Model.CampaignOsProof.JourneysPassed)}.";
 
     string ContextualPreviewHref(string? href)
@@ -117,6 +117,29 @@
             .Replace("errata posture", "errata updates", StringComparison.OrdinalIgnoreCase)
             .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase);
     }
+
+    string? FindLaunchHealthValue(string label)
+        => Model.LaunchHealthRows?
+            .FirstOrDefault(row => string.Equals(row.Label, label, StringComparison.OrdinalIgnoreCase))
+            ?.Value;
+
+    var releasePostureSummary = CustomerStatusText(
+        FindLaunchHealthValue("Preview"),
+        CustomerStatusText(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message, "The current release notes and support path should read like one honest record."));
+    var cautionSummary = CustomerStatusText(Model.Manifest.KnownIssueSummary, string.Empty);
+    if (string.IsNullOrWhiteSpace(cautionSummary))
+    {
+        cautionSummary = FindLaunchHealthValue("Blocked") ?? "Known issues and install help stay one short step away.";
+    }
+    else if (cautionSummary.Contains("proof is green", StringComparison.OrdinalIgnoreCase))
+    {
+        cautionSummary = "Known issues and install help stay one short step away, even when the current release checks are green.";
+    }
+    var compactReleaseSummary = CustomerStatusText(FindLaunchHealthValue("Live"), releasePostureSummary);
+    var compactCautionSummary = CustomerStatusText(FindLaunchHealthValue("Proof freshness"), cautionSummary);
+    var compactFollowThroughSummary = CustomerStatusText(
+        FindLaunchHealthValue("Support pulse"),
+        CustomerStatusText(Model.Manifest.FixAvailabilitySummary, "Use support only when downloads, notes, and known issues stop being enough to move forward."));
 }
 
 <section class="trust-page-hero">
@@ -203,14 +226,14 @@
 <section class="status-decision-strip" aria-label="Current status decisions">
     <article class="status-decision-strip__card">
         <span class="tag">Release posture</span>
-        <h2>@Model.ReleaseExperience.Display.BuildLabel stays attached to downloads.</h2>
-        <p>@CustomerStatusText(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message, "The current release shelf, notes, and support path should read like one honest record.")</p>
+        <h2>Current public release</h2>
+        <p>@releasePostureSummary</p>
         <a class="button-like button-like--ghost" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="status-decision-strip__card">
         <span class="tag tag--amber">Current caution</span>
-        <h2>Known issues and install help should be one short step away.</h2>
-                <p>@CustomerStatusText(Model.Manifest.KnownIssueSummary, Model.ReleaseExperience.KnownIssuesLabel)</p>
+        <h2>Install help stays close</h2>
+        <p>@cautionSummary</p>
         <a class="button-like button-like--ghost" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
     </article>
     <article class="status-decision-strip__card">
@@ -226,8 +249,8 @@
     <section class="release-shelf">
         <article class="app-action-card">
             <span class="tag">Public launch health</span>
-            <h2>Release checks behind the public status line</h2>
-            <p>These rows keep the current release, current caution, current proof recency, support posture, and adoption evidence in one short customer-safe summary.</p>
+            <h2>Quick release checks</h2>
+            <p>These rows keep release availability, fallback posture, verification freshness, support follow-through, and adoption evidence in one short summary.</p>
             <div class="settings-summary-list">
                 @foreach (var row in Model.LaunchHealthRows)
                 {
@@ -279,21 +302,21 @@
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Release status</h3>
-            <p>@CustomerStatusText(Model.Manifest.SupportabilitySummary ?? Model.Manifest.Message, "The current release shelf, notes, and support path should read like one honest record.")</p>
+            <p>@compactReleaseSummary</p>
         </div>
         <a class="inline-link" href="@ContextualPreviewHref("/downloads")">Open downloads</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Current caution</h3>
-            <p>@CustomerStatusText(Model.Manifest.KnownIssueSummary, Model.ReleaseExperience.KnownIssuesLabel)</p>
+            <p>@compactCautionSummary</p>
         </div>
         <a class="inline-link" href="@Model.ReleaseExperience.KnownIssuesHref">@Model.ReleaseExperience.KnownIssuesLabel</a>
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
             <h3>Fix and closure follow-through</h3>
-            <p>@CustomerStatusText(Model.Manifest.FixAvailabilitySummary, "Use support only when downloads, notes, and known issues stop being enough to move forward.")</p>
+            <p>@compactFollowThroughSummary</p>
         </div>
         <a class="inline-link" href="/contact#support-intake">Open support</a>
     </article>

@@ -9057,12 +9057,12 @@ Boundary:
         int directPublicCount = totalLiveRouteCount - accountRequiredCount;
         string routeSummary = totalLiveRouteCount switch
         {
-            <= 0 => "No live install routes are published on the downloads page right now.",
-            1 when accountRequiredCount <= 0 => "1 live install route is published on the downloads page right now.",
-            1 => "1 live install route is published on the downloads page right now, and it currently starts from a signed-in setup handoff.",
-            _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install routes are published on the downloads page right now.",
-            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} live install routes are published on the downloads page right now, and all {accountRequiredCount} currently start from a signed-in setup handoff.",
-            _ => $"{totalLiveRouteCount} live install routes are published on the downloads page right now; {directPublicCount} are public downloads and {accountRequiredCount} start from a signed-in setup handoff."
+            <= 0 => "No live install routes are available on downloads right now.",
+            1 when accountRequiredCount <= 0 => "1 live install route is available on downloads right now.",
+            1 => "1 live install route is available on downloads right now, and it starts with sign-in so recovery and support stay attached.",
+            _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install routes are available on downloads right now.",
+            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} live install routes are available on downloads right now, and all {accountRequiredCount} start with sign-in so recovery and support stay attached.",
+            _ => $"{totalLiveRouteCount} live install routes are available on downloads right now; {directPublicCount} are direct downloads and {accountRequiredCount} start with sign-in so recovery and support stay attached."
         };
 
         JsonElement primaryRoute = EnumerateDesktopRouteTruth(manifest)
@@ -9112,7 +9112,7 @@ Boundary:
             .ToArray();
         if (fallbackRoutes.Length == 0)
         {
-            return "No explicit fallback route is mirrored for the current downloads page.";
+            return "No separate fallback download route is published right now.";
         }
 
         string? reason = FirstNonEmpty(
@@ -9120,8 +9120,8 @@ Boundary:
             TryGetJsonString(fallbackRoutes[0], "promotionReason"),
             TryGetJsonString(fallbackRoutes[0], "updateEligibilityReason"));
         return string.IsNullOrWhiteSpace(reason)
-            ? $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current downloads page."
-            : $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current downloads page. {reason}";
+            ? $"{fallbackRoutes.Length} fallback download route(s) are published right now."
+            : $"{fallbackRoutes.Length} fallback download route(s) are published right now. {reason}";
     }
 
     private static string BuildRevokedLaunchSummary(PublicReleaseManifestDto manifest)
@@ -9133,16 +9133,16 @@ Boundary:
         if (revokedRoutes.Length == 0)
         {
             return routeRows.Count == 0
-                ? "No desktop route revoke state is mirrored for the current downloads page."
-                : $"No revoke markers are active across {routeRows.Count} tracked desktop routes.";
+                ? "No desktop download revoke state is published right now."
+                : $"No revoke markers are active across {routeRows.Count} tracked desktop download routes.";
         }
 
         string? reason = FirstNonEmpty(
             TryGetJsonString(revokedRoutes[0], "revokeReason"),
             TryGetJsonString(revokedRoutes[0], "installPostureReason"));
         return string.IsNullOrWhiteSpace(reason)
-            ? $"{revokedRoutes.Length} desktop route(s) are currently revoked."
-            : $"{revokedRoutes.Length} desktop route(s) are currently revoked. {reason}";
+            ? $"{revokedRoutes.Length} desktop download route(s) are currently revoked."
+            : $"{revokedRoutes.Length} desktop download route(s) are currently revoked. {reason}";
     }
 
     private static string BuildFixedLaunchSummary(PublicReleaseManifestDto manifest)
@@ -9150,7 +9150,7 @@ Boundary:
             ? manifest.FixAvailabilitySummary!
             : !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
                 ? manifest.SupportabilitySummary!
-                : "No fix follow-through note is published for the current downloads page.";
+                : "No fix follow-through note is published for downloads right now.";
 
     private static string BuildBlockedLaunchSummary(
         PublicReleaseManifestDto manifest,
@@ -9175,13 +9175,13 @@ Boundary:
         int blockedJourneyCount = pulse?.BlockedJourneyCount ?? 0;
         if (blockedRouteCount == 0 && blockedJourneyCount == 0)
         {
-            return "No blocked public install path or tested journey is mirrored right now.";
+            return "No blocked public install path or tested journey is active right now.";
         }
 
         var segments = new List<string>(2);
         if (blockedRouteCount > 0)
         {
-            segments.Add($"{blockedRouteCount} desktop routes are blocked or still proof-gated");
+            segments.Add($"{blockedRouteCount} desktop routes are blocked or still waiting for current verification");
         }
 
         if (blockedJourneyCount > 0)
@@ -9197,25 +9197,42 @@ Boundary:
         PublicTrustPulseSnapshot? pulse)
     {
         string manifestStamp = manifest.GeneratedAt is DateTimeOffset generatedAt
-            ? $"Manifest {generatedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC"
-            : $"Manifest published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC";
+            ? $"Release details refreshed {generatedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC"
+            : $"Release details published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC";
         string proofStamp = manifest.ProofGeneratedAt is DateTimeOffset proofGeneratedAt
-            ? $"release proof {proofGeneratedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC ({HumanizeToken(manifest.ProofStatus, "unknown")})"
-            : $"release proof {HumanizeToken(manifest.ProofStatus, "not mirrored").ToLowerInvariant()}";
+            ? $"verification checked {proofGeneratedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC ({HumanizeToken(manifest.ProofStatus, "unknown").ToLowerInvariant()})"
+            : $"verification is {HumanizeToken(manifest.ProofStatus, "not mirrored").ToLowerInvariant()}";
         string pulseStamp = string.IsNullOrWhiteSpace(pulse?.AsOf)
-            ? "weekly pulse not mirrored"
-            : $"weekly pulse as of {pulse.AsOf}";
+            ? "weekly adoption pulse is not mirrored"
+            : $"weekly adoption pulse as of {pulse.AsOf}";
         return $"{manifestStamp}; {proofStamp}; {pulseStamp}.";
     }
 
     private static string BuildSupportPulseSummary(
         PublicReleaseManifestDto manifest,
         PublicTrustPulseSnapshot? pulse)
-        => pulse is not null
-            ? BuildTrustPulseClosureHealthSummary(pulse)
-            : !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
-                ? manifest.SupportabilitySummary!
-                : "Support closure posture is not mirrored yet.";
+    {
+        if (pulse is not null)
+        {
+            if (pulse.ClosureHealthWaitingCount is int waitingCount
+                && pulse.ClosureHealthPendingHumanResponseCount is int pendingCount
+                && pulse.ClosureHealthOpenCaseCount is int openCaseCount)
+            {
+                if (waitingCount == 0 && pendingCount == 0 && openCaseCount == 0)
+                {
+                    return "No open support follow-through is waiting right now.";
+                }
+
+                return $"{waitingCount} support follow-up item(s) are waiting / {pendingCount} are waiting on a human reply. {openCaseCount} open support case(s) remain.";
+            }
+
+            return BuildTrustPulseClosureHealthSummary(pulse);
+        }
+
+        return !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
+            ? manifest.SupportabilitySummary!
+            : "Support follow-through is not mirrored yet.";
+    }
 
     private static bool IsBlockedStatus(string? value)
     {
@@ -9777,12 +9794,12 @@ Boundary:
             && pulse.ClosureHealthPendingHumanResponseCount is int pendingCount)
         {
             string openCaseSegment = pulse.ClosureHealthOpenCaseCount is int openCaseCount
-                ? $" {openCaseCount} open support packet(s) remain."
+                ? $" {openCaseCount} open support case(s) remain."
                 : string.Empty;
-            return $"{waitingCount} waiting closure / {pendingCount} pending human response.{openCaseSegment}".Trim();
+            return $"{waitingCount} support follow-up item(s) are waiting / {pendingCount} are waiting on a human reply.{openCaseSegment}".Trim();
         }
 
-        return "Closure health is waiting on current support-packet evidence.";
+        return "Support follow-through is waiting on current support evidence.";
     }
 
     private static string BuildTrustPulseProgressTrendSummary(PublicTrustPulseSnapshot pulse)
