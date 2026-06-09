@@ -70,7 +70,7 @@
                         ? release.GuestGateSummary
                         : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
-        <p class="muted-copy">Open downloads first. Create account for guided install only when you want first-launch recovery, linked restore, and support follow-through to stay attached.</p>
+        <p class="muted-copy">Start with the recommended download. Sign in only when you want setup return, recovery, and support follow-through tied to the same account.</p>
         <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
     </div>
 </section>
@@ -148,7 +148,7 @@ else
                         <strong>@(guestGateRequired ? "Link this copy from the first launch" : "Link this copy on first launch")</strong>
                         <p>
                             @(guestGateRequired
-                                ? "This install path begins from a linked handoff so recovery and support stay attached from the first launch."
+                                ? "This install path begins from a signed-in setup handoff so recovery and support stay attached from the first launch."
                                 : "You can install now, and Chummer links this copy on first launch before the workspace opens.")
                         </p>
                     </article>
@@ -209,7 +209,7 @@ else
                     <p class="downloads-inline-note">
                         @(recommendedUsesMacSetupScript
                             ? "Open the Mac setup handoff, copy the Terminal command, and run it in Terminal."
-                            : "After install, open Chummer and continue through Home, Horizons, or a guided starter workspace.")
+                            : "After install, open Chummer and continue through Home, Horizons, or a starter workspace.")
                     </p>
                     <details class="release-accordion">
                         <summary>Release notes, known issues, and requirements</summary>
@@ -280,7 +280,7 @@ else
                             </article>
                             <article class="downloads-fact">
                                 <span>First launch</span>
-                                <strong>Inspect the bundled <code class="mono-receipt">Soma-Career.chum5</code> sample before you start blank.</strong>
+                                <strong>Open a starter workspace or preview the bundled <code class="mono-receipt">Soma-Career.chum5</code> example before you build from scratch.</strong>
                             </article>
                             <article class="downloads-fact">
                                 <span>Support path</span>

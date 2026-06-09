@@ -9055,14 +9055,14 @@ Boundary:
         int accountRequiredCount = manifest.Downloads.Count(static artifact =>
             string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
         int directPublicCount = totalLiveRouteCount - accountRequiredCount;
-        string shelfSummary = totalLiveRouteCount switch
+        string routeSummary = totalLiveRouteCount switch
         {
-            <= 0 => "No live install routes are published on the shelf right now.",
-            1 when accountRequiredCount <= 0 => "1 live install route is published on the shelf right now.",
-            1 => "1 live install route is published on the shelf right now, and it currently uses a signed-in guided handoff.",
-            _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install route(s) are published on the shelf right now.",
-            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} live install route(s) are published on the shelf right now, and all {accountRequiredCount} currently use signed-in guided handoff.",
-            _ => $"{totalLiveRouteCount} live install route(s) are published on the shelf right now; {directPublicCount} are direct-public and {accountRequiredCount} use signed-in guided handoff."
+            <= 0 => "No live install routes are published on the downloads page right now.",
+            1 when accountRequiredCount <= 0 => "1 live install route is published on the downloads page right now.",
+            1 => "1 live install route is published on the downloads page right now, and it currently starts from a signed-in setup handoff.",
+            _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install routes are published on the downloads page right now.",
+            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} live install routes are published on the downloads page right now, and all {accountRequiredCount} currently start from a signed-in setup handoff.",
+            _ => $"{totalLiveRouteCount} live install routes are published on the downloads page right now; {directPublicCount} are public downloads and {accountRequiredCount} start from a signed-in setup handoff."
         };
 
         JsonElement primaryRoute = EnumerateDesktopRouteTruth(manifest)
@@ -9076,8 +9076,8 @@ Boundary:
             : null;
 
         return string.IsNullOrWhiteSpace(primaryReason)
-            ? shelfSummary
-            : $"{shelfSummary} {primaryReason}";
+            ? routeSummary
+            : $"{routeSummary} {primaryReason}";
     }
 
     private static string BuildPreviewLaunchSummary(
@@ -9099,7 +9099,7 @@ Boundary:
 
         if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
         {
-            return $"Current public release on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published}";
+            return $"Current public release: {releaseExperience.Display.BuildLabel} on {releaseExperience.Display.ChannelLabel}. {published}";
         }
 
         return $"Preview posture on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published}";
@@ -9112,7 +9112,7 @@ Boundary:
             .ToArray();
         if (fallbackRoutes.Length == 0)
         {
-            return "No explicit fallback route is mirrored for the current shelf.";
+            return "No explicit fallback route is mirrored for the current downloads page.";
         }
 
         string? reason = FirstNonEmpty(
@@ -9120,8 +9120,8 @@ Boundary:
             TryGetJsonString(fallbackRoutes[0], "promotionReason"),
             TryGetJsonString(fallbackRoutes[0], "updateEligibilityReason"));
         return string.IsNullOrWhiteSpace(reason)
-            ? $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current shelf."
-            : $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current shelf. {reason}";
+            ? $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current downloads page."
+            : $"{fallbackRoutes.Length} explicit fallback route(s) are mirrored for the current downloads page. {reason}";
     }
 
     private static string BuildRevokedLaunchSummary(PublicReleaseManifestDto manifest)
@@ -9133,8 +9133,8 @@ Boundary:
         if (revokedRoutes.Length == 0)
         {
             return routeRows.Count == 0
-                ? "No desktop route revoke truth is mirrored for the current shelf."
-                : $"No registry revoke markers are active across {routeRows.Count} tracked desktop route(s).";
+                ? "No desktop route revoke state is mirrored for the current downloads page."
+                : $"No revoke markers are active across {routeRows.Count} tracked desktop routes.";
         }
 
         string? reason = FirstNonEmpty(
@@ -9150,7 +9150,7 @@ Boundary:
             ? manifest.FixAvailabilitySummary!
             : !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
                 ? manifest.SupportabilitySummary!
-                : "No fixed-release follow-through note is published for the current shelf.";
+                : "No fix follow-through note is published for the current downloads page.";
 
     private static string BuildBlockedLaunchSummary(
         PublicReleaseManifestDto manifest,
@@ -9175,18 +9175,18 @@ Boundary:
         int blockedJourneyCount = pulse?.BlockedJourneyCount ?? 0;
         if (blockedRouteCount == 0 && blockedJourneyCount == 0)
         {
-            return "No blocked public route or journey is mirrored right now.";
+            return "No blocked public install path or tested journey is mirrored right now.";
         }
 
         var segments = new List<string>(2);
         if (blockedRouteCount > 0)
         {
-            segments.Add($"{blockedRouteCount} desktop route(s) are blocked or still proof-gated");
+            segments.Add($"{blockedRouteCount} desktop routes are blocked or still proof-gated");
         }
 
         if (blockedJourneyCount > 0)
         {
-            segments.Add($"{blockedJourneyCount} release journey(s) remain blocked");
+            segments.Add($"{blockedJourneyCount} tested journeys remain blocked");
         }
 
         return string.Join("; ", segments) + ".";
@@ -9732,21 +9732,21 @@ Boundary:
         if (!string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus))
         {
             segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-                ? "Current local edge proof passed."
+                ? "Current local release proof passed."
                 : $"Current local edge proof is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
         }
 
         if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)
         {
-            segments.Add($"{journeyCount} journey proofs and {routeCount} trust routes are on record.");
+            segments.Add($"{journeyCount} tested journeys and {routeCount} checked routes are on record.");
         }
         else if (pulse.ProvenJourneyCount is int journeyOnly && journeyOnly > 0)
         {
-            segments.Add($"{journeyOnly} journey proofs are on record.");
+            segments.Add($"{journeyOnly} tested journeys are on record.");
         }
         else if (pulse.ProvenRouteCount is int routeOnly && routeOnly > 0)
         {
-            segments.Add($"{routeOnly} trust routes are on record.");
+            segments.Add($"{routeOnly} checked routes are on record.");
         }
 
         if (pulse.HistorySnapshotCount is int historySnapshotCount && historySnapshotCount > 0)
