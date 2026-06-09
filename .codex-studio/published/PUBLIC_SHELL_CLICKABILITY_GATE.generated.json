@@ -1,0 +1,1466 @@
+{
+  "status": "pass",
+  "base_url": "https://chummer.run",
+  "generated_at": "2026-06-09T07:39:52.406242Z",
+  "summary": {
+    "page_count": 6,
+    "link_count": 155,
+    "failed_page_count": 0,
+    "failed_link_count": 0,
+    "failed_pages": [],
+    "failed_links": []
+  },
+  "pages": [
+    {
+      "page": "/",
+      "success": true,
+      "status_code": 200,
+      "forbidden_text_hits": [],
+      "link_count": 28,
+      "failed_link_count": 0,
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "success": true,
+      "status_code": 200,
+      "forbidden_text_hits": [],
+      "link_count": 22,
+      "failed_link_count": 0,
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "success": true,
+      "status_code": 200,
+      "forbidden_text_hits": [],
+      "link_count": 23,
+      "failed_link_count": 0,
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "success": true,
+      "status_code": 200,
+      "forbidden_text_hits": [],
+      "link_count": 33,
+      "failed_link_count": 0,
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "success": true,
+      "status_code": 200,
+      "forbidden_text_hits": [],
+      "link_count": 31,
+      "failed_link_count": 0,
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "success": true,
+      "status_code": 200,
+      "forbidden_text_hits": [],
+      "link_count": 18,
+      "failed_link_count": 0,
+      "detail": null
+    }
+  ],
+  "links": [
+    {
+      "page": "/",
+      "href": "https://chummer.run/",
+      "resolved_url": "https://chummer.run/",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/login?next=%2F",
+      "resolved_url": "https://chummer.run/login?next=%2F",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/login?next=%2F",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/downloads",
+      "resolved_url": "https://chummer.run/downloads",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/downloads",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/now",
+      "resolved_url": "https://chummer.run/now",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/help",
+      "resolved_url": "https://chummer.run/help",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/signup",
+      "resolved_url": "https://chummer.run/signup",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger",
+      "resolved_url": "https://chummer.run/ledger",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/dispatches",
+      "resolved_url": "https://chummer.run/ledger/dispatches",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/dispatches",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/participate/karma-forge",
+      "resolved_url": "https://chummer.run/participate/karma-forge",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate/karma-forge",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/anarchy",
+      "resolved_url": "https://chummer.run/anarchy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/anarchy",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/feedback",
+      "resolved_url": "https://chummer.run/feedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/feedback",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/changelog",
+      "resolved_url": "https://chummer.run/changelog",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/changelog",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/faq",
+      "resolved_url": "https://chummer.run/faq",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/faq",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/privacy",
+      "resolved_url": "https://chummer.run/privacy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/privacy",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/terms",
+      "resolved_url": "https://chummer.run/terms",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/terms",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/contact",
+      "resolved_url": "https://chummer.run/contact",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/factions/glass-tower-compact",
+      "resolved_url": "https://chummer.run/ledger/factions/glass-tower-compact",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/factions/glass-tower-compact",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/factions/rust-market-syndicate",
+      "resolved_url": "https://chummer.run/ledger/factions/rust-market-syndicate",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/factions/rust-market-syndicate",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/factions/ashline-circle",
+      "resolved_url": "https://chummer.run/ledger/factions/ashline-circle",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/factions/ashline-circle",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/factions/neon-docks-union",
+      "resolved_url": "https://chummer.run/ledger/factions/neon-docks-union",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/factions/neon-docks-union",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/factions/ghostline-network",
+      "resolved_url": "https://chummer.run/ledger/factions/ghostline-network",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/factions/ghostline-network",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/factions/barrens-free-wardens",
+      "resolved_url": "https://chummer.run/ledger/factions/barrens-free-wardens",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/factions/barrens-free-wardens",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/media/promo/chummer6-flagship-promo.receipt.json",
+      "resolved_url": "https://chummer.run/media/promo/chummer6-flagship-promo.receipt.json",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/media/promo/chummer6-flagship-promo.receipt.json",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/play",
+      "resolved_url": "https://chummer.run/play",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/play",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/status",
+      "resolved_url": "https://chummer.run/status",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/status",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/ledger/map?replay=turn-1",
+      "resolved_url": "https://chummer.run/ledger/map?replay=turn-1",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/map?replay=turn-1",
+      "detail": null
+    },
+    {
+      "page": "/",
+      "href": "https://chummer.run/roadmap",
+      "resolved_url": "https://chummer.run/roadmap",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/roadmap",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/",
+      "resolved_url": "https://chummer.run/",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/login?next=%2Fstatus",
+      "resolved_url": "https://chummer.run/login?next=%2Fstatus",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/login?next=%2Fstatus",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/downloads",
+      "resolved_url": "https://chummer.run/downloads",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/downloads",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/now",
+      "resolved_url": "https://chummer.run/now",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/help",
+      "resolved_url": "https://chummer.run/help",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/signup",
+      "resolved_url": "https://chummer.run/signup",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/ledger",
+      "resolved_url": "https://chummer.run/ledger",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/ledger/dispatches",
+      "resolved_url": "https://chummer.run/ledger/dispatches",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/dispatches",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/participate/karma-forge",
+      "resolved_url": "https://chummer.run/participate/karma-forge",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate/karma-forge",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/anarchy",
+      "resolved_url": "https://chummer.run/anarchy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/anarchy",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/feedback",
+      "resolved_url": "https://chummer.run/feedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/feedback",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/changelog",
+      "resolved_url": "https://chummer.run/changelog",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/changelog",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/faq",
+      "resolved_url": "https://chummer.run/faq",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/faq",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/privacy",
+      "resolved_url": "https://chummer.run/privacy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/privacy",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/terms",
+      "resolved_url": "https://chummer.run/terms",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/terms",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/contact",
+      "resolved_url": "https://chummer.run/contact",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/progress",
+      "resolved_url": "https://chummer.run/progress",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/progress",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/contact#support-intake",
+      "resolved_url": "https://chummer.run/contact#support-intake",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact#support-intake",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/help#install-update",
+      "resolved_url": "https://chummer.run/help#install-update",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help#install-update",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/signup?next=/home",
+      "resolved_url": "https://chummer.run/signup?next=/home",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=/home",
+      "detail": null
+    },
+    {
+      "page": "/status",
+      "href": "https://chummer.run/status",
+      "resolved_url": "https://chummer.run/status",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/status",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/",
+      "resolved_url": "https://chummer.run/",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/login?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "resolved_url": "https://chummer.run/login?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/login?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/now",
+      "resolved_url": "https://chummer.run/now",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/help",
+      "resolved_url": "https://chummer.run/help",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/signup",
+      "resolved_url": "https://chummer.run/signup",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/ledger",
+      "resolved_url": "https://chummer.run/ledger",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/ledger/dispatches",
+      "resolved_url": "https://chummer.run/ledger/dispatches",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/dispatches",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/participate/karma-forge",
+      "resolved_url": "https://chummer.run/participate/karma-forge",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate/karma-forge",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/anarchy",
+      "resolved_url": "https://chummer.run/anarchy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/anarchy",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/feedback",
+      "resolved_url": "https://chummer.run/feedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/feedback",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/changelog",
+      "resolved_url": "https://chummer.run/changelog",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/changelog",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/faq",
+      "resolved_url": "https://chummer.run/faq",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/faq",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/privacy",
+      "resolved_url": "https://chummer.run/privacy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/privacy",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/terms",
+      "resolved_url": "https://chummer.run/terms",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/terms",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/contact",
+      "resolved_url": "https://chummer.run/contact",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/downloads",
+      "resolved_url": "https://chummer.run/downloads",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/downloads",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/auth/google/start?next=%2Fdownloads",
+      "resolved_url": "https://chummer.run/auth/google/start?next=%2Fdownloads",
+      "success": true,
+      "status_code": 302,
+      "final_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=BiLGgygi94GyEx5DVo2FtOGTir5ujQXE&nonce=nRD8qGCLbAJkGLF3hRA8OWG0GFFLLcwz&code_challenge=mblRC1dxQAcekvvFOKQVfV4jEaI24Do4kXtWXQF9tOg&code_challenge_method=S256&prompt=select_account",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/help#install-update",
+      "resolved_url": "https://chummer.run/help#install-update",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help#install-update",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/downloads/concierge",
+      "resolved_url": "https://chummer.run/downloads/concierge",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/downloads/concierge",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-linux-x64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-linux-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-linux-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-osx-arm64-installer",
+      "detail": null
+    },
+    {
+      "page": "/downloads",
+      "href": "https://chummer.run/status",
+      "resolved_url": "https://chummer.run/status",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/status",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/",
+      "resolved_url": "https://chummer.run/",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/login?next=%2Ffeedback",
+      "resolved_url": "https://chummer.run/login?next=%2Ffeedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/login?next=%2Ffeedback",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/downloads",
+      "resolved_url": "https://chummer.run/downloads",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/downloads",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/now",
+      "resolved_url": "https://chummer.run/now",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/help",
+      "resolved_url": "https://chummer.run/help",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/signup",
+      "resolved_url": "https://chummer.run/signup",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/ledger",
+      "resolved_url": "https://chummer.run/ledger",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/ledger/dispatches",
+      "resolved_url": "https://chummer.run/ledger/dispatches",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/dispatches",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/participate/karma-forge",
+      "resolved_url": "https://chummer.run/participate/karma-forge",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate/karma-forge",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/anarchy",
+      "resolved_url": "https://chummer.run/anarchy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/anarchy",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/changelog",
+      "resolved_url": "https://chummer.run/changelog",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/changelog",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/faq",
+      "resolved_url": "https://chummer.run/faq",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/faq",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/privacy",
+      "resolved_url": "https://chummer.run/privacy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/privacy",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/terms",
+      "resolved_url": "https://chummer.run/terms",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/terms",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/contact",
+      "resolved_url": "https://chummer.run/contact",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/help/feedback",
+      "resolved_url": "https://chummer.run/help/feedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/feedback",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/roadmap",
+      "resolved_url": "https://chummer.run/roadmap",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/roadmap",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/contact#support-intake",
+      "resolved_url": "https://chummer.run/contact#support-intake",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact#support-intake",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/roadmap#roadmap-milestones",
+      "resolved_url": "https://chummer.run/roadmap#roadmap-milestones",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/roadmap#roadmap-milestones",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/signup?next=%2Faccount%2Fparticipation",
+      "resolved_url": "https://chummer.run/signup?next=%2Faccount%2Fparticipation",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Faccount%2Fparticipation",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/feedback",
+      "resolved_url": "https://chummer.run/feedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/feedback",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/participate",
+      "resolved_url": "https://chummer.run/participate",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/auth/google/start?next=%2Faccount%2Fparticipation",
+      "resolved_url": "https://chummer.run/auth/google/start?next=%2Faccount%2Fparticipation",
+      "success": true,
+      "status_code": 302,
+      "final_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=o8oS31Wmk0_Dc10OdEm79TxhaWjexWiH&nonce=Sap4qduHkaZRukcIFTmMLjPV8lL7brnp&code_challenge=1yE8Va2_2ESsKsRpWnsBwan5S3QNBSAdgB-P5memvmE&code_challenge_method=S256&prompt=select_account",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/signup?next=/account/settings",
+      "resolved_url": "https://chummer.run/signup?next=/account/settings",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=/account/settings",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/play/continuity",
+      "resolved_url": "https://chummer.run/play/continuity",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/play/continuity",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/alice",
+      "resolved_url": "https://chummer.run/alice",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/alice",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/table-pulse",
+      "resolved_url": "https://chummer.run/table-pulse",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/table-pulse",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/roadmap#roadmap-horizons",
+      "resolved_url": "https://chummer.run/roadmap#roadmap-horizons",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/roadmap#roadmap-horizons",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/now#real-rules-truth",
+      "resolved_url": "https://chummer.run/now#real-rules-truth",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now#real-rules-truth",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/now#real-mobile-prep",
+      "resolved_url": "https://chummer.run/now#real-mobile-prep",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now#real-mobile-prep",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/mobile",
+      "resolved_url": "https://chummer.run/mobile",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/mobile",
+      "detail": null
+    },
+    {
+      "page": "/feedback",
+      "href": "https://chummer.run/status",
+      "resolved_url": "https://chummer.run/status",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/status",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/",
+      "resolved_url": "https://chummer.run/",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/auth/google/start?next=%2Fparticipate",
+      "resolved_url": "https://chummer.run/auth/google/start?next=%2Fparticipate",
+      "success": true,
+      "status_code": 302,
+      "final_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=GLFkoRcqa1zGpv7T779hZwq3uL5hll6i&nonce=erCi7-_XUcy9Swdf2qvpgfrOb8t8lOrM&code_challenge=pB70cD0u2OuMYXjvG8tUt-dOcjTON1HbJhnEAh56-n0&code_challenge_method=S256&prompt=select_account",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/downloads",
+      "resolved_url": "https://chummer.run/downloads",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/downloads",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/now",
+      "resolved_url": "https://chummer.run/now",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/help",
+      "resolved_url": "https://chummer.run/help",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/signup",
+      "resolved_url": "https://chummer.run/signup",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/ledger",
+      "resolved_url": "https://chummer.run/ledger",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/ledger/dispatches",
+      "resolved_url": "https://chummer.run/ledger/dispatches",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/dispatches",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/participate/karma-forge",
+      "resolved_url": "https://chummer.run/participate/karma-forge",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate/karma-forge",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/anarchy",
+      "resolved_url": "https://chummer.run/anarchy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/anarchy",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/feedback",
+      "resolved_url": "https://chummer.run/feedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/feedback",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/changelog",
+      "resolved_url": "https://chummer.run/changelog",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/changelog",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/faq",
+      "resolved_url": "https://chummer.run/faq",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/faq",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/privacy",
+      "resolved_url": "https://chummer.run/privacy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/privacy",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/terms",
+      "resolved_url": "https://chummer.run/terms",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/terms",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/contact",
+      "resolved_url": "https://chummer.run/contact",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/contact#support-intake",
+      "resolved_url": "https://chummer.run/contact#support-intake",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact#support-intake",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/signup?next=%2Faccount%2Fparticipation",
+      "resolved_url": "https://chummer.run/signup?next=%2Faccount%2Fparticipation",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Faccount%2Fparticipation",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/roadmap#roadmap-milestones",
+      "resolved_url": "https://chummer.run/roadmap#roadmap-milestones",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/roadmap#roadmap-milestones",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/roadmap#roadmap-horizons",
+      "resolved_url": "https://chummer.run/roadmap#roadmap-horizons",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/roadmap#roadmap-horizons",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/roadmap",
+      "resolved_url": "https://chummer.run/roadmap",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/roadmap",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/alice",
+      "resolved_url": "https://chummer.run/alice",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/alice",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/play/continuity",
+      "resolved_url": "https://chummer.run/play/continuity",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/play/continuity",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/table-pulse",
+      "resolved_url": "https://chummer.run/table-pulse",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/table-pulse",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/now#real-rules-truth",
+      "resolved_url": "https://chummer.run/now#real-rules-truth",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now#real-rules-truth",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/now#real-mobile-prep",
+      "resolved_url": "https://chummer.run/now#real-mobile-prep",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now#real-mobile-prep",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/mobile",
+      "resolved_url": "https://chummer.run/mobile",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/mobile",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/auth/google/start?next=%2Faccount%2Fparticipation",
+      "resolved_url": "https://chummer.run/auth/google/start?next=%2Faccount%2Fparticipation",
+      "success": true,
+      "status_code": 302,
+      "final_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=706990095055-cnutgctsdl1g8ik169tr16h7gtc2k0p2.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fchummer.run%2Fauth%2Fgoogle%2Fcallback&response_type=code&scope=openid%20profile%20email&state=_QKLg93JR6rrn6ELn7JIETfc5Chm0DcK&nonce=GW6SFoD0whD5CJbp8QTMNgJIULXc8pxN&code_challenge=_oJAGI7q5GjVGCrSVpKhWb-iYt45unmhg0x6aL3AkF4&code_challenge_method=S256&prompt=select_account",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/signup?next=/account/settings",
+      "resolved_url": "https://chummer.run/signup?next=/account/settings",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=/account/settings",
+      "detail": null
+    },
+    {
+      "page": "/participate",
+      "href": "https://chummer.run/status",
+      "resolved_url": "https://chummer.run/status",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/status",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/",
+      "resolved_url": "https://chummer.run/",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/login?next=%2Fwhat-is-chummer",
+      "resolved_url": "https://chummer.run/login?next=%2Fwhat-is-chummer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/login?next=%2Fwhat-is-chummer",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "resolved_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup?next=%2Fdownloads%2Finstall%2Favalonia-win-x64-installer",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/downloads",
+      "resolved_url": "https://chummer.run/downloads",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/downloads",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/now",
+      "resolved_url": "https://chummer.run/now",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/now",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/help",
+      "resolved_url": "https://chummer.run/help",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/help",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/signup",
+      "resolved_url": "https://chummer.run/signup",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/signup",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/ledger",
+      "resolved_url": "https://chummer.run/ledger",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/ledger/dispatches",
+      "resolved_url": "https://chummer.run/ledger/dispatches",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/ledger/dispatches",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/participate/karma-forge",
+      "resolved_url": "https://chummer.run/participate/karma-forge",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/participate/karma-forge",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/anarchy",
+      "resolved_url": "https://chummer.run/anarchy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/anarchy",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/feedback",
+      "resolved_url": "https://chummer.run/feedback",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/feedback",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/changelog",
+      "resolved_url": "https://chummer.run/changelog",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/changelog",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/faq",
+      "resolved_url": "https://chummer.run/faq",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/faq",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/privacy",
+      "resolved_url": "https://chummer.run/privacy",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/privacy",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/terms",
+      "resolved_url": "https://chummer.run/terms",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/terms",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/contact",
+      "resolved_url": "https://chummer.run/contact",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/contact",
+      "detail": null
+    },
+    {
+      "page": "/what-is-chummer",
+      "href": "https://chummer.run/status",
+      "resolved_url": "https://chummer.run/status",
+      "success": true,
+      "status_code": 200,
+      "final_url": "https://chummer.run/status",
+      "detail": null
+    }
+  ]
+}
