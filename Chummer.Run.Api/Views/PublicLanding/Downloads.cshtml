@@ -55,23 +55,23 @@
         <h1 class="page-title">Install Chummer</h1>
         <p class="page-copy">
             @(requestedPlatformUnavailable
-                ? $"This browser looks like {deviceLabel}, but that platform is not on the current public shelf yet."
+                ? $"This browser looks like {deviceLabel}, but that platform is not publicly available right now."
                 : $"This browser looks like {deviceLabel}. Start with the recommended build for that platform.")
         </p>
         <p class="release-stage__note">
             @(platformShelfNotice
                 ? requestedWindowsUnavailable && hasSignedInWindowsBuilds
-                    ? "Windows is not promoted for guests on the current public shelf, but signed-in users can still open the latest Windows build below."
+                    ? "Windows is not available to guests right now, but signed-in users can still open the latest Windows build below."
                 : requestedWindowsUnavailable && hasWindowsProofRail
-                        ? "Windows is not promoted for this browser on the current public shelf. Check the main platform downloads below, and use the Windows verification page only if support points you there."
+                        ? "Windows is not available for this browser right now. Check the main platform downloads below, and use the Windows verification page only if support points you there."
                     : release.PlatformShelfNoticeSummary
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
                         ? release.GuestGateSummary
-                        : "Other platforms stay on the main platform downloads shelf below. Manual packages and technical detail stay collapsed underneath."))
+                        : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
         <p class="muted-copy">Open downloads first. Create account for guided install only when you want first-launch recovery, linked restore, and support follow-through to stay attached.</p>
-        <p class="muted-copy">Need the current shelf anchor again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
+        <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
     </div>
 </section>
 
@@ -104,7 +104,7 @@
 {
     <section class="release-shelf">
         <article class="release-empty">
-            <h2>No published build is on the shelf yet</h2>
+            <h2>No published build is available yet</h2>
             <p>@Model.Manifest.Message</p>
             <div class="stacked-actions">
                 <a class="button-like button-like--primary" href="@release.NoBuildPrimaryHref">@release.NoBuildPrimaryLabel</a>
@@ -174,7 +174,7 @@ else
                         <details class="release-accordion">
                             <summary>Release notes, known issues, and requirements</summary>
                             <div class="release-accordion__body">
-                                <p class="muted-copy">This platform is not on the current public shelf, but the release notes, known issues, and install help still stay attached to the same downloads page.</p>
+                                <p class="muted-copy">This platform is not publicly available right now, but the release notes, known issues, and install help still stay attached to the same downloads page.</p>
                                 <div class="stacked-actions">
                                     <a class="button-like button-like--ghost" href="/now">Open current release</a>
                                     <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>
@@ -215,7 +215,7 @@ else
                         <summary>Release notes, known issues, and requirements</summary>
                         <div class="release-accordion__body">
                             <p class="muted-copy">Known issues and install help stay nearby. Deeper release evidence lives on the current-release and status surfaces, not in front of the install button.</p>
-                            <p class="muted-copy">Release notes and known issues stay tied to this shelf, so install confidence remains truthful even while release shelves evolve.</p>
+                            <p class="muted-copy">Release notes and known issues stay tied to this downloads page, so install confidence remains truthful even while release availability evolves.</p>
                             <div class="stacked-actions">
                                 <a class="button-like button-like--ghost" href="/now">Open current release</a>
                                 <a class="button-like button-like--ghost" href="@release.KnownIssuesHref">@release.KnownIssuesLabel</a>

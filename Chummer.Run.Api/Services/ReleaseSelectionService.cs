@@ -211,11 +211,11 @@ public sealed class ReleaseSelectionService
         }
         else
         {
-            availabilitySummary = "No public download is on the shelf right now. Create an account if you want release follow-through and support when the next build lands.";
+            availabilitySummary = "No public download is available right now. Create an account if you want release follow-through and support when the next build lands.";
             accountValueSummary = "The account keeps recovery, tracked support, and release follow-through together when the next build lands.";
             createAccountSummary = "Create an account if you want release follow-through, tracked support, and a calmer return path when the next build lands.";
             signInSummary = "Sign in to reopen your linked release follow-through and support history.";
-            downloadFaqAnswer = "Not right now. No public download is on the shelf yet.";
+            downloadFaqAnswer = "Not right now. No public download is available yet.";
             accountFaqAnswer = "Account creation gives you recovery, tracked support, and release follow-through when the next build lands.";
         }
 

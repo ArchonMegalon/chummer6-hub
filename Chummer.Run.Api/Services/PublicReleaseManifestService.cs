@@ -821,10 +821,10 @@ public sealed class PublicReleaseManifestService
         {
             string coverageSummary = DesktopTupleCoverageGapSummary(filteredCoverage);
             rolloutState = "coverage_incomplete";
-            rolloutReason = $"Current shelf is published, but promotion stays blocked because {coverageSummary}.";
+            rolloutReason = $"The current release is published, but broader promotion stays blocked because {coverageSummary}.";
             supportabilityState = "review_required";
-            supportabilitySummary = $"Current shelf is live, but support posture stays review_required because {coverageSummary}.";
-            knownIssueSummary = "Public shelf intentionally suppresses disabled desktop artifacts until fresh platform proof is republished.";
+            supportabilitySummary = $"The current release is live, but support posture stays review_required because {coverageSummary}.";
+            knownIssueSummary = "Some desktop downloads stay hidden until fresh platform proof is republished.";
             fixAvailabilitySummary = "Verify fix availability against the live channel artifact before closing support loops.";
         }
 
@@ -858,11 +858,11 @@ public sealed class PublicReleaseManifestService
                 : manifest.RolloutState,
             RolloutReason = AppendDistinctSentence(
                 manifest.RolloutReason,
-                $"Current shelf stays install-capable, but parity claims remain blocked because {gapSummary}."),
+                $"The current release stays install-capable, but parity claims remain blocked because {gapSummary}."),
             SupportabilityState = "review_required",
             SupportabilitySummary = AppendDistinctSentence(
                 manifest.SupportabilitySummary,
-                $"Treat the current shelf as review-required because {gapSummary}."),
+                $"Treat the current release as review-required because {gapSummary}."),
             KnownIssueSummary = AppendDistinctSentence(
                 manifest.KnownIssueSummary,
                 "Desktop flagship proof receipts are not current yet, so parity-sensitive routes stay on the review-required lane."),
@@ -891,7 +891,7 @@ public sealed class PublicReleaseManifestService
             SupportabilityState = "review_required",
             SupportabilitySummary = AppendDistinctSentence(
                 manifest.SupportabilitySummary,
-                $"Treat the current shelf as review-required because {gapSummary}."),
+                $"Treat the current release as review-required because {gapSummary}."),
             KnownIssueSummary = AppendDistinctSentence(
                 manifest.KnownIssueSummary,
                 "Translator, XML amendment, Hero Lab, and adjacent import parity receipts are not current yet, so parity-sensitive routes stay on the review-required lane."),
@@ -956,10 +956,10 @@ public sealed class PublicReleaseManifestService
                 {
                     string coverageSummary = DesktopTupleCoverageGapSummary(JsonSerializer.SerializeToElement(coverage, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
                     manifest["rolloutState"] = "coverage_incomplete";
-                    manifest["rolloutReason"] = $"Current shelf is published, but promotion stays blocked because {coverageSummary}.";
+                    manifest["rolloutReason"] = $"The current release is published, but broader promotion stays blocked because {coverageSummary}.";
                     manifest["supportabilityState"] = "review_required";
-                    manifest["supportabilitySummary"] = $"Current shelf is live, but support posture stays review_required because {coverageSummary}.";
-                    manifest["knownIssueSummary"] = "Public shelf intentionally suppresses disabled desktop artifacts until fresh platform proof is republished.";
+                    manifest["supportabilitySummary"] = $"The current release is live, but support posture stays review_required because {coverageSummary}.";
+                    manifest["knownIssueSummary"] = "Some desktop downloads stay hidden until fresh platform proof is republished.";
                     manifest["fixAvailabilitySummary"] = "Verify fix availability against the live channel artifact before closing support loops.";
                 }
             }

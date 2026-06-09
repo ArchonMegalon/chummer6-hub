@@ -1,0 +1,67 @@
+{
+  "contract_name": "chummer.provider_proof_discoverability",
+  "status": "fail",
+  "providers": {
+    "payfunnels": {
+      "status": "pass",
+      "required_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/payfunnels/FINAL_PAYFUNNELS_TEST_BILLING_ADAPTER_VERDICT.md",
+        "/docker/chummercomplete/.integrated/fleet/_completion/payfunnels/PAYFUNNELS_PROVIDER_VERIFICATION.generated.json"
+      ],
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/FINAL_PAYFUNNELS_TEST_BILLING_ADAPTER_VERDICT.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/payfunnels/PAYFUNNELS_PROVIDER_VERIFICATION.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "prompt_architects": {
+      "status": "pass",
+      "required_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/prompt_architects/FINAL_PROMPT_ARCHITECTS_INTEGRATION_VERDICT.md",
+        "/docker/chummercomplete/.integrated/fleet/_completion/prompt_architects/PROMPT_ARCHITECTS_PROVIDER_VERIFICATION.generated.json"
+      ],
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/FINAL_PROMPT_ARCHITECTS_INTEGRATION_VERDICT.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/prompt_architects/PROMPT_ARCHITECTS_PROVIDER_VERIFICATION.generated.json"
+      ],
+      "missing_paths": []
+    },
+    "magicfit": {
+      "status": "fail",
+      "required_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md",
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/MAGICFIT_PROVIDER_VERIFICATION.generated.json"
+      ],
+      "mirrored_paths": [],
+      "missing_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md",
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit/MAGICFIT_PROVIDER_VERIFICATION.generated.json"
+      ]
+    },
+    "table_pulse": {
+      "status": "fail",
+      "required_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/table_pulse/TABLE_PULSE_SCENARIO_REPLAY.generated.json"
+      ],
+      "mirrored_paths": [],
+      "missing_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/table_pulse/TABLE_PULSE_SCENARIO_REPLAY.generated.json"
+      ]
+    },
+    "black_ledger_media": {
+      "status": "fail",
+      "required_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
+      ],
+      "mirrored_paths": [],
+      "missing_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/black_ledger/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
+      ]
+    }
+  },
+  "failures": [
+    "magicfit missing discoverable proof artifacts",
+    "table_pulse missing discoverable proof artifacts",
+    "black_ledger_media missing discoverable proof artifacts"
+  ]
+}

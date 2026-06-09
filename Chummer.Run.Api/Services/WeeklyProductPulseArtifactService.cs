@@ -382,15 +382,15 @@ public sealed class WeeklyProductPulseArtifactService
                 : "partial";
 
         string proofSegment = string.Equals(localReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-            ? "Current local edge proof passed."
-            : $"Current local edge proof is {localReleaseProofStatus}.";
+            ? "Current local release proof passed."
+            : $"Current local release proof is {localReleaseProofStatus}.";
         string journeysSegment = provenJourneyCount > 0 && provenRouteCount > 0
-            ? $"{provenJourneyCount} journey proofs and {provenRouteCount} trust routes are on record."
+            ? $"{provenJourneyCount} tested journeys and {provenRouteCount} checked routes are on record."
             : provenJourneyCount > 0
-                ? $"{provenJourneyCount} journey proofs are on record."
+                ? $"{provenJourneyCount} tested journeys are on record."
                 : provenRouteCount > 0
-                    ? $"{provenRouteCount} trust routes are on record."
-                    : "Journey-proof evidence is still accumulating.";
+                    ? $"{provenRouteCount} checked routes are on record."
+                    : "Journey evidence is still accumulating.";
         string historySegment = historySnapshotCount > 0
             ? historySnapshotCount < 6
                 ? $"{historySnapshotCount} weekly snapshots are measured so far, so adoption history is still early."

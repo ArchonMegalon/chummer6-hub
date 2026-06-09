@@ -1,0 +1,26 @@
+{
+  "artifact": "PAYFUNNELS_PROVIDER_VERIFICATION",
+  "mode": "test_only",
+  "product": {
+    "benefit": "none",
+    "currency": "USD",
+    "entitlement_effect": "no_op",
+    "name": "$1 Billing Test",
+    "price_cents": 100,
+    "product_id": "payfunnels_test_payment_1usd_v1",
+    "render_units_added": 0,
+    "type": "one_time"
+  },
+  "provider": "PayFunnels",
+  "runtime_boundaries": {
+    "checkout_disable_switch": true,
+    "feature_unlocks_enabled": false,
+    "payfunnels_is_entitlement_truth": false,
+    "premium_tiers_enabled": false,
+    "subscriptions_enabled": false,
+    "webhook_secret_committed": false
+  },
+  "status": "pass",
+  "tier": "Tier 3",
+  "verified_at_utc": "2026-06-06T05:21:45.937946+00:00"
+}

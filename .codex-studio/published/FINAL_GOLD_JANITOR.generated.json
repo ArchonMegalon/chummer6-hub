@@ -1,0 +1,94 @@
+{
+  "contract_name": "chummer.final_gold_janitor",
+  "generated_at_utc": "2026-06-09T11:40:54Z",
+  "scope": "full_estate_v20",
+  "artifact_root": "_completion/full_product_reaudit_v20",
+  "durable_artifacts_required": true,
+  "live_backed_required": true,
+  "live_recrawl_required": true,
+  "recrawl_max_age_hours": 24,
+  "status": "fail",
+  "verdict": "NOT_GOLD",
+  "required_gates": {
+    "live_public_web_recrawl": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-09T11:40:42Z",
+      "fresh_within_hours": 24,
+      "pass": true
+    },
+    "rule_authority_minimum_coverage": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
+      "exists": true,
+      "status": "fail",
+      "generated_at_utc": "",
+      "fresh_within_hours": null,
+      "pass": false
+    },
+    "provider_proof_discoverability": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
+      "exists": true,
+      "status": "fail",
+      "generated_at_utc": "",
+      "fresh_within_hours": null,
+      "pass": false
+    },
+    "black_ledger_live_media_proof": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "",
+      "fresh_within_hours": null,
+      "pass": true
+    },
+    "table_pulse_scenario_replay": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/TABLE_PULSE_SCENARIO_REPLAY.generated.json",
+      "exists": true,
+      "status": "fail",
+      "generated_at_utc": "",
+      "fresh_within_hours": null,
+      "pass": false
+    }
+  },
+  "materializers": [
+    {
+      "command": "python3 scripts/verify_live_public_web_recrawl.py --base-url https://chummer.run",
+      "returncode": 0,
+      "stdout": "live_public_web_recrawl:ok",
+      "stderr": ""
+    },
+    {
+      "command": "python3 scripts/verify_rules_authority_minimum_coverage.py",
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "rules authority minimum coverage failed"
+    },
+    {
+      "command": "python3 scripts/verify_provider_proof_discoverability.py",
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "provider proof discoverability failed"
+    },
+    {
+      "command": "python3 scripts/verify_black_ledger_live_media_proof.py --base-url https://chummer.run",
+      "returncode": 0,
+      "stdout": "black_ledger_live_media_proof:ok",
+      "stderr": ""
+    },
+    {
+      "command": "python3 scripts/verify_table_pulse_scenario_replay.py --base-url https://chummer.run",
+      "returncode": 1,
+      "stdout": "",
+      "stderr": "table pulse scenario replay failed"
+    }
+  ],
+  "failures": [
+    "rule_authority_minimum_coverage failed",
+    "provider_proof_discoverability failed",
+    "table_pulse_scenario_replay failed",
+    "materializer failed: python3 scripts/verify_rules_authority_minimum_coverage.py",
+    "materializer failed: python3 scripts/verify_provider_proof_discoverability.py",
+    "materializer failed: python3 scripts/verify_table_pulse_scenario_replay.py --base-url https://chummer.run"
+  ]
+}

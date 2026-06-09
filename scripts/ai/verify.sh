@@ -167,10 +167,18 @@ python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_origin_reachability_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_clickability_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_live_public_web_recrawl_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_rules_authority_minimum_coverage_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_provider_proof_discoverability_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_live_media_proof_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_table_pulse_scenario_replay_gate.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_final_gold_janitor.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_release_bundle_promotion_shelf_replacement.py' >/dev/null
 python3 "$ROOT_DIR/tests/test_stack_smoke.py" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_origin_reachability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 python3 "$ROOT_DIR/scripts/verify_public_shell_clickability.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
+python3 "$ROOT_DIR/scripts/verify_live_public_web_recrawl.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
+python3 "$ROOT_DIR/scripts/verify_black_ledger_live_media_proof.py" --base-url "${CHUMMER_HUB_PUBLIC_ORIGIN_GATE_BASE_URL:-https://chummer.run/}" >/dev/null
 
 sync_workflow_evidence_timestamps_from_nested_receipts() {
   python3 - "$UI_WORKFLOW_GATE_RECEIPT" <<'PY'

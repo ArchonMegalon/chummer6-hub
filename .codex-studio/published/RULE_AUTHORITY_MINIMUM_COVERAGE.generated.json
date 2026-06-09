@@ -1,0 +1,30 @@
+{
+  "contract_name": "chummer.rule_authority_minimum_coverage",
+  "minimum_rulefacts_required": 100,
+  "status": "fail",
+  "rulesets": {
+    "sr4": {
+      "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
+      "rulefact_count": 10,
+      "final_verdict": "SR4_RULE_AUTHORITY_READY",
+      "status": "fail"
+    },
+    "sr5": {
+      "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR5_RULE_AUTHORITY_REGISTRY.generated.json",
+      "rulefact_count": 10,
+      "final_verdict": "SR5_RULE_AUTHORITY_READY",
+      "status": "fail"
+    },
+    "sr6": {
+      "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR6_RULEFACT_REGISTRY.generated.json",
+      "rulefact_count": 10,
+      "final_verdict": "SR6_RULE_AUTHORITY_READY",
+      "status": "fail"
+    }
+  },
+  "failures": [
+    "sr4 rulefact_count 10 is below minimum 100",
+    "sr5 rulefact_count 10 is below minimum 100",
+    "sr6 rulefact_count 10 is below minimum 100"
+  ]
+}

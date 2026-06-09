@@ -92,7 +92,12 @@
         var text = string.IsNullOrWhiteSpace(value) ? fallback : value;
         return text
             .Replace("stale", "out of date", StringComparison.OrdinalIgnoreCase)
-            .Replace("proof freshness", "proof recency", StringComparison.OrdinalIgnoreCase);
+            .Replace("proof freshness", "proof recency", StringComparison.OrdinalIgnoreCase)
+            .Replace("shelf", "downloads page", StringComparison.OrdinalIgnoreCase)
+            .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
+            .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
+            .Replace("local edge proof", "local release proof", StringComparison.OrdinalIgnoreCase);
     }
 }
 
@@ -203,8 +208,8 @@
     <section class="release-shelf">
         <article class="app-action-card">
             <span class="tag">Public launch health</span>
-            <h2>Governor truth behind the public status line</h2>
-            <p>These rows compile the live shelf, preview posture, fallback and revoke truth, blocked gates, proof freshness, support pulse, and adoption evidence into one customer-safe summary.</p>
+            <h2>Release checks behind the public status line</h2>
+            <p>These rows keep the current release, current caution, current proof recency, support posture, and adoption evidence in one short customer-safe summary.</p>
             <div class="settings-summary-list">
                 @foreach (var row in Model.LaunchHealthRows)
                 {
