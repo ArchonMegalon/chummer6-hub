@@ -39,7 +39,7 @@
             Title = "Inspect live proof, dossiers, and publication lineage here",
             Summary = "Use this page when the job is to inspect outputs, provenance, trust posture, or linked proof without confusing that with the install decision.",
             Href = artifactShelfPrimaryHref,
-            Label = "Open proof shelf",
+            Label = "Open proof view",
             Proof = new[] { "Inspectable outputs", "Linked proof", "Provenance first" }
         },
         new
@@ -55,21 +55,21 @@
         {
             Badge = "Signed-in continuity",
             Title = Model.Chrome.Authenticated
-                ? "Personal, campaign, creator, and public returns stay on one signed-in shelf"
-                : "Sign in when you want the private continuity shelf as well as public proof",
+                ? "Personal, campaign, creator, and public returns stay in one signed-in view"
+                : "Sign in when you want the private continuity view as well as public proof",
             Summary = Model.Chrome.Authenticated
-                ? "The signed-in shelf is the return rail for Table Pulse Aftermath: aftermath, replay, publication, Signal Deck continuity, and campaign follow-through stay visible without splitting into separate stories."
-                : "Public proof works without an account. Sign in only when you want private continuity, linked returns, and campaign or creator-owned artifact follow-through.",
+                ? "The signed-in view is the return rail for Table Pulse Aftermath: aftermath, replay, publication, Signal Deck continuity, and campaign next steps stay visible without splitting into separate stories."
+                : "Public proof works without an account. Sign in only when you want private continuity, linked returns, and campaign or creator-owned next steps.",
             Href = signedInContinuityHref,
             Label = signedInContinuityLabel,
             Proof = Model.Chrome.Authenticated
-                ? new[] { "Table Pulse Aftermath return rail", "Creator follow-through", "Same return shelf" }
+                ? new[] { "Table Pulse Aftermath return rail", "Creator next steps", "Same return view" }
                 : new[] { "Public first", "Account adds continuity", "No auth wall for proof" }
         },
         new
         {
             Badge = "Help",
-            Title = "Leave the proof shelf when the problem becomes support or recovery",
+            Title = "Leave the proof view when the problem becomes support or recovery",
             Summary = "Install failures, account recovery, and private campaign issues belong on first-party help. Proof should support that work, not replace it.",
             Href = "/help",
             Label = "Open help",
@@ -149,7 +149,7 @@
         "campaign" => "Stay on the shared crew and continuity page for campaign-owned artifacts, prep packets, Table Pulse Aftermath return cues, and aftermath or replay follow-through.",
         "creator" => "Inspect only the creator-linked lineage, trust ranking, availability, and next step for published or publication-ready artifacts.",
         "public" => "Inspect only the published shared-publication page so discoverable creator packets, trust posture, and publication detail stay together while you are signed in.",
-        _ => "When you are signed in, the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together instead of splitting them into separate artifact stories."
+        _ => "When you are signed in, the proof view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together instead of splitting them into separate stories."
     };
 
     string PublicationAvailabilityLabel(bool discoverable)
@@ -186,7 +186,7 @@
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@artifactShelfPrimaryHref">Open proof shelf</a>
+        <a class="button-like button-like--primary" href="@artifactShelfPrimaryHref">Open proof view</a>
         <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
         <a class="button-like button-like--ghost" href="/now">Open what works today</a>
     </div>
@@ -196,7 +196,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Pick proof, downloads, signed-in continuity, or help without mixing their jobs.</h2>
-        <p class="editorial-copy">The proof shelf should make outputs and provenance tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
+        <p class="editorial-copy">The proof view should make outputs and provenance tangible. It should not become the install page, a support queue, or a disguised account wall.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -305,12 +305,12 @@
             <article class="continuity-band__fact">
                 <span>Visible recap cards</span>
                 <strong>@signedInRecapShelf.Length</strong>
-                <p>Aftermath, replay, and Table Pulse Aftermath return artifacts that stay on this signed-in shelf.</p>
+                <p>Aftermath, replay, and Table Pulse Aftermath return items that stay in this signed-in view.</p>
             </article>
             <article class="continuity-band__fact">
                 <span>Visible creator cards</span>
                 <strong>@signedInCreatorPublications.Length</strong>
-                <p>Creator-linked lineage, availability, and publication follow-through in one place.</p>
+                <p>Creator-linked lineage, availability, and publication next steps in one place.</p>
             </article>
             <article class="continuity-band__fact">
                 <span>Selected view</span>
@@ -334,7 +334,7 @@
                     : null;
                 <article class="artifact-card">
                     <div class="artifact-card__copy">
-                        <span class="tag">Signed-in return shelf</span>
+                        <span class="tag">Signed-in return view</span>
                         <h3>@item.Label</h3>
                         <p>@item.Summary</p>
                         <div class="trust-claim__microproof">
@@ -529,7 +529,7 @@
     <section class="editorial-block">
         <article class="route-callout">
             <span class="tag">Temporarily thin shelf</span>
-            <h3>The proof shelf is not populated on this request.</h3>
+            <h3>The proof view is not populated on this request.</h3>
             <p>Use downloads for the live build, what works today for current product truth, or help if you expected a specific artifact to be visible here already.</p>
             <div class="route-callout__actions">
                 <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>

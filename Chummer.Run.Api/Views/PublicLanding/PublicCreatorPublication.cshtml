@@ -51,8 +51,8 @@
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-proof-shelf" : "/signup?next=%2Fartifacts";
     var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in continuity shelf" : "Create account for signed-in continuity";
     var signedInShelfSummary = Model.Chrome.Authenticated
-        ? "Use the signed-in proof shelf when you want personal, campaign, creator, and public returns to stay in one calmer place."
-        : "Public discovery works without an account. Sign in only when you want private continuity, campaign return, and creator follow-through on the same shelf.";
+        ? "Use the signed-in proof view when you want personal, campaign, creator, and public returns to stay in one calmer place."
+        : "Public discovery works without an account. Sign in only when you want private continuity, campaign return, and creator next steps in one place.";
     var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
     var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";
     var routeChoices = new[]
@@ -69,7 +69,7 @@
         new
         {
             Badge = "Creator routing",
-            Title = "Use the creator concierge when the next job is consult, intake, or packet follow-through",
+            Title = "Use the creator concierge when the next job is consult, intake, or creator next steps",
             Summary = "The creator wrapper keeps consult routing, governed intake, and packet return separate from downloads, support, and account truth.",
             Href = creatorConciergeHref,
             Label = "Open creator concierge",
@@ -94,7 +94,7 @@
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
             Proof = Model.Chrome.Authenticated
-                ? new[] { "Personal and campaign returns", "Creator follow-through", "Same proof shelf" }
+                ? new[] { "Personal and campaign returns", "Creator next steps", "Same proof view" }
                 : new[] { "Public first", "Account adds continuity", "No auth wall for proof" }
         },
         new
@@ -161,7 +161,7 @@
         }
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>
-            <a class="button-like button-like--ghost" href="/artifacts">Open artifacts shelf</a>
+            <a class="button-like button-like--ghost" href="/artifacts">Open proof view</a>
         </div>
     </div>
 </section>
@@ -256,8 +256,8 @@
     <p class="editorial-copy">Stay in the proof gallery for related items, open Downloads when you actually want the build, or leave for Help when the issue becomes private, recovery-bound, or support-owned.</p>
     <div class="stacked-actions">
         <a class="cta-link cta-link--primary" href="@Model.BackHref">Back to publication discovery</a>
-        <a class="cta-link cta-link--secondary" href="/artifacts">Open artifacts shelf</a>
+        <a class="cta-link cta-link--secondary" href="/artifacts">Open proof view</a>
         <a class="cta-link cta-link--ghost" href="/downloads">Open downloads</a>
     </div>
-    <p class="muted-copy">Need private follow-through instead? <a class="inline-link" href="/contact#support-intake">Open support intake</a>.</p>
+    <p class="muted-copy">Need private help instead? <a class="inline-link" href="/contact#support-intake">Open support intake</a>.</p>
 </section>

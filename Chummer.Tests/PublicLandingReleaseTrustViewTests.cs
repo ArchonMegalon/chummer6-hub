@@ -97,6 +97,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open what works today when the question is current proof, not this device handoff", view, StringComparison.Ordinal);
         Assert.Contains("Leave the handoff for tracked support or help as soon as the problem becomes recovery-bound", view, StringComparison.Ordinal);
         Assert.Contains("Use this page to finish one install handoff, then move to the page that owns the next job.", view, StringComparison.Ordinal);
+        Assert.Contains("Current proof", view, StringComparison.Ordinal);
+        Assert.Contains("downloads page", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current proof shelf", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("downloads shelf", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -262,6 +266,31 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("included example runner", nowView, StringComparison.Ordinal);
         Assert.Contains("current downloads page", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("included sample runner", nowView, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HomeAndProofPagesPreferViewAndNextStepLanguageOverShelfAndFollowThroughLanguage()
+    {
+        string homeViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Home.cshtml");
+        string shelfViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml");
+        string creatorViewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "PublicCreatorPublication.cshtml");
+
+        string homeView = File.ReadAllText(homeViewPath);
+        string shelfView = File.ReadAllText(shelfViewPath);
+        string creatorView = File.ReadAllText(creatorViewPath);
+
+        Assert.Contains("A tracked fix or next step is waiting", homeView, StringComparison.Ordinal);
+        Assert.Contains("install return, support, and campaign return", homeView, StringComparison.Ordinal);
+        Assert.DoesNotContain("follow-through", homeView, StringComparison.Ordinal);
+
+        Assert.Contains("Open proof view", shelfView, StringComparison.Ordinal);
+        Assert.Contains("signed-in view", shelfView, StringComparison.Ordinal);
+        Assert.Contains("proof view", shelfView, StringComparison.Ordinal);
+        Assert.DoesNotContain("proof shelf", shelfView, StringComparison.Ordinal);
+
+        Assert.Contains("Use the signed-in proof view", creatorView, StringComparison.Ordinal);
+        Assert.Contains("creator next steps", creatorView, StringComparison.Ordinal);
+        Assert.DoesNotContain("artifacts shelf", creatorView, StringComparison.Ordinal);
     }
 
     [Fact]

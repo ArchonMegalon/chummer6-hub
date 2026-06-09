@@ -277,9 +277,9 @@
     var leadTravelDevice = leadWorkspaceServerPlane?.TravelMode.Devices.FirstOrDefault();
     var homeContinuityHeadline = leadWorkspaceServerPlane?.NextSafeAction.Label
         ?? (releasedOrNotifiedCases.Length > 0
-            ? "A tracked fix or follow-through is waiting"
+            ? "A tracked fix or next step is waiting"
             : pendingClaims > 0
-                ? "A linked install still needs return-path follow-through"
+                ? "A linked install still needs its return path finished"
                 : claimedInstallations > 0
                     ? "This account already has a live return path"
                     : "Start the first linked install from this account");
@@ -289,7 +289,7 @@
             ? "Finish the claim on the device that already has the build, then use Devices & access only for relink, reclaim, or recovery."
             : claimedInstallations > 0
                 ? "Downloads, support, and campaign return stay attached to the same account instead of splitting into a browser ritual."
-                : "Use this account to keep install handoff, support follow-through, and campaign return attached from the first successful launch.");
+                : "Use this account to keep install return, support, and campaign return attached from the first successful launch.");
     var homeRoleSummary = !string.IsNullOrWhiteSpace(leadWorkspaceServerPlane?.Workspace.DeviceRoleSummary)
         ? leadWorkspaceServerPlane!.Workspace.DeviceRoleSummary
         : leadTravelDevice is not null
@@ -1190,7 +1190,7 @@ else
                                                                     <span> Outputs: @string.Join(", ", handoff.Outputs.Take(8).Select(item => item.Label)).</span>
                                                                     @if (handoff.Outputs.Count > 8)
                                                                     {
-                                                                        <span> More outputs: +@(handoff.Outputs.Count - 8) additional governed follow-through items.</span>
+                                                                        <span> More outputs: +@(handoff.Outputs.Count - 8) additional guided next-step items.</span>
                                                                     }
                                                                     foreach (var output in handoff.Outputs.Take(8))
                                                                     {

@@ -26,7 +26,7 @@
             Summary = "The main downloads page still owns platform comparison, known issues, and the calmer entry point for a fresh device. This page should not become a general installer catalog.",
             Href = "/downloads",
             Label = "Back to downloads",
-            Proof = new[] { "Platform shelf", "Known issues nearby", "General install path" }
+            Proof = new[] { "Platform list", "Known issues nearby", "General install path" }
         },
         new
         {
@@ -44,7 +44,7 @@
             Summary = "The install handoff is for one device. Use the live proof page when you need the broader release posture, user-visible cautions, or current confidence before continuing.",
             Href = "/now",
             Label = "Open what works today",
-            Proof = new[] { "Current proof shelf", "User-visible caution", "No mixed jobs" }
+            Proof = new[] { "Current proof", "User-visible caution", "No mixed jobs" }
         },
         new
         {
@@ -56,7 +56,7 @@
             Proof = new[] { "Tracked follow-up", "Install context preserved", "Private help" }
         }
     };
-    @* Support follow-through stays on the same install rail while this handoff resolves linked install truth. *@
+    @* Support stays on the same install page while this handoff resolves linked install truth. *@
 }
 
 <section class="release-stage">
@@ -111,7 +111,7 @@
     <div class="editorial-block__lead">
         <p class="eyebrow">Where to go next</p>
         <h2 class="editorial-title">Keep install handoff, platform choice, release proof, and recovery on separate pages.</h2>
-        <p class="editorial-copy">This page should finish one signed-in device handoff. It should not replace the general downloads shelf, the account-owned device page, or first-party support.</p>
+        <p class="editorial-copy">This page should finish one signed-in device handoff. It should not replace the general downloads page, the account-owned device page, or first-party support.</p>
     </div>
     <div class="route-choice-grid">
         @foreach (var choice in routeChoices)
@@ -243,7 +243,7 @@
                         ? "The published packages stay the same for every user. The account-aware part is the short-lived setup assistant and the short-lived install claims it carries, not a personalized app binary."
                         : "The installer bytes stay the same for every user. If account linking is needed, enter the support or recovery code inside setup instead of copying one from this page.")</p>
                     <p class="muted-copy">Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.</p>
-                    <p class="muted-copy">Support follow-through stays on the same install page, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.</p>
+                <p class="muted-copy">Support stays on the same install page, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.</p>
                     <p class="muted-copy">Status, known issues, and install help stay on one release page so recovery never depends on stale page copy.</p>
                 </div>
             </details>
