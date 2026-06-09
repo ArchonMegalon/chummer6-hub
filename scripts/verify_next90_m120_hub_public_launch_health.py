@@ -152,7 +152,7 @@ SOURCE_MARKERS = {
         'Chrome: await BuildPublicOrAuthenticatedChromeAsync("Status", "Weekly pulse, release posture, and the current longest pole on one calmer route.", "/status", cancellationToken),',
         "LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),",
         'new("Live", BuildLiveLaunchSummary(manifest)),',
-        'new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience)),',
+        'new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)),',
         'new("Fallback", BuildFallbackLaunchSummary(manifest)),',
         'new("Revoked", BuildRevokedLaunchSummary(manifest)),',
         'new("Fixed", BuildFixedLaunchSummary(manifest)),',

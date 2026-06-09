@@ -8917,7 +8917,7 @@ Boundary:
         return
         [
             new("Live", BuildLiveLaunchSummary(manifest)),
-            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience)),
+            new("Preview", BuildPreviewLaunchSummary(manifest, releaseExperience, pulse)),
             new("Fallback", BuildFallbackLaunchSummary(manifest)),
             new("Revoked", BuildRevokedLaunchSummary(manifest)),
             new("Fixed", BuildFixedLaunchSummary(manifest)),
@@ -9016,8 +9016,28 @@ Boundary:
 
     private static string BuildPreviewLaunchSummary(
         PublicReleaseManifestDto manifest,
-        ReleaseExperienceViewModel releaseExperience)
-        => $"Gold-ready on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}, published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+        ReleaseExperienceViewModel releaseExperience,
+        PublicTrustPulseSnapshot? pulse)
+    {
+        string published = $"Published {manifest.PublishedAt.ToUniversalTime():yyyy-MM-dd HH:mm} UTC.";
+        string supportabilityState = (manifest.SupportabilityState ?? string.Empty).Trim();
+        bool reviewRequired = string.Equals(supportabilityState, "review_required", StringComparison.OrdinalIgnoreCase)
+            || pulse?.ParityClaimsReviewRequired == true
+            || (!string.IsNullOrWhiteSpace(pulse?.LocalReleaseProofStatus)
+                && !string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase));
+
+        if (reviewRequired)
+        {
+            return $"Preview posture on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published} Review is still required before this release can be treated as supportable.";
+        }
+
+        if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
+        {
+            return $"Current public release on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published}";
+        }
+
+        return $"Preview posture on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published}";
+    }
 
     private static string BuildFallbackLaunchSummary(PublicReleaseManifestDto manifest)
     {

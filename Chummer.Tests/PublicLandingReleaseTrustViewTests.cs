@@ -177,6 +177,18 @@ public sealed class PublicLandingReleaseTrustViewTests
     }
 
     [Fact]
+    public void PublicLaunchHealthPreviewSummaryDoesNotHardcodeGoldReadyForReviewRequiredShelves()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.DoesNotContain("=> $\"Gold-ready on", controller, StringComparison.Ordinal);
+        Assert.Contains("Preview posture on", controller, StringComparison.Ordinal);
+        Assert.Contains("Review is still required before this release can be treated as supportable.", controller, StringComparison.Ordinal);
+        Assert.Contains("Current public release on", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void HorizonsPageUsesTheSharedRouteChoiceAndDecisionShellInsteadOfOnlyLongscrollBands()
     {
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Horizons.cshtml");

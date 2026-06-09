@@ -23,10 +23,30 @@ build_if_present ../chummer-hub-registry/Chummer.Hub.Registry.Contracts/Chummer.
 build_if_present ../chummer-hub-registry/Chummer.Run.Registry/Chummer.Run.Registry.csproj
 build_if_present ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Contracts/Chummer.Media.Contracts.csproj
 build_if_present ../../fleet/repos/chummer-media-factory/src/Chummer.Media.Factory.Runtime/Chummer.Media.Factory.Runtime.csproj
-build_if_present Chummer.Play.Contracts/Chummer.Play.Contracts.csproj
-build_if_present Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj
-build_if_present Chummer.Control.Contracts/Chummer.Control.Contracts.csproj
-build_if_present Chummer.Run.Contracts/Chummer.Run.Contracts.csproj
+
+if [[ -f Chummer.Play.Contracts/Chummer.Play.Contracts.csproj ]]; then
+  dotnet build Chummer.Play.Contracts/Chummer.Play.Contracts.csproj --nologo --disable-build-servers
+else
+  echo "skip missing project: Chummer.Play.Contracts/Chummer.Play.Contracts.csproj"
+fi
+
+if [[ -f Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj ]]; then
+  dotnet build Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj --nologo --disable-build-servers
+else
+  echo "skip missing project: Chummer.Campaign.Contracts/Chummer.Campaign.Contracts.csproj"
+fi
+
+if [[ -f Chummer.Control.Contracts/Chummer.Control.Contracts.csproj ]]; then
+  dotnet build Chummer.Control.Contracts/Chummer.Control.Contracts.csproj --nologo --disable-build-servers
+else
+  echo "skip missing project: Chummer.Control.Contracts/Chummer.Control.Contracts.csproj"
+fi
+
+if [[ -f Chummer.Run.Contracts/Chummer.Run.Contracts.csproj ]]; then
+  dotnet build Chummer.Run.Contracts/Chummer.Run.Contracts.csproj --nologo --disable-build-servers
+else
+  echo "skip missing project: Chummer.Run.Contracts/Chummer.Run.Contracts.csproj"
+fi
 
 local_slice_requires_full_run_services_tree=0
 for project_path in \
@@ -46,9 +66,9 @@ done
 if [[ "$local_slice_requires_full_run_services_tree" = "1" ]]; then
   echo "skip local run-services app build: repository slice does not include the full contract/service project tree"
 else
-  build_if_present Chummer.Run.Api/Chummer.Run.Api.csproj
-  build_if_present Chummer.Run.Identity/Chummer.Run.Identity.csproj
-  build_if_present Chummer.Run.AI/Chummer.Run.AI.csproj
+  dotnet build Chummer.Run.Api/Chummer.Run.Api.csproj --nologo --disable-build-servers
+  dotnet build Chummer.Run.Identity/Chummer.Run.Identity.csproj --nologo --disable-build-servers
+  dotnet build Chummer.Run.AI/Chummer.Run.AI.csproj --nologo --disable-build-servers
 fi
 
 if [ "${CHUMMER_BUILD_SOLUTION:-0}" = "1" ]; then
