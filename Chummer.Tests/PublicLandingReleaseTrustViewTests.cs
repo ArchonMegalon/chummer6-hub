@@ -174,6 +174,23 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
         Assert.Contains("Signed-in return", view, StringComparison.Ordinal);
         Assert.Contains("ContextualPreviewHref(choice.Href)", view, StringComparison.Ordinal);
+        Assert.Contains("What still blocks gold support", view, StringComparison.Ordinal);
+        Assert.Contains("Model.GoldReadiness.Blockers", view, StringComparison.Ordinal);
+        Assert.Contains("Last reviewed @Model.GoldReadiness.GeneratedAtLabel", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusPageControllerBuildsGoldReadinessSummaryFromPublishedJanitorTruth()
+    {
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string controller = File.ReadAllText(controllerPath);
+
+        Assert.Contains("_goldReadiness = new GoldReadinessArtifactService(configuration);", controller, StringComparison.Ordinal);
+        Assert.Contains("GoldReadiness: BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot())", controller, StringComparison.Ordinal);
+        Assert.Contains("private static GoldReadinessStatusViewModel? BuildGoldReadinessStatus", controller, StringComparison.Ordinal);
+        Assert.Contains("Gold support is still blocked.", controller, StringComparison.Ordinal);
+        Assert.Contains("still needs these steps", controller, StringComparison.Ordinal);
+        Assert.Contains("complete the reviewed row-level authority mapping", controller, StringComparison.Ordinal);
     }
 
     [Fact]

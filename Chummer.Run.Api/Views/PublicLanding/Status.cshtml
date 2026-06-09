@@ -223,6 +223,40 @@
     </section>
 }
 
+@if (Model.GoldReadiness is not null)
+{
+    <section class="release-shelf">
+        <article class="app-action-card">
+            <span class="tag tag--amber">Gold support</span>
+            <h2>What still blocks gold support</h2>
+            <p>@Model.GoldReadiness.StatusLabel @Model.GoldReadiness.Summary</p>
+            @if (!string.IsNullOrWhiteSpace(Model.GoldReadiness.GeneratedAtLabel))
+            {
+                <p class="app-action-card__meta">Last reviewed @Model.GoldReadiness.GeneratedAtLabel</p>
+            }
+            <div class="route-choice-grid">
+                @foreach (var blocker in Model.GoldReadiness.Blockers)
+                {
+                    <article class="route-choice-card">
+                        <span class="tag">@blocker.RulesetLabel</span>
+                        <h3>@blocker.NextStep</h3>
+                        <p>@blocker.Summary</p>
+                        @if (blocker.RemainingChecks.Count > 0)
+                        {
+                            <div class="route-choice-card__proof">
+                                @foreach (var item in blocker.RemainingChecks.Take(3))
+                                {
+                                    <span>@item</span>
+                                }
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        </article>
+    </section>
+}
+
 <section class="compact-rail">
     <article class="compact-rail__item">
         <div class="compact-rail__copy">

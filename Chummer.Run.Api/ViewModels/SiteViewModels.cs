@@ -1024,8 +1024,21 @@ public sealed record StatusPageViewModel(
     ReleaseExperienceViewModel ReleaseExperience,
     CampaignOsLocalProofSnapshot? CampaignOsProof = null,
     IReadOnlyList<PublicTrustPulseRowViewModel>? LaunchHealthRows = null,
+    GoldReadinessStatusViewModel? GoldReadiness = null,
     PublicTrustPulsePanelViewModel? TrustPulse = null,
     SignedInTrustStatusPanelViewModel? SignedInStatus = null);
+
+public sealed record GoldReadinessStatusViewModel(
+    string StatusLabel,
+    string Summary,
+    string? GeneratedAtLabel,
+    IReadOnlyList<GoldReadinessBlockerViewModel> Blockers);
+
+public sealed record GoldReadinessBlockerViewModel(
+    string RulesetLabel,
+    string Summary,
+    string NextStep,
+    IReadOnlyList<string> RemainingChecks);
 
 public sealed record DownloadDispatchPageViewModel(
     SiteChromeViewModel Chrome,

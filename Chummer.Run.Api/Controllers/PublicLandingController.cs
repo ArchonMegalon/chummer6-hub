@@ -74,6 +74,7 @@ public sealed class PublicLandingController : Controller
     private readonly PublicTrustPulseService _trustPulse;
     private readonly FlagshipReadinessArtifactService _flagshipReadiness;
     private readonly LocalReleaseProofArtifactService _localReleaseProof;
+    private readonly GoldReadinessArtifactService _goldReadiness;
     private readonly ImportRouteParityProofGuardService _importRouteParityProofGuard;
     private readonly SignedInTrustStatusService _signedInTrustStatus;
     private readonly SupportCaseService _supportCases;
@@ -180,6 +181,7 @@ public sealed class PublicLandingController : Controller
         _trustPulse = trustPulse;
         _flagshipReadiness = new FlagshipReadinessArtifactService(configuration);
         _localReleaseProof = new LocalReleaseProofArtifactService(configuration);
+        _goldReadiness = new GoldReadinessArtifactService(configuration);
         _importRouteParityProofGuard = new ImportRouteParityProofGuardService(configuration);
         _signedInTrustStatus = signedInTrustStatus;
         _supportCases = supportCases;
@@ -3592,6 +3594,7 @@ public sealed class PublicLandingController : Controller
             ReleaseExperience: releaseExperience,
             CampaignOsProof: _campaignOsProof.LoadProof(),
             LaunchHealthRows: BuildPublicLaunchHealthRows(manifest, releaseExperience, pulse),
+            GoldReadiness: BuildGoldReadinessStatus(_goldReadiness.LoadSnapshot()),
             TrustPulse: BuildPublicTrustPulsePanel(manifest, releaseExperience, pulse),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, releaseExperience, cancellationToken));
         return View("~/Views/PublicLanding/Status.cshtml", model);
@@ -8928,6 +8931,53 @@ Boundary:
                 ? BuildManifestAdoptionSummary(manifest)
                 : BuildTrustPulseAdoptionSummary(pulse))
         ];
+    }
+
+    private static GoldReadinessStatusViewModel? BuildGoldReadinessStatus(GoldReadinessSnapshot? snapshot)
+    {
+        if (snapshot is null || snapshot.RuleAuthorityBlockers.Count == 0)
+        {
+            return null;
+        }
+
+        List<GoldReadinessBlockerViewModel> blockers = [];
+        foreach (GoldReadinessRuleAuthorityBlocker blocker in snapshot.RuleAuthorityBlockers)
+        {
+            string rulesetLabel = blocker.RulesetId.ToUpperInvariant();
+            string summary = $"{rulesetLabel} has {blocker.RulefactCount?.ToString() ?? "unknown"} published authority facts, but gold support still waits on reviewed mapping, reviewed errata application, and human signoff.";
+            string nextStep = BuildGoldBlockerNextStep(blocker);
+            blockers.Add(new GoldReadinessBlockerViewModel(
+                RulesetLabel: rulesetLabel,
+                Summary: summary,
+                NextStep: nextStep,
+                RemainingChecks: blocker.RemainingGates));
+        }
+
+        string statusLabel = string.Equals(snapshot.Verdict, "GOLD_READY", StringComparison.OrdinalIgnoreCase)
+            ? "Gold support is ready."
+            : "Gold support is still blocked.";
+        string summaryText = blockers.Count == 1
+            ? "One remaining rules lane still needs reviewed authority closure before this release can be treated as gold-supported."
+            : $"{blockers.Count} remaining rules lanes still need reviewed authority closure before this release can be treated as gold-supported.";
+        string? generatedAtLabel = snapshot.GeneratedAtUtc?.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'");
+        return new GoldReadinessStatusViewModel(statusLabel, summaryText, generatedAtLabel, blockers);
+    }
+
+    private static string BuildGoldBlockerNextStep(GoldReadinessRuleAuthorityBlocker blocker)
+    {
+        List<string> steps = [];
+        if (string.Equals(blocker.RowLevelMappingStatus, "pending_human_review", StringComparison.OrdinalIgnoreCase))
+        {
+            steps.Add("complete the reviewed row-level authority mapping");
+        }
+
+        if (string.Equals(blocker.ErrataPostureStatus, "pending_reviewed_application", StringComparison.OrdinalIgnoreCase))
+        {
+            steps.Add("apply and review the current errata posture");
+        }
+
+        steps.Add("publish the final human rule signoff");
+        return $"{blocker.RulesetId.ToUpperInvariant()} still needs these steps: {string.Join("; ", steps)}.";
     }
 
     private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
