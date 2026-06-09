@@ -190,7 +190,23 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("private static GoldReadinessStatusViewModel? BuildGoldReadinessStatus", controller, StringComparison.Ordinal);
         Assert.Contains("Gold support is still blocked.", controller, StringComparison.Ordinal);
         Assert.Contains("still needs these steps", controller, StringComparison.Ordinal);
-        Assert.Contains("complete the reviewed row-level authority mapping", controller, StringComparison.Ordinal);
+        Assert.Contains("complete the reviewed rules mapping", controller, StringComparison.Ordinal);
+        Assert.Contains("apply the current errata updates", controller, StringComparison.Ordinal);
+        Assert.Contains("publish the final human review", controller, StringComparison.Ordinal);
+        Assert.Contains("has {blocker.RulefactCount?.ToString() ?? \"unknown\"} published rules checks", controller, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatusPageCustomerTextSanitizesInternalProofTokensAndRuleAuthorityJargon()
+    {
+        string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
+        string view = File.ReadAllText(viewPath);
+
+        Assert.Contains(".Replace(\"install_claim_restore_continue\", \"install, restore, and continue\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"build_explain_publish\", \"build, explain, and publish\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"organize_community_and_close_loop\", \"community follow-through\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"reviewed authority closure\", \"reviewed coverage closure\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"authority facts\", \"rules checks\"", view, StringComparison.Ordinal);
     }
 
     [Fact]

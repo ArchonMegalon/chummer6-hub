@@ -8944,21 +8944,21 @@ Boundary:
         foreach (GoldReadinessRuleAuthorityBlocker blocker in snapshot.RuleAuthorityBlockers)
         {
             string rulesetLabel = blocker.RulesetId.ToUpperInvariant();
-            string summary = $"{rulesetLabel} has {blocker.RulefactCount?.ToString() ?? "unknown"} published authority facts, but gold support still waits on reviewed mapping, reviewed errata application, and human signoff.";
+            string summary = $"{rulesetLabel} has {blocker.RulefactCount?.ToString() ?? "unknown"} published rules checks, but gold support still waits on reviewed rules mapping, current errata updates, and final human review.";
             string nextStep = BuildGoldBlockerNextStep(blocker);
             blockers.Add(new GoldReadinessBlockerViewModel(
                 RulesetLabel: rulesetLabel,
                 Summary: summary,
                 NextStep: nextStep,
-                RemainingChecks: blocker.RemainingGates));
+                RemainingChecks: blocker.RemainingGates.Select(HumanizeGoldRemainingCheck).ToArray()));
         }
 
         string statusLabel = string.Equals(snapshot.Verdict, "GOLD_READY", StringComparison.OrdinalIgnoreCase)
             ? "Gold support is ready."
             : "Gold support is still blocked.";
         string summaryText = blockers.Count == 1
-            ? "One remaining rules lane still needs reviewed authority closure before this release can be treated as gold-supported."
-            : $"{blockers.Count} remaining rules lanes still need reviewed authority closure before this release can be treated as gold-supported.";
+            ? "One remaining ruleset still needs reviewed coverage closure before this release can be treated as gold-supported."
+            : $"{blockers.Count} remaining rulesets still need reviewed coverage closure before this release can be treated as gold-supported.";
         string? generatedAtLabel = snapshot.GeneratedAtUtc?.UtcDateTime.ToString("yyyy-MM-dd HH:mm 'UTC'");
         return new GoldReadinessStatusViewModel(statusLabel, summaryText, generatedAtLabel, blockers);
     }
@@ -8968,16 +8968,32 @@ Boundary:
         List<string> steps = [];
         if (string.Equals(blocker.RowLevelMappingStatus, "pending_human_review", StringComparison.OrdinalIgnoreCase))
         {
-            steps.Add("complete the reviewed row-level authority mapping");
+            steps.Add("complete the reviewed rules mapping");
         }
 
         if (string.Equals(blocker.ErrataPostureStatus, "pending_reviewed_application", StringComparison.OrdinalIgnoreCase))
         {
-            steps.Add("apply and review the current errata posture");
+            steps.Add("apply the current errata updates");
         }
 
-        steps.Add("publish the final human rule signoff");
+        steps.Add("publish the final human review");
         return $"{blocker.RulesetId.ToUpperInvariant()} still needs these steps: {string.Join("; ", steps)}.";
+    }
+
+    private static string HumanizeGoldRemainingCheck(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Current review step";
+        }
+
+        return value.Trim()
+            .Replace("human-reviewed row-level mapping from indexed table evidence into normalized records", "Reviewed rules mapping from indexed source tables into normalized records", StringComparison.OrdinalIgnoreCase)
+            .Replace("human-reviewed mapping of private PDF line-hash candidates into normalized public-safe records", "Reviewed rules mapping from indexed source candidates into normalized public-safe records", StringComparison.OrdinalIgnoreCase)
+            .Replace("errata profile applied and reviewed", "Current errata updates applied and reviewed", StringComparison.OrdinalIgnoreCase)
+            .Replace("complete authority golden fixture corpus, beyond seed fixtures", "Complete golden fixture coverage beyond the current seed fixtures", StringComparison.OrdinalIgnoreCase)
+            .Replace("full provider-backed explain receipt corpus", "Complete explain coverage from the current provider-backed receipts", StringComparison.OrdinalIgnoreCase)
+            .Replace("human rule review signoff", "Final human review signoff", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildReleaseProofSummary(PublicReleaseManifestDto manifest)
