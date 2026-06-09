@@ -12,6 +12,14 @@ RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
 CORE_ENGINE_ROOT = Path(os.environ.get("CHUMMER_CORE_ENGINE_ROOT", "/docker/chummercomplete/chummer-core-engine"))
 OUTPUT_PATH = RUN_SERVICES_ROOT / ".codex-studio" / "published" / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
 DEFAULT_MIN_RULEFACTS = int(os.environ.get("CHUMMER_RULE_AUTHORITY_MIN_RULEFACTS", "100"))
+FULL_COMPLETION_PATH = CORE_ENGINE_ROOT / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
+OPERATOR_GOLD_PATH = CORE_ENGINE_ROOT / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"
+
+READY_VERDICTS = {
+    "sr4": "SR4_RULE_AUTHORITY_READY",
+    "sr5": "SR5_RULE_AUTHORITY_READY",
+    "sr6": "SR6_RULE_AUTHORITY_READY",
+}
 
 def registry_paths() -> dict[str, Path]:
     return {
@@ -32,27 +40,52 @@ def main() -> int:
     parser.add_argument("--min-rulefacts", type=int, default=DEFAULT_MIN_RULEFACTS)
     args = parser.parse_args()
 
+    completion_payload = load_json(FULL_COMPLETION_PATH)
+    operator_gold_payload = load_json(OPERATOR_GOLD_PATH)
+    completion_rulesets = completion_payload.get("rulesets") if isinstance(completion_payload.get("rulesets"), dict) else {}
+    operator_rulesets = {
+        item.get("ruleset"): item
+        for item in operator_gold_payload.get("rulesets", [])
+        if isinstance(item, dict) and item.get("ruleset")
+    }
+
     rulesets: dict[str, Any] = {}
     failures: list[str] = []
     for ruleset, path in registry_paths().items():
         payload = load_json(path)
         count = int(payload.get("rulefact_count") or 0)
         verdict = str(payload.get("final_verdict") or "")
-        status = "pass" if count >= args.min_rulefacts else "fail"
+        expected_verdict = READY_VERDICTS[ruleset]
+        completion_entry = completion_rulesets.get(ruleset, {}) if isinstance(completion_rulesets, dict) else {}
+        operator_entry = operator_rulesets.get(ruleset, {}) if isinstance(operator_rulesets, dict) else {}
+        ready_by_verdict = verdict == expected_verdict
+        ready_by_completion = bool(completion_entry.get("rule_authority_ready"))
+        ready_by_operator = operator_entry.get("status") == "pass" and operator_entry.get("verdict") == expected_verdict
+        status = "pass" if count >= args.min_rulefacts and ready_by_verdict and ready_by_completion and ready_by_operator else "fail"
         if count < args.min_rulefacts:
             failures.append(f"{ruleset} rulefact_count {count} is below minimum {args.min_rulefacts}")
-        if "READY" not in verdict:
+        if not ready_by_verdict:
             failures.append(f"{ruleset} final_verdict is not ready")
+        if not ready_by_completion:
+            failures.append(f"{ruleset} full product rule authority completion is not ready")
+        if not ready_by_operator:
+            failures.append(f"{ruleset} operator promoted rule authority gold is not ready")
         rulesets[ruleset] = {
             "path": str(path),
             "rulefact_count": count,
             "final_verdict": verdict,
+            "expected_ready_verdict": expected_verdict,
+            "full_completion_rule_authority_ready": ready_by_completion,
+            "operator_gold_status": operator_entry.get("status"),
+            "operator_gold_verdict": operator_entry.get("verdict"),
             "status": status,
         }
 
     result = {
         "contract_name": "chummer.rule_authority_minimum_coverage",
         "minimum_rulefacts_required": args.min_rulefacts,
+        "full_completion_path": str(FULL_COMPLETION_PATH),
+        "operator_gold_path": str(OPERATOR_GOLD_PATH),
         "status": "pass" if not failures else "fail",
         "rulesets": rulesets,
         "failures": failures,

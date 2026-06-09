@@ -28,8 +28,16 @@ class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
                     json.dumps({"rulefact_count": 5, "final_verdict": "READY"}),
                     encoding="utf-8",
                 )
+            (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
+                json.dumps({"rulesets": {"sr4": {"rule_authority_ready": True}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": True}}}),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json").write_text(
+                json.dumps({"rulesets": [{"ruleset": "sr4", "status": "pass", "verdict": "SR4_RULE_AUTHORITY_READY"}, {"ruleset": "sr5", "status": "pass", "verdict": "SR5_RULE_AUTHORITY_READY"}, {"ruleset": "sr6", "status": "pass", "verdict": "SR6_RULE_AUTHORITY_READY"}]}),
+                encoding="utf-8",
+            )
             output = root / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
-            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output):
+            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "FULL_COMPLETION_PATH", root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"), mock.patch.object(module, "OPERATOR_GOLD_PATH", root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"):
                 with self.assertRaises(SystemExit):
                     with mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
                         module.main()
@@ -40,14 +48,43 @@ class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
             root = Path(temp_dir)
             for name in ("SR4_RULEFACT_REGISTRY.generated.json", "SR5_RULE_AUTHORITY_REGISTRY.generated.json", "SR6_RULEFACT_REGISTRY.generated.json"):
                 (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
-                (root / ".codex-studio" / "published" / name).write_text(
-                    json.dumps({"rulefact_count": 120, "final_verdict": "SR_READY"}),
-                    encoding="utf-8",
-                )
+            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR4_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR5_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR6_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
+                json.dumps({"rulesets": {"sr4": {"rule_authority_ready": True}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": True}}}),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json").write_text(
+                json.dumps({"rulesets": [{"ruleset": "sr4", "status": "pass", "verdict": "SR4_RULE_AUTHORITY_READY"}, {"ruleset": "sr5", "status": "pass", "verdict": "SR5_RULE_AUTHORITY_READY"}, {"ruleset": "sr6", "status": "pass", "verdict": "SR6_RULE_AUTHORITY_READY"}]}),
+                encoding="utf-8",
+            )
             output = root / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
-            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output):
+            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "FULL_COMPLETION_PATH", root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"), mock.patch.object(module, "OPERATOR_GOLD_PATH", root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"):
                 with mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
                     self.assertEqual(module.main(), 0)
+
+    def test_gate_fails_when_completion_or_operator_gold_are_not_ready(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="rules-min-completion-") as temp_dir:
+            root = Path(temp_dir)
+            (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
+            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR4_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR5_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR6_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
+                json.dumps({"rulesets": {"sr4": {"rule_authority_ready": False}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": False}}}),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json").write_text(
+                json.dumps({"rulesets": [{"ruleset": "sr4", "status": "fail", "verdict": "NOT_READY"}, {"ruleset": "sr5", "status": "pass", "verdict": "SR5_RULE_AUTHORITY_READY"}, {"ruleset": "sr6", "status": "fail", "verdict": "NOT_READY"}]}),
+                encoding="utf-8",
+            )
+            output = root / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
+            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "FULL_COMPLETION_PATH", root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"), mock.patch.object(module, "OPERATOR_GOLD_PATH", root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"):
+                with self.assertRaises(SystemExit):
+                    with mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
+                        module.main()
 
 
 if __name__ == "__main__":
