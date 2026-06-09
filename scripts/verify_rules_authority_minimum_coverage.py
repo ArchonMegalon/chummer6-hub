@@ -43,6 +43,11 @@ def main() -> int:
     completion_payload = load_json(FULL_COMPLETION_PATH)
     operator_gold_payload = load_json(OPERATOR_GOLD_PATH)
     completion_rulesets = completion_payload.get("rulesets") if isinstance(completion_payload.get("rulesets"), dict) else {}
+    completion_blockers = {
+        item.get("ruleset"): item
+        for item in completion_payload.get("blockers", [])
+        if isinstance(item, dict) and item.get("ruleset")
+    }
     operator_rulesets = {
         item.get("ruleset"): item
         for item in operator_gold_payload.get("rulesets", [])
@@ -57,6 +62,7 @@ def main() -> int:
         verdict = str(payload.get("final_verdict") or "")
         expected_verdict = READY_VERDICTS[ruleset]
         completion_entry = completion_rulesets.get(ruleset, {}) if isinstance(completion_rulesets, dict) else {}
+        blocker_entry = completion_blockers.get(ruleset, {}) if isinstance(completion_blockers, dict) else {}
         operator_entry = operator_rulesets.get(ruleset, {}) if isinstance(operator_rulesets, dict) else {}
         ready_by_verdict = verdict == expected_verdict
         ready_by_completion = bool(completion_entry.get("rule_authority_ready"))
@@ -78,11 +84,16 @@ def main() -> int:
             "full_completion_rule_authority_ready": ready_by_completion,
             "operator_gold_status": operator_entry.get("status"),
             "operator_gold_verdict": operator_entry.get("verdict"),
+            "blocker_receipts": blocker_entry.get("blocker_receipts", {}),
+            "row_level_mapping_status": blocker_entry.get("row_level_mapping_status"),
+            "errata_posture_status": blocker_entry.get("errata_posture_status"),
+            "remaining_gates": blocker_entry.get("remaining_gates", []),
             "status": status,
         }
 
     result = {
         "contract_name": "chummer.rule_authority_minimum_coverage",
+        "generated_at_utc": completion_payload.get("generated_at_utc") or operator_gold_payload.get("generated_at_utc") or "",
         "minimum_rulefacts_required": args.min_rulefacts,
         "full_completion_path": str(FULL_COMPLETION_PATH),
         "operator_gold_path": str(OPERATOR_GOLD_PATH),

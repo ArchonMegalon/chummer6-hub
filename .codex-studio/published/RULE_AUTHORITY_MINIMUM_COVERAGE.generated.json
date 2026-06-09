@@ -1,5 +1,6 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
+  "generated_at_utc": "2026-06-09T12:56:31Z",
   "minimum_rulefacts_required": 100,
   "full_completion_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json",
   "operator_gold_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json",
@@ -13,6 +14,18 @@
       "full_completion_rule_authority_ready": false,
       "operator_gold_status": "fail",
       "operator_gold_verdict": "NOT_READY",
+      "blocker_receipts": {
+        "errata_posture": "/docker/chummercomplete/_completion/sr4_rule_authority/SR4_ERRATA_SOURCE_POSTURE.generated.json",
+        "row_level_mapping": "/docker/chummercomplete/_completion/sr4_rule_authority/SR4_ROW_LEVEL_AUTHORITY_MAPPING.generated.json"
+      },
+      "row_level_mapping_status": "pending_human_review",
+      "errata_posture_status": "pending_reviewed_application",
+      "remaining_gates": [
+        "human-reviewed row-level mapping from indexed table evidence into normalized records",
+        "errata profile applied and reviewed",
+        "complete authority golden fixture corpus, beyond seed fixtures",
+        "human rule review signoff"
+      ],
       "status": "fail"
     },
     "sr5": {
@@ -23,6 +36,10 @@
       "full_completion_rule_authority_ready": true,
       "operator_gold_status": "pass",
       "operator_gold_verdict": "SR5_RULE_AUTHORITY_READY",
+      "blocker_receipts": {},
+      "row_level_mapping_status": null,
+      "errata_posture_status": null,
+      "remaining_gates": [],
       "status": "pass"
     },
     "sr6": {
@@ -33,6 +50,19 @@
       "full_completion_rule_authority_ready": false,
       "operator_gold_status": "fail",
       "operator_gold_verdict": "NOT_READY",
+      "blocker_receipts": {
+        "errata_posture": "/docker/chummercomplete/_completion/sr6_rule_authority/SR6_ERRATA_SOURCE_POSTURE.generated.json",
+        "row_level_mapping": "/docker/chummercomplete/_completion/sr6_rule_authority/SR6_ROW_LEVEL_AUTHORITY_MAPPING.generated.json"
+      },
+      "row_level_mapping_status": "pending_human_review",
+      "errata_posture_status": "pending_reviewed_application",
+      "remaining_gates": [
+        "human-reviewed mapping of private PDF line-hash candidates into normalized public-safe records",
+        "errata profile applied and reviewed",
+        "complete authority golden fixture corpus, beyond seed fixtures",
+        "full provider-backed explain receipt corpus",
+        "human rule review signoff"
+      ],
       "status": "fail"
     }
   },

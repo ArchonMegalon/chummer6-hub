@@ -54,6 +54,37 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual(payload["status"], "fail")
         self.assertIn("live_public_web_recrawl stale", payload["failures"])
 
+    def test_payload_surfaces_rule_authority_blocker_details(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-rules-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "rule_authority_minimum_coverage":
+                    payload = {
+                        "status": "fail",
+                        "generated_at_utc": module.now_iso(),
+                        "rulesets": {
+                            "sr4": {
+                                "status": "fail",
+                                "blocker_receipts": {"row_level_mapping": "/tmp/sr4-row.json", "errata_posture": "/tmp/sr4-errata.json"},
+                                "row_level_mapping_status": "pending_human_review",
+                                "errata_posture_status": "pending_reviewed_application",
+                            }
+                        },
+                        "failures": ["sr4 final_verdict is not ready"],
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", Path(temp_dir) / "v20"), mock.patch.object(module, "REQUIRED_RECEIPTS", required):
+                payload = module.build_payload([])
+
+        rules_gate = payload["required_gates"]["rule_authority_minimum_coverage"]
+        self.assertEqual("fail", rules_gate["status"])
+        self.assertIn("sr4", rules_gate["rulesets"])
+        self.assertEqual("/tmp/sr4-row.json", rules_gate["rulesets"]["sr4"]["blocker_receipts"]["row_level_mapping"])
+
 
 if __name__ == "__main__":
     unittest.main()

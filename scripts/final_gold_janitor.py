@@ -109,6 +109,9 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
             "fresh_within_hours": RECRAWL_MAX_AGE_HOURS if name == "live_public_web_recrawl" else None,
             "pass": passed,
         }
+        if name == "rule_authority_minimum_coverage" and path.is_file():
+            required_gates[name]["rulesets"] = payload.get("rulesets", {})
+            required_gates[name]["failures"] = payload.get("failures", [])
 
     for result in command_results:
         if result["returncode"] != 0:

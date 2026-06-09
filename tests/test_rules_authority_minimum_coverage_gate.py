@@ -86,6 +86,57 @@ class RulesAuthorityMinimumCoverageGateTests(unittest.TestCase):
                     with mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
                         module.main()
 
+    def test_gate_surfaces_blocker_receipts_when_not_ready(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="rules-min-blockers-") as temp_dir:
+            root = Path(temp_dir)
+            (root / ".codex-studio" / "published").mkdir(parents=True, exist_ok=True)
+            (root / ".codex-studio" / "published" / "SR4_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "NOT_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR5_RULE_AUTHORITY_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "SR5_RULE_AUTHORITY_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "SR6_RULEFACT_REGISTRY.generated.json").write_text(json.dumps({"rulefact_count": 120, "final_verdict": "NOT_READY"}), encoding="utf-8")
+            (root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json").write_text(
+                json.dumps({
+                    "generated_at_utc": "2026-06-09T13:30:00Z",
+                    "rulesets": {"sr4": {"rule_authority_ready": False}, "sr5": {"rule_authority_ready": True}, "sr6": {"rule_authority_ready": False}},
+                    "blockers": [
+                        {
+                            "ruleset": "sr4",
+                            "blocker_receipts": {
+                                "row_level_mapping": "/tmp/sr4-row.json",
+                                "errata_posture": "/tmp/sr4-errata.json",
+                            },
+                            "row_level_mapping_status": "pending_human_review",
+                            "errata_posture_status": "pending_reviewed_application",
+                            "remaining_gates": ["human-reviewed row-level mapping", "errata profile applied and reviewed"],
+                        },
+                        {
+                            "ruleset": "sr6",
+                            "blocker_receipts": {
+                                "row_level_mapping": "/tmp/sr6-row.json",
+                                "errata_posture": "/tmp/sr6-errata.json",
+                            },
+                            "row_level_mapping_status": "pending_human_review",
+                            "errata_posture_status": "pending_reviewed_application",
+                            "remaining_gates": ["human-reviewed mapping", "errata profile applied and reviewed"],
+                        },
+                    ],
+                }),
+                encoding="utf-8",
+            )
+            (root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json").write_text(
+                json.dumps({"rulesets": [{"ruleset": "sr4", "status": "fail", "verdict": "NOT_READY"}, {"ruleset": "sr5", "status": "pass", "verdict": "SR5_RULE_AUTHORITY_READY"}, {"ruleset": "sr6", "status": "fail", "verdict": "NOT_READY"}]}),
+                encoding="utf-8",
+            )
+            output = root / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json"
+            with mock.patch.object(module, "CORE_ENGINE_ROOT", root), mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "FULL_COMPLETION_PATH", root / ".codex-studio" / "published" / "FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"), mock.patch.object(module, "OPERATOR_GOLD_PATH", root / ".codex-studio" / "published" / "OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json"):
+                with self.assertRaises(SystemExit):
+                    with mock.patch("sys.argv", ["verify_rules_authority_minimum_coverage.py", "--min-rulefacts", "100"]):
+                        module.main()
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("2026-06-09T13:30:00Z", payload["generated_at_utc"])
+            self.assertEqual("/tmp/sr4-row.json", payload["rulesets"]["sr4"]["blocker_receipts"]["row_level_mapping"])
+            self.assertEqual("pending_reviewed_application", payload["rulesets"]["sr6"]["errata_posture_status"])
+
 
 if __name__ == "__main__":
     unittest.main()
