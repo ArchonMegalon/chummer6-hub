@@ -17,13 +17,13 @@
     },
     "sr5": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR5_RULE_AUTHORITY_REGISTRY.generated.json",
-      "rulefact_count": 10,
-      "final_verdict": "NOT_READY",
+      "rulefact_count": 375,
+      "final_verdict": "SR5_RULE_AUTHORITY_READY",
       "expected_ready_verdict": "SR5_RULE_AUTHORITY_READY",
       "full_completion_rule_authority_ready": true,
-      "operator_gold_status": "fail",
-      "operator_gold_verdict": "NOT_READY",
-      "status": "fail"
+      "operator_gold_status": "pass",
+      "operator_gold_verdict": "SR5_RULE_AUTHORITY_READY",
+      "status": "pass"
     },
     "sr6": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR6_RULEFACT_REGISTRY.generated.json",
@@ -40,9 +40,6 @@
     "sr4 final_verdict is not ready",
     "sr4 full product rule authority completion is not ready",
     "sr4 operator promoted rule authority gold is not ready",
-    "sr5 rulefact_count 10 is below minimum 100",
-    "sr5 final_verdict is not ready",
-    "sr5 operator promoted rule authority gold is not ready",
     "sr6 final_verdict is not ready",
     "sr6 full product rule authority completion is not ready",
     "sr6 operator promoted rule authority gold is not ready"
