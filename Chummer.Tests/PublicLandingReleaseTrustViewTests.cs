@@ -33,6 +33,9 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open play shell", view, StringComparison.Ordinal);
         Assert.Contains("Open status", view, StringComparison.Ordinal);
         Assert.Contains("Replay Turn 1", view, StringComparison.Ordinal);
+        Assert.Contains("One compact rail for downloads, play, and public status.", view, StringComparison.Ordinal);
+        Assert.Contains("Short, practical downloads page for the current build and platform notes.", view, StringComparison.Ordinal);
+        Assert.Contains("Session access and current play status stay explicit on the play surface", view, StringComparison.Ordinal);
         Assert.DoesNotContain("guestReadableHeroPrimaryHref", view, StringComparison.Ordinal);
         Assert.DoesNotContain("Model.FlagshipCoverage", view, StringComparison.Ordinal);
     }
@@ -257,6 +260,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("guided starter workspace", downloadsView, StringComparison.Ordinal);
         Assert.DoesNotContain("Inspect the bundled", downloadsView, StringComparison.Ordinal);
         Assert.Contains("included example runner", nowView, StringComparison.Ordinal);
+        Assert.Contains("current downloads page", nowView, StringComparison.Ordinal);
         Assert.DoesNotContain("included sample runner", nowView, StringComparison.Ordinal);
     }
 
