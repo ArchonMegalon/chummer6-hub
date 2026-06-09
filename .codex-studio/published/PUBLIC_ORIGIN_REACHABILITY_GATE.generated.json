@@ -1,12 +1,12 @@
 {
   "status": "pass",
-  "base_url": "https://www.chummer.run/",
-  "final_url": "https://www.chummer.run/",
+  "base_url": "https://chummer.run/",
+  "final_url": "https://chummer.run/",
   "http_status": 200,
-  "cloudflare_ray": "a08d1dfacd88d29c-FRA",
+  "cloudflare_ray": "a08d4183ff3fdba5-FRA",
   "server": "cloudflare",
   "detected_error_code": null,
   "failure_reason": null,
-  "generated_at": "2026-06-09T03:40:49.671643Z",
+  "generated_at": "2026-06-09T04:05:05.200905Z",
   "body_excerpt": "<!doctype html>\n<html lang=\"en\" data-theme=\"hub-front-door\">\n<head>\n    <meta charset=\"utf-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\n    <title>Chummer &#x2014; Shadowrun Campaign OS \u00b7 Chummer</title>\n    <meta name=\"description\" content=\"Build characters, inspect rulings, and keep sessions moving with explainable math, durable state, and clear capabilities for tonight&#x27;s game.\" />\n    <meta name=\"theme-color\" content=\"#07131c\" />\n    <meta name=\"apple-mobile-web-app-capable\" content=\"yes\" />\n    <meta name=\"apple-mobile-web-app-status-bar-style\" cont..."
 }

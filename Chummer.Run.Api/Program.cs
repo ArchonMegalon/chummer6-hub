@@ -253,7 +253,10 @@ static async Task ProxyRybbitAsync(HttpContext context)
             continue;
         }
 
-        string[] values = header.Value.ToArray();
+        string[] values = header.Value
+            .Where(static value => value is not null)
+            .Select(static value => value!)
+            .ToArray();
         if (!outbound.Headers.TryAddWithoutValidation(key, values) && outbound.Content is not null)
         {
             outbound.Content.Headers.TryAddWithoutValidation(key, values);

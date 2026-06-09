@@ -8985,17 +8985,18 @@ Boundary:
 
     private static string BuildLiveLaunchSummary(PublicReleaseManifestDto manifest)
     {
-        int openPublicCount = manifest.Downloads.Count(static artifact =>
-            !string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
+        int totalLiveRouteCount = manifest.Downloads.Count;
         int accountRequiredCount = manifest.Downloads.Count(static artifact =>
             string.Equals(artifact.InstallAccessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase));
-        string shelfSummary = openPublicCount switch
+        int directPublicCount = totalLiveRouteCount - accountRequiredCount;
+        string shelfSummary = totalLiveRouteCount switch
         {
-            <= 0 when accountRequiredCount > 0
-                => $"No open-public artifacts are live on the shelf right now. {accountRequiredCount} signed-in guided install route(s) remain available on the shelf right now.",
-            <= 0 => "No open-public artifacts are live on the shelf right now.",
-            1 => "1 open-public artifact is live on the shelf right now.",
-            _ => $"{openPublicCount} open-public artifacts are live on the shelf right now."
+            <= 0 => "No live install routes are published on the shelf right now.",
+            1 when accountRequiredCount <= 0 => "1 live install route is published on the shelf right now.",
+            1 => "1 live install route is published on the shelf right now, and it currently uses a signed-in guided handoff.",
+            _ when accountRequiredCount <= 0 => $"{totalLiveRouteCount} live install route(s) are published on the shelf right now.",
+            _ when directPublicCount <= 0 => $"{totalLiveRouteCount} live install route(s) are published on the shelf right now, and all {accountRequiredCount} currently use signed-in guided handoff.",
+            _ => $"{totalLiveRouteCount} live install route(s) are published on the shelf right now; {directPublicCount} are direct-public and {accountRequiredCount} use signed-in guided handoff."
         };
 
         JsonElement primaryRoute = EnumerateDesktopRouteTruth(manifest)
