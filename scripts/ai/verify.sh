@@ -164,6 +164,7 @@ run_slice_safe_dotnet_test() {
 
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_routes.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_black_ledger_newsroom_surface.py' >/dev/null
+python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_analytics_hooks.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_participate_codex_guest_fallback.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_origin_reachability_gate.py' >/dev/null
 python3 -m unittest discover -s "$ROOT_DIR/tests" -p 'test_public_shell_clickability_gate.py' >/dev/null
