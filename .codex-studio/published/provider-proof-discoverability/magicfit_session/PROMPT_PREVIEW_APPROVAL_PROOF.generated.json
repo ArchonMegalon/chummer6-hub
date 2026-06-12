@@ -1,0 +1,13 @@
+{
+  "focused_tests": [
+    "PromptOnlyRegenerationDoesNotReserveOrConsumeRenderUnits",
+    "EditedPromptRerunsPrivacyScanAndBlocksApprovalUntilClean",
+    "RenderCannotStartBeforeExplicitApprovalAndUsesSessionAccount"
+  ],
+  "gm_can_edit_prompt": "EditPromptDraft",
+  "privacy_scan_reruns_after_edit": "covered",
+  "prompt_generated_before_render": true,
+  "prompt_only_regeneration_burns_render_units": false,
+  "render_starts_only_after_approval": "covered",
+  "status": "pass"
+}

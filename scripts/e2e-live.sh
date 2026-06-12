@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${CHUMMER_ALLOW_LEGACY_WORKSPACE_E2E:-0}" != "1" ]]; then
+  cat >&2 <<'EOF'
+scripts/e2e-live.sh targets the retired standalone workspace API surface.
+Use the current Hub exit gate instead:
+
+  CHUMMER_HUB_PLAYWRIGHT=1 bash scripts/e2e-hub.sh
+
+Set CHUMMER_ALLOW_LEGACY_WORKSPACE_E2E=1 only when intentionally testing
+the archived /api/workspaces runtime.
+EOF
+  exit 64
+fi
+
 BASE_URL="${CHUMMER_API_BASE_URL:-${CHUMMER_WEB_BASE_URL:-http://127.0.0.1:${CHUMMER_API_PORT:-${CHUMMER_WEB_PORT:-8088}}}}"
 XML_FILE="${1:-Chummer.Tests/TestFiles/BLUE.chum5}"
 API_KEY="${CHUMMER_API_KEY:-}"

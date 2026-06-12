@@ -1619,19 +1619,19 @@ public sealed class ReleaseBundlePromotionService
         string normalizedStatus = NormalizeToken(status);
         if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
         {
-            return "No published channel support posture exists because no release shelf is live.";
+            return "No published channel support posture exists because no release page is live.";
         }
 
         if (!desktopCoverageComplete)
         {
-            return "Treat the current shelf as review-required because "
+            return "Treat the current release as review-required because "
                 + DesktopTupleCoverageGapSummary(coverage)
                 + ".";
         }
 
         if (!proofPassed)
         {
-            return "Treat the current shelf as review-required until release proof and support closure checks pass.";
+            return "Treat the current release as review-required until release proof and support closure checks pass.";
         }
 
         List<string> journeys = proofJourneys?
@@ -1642,24 +1642,24 @@ public sealed class ReleaseBundlePromotionService
         if (journeys.Count == 0)
         {
             return NormalizeToken(channel) is "public_stable" or "stable" or "docker"
-                ? "Gold release proof passed for the current shelf."
-                : "Local release proof passed for the current shelf.";
+                ? "Gold release proof passed for the current release."
+                : "Local release proof passed for the current release.";
         }
 
         List<string> proofNotes = [];
         if (journeys.Contains("install_claim_restore_continue", StringComparer.Ordinal))
         {
-            proofNotes.Add("Claimed-device restore and bounded offline prefetch stayed grounded on the current shelf.");
+            proofNotes.Add("Claimed-device restore and bounded offline prefetch stayed grounded on the current release.");
         }
 
         if (journeys.Contains("report_cluster_release_notify", StringComparer.Ordinal))
         {
-            proofNotes.Add("Clustered release notification stayed grounded on the current shelf.");
+            proofNotes.Add("Clustered release notification stayed grounded on the current release.");
         }
 
         if (journeys.Contains("organize_community_and_close_loop", StringComparer.Ordinal))
         {
-            proofNotes.Add("Community organizer closure stayed grounded on the current shelf.");
+            proofNotes.Add("Community organizer closure stayed grounded on the current release.");
         }
 
         string noteSuffix = proofNotes.Count > 0
@@ -1679,7 +1679,7 @@ public sealed class ReleaseBundlePromotionService
         string normalizedStatus = NormalizeToken(status);
         if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
         {
-            return "No active channel issues are published because the shelf is still empty.";
+            return "No active channel issues are published because the release page is still empty.";
         }
 
         if (!desktopCoverageComplete)
@@ -1689,7 +1689,7 @@ public sealed class ReleaseBundlePromotionService
 
         if (!proofPassed)
         {
-            return $"The {NormalizeToken(channel)} shelf is visible, but known-issue review should stay front-and-center until proof is refreshed.";
+            return $"The {NormalizeToken(channel)} release page is visible, but known-issue review should stay front-and-center until proof is refreshed.";
         }
 
         List<string> journeys = proofJourneys?
@@ -1718,12 +1718,12 @@ public sealed class ReleaseBundlePromotionService
             : string.Empty;
         if (NormalizeToken(channel) is "public_stable" or "stable" or "docker")
         {
-            return "No blocking release caveat is mirrored for the current public shelf. The promoted routes have recent install"
+            return "No blocking release caveat is mirrored for the current public release. The promoted routes have recent install"
                 + proofNoteClause
                 + ", bounded offline prefetch, and support proof instead of only manifest presence.";
         }
 
-        return "Preview caveats still apply, but the current shelf has recent install"
+        return "Preview caveats still apply, but the current release has recent install"
             + proofNoteClause
             + ", bounded offline prefetch, and support proof instead of only manifest presence.";
     }
@@ -1733,16 +1733,16 @@ public sealed class ReleaseBundlePromotionService
         string normalizedStatus = NormalizeToken(status);
         if (!string.Equals(normalizedStatus, "published", StringComparison.Ordinal))
         {
-            return "Fix notices should stay pending until a published shelf exists.";
+            return "Fix notices should stay pending until a published release exists.";
         }
 
         if (!desktopCoverageComplete)
         {
-            return "Do not send fixed notices until required desktop tuple coverage is complete for the promoted shelf.";
+            return "Do not send fixed notices until required desktop build coverage is complete for the promoted release.";
         }
 
         return proofPassed
-            ? "Only send fixed notices after the affected install can receive the published channel artifact now on the shelf."
+            ? "Only send fixed notices after the affected install can receive the published channel artifact now on the release page."
             : "Verify fix availability against the live channel artifact before closing support loops.";
     }
 
@@ -1756,7 +1756,7 @@ public sealed class ReleaseBundlePromotionService
     {
         if (coverage is null)
         {
-            return "required desktop tuple coverage is unavailable";
+            return "required desktop build coverage is unavailable";
         }
 
         List<string> details = [];
@@ -1781,12 +1781,12 @@ public sealed class ReleaseBundlePromotionService
 
         if (missingTuples.Count > 0)
         {
-            details.Add("tuples: " + string.Join(", ", missingTuples));
+            details.Add("build combinations: " + string.Join(", ", missingTuples));
         }
 
         return details.Count == 0
-            ? "required desktop tuple coverage is complete"
-            : "required desktop tuple coverage is incomplete (" + string.Join("; ", details) + ")";
+            ? "required desktop build coverage is complete"
+            : "required desktop build coverage is incomplete (" + string.Join("; ", details) + ")";
     }
 
     private static bool ProofPassed(string? proofStatus)

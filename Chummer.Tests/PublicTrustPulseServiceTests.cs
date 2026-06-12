@@ -177,7 +177,7 @@ public sealed class PublicTrustPulseServiceTests
                         ["proven_journey_count"] = 4,
                         ["proven_route_count"] = 6,
                         ["history_snapshot_count"] = 6,
-                        ["summary"] = "Current local edge proof passed with multi-route evidence."
+                        ["summary"] = "Current local verification passed with multi-route evidence."
                     },
                     ["progress_trend"] = new Dictionary<string, object?>
                     {

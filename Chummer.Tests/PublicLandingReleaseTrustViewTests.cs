@@ -184,6 +184,8 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("What still blocks gold support", view, StringComparison.Ordinal);
         Assert.Contains("Model.GoldReadiness.Blockers", view, StringComparison.Ordinal);
         Assert.Contains("Last reviewed @Model.GoldReadiness.GeneratedAtLabel", view, StringComparison.Ordinal);
+        Assert.Contains("@blocker.ReviewStatusLabel", view, StringComparison.Ordinal);
+        Assert.Contains("@blocker.MatrixStatusLabel", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -199,7 +201,11 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("still needs these steps", controller, StringComparison.Ordinal);
         Assert.Contains("complete the reviewed rules mapping", controller, StringComparison.Ordinal);
         Assert.Contains("apply the current errata updates", controller, StringComparison.Ordinal);
+        Assert.Contains("choose the SR6 source baseline", controller, StringComparison.Ordinal);
         Assert.Contains("publish the final human review", controller, StringComparison.Ordinal);
+        Assert.Contains("Human review is pending, including the SR6 source-baseline choice.", controller, StringComparison.Ordinal);
+        Assert.Contains("Verification matrix is blocked only on expected review gates.", controller, StringComparison.Ordinal);
+        Assert.Contains("unexpected verification gate(s) need engineering review", controller, StringComparison.Ordinal);
         Assert.Contains("has {blocker.RulefactCount?.ToString() ?? \"unknown\"} published rules checks", controller, StringComparison.Ordinal);
     }
 
@@ -211,7 +217,8 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains(".Replace(\"install_claim_restore_continue\", \"install, restore, and continue\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"build_explain_publish\", \"build, explain, and publish\"", view, StringComparison.Ordinal);
-        Assert.Contains(".Replace(\"organize_community_and_close_loop\", \"community follow-through\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"organize_community_and_close_loop\", \"community wrap-up\"", view, StringComparison.Ordinal);
+        Assert.Contains(".Replace(\"closure\", \"wrap-up\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"reviewed authority closure\", \"reviewed coverage closure\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"authority facts\", \"rules checks\"", view, StringComparison.Ordinal);
         Assert.Contains(".Replace(\"Promoted installer media\", \"Recommended installer\"", view, StringComparison.Ordinal);
@@ -229,7 +236,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("start with sign-in so recovery and support stay attached", controller, StringComparison.Ordinal);
         Assert.Contains("No blocked public install path or tested journey is active right now.", controller, StringComparison.Ordinal);
         Assert.Contains("tested journeys and {routeCount} checked routes are on record", controller, StringComparison.Ordinal);
-        Assert.Contains("Current public release:", controller, StringComparison.Ordinal);
+        Assert.Contains("Gold-ready on Public release", controller, StringComparison.Ordinal);
         Assert.DoesNotContain("journey proofs and {routeCount} trust routes", controller, StringComparison.Ordinal);
     }
 
@@ -299,10 +306,10 @@ public sealed class PublicLandingReleaseTrustViewTests
         string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
         string controller = File.ReadAllText(controllerPath);
 
-        Assert.DoesNotContain("=> $\"Gold-ready on", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current public release:", controller, StringComparison.Ordinal);
         Assert.Contains("Preview posture on", controller, StringComparison.Ordinal);
         Assert.Contains("Review is still required before this release can be treated as supportable.", controller, StringComparison.Ordinal);
-        Assert.Contains("Current public release:", controller, StringComparison.Ordinal);
+        Assert.Contains("Gold-ready on Public release", controller, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -330,9 +337,121 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Stay on this page when the job is turning table pain into a Chummer-owned packet", view, StringComparison.Ordinal);
         Assert.Contains("Return to participate when the question is broader public discovery, not this intake packet", view, StringComparison.Ordinal);
-        Assert.Contains("Create the account only when you want packet history and follow-through in one place", view, StringComparison.Ordinal);
+        Assert.Contains("Create the account only when you want packet history and next steps in one place", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("follow-through", view, StringComparison.Ordinal);
         Assert.Contains("Leave KARMA FORGE for normal support as soon as the issue is no longer discovery work", view, StringComparison.Ordinal);
         Assert.Contains("The loop is visible before any rules work starts.", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void JoinPrimerAndFeatureDetailPartialsUsePublicProofViewAndJoinPathWording()
+    {
+        string joinPrimerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "JoinPrimer.cshtml");
+        string liveProofPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailLiveProof.cshtml");
+        string previewConceptPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailPreviewConcept.cshtml");
+        string roadmapPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "_FeatureDetailRoadmap.cshtml");
+
+        string joinPrimer = File.ReadAllText(joinPrimerPath);
+        string liveProof = File.ReadAllText(liveProofPath);
+        string previewConcept = File.ReadAllText(previewConceptPath);
+        string roadmap = File.ReadAllText(roadmapPath);
+
+        Assert.Contains("invite path is for governed joining", joinPrimer, StringComparison.Ordinal);
+        Assert.DoesNotContain("invite rail", joinPrimer, StringComparison.Ordinal);
+        Assert.DoesNotContain("follow-through", joinPrimer, StringComparison.Ordinal);
+
+        Assert.Contains("signed-in proof view", liveProof, StringComparison.Ordinal);
+        Assert.DoesNotContain("proof shelf", liveProof, StringComparison.Ordinal);
+
+        Assert.Contains("proof view", previewConcept, StringComparison.Ordinal);
+        Assert.Contains("signed-in proof view", previewConcept, StringComparison.Ordinal);
+        Assert.DoesNotContain("proof shelf", previewConcept, StringComparison.Ordinal);
+        Assert.DoesNotContain("follow-through", previewConcept, StringComparison.Ordinal);
+
+        Assert.Contains("signed-in proof view", roadmap, StringComparison.Ordinal);
+        Assert.DoesNotContain("proof shelf", roadmap, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PublicLandingSupportAndStoryPagesAvoidFollowThroughJargon()
+    {
+        string statusPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Status.cshtml");
+        string feedbackPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Feedback.cshtml");
+        string productStoryPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "ProductStory.cshtml");
+        string packagesPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Packages.cshtml");
+        string trustPagePath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml");
+        string faqPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Faq.cshtml");
+        string ledgerNotificationsPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "LedgerNotifications.cshtml");
+        string gmSessionVenuePath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "GmSessionVenue.cshtml");
+        string karmaForgeSubmittedPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "KarmaForgeSubmitted.cshtml");
+        string buildGhostConciergePath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "BuildGhostConcierge.cshtml");
+        string shelfPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "Shelf.cshtml");
+        string controllerPath = RepoPaths.FromRoot("Chummer.Run.Api", "Controllers", "PublicLandingController.cs");
+        string releaseSelectionServicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "ReleaseSelectionService.cs");
+        string packageCatalogServicePath = RepoPaths.FromRoot("Chummer.Run.Api", "Services", "PublicPackageCatalogService.cs");
+
+        string status = File.ReadAllText(statusPath);
+        string feedback = File.ReadAllText(feedbackPath);
+        string productStory = File.ReadAllText(productStoryPath);
+        string packages = File.ReadAllText(packagesPath);
+        string trustPage = File.ReadAllText(trustPagePath);
+        string faq = File.ReadAllText(faqPath);
+        string ledgerNotifications = File.ReadAllText(ledgerNotificationsPath);
+        string gmSessionVenue = File.ReadAllText(gmSessionVenuePath);
+        string karmaForgeSubmitted = File.ReadAllText(karmaForgeSubmittedPath);
+        string buildGhostConcierge = File.ReadAllText(buildGhostConciergePath);
+        string shelf = File.ReadAllText(shelfPath);
+        string controller = File.ReadAllText(controllerPath);
+        string releaseSelectionService = File.ReadAllText(releaseSelectionServicePath);
+        string packageCatalogService = File.ReadAllText(packageCatalogServicePath);
+
+        Assert.Contains("Fix and closure next steps", status, StringComparison.Ordinal);
+        Assert.Contains("install return", status, StringComparison.Ordinal);
+        Assert.DoesNotContain("support follow-through", status, StringComparison.Ordinal);
+
+        Assert.Contains("Shipped updates stay upstream of public celebration.", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("shipped follow-through", feedback, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains("world-facing continuity", productStory, StringComparison.Ordinal);
+        Assert.DoesNotContain("world-facing follow-through", productStory, StringComparison.Ordinal);
+
+        Assert.Contains("tracked history", packages, StringComparison.Ordinal);
+        Assert.DoesNotContain("tracked follow-through", packages, StringComparison.Ordinal);
+
+        Assert.Contains("next step stays attached", trustPage, StringComparison.Ordinal);
+        Assert.DoesNotContain("follow-through stays attached", trustPage, StringComparison.Ordinal);
+
+        Assert.Contains("support history", faq, StringComparison.Ordinal);
+        Assert.DoesNotContain("support follow-through", faq, StringComparison.Ordinal);
+
+        Assert.Contains("command continuity", ledgerNotifications, StringComparison.Ordinal);
+        Assert.DoesNotContain("command follow-through", ledgerNotifications, StringComparison.Ordinal);
+
+        Assert.Contains("Black Ledger continuity", gmSessionVenue, StringComparison.Ordinal);
+        Assert.DoesNotContain("Black Ledger follow-through", gmSessionVenue, StringComparison.Ordinal);
+
+        Assert.Contains("Bounded next steps", karmaForgeSubmitted, StringComparison.Ordinal);
+        Assert.DoesNotContain("Bounded follow-through", karmaForgeSubmitted, StringComparison.Ordinal);
+
+        Assert.Contains("governed output history", buildGhostConcierge, StringComparison.Ordinal);
+        Assert.DoesNotContain("governed output follow-through", buildGhostConcierge, StringComparison.Ordinal);
+
+        Assert.Contains("aftermath or replay next steps", shelf, StringComparison.Ordinal);
+        Assert.DoesNotContain("aftermath or replay follow-through", shelf, StringComparison.Ordinal);
+
+        Assert.Contains("No open support next step is waiting right now.", controller, StringComparison.Ordinal);
+        Assert.DoesNotContain("No open support follow-through is waiting right now.", controller, StringComparison.Ordinal);
+
+        Assert.Contains("support history", releaseSelectionService, StringComparison.Ordinal);
+        Assert.DoesNotContain("support follow-through", releaseSelectionService, StringComparison.Ordinal);
+        Assert.Contains("current downloads page", releaseSelectionService, StringComparison.Ordinal);
+        Assert.DoesNotContain("current shelf", releaseSelectionService, StringComparison.Ordinal);
+        Assert.DoesNotContain("public shelf", releaseSelectionService, StringComparison.Ordinal);
+
+        Assert.Contains("support history", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("support follow-through", packageCatalogService, StringComparison.Ordinal);
+        Assert.Contains("proof view", packageCatalogService, StringComparison.Ordinal);
+        Assert.DoesNotContain("proof shelf", packageCatalogService, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -667,9 +786,12 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Keep feature detail, proof, installs, and help on their own pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Compare with live proof instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
+        Assert.Contains("Current proof view", view, StringComparison.Ordinal);
+        Assert.Contains("Open proof view", view, StringComparison.Ordinal);
         Assert.Contains("Use downloads when the question becomes install or update posture", view, StringComparison.Ordinal);
         Assert.Contains("Leave feature detail for first-party help as soon as the issue becomes support or recovery", view, StringComparison.Ordinal);
         Assert.Contains("Use the feature detail to answer one question, then move to the page that owns the next job.", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("proof shelf", view, StringComparison.Ordinal);
     }
 
     [Fact]

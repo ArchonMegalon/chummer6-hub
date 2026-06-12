@@ -1,7 +1,9 @@
 import importlib.util
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from unittest import mock
 
@@ -71,6 +73,7 @@ class FinalGoldJanitorTests(unittest.TestCase):
                                 "blocker_receipts": {"row_level_mapping": "/tmp/sr4-row.json", "errata_posture": "/tmp/sr4-errata.json"},
                                 "row_level_mapping_status": "pending_human_review",
                                 "errata_posture_status": "pending_reviewed_application",
+                                "human_review_status": {"pending_review": True, "review_ready": False, "source_baseline_required": False},
                             }
                         },
                         "failures": ["sr4 final_verdict is not ready"],
@@ -84,6 +87,42 @@ class FinalGoldJanitorTests(unittest.TestCase):
         self.assertEqual("fail", rules_gate["status"])
         self.assertIn("sr4", rules_gate["rulesets"])
         self.assertEqual("/tmp/sr4-row.json", rules_gate["rulesets"]["sr4"]["blocker_receipts"]["row_level_mapping"])
+        self.assertTrue(rules_gate["rulesets"]["sr4"]["human_review_status"]["pending_review"])
+        self.assertFalse(rules_gate["rulesets"]["sr4"]["human_review_status"]["source_baseline_required"])
+
+    def test_main_prints_failed_gate_details_before_exiting(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="gold-janitor-main-") as temp_dir:
+            published = Path(temp_dir) / "published"
+            artifact_root = Path(temp_dir) / "v20"
+            published.mkdir(parents=True, exist_ok=True)
+            for key, path in module.REQUIRED_RECEIPTS.items():
+                payload = {"status": "pass", "generated_at_utc": module.now_iso()}
+                if key == "rule_authority_minimum_coverage":
+                    payload = {
+                        "status": "fail",
+                        "generated_at_utc": module.now_iso(),
+                        "rulesets": {
+                            "sr4": {
+                                "status": "fail",
+                                "remaining_gates": ["human rule review signoff"],
+                                "verification_matrix_status": "blocked",
+                            }
+                        },
+                        "failures": ["sr4 final_verdict is not ready"],
+                    }
+                (published / path.name).write_text(json.dumps(payload), encoding="utf-8")
+            required = {key: published / path.name for key, path in module.REQUIRED_RECEIPTS.items()}
+            stderr = io.StringIO()
+            with mock.patch.object(module, "PUBLISHED_ROOT", published), mock.patch.object(module, "ARTIFACT_ROOT", artifact_root), mock.patch.object(module, "REQUIRED_RECEIPTS", required), mock.patch("sys.argv", ["final_gold_janitor.py", "--skip-materializers"]):
+                with self.assertRaises(SystemExit):
+                    with redirect_stderr(stderr):
+                        module.main()
+
+        stderr_text = stderr.getvalue()
+        self.assertIn("rule_authority_minimum_coverage", stderr_text)
+        self.assertIn("human rule review signoff", stderr_text)
+        self.assertIn("NOT_GOLD", stderr_text)
 
 
 if __name__ == "__main__":

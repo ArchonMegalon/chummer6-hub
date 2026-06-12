@@ -1,0 +1,21 @@
+{
+  "dimensions": [
+    "gm_user_id",
+    "group_id",
+    "campaign_id",
+    "provider_account_id",
+    "video_type",
+    "render_job_id"
+  ],
+  "ledger_events": [
+    "reserve"
+  ],
+  "prompt_generation_units": 0,
+  "prompt_regeneration_units": 0,
+  "quota_scopes": [
+    "per_gm_monthly",
+    "per_group_monthly",
+    "per_campaign_monthly"
+  ],
+  "status": "pass"
+}

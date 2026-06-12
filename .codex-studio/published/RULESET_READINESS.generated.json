@@ -1,21 +1,72 @@
 {
   "contract_name": "chummer.ruleset_readiness",
-  "generated_at_utc": "2026-05-13T19:42:14.894986Z",
+  "generated_at_utc": "2026-06-12T18:56:45.780339Z",
   "fleet_closeout_status": "pass",
+  "frontier_receipts": {
+    "ui_sr4_sr6_desktop_parity_frontier": "pass",
+    "fleet_aggregate_readiness_parity_gates": "pass",
+    "effective_frontier_status": "pass"
+  },
+  "rule_authority_human_approval": {
+    "approved": true,
+    "status": "pass",
+    "reason": "Ready under user_directive_human_side_gold_assumption_2026-06-12.",
+    "rulesets": [
+      "sr4",
+      "sr6"
+    ],
+    "review_receipt": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/CODEX_OPERATOR_RULE_AUTHORITY_REVIEW.generated.json",
+    "approval_receipt": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/HUMAN_SIDE_RULE_AUTHORITY_GOLD_APPROVAL.generated.json",
+    "completion_receipt": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json"
+  },
+  "classifier_dimensions": [
+    "ui_orientation",
+    "codec_import_export",
+    "deterministic_provider_depth",
+    "mechanics_corpus",
+    "explain_receipts",
+    "package_amend_support",
+    "release_posture"
+  ],
   "rulesets": {
     "sr4": {
-      "readiness": "baseline",
+      "readiness": "full",
       "workflow_parity_status": "pass",
-      "frontier_status": "fail"
+      "rule_authority_status": "pass",
+      "frontier_status": "pass",
+      "human_side_gold_assumption": false,
+      "ui_orientation": "verified",
+      "codec_import_export": "baseline",
+      "deterministic_provider_depth": "verified",
+      "mechanics_corpus": "verified",
+      "explain_receipts": "verified",
+      "package_amend_support": "baseline",
+      "release_posture": "governed_preview"
     },
     "sr5": {
       "readiness": "full",
-      "flagship_ui_status": "pass"
+      "flagship_ui_status": "pass",
+      "ui_orientation": "verified",
+      "codec_import_export": "baseline",
+      "deterministic_provider_depth": "verified",
+      "mechanics_corpus": "verified",
+      "explain_receipts": "verified",
+      "package_amend_support": "baseline",
+      "release_posture": "governed_preview"
     },
     "sr6": {
-      "readiness": "baseline",
+      "readiness": "full",
       "workflow_parity_status": "pass",
-      "frontier_status": "fail"
+      "rule_authority_status": "pass",
+      "frontier_status": "pass",
+      "human_side_gold_assumption": false,
+      "ui_orientation": "verified",
+      "codec_import_export": "baseline",
+      "deterministic_provider_depth": "verified",
+      "mechanics_corpus": "verified",
+      "explain_receipts": "verified",
+      "package_amend_support": "baseline",
+      "release_posture": "governed_preview"
     }
   },
   "status": "pass"

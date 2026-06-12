@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import re
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+
+RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
+COMPLETION_ROOT = Path(os.environ.get("CHUMMER_COMPLETION_DIR", "/docker/chummercomplete/_completion/chummer_run_redesign_closure"))
+PRESENTATION_PUBLISHED_ROOT = Path(os.environ.get("CHUMMER_PRESENTATION_PUBLISHED_ROOT", "/docker/chummercomplete/chummer-presentation/.codex-studio/published"))
+OUTPUT = PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json"
+REQUIRED_VIEWPORTS = {"390x844", "412x915", "768x1024", "1366x768", "1440x900", "1920x1080"}
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def parse_report_status(path: Path) -> str:
+    if not path.is_file():
+        return "missing"
+    match = re.search(r"^- Status:\s*`?([A-Za-z0-9_-]+)`?", path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+    return match.group(1).lower() if match else "unknown"
+
+
+def status_pass(payload: dict[str, Any]) -> bool:
+    return str(payload.get("status") or "").strip().lower() in {"pass", "passed", "ready"}
+
+
+def build_payload() -> dict[str, Any]:
+    failures: list[str] = []
+    checks: dict[str, Any] = {}
+
+    ui_frame_path = COMPLETION_ROOT / "UI_FRAME_INTEGRITY.generated.json"
+    ui_frame = load_json(ui_frame_path)
+    frame_summary = ui_frame.get("summary") if isinstance(ui_frame.get("summary"), dict) else {}
+    frame_failure_count = frame_summary.get("failure_count")
+    frame_pass = status_pass(ui_frame) and int(frame_summary.get("checked_pages") or 0) >= 60 and int(frame_failure_count if frame_failure_count is not None else -1) == 0
+    if not frame_pass:
+        failures.append("ui frame integrity gate is missing, too narrow, or failing")
+    checks["ui_frame_integrity"] = {
+        "path": str(ui_frame_path),
+        "status": ui_frame.get("status", "missing"),
+        "base_url": ui_frame.get("base_url"),
+        "checked_pages": frame_summary.get("checked_pages"),
+        "failure_count": frame_summary.get("failure_count"),
+        "pass": frame_pass,
+    }
+
+    screenshot_path = COMPLETION_ROOT / "SCREENSHOT_QA.generated.json"
+    screenshot = load_json(screenshot_path)
+    screenshot_results = screenshot.get("results") if isinstance(screenshot.get("results"), list) else []
+    screenshot_viewports = {str(item.get("viewport")) for item in screenshot_results if isinstance(item, dict)}
+    screenshot_failures = [
+        str(item.get("viewport"))
+        for item in screenshot_results
+        if isinstance(item, dict) and str(item.get("status") or "").lower() != "pass"
+    ]
+    missing_viewports = sorted(REQUIRED_VIEWPORTS - screenshot_viewports)
+    screenshot_pass = status_pass(screenshot) and not screenshot_failures and not missing_viewports
+    if not screenshot_pass:
+        failures.append("homepage screenshot QA is missing required viewport coverage or has failures")
+    checks["screenshot_qa"] = {
+        "path": str(screenshot_path),
+        "status": screenshot.get("status", "missing"),
+        "viewports": sorted(screenshot_viewports),
+        "missing_viewports": missing_viewports,
+        "failed_viewports": screenshot_failures,
+        "pass": screenshot_pass,
+    }
+
+    cta_path = COMPLETION_ROOT / "CTA_HIERARCHY.generated.json"
+    cta = load_json(cta_path)
+    cta_pass = status_pass(cta) and not cta.get("failures")
+    if not cta_pass:
+        failures.append("CTA hierarchy proof is missing or failing")
+    checks["cta_hierarchy"] = {
+        "path": str(cta_path),
+        "status": cta.get("status", "missing"),
+        "failure_count": len(cta.get("failures") or []),
+        "pass": cta_pass,
+    }
+
+    asset_path = COMPLETION_ROOT / "PUBLIC_ASSET_QUALITY_GATE.generated.json"
+    asset = load_json(asset_path)
+    asset_pass = status_pass(asset) and int(asset.get("raster_image_count") or 0) > 0 and int(asset.get("failure_count") or 0) == 0
+    if not asset_pass:
+        failures.append("public asset quality proof is missing, imageless, or failing")
+    checks["public_asset_quality"] = {
+        "path": str(asset_path),
+        "status": asset.get("status", "missing"),
+        "raster_image_count": asset.get("raster_image_count"),
+        "failure_count": asset.get("failure_count"),
+        "pass": asset_pass,
+    }
+
+    contrast_path = COMPLETION_ROOT / "CONTRAST_AUDIT.generated.json"
+    contrast = load_json(contrast_path)
+    contrast_pass = status_pass(contrast)
+    if not contrast_pass:
+        failures.append("contrast audit is missing or failing")
+    checks["contrast_audit"] = {
+        "path": str(contrast_path),
+        "status": contrast.get("status", "missing"),
+        "pass": contrast_pass,
+    }
+
+    noise_path = COMPLETION_ROOT / "NOISE_BUDGET_REPORT.md"
+    noise_status = parse_report_status(noise_path)
+    noise_pass = noise_status == "pass"
+    if not noise_pass:
+        failures.append("noise budget report is missing or failing")
+    checks["noise_budget"] = {
+        "path": str(noise_path),
+        "status": noise_status,
+        "pass": noise_pass,
+    }
+
+    ux_verdict_path = COMPLETION_ROOT / "FINAL_CHUMMER_RUN_UX_VERDICT.md"
+    ux_verdict_text = ux_verdict_path.read_text(encoding="utf-8") if ux_verdict_path.is_file() else ""
+    ux_verdict_pass = "Verdict: `FLAGSHIP_FRONT_READY`" in ux_verdict_text
+    if not ux_verdict_pass:
+        failures.append("final UX verdict is missing or not flagship-front-ready")
+    checks["final_ux_verdict"] = {
+        "path": str(ux_verdict_path),
+        "status": "pass" if ux_verdict_pass else "missing_or_not_ready",
+        "pass": ux_verdict_pass,
+    }
+
+    ui_gold_path = PRESENTATION_PUBLISHED_ROOT / "UI_GOLD_PROOF_DEPTH_GATE.generated.json"
+    ui_gold = load_json(ui_gold_path)
+    ui_gold_pass = status_pass(ui_gold)
+    if not ui_gold_pass:
+        failures.append("UI gold proof-depth gate is missing or failing")
+    checks["ui_gold_proof_depth"] = {
+        "path": str(ui_gold_path),
+        "status": ui_gold.get("status", "missing"),
+        "verdict": ui_gold.get("verdict"),
+        "pass": ui_gold_pass,
+    }
+
+    return {
+        "contract_name": "chummer.design_quality_gate",
+        "generated_at_utc": now_iso(),
+        "status": "pass" if not failures else "fail",
+        "verdict": "DESIGN_READY" if not failures else "DESIGN_NOT_READY",
+        "completion_root": str(COMPLETION_ROOT),
+        "checks": checks,
+        "failures": failures,
+    }
+
+
+def main() -> int:
+    payload = build_payload()
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    print(f"design_quality_gate:{payload['status']}")
+    return 0 if payload["status"] == "pass" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1037,7 +1037,9 @@ public sealed record GoldReadinessStatusViewModel(
 public sealed record GoldReadinessBlockerViewModel(
     string RulesetLabel,
     string Summary,
-    string NextStep,
+    string NextStepLabel,
+    string ReviewStatusLabel,
+    string MatrixStatusLabel,
     IReadOnlyList<string> RemainingChecks);
 
 public sealed record DownloadDispatchPageViewModel(

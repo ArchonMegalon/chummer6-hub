@@ -77,7 +77,7 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
     }
 
     [Fact]
-    public async Task Browser_install_link_redirects_authenticated_requests_back_to_callback_with_code()
+    public async Task Browser_install_link_renders_authenticated_handoff_page_with_callback_code()
     {
         using Fixture fixture = new(authenticated: true);
         fixture.Controller.ControllerContext = new ControllerContext
@@ -97,20 +97,24 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             installLinkCallbackUri: "chummer://install-link",
             cancellationToken: CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.True(Uri.TryCreate(redirect.Url, UriKind.Absolute, out Uri? callbackUri), "The controller should emit a valid callback URI.");
+        ContentResult page = Assert.IsType<ContentResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        Assert.Contains("Open Chummer to finish linking this install", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Open Chummer", page.Content, StringComparison.Ordinal);
+        Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
+        Assert.True(Uri.TryCreate(WebUtility.HtmlDecode(callbackHref), UriKind.Absolute, out Uri? callbackUri), "The controller should emit a valid callback URI.");
         Assert.Equal("chummer", callbackUri.Scheme);
         Assert.Equal("install-link", callbackUri.Host);
-        Assert.Contains("code=", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("installationId=ins-browser-route", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("headId=avalonia", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("installLinkMode=browser_callback", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("installLinkTransport=grant_callback", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("code=", callbackHref, StringComparison.Ordinal);
+        Assert.Contains("installationId=ins-browser-route", callbackHref, StringComparison.Ordinal);
+        Assert.Contains("headId=avalonia", callbackHref, StringComparison.Ordinal);
+        Assert.Contains("installLinkMode=browser_callback", callbackHref, StringComparison.Ordinal);
+        Assert.Contains("installLinkTransport=grant_callback", callbackHref, StringComparison.Ordinal);
 
         InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
         Assert.Equal("ins-browser-route", callback.InstallationId);
         Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
-        Assert.Contains($"code={Uri.EscapeDataString(callback.CallbackCode)}", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains($"code={Uri.EscapeDataString(callback.CallbackCode)}", callbackHref, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -142,26 +146,87 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             installLinkCallbackUri: callbackUri,
             cancellationToken: CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.True(Uri.TryCreate(redirect.Url, UriKind.Absolute, out Uri? redirectUri), "The controller should emit a valid app-local callback URI.");
+        ContentResult page = Assert.IsType<ContentResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
+        Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
+        string decodedCallbackHref = WebUtility.HtmlDecode(callbackHref);
+        Assert.True(Uri.TryCreate(decodedCallbackHref, UriKind.Absolute, out Uri? redirectUri), "The controller should emit a valid app-local callback URI.");
         Assert.Equal(expectedHost, redirectUri.Host);
         Assert.Equal(expectedPath, redirectUri.AbsolutePath);
-        Assert.Contains("code=", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("code=", decodedCallbackHref, StringComparison.Ordinal);
         if (expectDesktopState)
         {
-            Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);
+            Assert.Contains("state=desktop", decodedCallbackHref, StringComparison.Ordinal);
             if (callbackUri.Contains("nonce=callback-proof", StringComparison.Ordinal))
             {
-                Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);
+                Assert.Contains("nonce=callback-proof", decodedCallbackHref, StringComparison.Ordinal);
             }
         }
 
-        Assert.Contains("installationId=ins-local-callback", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("installLinkMode=browser_callback", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("installLinkTransport=grant_callback", redirect.Url, StringComparison.Ordinal);
+        Assert.Contains("installationId=ins-local-callback", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.Contains("installLinkMode=browser_callback", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.Contains("installLinkTransport=grant_callback", decodedCallbackHref, StringComparison.Ordinal);
 
         InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
         Assert.Equal("ins-local-callback", callback.InstallationId);
+        Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_matches_linux_callback_platform_to_rid_backed_manifest_artifact()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            installationId: "ins-linux-route",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "linux",
+            arch: "x64",
+            installLinkCallbackUri: "chummer://install-link",
+            cancellationToken: CancellationToken.None);
+
+        ContentResult page = Assert.IsType<ContentResult>(result);
+        Assert.Contains("installationId=ins-linux-route", page.Content, StringComparison.Ordinal);
+
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        Assert.Equal("avalonia-linux-x64-installer", callback.ArtifactId);
+        Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_matches_windows_callback_platform_to_rid_backed_manifest_artifact()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            installationId: "ins-windows-rid-route",
+            headId: "avalonia",
+            applicationVersion: "6.0.1-preview",
+            releaseChannel: "preview",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: "chummer://install-link",
+            cancellationToken: CancellationToken.None);
+
+        ContentResult page = Assert.IsType<ContentResult>(result);
+        Assert.Contains("installationId=ins-windows-rid-route", page.Content, StringComparison.Ordinal);
+
+        InstallBrowserCallbackDto callback = Assert.Single(fixture.Store.BrowserCallbacksById.Values);
+        Assert.Equal("avalonia-win-x64-installer", callback.ArtifactId);
         Assert.Equal(InstallBrowserCallbackStates.Pending, callback.Status);
     }
 
@@ -186,20 +251,72 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
             installLinkCallbackUri: "http://127.0.0.1:47761/install-link/callback?state=desktop&accessToken=stale-access&grantId=stale-grant&claimCode=stale-claim&claimTicketId=stale-ticket&ticketId=stale-ticket-id&receiptId=stale-receipt&installedBuildReceiptId=stale-installed-receipt&callbackCode=stale-callback&code=stale-code",
             cancellationToken: CancellationToken.None);
 
-        RedirectResult redirect = Assert.IsType<RedirectResult>(result);
-        Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("code=", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("installationId=ins-authoritative", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-access", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-grant", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-claim", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-ticket", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-ticket-id", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-receipt", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-installed-receipt", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-callback", redirect.Url, StringComparison.Ordinal);
-        Assert.DoesNotContain("stale-code", redirect.Url, StringComparison.Ordinal);
-        Assert.Contains("installLinkTransport=grant_callback", redirect.Url, StringComparison.Ordinal);
+        ContentResult page = Assert.IsType<ContentResult>(result);
+        Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
+        string decodedCallbackHref = WebUtility.HtmlDecode(callbackHref);
+        Assert.Contains("state=desktop", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.Contains("code=", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.Contains("installationId=ins-authoritative", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-access", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-grant", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-claim", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-ticket", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-ticket-id", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-receipt", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-installed-receipt", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-callback", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.DoesNotContain("stale-code", decodedCallbackHref, StringComparison.Ordinal);
+        Assert.Contains("installLinkTransport=grant_callback", decodedCallbackHref, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Browser_install_link_renders_visible_recovery_page_when_artifact_is_missing()
+    {
+        using Fixture fixture = new(authenticated: true);
+        fixture.Controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext()
+        };
+        fixture.Controller.ControllerContext.HttpContext.Request.Path = "/account/access/install-link";
+        fixture.Controller.ControllerContext.HttpContext.Request.Headers.Authorization = "Bearer desktop-access-token";
+
+        IActionResult result = await fixture.Controller.BrowserInstallLink(
+            installationId: "ins-missing-artifact",
+            headId: "unknown-head",
+            applicationVersion: "run-20260612-121055",
+            releaseChannel: "docker",
+            platform: "windows",
+            arch: "x64",
+            installLinkCallbackUri: "chummer://install-link",
+            cancellationToken: CancellationToken.None);
+
+        ContentResult page = Assert.IsType<ContentResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, page.StatusCode);
+        Assert.Contains("This install needs a current desktop package", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Open downloads", page.Content, StringComparison.Ordinal);
+        Assert.Contains("ins-missing-artifact", page.Content, StringComparison.Ordinal);
+    }
+
+    private static bool TryExtractPrimaryHref(string content, out string href)
+    {
+        const string marker = "<a class=\"button-like button-like--primary\" href=\"";
+        int start = content.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0)
+        {
+            href = string.Empty;
+            return false;
+        }
+
+        start += marker.Length;
+        int end = content.IndexOf('"', start);
+        if (end < 0)
+        {
+            href = string.Empty;
+            return false;
+        }
+
+        href = content[start..end];
+        return true;
     }
 
     private sealed class Fixture : IDisposable
@@ -220,13 +337,26 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
                   "publishedAt": "2026-04-15T08:00:00Z",
                   "downloads": [
                     {
+                      "id": "avalonia-linux-x64-installer",
+                      "platform": "Avalonia Desktop Linux x64 Installer",
+                      "url": "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                      "sha256": "c3",
+                      "sizeBytes": 303,
+                      "head": "avalonia",
+                      "platformId": "linux-x64",
+                      "arch": "x64",
+                      "kind": "installer",
+                      "fileName": "chummer-avalonia-linux-x64-installer.deb",
+                      "installAccessClass": "open_public"
+                    },
+                    {
                       "id": "avalonia-win-x64-installer",
                       "platform": "Avalonia Desktop Windows x64 Installer",
                       "url": "/downloads/files/chummer-avalonia-win-x64-installer.exe",
                       "sha256": "d4",
                       "sizeBytes": 404,
                       "head": "avalonia",
-                      "platformId": "windows",
+                      "platformId": "win-x64",
                       "arch": "x64",
                       "kind": "installer",
                       "fileName": "chummer-avalonia-win-x64-installer.exe",

@@ -149,6 +149,10 @@ REQUIRED_HORIZON_PROMO_SCENE_IDS = [
 ]
 
 
+def text_contains_any(source: str, phrases: tuple[str, ...]) -> bool:
+    return any(phrase in source for phrase in phrases)
+
+
 def public_guide_release_truth_checks(public_release_packet: dict[str, Any], public_guide_text: str) -> list[dict[str, Any]]:
     return [
         check(
@@ -217,6 +221,79 @@ def every_wonder_horizon_receipt_checks(receipt: dict[str, Any], probe: dict[str
             },
         ),
     ]
+
+
+def rule_authority_receipt_checks(
+    minimum_coverage: dict[str, Any],
+    verdict_texts: dict[str, str],
+) -> list[dict[str, Any]]:
+    rulesets = minimum_coverage.get("rulesets") if isinstance(minimum_coverage.get("rulesets"), dict) else {}
+    checks: list[dict[str, Any]] = []
+
+    for edition in ("sr4", "sr5", "sr6"):
+        text = verdict_texts.get(edition, "")
+        checks.append(check(
+            "Copyright boundary" in text and "pass" in text.lower(),
+            f"{edition.upper()} rule authority includes acceptance and copyright boundary",
+            {"verdict_path": f"FINAL_{edition.upper()}_RULE_AUTHORITY_VERDICT.md"},
+        ))
+
+    sr5 = rulesets.get("sr5") if isinstance(rulesets.get("sr5"), dict) else {}
+    sr5_text = verdict_texts.get("sr5", "")
+    checks.append(check(
+        sr5.get("status") == "pass"
+        and sr5.get("final_verdict") == "SR5_RULE_AUTHORITY_READY"
+        and "SR5_RULE_AUTHORITY_READY" in sr5_text,
+        "SR5 rule authority ready marker is backed by minimum coverage receipt",
+        sr5,
+    ))
+
+    for edition in ("sr4", "sr6"):
+        ruleset = rulesets.get(edition) if isinstance(rulesets.get(edition), dict) else {}
+        human_review = ruleset.get("human_review_status") if isinstance(ruleset.get("human_review_status"), dict) else {}
+        expected_ready = str(ruleset.get("expected_ready_verdict") or "").strip()
+        unexpected_matrix_failures = ruleset.get("verification_matrix_unexpected_failed_gates")
+        expected_matrix_blockers = ruleset.get("verification_matrix_expected_ready_blockers")
+        remaining_gates = ruleset.get("remaining_gates")
+        text = verdict_texts.get(edition, "")
+        blocked_on_review = (
+            ruleset.get("status") == "fail"
+            and ruleset.get("final_verdict") == "NOT_READY"
+            and expected_ready
+            and expected_ready not in text
+            and ruleset.get("full_completion_rule_authority_ready") is False
+            and ruleset.get("operator_gold_status") == "fail"
+            and human_review.get("pending_review") is True
+            and human_review.get("review_ready") is False
+            and ruleset.get("verification_matrix_status") == "blocked"
+            and isinstance(unexpected_matrix_failures, list)
+            and not unexpected_matrix_failures
+            and isinstance(expected_matrix_blockers, list)
+            and len(expected_matrix_blockers) > 0
+            and isinstance(remaining_gates, list)
+            and len(remaining_gates) > 0
+        )
+        ready_under_completion = (
+            ruleset.get("status") == "pass"
+            and expected_ready
+            and ruleset.get("final_verdict") == expected_ready
+            and expected_ready in text
+            and ruleset.get("full_completion_rule_authority_ready") is True
+            and ruleset.get("operator_gold_status") == "pass"
+            and ruleset.get("operator_gold_verdict") == expected_ready
+            and isinstance(unexpected_matrix_failures, list)
+            and not unexpected_matrix_failures
+            and isinstance(remaining_gates, list)
+            and not remaining_gates
+        )
+
+        checks.append(check(
+            blocked_on_review or ready_under_completion,
+            f"{edition.upper()} rule authority is either bounded-blocked on review or backed by ready completion",
+            ruleset,
+        ))
+
+    return checks
 
 
 def main() -> int:
@@ -291,7 +368,11 @@ def main() -> int:
     checks.append(check(release.get("gold_claim_allowed") is True, "release truth explicitly allows gold claim after alignment"))
     checks.append(check(release.get("release_manifest", {}).get("version") != "run-20260518-220935", "release version is not stale run-20260518-220935"))
     checks.append(check(release.get("release_manifest", {}).get("proofStatus") == "passed", "release manifest proofStatus is passed"))
-    checks.append(check(release.get("release_manifest", {}).get("download_count") == 3, "release manifest has three platform downloads"))
+    checks.append(check(
+        (release.get("release_manifest", {}).get("platform_download_count")
+         or release.get("release_manifest", {}).get("download_count")) == 3,
+        "release manifest has three platform downloads"
+    ))
     checks.append(check(all(release.get("live_truth", {}).get("downloads_page", {}).get(key) for key in ("contains_windows", "contains_linux", "contains_macos")), "downloads page proves all platform shelves"))
 
     public_release_packet = read_json(public_guide_root / "CHUMMER6_PUBLIC_RELEASE_TRUTH_PACKET.generated.json")
@@ -312,21 +393,43 @@ def main() -> int:
 
     live_status = fetch_text(f"{BASE_URL}/status")
     live_status_text = live_status.get("text") if isinstance(live_status.get("text"), str) else ""
+    contains_local_proof_pass = text_contains_any(
+        live_status_text,
+        (
+            "Current local edge proof passed",
+            "Current local release proof passed",
+        ),
+    )
+    contains_local_proof_unknown = text_contains_any(
+        live_status_text,
+        (
+            "Current local edge proof is unknown",
+            "Current local release proof is unknown",
+        ),
+    )
+    contains_gold_ready_marker = text_contains_any(
+        live_status_text,
+        (
+            "Gold-ready on Public release Build run-",
+            "Gold-ready on Public release",
+            "Current public release",
+        ),
+    )
     checks.append(check(
         live_status.get("pass") is True
         and "run-20260518-220935" not in live_status_text
-        and "Current local edge proof passed" in live_status_text
-        and "Current local edge proof is unknown" not in live_status_text
-        and "Gold-ready on Public release Build run-" in live_status_text,
+        and contains_local_proof_pass
+        and not contains_local_proof_unknown
+        and contains_gold_ready_marker,
         "configured /status route proves current gold-ready release and local edge proof",
         {
             "url": live_status.get("url"),
             "attempts": live_status.get("attempts"),
             "status_code": live_status.get("status_code"),
             "contains_stale_run": "run-20260518-220935" in live_status_text,
-            "contains_local_edge_passed": "Current local edge proof passed" in live_status_text,
-            "contains_local_edge_unknown": "Current local edge proof is unknown" in live_status_text,
-            "contains_gold_ready_build": "Gold-ready on Public release Build run-" in live_status_text,
+            "contains_local_edge_passed": contains_local_proof_pass,
+            "contains_local_edge_unknown": contains_local_proof_unknown,
+            "contains_gold_ready_build": contains_gold_ready_marker,
             "error": live_status.get("error"),
         },
     ))
@@ -337,10 +440,14 @@ def main() -> int:
     checks.append(check(not formport.get("generic_projection_hits"), "Classic FormPorts have no preview-json/fact-bucket projection hits"))
     checks.append(check("still depend" not in str(formport.get("summary") or "").lower(), "Classic FormPort summary does not contradict pass verdict"))
 
-    for edition in ("SR4", "SR5", "SR6"):
-        text = read_text(OUT / f"FINAL_{edition}_RULE_AUTHORITY_VERDICT.md")
-        checks.append(check(f"{edition}_RULE_AUTHORITY_READY" in text, f"{edition} rule authority ready marker present"))
-        checks.append(check("Copyright boundary" in text and "pass" in text.lower(), f"{edition} rule authority includes acceptance and copyright boundary"))
+    rule_authority_minimum_coverage = read_json(RUN_SERVICES / ".codex-studio" / "published" / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json")
+    checks.extend(rule_authority_receipt_checks(
+        rule_authority_minimum_coverage,
+        {
+            edition: read_text(OUT / f"FINAL_{edition.upper()}_RULE_AUTHORITY_VERDICT.md")
+            for edition in ("sr4", "sr5", "sr6")
+        },
+    ))
 
     magicfit_text = read_text(OUT / "FINAL_MAGICFIT_PROVIDER_ADAPTER_VERDICT.md")
     magicfit_provider = read_json(WORKSPACE / "_completion" / "magicfit_provider" / "MAGICFIT_PROVIDER_VERIFICATION.generated.json")

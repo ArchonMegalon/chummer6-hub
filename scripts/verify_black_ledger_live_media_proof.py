@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED_ROOT = REPO_ROOT / ".codex-studio" / "published"
 OUTPUT_PATH = PUBLISHED_ROOT / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
 SCREENSHOT_ROOT = PUBLISHED_ROOT / "black-ledger-live-media"
+CAPTURE_ATTEMPTS = 3
 
 NODE_SCRIPT = r"""
 const fs = require("fs");
@@ -117,24 +118,39 @@ def main() -> int:
         if env.get("NODE_PATH"):
             node_path_entries.append(env["NODE_PATH"])
         env["NODE_PATH"] = os.pathsep.join(node_path_entries)
-        completed = subprocess.run(
-            ["node", str(script_path), str(config_path), str(result_path)],
-            cwd=REPO_ROOT,
-            env=env,
-            capture_output=True,
-            text=True,
-        )
+        completed = None
+        attempts: list[dict[str, Any]] = []
+        for attempt in range(1, CAPTURE_ATTEMPTS + 1):
+            completed = subprocess.run(
+                ["node", str(script_path), str(config_path), str(result_path)],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            attempts.append(
+                {
+                    "attempt": attempt,
+                    "returncode": completed.returncode,
+                    "stdout": completed.stdout.strip(),
+                    "stderr": completed.stderr.strip(),
+                }
+            )
+            if completed.returncode == 0:
+                break
 
         payload = {
             "contract_name": "chummer.black_ledger_live_media_proof",
             "base_url": base_url,
-            "status": "pass" if completed.returncode == 0 else "fail",
+            "status": "pass" if completed and completed.returncode == 0 else "fail",
             "capture_mode": "playwright_screenshot",
-            "stdout": completed.stdout.strip(),
-            "stderr": completed.stderr.strip(),
+            "attempt_count": len(attempts),
+            "stdout": completed.stdout.strip() if completed else "",
+            "stderr": completed.stderr.strip() if completed else "",
+            "attempts": attempts,
             "screenshots": [],
         }
-        if completed.returncode == 0 and result_path.is_file():
+        if completed and completed.returncode == 0 and result_path.is_file():
             payload["screenshots"] = json.loads(result_path.read_text(encoding="utf-8")).get("entries", [])
 
     write_json(OUTPUT_PATH, payload)

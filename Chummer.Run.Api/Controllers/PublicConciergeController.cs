@@ -112,7 +112,7 @@ public sealed class PublicConciergeController : Controller
                 ? "Use the primer packet to align expectations before the table moves."
                 : "Use the primer guide to reduce first-session friction before you click deeper.",
             Intro: packetMode
-                ? "This packet view keeps expectations, setup prep, and session-zero follow-through together instead of scattering them between support, downloads, and campaign lore."
+                ? "This packet view keeps expectations, setup prep, and session-zero continuity together instead of scattering them between support, downloads, and campaign lore."
                 : "This primer view keeps orientation, prep, and the next invite step together instead of forcing a new player or GM to guess which page matters first.",
             ProofPoints:
             [
@@ -132,7 +132,7 @@ public sealed class PublicConciergeController : Controller
                     Bullets:
                     [
                         "Invite continuation stays on first-party account rails.",
-                        "Join-code follow-through should not hide behind a booking or support provider.",
+                        "Join-code continuity should not hide behind a booking or support provider.",
                         "The wrapper can be replayed safely if the first pass is interrupted."
                     ],
                     PrimaryAction: new TrustPageActionViewModel(

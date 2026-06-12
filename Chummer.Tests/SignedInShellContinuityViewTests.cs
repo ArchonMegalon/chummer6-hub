@@ -42,6 +42,7 @@ public sealed class SignedInShellContinuityViewTests
 
         Assert.Contains("account-rail-snapshot", view, StringComparison.Ordinal);
         Assert.Contains("Build follow-through", view, StringComparison.Ordinal);
+        Assert.Contains("Support follow-through", view, StringComparison.Ordinal);
         Assert.Contains("Recovery codes stay in reserve.", view, StringComparison.Ordinal);
         Assert.Contains("Do not turn this into a browser-first claim ritual.", view, StringComparison.Ordinal);
     }

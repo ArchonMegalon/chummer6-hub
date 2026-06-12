@@ -21,7 +21,7 @@ test('jackpoint public route stays receipt-backed and points at the signed-in pu
   expect(payload.signedInDesk.publicationDetailApiHrefTemplate).toBe('/api/v1/campaign-spine/me/publications/{publicationId}');
 
   await page.goto(`${baseUrl}/jackpoint`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'JACKPOINT briefings' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'JACKPOINT', exact: true })).toBeVisible();
   await expect(page.locator('body')).toContainText('JACKPOINT now ships a real first-party briefing network');
   await expect(page.locator('body')).toContainText('Signed-in publication desk');
   await expect(page.locator('body')).toContainText('Player-safe dossier and mission-brief output only.');

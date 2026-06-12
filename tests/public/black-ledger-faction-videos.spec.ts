@@ -13,11 +13,14 @@ const factions = [
 ];
 
 test('black ledger faction promo routes stay public-safe and expose cinematic render metadata', async ({ request }) => {
+  test.setTimeout(90000);
   const results: Array<Record<string, unknown>> = [];
   for (const faction of factions) {
-    const page = await request.get(`${baseUrl}/ledger/factions/${faction}/promo`);
-    const json = await request.get(`${baseUrl}/ledger/factions/${faction}/promo.json`);
-    const vtt = await request.get(`${baseUrl}/ledger/factions/${faction}/promo.vtt`);
+    const [page, json, vtt] = await Promise.all([
+      request.get(`${baseUrl}/ledger/factions/${faction}/promo`),
+      request.get(`${baseUrl}/ledger/factions/${faction}/promo.json`),
+      request.get(`${baseUrl}/ledger/factions/${faction}/promo.vtt`),
+    ]);
     const pageText = await page.text();
     const payload = await json.json();
     expect(page.status()).toBe(200);

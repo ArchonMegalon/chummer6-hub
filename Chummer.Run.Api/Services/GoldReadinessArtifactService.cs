@@ -112,6 +112,12 @@ public sealed class GoldReadinessArtifactService
                 RulefactCount: TryGetInt(value, "rulefact_count"),
                 RowLevelMappingStatus: TryGetString(value, "row_level_mapping_status"),
                 ErrataPostureStatus: TryGetString(value, "errata_posture_status"),
+                HumanReviewPending: TryGetNestedBool(value, "human_review_status", "pending_review"),
+                HumanReviewReady: TryGetNestedBool(value, "human_review_status", "review_ready"),
+                SourceBaselineRequired: TryGetNestedBool(value, "human_review_status", "source_baseline_required"),
+                VerificationMatrixStatus: TryGetString(value, "verification_matrix_status"),
+                VerificationMatrixFailedGates: ReadStringArray(value, "verification_matrix_failed_gates"),
+                VerificationMatrixUnexpectedFailedGates: ReadStringArray(value, "verification_matrix_unexpected_failed_gates"),
                 RemainingGates: ReadStringArray(value, "remaining_gates")));
         }
 
@@ -141,6 +147,23 @@ public sealed class GoldReadinessArtifactService
         => element.TryGetProperty(propertyName, out JsonElement valueElement) && valueElement.ValueKind == JsonValueKind.Number && valueElement.TryGetInt32(out int value)
             ? value
             : null;
+
+    private static bool? TryGetNestedBool(JsonElement element, string objectName, string propertyName)
+    {
+        if (!element.TryGetProperty(objectName, out JsonElement objectElement)
+            || objectElement.ValueKind != JsonValueKind.Object
+            || !objectElement.TryGetProperty(propertyName, out JsonElement valueElement))
+        {
+            return null;
+        }
+
+        return valueElement.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => null
+        };
+    }
 
     private static DateTimeOffset? TryParseTimestamp(string? value)
     {
@@ -174,4 +197,10 @@ public sealed record GoldReadinessRuleAuthorityBlocker(
     int? RulefactCount,
     string? RowLevelMappingStatus,
     string? ErrataPostureStatus,
+    bool? HumanReviewPending,
+    bool? HumanReviewReady,
+    bool? SourceBaselineRequired,
+    string? VerificationMatrixStatus,
+    IReadOnlyList<string> VerificationMatrixFailedGates,
+    IReadOnlyList<string> VerificationMatrixUnexpectedFailedGates,
     IReadOnlyList<string> RemainingGates);

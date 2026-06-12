@@ -30,6 +30,10 @@ class BlackLedgerLiveMediaProofGateTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     with mock.patch("sys.argv", ["verify_black_ledger_live_media_proof.py"]):
                         module.main()
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "fail")
+            self.assertEqual(payload["attempt_count"], module.CAPTURE_ATTEMPTS)
+            self.assertEqual(len(payload["attempts"]), module.CAPTURE_ATTEMPTS)
 
     def test_gate_records_screenshots_on_success(self) -> None:
         module = load_module()
@@ -49,6 +53,38 @@ class BlackLedgerLiveMediaProofGateTests(unittest.TestCase):
                     self.assertEqual(module.main(), 0)
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(payload["status"], "pass")
+            self.assertTrue(payload["screenshots"])
+            self.assertEqual(payload["attempt_count"], 1)
+
+    def test_gate_retries_before_success(self) -> None:
+        module = load_module()
+        with tempfile.TemporaryDirectory(prefix="ledger-media-retry-") as temp_dir:
+            temp_root = Path(temp_dir)
+            output = temp_root / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
+            result = temp_root / "result.json"
+            result.write_text(json.dumps({"entries": [{"route": "/ledger/map", "viewport": "desktop", "screenshotPath": "/tmp/map.png"}]}), encoding="utf-8")
+
+            responses = [
+                mock.Mock(returncode=1, stdout="", stderr="page.goto chrome-error://chromewebdata"),
+                mock.Mock(returncode=0, stdout="ok", stderr=""),
+            ]
+
+            def fake_run(*args, **kwargs):
+                current = responses.pop(0)
+                result_path = Path(args[0][3])
+                if current.returncode == 0:
+                    result_path.write_text(result.read_text(encoding="utf-8"), encoding="utf-8")
+                return current
+
+            with mock.patch.object(module, "OUTPUT_PATH", output), mock.patch.object(module, "SCREENSHOT_ROOT", temp_root / "screens"), mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                with mock.patch("sys.argv", ["verify_black_ledger_live_media_proof.py"]):
+                    self.assertEqual(module.main(), 0)
+
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["attempt_count"], 2)
+            self.assertEqual(payload["attempts"][0]["returncode"], 1)
+            self.assertEqual(payload["attempts"][1]["returncode"], 0)
             self.assertTrue(payload["screenshots"])
 
 

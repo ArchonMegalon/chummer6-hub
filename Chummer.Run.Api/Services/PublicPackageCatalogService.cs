@@ -330,20 +330,20 @@ public sealed class PublicPackageCatalogService
                     "Account value begins after install through claim, recovery, updates, and support continuity.",
                     "Release truth still lives on status, downloads, and the release proof rails."
                 ],
-                "Downloads, status, and linked-install follow-through already point here.",
+                "Downloads, status, and linked-install history already point here.",
                 "Open downloads",
                 "/downloads",
-                "Track the linked install, recovery state, and support follow-through from the account package rail.",
+                "Track the linked install, recovery state, and support history from the account package rail.",
                 "Keep this package as the public install anchor and compatibility reference."),
             new(
                 "sr5-rules-core",
                 "SR5 rules coverage package",
-                "The current rules-and-source package for the explainable SR5 coverage that the proof shelf can already inspect.",
+                "The current rules-and-source package for the explainable SR5 coverage that the proof view can already inspect.",
                 "rules_source_package",
                 "Rules and source package",
                 "Inspectable",
                 [
-                    "Binds to the deterministic rules runtime, explanation trail, and current proof shelf.",
+                    "Binds to the deterministic rules runtime, explanation trail, and current proof view.",
                     "Compatibility posture depends on the current explain receipt and import/export boundaries, not on route existence alone.",
                     "Public detail can point to current proof, but cannot overstate overall ruleset seriousness."
                 ],
@@ -352,7 +352,7 @@ public sealed class PublicPackageCatalogService
                     "Rollback and boundary posture stay explicit when this package changes explainable rules behavior.",
                     "The package browser shows compatibility and status; it does not replace the rules proof audit."
                 ],
-                "The current proof shelf already points to the explanation trail and live rules posture.",
+                "The current proof view already points to the explanation trail and live rules posture.",
                 "Open what works today",
                 "/now#real-rules-truth",
                 "Account package tracking keeps follows and votes attached to the same signed-in return path.",
@@ -388,7 +388,7 @@ public sealed class PublicPackageCatalogService
                 "Preview lane",
                 [
                     "Compatibility depends on publication trust, artifact shelf posture, and provenance receipts.",
-                    "The package can travel across the proof shelf without becoming the source of product truth.",
+                    "The package can travel across the proof view without becoming the source of product truth.",
                     "Creator, campaign, and public views can differ while the package lineage stays explicit."
                 ],
                 [

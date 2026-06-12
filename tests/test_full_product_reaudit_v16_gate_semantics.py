@@ -16,6 +16,7 @@ def load_module():
 
 
 MODULE = load_module()
+RULE_AUTHORITY_STATE_CHECK = "{edition} rule authority is either bounded-blocked on review or backed by ready completion"
 
 
 def statuses(checks):
@@ -105,6 +106,51 @@ class FullProductReauditV16GateSemanticTests(unittest.TestCase):
 
         self.assertTrue(all(check["status"] == "pass" for check in checks), checks)
 
+    def test_rule_authority_receipt_passes_when_sr4_and_sr6_are_explicit_human_review_blockers(self) -> None:
+        checks = MODULE.rule_authority_receipt_checks(
+            self.valid_rule_authority_minimum_coverage(),
+            {
+                "sr4": "NOT_READY\n\n- copyright safety: pass\n\nCopyright boundary: implementation facts only.",
+                "sr5": "SR5_RULE_AUTHORITY_READY\n\n- acceptance proof: pass\n\nCopyright boundary: structured data only.",
+                "sr6": "NOT_READY\n\n- copyright safety: pass\n\nCopyright boundary: implementation facts only.",
+            },
+        )
+
+        self.assertTrue(all(check["status"] == "pass" for check in checks), checks)
+
+    def test_rule_authority_receipt_fails_if_sr6_has_unexpected_matrix_failure(self) -> None:
+        receipt = self.valid_rule_authority_minimum_coverage()
+        receipt["rulesets"]["sr6"]["verification_matrix_unexpected_failed_gates"] = ["SR6-G999"]
+
+        checks = MODULE.rule_authority_receipt_checks(
+            receipt,
+            {
+                "sr4": "NOT_READY\n\n- copyright safety: pass\n\nCopyright boundary: implementation facts only.",
+                "sr5": "SR5_RULE_AUTHORITY_READY\n\n- acceptance proof: pass\n\nCopyright boundary: structured data only.",
+                "sr6": "NOT_READY\n\n- copyright safety: pass\n\nCopyright boundary: implementation facts only.",
+            },
+        )
+
+        self.assertEqual(
+            statuses(checks)[RULE_AUTHORITY_STATE_CHECK.format(edition="SR6")],
+            "fail",
+        )
+
+    def test_rule_authority_receipt_fails_if_blocked_ruleset_claims_ready_marker(self) -> None:
+        checks = MODULE.rule_authority_receipt_checks(
+            self.valid_rule_authority_minimum_coverage(),
+            {
+                "sr4": "SR4_RULE_AUTHORITY_READY\n\n- copyright safety: pass\n\nCopyright boundary: implementation facts only.",
+                "sr5": "SR5_RULE_AUTHORITY_READY\n\n- acceptance proof: pass\n\nCopyright boundary: structured data only.",
+                "sr6": "NOT_READY\n\n- copyright safety: pass\n\nCopyright boundary: implementation facts only.",
+            },
+        )
+
+        self.assertEqual(
+            statuses(checks)[RULE_AUTHORITY_STATE_CHECK.format(edition="SR4")],
+            "fail",
+        )
+
     def valid_probe(self):
         return {"status": "pass", "has_video": True, "has_audio": True, "duration": 90.0}
 
@@ -119,6 +165,38 @@ class FullProductReauditV16GateSemanticTests(unittest.TestCase):
             "proof_constraints": [
                 "MagicFit render claim requires provider and scene receipts; otherwise label first-party motion storyboard"
             ],
+        }
+
+    def valid_rule_authority_minimum_coverage(self):
+        blocked = {
+            "status": "fail",
+            "final_verdict": "NOT_READY",
+            "expected_ready_verdict": "SR4_RULE_AUTHORITY_READY",
+            "full_completion_rule_authority_ready": False,
+            "operator_gold_status": "fail",
+            "human_review_status": {
+                "pending_review": True,
+                "review_ready": False,
+            },
+            "verification_matrix_status": "blocked",
+            "verification_matrix_unexpected_failed_gates": [],
+            "verification_matrix_expected_ready_blockers": ["SR4-G013"],
+            "remaining_gates": ["human rule review signoff"],
+        }
+        return {
+            "status": "fail",
+            "rulesets": {
+                "sr4": dict(blocked),
+                "sr5": {
+                    "status": "pass",
+                    "final_verdict": "SR5_RULE_AUTHORITY_READY",
+                },
+                "sr6": {
+                    **blocked,
+                    "expected_ready_verdict": "SR6_RULE_AUTHORITY_READY",
+                    "verification_matrix_expected_ready_blockers": ["SR6-G012"],
+                },
+            },
         }
 
 

@@ -246,7 +246,7 @@ REQUIRED_SOURCE_MARKERS = {
         "NormalizeSupportPrefill(applicationVersion) ?? manifest.Version",
         "desktop app update lane",
         "previous installed copy",
-        "Support follow-through stays on the same install rail",
+        "Support stays on the same install rail",
         "BuildAccountSupportHref(",
         "\"/account/support\"",
         "Keep the fix, update, rollback, and verification on this same linked install.",
@@ -269,7 +269,7 @@ REQUIRED_SOURCE_MARKERS = {
     ],
     Path("Chummer.Run.Api/Views/PublicLanding/DownloadDispatch.cshtml"): [
         "Automatic account linking is the default path. Use claim-code fallback only when Chummer explicitly says it is in recovery mode.",
-        "Support follow-through stays on the same install rail",
+        "Support stays on the same install rail",
     ],
     Path("Chummer.Run.Api/Views/Accounts/Account.cshtml"): [
         "The next safe action is still inside Chummer on the already-downloaded device.",
@@ -514,8 +514,8 @@ REQUIRED_SOURCE_MARKERS = {
         "https://localhost:47762/account/access/install-link",
         "https://localhost:47762/install-link/callback",
         "The controller should emit a valid app-local callback URI.",
-        'Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);',
-        'Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);',
+        'Assert.Contains("state=desktop", decodedCallbackHref, StringComparison.Ordinal);',
+        'Assert.Contains("nonce=callback-proof", decodedCallbackHref, StringComparison.Ordinal);',
         "installLinkTransport=grant_callback",
     ],
     Path("scripts/ai/verify.sh"): [
@@ -552,8 +552,8 @@ REQUIRED_PROOF_RECEIPTS = {
         "milestone_id": 102,
         "frontier_id": FRONTIER_ID,
         "summary": (
-            "Support follow-through carries installed build, current release, channel, head, platform, fallback, "
-            "update, and rollback truth on the same install rail used by the desktop client."
+            "Support stays on the same install rail with installed build, current release, channel, head, platform, "
+            "fallback, update, and rollback truth attached for the desktop client."
         ),
         "surfaces": [
             "support_followthrough:install_truth",

@@ -57,6 +57,22 @@
         "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/black_ledger_media/BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json"
       ],
       "missing_paths": []
+    },
+    "magicfit_session": {
+      "status": "pass",
+      "required_paths": [
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/FINAL_GM_SESSION_VIDEO_FOUNDRY_VERDICT.md",
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/MAGICFIT_SESSION_PROVIDER_VERIFICATION.generated.json",
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/PROMPT_PREVIEW_APPROVAL_PROOF.generated.json",
+        "/docker/chummercomplete/.integrated/fleet/_completion/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json"
+      ],
+      "mirrored_paths": [
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/FINAL_GM_SESSION_VIDEO_FOUNDRY_VERDICT.md",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/MAGICFIT_SESSION_PROVIDER_VERIFICATION.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/PROMPT_PREVIEW_APPROVAL_PROOF.generated.json",
+        "/docker/chummercomplete/chummer.run-services/.codex-studio/published/provider-proof-discoverability/magicfit_session/GM_VIDEO_USAGE_METERING.generated.json"
+      ],
+      "missing_paths": []
     }
   },
   "failures": []

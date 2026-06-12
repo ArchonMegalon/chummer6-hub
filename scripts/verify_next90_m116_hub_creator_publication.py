@@ -154,7 +154,7 @@ SOURCE_MARKERS: dict[str, list[str]] = {
         "Resubmit corrected packet",
         "State what changed so this corrected packet can re-enter governed moderation without losing provenance or lineage.",
         "Request changes",
-        "Publish on public shelf",
+        "Publish publicly",
     ],
     "Chummer.Run.Api/Views/PublicLanding/PublicCreatorPublication.cshtml": [
         "Why this publication is live",

@@ -5,14 +5,38 @@ const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
 
 test('homepage and ledger routes use the globe as the primary render surface', async ({ page }) => {
   const results: Array<Record<string, unknown>> = [];
+  const expectations = {
+    '/': {
+      poster: /black-ledger-video-globe-idle-poster\.png(?:\?.*)?$/,
+      mp4: /black-ledger-video-globe-idle\.mp4(?:\?.*)?$/,
+      mapRender: true,
+      renderer: /^(canvas-geoscape|webgl-geoscape)$/,
+      videoLayer: /^(first-party-raster-overlay|canvas-only)$/,
+    },
+    '/ledger': {
+      poster: /(turn-2-newsreel-poster\.png|black-ledger-video-globe-idle-poster\.png)(?:\?.*)?$/,
+      mp4: /(turn-2-newsreel\.mp4|black-ledger-video-globe-idle\.mp4)(?:\?.*)?$/,
+      mapRender: false,
+      renderer: "magicfit-newsreel",
+      videoLayer: /^(magicfit-newsreel)$/,
+    },
+    '/ledger/map': {
+      poster: /black-ledger-video-globe-idle-poster\.png(?:\?.*)?$/,
+      mp4: /black-ledger-video-globe-idle\.mp4(?:\?.*)?$/,
+      mapRender: true,
+      renderer: /^(canvas-geoscape|webgl-geoscape)$/,
+      videoLayer: /^(first-party-raster-overlay|canvas-only)$/,
+    },
+  };
   for (const route of ['/', '/ledger', '/ledger/map']) {
+    const expectation = expectations[route as keyof typeof expectations];
     await page.goto(`${baseUrl}${route}`, { waitUntil: 'domcontentloaded' });
     const root = page.locator('[data-black-ledger-geoscape-root]').first();
     await expect(root).toHaveAttribute('data-ready', 'true');
     await expect(root.locator('canvas.black-ledger-geoscape__canvas')).toBeVisible();
     await expect(root.locator('canvas.black-ledger-geoscape__webgl')).toBeVisible();
-    await expect(root.locator('video.black-ledger-geoscape__video-plate')).toHaveAttribute('poster', /black-ledger-video-globe-idle-poster\.png/);
-    await expect(root.locator('video.black-ledger-geoscape__video-plate source[type="video/mp4"]')).toHaveAttribute('src', /black-ledger-video-globe-idle\.mp4/);
+    await expect(root.locator('video.black-ledger-geoscape__video-plate')).toHaveAttribute('poster', expectation.poster);
+    await expect(root.locator('video.black-ledger-geoscape__video-plate source[type="video/mp4"]')).toHaveAttribute('src', expectation.mp4);
     const videoState = await root.getAttribute('data-video-globe');
     const qaRenderer = await root.getAttribute('data-qa-renderer');
     expect(videoState === 'ready' || (videoState === 'disabled' && qaRenderer === 'canvas-only')).toBeTruthy();
@@ -58,9 +82,18 @@ test('homepage and ledger routes use the globe as the primary render surface', a
     expect(pixelProbe.overlayHeight).toBeGreaterThan(260);
     expect(pixelProbe.webglWidth).toBeGreaterThan(300);
     expect(pixelProbe.webglHeight).toBeGreaterThan(260);
-    expect(pixelProbe.alphaPixels).toBeGreaterThan(250);
-    expect(pixelProbe.coloredPixels).toBeGreaterThan(80);
-    expect(pixelProbe.renderer).not.toBe('video-globe-overlay');
+    if (expectation.mapRender) {
+      expect(pixelProbe.alphaPixels).toBeGreaterThan(250);
+      expect(pixelProbe.coloredPixels).toBeGreaterThan(80);
+      expect(pixelProbe.renderer).not.toBe('video-globe-overlay');
+      expect(pixelProbe.videoLayer).toMatch(expectation.videoLayer);
+      expect(pixelProbe.renderer).toMatch(expectation.renderer);
+    } else {
+      expect(pixelProbe.coloredPixels).toBeLessThan(24);
+      expect(pixelProbe.alphaPixels).toBeLessThan(24);
+      expect(pixelProbe.renderer).toBe(expectation.renderer);
+      expect(pixelProbe.videoLayer).toContain('newsreel');
+    }
     const box = await root.boundingBox();
     results.push({
       route,

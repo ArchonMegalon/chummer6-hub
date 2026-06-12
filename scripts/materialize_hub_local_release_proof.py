@@ -815,7 +815,7 @@ def main() -> int:
                 "frontier_id": M102_SUCCESSOR_FRONTIER_ID,
                 "frontier_ids": M102_FRONTIER_IDS,
                 "active_flagship_frontier_id": M102_ACTIVE_FLAGSHIP_FRONTIER_ID,
-                "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
+                "summary": "Support stays on the same install rail with installed build, current release, channel, head, platform, fallback, update, and rollback truth attached for the desktop client.",
                 "routes": [
                     "/api/v1/install-linking/continuation",
                     "/api/v1/install-linking/continuation/support",

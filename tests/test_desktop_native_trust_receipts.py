@@ -3596,7 +3596,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     markers = [
                         marker
                         for marker in markers
-                        if marker != 'Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);'
+                        if marker != 'Assert.Contains("state=desktop", decodedCallbackHref, StringComparison.Ordinal);'
                     ]
                 path.write_text("\n".join(markers) + "\n", encoding="utf-8")
 
@@ -3605,7 +3605,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertIn(
                 "Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs missing marker: "
-                'Assert.Contains("state=desktop", redirect.Url, StringComparison.Ordinal);',
+                'Assert.Contains("state=desktop", decodedCallbackHref, StringComparison.Ordinal);',
                 errors,
             )
 
@@ -3621,7 +3621,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
                     markers = [
                         marker
                         for marker in markers
-                        if marker != 'Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);'
+                        if marker != 'Assert.Contains("nonce=callback-proof", decodedCallbackHref, StringComparison.Ordinal);'
                     ]
                 path.write_text("\n".join(markers) + "\n", encoding="utf-8")
 
@@ -3630,7 +3630,7 @@ class DesktopNativeTrustReceiptTests(unittest.TestCase):
 
             self.assertIn(
                 "Chummer.Tests/InstallLinkingControllerBrowserCallbackTests.cs missing marker: "
-                'Assert.Contains("nonce=callback-proof", redirect.Url, StringComparison.Ordinal);',
+                'Assert.Contains("nonce=callback-proof", decodedCallbackHref, StringComparison.Ordinal);',
                 errors,
             )
 

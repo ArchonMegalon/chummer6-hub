@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import shutil
 import subprocess
@@ -23,6 +25,12 @@ SOURCE_FILES = [
 
 
 class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
+    def assert_verifier_fails_cleanly(self, verifier: object) -> None:
+        stderr_buffer = io.StringIO()
+        with contextlib.redirect_stderr(stderr_buffer):
+            self.assertEqual(verifier.main(), 1)
+        self.assertTrue(stderr_buffer.getvalue().strip())
+
     def test_verifier_accepts_repo_surface(self) -> None:
         result = subprocess.run(
             ["python3", str(SCRIPT)],
@@ -114,7 +122,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
         ):
-            self.assertEqual(verifier.main(), 1)
+            self.assert_verifier_fails_cleanly(verifier)
 
     def test_verifier_fails_when_live_transcript_redirect_drifts(self) -> None:
         class FakeResponse:
@@ -177,7 +185,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
         ):
-            self.assertEqual(verifier.main(), 1)
+            self.assert_verifier_fails_cleanly(verifier)
 
     def test_verifier_fails_when_invalid_episode_does_not_404(self) -> None:
         class FakeResponse:
@@ -240,7 +248,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
         ):
-            self.assertEqual(verifier.main(), 1)
+            self.assert_verifier_fails_cleanly(verifier)
 
     def test_verifier_fails_when_watch_page_drops_mp4_asset_reference(self) -> None:
         class FakeResponse:
@@ -310,7 +318,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
         ):
-            self.assertEqual(verifier.main(), 1)
+            self.assert_verifier_fails_cleanly(verifier)
 
     def test_verifier_fails_when_newsroom_route_lacks_no_store_headers(self) -> None:
         class FakeResponse:
@@ -383,7 +391,7 @@ class BlackLedgerNewsroomSurfaceTests(unittest.TestCase):
             "argv",
             ["verify_black_ledger_newsroom_surface.py", "--base-url", "http://example.test"],
         ):
-            self.assertEqual(verifier.main(), 1)
+            self.assert_verifier_fails_cleanly(verifier)
 
     @staticmethod
     def copy_sources(temp_root: Path) -> None:

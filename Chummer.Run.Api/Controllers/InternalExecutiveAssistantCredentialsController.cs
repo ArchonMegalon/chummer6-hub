@@ -34,6 +34,16 @@ public sealed class InternalExecutiveAssistantCredentialsController : Controller
 
     private ActionResult? RequireInternalAutomationAuth()
     {
+        string expectedToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(expectedToken))
+        {
+            return BuildProblem(
+                StatusCodes.Status503ServiceUnavailable,
+                "Executive assistant credential authorization is not configured",
+                "internal executive assistant credential authorization is not configured.",
+                "https://chummer.run/problems/executive-assistant/auth-not-configured");
+        }
+
         string header = Request.Headers.Authorization.ToString();
         const string bearerPrefix = "Bearer ";
         if (!header.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
@@ -46,8 +56,7 @@ public sealed class InternalExecutiveAssistantCredentialsController : Controller
         }
 
         string providedToken = header[bearerPrefix.Length..].Trim();
-        string expectedToken = (_configuration["FLEET_INTERNAL_API_TOKEN"] ?? string.Empty).Trim();
-        if (!string.IsNullOrWhiteSpace(expectedToken) && FixedTimeEquals(providedToken, expectedToken))
+        if (FixedTimeEquals(providedToken, expectedToken))
         {
             return null;
         }

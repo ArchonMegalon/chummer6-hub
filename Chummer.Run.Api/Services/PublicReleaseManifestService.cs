@@ -1124,7 +1124,7 @@ public sealed class PublicReleaseManifestService
         adoptionHealth["summary"] =
             $"{GetJsonInt32(adoptionHealth["primaryPromotedCount"])} primary routes are promoted; " +
             $"{publicInstallCount} are open-public, " +
-            $"{accountLinkedInstallCount} use linked install follow-through, " +
+            $"{accountLinkedInstallCount} use linked install continuity, " +
             $"{GetJsonInt32(adoptionHealth["fallbackRecoveryCount"])} fallback recovery routes are promoted, " +
             $"and {GetJsonInt32(adoptionHealth["blockedRouteCount"])} routes are still blocked on proof.";
     }

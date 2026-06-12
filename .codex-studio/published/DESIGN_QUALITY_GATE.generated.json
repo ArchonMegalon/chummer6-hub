@@ -1,0 +1,67 @@
+{
+  "contract_name": "chummer.design_quality_gate",
+  "generated_at_utc": "2026-06-12T18:58:08Z",
+  "status": "pass",
+  "verdict": "DESIGN_READY",
+  "completion_root": "/docker/chummercomplete/_completion/chummer_run_redesign_closure",
+  "checks": {
+    "ui_frame_integrity": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_FRAME_INTEGRITY.generated.json",
+      "status": "pass",
+      "base_url": "http://127.0.0.1:8091",
+      "checked_pages": 66,
+      "failure_count": 0,
+      "pass": true
+    },
+    "screenshot_qa": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/SCREENSHOT_QA.generated.json",
+      "status": "pass",
+      "viewports": [
+        "1366x768",
+        "1440x900",
+        "1920x1080",
+        "390x844",
+        "412x915",
+        "768x1024"
+      ],
+      "missing_viewports": [],
+      "failed_viewports": [],
+      "pass": true
+    },
+    "cta_hierarchy": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/CTA_HIERARCHY.generated.json",
+      "status": "pass",
+      "failure_count": 0,
+      "pass": true
+    },
+    "public_asset_quality": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/PUBLIC_ASSET_QUALITY_GATE.generated.json",
+      "status": "pass",
+      "raster_image_count": 1,
+      "failure_count": 0,
+      "pass": true
+    },
+    "contrast_audit": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/CONTRAST_AUDIT.generated.json",
+      "status": "pass",
+      "pass": true
+    },
+    "noise_budget": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/NOISE_BUDGET_REPORT.md",
+      "status": "pass",
+      "pass": true
+    },
+    "final_ux_verdict": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/FINAL_CHUMMER_RUN_UX_VERDICT.md",
+      "status": "pass",
+      "pass": true
+    },
+    "ui_gold_proof_depth": {
+      "path": "/docker/chummercomplete/chummer-presentation/.codex-studio/published/UI_GOLD_PROOF_DEPTH_GATE.generated.json",
+      "status": "pass",
+      "verdict": "UI_GOLD_PROOF_DEPTH_READY",
+      "pass": true
+    }
+  },
+  "failures": []
+}

@@ -15,6 +15,6 @@ test('black ledger dispatch route family is implemented', async () => {
   expect(controller).toContain('[HttpGet("/ledger/turns/{turn}/dispatches")]');
   expect(controller).toContain('[HttpGet("/ledger/factions/{factionId}/dispatches")]');
   expect(ledgerView).toContain('Latest dispatches');
-  expect(ledgerView).toContain('Receipt-backed narrative, not free-floating lore.');
+  expect(ledgerView).toContain('Each dispatch is a table-ready pressure beat with a clear public boundary.');
   expect(ledgerView).toContain('Dispatch detail');
 });

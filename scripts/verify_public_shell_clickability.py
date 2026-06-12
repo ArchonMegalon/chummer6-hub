@@ -5,6 +5,7 @@ import argparse
 import json
 import re
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -13,6 +14,7 @@ from typing import Iterable
 from urllib.parse import urljoin, urlparse
 
 import requests
+from requests import exceptions as requests_exceptions
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -28,6 +30,8 @@ FORBIDDEN_TEXT_PATTERNS = [
     r"Open Demo",
 ]
 ACCEPTABLE_STATUSES = {200, 301, 302, 303, 307, 308}
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 8
+DEFAULT_RUNTIME_BUDGET_SECONDS = 90
 
 
 class AnchorExtractor(HTMLParser):
@@ -108,9 +112,22 @@ def extract_same_origin_links(page_url: str, html: str, base_origin: str) -> lis
 def walk_link(session: requests.Session, resolved_url: str, base_origin: str) -> LinkResult:
     current_url = resolved_url
     for _ in range(8):
-        try:
-            response = session.get(current_url, timeout=20, allow_redirects=False)
-        except Exception as exc:  # pragma: no cover - exercised via failure handling
+        last_exception: Exception | None = None
+        response = None
+        for attempt in range(2):
+            try:
+                response = session.get(current_url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS, allow_redirects=False)
+                last_exception = None
+                break
+            except (requests_exceptions.ReadTimeout, requests_exceptions.ConnectTimeout) as exc:
+                last_exception = exc
+                if attempt == 0:
+                    continue
+            except Exception as exc:  # pragma: no cover - exercised via failure handling
+                last_exception = exc
+                break
+
+        if response is None:
             return LinkResult(
                 page="",
                 href="",
@@ -118,7 +135,7 @@ def walk_link(session: requests.Session, resolved_url: str, base_origin: str) ->
                 success=False,
                 status_code=None,
                 final_url=current_url,
-                detail=str(exc),
+                detail=str(last_exception) if last_exception else "request failed without response",
             )
 
         status_code = response.status_code
@@ -178,10 +195,10 @@ def walk_link(session: requests.Session, resolved_url: str, base_origin: str) ->
     )
 
 
-def verify_page(session: requests.Session, base_origin: str, page: str) -> tuple[PageResult, list[LinkResult]]:
+def verify_page(session: requests.Session, base_origin: str, page: str, link_cache: dict[str, LinkResult]) -> tuple[PageResult, list[LinkResult]]:
     page_url = urljoin(f"{base_origin}/", page.lstrip("/"))
     try:
-        response = session.get(page_url, timeout=20)
+        response = session.get(page_url, timeout=DEFAULT_REQUEST_TIMEOUT_SECONDS)
     except Exception as exc:
         return (
             PageResult(page=page, success=False, status_code=None, forbidden_text_hits=[], link_count=0, failed_link_count=0, detail=str(exc)),
@@ -193,9 +210,20 @@ def verify_page(session: requests.Session, base_origin: str, page: str) -> tuple
     link_results: list[LinkResult] = []
     failed_link_count = 0
     for link in links:
-        result = walk_link(session, link, base_origin)
-        result.page = page
-        result.href = link
+        cached = link_cache.get(link)
+        if cached is None:
+            cached = walk_link(session, link, base_origin)
+            cached.href = link
+            link_cache[link] = cached
+        result = LinkResult(
+            page=page,
+            href=link,
+            resolved_url=cached.resolved_url,
+            success=cached.success,
+            status_code=cached.status_code,
+            final_url=cached.final_url,
+            detail=cached.detail,
+        )
         link_results.append(result)
         if not result.success:
             failed_link_count += 1
@@ -252,11 +280,26 @@ def main(argv: list[str] | None = None) -> int:
     base_origin = f"{urlparse(base_url).scheme}://{urlparse(base_url).netloc}"
     session = requests.Session()
     session.headers.update({"User-Agent": "chummer-public-shell-clickability-gate/1.0"})
+    deadline = time.monotonic() + DEFAULT_RUNTIME_BUDGET_SECONDS
 
     page_results: list[PageResult] = []
     link_results: list[LinkResult] = []
+    link_cache: dict[str, LinkResult] = {}
     for page in DEFAULT_PAGES:
-        page_result, page_link_results = verify_page(session, base_origin, page)
+        if time.monotonic() >= deadline:
+            page_results.append(
+                PageResult(
+                    page=page,
+                    success=False,
+                    status_code=None,
+                    forbidden_text_hits=[],
+                    link_count=0,
+                    failed_link_count=0,
+                    detail="runtime budget exceeded before this page could be verified",
+                )
+            )
+            continue
+        page_result, page_link_results = verify_page(session, base_origin, page, link_cache)
         page_results.append(page_result)
         link_results.extend(page_link_results)
 

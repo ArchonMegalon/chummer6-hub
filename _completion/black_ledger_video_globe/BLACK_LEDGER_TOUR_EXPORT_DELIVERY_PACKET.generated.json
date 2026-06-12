@@ -1,0 +1,49 @@
+{
+  "schema": "chummer.black_ledger.tour_export_delivery_packet.v1",
+  "generated_at_utc": "2026-06-11T09:29:00Z",
+  "status": "ready",
+  "caption": "Black Ledger 3D viewer packet: Matterport and 3DVista exports are now in the manifest, plus a generated 3DVista fly-through MP4. Boundary: provider demos validate viewer behavior only; Chummer tactical truth stays in the command map.",
+  "manifest_url": "/media/ledger/tours/black-ledger-tour-exports.manifest.json",
+  "flythrough_video": {
+    "path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+    "public_url": "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+    "poster_url": "/media/ledger/tours/black-ledger-3dvista-flythrough-poster.png",
+    "duration_seconds": 60.233,
+    "resolution": "1280x720",
+    "codec": "h264",
+    "audio": "none"
+  },
+  "provider_exports": [
+    {
+      "provider": "Matterport",
+      "viewer_url": "https://my.matterport.com/show/?m=ax2JhiPGk5P",
+      "status": "real_external_viewer_link"
+    },
+    {
+      "provider": "3DVista",
+      "viewer_url": "https://www.3dvista.com/samples/new_york_loft.html",
+      "status": "real_external_viewer_link"
+    }
+  ],
+  "delivery_targets": [
+    {
+      "target": "telegram",
+      "mode": "video_upload",
+      "status": "sent",
+      "receipt_path": "/docker/chummercomplete/_completion/telegram_promo_delivery/black-ledger-3dvista-flythrough.telegram.receipt.json",
+      "message_ids": [
+        "1868"
+      ]
+    },
+    {
+      "target": "meta",
+      "mode": "reels_or_page_video_upload",
+      "status": "blocked_until_meta_graph_credentials_or_upload_surface_are_configured"
+    },
+    {
+      "target": "3dvista",
+      "mode": "provider_project_upload_or_hosted_tour_publish",
+      "status": "blocked_until_3dvista_account_upload_automation_is_configured"
+    }
+  ]
+}

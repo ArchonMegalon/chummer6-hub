@@ -30,7 +30,7 @@ test('public homepage screenshot QA stays readable across flagship viewports', a
     await expect(heroTitle).toContainText('The city is moving.');
     await expect(primaryCta).toContainText('Open Black Ledger');
     await expect(factions).toContainText('Six seeded houses are already pushing on the same city.');
-    await expect(playDownloads).toContainText('One compact rail for build, play shell, and public status.');
+    await expect(playDownloads).toContainText('One compact rail for downloads, play, and public status.');
     await expect(footer).toBeVisible();
 
     const overflow = await page.evaluate(() => {

@@ -134,7 +134,7 @@
   "rolloutState": "public_stable",
   "rolloutReason": "Current release shelf was exercised by the local docker release proof harness before publication.",
   "supportabilityState": "gold_supported",
-  "supportabilitySummary": "Gold release proof passed for: install_claim_restore_continue, build_explain_publish, campaign_session_recover_recap, report_cluster_release_notify, organize_community_and_close_loop. Claimed-device restore and bounded offline prefetch stayed grounded on the current shelf. Clustered release notification stayed grounded on the current shelf. Community organizer closure stayed grounded on the current shelf.",
+  "supportabilitySummary": "Gold release proof passed for: install_claim_restore_continue, build_explain_publish, campaign_session_recover_recap, report_cluster_release_notify, organize_community_and_close_loop. Claimed-device restore and bounded offline prefetch stayed grounded on the current release. Clustered release notification stayed grounded on the current release. Community organizer closure stayed grounded on the current release.",
   "knownIssueSummary": "Current release proof is green, and the shelf has recent install, claimed-device recovery, clustered release notification, community closure, bounded offline prefetch, and support proof instead of only manifest presence.",
   "fixAvailabilitySummary": "Only send fixed notices after the affected install can receive the published channel artifact now on the shelf.",
   "releaseProof": {
@@ -1166,7 +1166,7 @@
       "promotedInstallerTupleCount": 3,
       "desktopRouteTruthCount": 6,
       "publicTrustPosture": "live",
-      "summary": "Release-channel truth for public_stable/run-20260518-220935 keeps 3 promoted installer tuples and 6 explicit desktop route-truth rows under public_stable rollout posture."
+      "summary": "Release-channel truth for public_stable/run-20260518-220935 keeps 3 promoted desktop build combinations and 6 explicit desktop route-truth rows under public_stable rollout posture."
     },
     "artifactLineage": {
       "artifactIdentityCount": 6,

@@ -23,19 +23,19 @@
         .ThenBy(publication => publication.Title, StringComparer.OrdinalIgnoreCase)
         .ToArray();
     var artifactShelfPrimaryHref = rankedPublicCreatorPublications.Length > 0
-        ? "#public-proof-shelf"
+        ? "#public-proof-view"
         : liveItems.Length > 0
             ? "#current-proof-surfaces"
             : previewItems.Length > 0
                 ? "#preview-artifacts"
                 : "#artifact-route-map";
-    var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-proof-shelf" : "/signup?next=%2Fartifacts";
-    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Signed-in continuity shelf" : "Create account for signed-in continuity";
+    var signedInContinuityHref = Model.Chrome.Authenticated ? "#signed-in-proof-view" : "/signup?next=%2Fartifacts";
+    var signedInContinuityLabel = Model.Chrome.Authenticated ? "Signed-in continuity view" : "Create account for signed-in continuity";
     var routeChoices = new[]
     {
         new
         {
-            Badge = "Proof shelf",
+            Badge = "Proof view",
             Title = "Inspect live proof, dossiers, and publication lineage here",
             Summary = "Use this page when the job is to inspect outputs, provenance, trust posture, or linked proof without confusing that with the install decision.",
             Href = artifactShelfPrimaryHref,
@@ -133,8 +133,8 @@
     static string BuildHandoffDetailHref(string handoffId) => $"/account/work/build-handoffs/{Uri.EscapeDataString(handoffId)}";
     static string ArtifactViewHref(string view)
         => string.Equals(view, "all", StringComparison.Ordinal)
-            ? "/artifacts#signed-in-proof-shelf"
-            : $"/artifacts?view={Uri.EscapeDataString(view)}#signed-in-proof-shelf";
+            ? "/artifacts#signed-in-proof-view"
+            : $"/artifacts?view={Uri.EscapeDataString(view)}#signed-in-proof-view";
     static string ArtifactViewTitle(string view) => view switch
     {
         "personal" => "Personal view",
@@ -146,7 +146,7 @@
     static string ArtifactViewSummary(string view) => view switch
     {
         "personal" => "Keep the account-side runner and return artifacts visible without losing the shared record they already ride on.",
-        "campaign" => "Stay on the shared crew and continuity page for campaign-owned artifacts, prep packets, Table Pulse Aftermath return cues, and aftermath or replay follow-through.",
+        "campaign" => "Stay on the shared crew and continuity page for campaign-owned artifacts, prep packets, Table Pulse Aftermath return cues, and aftermath or replay next steps.",
         "creator" => "Inspect only the creator-linked lineage, trust ranking, availability, and next step for published or publication-ready artifacts.",
         "public" => "Inspect only the published shared-publication page so discoverable creator packets, trust posture, and publication detail stay together while you are signed in.",
         _ => "When you are signed in, the proof view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together instead of splitting them into separate stories."
@@ -171,7 +171,7 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">Dossiers, recaps, and release proof belong on a shelf you can inspect, not in a vague gallery. Use this page for proof and provenance, then go back to downloads when you actually want the build.</p>
+        <p class="page-copy">Dossiers, recaps, and release proof belong on an inspectable page, not in a vague gallery. Use this page for proof and provenance, then go back to downloads when you actually want the build.</p>
         <div class="trust-claim__microproof">
             <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public proof card(s)</span>
             <span>@previewItems.Length opening next</span>
@@ -219,9 +219,9 @@
 
 @if (rankedPublicCreatorPublications.Length > 0)
 {
-    <section class="artifact-gallery" id="public-proof-shelf">
+    <section class="artifact-gallery" id="public-proof-view">
         <div class="artifact-gallery__lead">
-            <p class="eyebrow">Public publication shelf</p>
+            <p class="eyebrow">Public publication view</p>
             <h2 class="editorial-title">@governedDiscoveryTitle</h2>
             <p class="editorial-copy">@governedDiscoveryCopy</p>
             @if (publicationRouteReviewRequired)
@@ -230,7 +230,7 @@
                     <span class="tag">Limited public claims</span>
                     <h3>These publications are visible now, but some public comparison language still needs one more review pass.</h3>
                     <p>You can inspect the publication, provenance, and trust posture today. The remaining boundary is about how broadly the public page should claim parity, not whether the publication exists.</p>
-                    <p>public parity claims remain review-required until current direct parity proof receipts are green.</p>
+                    <p>Public parity claims remain review-required until current direct parity proof receipts are green.</p>
                     <div class="route-callout__proof">
                         <span>Discoverable now</span>
                         <span>Comparison still reviewed</span>
@@ -288,9 +288,9 @@
 
 @if (Model.Chrome.Authenticated && (signedInRecapShelf.Length > 0 || signedInCreatorPublications.Length > 0))
 {
-    <section class="continuity-band" id="signed-in-proof-shelf">
+    <section class="continuity-band" id="signed-in-proof-view">
         <div class="continuity-band__copy">
-            <p class="eyebrow">Signed-in continuity shelf</p>
+            <p class="eyebrow">Signed-in continuity view</p>
             <h2 class="editorial-title">@ArtifactViewTitle(selectedSignedInArtifactView)</h2>
             <p class="editorial-copy">@ArtifactViewSummary(selectedSignedInArtifactView)</p>
             <div class="stacked-actions">
@@ -497,7 +497,7 @@
     <section class="editorial-block" id="preview-artifacts">
         <div class="editorial-block__lead">
             <p class="eyebrow">@PublicSurfaceStatus.PreviewInProgress</p>
-            <h2 class="editorial-title">Opening next on the shelf</h2>
+            <h2 class="editorial-title">Opening next in the proof view</h2>
             <p class="editorial-copy">These future-facing proof surfaces stay visible so you can compare what is opening next against what is already usable today, without pretending they are live yet.</p>
         </div>
         <div class="compact-rail">
@@ -528,7 +528,7 @@
 {
     <section class="editorial-block">
         <article class="route-callout">
-            <span class="tag">Temporarily thin shelf</span>
+            <span class="tag">Temporarily thin view</span>
             <h3>The proof view is not populated on this request.</h3>
             <p>Use downloads for the live build, what works today for current product truth, or help if you expected a specific artifact to be visible here already.</p>
             <div class="route-callout__actions">

@@ -67,7 +67,7 @@ public sealed class PublicFlagshipCoverageService
         return new FlagshipCoverageStripViewModel(
             Eyebrow: "Whole-product frontier",
             Heading: "Hub truth, mobile continuity, and shared flagship polish stay visible together.",
-            Intro: "The public install shelf is only one rail. These three lanes keep the front door honest about the hosted account stack, weak-network session return, and the shared UI quality bar behind the real workbench.",
+            Intro: "The public install path is only one rail. These three lanes keep the front door honest about the hosted account stack, weak-network session return, and the shared UI quality bar behind the real workbench.",
             Cards: cards);
     }
 

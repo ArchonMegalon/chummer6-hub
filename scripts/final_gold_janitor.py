@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -21,17 +22,30 @@ RECRAWL_MAX_AGE_HOURS = 24
 REQUIRED_RECEIPTS = {
     "live_public_web_recrawl": PUBLISHED_ROOT / "LIVE_PUBLIC_WEB_RECRAWL.generated.json",
     "rule_authority_minimum_coverage": PUBLISHED_ROOT / "RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
+    "ruleset_readiness": PUBLISHED_ROOT / "RULESET_READINESS.generated.json",
     "provider_proof_discoverability": PUBLISHED_ROOT / "PROVIDER_PROOF_DISCOVERABILITY.generated.json",
     "black_ledger_live_media_proof": PUBLISHED_ROOT / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
     "table_pulse_scenario_replay": PUBLISHED_ROOT / "TABLE_PULSE_SCENARIO_REPLAY.generated.json",
+    "public_route_proof": PUBLISHED_ROOT / "CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+    "external_distribution_mirror_proof": PUBLISHED_ROOT / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
+    "public_copy_leak_gate": PUBLISHED_ROOT / "PUBLIC_COPY_LEAK_GATE.generated.json",
+    "design_quality_gate": PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json",
+    "operator_release_dashboard": PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.generated.json",
+    "release_ready": PUBLISHED_ROOT / "RELEASE_READY.generated.json",
 }
 
 MATERIALIZERS = [
     ["python3", "scripts/verify_live_public_web_recrawl.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_rules_authority_minimum_coverage.py"],
+    ["python3", "scripts/classify_ruleset_readiness.py", "--output", str(PUBLISHED_ROOT / "RULESET_READINESS.generated.json")],
     ["python3", "scripts/verify_provider_proof_discoverability.py"],
     ["python3", "scripts/verify_black_ledger_live_media_proof.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/verify_table_pulse_scenario_replay.py", "--base-url", DEFAULT_BASE_URL],
+    ["python3", "scripts/materialize_external_distribution_mirror_proof.py", "--base-url", os.environ.get("CHUMMER_PUBLIC_BASE_URL", "http://127.0.0.1:8091")],
+    ["python3", "scripts/verify_public_copy_leak_gate.py", "--base-url", DEFAULT_BASE_URL],
+    ["python3", "scripts/materialize_design_quality_gate.py"],
+    ["python3", "scripts/materialize_operator_release_dashboard.py"],
+    ["python3", "scripts/materialize_release_ready_receipt.py"],
 ]
 
 
@@ -91,11 +105,21 @@ def run_materializers() -> list[dict[str, Any]]:
 def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
     required_gates: dict[str, Any] = {}
     failures: list[str] = []
+    caveats: list[dict[str, Any]] = []
     for name, path in REQUIRED_RECEIPTS.items():
         payload = load_json(path)
         generated_at = str(payload.get("generated_at_utc") or payload.get("generatedAt") or "")
         is_fresh = generated_at_is_fresh(generated_at, RECRAWL_MAX_AGE_HOURS) if name == "live_public_web_recrawl" else True
-        passed = path.is_file() and payload.get("status") == "pass" and is_fresh
+        status_value = str(payload.get("status") or "").strip().lower()
+        passed = path.is_file() and status_value in {"pass", "passed", "ready"} and is_fresh
+        if name == "public_route_proof" and path.is_file():
+            summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+            passed = (
+                int(summary.get("route_count") or 0) > 0
+                and int(summary.get("failed_count") or 0) == 0
+                and int(summary.get("negative_path_failed_count") or 0) == 0
+            )
+            status_value = "pass" if passed else "fail"
         if not passed:
             reason = f"{name} missing" if not path.is_file() else f"{name} failed"
             if path.is_file() and name == "live_public_web_recrawl" and not is_fresh:
@@ -112,6 +136,40 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
         if name == "rule_authority_minimum_coverage" and path.is_file():
             required_gates[name]["rulesets"] = payload.get("rulesets", {})
             required_gates[name]["failures"] = payload.get("failures", [])
+        if name == "ruleset_readiness" and path.is_file():
+            assumed_rulesets = [
+                ruleset
+                for ruleset, ruleset_payload in (payload.get("rulesets") or {}).items()
+                if isinstance(ruleset_payload, dict) and ruleset_payload.get("human_side_gold_assumption")
+            ]
+            if assumed_rulesets:
+                caveats.append(
+                    {
+                        "id": "ruleset_human_side_gold_assumption",
+                        "severity": "accepted_boundary",
+                        "summary": "SR4/SR6 readiness includes the current human-side gold assumption; mechanical rule authority is covered, but workflow parity remains explicitly accepted rather than independently re-proven.",
+                        "rulesets": sorted(assumed_rulesets),
+                    }
+                )
+            required_gates[name]["assumed_rulesets"] = sorted(assumed_rulesets)
+        if name == "public_route_proof" and path.is_file():
+            required_gates[name]["summary"] = payload.get("summary", {})
+            if passed:
+                required_gates[name]["status"] = "pass"
+        if name == "external_distribution_mirror_proof" and path.is_file():
+            required_gates[name]["external_required"] = payload.get("external_required")
+            required_gates[name]["providers"] = {
+                provider: data.get("status")
+                for provider, data in (payload.get("providers") or {}).items()
+                if isinstance(data, dict)
+            }
+        if name == "release_ready" and path.is_file():
+            required_gates[name]["verdict"] = payload.get("verdict")
+            required_gates[name]["failures"] = payload.get("failures", [])
+        if name == "operator_release_dashboard" and path.is_file():
+            required_gates[name]["verdict"] = payload.get("verdict")
+            required_gates[name]["failures"] = payload.get("failures", [])
+            required_gates[name]["release"] = payload.get("release", {})
 
     for result in command_results:
         if result["returncode"] != 0:
@@ -130,8 +188,58 @@ def build_payload(command_results: list[dict[str, Any]]) -> dict[str, Any]:
         "verdict": "GOLD_READY" if not failures else "NOT_GOLD",
         "required_gates": required_gates,
         "materializers": command_results,
+        "caveats": caveats,
         "failures": failures,
     }
+
+
+def build_verdict_markdown(payload: dict[str, Any]) -> str:
+    verdict = str(payload.get("verdict") or "NOT_GOLD")
+    lines = [
+        f"# {verdict}",
+        "",
+        f"Generated: {payload.get('generated_at_utc')}",
+        f"Scope: {payload.get('scope')}",
+        "",
+        "## Gate Summary",
+    ]
+    for name, gate in sorted((payload.get("required_gates") or {}).items()):
+        if not isinstance(gate, dict):
+            continue
+        mark = "PASS" if gate.get("pass") else "FAIL"
+        lines.append(f"- {mark} `{name}`: `{gate.get('status')}` at `{gate.get('path')}`")
+        if name == "public_route_proof" and isinstance(gate.get("summary"), dict):
+            summary = gate["summary"]
+            lines.append(
+                f"  - routes {summary.get('passed_count')}/{summary.get('route_count')}, failed {summary.get('failed_count')}, negative-path failures {summary.get('negative_path_failed_count')}"
+            )
+        if name == "external_distribution_mirror_proof" and isinstance(gate.get("providers"), dict):
+            provider_summary = ", ".join(f"{provider}={status}" for provider, status in sorted(gate["providers"].items()))
+            lines.append(f"  - mirrors: {provider_summary}; external_required={gate.get('external_required')}")
+        if name == "ruleset_readiness" and gate.get("assumed_rulesets"):
+            lines.append(f"  - accepted human-side assumption: {', '.join(gate['assumed_rulesets'])}")
+        if name == "release_ready" and gate.get("failures"):
+            lines.append(f"  - release failures: {', '.join(str(item) for item in gate['failures'])}")
+        if name == "operator_release_dashboard" and isinstance(gate.get("release"), dict):
+            release = gate["release"]
+            lines.append(f"  - release: {release.get('version')} on {release.get('channel')}")
+        if name == "operator_release_dashboard" and gate.get("failures"):
+            lines.append(f"  - dashboard failures: {', '.join(str(item) for item in gate['failures'])}")
+
+    caveats = payload.get("caveats") if isinstance(payload.get("caveats"), list) else []
+    if caveats:
+        lines.extend(["", "## Accepted Boundaries"])
+        for item in caveats:
+            if not isinstance(item, dict):
+                continue
+            lines.append(f"- `{item.get('id')}`: {item.get('summary')}")
+
+    failures = payload.get("failures") if isinstance(payload.get("failures"), list) else []
+    if failures:
+        lines.extend(["", "## Failures"])
+        lines.extend(f"- {failure}" for failure in failures)
+
+    return "\n".join(lines) + "\n"
 
 
 def parse_args() -> argparse.Namespace:
@@ -146,9 +254,24 @@ def main() -> int:
     payload = build_payload(command_results)
     write_json(PUBLISHED_ROOT / "FINAL_GOLD_JANITOR.generated.json", payload)
     write_json(ARTIFACT_ROOT / "FINAL_GOLD_JANITOR.generated.json", payload)
-    write_text(PUBLISHED_ROOT / "FINAL_GOLD_VERDICT.md", payload["verdict"])
-    write_text(ARTIFACT_ROOT / "FINAL_GOLD_VERDICT.md", payload["verdict"])
+    verdict_markdown = build_verdict_markdown(payload)
+    write_text(PUBLISHED_ROOT / "FINAL_GOLD_VERDICT.md", verdict_markdown)
+    write_text(ARTIFACT_ROOT / "FINAL_GOLD_VERDICT.md", verdict_markdown)
     if payload["status"] != "pass":
+        print(json.dumps({
+            "status": payload["status"],
+            "verdict": payload["verdict"],
+            "failures": payload["failures"],
+            "required_gates": {
+                name: gate
+                for name, gate in payload["required_gates"].items()
+                if not gate.get("pass")
+            },
+            "failed_materializers": [
+                result for result in payload["materializers"]
+                if result.get("returncode") != 0
+            ],
+        }, indent=2), file=sys.stderr)
         raise SystemExit("final gold janitor failed")
     print("final_gold_janitor:ok")
     return 0

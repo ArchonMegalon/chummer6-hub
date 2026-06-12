@@ -21,7 +21,7 @@ test('runsite public route stays receipt-backed and points at the signed-in prep
   expect(payload.signedInBench.runIndexApiHref).toBe('/api/v1/campaign-spine/me/runs');
 
   await page.goto(`${baseUrl}/runsites`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'RUNSITE packets' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'RUNSITE', exact: true })).toBeVisible();
   await expect(page.locator('body')).toContainText('RUNSITE now ships as a real prep network');
   await expect(page.locator('body')).toContainText('Signed-in prep bench');
   await expect(page.locator('body')).toContainText('Spatial-prep packet only.');

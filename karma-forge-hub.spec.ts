@@ -14,7 +14,8 @@ test('karma forge alias exists and ledger linkage stays first-party', async () =
 
   expect(controller).toContain('[HttpGet("/karma-forge")]');
   expect(controller).toContain('=> Redirect("/participate/karma-forge")');
-  expect(landingView).toContain('var forgeHref = "/karma-forge";');
+  expect(landingView).toContain('Open Black Ledger');
+  expect(landingView).toContain('Download Chummer');
   expect(service).toContain('/karma-forge');
   expect(service).toContain('/ledger/packages');
 });

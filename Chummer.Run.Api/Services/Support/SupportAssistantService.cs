@@ -291,7 +291,7 @@ public sealed class SupportAssistantService : IFirstPartySupportAssistant
             string guidance = tokens.Contains("update") || tokens.Contains("restart")
                 ? "I did not find an account-linked case yet, but the first-party release and update docs match your question."
                 : ShouldUseBuildJourneyTruth(tokens)
-                    ? "I did not find an account-linked case yet, but I did find a grounded build or campaign follow-through path in your signed-in workspace."
+                    ? "I did not find an account-linked case yet, but I did find a grounded build or campaign continuity path in your signed-in workspace."
                 : tokens.Contains("install") || tokens.Contains("download") || tokens.Contains("claim")
                     ? "I did not find an account-linked case yet, but the first-party install and downloads docs cover this path."
                     : "I did not find an account-linked case yet, but I did find first-party help that matches your question.";

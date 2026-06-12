@@ -1777,13 +1777,13 @@ internal static class CampaignSpineRestoreVerification
                     string.Equals(item.Kind, "entitlement_artifact_drift", StringComparison.OrdinalIgnoreCase)
                     && string.Equals(item.Surface, "entitlement_sync", StringComparison.Ordinal)
                     && string.Equals(item.Authority, "hub_registry_release_receipts", StringComparison.Ordinal)
-                    && item.RecoveryHint.Contains("download or install rail", StringComparison.OrdinalIgnoreCase)) == true,
+                    && item.RecoveryHint?.Contains("download or install rail", StringComparison.OrdinalIgnoreCase) == true) == true,
                 "Artifact drift should emit entitlement-sync provenance so stale release truth is recoverable before continuation.");
             VerificationAssert.True(restore.ProvenanceReceipts?.Any(item =>
                     string.Equals(item.Kind, "claimed_installation_stale", StringComparison.OrdinalIgnoreCase)
                     && string.Equals(item.SubjectId, "install-stale", StringComparison.Ordinal)
                     && string.Equals(item.Surface, "workspace_restore", StringComparison.Ordinal)
-                    && item.Proof.Contains("updated:", StringComparison.Ordinal)) == true,
+                    && item.Proof?.Contains("updated:", StringComparison.Ordinal) == true) == true,
                 "Stale claimed installs should emit workspace-restore provenance with proof and recovery posture instead of only a conflict summary.");
             VerificationAssert.True(restore.ProvenanceReceipts?.Any(item =>
                     string.Equals(item.Kind, "entitlement_replication_stale_claim", StringComparison.OrdinalIgnoreCase)
@@ -2015,9 +2015,9 @@ internal static class CampaignSpineRestoreVerification
                     && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "return_loop_route", StringComparison.Ordinal) && string.Equals(receipt.ReceiptId, "/account/work#aftermath-packages", StringComparison.Ordinal))),
                 "Governed campaign consequence updates should survive a community-store reload with durable heat, faction, contact, reputation, and downtime return-loop receipts.");
             VerificationAssert.True(
-                reloadedWorkspace.Consequences.Any(item =>
+                reloadedWorkspace.Consequences?.Any(item =>
                     string.Equals(item.Kind, "downtime", StringComparison.Ordinal)
-                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))),
+                    && item.Receipts.Any(receipt => string.Equals(receipt.SourceKind, "governed_aftermath_package", StringComparison.Ordinal))) == true,
                 "Downtime package generation should mint a durable governed downtime consequence that survives reload.");
 
             CampaignMemoryProjection reloadedCampaignMemory = reloadedWorkspaceServerPlane.GetWorkspaceCampaignMemory(user, reloadedWorkspace.WorkspaceId)

@@ -16,8 +16,8 @@ REPO_ROOT = Path(
 
 REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
     "Chummer.Run.Api/Controllers/PublicLandingController.cs": (
-        "Runner Passport connected lane",
-        "Connected faction command lane",
+        "Runner Passport continuity rail",
+        "Faction command rail",
         "Table Pulse Live turns the signed-in inbox into a command packet",
         "GM cockpit keeps remote-reaction aftermath on one command rail",
         "Table Pulse Live inbox",
@@ -33,9 +33,9 @@ REQUIRED_MARKERS: dict[str, tuple[str, ...]] = {
         "This is the off-table half of the same governed Table Pulse Live and Table Pulse Aftermath loop",
     ),
     "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml": (
-        "The signed-in shelf is the return rail for Table Pulse Aftermath",
-        "the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
-        "Table Pulse Aftermath return artifacts that stay on this signed-in shelf",
+        "The signed-in view is the return rail for Table Pulse Aftermath",
+        "the proof view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
+        "Table Pulse Aftermath return items that stay in this signed-in view",
     ),
     "Chummer.Run.Api/Views/PublicLanding/LedgerFactionWorkspace.cshtml": (
         "Connected command lane",

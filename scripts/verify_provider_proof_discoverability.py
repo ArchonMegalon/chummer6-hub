@@ -35,6 +35,12 @@ def required_artifacts() -> dict[str, list[Path]]:
         "black_ledger_media": [
             FLEET_COMPLETION_ROOT / "black_ledger" / "BLACK_LEDGER_LIVE_MEDIA_PROOF.generated.json",
         ],
+        "magicfit_session": [
+            FLEET_COMPLETION_ROOT / "magicfit_session" / "FINAL_GM_SESSION_VIDEO_FOUNDRY_VERDICT.md",
+            FLEET_COMPLETION_ROOT / "magicfit_session" / "MAGICFIT_SESSION_PROVIDER_VERIFICATION.generated.json",
+            FLEET_COMPLETION_ROOT / "magicfit_session" / "PROMPT_PREVIEW_APPROVAL_PROOF.generated.json",
+            FLEET_COMPLETION_ROOT / "magicfit_session" / "GM_VIDEO_USAGE_METERING.generated.json",
+        ],
     }
 
 

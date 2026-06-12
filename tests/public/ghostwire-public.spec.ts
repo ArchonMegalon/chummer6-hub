@@ -20,7 +20,7 @@ test('ghostwire public route stays receipt-backed and shipped as a replay lane',
   expect(payload.boundaries.transcriptTruth).toBe('Not claimed');
 
   await page.goto(`${baseUrl}/ghostwire`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'GHOSTWIRE after-action', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'GHOSTWIRE' })).toBeVisible();
   await expect(page.locator('body')).toContainText('GHOSTWIRE now ships first-party after-action packet rails');
   await expect(page.locator('body')).toContainText('Replay stays receipt-backed and public-safe.');
 

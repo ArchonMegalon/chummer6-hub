@@ -4,7 +4,10 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-auth";
     var accessPosture = Model.AccessPosture;
-    var nextTarget = Model.NextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
+    var isInstallLinkReturn = Model.NextPath.StartsWith("/account/access/install-link", StringComparison.OrdinalIgnoreCase);
+    var nextTarget = isInstallLinkReturn
+        ? "Chummer"
+        : Model.NextPath.StartsWith("/downloads", StringComparison.OrdinalIgnoreCase)
         ? "Downloads"
         : Model.NextPath.StartsWith("/account", StringComparison.OrdinalIgnoreCase)
             ? "Account"
@@ -29,11 +32,11 @@
                 <strong>Relink, reclaim, and recover from one calmer place.</strong>
             </article>
             <article class="auth-value-strip__fact">
-                <span>Support follow-through</span>
+                <span>Support continuity</span>
                 <strong>Tracked help stays attached to the same account story.</strong>
             </article>
         </div>
-        <p class="auth-entry__trust">@(accessPosture?.AccountValueSummary ?? "The binary stays the same for everyone. The account adds continuity, device return, and support follow-through when you want it.")</p>
+        <p class="auth-entry__trust">@(accessPosture?.AccountValueSummary ?? "The binary stays the same for everyone. The account adds continuity, device return, and support continuity when you want it.")</p>
     </div>
 
     <div class="auth-entry__panel auth-panel auth-panel--entry">
@@ -65,6 +68,10 @@
                 </ul>
             </div>
             <p class="muted-copy">After verification you land in @nextTarget.</p>
+            @if (isInstallLinkReturn)
+            {
+                <p class="muted-copy">The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.</p>
+            }
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()
                 <input type="hidden" name="next" value="@Model.NextPath" />
@@ -96,11 +103,15 @@
                 <span class="tag">What opens after sign-in</span>
                 <ul>
                     <li>Your signed-in home and account pages for continuity, recovery, and the next safe action.</li>
-                    <li>Account-linked download receipts, claim tickets, and device follow-through.</li>
+                    <li>Account-linked download receipts, claim tickets, and device continuity.</li>
                     <li>Any beta interest, update follows, support history, or optional participation state already on the account.</li>
                 </ul>
             </div>
             <p class="muted-copy">After verification you return to @nextTarget.</p>
+            @if (isInstallLinkReturn)
+            {
+                <p class="muted-copy">The next page opens Chummer to finish linking this install, with a manual open button if the browser blocks the app handoff.</p>
+            }
 
             <form class="auth-form" method="post" action="/auth/email/start">
                 @Html.AntiForgeryToken()

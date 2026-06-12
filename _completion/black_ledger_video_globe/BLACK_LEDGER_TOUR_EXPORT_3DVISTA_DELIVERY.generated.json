@@ -1,0 +1,19 @@
+{
+  "schema": "chummer.black_ledger.tour_export_delivery_receipt.v1",
+  "generated_at_utc": "2026-06-11T07:31:00Z",
+  "target": "3dvista",
+  "status": "blocked",
+  "blocked_reason": "No 3DVista account upload automation, hosted-tour API binding, or local 3DVista project export is configured in this workspace.",
+  "ready_payload": {
+    "caption": "Generated 3DVista fly-through from the public New York Loft sample. This validates viewer/fly-through behavior only; it is not a Chummer-authored runsite scan.",
+    "video_path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+    "poster_path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/tours/black-ledger-3dvista-flythrough-poster.png",
+    "source_viewer_url": "https://www.3dvista.com/samples/new_york_loft.html",
+    "manifest_url": "/media/ledger/tours/black-ledger-tour-exports.manifest.json"
+  },
+  "required_to_send": [
+    "Authenticated 3DVista account/session",
+    "A hosted-tour/project upload target",
+    "Confirmation whether this should be uploaded as a provider project asset, media attachment, or external reference"
+  ]
+}

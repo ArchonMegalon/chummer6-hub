@@ -71,8 +71,13 @@ def probe_video(path: Path) -> dict:
 def main() -> int:
     run_env = load_env(ROOT / ".env")
     ea_env = load_env(Path("/docker/EA/.env"))
-    run_email = run_env.get("CHUMMER_EA_MAGICFIT_EMAIL", "")
-    ea_email = ea_env.get("CHUMMER_EA_MAGICFIT_EMAIL", "")
+    run_email = (run_env.get("CHUMMER_EA_MAGICFIT_EMAIL", "") or ea_env.get("CHUMMER_EA_MAGICFIT_EMAIL", "")).strip()
+    session_email = (
+        run_env.get("CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL", "").strip()
+        or ea_env.get("CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL", "").strip()
+        or ea_env.get("CHUMMER_EA_MAGICFIT_EMAIL", "").strip()
+    )
+    ea_email = session_email
     code_present = {str(path.relative_to(ROOT)): path.exists() for path in REQUIRED_CODE}
     source_text = "\n".join(path.read_text(errors="ignore") if path.exists() else "" for path in REQUIRED_CODE)
     routes = [

@@ -1,0 +1,128 @@
+{
+  "contract_name": "chummer.public_copy_leak_gate",
+  "generated_at_utc": "2026-06-12T18:58:08Z",
+  "base_url": "https://chummer.run",
+  "status": "pass",
+  "summary": {
+    "route_count": 11,
+    "failed_route_count": 0,
+    "forbidden_pattern_count": 24,
+    "failed_routes": []
+  },
+  "forbidden_patterns": [
+    "\\bchummer-api\\b",
+    "\\bchummer6-hub\\b",
+    "\\bchummer6-ui\\b",
+    "\\bchummer-presentation\\b",
+    "\\bchummer-core-engine\\b",
+    "\\bhost\\.docker\\.internal\\b",
+    "\\blocalhost\\b",
+    "\\b127\\.0\\.0\\.1\\b",
+    "/docker/chummercomplete",
+    "/var/lib/",
+    "/home/[A-Za-z0-9_.-]+/",
+    "\\bFleet-written\\b",
+    "\\bProductLift\\b",
+    "\\bICanpreneur\\b",
+    "\\bIcanpreneur\\b",
+    "\\bEmailit\\b",
+    "\\bClickRank\\b",
+    "\\bDocumentation\\.AI\\b",
+    "\\bBrowserAct\\b",
+    "\\bTeable\\b",
+    "\\bSignitic\\b",
+    "\\bMagicFit\\b",
+    "\\bLoad Demo Runner\\b",
+    "\\bOpen Demo\\b"
+  ],
+  "routes": [
+    {
+      "route": "/",
+      "url": "https://chummer.run/",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/downloads",
+      "url": "https://chummer.run/downloads",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/status",
+      "url": "https://chummer.run/status",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/faq",
+      "url": "https://chummer.run/faq",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/ledger",
+      "url": "https://chummer.run/ledger",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/ledger/map",
+      "url": "https://chummer.run/ledger/map",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/packages",
+      "url": "https://chummer.run/packages",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/participate",
+      "url": "https://chummer.run/participate",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/feedback",
+      "url": "https://chummer.run/feedback",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/what-is-chummer",
+      "url": "https://chummer.run/what-is-chummer",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    },
+    {
+      "route": "/login?next=%2Faccount%2Faccess",
+      "url": "https://chummer.run/login?next=%2Faccount%2Faccess",
+      "status_code": 200,
+      "success": true,
+      "forbidden_hits": [],
+      "detail": null
+    }
+  ]
+}

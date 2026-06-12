@@ -79,9 +79,9 @@ public sealed class SignedInTrustStatusService
                     : BuildTrustPulseAdoptionSummary(pulse!)),
             new("Release proof", BuildReleaseProofSummary(manifest)),
             new(
-                "Support follow-through",
+                "Support next steps",
                 followThrough is null
-                    ? "No active fix, relink, or evidence follow-through is waiting on this account."
+                    ? "No active fix, relink, or evidence review is waiting on this account."
                     : $"{followThrough.StageLabel} · {followThrough.NextSafeAction}")
         };
 
@@ -148,7 +148,7 @@ public sealed class SignedInTrustStatusService
         bool reviewRequired = (pulse?.ParityClaimsReviewRequired ?? false)
             || string.Equals(manifest.SupportabilityState, "review_required", StringComparison.OrdinalIgnoreCase);
         string summary = reviewRequired
-            ? $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery stay on the same claimed install rail, but parity-sensitive follow-through remains review-required until current desktop proof receipts are green."
+            ? $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery stay on the same claimed install rail, but parity-sensitive desktop checks remain review-required until current proof receipts are green."
             : $"{installationLabel} is linked on {latestInstallation.Version} in {ResolveChannelLabel(latestInstallation.Channel, manifest, releaseExperience)}. Downloads, support, and recovery are all using the same claimed install context right now.";
         return new SignedInTrustStatusPanelViewModel(
             Eyebrow: "Signed-in trust status",
@@ -263,7 +263,7 @@ public sealed class SignedInTrustStatusService
         if (installation is null)
         {
             return manifest.Downloads.Count == 0 || releaseExperience.Recommended is null
-                ? "Link the current preview first so Chummer can compare this account against the published shelf."
+                ? "Link the current preview first so Chummer can compare this account against the published public release."
                 : $"Link the current preview first so Chummer can compare this account against {BuildPublishedArtifactSummary(manifest, releaseExperience, releaseExperience.Recommended.Artifact)}.";
         }
 
@@ -274,8 +274,8 @@ public sealed class SignedInTrustStatusService
             {
                 PublicReleaseArtifactDto? publishedArtifact = FindPublishedArtifactForInstallation(manifest, installation);
                 return publishedArtifact is null
-                    ? $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. Keep this linked copy on the support-directed lane until the promoted shelf catches up."
-                    : $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. The current public shelf still shows {BuildPublishedArtifactSummary(manifest, releaseExperience, publishedArtifact)}.";
+                    ? $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. Keep this linked copy on the guided support path until the public release catches up."
+                    : $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. The current public release still shows {BuildPublishedArtifactSummary(manifest, releaseExperience, publishedArtifact)}.";
             }
 
             if (followThrough.CanVerifyFix)
@@ -287,7 +287,7 @@ public sealed class SignedInTrustStatusService
         PublicReleaseArtifactDto? artifact = FindPublishedArtifactForInstallation(manifest, installation);
         if (artifact is null)
         {
-            return $"No promoted public-shelf match is published right now for {installationLabel}. Keep this copy linked and use a support-directed lane before moving it.";
+            return $"No promoted public-release match is published right now for {installationLabel}. Keep this copy linked and use the guided support path before moving it.";
         }
 
         string publishedSummary = BuildPublishedArtifactSummary(manifest, releaseExperience, artifact);
@@ -296,7 +296,7 @@ public sealed class SignedInTrustStatusService
             return $"{installationLabel} already matches the promoted {publishedSummary}.";
         }
 
-        return $"{installationLabel} reports {installation.Version} on {ResolveChannelLabel(installation.Channel, manifest, releaseExperience)}. The promoted shelf for this install is {publishedSummary}.";
+        return $"{installationLabel} reports {installation.Version} on {ResolveChannelLabel(installation.Channel, manifest, releaseExperience)}. The promoted public release for this install is {publishedSummary}.";
     }
 
     private static string BuildSignedInInstallPostureSummary(
@@ -316,7 +316,7 @@ public sealed class SignedInTrustStatusService
 
         if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
         {
-            return $"{ResolveInstallationDisplayLabel(installation)} is linked on {BuildInstallationFootprintSummary(installation)}, and that lane is not on the promoted public shelf right now.";
+            return $"{ResolveInstallationDisplayLabel(installation)} is linked on {BuildInstallationFootprintSummary(installation)}, and that lane is not on the promoted public release right now.";
         }
 
         if (!string.IsNullOrWhiteSpace(manifest.KnownIssueSummary))
@@ -340,7 +340,7 @@ public sealed class SignedInTrustStatusService
         }
 
         return installation is null
-            ? "No linked install is attached yet, so Chummer cannot compare this account against the current shelf or fix lane."
+            ? "No linked install is attached yet, so Chummer cannot compare this account against the current public release or fix path."
             : "No extra install-specific posture warning is published right now.";
     }
 
@@ -362,8 +362,8 @@ public sealed class SignedInTrustStatusService
             {
                 PublicReleaseArtifactDto? artifact = FindPublishedArtifactForInstallation(manifest, installation);
                 return artifact is null
-                    ? $"{fixedReleaseLabel} is the tracked fix target, but this linked install still needs a support-directed update before it can verify."
-                    : $"{fixedReleaseLabel} is the tracked fix target. The promoted shelf for this install is {BuildPublishedArtifactSummary(manifest, releaseExperience, artifact)}.";
+                    ? $"{fixedReleaseLabel} is the tracked fix target, but this linked install still needs a guided support update before it can verify."
+                    : $"{fixedReleaseLabel} is the tracked fix target. The promoted public release for this install is {BuildPublishedArtifactSummary(manifest, releaseExperience, artifact)}.";
             }
 
             return $"{fixedReleaseLabel} is the tracked fix target for this account right now.";
@@ -380,7 +380,7 @@ public sealed class SignedInTrustStatusService
         }
 
         return installation is null
-            ? "No linked install is attached yet, so Chummer cannot tie this account to a fix-ready shelf."
+            ? "No linked install is attached yet, so Chummer cannot tie this account to a fix-ready public release."
             : "No fix-specific availability note is published for this linked install right now.";
     }
 
@@ -411,7 +411,7 @@ public sealed class SignedInTrustStatusService
 
         if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
         {
-            return $"{ResolveInstallationDisplayLabel(installation)} is outside the promoted public shelf right now, so keep it on the support-directed lane until a matching build lands.";
+            return $"{ResolveInstallationDisplayLabel(installation)} is outside the promoted public release right now, so keep it on the guided support path until a matching build lands.";
         }
 
         if (!string.IsNullOrWhiteSpace(manifest.KnownIssueSummary))
@@ -586,7 +586,7 @@ public sealed class SignedInTrustStatusService
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
                 ? "The linked install route stays preferred while desktop proof receipts are still review-required."
-                : "Public downloads are visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
+                : "Public downloads are visible, but parity-sensitive desktop checks still stay on the review-required support path until current proof receipts are green.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
@@ -596,10 +596,10 @@ public sealed class SignedInTrustStatusService
 
         if (releaseExperience.GuestDownloadAvailable)
         {
-            return "The public download is visible now, and signing in adds linked-install follow-through once you want the install attached to your account.";
+            return "The public download is visible now, and signing in adds linked-install continuity once you want the install attached to your account.";
         }
 
-        return "Linked-install follow-through is available now when you sign in.";
+        return "Linked-install continuity is available now when you sign in.";
     }
 
     private static string BuildTrustPulseAdoptionSummary(PublicTrustPulseSnapshot pulse)
@@ -609,21 +609,21 @@ public sealed class SignedInTrustStatusService
         if (!string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus))
         {
             segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-                ? "Current local edge proof passed."
-                : $"Current local edge proof is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
+                ? "Current local verification passed."
+                : $"Current local verification is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
         }
 
         if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)
         {
-            segments.Add($"{journeyCount} journey proofs and {routeCount} trust routes are on record.");
+            segments.Add($"{journeyCount} verified journeys and {routeCount} checked routes are on record.");
         }
         else if (pulse.ProvenJourneyCount is int journeyOnly && journeyOnly > 0)
         {
-            segments.Add($"{journeyOnly} journey proofs are on record.");
+            segments.Add($"{journeyOnly} verified journeys are on record.");
         }
         else if (pulse.ProvenRouteCount is int routeOnly && routeOnly > 0)
         {
-            segments.Add($"{routeOnly} trust routes are on record.");
+            segments.Add($"{routeOnly} checked routes are on record.");
         }
 
         if (pulse.HistorySnapshotCount is int historySnapshotCount && historySnapshotCount > 0)

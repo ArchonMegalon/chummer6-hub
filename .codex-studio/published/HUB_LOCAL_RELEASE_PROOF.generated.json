@@ -5,7 +5,7 @@
   "desktop_client_readiness": {
     "status": "pass",
     "scoped_status": "pass",
-    "generated_at": "2026-05-29T23:34:37Z",
+    "generated_at": "2026-06-12T15:25:14Z",
     "missing_coverage_keys": [],
     "desktop_client_missing": false,
     "reason": "Flagship product readiness proof is green.",
@@ -934,7 +934,7 @@
         2594403904
       ],
       "active_flagship_frontier_id": 2594403904,
-      "summary": "Support follow-through carries installed build, current release, channel, head, platform, fallback, update, and rollback truth on the same install rail used by the desktop client.",
+      "summary": "Support stays on the same install rail with installed build, current release, channel, head, platform, fallback, update, and rollback truth attached for the desktop client.",
       "routes": [
         "/api/v1/install-linking/continuation",
         "/api/v1/install-linking/continuation/support",
@@ -1635,6 +1635,6 @@
       ]
     }
   ],
-  "generated_at": "2026-06-08T16:21:46Z",
-  "generatedAt": "2026-06-08T16:21:46Z"
+  "generated_at": "2026-06-12T15:27:48Z",
+  "generatedAt": "2026-06-12T15:27:48Z"
 }

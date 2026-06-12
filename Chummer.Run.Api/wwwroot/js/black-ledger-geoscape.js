@@ -120,12 +120,14 @@ function drawArrowHead(ctx, x, y, angle, size, color) {
 class BlackLedgerGeoscapeRoot {
   constructor(root) {
     this.root = root;
+    this.renderMode = root.dataset.globeRenderMode || 'command-map';
     this.variant = root.dataset.variant || 'full';
     this.mapUrl = root.dataset.mapUrl || `/api/v1/ledger/worlds/${GLOBE_WORLD_ID}/map`;
     this.deltaUrl = root.dataset.deltaUrl || `/api/v1/ledger/worlds/${GLOBE_WORLD_ID}/map/tick-delta/0/1`;
     this.videoMp4Url = root.dataset.globeVideoMp4 || '/media/ledger/globe/black-ledger-video-globe-idle.mp4';
     this.videoWebmUrl = root.dataset.globeVideoWebm || '/media/ledger/globe/black-ledger-video-globe-idle.webm';
     this.videoPosterUrl = root.dataset.globeVideoPoster || '/media/ledger/globe/black-ledger-video-globe-idle-poster.png';
+    this.videoLayerName = root.dataset.globeVideoLayer || 'first-party-raster-overlay';
     this.overlayEyebrow = root.dataset.overlayEyebrow || 'Black Ledger command deck';
     this.overlayHeadline = root.dataset.overlayHeadline || (this.variant === 'teaser' ? 'The city remembers.' : 'Heat is moving.');
     this.primarySignalLabel = root.dataset.signalPrimary || 'district pressure live';
@@ -133,7 +135,7 @@ class BlackLedgerGeoscapeRoot {
     this.tertiarySignalLabel = root.dataset.signalTertiary || 'newsroom feed armed';
     this.selectedFactionSlug = slugify(root.dataset.selectedFaction || '');
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    this.disableWebGl = root.dataset.disableWebgl === 'true' || IS_AUTOMATED_QA;
+    this.disableWebGl = root.dataset.disableWebgl === 'true' || this.renderMode === 'magicfit-newsreel' || IS_AUTOMATED_QA;
     this.disableAmbientVideo = root.dataset.disableAmbientVideo === 'true' || IS_AUTOMATED_QA;
     this.state = {
       mode: root.dataset.initialMode || 'influence',
@@ -223,7 +225,11 @@ class BlackLedgerGeoscapeRoot {
       this.renderFallbackList();
       this.attachEvents();
       this.selectInitialFaction();
-      this.root.dataset.renderer = 'canvas-geoscape';
+      if (this.renderMode === 'magicfit-newsreel') {
+        this.root.dataset.renderer = 'magicfit-newsreel';
+      } else {
+        this.root.dataset.renderer = 'canvas-geoscape';
+      }
       this.root.dataset.reducedMotion = this.reducedMotion ? 'true' : 'false';
       this.root.dataset.ready = 'true';
       if (this.root.dataset.autoReplay === 'true') {
@@ -250,6 +256,9 @@ class BlackLedgerGeoscapeRoot {
 
   mount() {
     this.root.classList.add('black-ledger-geoscape');
+    if (this.renderMode === 'magicfit-newsreel') {
+      this.root.classList.add('black-ledger-geoscape--magicfit-newsreel');
+    }
     if (IS_AUTOMATED_QA) {
       this.root.dataset.qaRenderer = 'canvas-only';
     }
@@ -320,8 +329,7 @@ class BlackLedgerGeoscapeRoot {
       const markVideoReady = () => {
         this.videoPlateReady = true;
         this.root.dataset.videoGlobe = 'ready';
-        this.root.dataset.videoLayer = 'magicfit-primary';
-        this.root.dataset.rendererContract = 'magicfit-video-globe-with-chummer-overlays';
+        this.root.dataset.videoLayer = this.videoLayerName;
         if (this.reducedMotion) {
           this.videoPlate.pause();
         } else {
@@ -342,7 +350,7 @@ class BlackLedgerGeoscapeRoot {
       }
     } else if (this.videoPlate) {
       this.root.dataset.videoGlobe = 'disabled';
-      this.root.dataset.videoLayer = 'canvas-only';
+      this.root.dataset.videoLayer = this.videoLayerName;
     }
     this.glCanvas?.addEventListener('webglcontextlost', this.handleWebGlContextLost, false);
     this.glCanvas?.addEventListener('webglcontextrestored', this.handleWebGlContextRestored, false);
@@ -1033,6 +1041,11 @@ class BlackLedgerGeoscapeRoot {
     const ctx = this.ctx;
     const width = parseFloat(this.canvas.style.width || '640');
     const height = parseFloat(this.canvas.style.height || '420');
+    if (this.renderMode === 'magicfit-newsreel') {
+      this.renderNewsreelFrame(ctx, width, height, time);
+      return;
+    }
+
     const centerX = width / 2;
     const centerY = height / 2;
     const radius = Math.min(width, height) * (this.variant === 'teaser' ? 0.31 : 0.34);
@@ -1043,7 +1056,7 @@ class BlackLedgerGeoscapeRoot {
       this.rotation = (-36 * Math.PI / 180) + phase * TWO_PI;
     }
     if (usedVideoGlobe && this.root.dataset.renderer !== 'webgl-geoscape') {
-      this.root.dataset.videoLayer = 'magicfit-primary';
+      this.root.dataset.videoLayer = this.videoLayerName;
     }
     const usedWebGl = this.renderWebGlBase(time, width, height, radius);
     if (!usedWebGl) {
@@ -1060,6 +1073,15 @@ class BlackLedgerGeoscapeRoot {
     this.drawFactions(ctx, radius, time);
     this.drawEvents(ctx, radius, time);
     ctx.restore();
+  }
+
+  renderNewsreelFrame(ctx, width, height) {
+    ctx.clearRect(0, 0, width, height);
+    const usedVideoGlobe = this.videoPlateReady && this.root.dataset.videoGlobe === 'ready';
+    if (usedVideoGlobe && this.videoPlate && !this.reducedMotion && this.state.replayState !== 'playing') {
+      const phase = (this.videoPlate.currentTime % VIDEO_GLOBE_IDLE_SECONDS) / VIDEO_GLOBE_IDLE_SECONDS;
+      this.rotation = (-36 * Math.PI / 180) + phase * TWO_PI;
+    }
   }
 
   drawBackdrop(ctx, width, height, centerX, centerY, radius, time) {

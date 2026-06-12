@@ -35,6 +35,15 @@ public sealed class GoldReadinessArtifactServiceTests
                                 final_verdict = "NOT_READY",
                                 row_level_mapping_status = "pending_human_review",
                                 errata_posture_status = "pending_reviewed_application",
+                                human_review_status = new
+                                {
+                                    pending_review = true,
+                                    review_ready = false,
+                                    source_baseline_required = true
+                                },
+                                verification_matrix_status = "blocked",
+                                verification_matrix_failed_gates = new[] { "SR4-G013" },
+                                verification_matrix_unexpected_failed_gates = Array.Empty<string>(),
                                 remaining_gates = new[]
                                 {
                                     "human-reviewed row-level mapping from indexed table evidence into normalized records",
@@ -72,6 +81,12 @@ public sealed class GoldReadinessArtifactServiceTests
             Assert.Equal(285, blocker.RulefactCount);
             Assert.Equal("pending_human_review", blocker.RowLevelMappingStatus);
             Assert.Equal("pending_reviewed_application", blocker.ErrataPostureStatus);
+            Assert.True(blocker.HumanReviewPending);
+            Assert.False(blocker.HumanReviewReady);
+            Assert.True(blocker.SourceBaselineRequired);
+            Assert.Equal("blocked", blocker.VerificationMatrixStatus);
+            Assert.Equal(new[] { "SR4-G013" }, blocker.VerificationMatrixFailedGates);
+            Assert.Empty(blocker.VerificationMatrixUnexpectedFailedGates);
             Assert.Contains("human rule review signoff", blocker.RemainingGates);
         }
         finally

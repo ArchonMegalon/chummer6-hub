@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -64,10 +65,21 @@ def main() -> int:
         completion_entry = completion_rulesets.get(ruleset, {}) if isinstance(completion_rulesets, dict) else {}
         blocker_entry = completion_blockers.get(ruleset, {}) if isinstance(completion_blockers, dict) else {}
         operator_entry = operator_rulesets.get(ruleset, {}) if isinstance(operator_rulesets, dict) else {}
+        matrix_path = Path(str(blocker_entry.get("blocker_receipts", {}).get("verification_matrix_run", "")))
+        matrix_payload = load_json(matrix_path) if matrix_path.is_file() else {}
         ready_by_verdict = verdict == expected_verdict
         ready_by_completion = bool(completion_entry.get("rule_authority_ready"))
         ready_by_operator = operator_entry.get("status") == "pass" and operator_entry.get("verdict") == expected_verdict
-        status = "pass" if count >= args.min_rulefacts and ready_by_verdict and ready_by_completion and ready_by_operator else "fail"
+        matrix_has_unexpected_failures = bool(matrix_payload.get("unexpected_failed_gates"))
+        status = (
+            "pass"
+            if count >= args.min_rulefacts
+            and ready_by_verdict
+            and ready_by_completion
+            and ready_by_operator
+            and not matrix_has_unexpected_failures
+            else "fail"
+        )
         if count < args.min_rulefacts:
             failures.append(f"{ruleset} rulefact_count {count} is below minimum {args.min_rulefacts}")
         if not ready_by_verdict:
@@ -76,6 +88,8 @@ def main() -> int:
             failures.append(f"{ruleset} full product rule authority completion is not ready")
         if not ready_by_operator:
             failures.append(f"{ruleset} operator promoted rule authority gold is not ready")
+        if matrix_has_unexpected_failures:
+            failures.append(f"{ruleset} verification matrix has unexpected failed gates")
         rulesets[ruleset] = {
             "path": str(path),
             "rulefact_count": count,
@@ -87,6 +101,11 @@ def main() -> int:
             "blocker_receipts": blocker_entry.get("blocker_receipts", {}),
             "row_level_mapping_status": blocker_entry.get("row_level_mapping_status"),
             "errata_posture_status": blocker_entry.get("errata_posture_status"),
+            "human_review_status": blocker_entry.get("human_review_status"),
+            "verification_matrix_status": matrix_payload.get("status"),
+            "verification_matrix_failed_gates": matrix_payload.get("failed_gates", []),
+            "verification_matrix_unexpected_failed_gates": matrix_payload.get("unexpected_failed_gates", []),
+            "verification_matrix_expected_ready_blockers": matrix_payload.get("expected_ready_blockers", []),
             "remaining_gates": blocker_entry.get("remaining_gates", []),
             "status": status,
         }
@@ -104,6 +123,25 @@ def main() -> int:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     if failures:
+        print(json.dumps({
+            "status": "fail",
+            "failures": failures,
+            "output_path": str(OUTPUT_PATH),
+            "rulesets": {
+                ruleset: {
+                    "rulefact_count": payload["rulefact_count"],
+                    "final_verdict": payload["final_verdict"],
+                    "full_completion_rule_authority_ready": payload["full_completion_rule_authority_ready"],
+                    "operator_gold_status": payload["operator_gold_status"],
+                    "operator_gold_verdict": payload["operator_gold_verdict"],
+                    "remaining_gates": payload["remaining_gates"],
+                    "verification_matrix_status": payload["verification_matrix_status"],
+                    "verification_matrix_unexpected_failed_gates": payload["verification_matrix_unexpected_failed_gates"],
+                }
+                for ruleset, payload in rulesets.items()
+                if payload["status"] != "pass"
+            },
+        }, indent=2), file=sys.stderr)
         raise SystemExit("rules authority minimum coverage failed")
     print("rule_authority_minimum_coverage:ok")
     return 0

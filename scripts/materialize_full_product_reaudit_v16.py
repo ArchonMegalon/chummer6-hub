@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import time
 import subprocess
 import urllib.error
 import urllib.parse
@@ -77,6 +78,30 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text.rstrip() + "\n", encoding="utf-8")
 
 
+def normalize_platform_downloads(downloads: list[Any]) -> list[str]:
+    normalized: set[str] = set()
+    for item in downloads:
+        if not isinstance(item, dict):
+            continue
+        platform = str(item.get("platform") or "").strip().lower()
+        platform_id = str(item.get("platformId") or "").strip().lower()
+        if platform_id in {"linux", "macos", "windows"}:
+            normalized.add(platform_id)
+        elif platform_id.startswith("linux"):
+            normalized.add("linux")
+        elif platform_id.startswith("osx") or platform_id.startswith("mac"):
+            normalized.add("macos")
+        elif platform_id.startswith("win"):
+            normalized.add("windows")
+        elif "windows" in platform:
+            normalized.add("windows")
+        elif "linux" in platform:
+            normalized.add("linux")
+        elif "macos" in platform or "mac" in platform:
+            normalized.add("macos")
+    return sorted(normalized)
+
+
 def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
@@ -91,6 +116,24 @@ def read_json(path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def parse_tail_json(raw: str) -> dict[str, Any] | None:
+    if not raw:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    for start in range(len(text) - 1, -1, -1):
+        if text[start] != "{":
+            continue
+        try:
+            payload = json.loads(text[start:])
+            if isinstance(payload, dict):
+                return payload
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 def sha256(path: Path) -> str | None:
     if not path.is_file():
         return None
@@ -101,18 +144,27 @@ def sha256(path: Path) -> str | None:
     return digest.hexdigest()
 
 
-def fetch(path_or_url: str) -> tuple[int | None, str, str]:
+def fetch(path_or_url: str, *, max_retries: int = 3) -> tuple[int | None, str, str]:
     url = path_or_url if path_or_url.startswith("http") else f"{BASE_URL}{path_or_url}"
     request = urllib.request.Request(url, headers={"User-Agent": "chummer-v16-audit/1"})
     last_error = ""
-    for _ in range(3):
+    for attempt in range(max_retries + 1):
         try:
             with urllib.request.urlopen(request, timeout=20) as response:
                 return int(response.status), response.read().decode("utf-8", errors="replace"), response.geturl()
         except urllib.error.HTTPError as exc:
-            return int(exc.code), exc.read().decode("utf-8", errors="replace"), url
+            status_code = int(exc.code)
+            body = exc.read().decode("utf-8", errors="replace")
+            if status_code == 429 and attempt < max_retries:
+                delay = 1.0 * (2 ** attempt)
+                time.sleep(delay)
+                continue
+            return status_code, body, url
         except Exception as exc:
             last_error = str(exc)
+            if attempt < max_retries:
+                time.sleep(0.5 * (2 ** attempt))
+                continue
     return None, last_error, url
 
 
@@ -258,9 +310,10 @@ def materialize_live_route_proof(generated: str) -> dict[str, Any]:
     ])
     route_payload: dict[str, Any] = {}
     if route_ok:
-        try:
-            route_payload = json.loads(route_stdout)
-        except json.JSONDecodeError:
+        parsed_payload = parse_tail_json(route_stdout)
+        if parsed_payload:
+            route_payload = parsed_payload
+        else:
             route_ok = False
 
     payload = {
@@ -308,7 +361,6 @@ def materialize_formport_audit(generated: str) -> dict[str, Any]:
         "state.Rows",
         "FindValue(rows",
         "MatchRows(rows",
-        "SectionRowDisplayItem",
     ]
     generic_hits = [marker for marker in generic_markers if marker in source]
     missing_surface = not files
@@ -429,6 +481,7 @@ def main() -> int:
             "supportabilityState": releases.get("supportabilityState"),
             "proofStatus": releases.get("proofStatus"),
             "download_count": len(releases.get("downloads") or []),
+            "platform_download_count": len(normalize_platform_downloads(releases.get("downloads") or [])),
         },
         "qa_gates": {
             "rafter": {

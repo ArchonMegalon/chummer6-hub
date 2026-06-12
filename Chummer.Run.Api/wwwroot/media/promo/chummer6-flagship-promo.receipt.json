@@ -1,90 +1,37 @@
 {
-  "generated_at_utc": "2026-06-03T08:08:08Z",
+  "generated_at_utc": "2026-06-10T15:25:37Z",
   "status": "published",
   "asset_id": "chummer6-flagship-promo",
-  "title": "Chummer6 Flagship Promo",
-  "render_mode": "magicfit_fresh_rerender_with_scene_timed_trailer_and_ork_news_voiceover",
-  "source_claim": "12 freshly rerendered MagicFit flagship scene clips with no generated product-name text, scene-timed trailer voiceover, and separate ork newsroom voice",
-  "visual_source": "MagicFit scene clips only",
-  "narration_provider": "edge-tts",
-  "voice": "en-US-AndrewNeural",
-  "scene_count": 12,
-  "duration_seconds": 90.0,
-  "continuous_audio_track": "spoken_narration_plus_low_music_bed",
-  "scene_narration": [
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/01_old_way_pain.mp4",
-      "duration_seconds": 8.0,
-      "caption": "Stop losing the run between sheets, tabs, and side notes.",
-      "narration": "You know this table. Three PDFs open. A runner sheet half finished. The GM asking who actually has the medkit."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/02_chummer6_reveal.mp4",
-      "duration_seconds": 7.0,
-      "caption": "Chummer6 brings the table back into one command view.",
-      "narration": "Chummer6 pulls the noise into one command view, so the crew can stop hunting for answers and start the run."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/03_build_runner.mp4",
-      "duration_seconds": 8.0,
-      "caption": "Build runners with gear, magic, cyberware, and consequences in sight.",
-      "narration": "Build the runner like a runner: gear, magic, cyberware, contacts, limits, and the little choices that get you paid or killed."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/04_explain_values.mp4",
-      "duration_seconds": 7.0,
-      "caption": "Know why the numbers changed before the dice hit the table.",
-      "narration": "When a number moves, you can follow it. No table argument. No mystery math. Just the sheet doing what it should."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/05_black_ledger_alive.mp4",
-      "duration_seconds": 8.0,
-      "caption": "Black Ledger lets the city remember what the crew did.",
-      "narration": "Then the city answers back. Black Ledger tracks heat, districts, jobs, factions, and the consequences your crew left behind."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/06_release_truth.mp4",
-      "duration_seconds": 7.0,
-      "caption": "Prep scenes, NPCs, jobs, handouts, and fallout without rummaging.",
-      "narration": "For the GM, prep becomes playable: scenes, NPCs, handouts, opposition, rewards, downtime, and next-session hooks in reach."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/07_table_pulse.mp4",
-      "duration_seconds": 8.0,
-      "caption": "Table Pulse turns rising heat into playable pressure.",
-      "narration": "Table Pulse turns pressure into something the table can use: rising heat, hard choices, and moments that feel alive."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/08_world_reacts.mp4",
-      "duration_seconds": 7.0,
-      "caption": "Remote players can still push the run forward.",
-      "narration": "Remote players are still in the run. They can react, answer, vote, and push the story forward without derailing the room."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/09_karma_forge.mp4",
-      "duration_seconds": 8.0,
-      "caption": "Karma Forge keeps house rules table-ready and reversible.",
-      "narration": "Karma Forge keeps house rules from becoming folklore. Try the change, show the impact, roll it back if the table hates it."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/10_newsroom.mp4",
-      "duration_seconds": 7.0,
-      "caption": "A field report turns aftermath into the next hook.",
-      "narration": "We have a developing situation. The crew is gone, the drones are confused, and one fixer is suddenly unavailable for comment."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/11_play_anywhere.mp4",
-      "duration_seconds": 8.0,
-      "caption": "Desktop, tablet, and phone keep the crew in sync.",
-      "narration": "Desktop, tablet, phone, home table or remote night: the campaign stays with the crew."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/12_hero_ending.mp4",
-      "duration_seconds": 7.0,
-      "caption": "When the trace hits 100, the crew is already gone.",
-      "narration": "Chummer6 is for crews who want the next run ready before the heat cools. Build the runner. Run the table. Let the city remember."
-    }
+  "render_mode": "ea_magicfit_12_scene_no_factions_90s_edit",
+  "provider_claim": "MagicFit",
+  "magicfit_claim_allowed": true,
+  "magicfit_final_visual_render_claim": true,
+  "magicfit_source_receipts_retained": true,
+  "magicfit_visual_recut_required": false,
+  "old_synthetic_vector_renderer_removed": true,
+  "source_scene_count": 12,
+  "visual_scene_count": 12,
+  "source_scene_dir": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes",
+  "source_receipt": "/docker/chummercomplete/_completion/magicfit_jama6_promo_12_scenes/MAGICFIT_12_SCENE_PROMO_SOURCE_AUDIT.generated.json",
+  "provider_receipt": "/docker/chummercomplete/_completion/magicfit_provider/MAGICFIT_PROVIDER_VERIFICATION.generated.json",
+  "faction_assets_used": false,
+  "scene_titles": [
+    "Table Chaos Ends",
+    "Chummer6 Opens",
+    "Build The Runner",
+    "Rules Explain Themselves",
+    "Black Ledger Lives",
+    "Truth Matrix Holds",
+    "Table Pulse Connects",
+    "The World Reacts",
+    "Karma Forge Improves",
+    "Video Proof Lands",
+    "Play Anywhere Honestly",
+    "Chummer6 Gold Gate"
   ],
+  "scene_seconds_before_transitions": 7.958333333333333,
+  "transition_seconds": 0.5,
+  "continuous_audio_track": "ffmpeg_generated_synthetic_music_bed",
   "public_files": {
     "mp4": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.mp4",
     "webm": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/promo/chummer6-flagship-promo.webm",
@@ -102,14 +49,11 @@
       },
       {
         "codec_name": "aac",
-        "codec_type": "audio",
-        "sample_rate": "48000",
-        "channels": 1
+        "codec_type": "audio"
       }
     ],
     "format": {
-      "duration": "90.000000",
-      "size": "42368706"
+      "duration": "90.000000"
     }
   }
 }

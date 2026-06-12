@@ -11,6 +11,8 @@ public sealed class GmSessionVideoFoundryService
 {
     public const string ProviderAccountId = "magicfit_gm_session_video_foundry";
     public const string Origin = "gm_session_video";
+    private const string SessionAccountEmailKey = "CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL";
+    private const string LegacySessionAccountEmailKey = "CHUMMER_EA_MAGICFIT_EMAIL";
 
     private static readonly Regex EmailRegex = new(@"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     private static readonly string[] ForbiddenPromptFragments =
@@ -46,7 +48,7 @@ public sealed class GmSessionVideoFoundryService
                 CampaignId: campaignId,
                 ProviderAccountRole: "gm_session_video_foundry",
                 ProviderAccountStatus: IsSessionAccountConfigured() ? "configured" : "pending_verification",
-                QueueIsolationStatus: "isolated_from_official_product_media",
+                QueueIsolationStatus: BuildQueueIsolationStatus(),
                 Routes:
                 [
                     $"/gm/campaigns/{campaignId}/video-foundry",
@@ -619,8 +621,39 @@ public sealed class GmSessionVideoFoundryService
     }
 
     private bool IsSessionAccountConfigured()
-        => !string.IsNullOrWhiteSpace(_configuration["CHUMMER_EA_MAGICFIT_EMAIL"])
+        => !string.IsNullOrWhiteSpace(GetSessionAccountEmail())
             || File.Exists("/docker/EA/.env");
+
+    private string BuildQueueIsolationStatus()
+    {
+        string? sessionEmail = GetSessionAccountEmail();
+        string? officialEmail = GetOfficialMagicfitAccountEmail();
+        if (string.IsNullOrWhiteSpace(sessionEmail) || string.IsNullOrWhiteSpace(officialEmail))
+        {
+            return "session_isolation_pending";
+        }
+
+        return string.Equals(sessionEmail.Trim(), officialEmail.Trim(), StringComparison.OrdinalIgnoreCase)
+            ? "not_isolated_from_official_product_media"
+            : "isolated_from_official_product_media";
+    }
+
+    private string? GetSessionAccountEmail()
+    {
+        string? sessionEmail = _configuration[SessionAccountEmailKey];
+        if (!string.IsNullOrWhiteSpace(sessionEmail))
+        {
+            return sessionEmail.Trim();
+        }
+
+        return GetOfficialMagicfitAccountEmail();
+    }
+
+    private string? GetOfficialMagicfitAccountEmail()
+    {
+        string? officialEmail = _configuration[LegacySessionAccountEmailKey];
+        return string.IsNullOrWhiteSpace(officialEmail) ? null : officialEmail.Trim();
+    }
 
     private int GetInt(string key, int fallback)
         => int.TryParse(_configuration[key], out int value) && value > 0 ? value : fallback;

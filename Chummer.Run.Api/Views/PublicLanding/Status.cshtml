@@ -9,7 +9,7 @@
     var accountReturnHref = Model.Chrome.Authenticated ? "/home" : "/signup?next=/home";
     var accountReturnLabel = Model.Chrome.Authenticated ? "Open home" : "Open account setup";
     var accountReturnSummary = Model.Chrome.Authenticated
-        ? "Use Home when install follow-through, support status, and the next safe action should stay in one signed-in place."
+        ? "Use Home when install return, support status, and the next safe action should stay in one signed-in place."
         : "Use account setup when you want install return, support history, and roadmap follow-up attached to one calmer place.";
     var statusRouteChoices = new[]
     {
@@ -97,7 +97,6 @@
             .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
             .Replace("trust routes", "checked routes", StringComparison.OrdinalIgnoreCase)
-            .Replace("local edge proof", "local release proof", StringComparison.OrdinalIgnoreCase)
             .Replace("Promoted installer media", "Recommended installer", StringComparison.OrdinalIgnoreCase)
             .Replace("startup-smoke proof", "startup verification", StringComparison.OrdinalIgnoreCase)
             .Replace("proof-gated", "waiting for current proof", StringComparison.OrdinalIgnoreCase)
@@ -108,8 +107,8 @@
             .Replace("build_explain_publish", "build, explain, and publish", StringComparison.OrdinalIgnoreCase)
             .Replace("campaign_session_recover_recap", "campaign recovery and recap", StringComparison.OrdinalIgnoreCase)
             .Replace("report_cluster_release_notify", "clustered release notification", StringComparison.OrdinalIgnoreCase)
-            .Replace("organize_community_and_close_loop", "community follow-through", StringComparison.OrdinalIgnoreCase)
-            .Replace("closure", "follow-through", StringComparison.OrdinalIgnoreCase)
+            .Replace("organize_community_and_close_loop", "community wrap-up", StringComparison.OrdinalIgnoreCase)
+            .Replace("closure", "wrap-up", StringComparison.OrdinalIgnoreCase)
             .Replace("rules lanes", "rulesets", StringComparison.OrdinalIgnoreCase)
             .Replace("rules lane", "ruleset", StringComparison.OrdinalIgnoreCase)
             .Replace("reviewed authority closure", "reviewed coverage closure", StringComparison.OrdinalIgnoreCase)
@@ -250,7 +249,7 @@
         <article class="app-action-card">
             <span class="tag">Public launch health</span>
             <h2>Quick release checks</h2>
-            <p>These rows keep release availability, fallback posture, verification freshness, support follow-through, and adoption evidence in one short summary.</p>
+            <p>These rows keep release availability, fallback posture, verification freshness, support history, and adoption evidence in one short summary.</p>
             <div class="settings-summary-list">
                 @foreach (var row in Model.LaunchHealthRows)
                 {
@@ -280,8 +279,10 @@
                 {
                     <article class="route-choice-card">
                         <span class="tag">@blocker.RulesetLabel</span>
-                        <h3>@blocker.NextStep</h3>
+                        <h3>@blocker.NextStepLabel</h3>
                         <p>@blocker.Summary</p>
+                        <p class="app-action-card__meta">@blocker.ReviewStatusLabel</p>
+                        <p class="app-action-card__meta">@blocker.MatrixStatusLabel</p>
                         @if (blocker.RemainingChecks.Count > 0)
                         {
                             <div class="route-choice-card__proof">
@@ -315,7 +316,7 @@
     </article>
     <article class="compact-rail__item">
         <div class="compact-rail__copy">
-            <h3>Fix and closure follow-through</h3>
+            <h3>Fix and closure next steps</h3>
             <p>@compactFollowThroughSummary</p>
         </div>
         <a class="inline-link" href="/contact#support-intake">Open support</a>
@@ -358,7 +359,7 @@
 
 <section class="release-footnote">
     <p class="eyebrow">Signed-in return</p>
-    <h2 class="editorial-title">Keep status, install follow-through, and support history in one calmer signed-in place.</h2>
+    <h2 class="editorial-title">Keep status, install return, and support history in one calmer signed-in place.</h2>
     <p class="editorial-copy">@accountReturnSummary</p>
     <div class="stacked-actions">
         <a class="button-like button-like--primary" href="@accountReturnHref">@accountReturnLabel</a>

@@ -2,6 +2,7 @@ using Chummer.Contracts.Content;
 using Chummer.Run.Api.Services;
 using Microsoft.Extensions.Configuration;
 using Xunit;
+using System;
 
 namespace Chummer.Tests;
 
@@ -85,5 +86,32 @@ public sealed class FlipLinkDocumentPortalServiceTests
         Assert.Equal("chummer6-quickstart-guide.pdf", artifact.FileName);
         Assert.StartsWith("%PDF-1.4", System.Text.Encoding.ASCII.GetString(artifact.Bytes.Take(8).ToArray()));
         Assert.Equal(64, artifact.Sha256.Length);
+    }
+
+    [Fact]
+    public void QuickstartArtifactResolvesFromLocalFilesystemWithoutConfiguredRoot()
+    {
+        string originalDirectory = Environment.CurrentDirectory;
+        try
+        {
+            // Keep the working directory deterministic so fallback search is stable.
+            Environment.CurrentDirectory = RepoPaths.Root;
+
+            var configuration = new ConfigurationBuilder().Build();
+            var service = new FlipLinkDocumentPortalService(configuration);
+
+            var artifact = service.TryBuildPdfArtifact("chummer6-quickstart");
+            var document = service.TryGetPublicDocument("chummer6-quickstart");
+
+            Assert.NotNull(artifact);
+            Assert.NotNull(document);
+            Assert.False(string.IsNullOrWhiteSpace(document!.SourceHash));
+            Assert.Equal(64, document.SourceHash.Length);
+            Assert.Equal("products/chummer/public-guides/chummer6-quickstart.md", document.SourcePath);
+        }
+        finally
+        {
+            Environment.CurrentDirectory = originalDirectory;
+        }
     }
 }

@@ -1,88 +1,169 @@
 {
-  "generated_at_utc": "2026-06-03T08:09:15Z",
+  "generated_at_utc": "2026-06-10T15:27:36Z",
   "status": "published",
   "asset_id": "every-wonder-horizon-promo",
-  "title": "Every Wonder Horizon Promo",
-  "render_mode": "magicfit_refined_deepdive_montage_with_spoken_narration",
-  "source_claim": "12 curated MagicFit-rendered refined deep-dive clips; distinct from the All Horizons teaser",
-  "visual_source": "MagicFit scene clips only",
-  "narration_provider": "edge-tts",
-  "voice": "en-US-AndrewNeural",
+  "render_mode": "first_party_motion_storyboard_90s",
+  "provider_claim": "none",
+  "magicfit_claim_allowed": false,
+  "magicfit_provider_required_before_claim": true,
+  "horizon_claim_boundary": "directional_future_shelf_not_current_release_truth",
   "scene_count": 12,
   "duration_seconds": 90.0,
-  "continuous_audio_track": "spoken_narration_plus_low_music_bed",
-  "scene_narration": [
+  "title": "Chummer6 Horizons - The Table Remembers",
+  "global_magicfit_prompt": "Cinematic cyberpunk tabletop product promo, rain-soaked neon sprawl, warm table light, AR campaign interface, dice and character sheets on a dark table, tactical UI overlays, readable horizon cards, polished product trailer, subtle handheld camera, no official game logos, no real brand logos, 16:9, 90 seconds.",
+  "negative_prompt": "No official Shadowrun logos, no real corporate logos, no unreadable tiny text, no gore, no messy UI, no cartoon style, no exaggerated fantasy magic, no random weapon closeups, no ungrounded superhero visuals, no voyeuristic surveillance framing, no real-world targeting UI, no player scoring dashboard.",
+  "proof_constraints": [
+    "90 second minimum final duration with audio and video streams",
+    "exactly 12 distinct timed scenes",
+    "captions contain one segment per scene",
+    "horizons are future lanes, not current feature promises",
+    "MagicFit render claim requires provider and scene receipts; otherwise label first-party motion storyboard"
+  ],
+  "production_sheet": "/docker/chummercomplete/_completion/every_wonder_horizon_promo/EVERY_WONDER_HORIZON_12_SCENE_PRODUCTION_SHEET.generated.json",
+  "production_scenes": [
     {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/nexus-pan_epic_90s/nexus-pan_epic_01_the_split_truth.mp4",
+      "scene_number": 1,
+      "start_seconds": 0.0,
+      "end_seconds": 6.0,
+      "duration_seconds": 6.0,
+      "id": "opener_table_remembers",
+      "horizon": "Chummer6 Horizons",
+      "title": "The Table Remembers",
+      "voiceover": "A run does not end when the dice stop. Chummer6 carries builds, rules, places, briefings, and world state with proof.",
+      "on_screen_text": "Chummer6 Horizons / Future lanes, not feature promises",
+      "magicfit_visual_prompt": "Dark tabletop with dice, character sheets, laptop, and city map; neon AR lines connect runner, GM, rules, and campaign state."
+    },
+    {
+      "scene_number": 2,
+      "start_seconds": 6.0,
+      "end_seconds": 12.0,
+      "duration_seconds": 6.0,
+      "id": "proof_boundary",
+      "horizon": "Release Truth",
+      "title": "Proof Before Promise",
+      "voiceover": "These are horizon lanes, not claims that unfinished work is shipped. Current proof stays in charge.",
+      "on_screen_text": "Proof boundary / Direction, not shelf truth",
+      "magicfit_visual_prompt": "Trailer card pauses over live-proof receipts, download truth, status checkmarks, and a visible future-claim boundary."
+    },
+    {
+      "scene_number": 3,
+      "start_seconds": 12.0,
+      "end_seconds": 19.0,
       "duration_seconds": 7.0,
-      "caption": "Every Wonder starts when split screens start slowing the table.",
-      "narration": "Every Wonder Horizon starts with the real table problem: split devices, split notes, and a scene that should already be moving."
+      "id": "nexus_pan",
+      "horizon": "NEXUS-PAN",
+      "title": "Shared State Survives Device Churn",
+      "voiceover": "NEXUS-PAN keeps the session calm when devices drift: reconnects, status, conflicts, and recovery you can understand.",
+      "on_screen_text": "NEXUS-PAN / Shared state survives device churn",
+      "magicfit_visual_prompt": "Player reconnects mid-session; multiple devices synchronize; red conflict warning resolves to green recovered state."
     },
     {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/nexus_pan_90s_deepdive/nexus_pan_08_rejoin_cleanly.mp4",
+      "scene_number": 4,
+      "start_seconds": 19.0,
+      "end_seconds": 26.0,
       "duration_seconds": 7.0,
-      "caption": "NEXUS-PAN recovers session state when players reconnect.",
-      "narration": "NEXUS-PAN keeps reconnects calm. Players return with visible state, conflict status, and a clean handoff."
+      "id": "alice",
+      "horizon": "ALICE",
+      "title": "Build Mentor With Receipts",
+      "voiceover": "ALICE checks builds before they break at the table: what is legal, what is fragile, and what really fits the role.",
+      "on_screen_text": "ALICE / Build mentor with receipts",
+      "magicfit_visual_prompt": "Two holographic runner build cards compare legality, role fit, budget, survivability, and cited receipt markers."
     },
     {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/alice_90s_deepdive/alice_02_variant_compare.mp4",
+      "scene_number": 5,
+      "start_seconds": 26.0,
+      "end_seconds": 33.0,
       "duration_seconds": 7.0,
-      "caption": "ALICE compares runner choices before they become table problems.",
-      "narration": "ALICE turns build advice into explainable tradeoffs: role fit, survivability, legality, and cost."
+      "id": "karma_forge",
+      "horizon": "KARMA FORGE",
+      "title": "Change The Table. Keep The Trust.",
+      "voiceover": "KARMA FORGE turns house rules into controlled packages: no pinned-message chaos, just changes with history and impact.",
+      "on_screen_text": "KARMA FORGE / Change the table. Keep the trust.",
+      "magicfit_visual_prompt": "GM activates a house-rule package; UI shows changed categories, affected runners, dependency warning, and rollback available."
     },
     {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/karma_forge_90s_deepdive/karma_forge_03_impact_preview.mp4",
+      "scene_number": 6,
+      "start_seconds": 33.0,
+      "end_seconds": 40.0,
       "duration_seconds": 7.0,
-      "caption": "KARMA FORGE previews house-rule impact before approval.",
-      "narration": "KARMA FORGE makes house rules inspectable. The GM sees impact before the table commits."
+      "id": "jackpoint",
+      "horizon": "JACKPOINT",
+      "title": "Briefings And Dossiers Without Making Things Up",
+      "voiceover": "JACKPOINT turns campaign truth into briefings, dossiers, and recaps: polished, spoiler-safe, and source-bound.",
+      "on_screen_text": "JACKPOINT / Briefings and dossiers with source path",
+      "magicfit_visual_prompt": "Post-run evidence board, dossier pages, recap cards, audio waveform, and player-safe versus GM-only spoiler toggle."
     },
     {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/jackpoint_90s_deepdive/jackpoint_04_dossier_build.mp4",
-      "duration_seconds": 8.0,
-      "caption": "JACKPOINT turns table events into clean dossiers.",
-      "narration": "JACKPOINT turns table events into dossiers, briefings, recaps, and player-safe handouts."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/runsite_90s_deepdive/runsite_02_site_unfolds.mp4",
-      "duration_seconds": 8.0,
-      "caption": "RUNSITE makes mission spaces readable before contact.",
-      "narration": "RUNSITE opens the site before the run starts: routes, hotspots, layers, and GM-only context."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/runbook_press_90s_deepdive/runbook_press_03_book_structure.mp4",
-      "duration_seconds": 8.0,
-      "caption": "RUNBOOK PRESS shapes campaign material into books.",
-      "narration": "RUNBOOK PRESS turns campaign material into structured guides, season books, and handoff-ready exports."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/table_pulse_90s_deepdive/table_pulse_04_remote_packet.mp4",
-      "duration_seconds": 8.0,
-      "caption": "TABLE PULSE turns heat into governed remote reaction packets.",
-      "narration": "TABLE PULSE keeps pressure bounded: live heat, remote packets, opt-outs, and GM approval."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/black_ledger_epic_90s/black_ledger_epic_02_the_globe_wakes.mp4",
-      "duration_seconds": 8.0,
-      "caption": "BLACK LEDGER lets the world wake up after the run.",
-      "narration": "BLACK LEDGER makes the city remember. Factions move, districts heat up, and new jobs emerge."
-    },
-    {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/black_ledger_90s_deepdive/black_ledger_07_newsroom.mp4",
+      "scene_number": 7,
+      "start_seconds": 40.0,
+      "end_seconds": 47.0,
       "duration_seconds": 7.0,
-      "caption": "Newsreels make consequences feel like the city is watching.",
-      "narration": "Newsroom clips turn fallout into rumors, pressure, jokes, and hooks the GM can bring back to the table."
+      "id": "runsite",
+      "horizon": "RUNSITE",
+      "title": "Mission Spaces, Made Legible",
+      "voiceover": "RUNSITE makes dangerous places readable before they get loud: maps, routes, hotspots, and separate player and GM views.",
+      "on_screen_text": "RUNSITE / Mission spaces, made legible",
+      "magicfit_visual_prompt": "Explorable safehouse blueprint with hotspots, camera cones, escape routes, hidden doors, and astral layer as GM-only overlay."
     },
     {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/community_hub_90s_deepdive/community_hub_02_open_run_board.mp4",
+      "scene_number": 8,
+      "start_seconds": 47.0,
+      "end_seconds": 54.0,
       "duration_seconds": 7.0,
-      "caption": "COMMUNITY HUB brings players to vetted open runs.",
-      "narration": "COMMUNITY HUB helps players find tables, pass preflight, schedule cleanly, and close the loop."
+      "id": "runbook_press",
+      "horizon": "RUNBOOK PRESS",
+      "title": "Living Campaign Truth Becomes Books",
+      "voiceover": "RUNBOOK PRESS builds primers, handbooks, and campaign books from confirmed material instead of copy-paste from ten tools.",
+      "on_screen_text": "RUNBOOK PRESS / Campaign truth becomes books",
+      "magicfit_visual_prompt": "Campaign data assembles into a book layout: table of contents, district guide, GM appendix, PDF and web export cards."
     },
     {
-      "clip": "/docker/chummercomplete/_completion/refined_magicfit_promo_plans_20260531/magicfit_clips/community_hub_90s_deepdive/community_hub_10_community_hero.mp4",
+      "scene_number": 9,
+      "start_seconds": 54.0,
+      "end_seconds": 62.0,
       "duration_seconds": 8.0,
-      "caption": "Every Wonder returns to one table and one campaign.",
-      "narration": "Every Wonder Horizon is the promise that the campaign can grow without losing the people, scenes, and choices that made it matter."
+      "id": "table_pulse",
+      "horizon": "TABLE PULSE",
+      "title": "Heat, Reactions, Aftermath - Bounded",
+      "voiceover": "TABLE PULSE separates live pressure from private aftermath: reactions in play, coaching after play, always bounded.",
+      "on_screen_text": "TABLE PULSE / Heat, reactions, aftermath - bounded",
+      "magicfit_visual_prompt": "World heat rises during a scene; GM receives a reaction packet; cut to private after-action packet, no player score."
+    },
+    {
+      "scene_number": 10,
+      "start_seconds": 62.0,
+      "end_seconds": 72.0,
+      "duration_seconds": 10.0,
+      "id": "black_ledger",
+      "horizon": "BLACK LEDGER",
+      "title": "The City Remembers",
+      "voiceover": "BLACK LEDGER lets the city remember. Runs create consequences, factions move, and new jobs grow from what actually happened.",
+      "on_screen_text": "BLACK LEDGER / The city remembers",
+      "magicfit_visual_prompt": "Neon city map with district heat, faction moves, open jobs; completed run changes a marker and starts a news ticker."
+    },
+    {
+      "scene_number": 11,
+      "start_seconds": 72.0,
+      "end_seconds": 82.0,
+      "duration_seconds": 10.0,
+      "id": "community_hub",
+      "horizon": "COMMUNITY HUB",
+      "title": "Find The Table. Close The Loop.",
+      "voiceover": "COMMUNITY HUB helps people reach the table: open runs, preflight, rules, roster, scheduling, and closeout without losing Chummer truth.",
+      "on_screen_text": "COMMUNITY HUB / Find the table. Close the loop.",
+      "magicfit_visual_prompt": "Player finds an open run, applies with runner dossier, preflight turns green, calendar handoff opens a neutral meeting door."
+    },
+    {
+      "scene_number": 12,
+      "start_seconds": 82.0,
+      "end_seconds": 90.0,
+      "duration_seconds": 8.0,
+      "id": "finale_all_horizons",
+      "horizon": "Chummer6 Horizons",
+      "title": "Nine Horizons. One Boundary.",
+      "voiceover": "Nine horizons. One promise: keep the campaign explainable, from the first build to the world that remembers.",
+      "on_screen_text": "Chummer6 Horizons / Build clearly. Run reliably. Carry the campaign forward.",
+      "magicfit_visual_prompt": "All nine horizon cards orbit the tabletop; camera rises as table becomes a city map and resolves into Chummer6 interface."
     }
   ],
   "public_files": {
@@ -102,14 +183,11 @@
       },
       {
         "codec_name": "aac",
-        "codec_type": "audio",
-        "sample_rate": "48000",
-        "channels": 1
+        "codec_type": "audio"
       }
     ],
     "format": {
-      "duration": "90.000000",
-      "size": "32664470"
+      "duration": "90.000000"
     }
   }
 }

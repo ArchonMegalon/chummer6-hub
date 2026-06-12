@@ -48,8 +48,8 @@
     var routeReceiptSummary = Model.RouteReceipt?.Summary
         ?? Model.BoundedFailureReason
         ?? "No visible receipt is attached to this outward-facing publication yet.";
-    var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-proof-shelf" : "/signup?next=%2Fartifacts";
-    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in continuity shelf" : "Create account for signed-in continuity";
+    var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-proof-view" : "/signup?next=%2Fartifacts";
+    var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in continuity view" : "Create account for signed-in continuity";
     var signedInShelfSummary = Model.Chrome.Authenticated
         ? "Use the signed-in proof view when you want personal, campaign, creator, and public returns to stay in one calmer place."
         : "Public discovery works without an account. Sign in only when you want private continuity, campaign return, and creator next steps in one place.";
@@ -89,7 +89,7 @@
             Badge = "Signed-in continuity",
             Title = Model.Chrome.Authenticated
                 ? "Signed-in continuity keeps public and private proof returns together"
-                : "Create the account only when you want the signed-in continuity shelf too",
+                : "Create the account only when you want the signed-in continuity view too",
             Summary = signedInShelfSummary,
             Href = signedInShelfHref,
             Label = signedInShelfLabel,
@@ -157,7 +157,7 @@
         @if (publicationRouteReviewRequired && !string.IsNullOrWhiteSpace(Model.TrustPulse?.RouteGuardSummary))
         {
             <p class="muted-copy">@Model.TrustPulse.RouteGuardSummary</p>
-            <p class="muted-copy">The current direct parity proof receipts still hold public parity claims on the review-required lane.</p>
+            <p class="muted-copy">Current direct parity proof receipts still keep the public parity claim under review.</p>
         }
         <div class="stacked-actions">
             <a class="button-like button-like--primary" href="@Model.BackHref">Back to publication discovery</a>

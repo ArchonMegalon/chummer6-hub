@@ -173,8 +173,8 @@ SOURCE_MARKERS = {
     ],
     "Chummer.Run.Api/Views/PublicLanding/Status.cshtml": [
         "Public launch health",
-        "Governor truth behind the public status line",
-        "These rows compile the live shelf, preview posture, fallback and revoke truth, blocked gates, proof freshness, support pulse, and adoption evidence into one customer-safe summary.",
+        "Quick release checks",
+        "These rows keep release availability, fallback posture, verification freshness, support history, and adoption evidence in one short summary.",
         "@if (Model.LaunchHealthRows is { Count: > 0 })",
         "@foreach (var row in Model.LaunchHealthRows)",
         "/api/public/progress-poster.svg",
@@ -189,7 +189,7 @@ SOURCE_MARKERS = {
         'Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Blocked", StringComparison.Ordinal) && row.Value.Contains("blocked", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface blocked route or journey posture in launch-health rows.");',
         'Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Live", StringComparison.Ordinal) && row.Value.Contains("live install route", StringComparison.OrdinalIgnoreCase)) == true, "status page should compile the live install shelf posture into launch-health rows without claiming nothing is live while downloads remain available.");',
         'Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Support pulse", StringComparison.Ordinal) && row.Value.Contains("support", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface support closure posture in launch-health rows.");',
-        'Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface adoption health directly inside the launch-health breakdown.");',
+        'Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofLabel(row.Value)) == true, "status page should surface adoption health directly inside the launch-health breakdown.");',
     ],
     "scripts/materialize_hub_local_release_proof.py": [
         '"package_id": "next90-m120-hub-public-launch-health"',

@@ -3,8 +3,17 @@
   "base_url": "https://chummer.run",
   "status": "pass",
   "capture_mode": "playwright_screenshot",
+  "attempt_count": 1,
   "stdout": "",
   "stderr": "",
+  "attempts": [
+    {
+      "attempt": 1,
+      "returncode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
   "screenshots": [
     {
       "route": "/",

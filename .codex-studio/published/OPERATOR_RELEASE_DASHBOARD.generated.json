@@ -1,0 +1,128 @@
+{
+  "contract_name": "chummer.operator_release_dashboard",
+  "generated_at_utc": "2026-06-12T18:58:23Z",
+  "status": "pass",
+  "verdict": "OPERABLE_RELEASE_READY",
+  "release": {
+    "version": "run-20260612-121055",
+    "published_at": "2026-06-12T13:20:46Z",
+    "channel": "public_stable",
+    "rollout_state": "public_stable",
+    "supportability_state": "gold_supported",
+    "known_issue_summary": "Current release proof is green, including current cross-platform startup-smoke and executable-gate proof for the promoted flagship bytes."
+  },
+  "mirrors": {
+    "external_required": false,
+    "required_providers": [
+      "local_registry",
+      "public_edge"
+    ],
+    "providers": {
+      "local_registry": "pass",
+      "public_edge": "pass",
+      "pcloud": "pass",
+      "onedrive": "pass"
+    }
+  },
+  "rulesets": {
+    "sr4": {
+      "status": null,
+      "workflow_parity_status": "pass",
+      "human_side_gold_assumption": false
+    },
+    "sr5": {
+      "status": null,
+      "workflow_parity_status": null,
+      "human_side_gold_assumption": null
+    },
+    "sr6": {
+      "status": null,
+      "workflow_parity_status": "pass",
+      "human_side_gold_assumption": false
+    }
+  },
+  "ui": {
+    "frame_base_url": "http://127.0.0.1:8091",
+    "frame_checked_pages": 66,
+    "frame_failure_count": 0,
+    "design_verdict": "DESIGN_READY"
+  },
+  "checks": {
+    "release_channel": {
+      "path": "/docker/chummercomplete/chummer-hub-registry/.codex-studio/published/RELEASE_CHANNEL.generated.json",
+      "exists": true,
+      "status": "published",
+      "verdict": null,
+      "generated_at_utc": "2026-06-12T12:29:42Z",
+      "pass": true
+    },
+    "external_distribution_mirror_proof": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-06-12T18:57:00Z",
+      "pass": true
+    },
+    "ruleset_readiness": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-06-12T18:56:45.780339Z",
+      "pass": true
+    },
+    "ui_frame_integrity": {
+      "path": "/docker/chummercomplete/_completion/chummer_run_redesign_closure/UI_FRAME_INTEGRITY.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "READY",
+      "generated_at_utc": "2026-06-12T18:58:07.232Z",
+      "pass": true
+    },
+    "design_quality_gate": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "DESIGN_READY",
+      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "pass": true
+    },
+    "public_copy_leak_gate": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "pass": true
+    },
+    "release_ready": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "RELEASE_READY",
+      "generated_at_utc": "2026-06-12T18:56:44Z",
+      "pass": true,
+      "release_blocking": false
+    },
+    "final_gold_janitor": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/FINAL_GOLD_JANITOR.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": "GOLD_READY",
+      "generated_at_utc": "2026-06-12T18:41:39Z",
+      "pass": true,
+      "release_blocking": false
+    },
+    "google_oauth_linking_proof": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/GOOGLE_OAUTH_LINKING_PROOF.generated.json",
+      "exists": true,
+      "status": "pass",
+      "verdict": null,
+      "generated_at_utc": "2026-05-08T20:02:00.000000Z",
+      "pass": true,
+      "release_blocking": false
+    }
+  },
+  "failures": []
+}

@@ -2,11 +2,14 @@ import { expect, test } from 'playwright/test';
 import { writeJsonArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
+const gotoOptions = { waitUntil: 'domcontentloaded' as const, timeout: 45000 };
 
 test('black ledger globe mode switching and replay produce visible state changes', async ({ page }) => {
-  await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'domcontentloaded' });
-
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${baseUrl}/ledger/map#ledger-map`, gotoOptions);
   const root = page.locator('#ledger-map [data-black-ledger-geoscape-root]').first();
+  await expect(root).toHaveAttribute('data-ready', 'true');
+
   await expect(root).toBeVisible();
   await expect(page.locator('#ledger-map')).toBeVisible();
   await expect(root.getByRole('button', { name: 'Influence' })).toBeVisible();
@@ -46,9 +49,11 @@ test('black ledger globe mode switching and replay produce visible state changes
 
 test('black ledger globe honors reduced motion with step replay', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto(`${baseUrl}/ledger/map#ledger-map`, { waitUntil: 'domcontentloaded' });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${baseUrl}/ledger/map#ledger-map`, gotoOptions);
 
   const root = page.locator('#ledger-map [data-black-ledger-geoscape-root]').first();
+  await expect(root).toHaveAttribute('data-ready', 'true');
   await expect(root).toHaveAttribute('data-reduced-motion', 'true');
 
   const states: string[] = [];

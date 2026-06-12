@@ -9,6 +9,8 @@ using Chummer.Contracts.Characters;
 using Chummer.Run.Contracts.PublicSurface;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using System.Net;
+using System.Text.Json;
 
 namespace Chummer.Run.Api.Controllers;
 
@@ -182,7 +184,22 @@ public sealed class InstallLinkingController : ControllerBase
             PublicReleaseArtifactDto? artifact = ResolveBrowserCallbackArtifact(manifest, headId, platform, arch);
             if (artifact is null)
             {
-                return Problem(statusCode: StatusCodes.Status404NotFound, detail: "no published desktop artifact matches this install.");
+                return BuildBrowserInstallLinkStatusPage(
+                    statusCode: StatusCodes.Status404NotFound,
+                    heading: "This install needs a current desktop package",
+                    supportLine: "Chummer could not match this app handoff to a published desktop artifact. Open Downloads for the current installer, or contact support with this install identity attached.",
+                    primaryLabel: "Open downloads",
+                    primaryHref: "/downloads",
+                    secondaryLabel: "Open install support",
+                    secondaryHref: BuildInstallSupportHref(installationId, applicationVersion, releaseChannel, headId, platform, arch),
+                    stateLabel: "Install link not matched",
+                    highlights:
+                    [
+                        $"Install: {NormalizeBrowserInstallLinkLabel(installationId, "unknown")}",
+                        $"Requested build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}",
+                        $"Requested target: {NormalizeBrowserInstallLinkLabel(headId, "desktop")} {NormalizeBrowserInstallLinkLabel(platform, "unknown")} {NormalizeBrowserInstallLinkLabel(arch, "unknown")}"
+                    ],
+                    autoOpenHref: null);
             }
 
             IssueInstallBrowserCallbackResponseDto issued = _installLinking.IssueBrowserCallback(
@@ -201,7 +218,7 @@ public sealed class InstallLinkingController : ControllerBase
                 user.UserId,
                 subject.SubjectId);
 
-            return Redirect(BuildBrowserInstallCallbackRedirectUri(
+            string callbackRedirectUri = BuildBrowserInstallCallbackRedirectUri(
                 normalizedCallbackUri,
                 issued.Callback.CallbackCode,
                 installationId ?? string.Empty,
@@ -209,7 +226,23 @@ public sealed class InstallLinkingController : ControllerBase
                 applicationVersion ?? manifest.Version,
                 releaseChannel ?? manifest.Channel,
                 platform ?? artifact.PlatformId ?? artifact.Platform ?? "unknown",
-                arch ?? artifact.Arch ?? "unknown"));
+                arch ?? artifact.Arch ?? "unknown");
+            return BuildBrowserInstallLinkStatusPage(
+                statusCode: StatusCodes.Status200OK,
+                heading: "Open Chummer to finish linking this install",
+                supportLine: "Your account approved this install. If the app does not open automatically, use the button below from this same browser.",
+                primaryLabel: "Open Chummer",
+                primaryHref: callbackRedirectUri,
+                secondaryLabel: "Open devices and access",
+                secondaryHref: "/account/access",
+                stateLabel: "Install link ready",
+                highlights:
+                [
+                    $"Install: {NormalizeBrowserInstallLinkLabel(installationId, issued.Callback.InstallationId)}",
+                    $"Package: {artifact.Id}",
+                    $"Build: {NormalizeBrowserInstallLinkLabel(applicationVersion, manifest.Version)}"
+                ],
+                autoOpenHref: callbackRedirectUri);
         }
         catch (HubRequestAuthException ex) when (ex.StatusCode is StatusCodes.Status401Unauthorized or StatusCodes.Status403Forbidden)
         {
@@ -224,6 +257,97 @@ public sealed class InstallLinkingController : ControllerBase
             return Problem(statusCode: ex.StatusCode, detail: ex.Message);
         }
     }
+
+    private static ContentResult BuildBrowserInstallLinkStatusPage(
+        int statusCode,
+        string heading,
+        string supportLine,
+        string primaryLabel,
+        string primaryHref,
+        string secondaryLabel,
+        string secondaryHref,
+        string stateLabel,
+        IReadOnlyList<string> highlights,
+        string? autoOpenHref)
+    {
+        string autoOpenScript = string.IsNullOrWhiteSpace(autoOpenHref)
+            ? string.Empty
+            : $$"""
+              <script>
+              (() => {
+                const href = {{JsonSerializer.Serialize(autoOpenHref)}};
+                window.setTimeout(() => {
+                  window.location.href = href;
+                }, 300);
+              })();
+              </script>
+              """;
+        string highlightsHtml = string.Join(
+            string.Empty,
+            highlights.Select(item => $"<li>{WebUtility.HtmlEncode(item)}</li>"));
+        string html = $$"""
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+              <title>{{WebUtility.HtmlEncode(heading)}} · Chummer</title>
+              <link rel="stylesheet" href="/css/site.css">
+            </head>
+            <body class="surface-auth">
+              <main class="auth-stage">
+                <section class="auth-shell auth-shell--message">
+                  <div class="auth-shell__story auth-visual">
+                    <p class="auth-visual__eyebrow">{{WebUtility.HtmlEncode(stateLabel)}}</p>
+                    <h1 class="hero-brand">CHUMMER</h1>
+                    <h2 class="hero-headline">{{WebUtility.HtmlEncode(heading)}}</h2>
+                    <p class="auth-visual__copy">{{WebUtility.HtmlEncode(supportLine)}}</p>
+                  </div>
+                  <div class="auth-panel auth-panel--message">
+                    <ul class="auth-benefits auth-benefits--message">{{highlightsHtml}}</ul>
+                    <div class="stacked-actions">
+                      <a class="button-like button-like--primary" href="{{WebUtility.HtmlEncode(primaryHref)}}">{{WebUtility.HtmlEncode(primaryLabel)}}</a>
+                      <a class="button-like button-like--secondary" href="{{WebUtility.HtmlEncode(secondaryHref)}}">{{WebUtility.HtmlEncode(secondaryLabel)}}</a>
+                    </div>
+                  </div>
+                </section>
+              </main>
+              {{autoOpenScript}}
+            </body>
+            </html>
+            """;
+        return new ContentResult
+        {
+            StatusCode = statusCode,
+            ContentType = "text/html; charset=utf-8",
+            Content = html
+        };
+    }
+
+    private static string BuildInstallSupportHref(
+        string? installationId,
+        string? applicationVersion,
+        string? releaseChannel,
+        string? headId,
+        string? platform,
+        string? arch)
+    {
+        Dictionary<string, string?> query = new(StringComparer.Ordinal)
+        {
+            ["kind"] = "install_help",
+            ["installationId"] = installationId,
+            ["applicationVersion"] = applicationVersion,
+            ["releaseChannel"] = releaseChannel,
+            ["headId"] = headId,
+            ["platform"] = platform,
+            ["arch"] = arch
+        };
+        return QueryHelpers.AddQueryString("/contact", query);
+    }
+
+    private static string NormalizeBrowserInstallLinkLabel(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 
     [HttpPost("continuation")]
     [ProducesResponseType<DesktopInstallNativeContinuationResponse>(StatusCodes.Status200OK)]
@@ -1100,15 +1224,20 @@ public sealed class InstallLinkingController : ControllerBase
             return 0;
         }
 
-        if (!TryScoreArtifactField(artifact.PlatformId, installation.Platform, 2, ref score)
-            && !TryScoreArtifactField(artifact.Platform, installation.Platform, 2, ref score))
+        if (!TryScoreArtifactPlatform(artifact, installation.Platform, 2, ref score))
         {
             return 0;
         }
 
-        if (!TryScoreArtifactField(artifact.Arch, installation.Arch, 1, ref score))
+        if (!TryScoreArtifactArch(artifact, installation.Arch, 1, ref score))
         {
             return 0;
+        }
+
+        if (string.Equals(artifact.Kind, "installer", StringComparison.OrdinalIgnoreCase)
+            || artifact.Id.EndsWith("-installer", StringComparison.OrdinalIgnoreCase))
+        {
+            score += 3;
         }
 
         return score;
@@ -1128,6 +1257,133 @@ public sealed class InstallLinkingController : ControllerBase
 
         score += fieldScore;
         return true;
+    }
+
+    private static bool TryScoreArtifactPlatform(PublicReleaseArtifactDto artifact, string? installationPlatform, int fieldScore, ref int score)
+    {
+        if (string.IsNullOrWhiteSpace(installationPlatform))
+        {
+            return true;
+        }
+
+        string normalizedInstallPlatform = NormalizeInstallPlatform(installationPlatform);
+        string[] artifactPlatforms =
+        [
+            NormalizeInstallPlatform(artifact.PlatformId),
+            NormalizeInstallPlatform(artifact.Platform),
+            NormalizeInstallPlatform(PlatformFromRid(artifact.PlatformId)),
+            NormalizeInstallPlatform(PlatformFromRid(artifact.Id))
+        ];
+
+        if (!artifactPlatforms.Any(value => string.Equals(value, normalizedInstallPlatform, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        score += fieldScore;
+        return true;
+    }
+
+    private static bool TryScoreArtifactArch(PublicReleaseArtifactDto artifact, string? installationArch, int fieldScore, ref int score)
+    {
+        if (string.IsNullOrWhiteSpace(installationArch))
+        {
+            return true;
+        }
+
+        string normalizedInstallArch = NormalizeInstallArch(installationArch);
+        string[] artifactArchitectures =
+        [
+            NormalizeInstallArch(artifact.Arch),
+            NormalizeInstallArch(ArchFromRid(artifact.PlatformId)),
+            NormalizeInstallArch(ArchFromRid(artifact.Id))
+        ];
+
+        if (!artifactArchitectures.Any(value => string.Equals(value, normalizedInstallArch, StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        score += fieldScore;
+        return true;
+    }
+
+    private static string NormalizeInstallPlatform(string? value)
+    {
+        string token = NormalizeResponseValue(value).ToLowerInvariant();
+        return token switch
+        {
+            "win" or "win32" or "win64" or "windows-x64" or "windows-arm64" or "win-x64" or "win-arm64" => "windows",
+            "osx" or "mac" or "darwin" or "macos-x64" or "macos-arm64" or "osx-x64" or "osx-arm64" => "macos",
+            "linux-x64" or "linux-arm64" => "linux",
+            _ when token.Contains("windows", StringComparison.OrdinalIgnoreCase) => "windows",
+            _ when token.Contains("macos", StringComparison.OrdinalIgnoreCase) => "macos",
+            _ when token.Contains("linux", StringComparison.OrdinalIgnoreCase) => "linux",
+            _ => token
+        };
+    }
+
+    private static string NormalizeInstallArch(string? value)
+    {
+        string token = NormalizeResponseValue(value).ToLowerInvariant();
+        return token switch
+        {
+            "amd64" or "x86_64" or "win-x64" or "linux-x64" or "osx-x64" or "windows-x64" => "x64",
+            "aarch64" or "arm64" or "win-arm64" or "linux-arm64" or "osx-arm64" or "windows-arm64" => "arm64",
+            _ when token.EndsWith("-x64", StringComparison.OrdinalIgnoreCase) => "x64",
+            _ when token.EndsWith("-arm64", StringComparison.OrdinalIgnoreCase) => "arm64",
+            _ => token
+        };
+    }
+
+    private static string? PlatformFromRid(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string token = value.Trim();
+        if (token.Contains("win-x64", StringComparison.OrdinalIgnoreCase)
+            || token.Contains("win-arm64", StringComparison.OrdinalIgnoreCase))
+        {
+            return "windows";
+        }
+
+        if (token.Contains("osx-x64", StringComparison.OrdinalIgnoreCase)
+            || token.Contains("osx-arm64", StringComparison.OrdinalIgnoreCase))
+        {
+            return "macos";
+        }
+
+        if (token.Contains("linux-x64", StringComparison.OrdinalIgnoreCase)
+            || token.Contains("linux-arm64", StringComparison.OrdinalIgnoreCase))
+        {
+            return "linux";
+        }
+
+        return null;
+    }
+
+    private static string? ArchFromRid(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string token = value.Trim();
+        if (token.Contains("-x64", StringComparison.OrdinalIgnoreCase))
+        {
+            return "x64";
+        }
+
+        if (token.Contains("-arm64", StringComparison.OrdinalIgnoreCase))
+        {
+            return "arm64";
+        }
+
+        return null;
     }
 
     private IReadOnlyList<DesktopInstallSupportContinuationCase> ResolveSupportContinuationCases(

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import unittest
+from urllib.parse import urlparse
 from pathlib import Path
 
 
@@ -9,6 +11,7 @@ CONTROLLER = REPO_ROOT / "Chummer.Run.Api" / "Controllers" / "PublicLandingContr
 VIEW = REPO_ROOT / "Chummer.Run.Api" / "Views" / "PublicLanding" / "Ledger.cshtml"
 BRIEFINGS = REPO_ROOT / "Chummer.Run.Api" / "Services" / "Community" / "BlackLedgerWorldTickBriefingService.cs"
 MODELS = REPO_ROOT / "Chummer.Run.Api" / "ViewModels" / "SiteViewModels.cs"
+TOUR_EXPORTS_MANIFEST = REPO_ROOT / "Chummer.Run.Api" / "wwwroot" / "media" / "ledger" / "tours" / "black-ledger-tour-exports.manifest.json"
 
 
 class BlackLedgerNewsroomRouteTests(unittest.TestCase):
@@ -47,6 +50,27 @@ class BlackLedgerNewsroomRouteTests(unittest.TestCase):
         self.assertIn('string watchHref = $"{ledgerBasePath.TrimEnd(\'/\')}/newsroom/{slug}";', briefing_service)
         self.assertIn("Public-safe bulletin built from aggregate Black Ledger world receipts.", briefing_service)
         self.assertIn("Some footage is reconstructed from public-safe receipts.", briefing_service)
+
+    def test_ledger_map_exposes_real_provider_tour_exports_from_manifest(self) -> None:
+        ledger_view = VIEW.read_text(encoding="utf-8")
+        manifest = json.loads(TOUR_EXPORTS_MANIFEST.read_text(encoding="utf-8"))
+        exports = {item["provider"]: item for item in manifest["exports"]}
+
+        self.assertIn("data-ledger-tour-exports=\"/media/ledger/tours/black-ledger-tour-exports.manifest.json\"", ledger_view)
+        self.assertEqual({"Matterport", "3DVista"}, set(exports))
+        self.assertIn("not Chummer-authored runsite scans", manifest["claimBoundary"])
+        self.assertEqual("/media/ledger/tours/black-ledger-3dvista-flythrough.mp4", manifest["flythrough"]["videoUrl"])
+        self.assertIn("/media/ledger/tours/black-ledger-3dvista-flythrough.mp4", ledger_view)
+
+        for provider, item in exports.items():
+            viewer_url = item["viewerUrl"]
+            parsed = urlparse(viewer_url)
+            self.assertEqual("https", parsed.scheme, provider)
+            self.assertNotIn("placeholder", viewer_url.lower(), provider)
+            self.assertNotIn("localhost", parsed.netloc.lower(), provider)
+            self.assertNotIn("chummer-api", parsed.netloc.lower(), provider)
+            self.assertIn(viewer_url, ledger_view, provider)
+            self.assertEqual("real_external_viewer_link", item["integrationStatus"], provider)
 
 
 if __name__ == "__main__":

@@ -5,10 +5,10 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-karma-forge-submitted";
     ViewData["ContextSidebarHeading"] = "KARMA FORGE receipt";
-    ViewData["ContextSidebarSummary"] = "Keep follow-through, next questions, and saved packet data in the shared side panel.";
+    ViewData["ContextSidebarSummary"] = "Keep next steps, next questions, and saved packet data in the shared side panel.";
     ViewData["ContextSidebarLinks"] = new[]
     {
-        new PublicNavigationLink("Bounded follow-through", "#bounded-followthrough"),
+        new PublicNavigationLink("Bounded next steps", "#bounded-followthrough"),
         new PublicNavigationLink("Next questions", "#next-questions"),
         new PublicNavigationLink("Next steps", "#next-steps"),
         new PublicNavigationLink("Saved packet data", "#packet-json"),
@@ -83,7 +83,7 @@
 
 <section class="editorial-block" id="bounded-followthrough">
     <div class="editorial-block__lead">
-        <p class="eyebrow">Bounded follow-through</p>
+        <p class="eyebrow">Bounded next steps</p>
         <h2 class="editorial-title">The next governed stages stay explicit from follow-up through closeout.</h2>
         <p class="editorial-copy">These lanes can sharpen, validate, schedule, review, decide, or close out the packet. None of them become product truth on their own unless the first-party decision step says so.</p>
     </div>
@@ -122,7 +122,7 @@
 <section class="trust-page-layout">
     <div class="trust-page-sections">
         <article class="trust-page-section" id="next-questions">
-            <p class="eyebrow">Follow-through queue</p>
+            <p class="eyebrow">Next questions queue</p>
             <h2>Questions that should sharpen the next pass</h2>
             <p>@(Model.FollowUpAllowed ? "Follow-up is allowed, so these are the most likely questions Chummer will ask next if this packet stays high-signal." : "Follow-up is off, but these are still the canonical prompts that would sharpen the packet if you return later.")</p>
             <ul class="trust-page-section__list">

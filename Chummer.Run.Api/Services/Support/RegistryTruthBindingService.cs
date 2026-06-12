@@ -108,15 +108,15 @@ public sealed class RegistryTruthBindingService
             Summary: summary,
             EvidenceLines:
             [
-                "Known issues and install help stays nearby on the downloads shelf instead of becoming a second release page.",
+                "Known issues and install help stay nearby on the downloads page instead of becoming a second release page.",
                 $"Current supportability posture is {ResolveSupportabilityState(manifest)}.",
                 ResolveFixAvailabilitySummary(manifest)
             ],
             Actions:
             [
                 new RegistryTruthBindingActionProjection("open_downloads_help", "Open install help", "/downloads", "Keep install questions on the downloads rail where registry-backed cautions already live."),
-                new RegistryTruthBindingActionProjection("open_status", "Open status", "/status", "Inspect deeper proof and caution evidence when install help needs more than the shelf copy."),
-                new RegistryTruthBindingActionProjection("open_current_release", "Open current release", "/now", "Compare the current release shelf before escalating into support.")
+                new RegistryTruthBindingActionProjection("open_status", "Open status", "/status", "Inspect deeper proof and caution evidence when install help needs more than the page summary."),
+                new RegistryTruthBindingActionProjection("open_current_release", "Open current release", "/now", "Compare the current release page before escalating into support.")
             ],
             EmittedAtUtc: now,
             Locale: locale,
@@ -142,7 +142,7 @@ public sealed class RegistryTruthBindingService
             : $"/downloads/install/{Uri.EscapeDataString(artifact.Id)}";
         string summary = installation is not null
             ? $"Account-aware guidance keeps claimed install {installation.Platform ?? "desktop"} {installation.Version} on registry-backed release truth without changing the published bytes."
-            : $"Receipt {receipt!.ReceiptId} keeps the public shelf open while linked install follow-through stays attached to first-party install truth.";
+            : $"Receipt {receipt!.ReceiptId} keeps the public download path open while linked install continuity stays attached to first-party install truth.";
 
         return new RegistryTruthBindingProjection(
             BindingId: StableId("registry-truth-account-aware", sourceId),
@@ -161,14 +161,14 @@ public sealed class RegistryTruthBindingService
                 "The published packages stay the same for every user; only the short-lived setup assistant and install claims become account-aware.",
                 installation is null
                     ? $"Download receipt {receipt!.ReceiptId} is the first-party install anchor."
-                    : $"Claimed installation {installation.InstallationId} keeps follow-through on /account/access.",
-                $"{ResolveProofStatus(manifest)} proof and {ResolveSupportabilityState(manifest)} supportability still come from the registry shelf."
+                    : $"Claimed installation {installation.InstallationId} keeps continuity on /account/access.",
+                $"{ResolveProofStatus(manifest)} proof and {ResolveSupportabilityState(manifest)} supportability still come from the release registry."
             ],
             Actions:
             [
                 new RegistryTruthBindingActionProjection("open_account_access", "Open Devices & access", "/account/access", "Review the signed-in install continuity rail."),
-                new RegistryTruthBindingActionProjection("open_install_handoff", "Open install route", comparisonRoute, "Compare linked install follow-through with the same published installer shelf."),
-                new RegistryTruthBindingActionProjection("open_downloads", "Open downloads", "/downloads", "Return to the open public shelf that still points at the same bytes.")
+                new RegistryTruthBindingActionProjection("open_install_handoff", "Open install route", comparisonRoute, "Compare linked install continuity with the same published installer route."),
+                new RegistryTruthBindingActionProjection("open_downloads", "Open downloads", "/downloads", "Return to the public downloads page that still points at the same bytes.")
             ],
             EmittedAtUtc: now,
             Locale: locale,

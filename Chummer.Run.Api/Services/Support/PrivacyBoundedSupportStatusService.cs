@@ -262,8 +262,8 @@ public sealed class PrivacyBoundedSupportStatusService
             Actions:
             [
                 new PrivacyBoundedSupportStatusActionProjection("open_privacy", "Open privacy", "/privacy", "Review the privacy and retention boundary."),
-                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", "/account/support", "Inspect the signed-in followthrough that stays on the bounded clock."),
-                new PrivacyBoundedSupportStatusActionProjection("open_status", "Open status", "/status", "Compare privacy and retention posture with the public release proof shelf.")
+                new PrivacyBoundedSupportStatusActionProjection("open_account_support", "Open account support", "/account/support", "Inspect the signed-in support continuity that stays on the bounded clock."),
+                new PrivacyBoundedSupportStatusActionProjection("open_status", "Open status", "/status", "Compare privacy and retention posture with the public release evidence.")
             ],
             EmittedAtUtc: now,
             Locale: locale,

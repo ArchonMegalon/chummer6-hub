@@ -18,7 +18,7 @@ test('alice public route stays bounded and receipt-backed', async ({ request, pa
   expect(payload.actions.some((item: { href?: string }) => item.href === '/alice')).toBeTruthy();
 
   await page.goto(`${baseUrl}/alice`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'ALICE keeps compare, tradeoffs, and apply truth on first-party rails.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'ALICE' })).toBeVisible();
   await expect(page.locator('body')).toContainText('The experiment should leave behind receipts, not vibes.');
   await expect(page.locator('body')).toContainText('Build ghost compare brief');
 

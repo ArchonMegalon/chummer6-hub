@@ -500,7 +500,7 @@ public sealed class PublicLandingController : Controller
                 chromeDescription: "Track package follows, votes, and package return posture from the same signed-in rail as installs and support.",
                 eyebrow: "Signed-in package rail",
                 heading: "Account packages",
-                intro: "Votes, follows, and package return posture stay attached to the same account rail that already owns installs, recovery, and support follow-through.",
+                intro: "Votes, follows, and package return posture stay attached to the same account rail that already owns installs, recovery, and support history.",
                 scopeLabel: "Account rail",
                 signedInScope: true,
                 operatorScope: false,
@@ -1218,7 +1218,7 @@ public sealed class PublicLandingController : Controller
             [
                 "Download the supplemental installer directly from this page.",
                 "Install and validate the current Windows build.",
-                "Use install help and support if this specific Windows installer needs follow-through."
+                "Use install help and support if this specific Windows installer needs more help."
             ],
             TrustPulse: BuildPublicTrustPulsePanel(manifest, release),
             SignedInStatus: await BuildSignedInTrustStatusPanelAsync(manifest, release, cancellationToken));
@@ -1543,7 +1543,7 @@ public sealed class PublicLandingController : Controller
                 HandoffDetailHrefTemplate = "/account/alice/{handoffId}",
                 HandoffIndexApiHref = "/api/v1/campaign-spine/me/build-handoffs",
                 HandoffDetailApiHrefTemplate = "/api/v1/campaign-spine/me/build-handoffs/{handoffId}",
-                Summary = "Signed-in ALICE opens the first-party build handoff bench, where compare follow-through, planner coverage, tradeoffs, and apply-safe outputs stay on account-owned rails."
+                Summary = "Signed-in ALICE opens the first-party build handoff bench, where compare history, planner coverage, tradeoffs, and apply-safe outputs stay on account-owned rails."
             }
         });
     }
@@ -1723,7 +1723,7 @@ public sealed class PublicLandingController : Controller
             currentPath: "/table-pulse",
             eyebrow: "Shipped split rail",
             heading: "TABLE PULSE",
-            intro: "TABLE PULSE is now a real product surface, not just a redirect. Live pressure stays on the signed-in command lane. GM-private aftermath packages stay on a separate receipt-backed rail so heat, recap, and follow-through do not collapse into surveillance or vague drama text.",
+            intro: "TABLE PULSE is now a real product surface, not just a redirect. Live pressure stays on the signed-in command lane. GM-private aftermath packages stay on a separate receipt-backed rail so heat, recap, and next steps do not collapse into surveillance or vague drama text.",
             sections:
             [
                 new TrustPageSectionViewModel(
@@ -1744,7 +1744,7 @@ public sealed class PublicLandingController : Controller
                     [
                         "Workspace aftermath recap packages stay receipt-backed.",
                         "Downtime, carry-forward, and campaign-memory cues stay on one governed return lane.",
-                        "The rail is private GM follow-through, not public scoring or moderation truth."
+                        "The rail is private GM recap and next-step work, not public scoring or moderation truth."
                     ]),
                 new TrustPageSectionViewModel(
                     "table_pulse_boundary",
@@ -1797,7 +1797,7 @@ public sealed class PublicLandingController : Controller
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/aftermath-recap-packages",
                     "/api/v1/campaign-spine/me/workspaces/{workspaceId}/downtime-aftermath"
                 },
-                Summary = "GM-private aftermath recap, downtime carry-forward, and campaign-memory follow-through remain receipt-backed and separate from the live rail."
+                Summary = "GM-private aftermath recap, downtime carry-forward, and campaign-memory next steps remain receipt-backed and separate from the live rail."
             },
             Boundaries = new[]
             {
@@ -1843,7 +1843,7 @@ public sealed class PublicLandingController : Controller
                 PublicationIndexApiHref = "/api/v1/campaign-spine/me/publications",
                 PublicationDetailApiHrefTemplate = "/api/v1/campaign-spine/me/publications/{publicationId}",
                 ArtifactDetailHrefTemplate = "/artifacts/publications/{publicationId}",
-                Summary = "Signed-in JACKPOINT keeps publication review, public-shelf truth, and campaign-return publication follow-through on first-party rails."
+                Summary = "Signed-in JACKPOINT keeps publication review, public publication truth, and campaign-return publication history on first-party rails."
             },
             Boundary = new
             {
@@ -2479,7 +2479,7 @@ public sealed class PublicLandingController : Controller
                 PublicationDetailHrefTemplate = "/account/creator/{publicationId}",
                 PublicationFallbackDetailHrefTemplate = "/account/work/publications/{publicationId}",
                 PublicDetailHrefTemplate = "/artifacts/publications/{publicationId}",
-                Summary = "Signed-in Creator OS keeps publication draft, review, publish, and campaign-return follow-through on first-party account rails."
+                Summary = "Signed-in Creator OS keeps publication draft, review, publish, and campaign-return history on first-party account rails."
             },
             Boundary = new
             {
@@ -4473,7 +4473,7 @@ public sealed class PublicLandingController : Controller
                 Chrome: chrome,
                 Eyebrow: "Package route receipt",
                 Heading: $"{BuildPackageActionLabel(receipt.ActionKind)} recorded",
-                Intro: "This receipt stays inside Chummer-owned package routes so package interest, compatibility posture, and later follow-through do not disappear into an external board or generic support thread.",
+                Intro: "This receipt stays inside Chummer-owned package routes so package interest, compatibility posture, and later next steps do not disappear into an external board or generic support thread.",
                 Package: packageEntry,
                 Receipt: receiptCard,
                 PrimaryAction: new TrustPageActionViewModel("Open package detail", $"/packages/{Uri.EscapeDataString(package.PackageId)}", "primary"),
@@ -4646,10 +4646,10 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/jackpoint",
             title: "JACKPOINT",
-            description: "Player-safe dossier cards, mission briefs, and first-party publication follow-through.",
+            description: "Player-safe dossier cards, mission briefs, and first-party publication history.",
             eyebrow: "Publication horizon",
             heading: "JACKPOINT",
-            intro: "JACKPOINT now ships a real first-party briefing network: public-safe dossier and mission packets stay readable on the open rail, while signed-in publication review and campaign-return publication follow-through stay on named account routes.",
+            intro: "JACKPOINT now ships a real first-party briefing network: public-safe dossier and mission packets stay readable on the open rail, while signed-in publication review and campaign-return publication history stay on named account routes.",
             boundaryLine: "Player-safe dossier and mission-brief output only. GM-private spoilers, draft publication notes, and private campaign return state stay signed-in.",
             summaryPoints: ["Dossier cards", "Mission brief packets", "Signed-in publication desk"],
             documents: briefings,
@@ -4687,10 +4687,10 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/run-control",
             title: "RUN CONTROL",
-            description: "Session board, active-scene continuity, reconnect posture, and first-party GM operations follow-through.",
+            description: "Session board, active-scene continuity, reconnect posture, and first-party GM operations history.",
             eyebrow: "GM operations horizon",
             heading: "RUN CONTROL",
-            intro: "RUN CONTROL now ships a real first-party GM operations lane: public-safe board posture stays readable, while signed-in session control, active-scene continuity, reconnect-safe run follow-through, and recap return stay on named campaign-spine rails.",
+            intro: "RUN CONTROL now ships a real first-party GM operations lane: public-safe board posture stays readable, while signed-in session control, active-scene continuity, reconnect-safe run history, and recap return stay on named campaign-spine rails.",
             boundaryLine: "GM-control surface only. RUN CONTROL does not replace the rules engine, become a generic chat suite, or let hidden state outrank campaign truth.",
             summaryPoints: ["Session board packet", "Continuity packet", "Signed-in control desk"],
             documents:
@@ -4723,10 +4723,10 @@ public sealed class PublicLandingController : Controller
         return await BuildMediaArtifactHorizonPageModel(
             currentPath: "/onramp",
             title: "ONRAMP",
-            description: "Guided starter lane, recovery posture, and first-session follow-through without fake automation.",
+            description: "Guided starter lane, recovery posture, and first-session continuity without fake automation.",
             eyebrow: "Guided mastery horizon",
             heading: "ONRAMP",
-            intro: "ONRAMP now ships a bounded first-party starter lane: public-safe starter and recovery packets stay readable, while signed-in starter workspace, continuity restore, and first-session follow-through stay on named campaign-spine rails.",
+            intro: "ONRAMP now ships a bounded first-party starter lane: public-safe starter and recovery packets stay readable, while signed-in starter workspace, continuity restore, and first-session history stay on named campaign-spine rails.",
             boundaryLine: "Guided starter surface only. ONRAMP does not auto-build characters, invent legality, or let tutorial theater outrank core receipts and signed-in restore truth.",
             summaryPoints: ["Starter lane packet", "Recovery lane packet", "Signed-in starter desk"],
             documents:
@@ -4884,7 +4884,7 @@ public sealed class PublicLandingController : Controller
             description: "Governed publication discovery, trust posture, and campaign return loops.",
             eyebrow: "Creator horizon",
             heading: "Creator OS",
-            intro: "Creator OS now ships a real first-party publication network: governed discovery stays public-safe, while signed-in draft review, publication state, and campaign-return follow-through stay on named account rails.",
+            intro: "Creator OS now ships a real first-party publication network: governed discovery stays public-safe, while signed-in draft review, publication state, and campaign-return history stay on named account rails.",
             boundaryLine: "Creator truth comes from Chummer-owned publication receipts and signed-in review state. Provider dashboards, external shelves, and asset hosts stay off the truth lane.",
             summaryPoints:
             [
@@ -4933,7 +4933,7 @@ public sealed class PublicLandingController : Controller
                     "Inspect the named targets and focus routes that keep expert speed on first-party rails.",
                     "/quicksilver/packets/jump_targets.md",
                     "/quicksilver/packets/jump_targets.json",
-                    ["Focus routes", "API deck", "Account-owned follow-through"])
+                    ["Focus routes", "API deck", "Account-owned history"])
             ],
             primaryAction: new TrustPageActionViewModel(subject is null ? "Sign in for Quicksilver" : "Open Quicksilver", subject is null ? "/login?next=%2Faccount%2Fquicksilver" : "/account/quicksilver", "primary"),
             secondaryAction: new TrustPageActionViewModel("Open command receipt", "/quicksilver/receipts/command-network.json", "secondary"),
@@ -5016,7 +5016,7 @@ public sealed class PublicLandingController : Controller
             Eyebrow: "Command horizon",
             Heading: "Signal Deck",
             Intro: "Signal Deck now has a real first-party route: governed command pressure, consequence posture, and aftermath continuity stay attached to the same signed-in Table Pulse Live rail instead of disappearing into generic recap copy.",
-            BoundaryLine: "Signal Deck is a first-party command and follow-through surface. It can show governed pressure and consequence posture, but it does not become automatic world authority, a hidden moderation score, or a private transcript lane.",
+            BoundaryLine: "Signal Deck is a first-party command and continuity surface. It can show governed pressure and consequence posture, but it does not become automatic world authority, a hidden moderation score, or a private transcript lane.",
             SummaryPoints:
             [
                 consequenceCount > 0 ? $"{consequenceCount} governed consequence cue(s) live" : "Command rail armed",
@@ -5231,7 +5231,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in publication desk",
-                    Summary: "Sign in to open the governed Creator OS desk where publication review, publish state, and campaign-return follow-through stay on first-party rails.",
+                    Summary: "Sign in to open the governed Creator OS desk where publication review, publish state, and campaign-return history stay on first-party rails.",
                     Href: "/login?next=%2Faccount%2Fcreator",
                     StatusLabel: "Sign-in"),
                 new(
@@ -5274,13 +5274,13 @@ public sealed class PublicLandingController : Controller
                 Label: "Signed-in publication desk",
                 Summary: publications.Count == 0
                     ? "No governed publication is attached to this account yet. Creator OS is ready to open the named desk as soon as a workspace publishes one."
-                    : $"{publications.Count} publication(s) are already visible on your signed-in rail, with review, publish state, and campaign-return follow-through on one account path.",
+                    : $"{publications.Count} publication(s) are already visible on your signed-in rail, with review, publish state, and campaign-return history on one account path.",
                 Href: "/account/creator",
                 StatusLabel: publications.Count == 0 ? "Ready" : "Signed-in"),
             new(
                 Label: "Lead publication detail",
                 Summary: leadPublication is null
-                    ? "Use the publication board and public shelf until a governed publication is attached to the signed-in desk."
+                    ? "Use the publication board and public view until a governed publication is attached to the signed-in desk."
                     : $"{leadPublication.PublicationStatus} · {leadPublication.TrustBand}. {leadPublication.CampaignReturnSummary ?? "Campaign-return posture stays attached to the publication."}",
                 Href: leadPublicationHref,
                 StatusLabel: leadPublication is null ? "Desk" : "Typed"),
@@ -5288,14 +5288,14 @@ public sealed class PublicLandingController : Controller
                 Label: "Public shelf boundary",
                 Summary: leadPublication is null
                     ? "Public creator discovery is live, but draft review and provider-side state remain off the public lane."
-                    : $"{leadPublication.Title} is discoverable on the public shelf, but Chummer still owns publication receipts and review state.",
+                    : $"{leadPublication.Title} is discoverable on the public view, but Chummer still owns publication receipts and review state.",
                 Href: publicPublicationHref,
                 StatusLabel: leadPublication is null ? "Public-safe" : "Shelf-linked")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
             Heading: "Creator OS publication rail",
-            Summary: "The named Creator OS rail now carries governed publication discovery, signed-in publication detail, and campaign-return follow-through on one first-party path.",
+            Summary: "The named Creator OS rail now carries governed publication discovery, signed-in publication detail, and campaign-return history on one first-party path.",
             BoundaryLine: "Creator OS can expose public-safe publication detail, but it does not hand publication truth, review state, or campaign return to provider dashboards or generic asset shelves.",
             Cues: cues);
     }
@@ -5327,7 +5327,7 @@ public sealed class PublicLandingController : Controller
 
             return new BlackLedgerConnectedLanePacketViewModel(
                 Heading: "Quicksilver command rail",
-                Summary: "Public command posture is readable without an account, but the actual fast-jump follow-through stays on signed-in first-party rails.",
+                Summary: "Public command posture is readable without an account, but the actual fast-jump history stays on signed-in first-party rails.",
                 BoundaryLine: "Quicksilver speeds up access to trusted Chummer lanes; it does not become a separate rules engine, a hidden automation surface, or a stale cache authority.",
                 Cues: guestCues);
         }
@@ -5370,7 +5370,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in JACKPOINT desk",
-                    Summary: "Sign in to open the governed JACKPOINT publication desk where review, publication truth, and campaign-return follow-through stay on first-party rails.",
+                    Summary: "Sign in to open the governed JACKPOINT publication desk where review, publication truth, and campaign-return history stay on first-party rails.",
                     Href: "/login?next=%2Faccount%2Fjackpoint",
                     StatusLabel: "Sign-in"),
                 new(
@@ -5387,7 +5387,7 @@ public sealed class PublicLandingController : Controller
 
             return new BlackLedgerConnectedLanePacketViewModel(
                 Heading: "JACKPOINT briefing rail",
-                Summary: "Public dossier and briefing packets are readable without an account, but publication review and campaign-return follow-through stay on signed-in first-party rails.",
+                Summary: "Public dossier and briefing packets are readable without an account, but publication review and campaign-return history stay on signed-in first-party rails.",
                 BoundaryLine: "Narration, export, or promotion helpers may assist packaging, but Chummer owns publication truth, provenance, and spoiler boundaries.",
                 Cues: guestCues);
         }
@@ -5427,9 +5427,9 @@ public sealed class PublicLandingController : Controller
                 Label: "Open named desk route",
                 Summary: leadPublication is null
                     ? "The named JACKPOINT desk opens to the first signed-in publication-safe rail, not to a generic docs shelf."
-                    : $"Open the named JACKPOINT desk for {leadPublication.Title} when the next job is publication review or campaign-return follow-through.",
+                    : $"Open the named JACKPOINT desk for {leadPublication.Title} when the next job is publication review or campaign-return history.",
                 Href: detailAccountHref,
-                StatusLabel: leadPublication is null ? "Desk" : "Follow-through")
+                    StatusLabel: leadPublication is null ? "Desk" : "Next step")
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
@@ -5529,7 +5529,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in control desk",
-                    Summary: "Sign in to open the named RUN CONTROL desk where runboard continuity, active scene, and recap follow-through stay on first-party campaign rails.",
+                    Summary: "Sign in to open the named RUN CONTROL desk where runboard continuity, active scene, and recap history stay on first-party campaign rails.",
                     Href: "/login?next=%2Faccount%2Frun-control",
                     StatusLabel: "Sign-in"),
                 new(
@@ -5546,7 +5546,7 @@ public sealed class PublicLandingController : Controller
 
             return new BlackLedgerConnectedLanePacketViewModel(
                 Heading: "RUN CONTROL operations rail",
-                Summary: "Public board posture is readable without an account, but the live session-control follow-through stays on signed-in first-party rails.",
+                Summary: "Public board posture is readable without an account, but the live session-control history stays on signed-in first-party rails.",
                 BoundaryLine: "RUN CONTROL can summarize session posture and continuity, but it does not replace campaign truth, the rules engine, or the dedicated workbench rails.",
                 Cues: guestCues);
         }
@@ -5575,7 +5575,7 @@ public sealed class PublicLandingController : Controller
 
         return new BlackLedgerConnectedLanePacketViewModel(
             Heading: "RUN CONTROL operations rail",
-            Summary: "The named RUN CONTROL rail now carries session board posture, active-scene continuity, reconnect-safe follow-through, and recap return on one first-party path.",
+            Summary: "The named RUN CONTROL rail now carries session board posture, active-scene continuity, reconnect-safe history, and recap return on one first-party path.",
             BoundaryLine: "RUN CONTROL can help a GM operate the table, but it does not become hidden state, a generic collaboration suite, or a truth source outside the campaign spine.",
             Cues: cues);
     }
@@ -5590,7 +5590,7 @@ public sealed class PublicLandingController : Controller
             [
                 new(
                     Label: "Signed-in starter desk",
-                    Summary: "Sign in to open the named ONRAMP desk where starter workspace, first playable session, and restore follow-through stay on first-party account rails.",
+                    Summary: "Sign in to open the named ONRAMP desk where starter workspace, first playable session, and restore history stay on first-party account rails.",
                     Href: "/login?next=%2Faccount%2Fonramp",
                     StatusLabel: "Sign-in"),
                 new(
@@ -5607,7 +5607,7 @@ public sealed class PublicLandingController : Controller
 
             return new BlackLedgerConnectedLanePacketViewModel(
                 Heading: "ONRAMP starter rail",
-                Summary: "Public starter posture is readable without an account, but actual starter workspace and restore follow-through stay on signed-in first-party rails.",
+                Summary: "Public starter posture is readable without an account, but actual starter workspace and restore history stay on signed-in first-party rails.",
                 BoundaryLine: "ONRAMP can guide the first playable session and recovery path, but it does not replace rules truth, hide complexity, or turn background hints into authority.",
                 Cues: guestCues);
         }
@@ -5635,7 +5635,7 @@ public sealed class PublicLandingController : Controller
 
         return new BlackLedgerConnectedLanePacketViewModel(
             Heading: "ONRAMP starter rail",
-            Summary: "The named ONRAMP rail now carries starter workspace, recovery posture, and first playable follow-through on one first-party path.",
+            Summary: "The named ONRAMP rail now carries starter workspace, recovery posture, and first playable history on one first-party path.",
             BoundaryLine: "ONRAMP can reduce first-session friction, but it does not auto-build characters, hide legality, or become a separate authority outside the campaign spine.",
             Cues: cues);
     }
@@ -5784,11 +5784,11 @@ public sealed class PublicLandingController : Controller
                 Counts: new QuicksilverCounts(0, 0, 0, 0),
                 FocusTargets:
                 [
-                    new QuicksilverFocusTarget("builds", "Build handoffs", false, "/account/quicksilver/builds", "/api/v1/campaign-spine/me/build-handoffs", "Jump straight into the governed ALICE follow-through rail."),
+                    new QuicksilverFocusTarget("builds", "Build handoffs", false, "/account/quicksilver/builds", "/api/v1/campaign-spine/me/build-handoffs", "Jump straight into the governed ALICE history rail."),
                     new QuicksilverFocusTarget("rules", "Rules answers", false, "/account/quicksilver/rules", "/account/work", "Jump into the rules answer lane without flattening provenance."),
                     new QuicksilverFocusTarget("runsites", "Prep benches", false, "/account/quicksilver/runsites", "/api/v1/campaign-spine/me/workspace-digests", "Jump into governed prep and workspace continuity."),
                     new QuicksilverFocusTarget("creator", "Creator desk", false, "/account/quicksilver/creator", "/api/v1/campaign-spine/me/publications", "Jump into signed-in publication desks without leaving first-party rails."),
-                    new QuicksilverFocusTarget("briefings", "JACKPOINT desk", false, "/account/quicksilver/briefings", "/api/v1/campaign-spine/me/publications", "Jump into briefing-safe publication follow-through.")
+                    new QuicksilverFocusTarget("briefings", "JACKPOINT desk", false, "/account/quicksilver/briefings", "/api/v1/campaign-spine/me/publications", "Jump into briefing-safe publication history.")
                 ],
                 Boundary: new QuicksilverBoundary(
                     RulesTruth: "Explainability required",
@@ -5834,7 +5834,7 @@ public sealed class PublicLandingController : Controller
                     leadHandoff is not null,
                     leadHandoff is null ? "/account/alice" : $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
                     leadHandoff is null ? "/api/v1/campaign-spine/me/build-handoffs" : $"/api/v1/campaign-spine/me/build-handoffs/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
-                    leadHandoff is null ? "ALICE remains the follow-through lane for governed build compare and apply." : $"{leadHandoff.Title} is ready on the ALICE rail for the next safe jump."),
+                    leadHandoff is null ? "ALICE remains the continuity lane for governed build compare and apply." : $"{leadHandoff.Title} is ready on the ALICE rail for the next safe jump."),
                 new QuicksilverFocusTarget(
                     "rules",
                     "Rules answers",
@@ -5890,7 +5890,7 @@ public sealed class PublicLandingController : Controller
                     DashboardApiHref: "/api/v1/campaign-spine/me/onramp/dashboard",
                     StarterApiHref: "/api/v1/campaign-spine/me/onramp/starter",
                     RecoveryApiHref: "/api/v1/campaign-spine/me/onramp/recovery",
-                    Summary: "Signed-in ONRAMP keeps starter workspace, restore posture, and first-session follow-through on first-party rails."),
+                    Summary: "Signed-in ONRAMP keeps starter workspace, restore posture, and first-session history on first-party rails."),
                 Counts: new OnrampCounts(0, 0, 0, 0),
                 LeadStarter: null,
                 Recovery: new OnrampRecoveryTarget(
@@ -5929,7 +5929,7 @@ public sealed class PublicLandingController : Controller
                 DashboardApiHref: "/api/v1/campaign-spine/me/onramp/dashboard",
                 StarterApiHref: "/api/v1/campaign-spine/me/onramp/starter",
                 RecoveryApiHref: "/api/v1/campaign-spine/me/onramp/recovery",
-                Summary: "Signed-in ONRAMP keeps starter workspace, restore posture, and first playable follow-through attached to named first-party rails."),
+                Summary: "Signed-in ONRAMP keeps starter workspace, restore posture, and first playable history attached to named first-party rails."),
             Counts: new OnrampCounts(
                 summary.Campaigns.Count,
                 summary.Workspaces.Count,
@@ -6173,7 +6173,7 @@ public sealed class PublicLandingController : Controller
                     DashboardApiHref: "/api/v1/campaign-spine/me/run-control/dashboard",
                     RunIndexApiHref: "/api/v1/campaign-spine/me/runs",
                     RunDetailApiHrefTemplate: "/api/v1/campaign-spine/me/run-control/runs/{runId}",
-                    Summary: "Signed-in RUN CONTROL keeps live session board, active-scene continuity, and reconnect-safe follow-through on first-party rails."),
+                    Summary: "Signed-in RUN CONTROL keeps live session board, active-scene continuity, and reconnect-safe history on first-party rails."),
                 Counts: new RunControlCounts(0, 0, 0, 0),
                 LeadRun: null,
                 Boundary: new RunControlBoundary(
@@ -6209,7 +6209,7 @@ public sealed class PublicLandingController : Controller
                 DashboardApiHref: "/api/v1/campaign-spine/me/run-control/dashboard",
                 RunIndexApiHref: "/api/v1/campaign-spine/me/runs",
                 RunDetailApiHrefTemplate: "/api/v1/campaign-spine/me/run-control/runs/{runId}",
-                Summary: "Signed-in RUN CONTROL keeps session board, active-scene continuity, and recap-safe GM follow-through on named first-party rails."),
+                Summary: "Signed-in RUN CONTROL keeps session board, active-scene continuity, and recap-safe GM history on named first-party rails."),
             Counts: new RunControlCounts(
                 summary.Campaigns.Count,
                 summary.Workspaces.Count,
@@ -6506,7 +6506,7 @@ LOCAL CO-PROCESSOR now ships a bounded optional-acceleration lane.
             return $$"""
 # Run Control continuity packet
 
-RUN CONTROL keeps reconnect-safe GM follow-through on first-party rails.
+RUN CONTROL keeps reconnect-safe GM history on first-party rails.
 
 ## Public board
 
@@ -7406,7 +7406,7 @@ Boundary:
     private static string GuestArtifactViewSummaryForApi(string view) => view switch
     {
         "creator" => "Guest creator shelf view keeps discoverable creator packets, sibling packets, and publication posture together on the public rail.",
-        "public" => "Guest public shelf view keeps proof cards, preview posture, and published creator packets on one inspectable route.",
+        "public" => "Guest public view keeps proof cards, preview posture, and published creator packets on one inspectable route.",
         "personal" => "Personal shelf view requires a signed-in account before private return artifacts can render.",
         "campaign" => "Campaign shelf view requires a signed-in account before shared continuity artifacts can render.",
         _ => "Public proof, preview posture, and governed publication discovery stay on one inspectable artifact rail."
@@ -8045,7 +8045,7 @@ Boundary:
                 EntryLabel: "Open ALICE workbench",
                 LeadHandoffHref: "/account/work",
                 LeadHandoffTitle: "No build handoff yet",
-                LeadHandoffSummary: "Create or restore a runner, then return here to inspect compare follow-through, planner coverage, and apply-safe output lanes.",
+                LeadHandoffSummary: "Create or restore a runner, then return here to inspect compare history, planner coverage, and apply-safe output lanes.",
                 ProofPoints:
                 [
                     "Account-owned handoff lane",
@@ -8063,7 +8063,7 @@ Boundary:
 
         return new BuildGhostSignedInBenchViewModel(
             StatusLabel: "Signed-in ALICE bench ready",
-            Summary: "Your account already has a governed build handoff. Open the named ALICE bench to inspect tradeoffs, planner coverage, rule-environment diff, and output follow-through on the first-party account rail.",
+            Summary: "Your account already has a governed build handoff. Open the named ALICE bench to inspect tradeoffs, planner coverage, rule-environment diff, and output history on the first-party account rail.",
             EntryHref: "/account/alice/open",
             EntryLabel: "Open ALICE workbench",
             LeadHandoffHref: $"/account/alice/{Uri.EscapeDataString(leadHandoff.HandoffId)}",
@@ -8487,7 +8487,7 @@ Boundary:
         var manifest = _releaseSelection.ApplyAccessPolicy(_releases.LoadManifest());
         var chrome = await BuildPublicOrAuthenticatedChromeAsync(
             "KARMA FORGE packet receipt",
-            "The normalized packet, decision path, and follow-through questions for one KARMA FORGE submission.",
+            "The normalized packet, decision path, and next-step questions for one KARMA FORGE submission.",
             $"/participate/karma-forge/submitted/{submission.SubmissionId}",
             cancellationToken);
         var releaseExperience = _releaseSelection.BuildExperience(manifest, Request.Headers.UserAgent.ToString(), chrome.Authenticated);
@@ -8677,7 +8677,7 @@ Boundary:
 
         return segments.Count == 0
             ? null
-            : $"Follow-through opened with {string.Join(" · ", segments)}.";
+            : $"Context opened with {string.Join(" · ", segments)}.";
     }
 
     private static string? NormalizeSupportPrefill(string? value)
@@ -8949,7 +8949,9 @@ Boundary:
             blockers.Add(new GoldReadinessBlockerViewModel(
                 RulesetLabel: rulesetLabel,
                 Summary: summary,
-                NextStep: nextStep,
+                NextStepLabel: nextStep,
+                ReviewStatusLabel: BuildGoldBlockerReviewStatus(blocker),
+                MatrixStatusLabel: BuildGoldBlockerMatrixStatus(blocker),
                 RemainingChecks: blocker.RemainingGates.Select(HumanizeGoldRemainingCheck).ToArray()));
         }
 
@@ -8976,8 +8978,52 @@ Boundary:
             steps.Add("apply the current errata updates");
         }
 
+        if (blocker.SourceBaselineRequired == true)
+        {
+            steps.Add("choose the SR6 source baseline");
+        }
+
         steps.Add("publish the final human review");
         return $"{blocker.RulesetId.ToUpperInvariant()} still needs these steps: {string.Join("; ", steps)}.";
+    }
+
+    private static string BuildGoldBlockerReviewStatus(GoldReadinessRuleAuthorityBlocker blocker)
+    {
+        if (blocker.HumanReviewReady == true)
+        {
+            return "Human review is approved.";
+        }
+
+        if (blocker.HumanReviewPending == true)
+        {
+            return blocker.SourceBaselineRequired == true
+                ? "Human review is pending, including the SR6 source-baseline choice."
+                : "Human review is pending.";
+        }
+
+        return "Human review status is not recorded yet.";
+    }
+
+    private static string BuildGoldBlockerMatrixStatus(GoldReadinessRuleAuthorityBlocker blocker)
+    {
+        if (blocker.VerificationMatrixUnexpectedFailedGates.Count > 0)
+        {
+            return $"{blocker.VerificationMatrixUnexpectedFailedGates.Count} unexpected verification gate(s) need engineering review.";
+        }
+
+        if (string.Equals(blocker.VerificationMatrixStatus, "blocked", StringComparison.OrdinalIgnoreCase))
+        {
+            return blocker.VerificationMatrixFailedGates.Count > 0
+                ? "Verification matrix is blocked only on expected review gates."
+                : "Verification matrix is blocked on review gates.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(blocker.VerificationMatrixStatus))
+        {
+            return $"Verification matrix status: {HumanizeToken(blocker.VerificationMatrixStatus, "Unknown")}.";
+        }
+
+        return "Verification matrix status is not recorded yet.";
     }
 
     private static string HumanizeGoldRemainingCheck(string value)
@@ -9099,7 +9145,7 @@ Boundary:
 
         if (string.Equals(supportabilityState, "gold_supported", StringComparison.OrdinalIgnoreCase))
         {
-            return $"Current public release: {releaseExperience.Display.BuildLabel} on {releaseExperience.Display.ChannelLabel}. {published}";
+            return $"Gold-ready on Public release {releaseExperience.Display.BuildLabel}. {published}";
         }
 
         return $"Preview posture on {releaseExperience.Display.ChannelLabel} {releaseExperience.Display.BuildLabel}. {published}";
@@ -9150,7 +9196,7 @@ Boundary:
             ? manifest.FixAvailabilitySummary!
             : !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
                 ? manifest.SupportabilitySummary!
-                : "No fix follow-through note is published for downloads right now.";
+                : "No fix note is published for downloads right now.";
 
     private static string BuildBlockedLaunchSummary(
         PublicReleaseManifestDto manifest,
@@ -9220,10 +9266,10 @@ Boundary:
             {
                 if (waitingCount == 0 && pendingCount == 0 && openCaseCount == 0)
                 {
-                    return "No open support follow-through is waiting right now.";
+                    return "No open support next step is waiting right now.";
                 }
 
-                return $"{waitingCount} support follow-up item(s) are waiting / {pendingCount} are waiting on a human reply. {openCaseCount} open support case(s) remain.";
+                return $"{waitingCount} support next step(s) are waiting / {pendingCount} are waiting on a human reply. {openCaseCount} open support case(s) remain.";
             }
 
             return BuildTrustPulseClosureHealthSummary(pulse);
@@ -9231,7 +9277,7 @@ Boundary:
 
         return !string.IsNullOrWhiteSpace(manifest.SupportabilitySummary)
             ? manifest.SupportabilitySummary!
-            : "Support follow-through is not mirrored yet.";
+            : "Support history is not mirrored yet.";
     }
 
     private static bool IsBlockedStatus(string? value)
@@ -9292,8 +9338,8 @@ Boundary:
             {
                 PublicReleaseArtifactDto? publishedArtifact = FindPublishedArtifactForInstallation(manifest, installation);
                 return publishedArtifact is null
-                    ? $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. Keep this linked copy on the support-directed lane until the promoted shelf catches up."
-                    : $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. The current public shelf still shows {BuildPublishedArtifactSummary(manifest, releaseExperience, publishedArtifact)}.";
+                    ? $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. Keep this linked copy on the support path until the promoted download catches up."
+                    : $"Support is tracking {followThrough.FixedReleaseLabel} for {installationLabel}. The current downloads page still shows {BuildPublishedArtifactSummary(manifest, releaseExperience, publishedArtifact)}.";
             }
 
             if (followThrough.CanVerifyFix)
@@ -9305,7 +9351,7 @@ Boundary:
         PublicReleaseArtifactDto? artifact = FindPublishedArtifactForInstallation(manifest, installation);
         if (artifact is null)
         {
-            return $"No promoted public-shelf match is published right now for {installationLabel}. Keep this copy linked and use a support-directed lane before moving it.";
+            return $"No promoted download match is published right now for {installationLabel}. Keep this copy linked and use a support path before moving it.";
         }
 
         string publishedSummary = BuildPublishedArtifactSummary(manifest, releaseExperience, artifact);
@@ -9314,7 +9360,7 @@ Boundary:
             return $"{installationLabel} already matches the promoted {publishedSummary}.";
         }
 
-        return $"{installationLabel} reports {installation.Version} on {ResolveChannelLabel(installation.Channel, manifest, releaseExperience)}. The promoted shelf for this install is {publishedSummary}.";
+        return $"{installationLabel} reports {installation.Version} on {ResolveChannelLabel(installation.Channel, manifest, releaseExperience)}. The promoted download for this install is {publishedSummary}.";
     }
 
     private static string BuildSignedInInstallPostureSummary(
@@ -9334,7 +9380,7 @@ Boundary:
 
         if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
         {
-            return $"{ResolveInstallationDisplayLabel(installation)} is linked on {BuildInstallationFootprintSummary(installation)}, and that lane is not on the promoted public shelf right now.";
+            return $"{ResolveInstallationDisplayLabel(installation)} is linked on {BuildInstallationFootprintSummary(installation)}, and that lane is not on the current downloads page right now.";
         }
 
         if (!string.IsNullOrWhiteSpace(manifest.KnownIssueSummary))
@@ -9358,7 +9404,7 @@ Boundary:
         }
 
         return installation is null
-            ? "No linked install is attached yet, so Chummer cannot compare this account against the current shelf or fix lane."
+            ? "No linked install is attached yet, so Chummer cannot compare this account against the current downloads page or fix lane."
             : "No extra install-specific posture warning is published right now.";
     }
 
@@ -9380,8 +9426,8 @@ Boundary:
             {
                 PublicReleaseArtifactDto? artifact = FindPublishedArtifactForInstallation(manifest, installation);
                 return artifact is null
-                    ? $"{fixedReleaseLabel} is the tracked fix target, but this linked install still needs a support-directed update before it can verify."
-                    : $"{fixedReleaseLabel} is the tracked fix target. The promoted shelf for this install is {BuildPublishedArtifactSummary(manifest, releaseExperience, artifact)}.";
+                    ? $"{fixedReleaseLabel} is the tracked fix target, but this linked install still needs a support-path update before it can verify."
+                    : $"{fixedReleaseLabel} is the tracked fix target. The promoted download for this install is {BuildPublishedArtifactSummary(manifest, releaseExperience, artifact)}.";
             }
 
             return $"{fixedReleaseLabel} is the tracked fix target for this account right now.";
@@ -9429,7 +9475,7 @@ Boundary:
 
         if (installation is not null && FindPublishedArtifactForInstallation(manifest, installation) is null)
         {
-            return $"{ResolveInstallationDisplayLabel(installation)} is outside the promoted public shelf right now, so keep it on the support-directed lane until a matching build lands.";
+            return $"{ResolveInstallationDisplayLabel(installation)} is outside the current downloads page right now, so keep it on the support path until a matching build lands.";
         }
 
         if (!string.IsNullOrWhiteSpace(manifest.KnownIssueSummary))
@@ -9605,12 +9651,12 @@ Boundary:
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
                 ? "The linked install route remains the safest option while desktop proof receipts stay review-required."
-                : "The current shelf is still installable, but keep parity-sensitive installs on the review-required lane until current desktop proof receipts are green.";
+                : "The current downloads page is still installable, but keep parity-sensitive installs on the review-required lane until current desktop proof receipts are green.";
         }
 
         string accessSummary = releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
             ? "The linked install route is the recommended path so the install can stay attached."
-            : "The public download is live on the current shelf, and signing in keeps the install linked once you want account-aware follow-through.";
+            : "The public download is live on the current downloads page, and signing in keeps the install linked once you want account-aware history.";
         return $"{releaseExperience.Recommended.Title} on {releaseExperience.Display.ChannelLabel}. {accessSummary}";
     }
 
@@ -9628,7 +9674,7 @@ Boundary:
         {
             return releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable
                 ? "The linked install route stays preferred while desktop proof receipts are still review-required."
-                : "Public downloads are visible, but parity-sensitive follow-through stays on the review-required support lane until current desktop proof receipts are green.";
+                : "Public downloads are visible, but parity-sensitive next steps stay on the review-required support lane until current desktop proof receipts are green.";
         }
 
         if (releaseExperience.Recommended.RequiresAccount && !releaseExperience.GuestDownloadAvailable)
@@ -9638,10 +9684,10 @@ Boundary:
 
         if (releaseExperience.GuestDownloadAvailable)
         {
-            return "The public download is visible now, and signing in adds linked-install follow-through once you want the install attached to your account.";
+            return "The public download is visible now, and signing in adds linked-install history once you want the install attached to your account.";
         }
 
-        return "Linked-install follow-through is available now when you sign in.";
+        return "Linked-install history is available now when you sign in.";
     }
 
     private static string BuildJourneyPulseSummary(PublicTrustPulseSnapshot pulse)
@@ -9750,7 +9796,7 @@ Boundary:
         {
             segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
                 ? "Current local release proof passed."
-                : $"Current local edge proof is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
+                : $"Current local release proof is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
         }
 
         if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)
@@ -9799,7 +9845,7 @@ Boundary:
             return $"{waitingCount} support follow-up item(s) are waiting / {pendingCount} are waiting on a human reply.{openCaseSegment}".Trim();
         }
 
-        return "Support follow-through is waiting on current support evidence.";
+        return "Support next steps are waiting on current support evidence.";
     }
 
     private static string BuildTrustPulseProgressTrendSummary(PublicTrustPulseSnapshot pulse)
@@ -10152,7 +10198,7 @@ Boundary:
         return card.Bucket switch
         {
             "coming_next" => "Compare this horizon with the current preview proof first, then open the deeper roadmap brief only when you need the longer rationale.",
-            "featured_artifacts" => "Use the proof gallery and current release shelf together to verify whether this artifact is live today or still preview-only.",
+            "featured_artifacts" => "Use the proof gallery and current release page together to verify whether this artifact is live today or still preview-only.",
             _ => null
         };
     }
@@ -10167,7 +10213,7 @@ Boundary:
         return card.Bucket switch
         {
             "featured_artifacts" => "This artifact keeps the preview tangible through manifests, provenance, and one truthful next action instead of a vague gallery card.",
-            "coming_next" => "The payoff only becomes real when the horizon moves onto the live proof shelf, but the user value is already explicit here.",
+            "coming_next" => "The payoff only becomes real when the horizon moves onto the live proof view, but the user value is already explicit here.",
             _ => null
         };
     }
@@ -10182,7 +10228,7 @@ Boundary:
 
         return card.Bucket switch
         {
-            "coming_next" => new[] { "Planned product work", "Current proof shelf contrast", "Deeper horizon brief" },
+            "coming_next" => new[] { "Planned product work", "Current proof view contrast", "Deeper horizon brief" },
             "featured_artifacts" => new[] { "Manifest-backed", "Preview or live status", "Next truthful action" },
             _ => Array.Empty<string>()
         };
@@ -12756,11 +12802,11 @@ echo "Help: ${HELP_URL}"
             : "Living Newsroom is armed for this turn, but the signed-in lane has not attached a watch package yet.";
         string livingNewsroomHref = worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1";
         string aftermathSummary = aftermathCount > 0
-            ? $"Governed aftermath currently holds {aftermathCount} package(s), so remote reactions can return as receipts and follow-through instead of disappearing into flavor-only copy."
-            : "No governed aftermath package is attached yet, so follow-through stays armed and bounded until the next safe action writes one.";
+            ? $"Governed aftermath currently holds {aftermathCount} package(s), so remote reactions can return as receipts and next steps instead of disappearing into flavor-only copy."
+            : "No governed aftermath package is attached yet, so the next-step path stays armed and bounded until the next safe action writes one.";
         string aftermathHref = "/account/work#aftermath-packages";
-        string summary = "After a Table Pulse Live reaction resolves, the result should survive as follow-through: Signal Deck keeps the pressure cue visible, and Runner Passport keeps the trust/return story bounded and public-safe.";
-        string boundaryLine = "Follow-through stays on first-party rails only. Signal Deck shows governed consequence posture; Runner Passport shows aggregate trust and continuity proof without leaking private account or moderation detail.";
+        string summary = "After a Table Pulse Live reaction resolves, the result should survive as a durable next step: Signal Deck keeps the pressure cue visible, and Runner Passport keeps the trust/return story bounded and public-safe.";
+        string boundaryLine = "Next steps stay on first-party rails only. Signal Deck shows governed consequence posture; Runner Passport shows aggregate trust and continuity proof without leaking private account or moderation detail.";
 
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
@@ -12780,7 +12826,7 @@ echo "Help: ${HELP_URL}"
                 Href: worldTurnBriefing?.Broadcast?.WatchHref ?? "/ledger/turns/1",
                 StatusLabel: worldTurnBriefing?.Broadcast is null ? "Armed" : "Watch package"),
             new(
-                Label: "Leader follow-through",
+                Label: "Leader next steps",
                 Summary: "Leader briefing stays the escalation lane when a reaction outcome needs another command decision before the next turn packet.",
                 Href: $"/account/ledger/factions/{factionId}/leader-briefing",
                 StatusLabel: "Escalation"),
@@ -12792,7 +12838,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerFollowThroughPacketViewModel(
-            Heading: "Signal Deck and Runner Passport follow-through",
+            Heading: "Signal Deck and Runner Passport continuity",
             Summary: summary,
             SignalDeckSummary: signalDeckSummary,
             RunnerPassportSummary: runnerPassportSummaryText,
@@ -12815,7 +12861,7 @@ echo "Help: ${HELP_URL}"
         string leaderHref = string.IsNullOrWhiteSpace(factionId)
             ? "/account/ledger"
             : $"/account/ledger/factions/{factionId}/leader-briefing";
-        string summary = "Runner Passport is the continuity rail for Table Pulse Live: trust stays public-safe, but the signed-in command loop can still carry inbox reactions, Signal Deck cues, Living Newsroom framing, and Table Pulse Aftermath follow-through on one governed path.";
+        string summary = "Runner Passport is the continuity rail for Table Pulse Live: trust stays public-safe, but the signed-in command loop can still carry inbox reactions, Signal Deck cues, Living Newsroom framing, and Table Pulse Aftermath history on one governed path.";
         string boundaryLine = "Runner Passport exposes aggregate trust and return posture only. It can point to signed-in command lanes, but it does not project private identity, moderation decisions, or transcript detail.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
@@ -12855,7 +12901,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Runner Passport connected lane",
+            Heading: "Runner Passport continuity rail",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);
@@ -12929,8 +12975,8 @@ echo "Help: ${HELP_URL}"
         string leaderHref = string.IsNullOrWhiteSpace(factionId)
             ? "/account/ledger"
             : $"/account/ledger/factions/{factionId}/leader-briefing";
-        string summary = "Living World is the between-session continuity layer for this epic: watch packages, command follow-through, Runner Passport, and aftermath all stay attached to the same governed turn instead of forking into separate systems.";
-        string boundaryLine = "Living World engagement is first-party, governed, and fail-closed. It can frame and carry follow-through, but it does not claim autonomous simulation or detached world authority.";
+        string summary = "Living World is the between-session continuity layer for this epic: watch packages, command continuity, Runner Passport, and aftermath all stay attached to the same governed turn instead of forking into separate systems.";
+        string boundaryLine = "Living World engagement is first-party, governed, and fail-closed. It can frame and carry continuity, but it does not claim autonomous simulation or detached world authority.";
         BlackLedgerFollowThroughCueViewModel[] cues =
         [
             new(
@@ -12943,14 +12989,14 @@ echo "Help: ${HELP_URL}"
             new(
                 Label: "Table Pulse Live inbox",
                 Summary: consequenceCount > 0
-                    ? $"{consequenceCount} consequence cue(s) are already live, so between-session follow-through is attached to governed command truth."
+                    ? $"{consequenceCount} consequence cue(s) are already live, so between-session continuity is attached to governed command truth."
                     : "The signed-in inbox is armed so the next remote reaction can enter the same governed between-session loop.",
                 Href: "/account/ledger/notifications",
                 StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Inbox"),
             new(
                 Label: "Faction command",
                 Summary: string.IsNullOrWhiteSpace(factionId)
-                    ? "Join a faction to bind Living World follow-through to the leader briefing and command deck."
+                    ? "Join a faction to bind Living World continuity to the leader briefing and command deck."
                     : "Leader briefing keeps between-session escalation on the same command rail instead of a detached lore layer.",
                 Href: leaderHref,
                 StatusLabel: string.IsNullOrWhiteSpace(factionId) ? "Sign-in" : "Command-linked"),
@@ -12996,12 +13042,12 @@ echo "Help: ${HELP_URL}"
                 StatusLabel: consequenceCount > 0 ? "Consequence-backed" : "Inbox"),
             new(
                 Label: "Leader briefing",
-                Summary: "Escalate into the GM cockpit when a faction action needs a second command decision, governed adjudication, or a bounded follow-through review.",
+                Summary: "Escalate into the GM cockpit when a faction action needs a second command decision, governed adjudication, or a bounded continuity review.",
                 Href: $"/account/ledger/factions/{factionId}/leader-briefing",
                 StatusLabel: "Cockpit"),
             new(
                 Label: "Runner Passport",
-                Summary: $"Runner Passport is carrying {runnerPassportSummary.ActiveInstallationCount} claimed install(s) and {runnerPassportSummary.ParticipationNotificationCount} participation receipt(s), so faction follow-through stays attached to real runner continuity.",
+                Summary: $"Runner Passport is carrying {runnerPassportSummary.ActiveInstallationCount} claimed install(s) and {runnerPassportSummary.ParticipationNotificationCount} participation receipt(s), so faction continuity stays attached to real runner continuity.",
                 Href: "/passport",
                 StatusLabel: "Trust rail"),
             new(
@@ -13021,7 +13067,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerConnectedLanePacketViewModel(
-            Heading: "Connected faction command lane",
+            Heading: "Faction command rail",
             Summary: summary,
             BoundaryLine: boundaryLine,
             Cues: cues);
@@ -13295,7 +13341,7 @@ echo "Help: ${HELP_URL}"
             "scramble" => new CampaignConsequenceUpdateRequest(
                 Kind: "contact",
                 State: "fragile",
-                Summary: "Scramble adjudication kept the contact network live, but the route is still fragile and needs a follow-through pass.",
+                Summary: "Scramble adjudication kept the contact network live, but the route is still fragile and needs a continuity pass.",
                 ReturnLoopAction: "Review contact fallout",
                 ReturnLoopRoute: "/account/work",
                 Note: "Table Pulse Live remote reaction: scramble"),
@@ -13410,7 +13456,7 @@ echo "Help: ${HELP_URL}"
         ];
 
         return new BlackLedgerGmCockpitPacketViewModel(
-            Heading: "GM cockpit follow-through",
+            Heading: "GM cockpit continuity",
             Summary: summary,
             CommandPosture: commandPosture,
             LivingNewsroomSummary: livingNewsroomSummary,

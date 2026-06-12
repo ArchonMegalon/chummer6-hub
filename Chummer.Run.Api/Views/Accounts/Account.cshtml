@@ -171,9 +171,9 @@
         ? "/account/work#selected-campaign-memory"
         : $"/account/work/workspaces/{Uri.EscapeDataString(selectedWorkspace.WorkspaceId)}#selected-campaign-memory";
     var selectedWorkspaceTablePulseSummary = selectedWorkspaceServerPlane is null
-        ? "This workspace is not attached to a governed server plane yet, so Table Pulse Live follow-through stays armed but cannot write command-to-fallout posture here."
+        ? "This workspace is not attached to a governed server plane yet, so Table Pulse Live continuity stays armed but cannot write command-to-fallout posture here."
         : selectedWorkspaceLeadConsequence is not null
-            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} governed consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath follow-through are attached to real campaign return instead of flavor-only recap copy."
+            ? $"Table Pulse Live is already carrying {selectedWorkspaceConsequences.Count} governed consequence cue(s) on this workspace, so inbox reactions, Signal Deck pressure, and Table Pulse Aftermath continuity are attached to real campaign return instead of flavor-only recap copy."
             : "Table Pulse Live is armed on this workspace even before the next reaction resolves, so the next signed-in inbox packet can return through carry-forward, memory, and Table Pulse Aftermath on the same governed rail.";
     var selectedWorkspaceLivingNewsroomSummary = selectedWorkspaceNextSessionCarryForward is not null
         ? $"Living Newsroom framing is anchored by next-session carry-forward: {selectedWorkspaceNextSessionCarryForward.Summary}"
@@ -220,7 +220,7 @@
 
     if (leadInstallRailSupport is not null)
     {
-        installRailHeading = "Tracked install follow-through";
+        installRailHeading = "Tracked install next steps";
         installRailSummary = $"{leadInstallRailSupport.NextSafeAction} {leadInstallRailSupport.InstallReadinessSummary}";
         installRailPrimaryLabel = leadInstallRailSupport.PrimaryActionLabel;
         installRailPrimaryHref = leadInstallRailSupport.PrimaryActionHref;
@@ -549,7 +549,7 @@
     var accountRailHeadline = showAccessSection
         ? "Devices and access remain the calm recovery path"
         : showSupportSection
-            ? "Support and install follow-through stay attached to this account"
+            ? "Support and install continuity stay attached to this account"
             : installRailHeading;
     var accountRailSummary = showAccessSection
         ? "Relink, reclaim, recovery, and active grant review stay here after the installer or app does the real work. Do not turn this into a browser-first claim ritual."
@@ -1589,7 +1589,7 @@
                             }
                             <div class="settings-summary-row">
                                 <span>Support follow-through</span>
-                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support follow-through stays attached to the linked install and release details that reopen this campaign workspace.")</strong>
+                                <strong>@(selectedWorkspaceServerPlane?.Workspace.SupportClosureSummary ?? "Support continuity stays attached to the linked install and release details that reopen this campaign workspace.")</strong>
                             </div>
                             <div class="settings-summary-row">
                                 <span>Next safe action</span>
@@ -2324,7 +2324,7 @@
                             @if (selectedWorkspaceServerPlane.Runboard is not null)
                             {
                                 <details class="details-drawer">
-                                    <summary>Runboard follow-through</summary>
+                                    <summary>Runboard continuity</summary>
                                     <div class="settings-summary-list">
                                         <div class="settings-summary-row">
                                             <span>Status</span>
@@ -2714,7 +2714,7 @@
                                         </div>
                                         <div class="field">
                                             <label for="aftermathPackageNote">Operator note</label>
-                                            <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath, replay, or next-session follow-through should stay grounded in this package?"></textarea>
+                                            <textarea id="aftermathPackageNote" rows="3" placeholder="What aftermath, replay, or next-session continuity should stay grounded in this package?"></textarea>
                                         </div>
                                         <div id="aftermathPackagePreview" class="settings-summary-list" hidden></div>
                                         <button class="button-like button-like--secondary" type="submit">Generate aftermath or replay package</button>
@@ -2979,7 +2979,7 @@
                                 }
                                 @if (selectedBuildLabHandoff.Outputs.Count > 3)
                                 {
-                                    <li>More outputs: +@(selectedBuildLabHandoff.Outputs.Count - 3) additional governed follow-through items.</li>
+                                    <li>More outputs: +@(selectedBuildLabHandoff.Outputs.Count - 3) additional governed continuity items.</li>
                                 }
                             </ul>
                         }
@@ -3283,9 +3283,9 @@
                                 <form class="settings-form" method="post" action="/account/work/publications/@Uri.EscapeDataString(selectedCreatorPublication.PublicationId)/publish">
                                     @Html.AntiForgeryToken()
                                     <label for="creatorPublicationPublishNotes">Publish notes</label>
-                                    <textarea id="creatorPublicationPublishNotes" name="notes" rows="3" placeholder="State why this publication is ready for governed public discovery and shared-shelf follow-through."></textarea>
+                                    <textarea id="creatorPublicationPublishNotes" name="notes" rows="3" placeholder="State why this publication is ready for governed public discovery and shared-public continuity."></textarea>
                                     <div class="stacked-actions">
-                                        <button class="button-like button-like--primary" type="submit">Publish on public shelf</button>
+                                        <button class="button-like button-like--primary" type="submit">Publish publicly</button>
                                     </div>
                                 </form>
                             }
@@ -3302,7 +3302,7 @@
                 }
                 @if (Model.CampaignSpine.Workspaces.Count == 0)
                 {
-                    <p class="muted-copy">No campaign workspace yet. Use the starter path to seed the first playable session before you come back for deeper work follow-through.</p>
+                    <p class="muted-copy">No campaign workspace yet. Use the starter path to seed the first playable session before you come back for deeper work continuity.</p>
                     <div class="stacked-actions">
                         <button id="seedStarterWorkspaceFromAccount" class="button-like button-like--primary" type="button">Start first playable session</button>
                         <a class="inline-link" href="/home/work">Open starter lane on Home</a>
@@ -4269,7 +4269,7 @@
                                     <article class="app-rail__item">
                                         <span class="tag">Support closure</span>
                                         <div class="app-rail__copy">
-                                            <h3>@(openSupportCases == 0 ? "Quiet support posture" : "Tracked support follow-through")</h3>
+                                            <h3>@(openSupportCases == 0 ? "Quiet support posture" : "Tracked support continuity")</h3>
                                             <p>@(openSupportCases == 0 ? "No tracked support case is blocking organizer guidance right now, so members can stay on the public release and help pages." : $"{openSupportCases} tracked support case(s) are still visible on this account if member guidance needs a real closure reference.")</p>
                                             <p class="muted-copy">@op.SupportEscalationSummary</p>
                                         </div>
@@ -4391,7 +4391,7 @@
                         }
                     </div>
                 }
-                <p class="muted-copy">Contribution cred follows proof, closeout, and useful follow-through. Votes show demand; Chummer-owned proof decides what ships. Public recognition stays off unless you opt in.</p>
+                <p class="muted-copy">Contribution cred follows proof, closeout, and useful continuity. Votes show demand; Chummer-owned proof decides what ships. Public recognition stays off unless you opt in.</p>
                 <p class="muted-copy">Recovery codes stay below as a fallback, not the first instruction.</p>
                 <section class="compact-rail">
                     <article class="compact-rail__item">
@@ -4466,7 +4466,7 @@
                             <article class="compact-rail__item">
                                 <div class="compact-rail__copy">
                                     <h3>Impact journal</h3>
-                                    <p>@(activity.Summary ?? "The internal follow-through bridge recorded a participation event receipt.")</p>
+                                    <p>@(activity.Summary ?? "The internal continuity bridge recorded a participation event receipt.")</p>
                                     <p><strong>@HumanizeStatus(activity.EventType)</strong> · @activity.OccurredAtUtc.ToString("yyyy-MM-dd HH:mm 'UTC'", System.Globalization.CultureInfo.InvariantCulture)</p>
                                 </div>
                             </article>
@@ -4770,7 +4770,7 @@
       case "replay_timeline":
         return `${scopeLabel} keeps contested-turn review in the same governed replay timeline.`;
       case "after_action_report":
-        return `${scopeLabel} keeps after-action review and consequence follow-through on the shared return path.`;
+        return `${scopeLabel} keeps after-action review and consequence continuity on the shared return path.`;
       case "downtime_brief":
         return `${scopeLabel} keeps downtime obligations and next-session readiness grounded on the shared return path.`;
       case "runboard_state":

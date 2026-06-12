@@ -1,1 +1,3 @@
-export * from '../../package-browser.spec';
+import { registerPackageBrowserContractTests } from '../../package-browser.contract';
+
+registerPackageBrowserContractTests();

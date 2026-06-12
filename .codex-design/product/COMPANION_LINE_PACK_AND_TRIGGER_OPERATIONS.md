@@ -16,7 +16,7 @@ companion_content_ops:
     - chummer6-mobile
   review_projection: Teable
   prompt_lab:
-    - Prompting Systems
+    - Prompt Architects
     - ChatPlayground AI
   validation:
     - Icanpreneur

@@ -51,7 +51,7 @@
     var groups = new[]
     {
         new { Badge = "Preparing", Label = PublicSurfaceStatus.PreparingNext, Heading = "Preparing next", Intro = "These horizons are closest to the current public release and the next release-adjacent work." },
-        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need more implementation before they belong on the live shelf." },
+        new { Badge = "Designing", Label = PublicSurfaceStatus.DesigningInPublic, Heading = "Designing in public", Intro = "These horizons have clearer product shape, but they still need more implementation before they belong on the live public release." },
         new { Badge = "Research", Label = PublicSurfaceStatus.ResearchTrack, Heading = "Research track", Intro = "These are worth following early, but they are not current public-release promises yet." }
     };
     var rendered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -136,7 +136,7 @@
     <article class="status-decision-strip__card">
         <span class="tag tag--amber">Research track</span>
         <h2>@researchCount horizon@(researchCount == 1 ? string.Empty : "s") are worth following early without reading them as current-preview promises.</h2>
-        <p>Research remains visible because it explains direction, not because it already belongs on the live shelf or install path.</p>
+        <p>Research remains visible because it explains direction, not because it already belongs on the live public release or install path.</p>
         <a class="button-like button-like--ghost" href="#research">Open research tracks</a>
     </article>
 </section>

@@ -33,7 +33,7 @@ public sealed class PublicLandingClaimRecoveryFlowTests
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains(
-            "Support follow-through stays on the same install page, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.",
+            "Support stays on the same install page, so the support form opens with this installer context instead of splitting recovery into a separate browser ritual.",
             dispatchView,
             StringComparison.Ordinal);
         Assert.Contains("@Model.SupportIntake.InstallAccessHref", File.ReadAllText(RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "TrustPage.cshtml")), StringComparison.Ordinal);

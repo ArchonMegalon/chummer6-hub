@@ -75,6 +75,8 @@ internal sealed class PublicLandingRouteDocument
     public string? VerificationFile { get; init; }
     public string? VerificationPattern { get; init; }
     public string? VerificationPath { get; init; }
+    public string? CloseoutProofBinding { get; init; }
+    public string? HeroPathCloseoutProofBinding { get; init; }
 }
 
 internal sealed class PublicLandingSectionDocument

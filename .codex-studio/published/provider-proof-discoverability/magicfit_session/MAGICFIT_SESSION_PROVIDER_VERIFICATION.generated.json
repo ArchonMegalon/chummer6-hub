@@ -1,0 +1,14 @@
+{
+  "account_isolated_from_product_media": true,
+  "account_role": "gm_session_video_foundry",
+  "browser_workflow": "MagicFitSessionVideoProviderAdapter boundary implemented as approved-prompt-only queue contract.",
+  "commercial_private_use_status": "pending live provider recapture",
+  "direct_publish_allowed": false,
+  "export_rights": "pending live provider recapture",
+  "provider": "MagicFit",
+  "provider_shared_library_risk": "gated: GMs never browse MagicFit directly; Chummer owns canonical face storage.",
+  "queue_isolation_status": "pass",
+  "retention_deletion_behavior": "pending live provider recapture",
+  "tier5_tracked": true,
+  "watermark_status": "pending live provider recapture"
+}

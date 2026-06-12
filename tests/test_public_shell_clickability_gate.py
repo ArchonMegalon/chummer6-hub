@@ -16,6 +16,7 @@ SCRIPT = REPO_ROOT / "scripts" / "verify_public_shell_clickability.py"
 class _PublicShellFixtureHandler(BaseHTTPRequestHandler):
     BAD_COPY = False
     BAD_LINK = False
+    GOOD_HITS = 0
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path in {"/", "/status", "/downloads", "/feedback", "/participate", "/what-is-chummer"}:
@@ -35,6 +36,7 @@ class _PublicShellFixtureHandler(BaseHTTPRequestHandler):
             self._send_html(200, body)
             return
         if self.path == "/good":
+            type(self).GOOD_HITS += 1
             self._send_html(200, "<html><body>ok</body></html>")
             return
         if self.path.startswith("/auth/google/start"):
@@ -59,6 +61,7 @@ class PublicShellClickabilityGateTests(unittest.TestCase):
     def setUp(self) -> None:
         _PublicShellFixtureHandler.BAD_COPY = False
         _PublicShellFixtureHandler.BAD_LINK = False
+        _PublicShellFixtureHandler.GOOD_HITS = 0
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), _PublicShellFixtureHandler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -104,6 +107,13 @@ class PublicShellClickabilityGateTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertEqual(payload["status"], "fail")
         self.assertGreater(payload["summary"]["failed_link_count"], 0)
+
+    def test_gate_reuses_cached_result_for_repeated_same_origin_links(self) -> None:
+        completed, payload = self.run_script()
+
+        self.assertEqual(completed.returncode, 0, msg=completed.stderr or completed.stdout)
+        self.assertEqual(payload["status"], "pass")
+        self.assertEqual(_PublicShellFixtureHandler.GOOD_HITS, 1)
 
 
 if __name__ == "__main__":

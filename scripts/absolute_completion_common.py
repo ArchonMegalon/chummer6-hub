@@ -243,6 +243,7 @@ class LocalHubApp(AbstractContextManager["LocalHubApp"]):
         env["ASPNETCORE_ENVIRONMENT"] = "Development"
         env["ASPNETCORE_URLS"] = self.base_url
         env["TMPDIR"] = str(temp_root)
+        env["CHUMMER_PUBLIC_CANON_ROOT"] = str(RUN_SERVICES_ROOT)
         if self.identity_base_url:
             env["IDENTITY_SERVICE_BASE_URL"] = self.identity_base_url
 

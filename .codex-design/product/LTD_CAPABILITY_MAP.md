@@ -14,7 +14,7 @@ It does not imply that every owned tool must be integrated.
 
 * `1min.AI` - low-cost governed reasoning fallback in `chummer6-hub`
 * `AI Magicx` - structured AI provider and visual/media assistance lane
-* `Prompting Systems` - prompt, style, and persona support for guide, horizon, and media workflows
+* `Prompt Architects` - prompt, style, and persona support for guide, horizon, media, and live runtime planning workflows
 * `BrowserAct` - no-API automation fallback, account verification, capture, and ops bridge
 * `ApproveThis` - approval inbox bridge
 * `ClickRank` - public site visibility, crawl-health, technical SEO, schema, metadata, and AI-search audit lane
@@ -50,6 +50,7 @@ It does not imply that every owned tool must be integrated.
 * `hedy.ai` - bounded post-session transcript structure, highlight digest, and GM debrief helper for `TABLE PULSE AFTERMATH`
 * `Nonverbia` - post-session coaching and social-dynamics analysis lane for `TABLE PULSE AFTERMATH`
 * `Unmixr AI` - candidate voice lane until proven
+* `PayFunnels` - bounded test-billing adapter and entitlement-event simulation lane
 
 ## Research / Parked
 
@@ -138,7 +139,7 @@ The owned LTD stack should be evaluated as governed product loops, not isolated 
 * Discovery System - `ProductLift`, `Deftform`, `Icanpreneur`, `MetaSurvey`, `Lunacal`, `Teable`, and Product Governor convert public demand into Chummer-owned packets and decisions.
 * Artifact Factory - `vidBoard`, `MarkupGo`, `PeekShot`, `Taja`, `Soundmadeseen`, `Unmixr AI`, and `First Book ai` render approved source packets into repeatable media, document, and share artifacts.
 * BLACK LEDGER Ops - Hub, `Teable`, `NextStep`, `ApproveThis`, `Signitic`, `Emailit`, and first-party map infrastructure run world ticks, faction operations, open-run closeout, and operator review.
-* Table Pulse / Companion Lab - `hedy.ai`, `Nonverbia`, `Unmixr AI`, `Soundmadeseen`, `MarkupGo`, `PeekShot`, `Prompting Systems`, `ChatPlayground AI`, and `Teable` support consent-gated debriefs and reviewed line packs.
+* Table Pulse / Companion Lab - `hedy.ai`, `Nonverbia`, `Unmixr AI`, `Soundmadeseen`, `MarkupGo`, `PeekShot`, `Prompt Architects`, `ChatPlayground AI`, and `Teable` support consent-gated debriefs and reviewed line packs.
 * Trust / Closure System - Hub, Registry, Fleet, Product Governor, `ProductLift`, `Emailit`, and first-party analytics/observability prove that install, support, roadmap, and release promises actually closed.
 
 Non-LTD production infrastructure candidates such as PostHog, Sentry, MapLibre, and LiveKit may be designed as first-party infrastructure lanes when needed. They are not substitutes for Chummer-owned truth.

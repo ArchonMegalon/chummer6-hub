@@ -1,52 +1,49 @@
 {
   "contract_name": "chummer.final_gold_janitor",
-  "generated_at_utc": "2026-06-09T14:09:06Z",
+  "generated_at_utc": "2026-06-12T18:58:23Z",
   "scope": "full_estate_v20",
   "artifact_root": "_completion/full_product_reaudit_v20",
   "durable_artifacts_required": true,
   "live_backed_required": true,
   "live_recrawl_required": true,
   "recrawl_max_age_hours": 24,
-  "status": "fail",
-  "verdict": "NOT_GOLD",
+  "status": "pass",
+  "verdict": "GOLD_READY",
   "required_gates": {
     "live_public_web_recrawl": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/LIVE_PUBLIC_WEB_RECRAWL.generated.json",
       "exists": true,
       "status": "pass",
-      "generated_at_utc": "2026-06-09T14:08:57Z",
+      "generated_at_utc": "2026-06-12T18:56:45Z",
       "fresh_within_hours": 24,
       "pass": true
     },
     "rule_authority_minimum_coverage": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULE_AUTHORITY_MINIMUM_COVERAGE.generated.json",
       "exists": true,
-      "status": "fail",
-      "generated_at_utc": "2026-06-09T12:56:31Z",
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T10:57:39Z",
       "fresh_within_hours": null,
-      "pass": false,
+      "pass": true,
       "rulesets": {
         "sr4": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
           "rulefact_count": 285,
-          "final_verdict": "NOT_READY",
+          "final_verdict": "SR4_RULE_AUTHORITY_READY",
           "expected_ready_verdict": "SR4_RULE_AUTHORITY_READY",
-          "full_completion_rule_authority_ready": false,
-          "operator_gold_status": "fail",
-          "operator_gold_verdict": "NOT_READY",
-          "blocker_receipts": {
-            "errata_posture": "/docker/chummercomplete/_completion/sr4_rule_authority/SR4_ERRATA_SOURCE_POSTURE.generated.json",
-            "row_level_mapping": "/docker/chummercomplete/_completion/sr4_rule_authority/SR4_ROW_LEVEL_AUTHORITY_MAPPING.generated.json"
-          },
-          "row_level_mapping_status": "pending_human_review",
-          "errata_posture_status": "pending_reviewed_application",
-          "remaining_gates": [
-            "human-reviewed row-level mapping from indexed table evidence into normalized records",
-            "errata profile applied and reviewed",
-            "complete authority golden fixture corpus, beyond seed fixtures",
-            "human rule review signoff"
-          ],
-          "status": "fail"
+          "full_completion_rule_authority_ready": true,
+          "operator_gold_status": "pass",
+          "operator_gold_verdict": "SR4_RULE_AUTHORITY_READY",
+          "blocker_receipts": {},
+          "row_level_mapping_status": null,
+          "errata_posture_status": null,
+          "human_review_status": null,
+          "verification_matrix_status": null,
+          "verification_matrix_failed_gates": [],
+          "verification_matrix_unexpected_failed_gates": [],
+          "verification_matrix_expected_ready_blockers": [],
+          "remaining_gates": [],
+          "status": "pass"
         },
         "sr5": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR5_RULE_AUTHORITY_REGISTRY.generated.json",
@@ -59,41 +56,44 @@
           "blocker_receipts": {},
           "row_level_mapping_status": null,
           "errata_posture_status": null,
+          "human_review_status": null,
+          "verification_matrix_status": null,
+          "verification_matrix_failed_gates": [],
+          "verification_matrix_unexpected_failed_gates": [],
+          "verification_matrix_expected_ready_blockers": [],
           "remaining_gates": [],
           "status": "pass"
         },
         "sr6": {
           "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR6_RULEFACT_REGISTRY.generated.json",
           "rulefact_count": 301,
-          "final_verdict": "NOT_READY",
+          "final_verdict": "SR6_RULE_AUTHORITY_READY",
           "expected_ready_verdict": "SR6_RULE_AUTHORITY_READY",
-          "full_completion_rule_authority_ready": false,
-          "operator_gold_status": "fail",
-          "operator_gold_verdict": "NOT_READY",
-          "blocker_receipts": {
-            "errata_posture": "/docker/chummercomplete/_completion/sr6_rule_authority/SR6_ERRATA_SOURCE_POSTURE.generated.json",
-            "row_level_mapping": "/docker/chummercomplete/_completion/sr6_rule_authority/SR6_ROW_LEVEL_AUTHORITY_MAPPING.generated.json"
-          },
-          "row_level_mapping_status": "pending_human_review",
-          "errata_posture_status": "pending_reviewed_application",
-          "remaining_gates": [
-            "human-reviewed mapping of private PDF line-hash candidates into normalized public-safe records",
-            "errata profile applied and reviewed",
-            "complete authority golden fixture corpus, beyond seed fixtures",
-            "full provider-backed explain receipt corpus",
-            "human rule review signoff"
-          ],
-          "status": "fail"
+          "full_completion_rule_authority_ready": true,
+          "operator_gold_status": "pass",
+          "operator_gold_verdict": "SR6_RULE_AUTHORITY_READY",
+          "blocker_receipts": {},
+          "row_level_mapping_status": null,
+          "errata_posture_status": null,
+          "human_review_status": null,
+          "verification_matrix_status": null,
+          "verification_matrix_failed_gates": [],
+          "verification_matrix_unexpected_failed_gates": [],
+          "verification_matrix_expected_ready_blockers": [],
+          "remaining_gates": [],
+          "status": "pass"
         }
       },
-      "failures": [
-        "sr4 final_verdict is not ready",
-        "sr4 full product rule authority completion is not ready",
-        "sr4 operator promoted rule authority gold is not ready",
-        "sr6 final_verdict is not ready",
-        "sr6 full product rule authority completion is not ready",
-        "sr6 operator promoted rule authority gold is not ready"
-      ]
+      "failures": []
+    },
+    "ruleset_readiness": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T18:56:45.780339Z",
+      "fresh_within_hours": null,
+      "pass": true,
+      "assumed_rulesets": []
     },
     "provider_proof_discoverability": {
       "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PROVIDER_PROOF_DISCOVERABILITY.generated.json",
@@ -118,6 +118,89 @@
       "generated_at_utc": "",
       "fresh_within_hours": null,
       "pass": true
+    },
+    "public_route_proof": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/CHUMMER_PUBLIC_ROUTE_PROOF.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T16:21:46.108144Z",
+      "fresh_within_hours": null,
+      "pass": true,
+      "summary": {
+        "route_count": 165,
+        "passed_count": 165,
+        "failed_count": 0,
+        "positive_proof_count": 165,
+        "public_route_count": 115,
+        "auth_operation_count": 4,
+        "registered_route_count": 44,
+        "controller_contract_count": 2,
+        "controller_contract_only_count": 0,
+        "negative_path_count": 2,
+        "negative_path_failed_count": 0,
+        "seeded_receipt_count": 0,
+        "seed_required_count": 0,
+        "failed_paths": []
+      }
+    },
+    "external_distribution_mirror_proof": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T18:57:00Z",
+      "fresh_within_hours": null,
+      "pass": true,
+      "external_required": false,
+      "providers": {
+        "local_registry": "pass",
+        "public_edge": "pass",
+        "pcloud": "pass",
+        "onedrive": "pass"
+      }
+    },
+    "public_copy_leak_gate": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/PUBLIC_COPY_LEAK_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "fresh_within_hours": null,
+      "pass": true
+    },
+    "design_quality_gate": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/DESIGN_QUALITY_GATE.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T18:58:08Z",
+      "fresh_within_hours": null,
+      "pass": true
+    },
+    "operator_release_dashboard": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/OPERATOR_RELEASE_DASHBOARD.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T18:58:23Z",
+      "fresh_within_hours": null,
+      "pass": true,
+      "verdict": "OPERABLE_RELEASE_READY",
+      "failures": [],
+      "release": {
+        "version": "run-20260612-121055",
+        "published_at": "2026-06-12T13:20:46Z",
+        "channel": "public_stable",
+        "rollout_state": "public_stable",
+        "supportability_state": "gold_supported",
+        "known_issue_summary": "Current release proof is green, including current cross-platform startup-smoke and executable-gate proof for the promoted flagship bytes."
+      }
+    },
+    "release_ready": {
+      "path": "/docker/chummercomplete/chummer.run-services/.codex-studio/published/RELEASE_READY.generated.json",
+      "exists": true,
+      "status": "pass",
+      "generated_at_utc": "2026-06-12T18:58:23Z",
+      "fresh_within_hours": null,
+      "pass": true,
+      "verdict": "RELEASE_READY",
+      "failures": []
     }
   },
   "materializers": [
@@ -129,9 +212,15 @@
     },
     {
       "command": "python3 scripts/verify_rules_authority_minimum_coverage.py",
-      "returncode": 1,
+      "returncode": 0,
+      "stdout": "rule_authority_minimum_coverage:ok",
+      "stderr": ""
+    },
+    {
+      "command": "python3 scripts/classify_ruleset_readiness.py --output /docker/chummercomplete/chummer.run-services/.codex-studio/published/RULESET_READINESS.generated.json",
+      "returncode": 0,
       "stdout": "",
-      "stderr": "rules authority minimum coverage failed"
+      "stderr": ""
     },
     {
       "command": "python3 scripts/verify_provider_proof_discoverability.py",
@@ -150,10 +239,38 @@
       "returncode": 0,
       "stdout": "table_pulse_scenario_replay:ok",
       "stderr": ""
+    },
+    {
+      "command": "python3 scripts/materialize_external_distribution_mirror_proof.py --base-url http://127.0.0.1:8091",
+      "returncode": 0,
+      "stdout": "external_distribution_mirror_proof:ok",
+      "stderr": ""
+    },
+    {
+      "command": "python3 scripts/verify_public_copy_leak_gate.py --base-url https://chummer.run",
+      "returncode": 0,
+      "stdout": "{\"contract_name\": \"chummer.public_copy_leak_gate\", \"generated_at_utc\": \"2026-06-12T18:57:02Z\", \"base_url\": \"https://chummer.run\", \"status\": \"pass\", \"summary\": {\"route_count\": 11, \"failed_route_count\": 0, \"forbidden_pattern_count\": 24, \"failed_routes\": []}, \"forbidden_patterns\": [\"\\\\bchummer-api\\\\b\", \"\\\\bchummer6-hub\\\\b\", \"\\\\bchummer6-ui\\\\b\", \"\\\\bchummer-presentation\\\\b\", \"\\\\bchummer-core-engine\\\\b\", \"\\\\bhost\\\\.docker\\\\.internal\\\\b\", \"\\\\blocalhost\\\\b\", \"\\\\b127\\\\.0\\\\.0\\\\.1\\\\b\", \"/docker/chummercomplete\", \"/var/lib/\", \"/home/[A-Za-z0-9_.-]+/\", \"\\\\bFleet-written\\\\b\", \"\\\\bProductLift\\\\b\", \"\\\\bICanpreneur\\\\b\", \"\\\\bIcanpreneur\\\\b\", \"\\\\bEmailit\\\\b\", \"\\\\bClickRank\\\\b\", \"\\\\bDocumentation\\\\.AI\\\\b\", \"\\\\bBrowserAct\\\\b\", \"\\\\bTeable\\\\b\", \"\\\\bSignitic\\\\b\", \"\\\\bMagicFit\\\\b\", \"\\\\bLoad Demo Runner\\\\b\", \"\\\\bOpen Demo\\\\b\"], \"routes\": [{\"route\": \"/\", \"url\": \"https://chummer.run/\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/downloads\", \"url\": \"https://chummer.run/downloads\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/status\", \"url\": \"https://chummer.run/status\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/faq\", \"url\": \"https://chummer.run/faq\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger\", \"url\": \"https://chummer.run/ledger\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/ledger/map\", \"url\": \"https://chummer.run/ledger/map\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/packages\", \"url\": \"https://chummer.run/packages\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/participate\", \"url\": \"https://chummer.run/participate\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/feedback\", \"url\": \"https://chummer.run/feedback\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/what-is-chummer\", \"url\": \"https://chummer.run/what-is-chummer\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}, {\"route\": \"/login?next=%2Faccount%2Faccess\", \"url\": \"https://chummer.run/login?next=%2Faccount%2Faccess\", \"status_code\": 200, \"success\": true, \"forbidden_hits\": [], \"detail\": null}]}",
+      "stderr": ""
+    },
+    {
+      "command": "python3 scripts/materialize_design_quality_gate.py",
+      "returncode": 0,
+      "stdout": "design_quality_gate:pass",
+      "stderr": ""
+    },
+    {
+      "command": "python3 scripts/materialize_operator_release_dashboard.py",
+      "returncode": 0,
+      "stdout": "operator_release_dashboard:pass",
+      "stderr": ""
+    },
+    {
+      "command": "python3 scripts/materialize_release_ready_receipt.py",
+      "returncode": 0,
+      "stdout": "release_ready_receipt:pass",
+      "stderr": ""
     }
   ],
-  "failures": [
-    "rule_authority_minimum_coverage failed",
-    "materializer failed: python3 scripts/verify_rules_authority_minimum_coverage.py"
-  ]
+  "caveats": [],
+  "failures": []
 }

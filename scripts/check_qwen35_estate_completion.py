@@ -20,6 +20,7 @@ OVERWATCH_OUT_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "out" / "absolute-aud
 CURRENT_RUN_DIR = OVERWATCH_OUT_ROOT / "current"
 GIT_BASELINE_PATH = CURRENT_RUN_DIR / "estate-git-baseline.json"
 STRICT_GATE = RUN_SERVICES_ROOT / "scripts" / "check_absolute_audit_substance.py"
+RUN_LEDGER_METRICS: dict[str, tuple[int, int, int, bool]] | None = None
 PASS_STATUSES = {"pass", "passed", "ready", "ok", "green"}
 EXPECTED_REPO_PATHS = [
     "/docker/chummercomplete/Chummer6",
@@ -65,6 +66,19 @@ REQUIRED_GATE_IDS = [
     "gate-mobile-pwa",
     "gate-ltd-adapters",
 ]
+
+
+def pass_value_to_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
 PASS0_ARTIFACTS = [
     "REPO_INVENTORY.yaml",
     "CANON_TRUTH_MAP.md",
@@ -420,9 +434,10 @@ def current_git_state_map() -> dict[str, dict[str, Any]]:
 
 
 def git_baseline_map() -> dict[str, dict[str, Any]] | None:
-    if not GIT_BASELINE_PATH.is_file():
+    baseline_path = git_baseline_path()
+    if not baseline_path.is_file():
         return None
-    payload = load_json(GIT_BASELINE_PATH)
+    payload = load_json(baseline_path)
     if isinstance(payload, dict) and isinstance(payload.get("repos"), list):
         items = payload["repos"]
     elif isinstance(payload, list):
@@ -453,7 +468,7 @@ def current_run_started_at() -> datetime | None:
         if timestamps:
             return datetime.fromtimestamp(max(timestamps), tz=timezone.utc)
 
-    baseline = GIT_BASELINE_PATH
+    baseline = git_baseline_path()
     if baseline.is_file():
         payload = load_json(baseline)
         if isinstance(payload, dict):
@@ -463,13 +478,62 @@ def current_run_started_at() -> datetime | None:
     return None
 
 
+def run_ledger_metrics_by_run_id() -> dict[str, tuple[int, int, int, bool]]:
+    global RUN_LEDGER_METRICS
+    if RUN_LEDGER_METRICS is not None:
+        return RUN_LEDGER_METRICS
+
+    metrics: dict[str, list[int]] = {}
+    ledger_path = COMPLETION_ROOT / "RUN_LEDGER.jsonl"
+    if not ledger_path.is_file():
+        RUN_LEDGER_METRICS = {}
+        return RUN_LEDGER_METRICS
+    for line in ledger_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            item = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(item, dict):
+            continue
+        run_id = str(item.get("run_id") or "").strip()
+        if not re.fullmatch(r"\d{8}T\d{6}Z", run_id):
+            continue
+        values = metrics.setdefault(run_id, [0, 0, 0, False])
+        values[0] += 1
+        if (
+            all(key in item for key in RUN_LEDGER_REQUIRED_KEYS)
+            and pass_value_to_int(item.get("pass")) in {0, 1, 2}
+            and str(item.get("phase") or "").strip()
+            and str(item.get("action") or "").strip()
+            and str(item.get("status") or "").strip()
+        ):
+            values[1] += 1
+        if any(item.get(key) for key in ("repo", "repo_path", "artifacts", "proof_paths", "evidence_paths")):
+            values[2] += 1
+        if pass_value_to_int(item.get("pass")) == 0:
+            values[3] = True
+    RUN_LEDGER_METRICS = {run_id: tuple(values) for run_id, values in metrics.items()}
+    return RUN_LEDGER_METRICS
+
+
+def has_sufficient_run_ledger_activity(run_id: str | None) -> bool:
+    if not run_id:
+        return False
+    parsed, structured, evidence, pass0_seen = run_ledger_metrics_by_run_id().get(run_id, (0, 0, 0, False))
+    return parsed >= 1 and structured >= 1 and evidence >= 1 and pass0_seen
+
+
 def current_run_id() -> str | None:
     try:
         explicit_run_dir = CURRENT_RUN_DIR.resolve().name
     except Exception:
         explicit_run_dir = ""
-    if explicit_run_dir and explicit_run_dir.lower() != "current":
-        return explicit_run_dir
+    candidates: list[str] = []
+    if re.fullmatch(r"\d{8}T\d{6}Z", explicit_run_dir or ""):
+        candidates.append(explicit_run_dir)
 
     completion_run_ids = []
     release_gates_path = COMPLETION_ROOT / "ABSOLUTE_RELEASE_GATES.yaml"
@@ -489,9 +553,22 @@ def current_run_id() -> str | None:
             for path in proof_root.iterdir()
             if path.is_dir() and re.fullmatch(r"\d{8}T\d{6}Z", path.name)
         )
-    if completion_run_ids:
-        return sorted(set(completion_run_ids))[-1]
-    return explicit_run_dir or None
+    candidates.extend(sorted(set(completion_run_ids), reverse=True))
+
+    if not candidates:
+        return explicit_run_dir or None
+
+    for run_id in candidates:
+        if has_sufficient_run_ledger_activity(run_id):
+            return run_id
+    return candidates[0]
+
+
+def git_baseline_path() -> Path:
+    run_id = current_run_id()
+    if run_id:
+        return OVERWATCH_OUT_ROOT / str(run_id) / "estate-git-baseline.json"
+    return GIT_BASELINE_PATH
 
 
 def repo_inventory_map() -> dict[str, dict[str, Any]]:
@@ -1010,7 +1087,13 @@ def estate_git_state_check() -> dict[str, Any]:
 def estate_git_drift_from_baseline_check() -> dict[str, Any]:
     baseline = git_baseline_map()
     if baseline is None:
-        return build_check(key="estate_git_drift_from_baseline", label="Estate git drift from baseline", path=GIT_BASELINE_PATH, ok=False, detail="missing baseline")
+        return build_check(
+            key="estate_git_drift_from_baseline",
+            label="Estate git drift from baseline",
+            path=git_baseline_path(),
+            ok=False,
+            detail="missing baseline",
+        )
     current = current_git_state_map()
     drifts: list[str] = []
     for path, state in current.items():
@@ -1030,7 +1113,7 @@ def estate_git_drift_from_baseline_check() -> dict[str, Any]:
     return build_check(
         key="estate_git_drift_from_baseline",
         label="Estate git drift from baseline",
-        path=GIT_BASELINE_PATH,
+        path=git_baseline_path(),
         ok=ok,
         detail=f"drifts={', '.join(drifts) if drifts else 'none'}",
     )

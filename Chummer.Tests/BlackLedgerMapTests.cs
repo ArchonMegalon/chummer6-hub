@@ -118,8 +118,9 @@ public sealed class BlackLedgerMapTests
         Assert.Contains("black-ledger-video-globe-idle.mp4", script, StringComparison.Ordinal);
         Assert.Contains("black-ledger-video-globe-idle.webm", script, StringComparison.Ordinal);
         Assert.Contains("black-ledger-video-globe-idle-poster.png", script, StringComparison.Ordinal);
-        Assert.Contains("magicfit-primary", script, StringComparison.Ordinal);
-        Assert.Contains("magicfit-video-globe-with-chummer-overlays", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("magicfit-primary", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("magicfit-video-globe-with-chummer-overlays", script, StringComparison.Ordinal);
+        Assert.Contains("first-party-raster-overlay", script, StringComparison.Ordinal);
         Assert.Contains("EARTH_LANDMASSES", script, StringComparison.Ordinal);
         Assert.Contains("EARTH_MOUNTAIN_RANGES", script, StringComparison.Ordinal);
         Assert.Contains("getContext('webgl'", script, StringComparison.Ordinal);

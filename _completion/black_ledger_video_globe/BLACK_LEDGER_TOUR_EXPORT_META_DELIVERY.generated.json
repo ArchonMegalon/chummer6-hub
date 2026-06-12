@@ -1,0 +1,19 @@
+{
+  "schema": "chummer.black_ledger.tour_export_delivery_receipt.v1",
+  "generated_at_utc": "2026-06-11T07:31:00Z",
+  "target": "meta",
+  "status": "blocked",
+  "blocked_reason": "No Meta Graph API page/account credentials, target page id, or local Meta upload automation are configured in this workspace.",
+  "ready_payload": {
+    "caption": "Black Ledger 3D viewer packet: Matterport and 3DVista exports are now in the manifest, plus a generated 3DVista fly-through MP4. Boundary: provider demos validate viewer behavior only; Chummer tactical truth stays in the command map.",
+    "video_path": "/docker/chummercomplete/chummer.run-services/Chummer.Run.Api/wwwroot/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+    "manifest_url": "/media/ledger/tours/black-ledger-tour-exports.manifest.json",
+    "matterport_url": "https://my.matterport.com/show/?m=ax2JhiPGk5P",
+    "threedvista_url": "https://www.3dvista.com/samples/new_york_loft.html"
+  },
+  "required_to_send": [
+    "Meta Graph API page access token or verified upload surface",
+    "Target page/account id",
+    "Chosen placement: page video, reel, story, or ad creative"
+  ]
+}

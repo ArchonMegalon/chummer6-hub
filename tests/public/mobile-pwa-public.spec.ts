@@ -67,12 +67,40 @@ test('mobile and PWA public routes keep installability and role entry explicit',
   });
   expect(readyWorkerUrl).toContain('/service-worker.js');
 
-  const controllerWorkerUrl = await page.evaluate(() => {
+  const controllerWorkerUrl = await page.evaluate(async () => {
+    if (!('serviceWorker' in navigator)) {
+      return null;
+    }
+
+    if (navigator.serviceWorker.controller) {
+      return navigator.serviceWorker.controller.scriptURL;
+    }
+
+    await new Promise<void>((resolve) => {
+      const timeout = window.setTimeout(resolve, 3000);
+      navigator.serviceWorker.addEventListener(
+        'controllerchange',
+        () => {
+          window.clearTimeout(timeout);
+          resolve();
+        },
+        { once: true },
+      );
+    });
+
+    return navigator.serviceWorker.controller?.scriptURL ?? null;
+  });
+
+  if (controllerWorkerUrl === null) {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+  }
+
+  const controlledWorkerUrl = controllerWorkerUrl ?? await page.evaluate(() => {
     if (!('serviceWorker' in navigator)) {
       return null;
     }
 
     return navigator.serviceWorker.controller?.scriptURL ?? null;
   });
-  expect(controllerWorkerUrl).toContain('/service-worker.js');
+  expect(controlledWorkerUrl).toContain('/service-worker.js');
 });

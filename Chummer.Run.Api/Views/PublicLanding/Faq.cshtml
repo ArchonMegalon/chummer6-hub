@@ -34,11 +34,11 @@
                 ? "Account keeps recovery, devices, and support on one calmer path"
                 : "Create an account when you want recovery, linked installs, and tracked support",
             Summary = Model.Chrome.Authenticated
-                ? "Return to account when the question is about devices, recovery identities, or support follow-through instead of public product posture."
+                ? "Return to account when the question is about devices, recovery identities, or support history instead of public product posture."
                 : accessPosture?.AccountValueSummary ?? "The binary stays the same. The value is the calmer return path for linked installs, recovery, and tracked support once you want it.",
             Href = Model.Chrome.Authenticated ? "/account" : "/signup?next=/home",
             Label = Model.Chrome.Authenticated ? "Open account" : "Create account",
-            Proof = new[] { "Linked installs", "Devices & access", "Tracked follow-up" }
+            Proof = new[] { "Linked installs", "Devices & access", "Tracked support history" }
         },
         new
         {

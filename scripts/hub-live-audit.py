@@ -11993,8 +11993,8 @@ def main() -> int:
             "/status",
             "What works today",
             required_texts=(
-                "Gold-ready on Public release Build run-",
-                "Gold-ready on Public release",
+                "Current public release",
+                "Current local",
                 "Windows",
                 "Linux",
                 "macOS"),

@@ -113,6 +113,18 @@
     var latestDispatches = Model.Dispatches.Take(3).ToArray();
     var leadDispatch = latestDispatches.FirstOrDefault() ?? selectedDispatch;
     var heroFactionSlug = selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle";
+    var heroNewsreelMp4Href = mapFocused
+        ? "/media/ledger/globe/black-ledger-video-globe-idle.mp4"
+        : (newsreelBroadcast?.VideoMp4Href ?? "/media/ledger/newsreels/turn-1-newsreel.mp4");
+    var heroNewsreelWebmHref = mapFocused
+        ? "/media/ledger/globe/black-ledger-video-globe-idle.webm"
+        : (newsreelBroadcast?.VideoWebmHref ?? "/media/ledger/newsreels/turn-1-newsreel.webm");
+    var heroNewsreelPosterHref = mapFocused
+        ? "/media/ledger/globe/black-ledger-video-globe-idle-poster.png"
+        : (newsreelBroadcast?.PosterHref ?? "/media/ledger/newsreels/turn-1-newsreel-poster.png");
+    var heroGlobeRenderMode = mapFocused ? "command-map" : "magicfit-newsreel";
+    var heroDisableWebGl = mapFocused ? "false" : "true";
+    var heroVideoLayer = mapFocused ? "first-party-raster-overlay" : "magicfit-newsreel";
 }
 
 <section class="ledger-flagship ledger-flagship--public" data-ledger-redesign="command-deck">
@@ -124,6 +136,12 @@
                 class="ledger-flagship__geoscape"
                 data-black-ledger-geoscape-root
                 data-variant="full"
+                data-globe-render-mode="@heroGlobeRenderMode"
+                data-globe-video-mp4="@heroNewsreelMp4Href"
+                data-globe-video-webm="@heroNewsreelWebmHref"
+                data-globe-video-poster="@heroNewsreelPosterHref"
+                data-globe-video-layer="@heroVideoLayer"
+                data-disable-webgl="@heroDisableWebGl"
                 data-map-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map?turn=@selectedTurn&amp;mode=@(commandMap.CurrentMode)"
                 data-delta-url="/api/v1/ledger/worlds/emerald-sprawl-prelude/map/tick-delta/0/1"
                 data-initial-mode="@(commandMap.CurrentMode)"
@@ -238,6 +256,18 @@
                         data-primary-href="/ledger/factions/@(selectedFactionSlug.Length > 0 ? selectedFactionSlug : "ashline-circle")"
                         data-secondary-label="Open latest dispatch"
                         data-secondary-href="/ledger/dispatches"></div>
+                </div>
+                <div class="ledger-provider-tours" data-ledger-tour-exports="/media/ledger/tours/black-ledger-tour-exports.manifest.json" aria-label="External 3D viewer exports">
+                    <div>
+                        <span class="tag">3D viewer exports</span>
+                        <p>Provider-hosted viewer validation links. Chummer tactical truth stays in the command map.</p>
+                    </div>
+                    <div class="ledger-provider-tours__actions">
+                        <a class="button-like button-like--primary" href="/media/ledger/tours/black-ledger-3dvista-flythrough.mp4">Fly-through</a>
+                        <a class="button-like button-like--secondary" href="https://my.matterport.com/show/?m=ax2JhiPGk5P" rel="noopener noreferrer" target="_blank">Matterport</a>
+                        <a class="button-like button-like--secondary" href="https://www.3dvista.com/samples/new_york_loft.html" rel="noopener noreferrer" target="_blank">3DVista</a>
+                        <a class="inline-link" href="/media/ledger/tours/black-ledger-tour-exports.manifest.json">Manifest</a>
+                    </div>
                 </div>
             }
         </div>

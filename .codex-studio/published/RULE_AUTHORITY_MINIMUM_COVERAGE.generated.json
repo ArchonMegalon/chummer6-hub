@@ -1,32 +1,29 @@
 {
   "contract_name": "chummer.rule_authority_minimum_coverage",
-  "generated_at_utc": "2026-06-09T12:56:31Z",
+  "generated_at_utc": "2026-06-12T10:57:39Z",
   "minimum_rulefacts_required": 100,
   "full_completion_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/FULL_PRODUCT_RULE_AUTHORITY_COMPLETION.generated.json",
   "operator_gold_path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/OPERATOR_PROMOTED_RULE_AUTHORITY_GOLD.generated.json",
-  "status": "fail",
+  "status": "pass",
   "rulesets": {
     "sr4": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR4_RULEFACT_REGISTRY.generated.json",
       "rulefact_count": 285,
-      "final_verdict": "NOT_READY",
+      "final_verdict": "SR4_RULE_AUTHORITY_READY",
       "expected_ready_verdict": "SR4_RULE_AUTHORITY_READY",
-      "full_completion_rule_authority_ready": false,
-      "operator_gold_status": "fail",
-      "operator_gold_verdict": "NOT_READY",
-      "blocker_receipts": {
-        "errata_posture": "/docker/chummercomplete/_completion/sr4_rule_authority/SR4_ERRATA_SOURCE_POSTURE.generated.json",
-        "row_level_mapping": "/docker/chummercomplete/_completion/sr4_rule_authority/SR4_ROW_LEVEL_AUTHORITY_MAPPING.generated.json"
-      },
-      "row_level_mapping_status": "pending_human_review",
-      "errata_posture_status": "pending_reviewed_application",
-      "remaining_gates": [
-        "human-reviewed row-level mapping from indexed table evidence into normalized records",
-        "errata profile applied and reviewed",
-        "complete authority golden fixture corpus, beyond seed fixtures",
-        "human rule review signoff"
-      ],
-      "status": "fail"
+      "full_completion_rule_authority_ready": true,
+      "operator_gold_status": "pass",
+      "operator_gold_verdict": "SR4_RULE_AUTHORITY_READY",
+      "blocker_receipts": {},
+      "row_level_mapping_status": null,
+      "errata_posture_status": null,
+      "human_review_status": null,
+      "verification_matrix_status": null,
+      "verification_matrix_failed_gates": [],
+      "verification_matrix_unexpected_failed_gates": [],
+      "verification_matrix_expected_ready_blockers": [],
+      "remaining_gates": [],
+      "status": "pass"
     },
     "sr5": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR5_RULE_AUTHORITY_REGISTRY.generated.json",
@@ -39,39 +36,33 @@
       "blocker_receipts": {},
       "row_level_mapping_status": null,
       "errata_posture_status": null,
+      "human_review_status": null,
+      "verification_matrix_status": null,
+      "verification_matrix_failed_gates": [],
+      "verification_matrix_unexpected_failed_gates": [],
+      "verification_matrix_expected_ready_blockers": [],
       "remaining_gates": [],
       "status": "pass"
     },
     "sr6": {
       "path": "/docker/chummercomplete/chummer-core-engine/.codex-studio/published/SR6_RULEFACT_REGISTRY.generated.json",
       "rulefact_count": 301,
-      "final_verdict": "NOT_READY",
+      "final_verdict": "SR6_RULE_AUTHORITY_READY",
       "expected_ready_verdict": "SR6_RULE_AUTHORITY_READY",
-      "full_completion_rule_authority_ready": false,
-      "operator_gold_status": "fail",
-      "operator_gold_verdict": "NOT_READY",
-      "blocker_receipts": {
-        "errata_posture": "/docker/chummercomplete/_completion/sr6_rule_authority/SR6_ERRATA_SOURCE_POSTURE.generated.json",
-        "row_level_mapping": "/docker/chummercomplete/_completion/sr6_rule_authority/SR6_ROW_LEVEL_AUTHORITY_MAPPING.generated.json"
-      },
-      "row_level_mapping_status": "pending_human_review",
-      "errata_posture_status": "pending_reviewed_application",
-      "remaining_gates": [
-        "human-reviewed mapping of private PDF line-hash candidates into normalized public-safe records",
-        "errata profile applied and reviewed",
-        "complete authority golden fixture corpus, beyond seed fixtures",
-        "full provider-backed explain receipt corpus",
-        "human rule review signoff"
-      ],
-      "status": "fail"
+      "full_completion_rule_authority_ready": true,
+      "operator_gold_status": "pass",
+      "operator_gold_verdict": "SR6_RULE_AUTHORITY_READY",
+      "blocker_receipts": {},
+      "row_level_mapping_status": null,
+      "errata_posture_status": null,
+      "human_review_status": null,
+      "verification_matrix_status": null,
+      "verification_matrix_failed_gates": [],
+      "verification_matrix_unexpected_failed_gates": [],
+      "verification_matrix_expected_ready_blockers": [],
+      "remaining_gates": [],
+      "status": "pass"
     }
   },
-  "failures": [
-    "sr4 final_verdict is not ready",
-    "sr4 full product rule authority completion is not ready",
-    "sr4 operator promoted rule authority gold is not ready",
-    "sr6 final_verdict is not ready",
-    "sr6 full product rule authority completion is not ready",
-    "sr6 operator promoted rule authority gold is not ready"
-  ]
+  "failures": []
 }

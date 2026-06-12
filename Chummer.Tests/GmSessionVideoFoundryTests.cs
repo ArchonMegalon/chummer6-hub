@@ -32,6 +32,39 @@ public sealed class GmSessionVideoFoundryTests
     }
 
     [Fact]
+    public void GetHome_reports_provider_account_configured_when_dedicated_session_email_is_set()
+    {
+        TestFoundryContext ctx = CreateContext(new Dictionary<string, string?>
+        {
+            ["CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL"] = "gm-session-account@example.invalid"
+        });
+        Assert.Equal("configured", ctx.Service.GetHome("gm-a", "campaign-1").ProviderAccountStatus);
+    }
+
+    [Fact]
+    public void GetHome_reports_session_isolation_status_when_session_account_is_distinct()
+    {
+        TestFoundryContext ctx = CreateContext(new Dictionary<string, string?>
+        {
+            ["CHUMMER_EA_MAGICFIT_EMAIL"] = "official@example.invalid",
+            ["CHUMMER_EA_MAGICFIT_GM_SESSION_EMAIL"] = "gm-session-account@example.invalid"
+        });
+
+        Assert.Equal("isolated_from_official_product_media", ctx.Service.GetHome("gm-a", "campaign-1").QueueIsolationStatus);
+    }
+
+    [Fact]
+    public void GetHome_reports_not_isolated_status_when_session_uses_official_account()
+    {
+        TestFoundryContext ctx = CreateContext(new Dictionary<string, string?>
+        {
+            ["CHUMMER_EA_MAGICFIT_EMAIL"] = "official@example.invalid"
+        });
+
+        Assert.Equal("not_isolated_from_official_product_media", ctx.Service.GetHome("gm-a", "campaign-1").QueueIsolationStatus);
+    }
+
+    [Fact]
     public void PromptOnlyRegenerationDoesNotReserveOrConsumeRenderUnits()
     {
         TestFoundryContext ctx = CreateContext();
@@ -118,20 +151,29 @@ public sealed class GmSessionVideoFoundryTests
         Assert.Equal("pass", packet.PrivacyScanStatus);
     }
 
-    private static TestFoundryContext CreateContext()
+    private static TestFoundryContext CreateContext(Dictionary<string, string?>? extraConfiguration = null)
     {
         string root = Path.Combine(Path.GetTempPath(), "chummer-foundry-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
-        IConfiguration configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
+        Dictionary<string, string?> values = new()
+        {
+            ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
+            ["CHUMMER_GM_SESSION_VIDEO_FOUNDRY_STORE_PATH"] = Path.Combine(root, "foundry.json"),
+            ["CHUMMER_GM_VIDEO_QUOTA_PER_GM"] = "20",
+            ["CHUMMER_GM_VIDEO_QUOTA_PER_GROUP"] = "60",
+            ["CHUMMER_GM_VIDEO_QUOTA_PER_CAMPAIGN"] = "30",
+            ["CHUMMER_EA_MAGICFIT_EMAIL"] = "session-account@example.invalid"
+        };
+        if (extraConfiguration is not null)
+        {
+            foreach (KeyValuePair<string, string?> pair in extraConfiguration)
             {
-                ["CHUMMER_COMMUNITY_STORE_PATH"] = Path.Combine(root, "community.json"),
-                ["CHUMMER_GM_SESSION_VIDEO_FOUNDRY_STORE_PATH"] = Path.Combine(root, "foundry.json"),
-                ["CHUMMER_GM_VIDEO_QUOTA_PER_GM"] = "20",
-                ["CHUMMER_GM_VIDEO_QUOTA_PER_GROUP"] = "60",
-                ["CHUMMER_GM_VIDEO_QUOTA_PER_CAMPAIGN"] = "30",
-                ["CHUMMER_EA_MAGICFIT_EMAIL"] = "session-account@example.invalid"
-            })
+                values[pair.Key] = pair.Value;
+            }
+        }
+
+        IConfiguration configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
             .Build();
         CommunityStore community = new(configuration, NullLogger<CommunityStore>.Instance);
         DateTimeOffset now = DateTimeOffset.UtcNow;

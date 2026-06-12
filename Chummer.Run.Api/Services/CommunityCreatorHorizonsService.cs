@@ -42,7 +42,7 @@ public sealed class CommunityCreatorHorizonsService
             "Governed publication discovery backed by Chummer-owned publication truth instead of loose external shelves.",
             "/creator/packets/publication_board.md",
             "/creator/packets/publication_board.json",
-            ["Governed discovery", "Publication truth", "Public-safe shelf"]),
+            ["Governed discovery", "Publication truth", "Public-safe gallery"]),
         new(
             "publication_trust_boundary",
             "Publication trust boundary",
@@ -53,7 +53,7 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "campaign_return_loop",
             "Campaign return loop",
-            "Shows how public creator output returns to campaign use instead of becoming dead shelf inventory.",
+            "Shows how public creator output returns to campaign use instead of becoming dead gallery inventory.",
             "/creator/packets/campaign_return_loop.md",
             "/creator/packets/campaign_return_loop.json",
             ["Campaign return", "Artifact provenance", "Update followthrough"])
@@ -89,7 +89,7 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "pressure_posture",
             "Signal Deck pressure posture",
-            "Public-safe command-deck posture for governed consequence cues, inbox continuity, and follow-through pressure.",
+            "Public-safe command-deck posture for governed consequence cues, inbox continuity, and next-step pressure.",
             "/signal-deck/receipts/pressure_posture.md",
             "/signal-deck/receipts/pressure_posture.json",
             ["Command pressure", "Governed cues", "Inbox continuity"]),
@@ -114,17 +114,17 @@ public sealed class CommunityCreatorHorizonsService
         new(
             "watch_package_posture",
             "Living World watch package posture",
-            "Public-safe between-session posture showing how Living Newsroom framing, faction command, and governed follow-through stay attached to the same turn.",
+            "Public-safe between-session posture showing how Living Newsroom framing, faction command, and governed continuity stay attached to the same turn.",
             "/living-world/receipts/watch_package_posture.md",
             "/living-world/receipts/watch_package_posture.json",
             ["Watch package", "Between-session loop", "First-party framing"]),
         new(
             "command_followthrough_boundary",
-            "Living World command follow-through boundary",
+            "Living World command continuity boundary",
             "Explains how living-world engagement stays governed, opt-in, and bounded instead of becoming autonomous world simulation.",
             "/living-world/receipts/command_followthrough_boundary.md",
             "/living-world/receipts/command_followthrough_boundary.json",
-            ["Governed follow-through", "No autonomous simulation", "Bounded engagement"]),
+            ["Governed continuity", "No autonomous simulation", "Bounded engagement"]),
         new(
             "newsroom_aftermath_loop",
             "Living World newsroom and aftermath loop",
@@ -651,7 +651,7 @@ public sealed class CommunityCreatorHorizonsService
         => id switch
         {
             "pressure_posture" => "Signal Deck can expose governed command pressure and consequence posture on first-party rails, but it does not become automatic world authority or a hidden moderation score.",
-            "command_boundary" => "Signal Deck stays bounded to first-party command and follow-through. It does not reveal private session transcript detail, moderation internals, or off-platform operator state.",
+            "command_boundary" => "Signal Deck stays bounded to first-party command and continuity. It does not reveal private session transcript detail, moderation internals, or off-platform operator state.",
             _ => "Aftermath return loops can stay attached to Signal Deck posture, Living Newsroom framing, and Runner Passport continuity without leaking private campaign detail."
         };
 

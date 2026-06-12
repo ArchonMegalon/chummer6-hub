@@ -16,7 +16,7 @@ class DesktopProofReviewRequiredCopyTests(unittest.TestCase):
         source = SIGNED_IN_STATUS_SERVICE.read_text(encoding="utf-8")
 
         self.assertIn("bool reviewRequired = (pulse?.ParityClaimsReviewRequired ?? false)", source)
-        self.assertIn("parity-sensitive follow-through remains review-required until current desktop proof receipts are green", source)
+        self.assertIn("parity-sensitive desktop checks remain review-required until current proof receipts are green", source)
         self.assertIn("Downloads, support, and recovery stay on the same claimed install rail", source)
 
     def test_publication_detail_view_switches_headline_when_route_is_review_required(self) -> None:
@@ -25,7 +25,7 @@ class DesktopProofReviewRequiredCopyTests(unittest.TestCase):
         self.assertIn("Model.TrustPulse?.ParityClaimsReviewRequired == true", source)
         self.assertIn("publicationRouteReviewRequired", source)
         self.assertIn("Why this publication stays review-required", source)
-        self.assertIn("public parity claims on the review-required lane", source)
+        self.assertIn("Current direct parity proof receipts still keep the public parity claim under review.", source)
 
     def test_publication_shelf_view_switches_discovery_copy_when_route_is_review_required(self) -> None:
         source = SHELF_VIEW.read_text(encoding="utf-8")
@@ -33,7 +33,7 @@ class DesktopProofReviewRequiredCopyTests(unittest.TestCase):
         self.assertIn("Model.TrustPulse?.ParityClaimsReviewRequired == true", source)
         self.assertIn("Shared publications with limited public claims", source)
         self.assertIn("These publications are visible now, but some public comparison language still needs one more review pass.", source)
-        self.assertIn("public parity claims remain review-required until current direct parity proof receipts are green", source)
+        self.assertIn("Public parity claims remain review-required until current direct parity proof receipts are green.", source)
 
     def test_support_response_expectation_inherits_review_required_route_guard(self) -> None:
         source = PUBLIC_LANDING_CONTROLLER.read_text(encoding="utf-8")

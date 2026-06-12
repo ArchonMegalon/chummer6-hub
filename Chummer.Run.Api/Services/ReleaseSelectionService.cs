@@ -187,7 +187,7 @@ public sealed class ReleaseSelectionService
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
             accountValueSummary = "The account does not change the published file. It keeps recovery, tracked support, and linked install history on the same return path, and it unlocks the routes that still attach install continuity after the first launch link.";
             createAccountSummary = "Some platforms are published directly now. Create an account only when you want guided recovery, tracked support, or linked install history on the same return path.";
-            signInSummary = "Sign in to reopen linked installs, recovery history, and support follow-through.";
+            signInSummary = "Sign in to reopen linked installs, recovery history, and support history.";
             downloadFaqAnswer = $"It depends on the platform. {PublicDownloadSentence(guestPlatforms)} {GatedInstallSentence(accountPlatforms)}";
             accountFaqAnswer = "Account creation does not change the published file. It gives you recovery, tracked support, linked install history, and access to routes that keep install continuity attached after linking.";
         }
@@ -196,7 +196,7 @@ public sealed class ReleaseSelectionService
             availabilitySummary = $"{PublicDownloadSentence(guestPlatforms)} Create an account when you want recovery, tracked support, or linked install history on the same return path.";
             accountValueSummary = "The account does not change the published file. It adds recovery, tracked support, and linked install history when you want a calmer return path.";
             createAccountSummary = "Create an account when you want recovery, tracked support, and linked install history on the same return path. The download file stays the same for everyone.";
-            signInSummary = "Sign in to reopen your recovery history, support follow-through, and linked installs.";
+            signInSummary = "Sign in to reopen your recovery history, support history, and linked installs.";
             downloadFaqAnswer = availabilitySummary;
             accountFaqAnswer = "Account creation gives you recovery, tracked support, and linked install history. It does not change the published file.";
         }
@@ -211,12 +211,12 @@ public sealed class ReleaseSelectionService
         }
         else
         {
-            availabilitySummary = "No public download is available right now. Create an account if you want release follow-through and support when the next build lands.";
-            accountValueSummary = "The account keeps recovery, tracked support, and release follow-through together when the next build lands.";
-            createAccountSummary = "Create an account if you want release follow-through, tracked support, and a calmer return path when the next build lands.";
-            signInSummary = "Sign in to reopen your linked release follow-through and support history.";
+            availabilitySummary = "No public download is available right now. Create an account if you want release updates and support when the next build lands.";
+            accountValueSummary = "The account keeps recovery, tracked support, and release updates together when the next build lands.";
+            createAccountSummary = "Create an account if you want release updates, tracked support, and a calmer return path when the next build lands.";
+            signInSummary = "Sign in to reopen your linked release history and support history.";
             downloadFaqAnswer = "Not right now. No public download is available yet.";
-            accountFaqAnswer = "Account creation gives you recovery, tracked support, and release follow-through when the next build lands.";
+            accountFaqAnswer = "Account creation gives you recovery, tracked support, and release updates when the next build lands.";
         }
 
         return new PublicAccessPostureViewModel(
@@ -507,10 +507,10 @@ public sealed class ReleaseSelectionService
         if (UsesMacBootstrapFlow(download))
         {
             return authenticated
-                ? "Download the published Mac DMG immediately. If you want the guided Terminal flow or install-link follow-through, you can still open that route separately."
+                ? "Download the published Mac DMG immediately. If you want the guided Terminal flow or install-link history, you can still open that route separately."
                 : string.Equals(accessClass, InstallAccessClasses.AccountRequired, StringComparison.OrdinalIgnoreCase)
-                ? "Create an account to download the Mac DMG immediately and keep recovery or install follow-through attached if you need it later."
-                    : "Download the Mac DMG immediately, or sign in if you want recovery and install follow-through tied back to your account.";
+                ? "Create an account to download the Mac DMG immediately and keep recovery or install history attached if you need it later."
+                    : "Download the Mac DMG immediately, or sign in if you want recovery and install history tied back to your account.";
         }
 
         if (authenticated)
@@ -712,6 +712,11 @@ public sealed class ReleaseSelectionService
         PublicReleaseExperienceDocument experience,
         DesktopPlatformAcceptanceDocument platformAcceptance)
     {
+        if (UsesMacBootstrapFlow(download) && !HasExplicitArtifactProof(manifest, download))
+        {
+            return false;
+        }
+
         var platform = ResolvePlatformAcceptance(platformAcceptance, PlatformFamily(download));
         if (platform is null)
         {
@@ -825,12 +830,12 @@ public sealed class ReleaseSelectionService
         if (platform is not null && string.Equals(platform.PublicShelfStatus, "buildable_not_publicly_promoted", StringComparison.OrdinalIgnoreCase))
         {
             return new PlatformShelfNoticeViewModel(
-                $"{label} is not on the public shelf yet",
+                $"{label} is not on the downloads page yet",
                 $"The current preview does not publish a promoted {label} download yet. Built artifacts may exist as internal release evidence, but /downloads only exposes platforms that have cleared signing, promotion, and public release-truth checks.");
         }
 
         return new PlatformShelfNoticeViewModel(
-            $"{label} is not on the current shelf",
+            $"{label} is not on the current downloads page",
             $"The current preview does not publish a download for {label}. Use the release-truth and install-help surfaces before assuming this platform is currently supported.");
     }
 
@@ -861,7 +866,7 @@ public sealed class ReleaseSelectionService
     {
         if (platforms.Count == 0)
         {
-            return "No public download is on the shelf right now.";
+            return "No public download is available right now.";
         }
 
         var labels = FormatPlatformList(platforms);
@@ -931,7 +936,7 @@ public sealed class ReleaseSelectionService
             return new ReleasePlatformAvailabilityViewModel(
                 PlatformId: platformId,
                 PlatformLabel: label,
-                StatusLabel: publiclyAvailable ? (currentDevice ? "Available on this device" : "Available now") : "Not on public shelf",
+                StatusLabel: publiclyAvailable ? (currentDevice ? "Available on this device" : "Available now") : "Not on downloads page",
                 Summary: publiclyAvailable
                     ? BuildAvailablePlatformSummary(promotedDownload!, platform)
                     : BuildUnavailablePlatformSummary(label, platform),
@@ -948,12 +953,12 @@ public sealed class ReleaseSelectionService
     {
         if (UsesMacBootstrapFlow(promotedDownload))
         {
-            return "The current public shelf publishes the Mac DMG directly and keeps the guided install handoff available when you want linking, recovery, and support to stay attached from the first launch.";
+            return "The current downloads page publishes the Mac DMG directly and keeps the guided install handoff available when you want linking, recovery, and support to stay attached from the first launch.";
         }
 
         var packageKind = PackageKindLabel(promotedDownload.Kind);
         var supportability = SupportabilityLabel(platform);
-        return $"The current public shelf publishes {promotedDownload.Platform} as the live {packageKind} path. Support posture is {supportability}.";
+        return $"The current downloads page publishes {promotedDownload.Platform} as the live {packageKind} path. Support posture is {supportability}.";
     }
 
     private static string BuildUnavailablePlatformSummary(
@@ -962,15 +967,15 @@ public sealed class ReleaseSelectionService
     {
         if (platform is null)
         {
-            return $"The current public shelf does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform.";
+            return $"The current downloads page does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform.";
         }
 
         return NormalizePlatformId(platform.Id) switch
         {
-            "macos" => "The Mac setup lane is outside the current promoted public shelf. Use downloads for the promoted desktop package and support help for guided Mac setup.",
-            "windows" => "The Windows lane is outside the current promoted public shelf. Use downloads for the promoted desktop package and support help for Windows setup.",
-            "linux" => "The Linux package lane is outside the current public shelf. Use downloads for the promoted desktop package and support help for Linux setup.",
-            _ => $"The current public shelf does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform."
+            "macos" => "The Mac setup lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for guided Mac setup.",
+            "windows" => "The Windows lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for Windows setup.",
+            "linux" => "The Linux package lane is outside the current downloads page. Use downloads for the promoted desktop package and support help for Linux setup.",
+            _ => $"The current downloads page does not publish a {platformLabel} artifact right now. Use the release-truth and install-help surfaces before assuming support on this platform."
         };
     }
 

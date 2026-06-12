@@ -11,7 +11,40 @@
   "files": {
     "mp4": "/media/ledger/globe/black-ledger-video-globe-idle.mp4",
     "webm": "/media/ledger/globe/black-ledger-video-globe-idle.webm",
-    "poster_png": "/media/ledger/globe/black-ledger-video-globe-idle-poster.png"
+    "poster_png": "/media/ledger/globe/black-ledger-video-globe-idle-poster.png",
+    "tour_exports_manifest": "/media/ledger/tours/black-ledger-tour-exports.manifest.json"
+  },
+  "tour_exports": {
+    "status": "provider_demo_exports_available",
+    "claim_boundary": "These links are real provider-hosted 3D/virtual-tour exports for viewer validation. They are not Chummer-authored runsite scans and they are not tactical, route, map, or campaign truth.",
+    "flythrough": {
+      "status": "generated",
+      "provider_source": "3DVista public sample capture",
+      "video_url": "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+      "poster_url": "/media/ledger/tours/black-ledger-3dvista-flythrough-poster.png",
+      "duration_seconds": 60.233,
+      "resolution": "1280x720",
+      "codec": "h264",
+      "audio": "none"
+    },
+    "exports": [
+      {
+        "provider": "Matterport",
+        "export_id": "matterport-sample-ax2JhiPGk5P",
+        "viewer_url": "https://my.matterport.com/show/?m=ax2JhiPGk5P",
+        "embed_url": "https://my.matterport.com/show/?m=ax2JhiPGk5P&play=1",
+        "format": "matterport_showcase",
+        "integration_status": "real_external_viewer_link"
+      },
+      {
+        "provider": "3DVista",
+        "export_id": "3dvista-sample-new-york-loft",
+        "viewer_url": "https://www.3dvista.com/samples/new_york_loft.html",
+        "embed_url": "https://www.3dvista.com/samples/new_york_loft.html",
+        "format": "3dvista_virtual_tour",
+        "integration_status": "real_external_viewer_link"
+      }
+    ]
   },
   "qa": {
     "watermark_status": "none",

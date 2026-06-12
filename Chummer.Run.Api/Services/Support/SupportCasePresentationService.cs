@@ -417,8 +417,8 @@ public sealed class SupportCasePresentationService
             return normalizedStatus switch
             {
                 SupportCaseStatuses.Fixed => string.IsNullOrWhiteSpace(fixedReleaseLabel)
-                    ? "Update the affected claimed install, then continue fix follow-through on that same copy."
-                    : $"Update the affected claimed install to {fixedReleaseLabel}, then continue fix follow-through on that same copy.",
+                    ? "Update the affected claimed install, then continue the fix on that same copy."
+                    : $"Update the affected claimed install to {fixedReleaseLabel}, then continue the fix on that same copy.",
                 SupportCaseStatuses.ReleasedToReporterChannel => string.IsNullOrWhiteSpace(fixedReleaseLabel)
                     ? "Update the affected claimed install to the reporter-ready build, then verify the fix on that same copy."
                     : $"Update the affected claimed install to {fixedReleaseLabel}, then verify the fix on that same copy.",

@@ -29,7 +29,7 @@
   "required_markers": {
     "install_claim_restore_continue": [
       "downloadDispatchSource.Contains(\"Automatic account linking is the default path.\"",
-      "downloadDispatchSource.Contains(\"Support follow-through stays on the same install rail",
+      "downloadDispatchSource.Contains(\"Support stays on the same install rail",
       "accountSource.Contains(\"Recent install handoffs\"",
       "accountSource.Contains(\"Recovery mode only\"",
       "accountSource.Contains(\"Do not redeem claim codes in a browser tab.\"",
@@ -193,5 +193,5 @@
       "authenticatedHomeModel.CampaignSpine.CommunityOperations.Count >= 1"
     ]
   },
-  "generated_at": "2026-05-08T04:16:41Z"
+  "generated_at": "2026-06-09T18:24:52Z"
 }

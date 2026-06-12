@@ -1,0 +1,49 @@
+{
+  "schema": "chummer.black_ledger.tour_exports.v1",
+  "assetId": "black-ledger-public-tour-provider-demo-exports",
+  "route": "/ledger/map",
+  "status": "provider_demo_exports_available",
+  "claimBoundary": "These links are real provider-hosted 3D/virtual-tour exports for viewer validation. They are not Chummer-authored runsite scans and they are not tactical, route, map, or campaign truth.",
+  "generatedAtUtc": "2026-06-11T09:07:00Z",
+  "flythrough": {
+    "status": "generated",
+    "providerSource": "3DVista public sample capture",
+    "videoUrl": "/media/ledger/tours/black-ledger-3dvista-flythrough.mp4",
+    "posterUrl": "/media/ledger/tours/black-ledger-3dvista-flythrough-poster.png",
+    "durationSeconds": 60.233,
+    "resolution": "1280x720",
+    "codec": "h264",
+    "audio": "none",
+    "captureBoundary": "Generated from the public 3DVista New York Loft sample for viewer/fly-through validation only; not Chummer-authored tactical truth."
+  },
+  "exports": [
+    {
+      "provider": "Matterport",
+      "exportId": "matterport-sample-ax2JhiPGk5P",
+      "label": "Matterport 3D Showcase sample",
+      "viewerUrl": "https://my.matterport.com/show/?m=ax2JhiPGk5P",
+      "embedUrl": "https://my.matterport.com/show/?m=ax2JhiPGk5P&play=1",
+      "format": "matterport_showcase",
+      "host": "my.matterport.com",
+      "integrationStatus": "real_external_viewer_link",
+      "chummerTruthRole": "viewer_provider_validation_only"
+    },
+    {
+      "provider": "3DVista",
+      "exportId": "3dvista-sample-new-york-loft",
+      "label": "3DVista New York Loft sample",
+      "viewerUrl": "https://www.3dvista.com/samples/new_york_loft.html",
+      "embedUrl": "https://www.3dvista.com/samples/new_york_loft.html",
+      "format": "3dvista_virtual_tour",
+      "host": "www.3dvista.com",
+      "integrationStatus": "real_external_viewer_link",
+      "chummerTruthRole": "viewer_provider_validation_only"
+    }
+  ],
+  "requiredForViewerLink": [
+    "Matterport export with non-empty https viewerUrl",
+    "3DVista export with non-empty https viewerUrl",
+    "Generated fly-through video with non-empty local videoUrl",
+    "claimBoundary that forbids treating provider demos as Chummer-authored runsite truth"
+  ]
+}

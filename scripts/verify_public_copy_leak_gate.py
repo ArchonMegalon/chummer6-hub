@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import html
+import json
+import re
+import sys
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urljoin, urlparse
+
+import requests
+
+
+RUN_SERVICES_ROOT = Path(__file__).resolve().parents[1]
+PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
+DEFAULT_OUTPUT = PUBLISHED_ROOT / "PUBLIC_COPY_LEAK_GATE.generated.json"
+DEFAULT_ROUTES = [
+    "/",
+    "/downloads",
+    "/status",
+    "/faq",
+    "/ledger",
+    "/ledger/map",
+    "/packages",
+    "/participate",
+    "/feedback",
+    "/what-is-chummer",
+    "/login?next=%2Faccount%2Faccess",
+]
+FORBIDDEN_PATTERNS = [
+    r"\bchummer-api\b",
+    r"\bchummer6-hub\b",
+    r"\bchummer6-ui\b",
+    r"\bchummer-presentation\b",
+    r"\bchummer-core-engine\b",
+    r"\bhost\.docker\.internal\b",
+    r"\blocalhost\b",
+    r"\b127\.0\.0\.1\b",
+    r"/docker/chummercomplete",
+    r"/var/lib/",
+    r"/home/[A-Za-z0-9_.-]+/",
+    r"\bFleet-written\b",
+    r"\bProductLift\b",
+    r"\bICanpreneur\b",
+    r"\bIcanpreneur\b",
+    r"\bEmailit\b",
+    r"\bClickRank\b",
+    r"\bDocumentation\.AI\b",
+    r"\bBrowserAct\b",
+    r"\bTeable\b",
+    r"\bSignitic\b",
+    r"\bMagicFit\b",
+    r"\bLoad Demo Runner\b",
+    r"\bOpen Demo\b",
+]
+
+
+class VisibleTextParser(HTMLParser):
+    VOID_TAGS = {
+        "area",
+        "base",
+        "br",
+        "col",
+        "embed",
+        "hr",
+        "img",
+        "input",
+        "link",
+        "meta",
+        "param",
+        "source",
+        "track",
+        "wbr",
+    }
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._hidden_depth = 0
+        self._hidden_stack: list[bool] = []
+        self._parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        tag_name = tag.lower()
+        attrs_map = {key.lower(): value or "" for key, value in attrs}
+        hidden = (
+            tag_name in {"script", "style", "template", "noscript", "svg"}
+            or "hidden" in attrs_map
+            or attrs_map.get("aria-hidden", "").lower() == "true"
+        )
+        if tag_name in self.VOID_TAGS:
+            return
+        self._hidden_stack.append(hidden)
+        if hidden:
+            self._hidden_depth += 1
+
+    def handle_endtag(self, tag: str) -> None:
+        hidden = self._hidden_stack.pop() if self._hidden_stack else tag.lower() in {"script", "style", "template", "noscript", "svg"}
+        if hidden and self._hidden_depth:
+            self._hidden_depth -= 1
+
+    def handle_data(self, data: str) -> None:
+        if self._hidden_depth:
+            return
+        text = html.unescape(data).strip()
+        if text:
+            self._parts.append(text)
+
+    @property
+    def text(self) -> str:
+        return re.sub(r"\s+", " ", " ".join(self._parts)).strip()
+
+
+@dataclass
+class RouteResult:
+    route: str
+    url: str
+    status_code: int | None
+    success: bool
+    forbidden_hits: list[str]
+    detail: str | None = None
+
+
+def now_iso() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def visible_text(markup: str) -> str:
+    parser = VisibleTextParser()
+    parser.feed(markup)
+    return parser.text
+
+
+def forbidden_hits(text: str) -> list[str]:
+    hits: list[str] = []
+    for pattern in FORBIDDEN_PATTERNS:
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            hits.append(pattern)
+    return hits
+
+
+def normalize_base_url(base_url: str) -> str:
+    parsed = urlparse(base_url)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError(f"base URL must include scheme and host: {base_url}")
+    return base_url.rstrip("/")
+
+
+def verify_route(session: requests.Session, base_url: str, route: str) -> RouteResult:
+    url = urljoin(f"{base_url}/", route.lstrip("/"))
+    try:
+        response = session.get(url, timeout=10)
+    except Exception as exc:
+        return RouteResult(route, url, None, False, [], str(exc))
+
+    hits = forbidden_hits(visible_text(response.text))
+    success = response.status_code == 200 and not hits
+    detail = None
+    if response.status_code != 200:
+        detail = f"route returned HTTP {response.status_code}"
+    elif hits:
+        detail = "public visible copy contains internal, provider, local-host, or demo wording"
+
+    return RouteResult(route, url, response.status_code, success, hits, detail)
+
+
+def build_payload(base_url: str, results: list[RouteResult]) -> dict:
+    failures = [result for result in results if not result.success]
+    return {
+        "contract_name": "chummer.public_copy_leak_gate",
+        "generated_at_utc": now_iso(),
+        "base_url": base_url,
+        "status": "pass" if not failures else "fail",
+        "summary": {
+            "route_count": len(results),
+            "failed_route_count": len(failures),
+            "forbidden_pattern_count": len(FORBIDDEN_PATTERNS),
+            "failed_routes": [result.route for result in failures],
+        },
+        "forbidden_patterns": FORBIDDEN_PATTERNS,
+        "routes": [asdict(result) for result in results],
+    }
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Verify public-visible copy does not expose internal tooling, local paths, or provider names.")
+    parser.add_argument("--base-url", default="https://chummer.run")
+    parser.add_argument("--output", default=str(DEFAULT_OUTPUT))
+    parser.add_argument("--route", action="append", dest="routes", help="Route to verify; repeat to override the default route set.")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    base_url = normalize_base_url(args.base_url)
+    routes = args.routes if args.routes else DEFAULT_ROUTES
+    session = requests.Session()
+    session.headers.update({"User-Agent": "chummer-public-copy-leak-gate/1.0"})
+    results = [verify_route(session, base_url, route) for route in routes]
+    payload = build_payload(base_url, results)
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+    if payload["status"] != "pass":
+        json.dump(payload, sys.stderr, indent=2)
+        sys.stderr.write("\n")
+        return 1
+
+    print(json.dumps(payload))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -88,7 +88,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             shelf_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml"
             shelf_path.write_text(
                 shelf_path.read_text(encoding="utf-8").replace(
-                    "the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
+                    "the proof view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
                     "the artifact shelf keeps your live aftermath, replay, and linked creator-publication record together",
                     1,
                 ),
@@ -99,7 +99,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: the artifact shelf keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
+            "Chummer.Run.Api/Views/PublicLanding/Shelf.cshtml missing marker: the proof view keeps your live Table Pulse Aftermath return cues, aftermath, replay, and linked creator-publication record together",
             result.stderr,
         )
 
@@ -110,7 +110,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
             controller_path = temp_root / "Chummer.Run.Api/Controllers/PublicLandingController.cs"
             controller_path.write_text(
                 controller_path.read_text(encoding="utf-8").replace(
-                    'Heading: "Runner Passport connected lane"',
+                    'Heading: "Runner Passport continuity rail"',
                     'Heading: "Runner Passport"',
                     1,
                 ),
@@ -121,7 +121,7 @@ class TablePulseConnectedLaneSurfaceTests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Chummer.Run.Api/Controllers/PublicLandingController.cs missing marker: Runner Passport connected lane",
+            "Chummer.Run.Api/Controllers/PublicLandingController.cs missing marker: Runner Passport continuity rail",
             result.stderr,
         )
 

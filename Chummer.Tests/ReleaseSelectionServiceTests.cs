@@ -216,6 +216,50 @@ platforms:
     }
 
     [Fact]
+    public void PublicStableKeepsOpenPublicLinuxInstallerGuestReadable()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260612-121055",
+            Channel: "public_stable",
+            Status: "published",
+            RolloutState: "public_stable",
+            PublishedAt: DateTimeOffset.Parse("2026-06-12T13:20:46Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-linux-x64-installer",
+                    Platform: "Avalonia Desktop Linux X64 Installer",
+                    Url: "/downloads/files/chummer-avalonia-linux-x64-installer.deb",
+                    Sha256: "158294957a9456ddfb561325d5e503f22879ff1ff4036a360f2812099d7fc475",
+                    SizeBytes: 42855330,
+                    Head: "avalonia",
+                    PlatformId: "linux-x64",
+                    Arch: "x64",
+                    Kind: "installer",
+                    FileName: "chummer-avalonia-linux-x64-installer.deb",
+                    InstallAccessClass: "open_public")
+            ]);
+
+        PublicReleaseArtifactDto linuxDownload = Assert.Single(manifest.Downloads);
+        ReleaseOptionViewModel linuxOption = service.BuildOption(manifest, linuxDownload, authenticated: false, recommended: true);
+        PublicAccessPostureViewModel posture = service.BuildPublicAccessPosture(manifest, userAgent: "Mozilla/5.0 (X11; Linux x86_64)", authenticated: false);
+
+        Assert.Equal("open_public", linuxOption.InstallAccessClass);
+        Assert.False(linuxOption.RequiresAccount);
+        Assert.Equal("/downloads/get/avalonia-linux-x64-installer", linuxOption.DispatchHref);
+        Assert.True(posture.GuestInstallAvailable);
+        Assert.False(posture.AccountRequiredInstallAvailable);
+    }
+
+    [Fact]
     public void PublicReleaseExperienceCanonAcceptsCurrentProofBoundaryFields()
     {
         var configuration = new ConfigurationBuilder()
@@ -271,7 +315,7 @@ platforms:
         Assert.False(string.IsNullOrWhiteSpace(experience.PlatformShelfNoticeTitle));
         var windows = Assert.Single(experience.PlatformAvailability, item => item.PlatformId == "windows");
         Assert.False(windows.PubliclyAvailable);
-        Assert.Contains("outside the current public shelf", windows.Summary, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("outside the current downloads page", windows.Summary, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("unavailable", windows.Summary, StringComparison.OrdinalIgnoreCase);
     }
 

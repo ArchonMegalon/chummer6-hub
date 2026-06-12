@@ -125,6 +125,23 @@ static bool ContainsLaunchReadinessSignal(string value)
         || value.Contains("hold launch expansion", StringComparison.OrdinalIgnoreCase);
 }
 
+static bool ContainsLocalProofLabel(string value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return false;
+    }
+
+    return value.Contains("Current local edge proof", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("Current local release proof", StringComparison.OrdinalIgnoreCase);
+}
+
+static bool ContainsLocalProofPassed(string value)
+{
+    return ContainsLocalProofLabel(value)
+        && value.Contains("passed", StringComparison.OrdinalIgnoreCase);
+}
+
 async Task VerifyPublicationWorkflowAsync()
 {
     var workflow = new PublicationWorkflowService();
@@ -2379,7 +2396,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(!downloadDispatchSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "download handoff should stay focused on install handoff controls instead of duplicating the broader signed-in trust panel.");
     Assert(downloadDispatchSource.Contains("Current release", StringComparison.Ordinal), "download handoff should still expose current release posture directly on the handoff card.");
     Assert(downloadDispatchSource.Contains("Automatic account linking is the default path.", StringComparison.Ordinal), "download handoff should explicitly keep automatic linking as the default and reserve claim codes for recovery fallback.");
-    Assert(downloadDispatchSource.Contains("Support follow-through stays on the same install rail", StringComparison.Ordinal), "download handoff should keep support recovery on the same install rail instead of splitting it into a separate browser ritual.");
+    Assert(downloadDispatchSource.Contains("Support stays on the same install rail", StringComparison.Ordinal), "download handoff should keep support recovery on the same install rail instead of splitting it into a separate browser ritual.");
     Assert(!supportSubmittedSource.Contains("signed-in shell", StringComparison.Ordinal), "support confirmation should avoid signed-in shell wording.");
     Assert(supportSubmittedSource.Contains("_SignedInTrustStatusPanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared signed-in trust panel instead of inventing a confirmation-only trust surface.");
     Assert(supportSubmittedSource.Contains("_PublicTrustPulsePanel.cshtml", StringComparison.Ordinal), "support confirmation should reuse the shared public trust pulse instead of duplicating weekly trust rows.");
@@ -3364,7 +3381,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountModel!.SupportCaseSummaries.Any(item => string.Equals(item.Case.CaseId, supportCase.CaseId, StringComparison.Ordinal) && !string.IsNullOrWhiteSpace(item.ClosureSummary)), "account page should project support lifecycle and closure summaries instead of only raw case rows.");
     Assert(accountModel.SignedInTrustStatus is not null, "account page should project install-specific trust status directly on the signed-in account surface.");
     Assert(accountModel.SignedInTrustStatus!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "account page should surface who-can-get-it-now posture inside the signed-in trust panel.");
-    Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "account page should surface adoption health inside the signed-in trust panel.");
+    Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofPassed(row.Value)), "account page should surface adoption health inside the signed-in trust panel.");
     Assert(accountModel.SignedInTrustStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "account page should surface the install-specific caution lane inside the signed-in trust panel.");
     Assert(accountModel.PrivacyBoundary is not null, "account page should surface the signed-in privacy boundary next to visibility and recovery posture.");
     Assert(string.Equals(accountModel!.CurrentSection, "profile", StringComparison.Ordinal), "default account route should land on the profile section.");
@@ -4190,9 +4207,9 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Install posture", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in downloads should surface the install-specific posture from the support readiness summary.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Fix availability", StringComparison.Ordinal) && row.Value.Contains("preview 0.6.3-smoke", StringComparison.Ordinal)), "signed-in downloads should surface fix availability for the linked install instead of leaving it implicit in prose.");
     Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("Update it to preview 0.6.3-smoke first", StringComparison.Ordinal)), "signed-in downloads should surface the install-specific caution lane beside the fix target.");
-    Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "signed-in downloads should surface adoption health directly inside the install-specific trust panel.");
+    Assert(authenticatedDownloadsModel.SignedInStatus.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofPassed(row.Value)), "signed-in downloads should surface adoption health directly inside the install-specific trust panel.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Who can get it now", StringComparison.Ordinal) && (row.Value.Contains("linked install", StringComparison.OrdinalIgnoreCase) || row.Value.Contains("public download", StringComparison.OrdinalIgnoreCase))), "downloads should explain the current access posture beside the release shelf.");
-    Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof passed", StringComparison.Ordinal)), "downloads should surface current adoption evidence beside the release shelf.");
+    Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofPassed(row.Value)), "downloads should surface current adoption evidence beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse.Rows.Any(static row => string.Equals(row.Label, "Launch readiness", StringComparison.Ordinal) && ContainsLaunchReadinessSignal(row.Value)), "downloads should surface launch-readiness posture beside the release shelf.");
     Assert(authenticatedDownloadsModel.TrustPulse!.Rows.Any(static row => string.Equals(row.Label, "Current caution", StringComparison.Ordinal) && row.Value.Contains("current longest pole", StringComparison.OrdinalIgnoreCase)), "downloads should surface the weekly caution lane from the trust pulse.");
     var authenticatedHelpPage = await authenticatedLandingController.HelpPage(CancellationToken.None) as ViewResult;
@@ -5413,7 +5430,7 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Blocked", StringComparison.Ordinal) && row.Value.Contains("blocked", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface blocked route or journey posture in launch-health rows.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Live", StringComparison.Ordinal) && row.Value.Contains("live install route", StringComparison.OrdinalIgnoreCase)) == true, "status page should compile the live install shelf posture into launch-health rows without claiming nothing is live while downloads remain available.");
     Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Support pulse", StringComparison.Ordinal) && row.Value.Contains("support", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface support closure posture in launch-health rows.");
-    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && row.Value.Contains("Current local edge proof", StringComparison.OrdinalIgnoreCase)) == true, "status page should surface adoption health directly inside the launch-health breakdown.");
+    Assert(statusModel?.LaunchHealthRows?.Any(static row => string.Equals(row.Label, "Adoption health", StringComparison.Ordinal) && ContainsLocalProofLabel(row.Value)) == true, "status page should surface adoption health directly inside the launch-health breakdown.");
     var authenticatedStatusView = await authenticatedLandingController.StatusPage(CancellationToken.None) as ViewResult;
     var authenticatedStatusModel = authenticatedStatusView?.Model as StatusPageViewModel;
     Assert(authenticatedStatusModel?.TrustPulse is not null, "authenticated status page should keep the weekly public trust pulse visible.");

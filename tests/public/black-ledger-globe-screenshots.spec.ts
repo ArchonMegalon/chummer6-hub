@@ -2,6 +2,8 @@ import { test, expect } from 'playwright/test';
 import { completionPath, writeMarkdownArtifact } from './ux-artifacts';
 
 const baseUrl = process.env.BASE_URL?.trim() || 'https://chummer.run';
+const gotoOptions = { waitUntil: 'domcontentloaded' as const, timeout: 45000 };
+const readyTimeout = 30000;
 const viewports = [
   { width: 390, height: 844 },
   { width: 412, height: 915 },
@@ -13,9 +15,16 @@ const viewports = [
 
 for (const viewport of viewports) {
   test(`black ledger globe screenshot ${viewport.width}x${viewport.height}`, async ({ page }) => {
+    test.setTimeout(90000);
     await page.setViewportSize(viewport);
-    await page.goto(`${baseUrl}/ledger/map`, { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-black-ledger-geoscape-root][data-ready="true"]').first()).toBeVisible();
+    await page.goto(`${baseUrl}/ledger/map`, gotoOptions);
+
+    const heroGeoscape = page.locator(
+      '.ledger-flagship__geoscape-wrap .ledger-flagship__geoscape[data-black-ledger-geoscape-root]'
+    );
+    await expect(heroGeoscape).toHaveAttribute('data-ready', 'true', { timeout: readyTimeout });
+    await heroGeoscape.scrollIntoViewIfNeeded();
+    await expect(heroGeoscape).toBeVisible();
     await page.screenshot({ path: completionPath(`black-ledger-globe-${viewport.width}x${viewport.height}.png`), fullPage: true });
   });
 }

@@ -49,7 +49,7 @@ internal static class DesktopInstallRail
                 ["title"] = $"Install help for {BuildGuidedBootstrapArtifactTitle(artifact)}",
                 ["summary"] = recoveryMode
                     ? "Setup entered recovery or needed a relink step during install."
-                    : "Install, first launch, or update follow-through needs help on this device.",
+                    : "Install, first launch, or update needs help on this device.",
                 ["detail"] = BuildSupportDetail(recoveryMode, installedBuildReceiptId),
                 ["installationId"] = installationId,
                 ["applicationVersion"] = NormalizeSupportPrefill(applicationVersion) ?? manifest.Version,
@@ -77,7 +77,7 @@ internal static class DesktopInstallRail
             {
                 ["kind"] = SupportCaseKinds.InstallHelp,
                 ["title"] = "Install help for claimed desktop install",
-                ["summary"] = "Install, update, rollback, or support follow-through needs help on this linked device.",
+                ["summary"] = "Install, update, rollback, or support needs help on this linked device.",
                 ["detail"] = BuildAccountSupportDetail(installedBuildReceiptId),
                 ["installationId"] = NormalizeSupportPrefill(installationId),
                 ["applicationVersion"] = NormalizeSupportPrefill(applicationVersion),
@@ -101,7 +101,7 @@ internal static class DesktopInstallRail
             ReturnLabel: recoveryMode ? "Return to recovery handoff" : "Return to guided installer",
             Summary: recoveryMode
                 ? "This case stays on the same install rail. Go back to the guided handoff when you are ready to retry recovery, and only use a recovery code if Chummer entered recovery mode on that device."
-                : "This case stays on the same install rail. Go back to the guided handoff when you are ready to retry install, first launch, or update follow-through on that device.",
+                : "This case stays on the same install rail. Go back to the guided handoff when you are ready to retry install, first launch, or update on that device.",
             RecoveryModeOnly: recoveryMode);
     }
 
@@ -129,7 +129,7 @@ internal static class DesktopInstallRail
                 : "Continue in the installer or desktop app so the linked install can claim this account without a browser handoff.",
             UpdateAction: "Use the desktop app update lane or signed-in installer for this same channel and build lineage before filing a new support case.",
             RollbackAction: "If update or setup fails, keep the previous installed copy and return to this claimed install continuation rail or tracked support on this same install rail.",
-            SupportContinuation: "Support follow-through stays on the same install rail with the current claim, build, channel, fallback, and recovery context attached.");
+            SupportContinuation: "Support stays on the same install rail with the current claim, build, channel, fallback, and recovery context attached.");
     }
 
     private static string BuildGuidedBootstrapArtifactTitle(PublicReleaseArtifactDto artifact)

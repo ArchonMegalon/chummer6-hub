@@ -36,7 +36,7 @@ PACKAGE_PROOF = {
 REQUIRED_MARKERS = {
     "install_claim_restore_continue": [
         'downloadDispatchSource.Contains("Automatic account linking is the default path."',
-        'downloadDispatchSource.Contains("Support follow-through stays on the same install rail',
+        'downloadDispatchSource.Contains("Support stays on the same install rail',
         'accountSource.Contains("Recent install handoffs"',
         'accountSource.Contains("Recovery mode only"',
         'accountSource.Contains("Do not redeem claim codes in a browser tab."',

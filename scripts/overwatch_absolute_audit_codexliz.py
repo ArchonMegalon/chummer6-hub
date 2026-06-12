@@ -144,7 +144,11 @@ def ensure_dirs() -> None:
         owner_pid = PID_FILE.read_text(encoding="utf-8").strip() if PID_FILE.exists() else "unknown"
         raise RuntimeError(f"another overwatch supervisor already owns {LOCK_FILE} pid={owner_pid}") from exc
     RUN_DIR.mkdir(parents=True, exist_ok=True)
-    if CURRENT_LINK.exists() or CURRENT_LINK.is_symlink():
+    if CURRENT_LINK.is_symlink():
+        CURRENT_LINK.unlink()
+    elif CURRENT_LINK.is_dir():
+        shutil.rmtree(CURRENT_LINK)
+    elif CURRENT_LINK.exists():
         CURRENT_LINK.unlink()
     CURRENT_LINK.symlink_to(RUN_DIR)
     PID_FILE.write_text(f"{os.getpid()}\n", encoding="utf-8")

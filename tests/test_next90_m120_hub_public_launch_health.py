@@ -165,14 +165,16 @@ class Next90M120HubPublicLaunchHealthTests(unittest.TestCase):
             status_path = temp_root / "Chummer.Run.Api/Views/PublicLanding/Status.cshtml"
             status_text = status_path.read_text(encoding="utf-8")
             status_path.write_text(
-                status_text.replace("Model.LaunchHealthRows", "Model.TrustPulse.Rows", 1),
+                status_text
+                .replace("Model.LaunchHealthRows", "Model.TrustPulse.Rows", 1)
+                .replace("Quick release checks", "Quick release summary", 1),
                 encoding="utf-8",
             )
 
             result = self.run_verifier(temp_root)
 
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Model.LaunchHealthRows", result.stderr)
+        self.assertIn("Quick release checks", result.stderr)
 
     def test_verifier_fails_when_release_proof_drops_public_trust_surface_block(self) -> None:
         with tempfile.TemporaryDirectory(prefix="next90-m120-proof-surface-") as temp_dir:

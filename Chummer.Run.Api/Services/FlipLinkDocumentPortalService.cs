@@ -10,6 +10,7 @@ public sealed class FlipLinkDocumentPortalService
     private const string QuickstartDocumentId = "chummer6_quickstart_guide";
     private const string QuickstartSlug = "chummer6-quickstart";
     private const string QuickstartCategory = "quickstart";
+    private const string QuickstartRelativeGuidePath = "public-guides/chummer6-quickstart.md";
     private const string QuickstartSourceRepo = "chummer6-design";
     private const string QuickstartSourcePath = "products/chummer/public-guides/chummer6-quickstart.md";
     private const string QuickstartVersion = "2026.06-first-lane";
@@ -165,7 +166,57 @@ public sealed class FlipLinkDocumentPortalService
             }
         }
 
+        foreach (string candidate in ResolveAncestorProductRoots(Directory.GetCurrentDirectory()))
+        {
+            if (TryResolveProductRoot(candidate, out string matchedRoot))
+            {
+                return matchedRoot;
+            }
+        }
+
+        foreach (string candidate in ResolveAncestorProductRoots(AppContext.BaseDirectory))
+        {
+            if (TryResolveProductRoot(candidate, out string matchedRoot))
+            {
+                return matchedRoot;
+            }
+        }
+
         return Path.Combine(AppContext.BaseDirectory, ".codex-design", "product");
+    }
+
+    private static bool TryResolveProductRoot(string rootCandidate, out string productRoot)
+    {
+        foreach (string candidate in BuildProductRootCandidates(rootCandidate))
+        {
+            if (File.Exists(Path.Combine(candidate, QuickstartRelativeGuidePath)))
+            {
+                productRoot = candidate;
+                return true;
+            }
+        }
+
+        productRoot = string.Empty;
+        return false;
+    }
+
+    private static IEnumerable<string> BuildProductRootCandidates(string root)
+    {
+        string fullRoot = Path.GetFullPath(root);
+        yield return fullRoot;
+        yield return Path.Combine(fullRoot, "products", "chummer");
+        yield return Path.Combine(fullRoot, "chummer-design", "products", "chummer");
+        yield return Path.Combine(fullRoot, ".codex-design", "product");
+    }
+
+    private static IEnumerable<string> ResolveAncestorProductRoots(string start)
+    {
+        string? current = Path.GetFullPath(start);
+        for (int depth = 0; depth < 8 && !string.IsNullOrWhiteSpace(current); depth++)
+        {
+            yield return current;
+            current = Directory.GetParent(current)?.FullName;
+        }
     }
 
     private static string ComputeFileSha256(string path)
