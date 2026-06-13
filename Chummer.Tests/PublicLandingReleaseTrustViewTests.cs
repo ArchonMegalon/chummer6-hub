@@ -71,6 +71,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Open current release", view, StringComparison.Ordinal);
         Assert.DoesNotContain("@Model.FlagshipCoverage.Eyebrow", view, StringComparison.Ordinal);
         Assert.DoesNotContain("id=\"downloads-@card.Id.Replace('_', '-')\"", view, StringComparison.Ordinal);
+        Assert.Contains("The Windows installer is larger because it bundles the self-contained setup app and the desktop payload together. The ZIP is smaller because it is only the portable package.", view, StringComparison.Ordinal);
     }
 
     [Fact]

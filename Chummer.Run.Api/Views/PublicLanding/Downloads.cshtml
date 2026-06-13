@@ -300,6 +300,10 @@ else
                                 <span>Support path</span>
                                 <strong>@(Model.Chrome.Authenticated ? "This install stays tied to your signed-in recovery and support path." : "Sign in when you want recovery and support tied to this install.")</strong>
                             </article>
+                            <article class="downloads-fact">
+                                <span>Windows size</span>
+                                <strong>The Windows installer is larger because it bundles the self-contained setup app and the desktop payload together. The ZIP is smaller because it is only the portable package.</strong>
+                            </article>
                         </div>
                         <div class="stacked-actions">
                             <a class="button-like button-like--ghost" href="@release.InstallHelpHref">@release.InstallHelpLabel</a>
