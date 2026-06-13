@@ -67,10 +67,10 @@
                     : release.PlatformShelfNoticeSummary
                 : accessPosture?.AvailabilitySummary
                     ?? (guestGateRequired
-                        ? "Sign in when you want setup return, recovery, and support attached from the first launch."
+                        ? "You can continue as a guest and install directly. Sign in if you want setup return, recovery, and support tied to one account."
                         : "Other platforms stay on the main platform downloads list below. Manual packages and technical detail stay collapsed underneath."))
         </p>
-        <p class="muted-copy">Start with the recommended download. Sign in when you want setup return, recovery, and support tied to the same account.</p>
+        <p class="muted-copy">Start with the recommended download. Install first, then sign in if you want setup continuity.</p>
         <p class="muted-copy">Need the main downloads page again? <a class="inline-link" href="/downloads">Open downloads</a>.</p>
     </div>
 </section>
@@ -126,7 +126,7 @@ else
                             : $"Recommended for {deviceLabel}")
                 </span>
                 <h2>@(requestedPlatformUnavailable ? $"This browser looks like {deviceLabel}" : release.Recommended.Title)</h2>
-                <p>@(requestedPlatformUnavailable ? release.PlatformShelfNoticeSummary : "Use the main install path for this platform. Choose sign-in when you want recovery, support, and install return attached from the first launch.")</p>
+                <p>@(requestedPlatformUnavailable ? release.PlatformShelfNoticeSummary : "Use the main install path for this platform. You can install first and sign in later for continuity.")</p>
                 <div class="recommended-download__meta">
                     <span>@(requestedPlatformUnavailable ? (release.RequestedPlatformLabel ?? "Platform note") : release.Recommended.PlatformLabel)</span>
                     @if (!requestedPlatformUnavailable)
@@ -148,8 +148,8 @@ else
                         <strong>@(guestGateRequired ? "Link this copy from the first launch" : "Link this copy on first launch")</strong>
                         <p>
                             @(guestGateRequired
-                                ? "This install path starts with sign-in so recovery and support stay attached from the first launch."
-                                : "You can install now, and Chummer links this copy on first launch before the workspace opens.")
+                                ? "Recovery and support can stay attached when you choose sign-in."
+                                : "You can install now, and Chummer links your setup after install.")
                         </p>
                     </article>
                     <article class="recommended-download__trustfact">

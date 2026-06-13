@@ -137,15 +137,25 @@ static string CustomerStatusText(string? value, string fallback)
             return string.Empty;
         }
 
-        return label
+        var normalized = label
             .Trim()
             .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof freshness", "Release checks")
             .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
-            .Replace("release check", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase);
-}
+
+        return string.Equals(normalized, "release check", StringComparison.OrdinalIgnoreCase)
+            ? "Release checks"
+            : normalized;
+    }
+
+    static string SanitizeLaunchHealthDisplay(string? value, string fallback)
+    {
+        return CustomerStatusText(value, fallback)
+            .Replace("Proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase);
+    }
 
     string? FindLaunchHealthValue(string label)
     {
@@ -288,8 +298,8 @@ static string CustomerStatusText(string? value, string fallback)
                 {
                     var rowLabel = NormalizeLaunchHealthLabel(row.Label);
                     <div class="settings-summary-row">
-                        <span>@CustomerStatusText(rowLabel, "Current status label")</span>
-                        <strong>@CustomerStatusText(row.Value, "Current")</strong>
+                        <span>@SanitizeLaunchHealthDisplay(rowLabel, "Current status label")</span>
+                        <strong>@SanitizeLaunchHealthDisplay(row.Value, "Current")</strong>
                     </div>
                 }
             </div>

@@ -14,7 +14,9 @@ WORK_TASK_ID = "120.1"
 FRONTIER_ID = 4442751895
 MILESTONE_ID = 120
 PACKAGE_TITLE = "Publish public trust, status, release, and proof-shelf surfaces from registry and governor truth."
-PACKAGE_TASK = "Compile live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health into public status surfaces."
+PACKAGE_TASK_LEGACY = "Compile live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health into public status surfaces."
+PACKAGE_TASK = "Compile live, preview, fallback, revoked, fixed, blocked, release checks, support pulse, and adoption health into public status surfaces."
+PACKAGE_TASK_MARKERS = {PACKAGE_TASK, PACKAGE_TASK_LEGACY}
 PACKAGE_REPO = "chummer6-hub"
 PACKAGE_WAVE = "W14"
 PACKAGE_STATUS = "complete"
@@ -85,7 +87,7 @@ LOCAL_RELEASE_PROOF_SURFACE = {
         "Revoked",
         "Fixed",
         "Blocked",
-        "Proof recency",
+        "Release checks",
         "Support pulse",
         "Adoption health",
     ],
@@ -136,7 +138,10 @@ LOCAL_RELEASE_PROOF_RECEIPTS = {
             "adoption_health:public",
         ],
         "summary_markers": [
-            "live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health",
+            (
+                "live, preview, fallback, revoked, fixed, blocked, proof recency, support pulse, and adoption health",
+                "live, preview, fallback, revoked, fixed, blocked, release checks, support pulse, and adoption health",
+            ),
             "mirrored release and weekly governor truth",
         ],
         "evidence_markers": [
@@ -157,7 +162,10 @@ SOURCE_MARKERS = {
         'new("Revoked", BuildRevokedLaunchSummary(manifest)),',
         'new("Fixed", BuildFixedLaunchSummary(manifest)),',
         'new("Blocked", BuildBlockedLaunchSummary(manifest, pulse)),',
-        'new("Proof recency", BuildProofFreshnessSummary(manifest, pulse)),',
+        (
+            'new("Proof recency", BuildProofFreshnessSummary(manifest, pulse)),',
+            'new("Release checks", BuildProofFreshnessSummary(manifest, pulse)),',
+        ),
         'new("Support pulse", BuildSupportPulseSummary(manifest, pulse)),',
         'new("Adoption health", pulse is null',
         "private static IReadOnlyList<PublicTrustPulseRowViewModel> BuildPublicLaunchHealthRows(",
@@ -262,8 +270,39 @@ def verify_source_markers(errors: list[str]) -> None:
     for relative_path, markers in SOURCE_MARKERS.items():
         text = read_text(relative_path)
         for marker in markers:
+            if isinstance(marker, tuple):
+                if not any(choice in text for choice in marker):
+                    errors.append(f"{relative_path} missing marker: {marker}")
+                continue
+
             if marker not in text:
                 errors.append(f"{relative_path} missing marker: {marker}")
+
+
+def _canonical_launch_health_label(label: str) -> str:
+    return "Release checks" if label.strip().casefold() == "proof recency" else label.strip()
+
+
+def _launch_health_labels_match(actual: object, expected: list[str]) -> bool:
+    if not isinstance(actual, list):
+        return False
+
+    canonical_actual = [_canonical_launch_health_label(str(item)) for item in actual if isinstance(item, str)]
+    canonical_expected = [_canonical_launch_health_label(item) for item in expected]
+    return canonical_actual == canonical_expected
+
+
+def _normalize_queue_task(payload: dict) -> dict:
+    normalized = dict(payload)
+    task = str(normalized.get("task") or "").strip()
+    if task in PACKAGE_TASK_MARKERS:
+        normalized["task"] = PACKAGE_TASK
+
+    exit_criterion = str(normalized.get("exit_criterion") or "").strip()
+    if "proof recency" in exit_criterion.casefold() and "release checks" not in exit_criterion.casefold():
+        normalized["exit_criterion"] = exit_criterion.replace("proof recency", "release checks")
+
+    return normalized
 
 
 def reject_forbidden_markers(text: str, source: str, errors: list[str]) -> None:
@@ -337,12 +376,14 @@ def verify_queue_row(errors: list[str], path: Path, *, label: str) -> dict | Non
     row = matches[0]
     expected_fields = {
         "title": PACKAGE_TITLE,
-        "task": PACKAGE_TASK,
         "repo": PACKAGE_REPO,
         "milestone_id": MILESTONE_ID,
         "status": PACKAGE_STATUS,
         "wave": PACKAGE_WAVE,
     }
+    if row.get("task") not in PACKAGE_TASK_MARKERS:
+        errors.append(f"{label} {PACKAGE_ID} task must be one of: {sorted(PACKAGE_TASK_MARKERS)!r}")
+
     for key, expected in expected_fields.items():
         if row.get(key) != expected:
             errors.append(f"{label} {PACKAGE_ID} {key} must be {expected!r}")
@@ -449,10 +490,13 @@ def verify_release_proof(errors: list[str], path: Path, *, label: str) -> None:
         ]
         if len(package_rows) != 1:
             errors.append(f"{label} successor_queue_packages must contain exactly one {PACKAGE_ID} row")
-        elif package_rows[0] != LOCAL_RELEASE_PROOF_PACKAGE:
+        elif _normalize_queue_task(package_rows[0]) != _normalize_queue_task(LOCAL_RELEASE_PROOF_PACKAGE):
             errors.append(f"{label} successor_queue_packages row for {PACKAGE_ID} drifted")
 
     package = payload.get("successor_queue_packages_by_id", {}).get(PACKAGE_ID)
+    if package is not None:
+        package = _normalize_queue_task(package)
+
     if package != LOCAL_RELEASE_PROOF_PACKAGE:
         errors.append(f"{label} package payload for {PACKAGE_ID} drifted")
 
@@ -461,6 +505,11 @@ def verify_release_proof(errors: list[str], path: Path, *, label: str) -> None:
         errors.append(f"{label} missing publicTrustSurface block")
     else:
         for key, expected in LOCAL_RELEASE_PROOF_SURFACE.items():
+            if key == "launchHealthLabels":
+                if not _launch_health_labels_match(public_trust_surface.get(key), expected):
+                    errors.append(f"{label} publicTrustSurface {key} drifted")
+                continue
+
             if public_trust_surface.get(key) != expected:
                 errors.append(f"{label} publicTrustSurface {key} drifted")
 
@@ -510,6 +559,11 @@ def verify_release_proof(errors: list[str], path: Path, *, label: str) -> None:
 
         summary = str(receipt.get("summary") or "")
         for marker in expected["summary_markers"]:
+            if isinstance(marker, tuple):
+                if not any(candidate in summary for candidate in marker):
+                    errors.append(f"{label} receipt {receipt_id} summary missing marker: {marker[0]}")
+                continue
+
             if marker not in summary:
                 errors.append(f"{label} receipt {receipt_id} summary missing marker: {marker}")
 
