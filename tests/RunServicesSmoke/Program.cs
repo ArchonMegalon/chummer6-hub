@@ -133,7 +133,7 @@ static bool ContainsLocalProofLabel(string value)
     }
 
     return value.Contains("Current local edge proof", StringComparison.OrdinalIgnoreCase)
-        || value.Contains("Current local release proof", StringComparison.OrdinalIgnoreCase);
+        || value.Contains("Current local release checks", StringComparison.OrdinalIgnoreCase);
 }
 
 static bool ContainsLocalProofPassed(string value)
@@ -2335,7 +2335,8 @@ async Task VerifyPublicLandingProjectionAsync()
     Assert(accountSource.Contains("Signed-in trust snapshot", StringComparison.Ordinal), "account teams and permissions should give organizers a bounded signed-in trust snapshot on the member-guidance rail.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Who can get it now\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current access guidance.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Recommended for this install\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the promoted install path.");
-    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Release proof\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current proof.");
+    Assert(accountSource.Contains("<strong>Release checks:</strong>", StringComparison.Ordinal), "account member guidance should label the signed-in release lane with customer-facing release-check language.");
+    Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Release proof\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for current release checks.");
     Assert(accountSource.Contains("TrustRowValue(Model.SignedInTrustStatus, \"Current caution\"", StringComparison.Ordinal), "account member guidance should reuse the signed-in trust posture for the caution lane.");
     Assert(accountSource.Contains("#signed-in-trust-status", StringComparison.Ordinal), "account member guidance should deep-link back to the shared signed-in trust panel instead of inventing a second trust page.");
     Assert(accountSource.Contains("Start first playable session", StringComparison.Ordinal), "account work should offer starter-lane follow-through when the shared campaign view is still empty.");

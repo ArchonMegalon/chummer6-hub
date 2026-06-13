@@ -9838,8 +9838,8 @@ Boundary:
         if (!string.IsNullOrWhiteSpace(pulse.LocalReleaseProofStatus))
         {
             segments.Add(string.Equals(pulse.LocalReleaseProofStatus, "passed", StringComparison.OrdinalIgnoreCase)
-                ? "Current local release proof passed."
-                : $"Current local release proof is {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
+                ? "Current local release checks passed."
+                : $"Current local release checks are {HumanizeToken(pulse.LocalReleaseProofStatus, "unknown").ToLowerInvariant()}.");
         }
 
         if (pulse.ProvenJourneyCount is int journeyCount && journeyCount > 0 && pulse.ProvenRouteCount is int routeCount && routeCount > 0)

@@ -51,7 +51,7 @@
     var signedInShelfHref = Model.Chrome.Authenticated ? "/artifacts#signed-in-proof-view" : "/signup?next=%2Fartifacts";
     var signedInShelfLabel = Model.Chrome.Authenticated ? "Open signed-in continuity view" : "Create account for signed-in continuity";
     var signedInShelfSummary = Model.Chrome.Authenticated
-        ? "Use the signed-in proof view when you want personal, campaign, creator, and public returns to stay in one calmer place."
+        ? "Use the signed-in detail view when you want personal, campaign, creator, and public returns to stay in one calmer place."
         : "Public discovery works without an account. Sign in only when you want private continuity, campaign return, and creator next steps in one place.";
     var creatorConciergeHref = $"/artifacts/publications/{Uri.EscapeDataString(Model.Publication.PublicationId)}/concierge";
     var testimonialConciergeHref = $"/testimonials/concierge?publicationId={Uri.EscapeDataString(Model.Publication.PublicationId)}";

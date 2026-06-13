@@ -90,16 +90,16 @@ public sealed class PublicLandingReleaseTrustViewTests
         string viewPath = RepoPaths.FromRoot("Chummer.Run.Api", "Views", "PublicLanding", "DownloadDispatch.cshtml");
         string view = File.ReadAllText(viewPath);
 
-        Assert.Contains("Keep install handoff, platform choice, release proof, and recovery on separate pages.", view, StringComparison.Ordinal);
+        Assert.Contains("Keep install handoff, platform choice, release status, and recovery on separate pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Return to downloads when the job is choosing a platform or installer shape", view, StringComparison.Ordinal);
         Assert.Contains("Open Devices and access only when this copy needs relink or reclaim help", view, StringComparison.Ordinal);
-        Assert.Contains("Open what works today when the question is current proof, not this device handoff", view, StringComparison.Ordinal);
+        Assert.Contains("Open what works today when the question is current release status, not this device handoff", view, StringComparison.Ordinal);
         Assert.Contains("Leave the handoff for tracked support or help as soon as the problem becomes recovery-bound", view, StringComparison.Ordinal);
         Assert.Contains("Use this page to finish one install handoff, then move to the page that owns the next job.", view, StringComparison.Ordinal);
-        Assert.Contains("Current proof", view, StringComparison.Ordinal);
+        Assert.Contains("Current release", view, StringComparison.Ordinal);
         Assert.Contains("downloads page", view, StringComparison.Ordinal);
-        Assert.DoesNotContain("Current proof shelf", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("Current release status shelf", view, StringComparison.Ordinal);
         Assert.DoesNotContain("downloads shelf", view, StringComparison.Ordinal);
     }
 
@@ -151,7 +151,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Safe public signal", feedbackView, StringComparison.Ordinal);
         Assert.Contains("What looks likely next, and what is still only planned", roadmapView, StringComparison.Ordinal);
         Assert.Contains("Milestone ledger", roadmapView, StringComparison.Ordinal);
-        Assert.Contains("Shipped updates with proof you can verify", changelogView, StringComparison.Ordinal);
+        Assert.Contains("Shipped updates you can verify", changelogView, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", changelogView, StringComparison.Ordinal);
     }
 
@@ -176,7 +176,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("Install or update from the downloads page", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
         Assert.Contains("Open the larger machine picture only when the short status line is not enough", view, StringComparison.Ordinal);
-        Assert.Contains("Use what works today when the question is proof, not packaging", view, StringComparison.Ordinal);
+        Assert.Contains("Use what works today when the question is readiness, not packaging", view, StringComparison.Ordinal);
         Assert.Contains("Leave status for first-party help as soon as the issue becomes private", view, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
         Assert.Contains("Signed-in return", view, StringComparison.Ordinal);
@@ -321,7 +321,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("proof view", shelfView, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", shelfView, StringComparison.Ordinal);
 
-        Assert.Contains("Use the signed-in proof view", creatorView, StringComparison.Ordinal);
+        Assert.Contains("Use the signed-in detail view", creatorView, StringComparison.Ordinal);
         Assert.Contains("creator next steps", creatorView, StringComparison.Ordinal);
         Assert.DoesNotContain("artifacts shelf", creatorView, StringComparison.Ordinal);
     }
@@ -347,7 +347,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("trust-page-hero", view, StringComparison.Ordinal);
         Assert.Contains("status-decision-strip", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Compare with live proof instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
+        Assert.Contains("Compare with current release status instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
         Assert.Contains("The milestone roadmap lives on a separate page", view, StringComparison.Ordinal);
         Assert.Contains("Use public feedback when a future idea matches real user pain", view, StringComparison.Ordinal);
         Assert.Contains("Use horizons to understand the future, then move to the page that owns the present-tense job.", view, StringComparison.Ordinal);
@@ -386,15 +386,15 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.DoesNotContain("invite rail", joinPrimer, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", joinPrimer, StringComparison.Ordinal);
 
-        Assert.Contains("signed-in proof view", liveProof, StringComparison.Ordinal);
+        Assert.Contains("signed-in detail view", liveProof, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", liveProof, StringComparison.Ordinal);
 
-        Assert.Contains("proof view", previewConcept, StringComparison.Ordinal);
-        Assert.Contains("signed-in proof view", previewConcept, StringComparison.Ordinal);
+        Assert.Contains("detail view", previewConcept, StringComparison.Ordinal);
+        Assert.Contains("signed-in detail view", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", previewConcept, StringComparison.Ordinal);
         Assert.DoesNotContain("follow-through", previewConcept, StringComparison.Ordinal);
 
-        Assert.Contains("signed-in proof view", roadmap, StringComparison.Ordinal);
+        Assert.Contains("signed-in detail view", roadmap, StringComparison.Ordinal);
         Assert.DoesNotContain("proof shelf", roadmap, StringComparison.Ordinal);
     }
 
@@ -811,9 +811,9 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         Assert.Contains("Keep feature detail, proof, installs, and help on their own pages.", view, StringComparison.Ordinal);
         Assert.Contains("route-choice-grid", view, StringComparison.Ordinal);
-        Assert.Contains("Compare with live proof instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
-        Assert.Contains("Current proof view", view, StringComparison.Ordinal);
-        Assert.Contains("Open proof view", view, StringComparison.Ordinal);
+        Assert.Contains("Compare with current release status instead of treating a horizon as already shipped", view, StringComparison.Ordinal);
+        Assert.Contains("Current status view", view, StringComparison.Ordinal);
+        Assert.Contains("Open detail view", view, StringComparison.Ordinal);
         Assert.Contains("Use downloads when the question becomes install or update posture", view, StringComparison.Ordinal);
         Assert.Contains("Leave feature detail for first-party help as soon as the issue becomes support or recovery", view, StringComparison.Ordinal);
         Assert.Contains("Use the feature detail to answer one question, then move to the page that owns the next job.", view, StringComparison.Ordinal);
@@ -970,7 +970,7 @@ public sealed class PublicLandingReleaseTrustViewTests
 
         string layout = File.ReadAllText(layoutPath);
 
-        Assert.Contains("Use <a class=\"quiet-link\" href=\"/downloads\">Get Chummer</a> for the acquisition path, <a class=\"quiet-link\" href=\"/now\">what works today</a> for current proof, and <a class=\"quiet-link\" href=\"/status\">status</a> for cautions.", layout, StringComparison.Ordinal);
+        Assert.Contains("Use <a class=\"quiet-link\" href=\"/downloads\">Get Chummer</a> for the acquisition path, <a class=\"quiet-link\" href=\"/now\">what works today</a> for current availability, and <a class=\"quiet-link\" href=\"/status\">status</a> for cautions.", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterCanonicalSource", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("@chrome.FooterGeneratedNote", layout, StringComparison.Ordinal);
         Assert.DoesNotContain("Truth boundary", layout, StringComparison.Ordinal);

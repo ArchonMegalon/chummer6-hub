@@ -171,9 +171,9 @@
     <div class="trust-page-hero__copy">
         <p class="eyebrow">@Model.Eyebrow</p>
         <h1 class="page-title">@Model.Heading</h1>
-        <p class="page-copy">Dossiers, recaps, and release proof belong on an inspectable page, not in a vague gallery. Use this page for proof and provenance, then go back to downloads when you actually want the build.</p>
+        <p class="page-copy">Dossiers, recaps, and release details belong on an inspectable page, not in a vague gallery. Use this page for publication lineage and provenance, then go back to downloads when you actually want the build.</p>
         <div class="trust-claim__microproof">
-            <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public proof card(s)</span>
+            <span>@(liveItems.Length + rankedPublicCreatorPublications.Length) public detail card(s)</span>
             <span>@previewItems.Length opening next</span>
             @if (publicationRouteReviewRequired)
             {
@@ -186,7 +186,7 @@
         </div>
     </div>
     <div class="stacked-actions">
-        <a class="button-like button-like--primary" href="@artifactShelfPrimaryHref">Open proof view</a>
+        <a class="button-like button-like--primary" href="@artifactShelfPrimaryHref">Open detail view</a>
         <a class="button-like button-like--secondary" href="/downloads">Open downloads</a>
         <a class="button-like button-like--ghost" href="/now">Open what works today</a>
     </div>

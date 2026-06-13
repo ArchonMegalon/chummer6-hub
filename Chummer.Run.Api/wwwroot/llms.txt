@@ -2,7 +2,7 @@ Chummer public route guide
 
 Overview
 - Chummer is the public front door and support-aware release rail for the Shadowrun campaign OS preview.
-- This hosted surface keeps live proof, future direction, public signal, and private support on separate routes.
+- This hosted surface keeps current release status, future direction, public signal, and private support on separate routes.
 - Signed-in account overlays exist for install continuity, support return, and follow-up, but the public pages remain readable without an account.
 
 Primary routes
