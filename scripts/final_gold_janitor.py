@@ -17,6 +17,7 @@ COMPLETION_ROOT = Path("/docker/chummercomplete/_completion")
 ARTIFACT_ROOT_NAME = os.environ.get("CHUMMER_FINAL_GOLD_ARTIFACT_ROOT", "full_product_reaudit_v20")
 ARTIFACT_ROOT = COMPLETION_ROOT / ARTIFACT_ROOT_NAME
 UI_LAYOUT_COMPLETION_ROOT = COMPLETION_ROOT / "chummer_run_redesign_closure"
+LEGACY_GOLD_CLOSURE_ROOT = COMPLETION_ROOT / "gold_readiness_closure"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
 RECRAWL_MAX_AGE_HOURS = 24
 
@@ -253,13 +254,25 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    prior_payload = load_json(PUBLISHED_ROOT / "FINAL_GOLD_JANITOR.generated.json")
     command_results = [] if args.skip_materializers else run_materializers()
     payload = build_payload(command_results)
+    if args.skip_materializers and not payload.get("materializers"):
+        prior_materializers = prior_payload.get("materializers")
+        if isinstance(prior_materializers, list):
+            payload["materializers"] = prior_materializers
+    legacy_payload = dict(payload)
+    legacy_payload["mirrors"] = {
+        "authoritative_artifact_root": payload["artifact_root"],
+        "legacy_closure_root": str(LEGACY_GOLD_CLOSURE_ROOT),
+    }
     write_json(PUBLISHED_ROOT / "FINAL_GOLD_JANITOR.generated.json", payload)
     write_json(ARTIFACT_ROOT / "FINAL_GOLD_JANITOR.generated.json", payload)
+    write_json(LEGACY_GOLD_CLOSURE_ROOT / "FINAL_GOLD_JANITOR.generated.json", legacy_payload)
     verdict_markdown = build_verdict_markdown(payload)
     write_text(PUBLISHED_ROOT / "FINAL_GOLD_VERDICT.md", verdict_markdown)
     write_text(ARTIFACT_ROOT / "FINAL_GOLD_VERDICT.md", verdict_markdown)
+    write_text(LEGACY_GOLD_CLOSURE_ROOT / "FINAL_GOLD_VERDICT.md", verdict_markdown)
     if payload["status"] != "pass":
         print(json.dumps({
             "status": payload["status"],

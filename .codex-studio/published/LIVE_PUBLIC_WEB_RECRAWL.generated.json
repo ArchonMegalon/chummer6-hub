@@ -1,6 +1,6 @@
 {
   "contract_name": "chummer.live_public_web_recrawl",
-  "generated_at_utc": "2026-06-13T12:37:07Z",
+  "generated_at_utc": "2026-06-13T13:31:20Z",
   "base_url": "https://chummer.run",
   "required_paths": [
     "/",
