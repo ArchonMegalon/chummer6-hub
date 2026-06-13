@@ -101,6 +101,11 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
         Assert.Equal(StatusCodes.Status200OK, page.StatusCode);
         Assert.Contains("Open Chummer to finish linking this install", page.Content, StringComparison.Ordinal);
         Assert.Contains("Open Chummer", page.Content, StringComparison.Ordinal);
+        Assert.Contains("id=\"install-link-open\"", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Manual launch link", page.Content, StringComparison.Ordinal);
+        Assert.Contains("Copy launch link", page.Content, StringComparison.Ordinal);
+        Assert.Contains("window.location.assign(href)", page.Content, StringComparison.Ordinal);
+        Assert.Contains("iframe", page.Content, StringComparison.Ordinal);
         Assert.True(TryExtractPrimaryHref(page.Content!, out string callbackHref), "The controller should render a manual callback link.");
         Assert.True(Uri.TryCreate(WebUtility.HtmlDecode(callbackHref), UriKind.Absolute, out Uri? callbackUri), "The controller should emit a valid callback URI.");
         Assert.Equal("chummer", callbackUri.Scheme);
@@ -299,15 +304,22 @@ public sealed class InstallLinkingControllerBrowserCallbackTests
 
     private static bool TryExtractPrimaryHref(string content, out string href)
     {
-        const string marker = "<a class=\"button-like button-like--primary\" href=\"";
-        int start = content.IndexOf(marker, StringComparison.Ordinal);
-        if (start < 0)
+        const string classMarker = "class=\"button-like button-like--primary\"";
+        int anchorStart = content.IndexOf(classMarker, StringComparison.Ordinal);
+        if (anchorStart < 0)
         {
             href = string.Empty;
             return false;
         }
 
-        start += marker.Length;
+        int hrefMarker = content.IndexOf("href=\"", anchorStart, StringComparison.Ordinal);
+        if (hrefMarker < 0)
+        {
+            href = string.Empty;
+            return false;
+        }
+
+        int start = hrefMarker + "href=\"".Length;
         int end = content.IndexOf('"', start);
         if (end < 0)
         {

@@ -276,8 +276,66 @@ public sealed class InstallLinkingController : ControllerBase
               <script>
               (() => {
                 const href = {{JsonSerializer.Serialize(autoOpenHref)}};
+                const primaryAction = document.getElementById("install-link-open");
+                const status = document.getElementById("install-link-status");
+                const manualPanel = document.getElementById("install-link-manual");
+                const manualField = document.getElementById("install-link-manual-field");
+                const copyAction = document.getElementById("install-link-copy");
+
+                const markAttempted = (message) => {
+                  if (status) {
+                    status.textContent = message;
+                  }
+                  if (manualPanel) {
+                    manualPanel.hidden = false;
+                  }
+                };
+
+                const tryOpen = () => {
+                  try {
+                    const frame = document.createElement("iframe");
+                    frame.setAttribute("aria-hidden", "true");
+                    frame.tabIndex = -1;
+                    frame.style.position = "absolute";
+                    frame.style.inlineSize = "1px";
+                    frame.style.blockSize = "1px";
+                    frame.style.opacity = "0";
+                    frame.style.pointerEvents = "none";
+                    frame.src = href;
+                    document.body.appendChild(frame);
+                    window.setTimeout(() => frame.remove(), 1500);
+                  } catch {}
+
+                  try {
+                    window.location.assign(href);
+                  } catch {}
+                };
+
+                if (primaryAction) {
+                  primaryAction.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    markAttempted("Tried the Chummer app handoff again. If nothing opens, copy the launch link below and paste it into the browser address bar.");
+                    tryOpen();
+                  });
+                }
+
+                if (copyAction && manualField && navigator.clipboard?.writeText) {
+                  copyAction.hidden = false;
+                  copyAction.addEventListener("click", async () => {
+                    try {
+                      await navigator.clipboard.writeText(href);
+                      if (status) {
+                        status.textContent = "Launch link copied. Paste it into the browser address bar if the app still does not open.";
+                      }
+                    } catch {}
+                  });
+                }
+
                 window.setTimeout(() => {
-                  window.location.href = href;
+                  tryOpen();
+                  window.setTimeout(() => {
+                    markAttempted("Tried the Chummer app handoff automatically. If the app did not open, use the button again or copy the launch link below.");
+                  }, 900);
                 }, 300);
               })();
               </script>
@@ -307,8 +365,14 @@ public sealed class InstallLinkingController : ControllerBase
                   <div class="auth-panel auth-panel--message">
                     <ul class="auth-benefits auth-benefits--message">{{highlightsHtml}}</ul>
                     <div class="stacked-actions">
-                      <a class="button-like button-like--primary" href="{{WebUtility.HtmlEncode(primaryHref)}}">{{WebUtility.HtmlEncode(primaryLabel)}}</a>
+                      <a class="button-like button-like--primary" id="install-link-open" href="{{WebUtility.HtmlEncode(primaryHref)}}">{{WebUtility.HtmlEncode(primaryLabel)}}</a>
                       <a class="button-like button-like--secondary" href="{{WebUtility.HtmlEncode(secondaryHref)}}">{{WebUtility.HtmlEncode(secondaryLabel)}}</a>
+                    </div>
+                    <p id="install-link-status" class="muted-copy">Chummer should open from this page. If the browser blocks the handoff, use the button again or the manual launch link below.</p>
+                    <div id="install-link-manual" class="field" hidden>
+                      <label for="install-link-manual-field">Manual launch link</label>
+                      <input id="install-link-manual-field" type="text" readonly value="{{WebUtility.HtmlEncode(primaryHref)}}">
+                      <button id="install-link-copy" class="button-like button-like--ghost" type="button" hidden>Copy launch link</button>
                     </div>
                   </div>
                 </section>
