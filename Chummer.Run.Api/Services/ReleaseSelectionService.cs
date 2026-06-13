@@ -1021,7 +1021,14 @@ public sealed class ReleaseSelectionService
         };
 
     private static string NormalizePackageKind(string? packageKind)
-        => (packageKind ?? string.Empty).Trim().ToLowerInvariant();
+    {
+        var normalized = (packageKind ?? string.Empty).Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "portable" => "portable_exe",
+            _ => normalized
+        };
+    }
 
     private static string SupportabilityLabel(DesktopPlatformAcceptancePlatformDocument? platform)
         => (platform?.Supportability ?? string.Empty).Trim().ToLowerInvariant() switch

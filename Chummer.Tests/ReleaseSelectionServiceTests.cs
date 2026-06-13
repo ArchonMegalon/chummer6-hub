@@ -429,6 +429,44 @@ platforms:
     }
 
     [Fact]
+    public void BuildOptionTreatsPortableKindAsLauncherAlias()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["CHUMMER_PUBLIC_CANON_ROOT"] = RepoPaths.Root
+            })
+            .Build();
+
+        var service = new ReleaseSelectionService(new PublicCanonFileLoader(configuration));
+        var manifest = new PublicReleaseManifestDto(
+            Version: "run-20260612-121055",
+            Channel: "public_stable",
+            PublishedAt: DateTimeOffset.Parse("2026-06-12T13:20:46Z"),
+            Downloads:
+            [
+                new PublicReleaseArtifactDto(
+                    Id: "avalonia-win-x64-portable",
+                    Platform: "Avalonia Desktop Windows X64 Portable Launcher",
+                    Url: "/downloads/files/chummer-avalonia-win-x64.exe",
+                    Sha256: "portable-launcher",
+                    SizeBytes: 433152,
+                    Head: "avalonia",
+                    PlatformId: "win-x64",
+                    Arch: "x64",
+                    Kind: "portable",
+                    FileName: "chummer-avalonia-win-x64.exe",
+                    InstallAccessClass: "open_public")
+            ]);
+
+        var launcher = service.BuildOption(manifest, manifest.Downloads[0], authenticated: false, recommended: false);
+
+        Assert.Equal("Portable launcher for Windows", launcher.Title);
+        Assert.Equal("Small launcher for Windows. Use this only when support sends you to the app launcher instead of the full installer or ZIP.", launcher.SupportLine);
+        Assert.Equal("Download Windows launcher", launcher.ActionLabel);
+    }
+
+    [Fact]
     public void BuildExperienceKeepsPublicStableMacDmgVisibleWhenProofIsMirrored()
     {
         var configuration = new ConfigurationBuilder()
