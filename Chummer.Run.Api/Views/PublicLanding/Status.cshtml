@@ -4,7 +4,9 @@
     ViewData["Chrome"] = Model.Chrome;
     ViewData["SurfaceClass"] = "surface-status";
     var guestNeedsInstallGate = !Model.Chrome.Authenticated && !string.IsNullOrWhiteSpace(Model.ReleaseExperience.GuestGatePrimaryHref);
-    var validationState = string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus;
+    var validationState = CustomerStatusText(
+        string.IsNullOrWhiteSpace(Model.Manifest.ProofStatus) ? "Not mirrored" : Model.Manifest.ProofStatus,
+        "Not mirrored");
     var publishedLabel = Model.Manifest.PublishedAt.ToUniversalTime().ToString("yyyy-MM-dd");
     var accountReturnHref = Model.Chrome.Authenticated ? "/home" : "/signup?next=/home";
     var accountReturnLabel = Model.Chrome.Authenticated ? "Open home" : "Open account setup";
@@ -91,6 +93,7 @@ static string CustomerStatusText(string? value, string fallback)
 {
     var text = string.IsNullOrWhiteSpace(value) ? fallback : value;
     return text
+            .Replace("proof-freshness", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("stale", "out of date", StringComparison.OrdinalIgnoreCase)
             .Replace("shelf", "downloads page", StringComparison.OrdinalIgnoreCase)
             .Replace("governor truth", "release checks", StringComparison.OrdinalIgnoreCase)
@@ -139,10 +142,12 @@ static string CustomerStatusText(string? value, string fallback)
 
         var normalized = label
             .Trim()
+            .Replace("proof-freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof freshness", "Release checks")
             .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof-freshness", "Release checks")
             .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase);
 
         return string.Equals(normalized, "release check", StringComparison.OrdinalIgnoreCase)
@@ -153,6 +158,8 @@ static string CustomerStatusText(string? value, string fallback)
     static string SanitizeLaunchHealthDisplay(string? value, string fallback)
     {
         return CustomerStatusText(value, fallback)
+            .Replace("proof-freshness", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof-freshness", "Release checks")
             .Replace("Proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase);
     }
@@ -245,7 +252,7 @@ static string CustomerStatusText(string? value, string fallback)
         </div>
         <div class="settings-summary-row">
             <span>Validation state</span>
-            <strong>@validationState</strong>
+            <strong>@CustomerStatusText(validationState, "Not mirrored")</strong>
         </div>
         <div class="settings-summary-row">
             <span>Update status</span>

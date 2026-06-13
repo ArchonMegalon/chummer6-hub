@@ -254,6 +254,7 @@ public sealed class PublicLandingReleaseTrustViewTests
         Assert.Contains("<h2>Current public release</h2>", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Install help stays close</h2>", view, StringComparison.Ordinal);
         Assert.Contains("<h2>Quick release checks</h2>", view, StringComparison.Ordinal);
+        Assert.Contains("FindLaunchHealthValue(\"Release checks\")", view, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -26,6 +26,17 @@ const viewports = [
   { name: 'wide', width: 1920, height: 1080 },
 ];
 
+const singleLineRules: Array<{ selector: string; minWidth: number; label: string }> = [
+  { selector: '.site-brand__wordmark', minWidth: 320, label: 'site-brand wordmark' },
+  { selector: '.site-footer__wordmark', minWidth: 768, label: 'footer wordmark' },
+  { selector: '.hero-brand', minWidth: 1024, label: 'hero brand' },
+  { selector: '.launch-hero__title', minWidth: 1280, label: 'launch hero title' },
+  { selector: '.home-hero__title', minWidth: 1280, label: 'home hero title' },
+  { selector: '.site-nav a', minWidth: 1366, label: 'top navigation item' },
+  { selector: '.page-title', minWidth: 1366, label: 'page title' },
+  { selector: '.editorial-title', minWidth: 1366, label: 'editorial title' },
+];
+
 type FrameFailure = {
   route: string;
   viewport: string;
@@ -62,7 +73,7 @@ test('public UI elements are not cut off by their frames outside intentional scr
         continue;
       }
 
-      const routeFailures = await page.evaluate(() => {
+      const routeFailures = await page.evaluate((lineRulesArg) => {
         type Rect = { x: number; y: number; width: number; height: number; right: number; bottom: number };
         type Failure = {
           selector: string;
@@ -71,6 +82,14 @@ test('public UI elements are not cut off by their frames outside intentional scr
           element: Rect;
           frame?: Rect;
           frameOverflow?: string;
+        };
+
+        type LineFailure = {
+          selector: string;
+          text: string;
+          reason: string;
+          element: Rect;
+          lines: number;
         };
 
         const tolerance = 1.5;
@@ -102,6 +121,9 @@ test('public UI elements are not cut off by their frames outside intentional scr
           '.feature-card',
           '.status-card',
           '.ledger-flagship__actions',
+          '.site-brand',
+          '.site-brand__wordmark',
+          '.site-footer__wordmark',
           '[data-geoscape-panel]',
           '[data-geoscape-controls]',
           '[data-geoscape-signal-rail]',
@@ -146,6 +168,11 @@ test('public UI elements are not cut off by their frames outside intentional scr
 
           return element.scrollHeight > element.clientHeight + tolerance
             || element.scrollWidth > element.clientWidth + tolerance;
+        }
+
+        function lineCount(element: HTMLElement): number {
+          const rects = Array.from(element.getClientRects());
+          return Math.max(1, rects.length);
         }
 
         function hasScrollableAncestorBetween(element: HTMLElement, ancestor: HTMLElement | null): boolean {
@@ -218,6 +245,7 @@ test('public UI elements are not cut off by their frames outside intentional scr
         }
 
         const failures: Failure[] = [];
+        const lineFailures: LineFailure[] = [];
         const root = document.documentElement;
         const pageOverflow = root.scrollWidth - root.clientWidth;
         if (pageOverflow > tolerance) {
@@ -306,20 +334,70 @@ test('public UI elements are not cut off by their frames outside intentional scr
           }
         }
 
-        return failures.slice(0, 80);
-      });
+        const viewportWidth = window.innerWidth;
+        const singleLineRules: Array<{ selector: string; minWidth: number; label: string }> = lineRulesArg as Array<{
+          selector: string;
+          minWidth: number;
+          label: string;
+        }>;
 
-      failures.push(...routeFailures.map((failure) => ({
+        for (const lineRule of singleLineRules) {
+          if (viewportWidth < lineRule.minWidth) {
+            continue;
+          }
+
+          for (const element of Array.from(document.querySelectorAll<HTMLElement>(lineRule.selector))) {
+            if (!isVisible(element) || !hasSubstance(element)) {
+              continue;
+            }
+
+            const lines = lineCount(element);
+            if (lines <= 1) {
+              continue;
+            }
+
+            lineFailures.push({
+              selector: selectorFor(element),
+              text: textFor(element),
+              reason: `${lineRule.label} rendered on ${lines} lines at ${viewportWidth}px viewport`,
+              element: rectOf(element),
+              lines,
+            });
+          }
+        }
+
+        return {
+          failures: failures.slice(0, 80),
+          lineFailures,
+        };
+      }, singleLineRules);
+
+      const frameFailures = routeFailures.failures || [];
+      const lineRuleFailures = routeFailures.lineFailures || [];
+      const routeFailureCount = frameFailures.length + lineRuleFailures.length;
+
+      failures.push(...frameFailures.map((failure) => ({
         route,
         viewport: viewport.name,
         ...failure,
+      })));
+
+      failures.push(...lineRuleFailures.map((failure) => ({
+        route,
+        viewport: viewport.name,
+        selector: failure.selector,
+        text: failure.text,
+        reason: failure.reason,
+        element: failure.element,
+        frame: undefined,
+        frameOverflow: `line-count:${failure.lines}`,
       })));
 
       pageResults.push({
         route,
         viewport: viewport.name,
         status,
-        failure_count: routeFailures.length,
+        failure_count: routeFailureCount,
       });
     }
 

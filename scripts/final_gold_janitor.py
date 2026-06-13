@@ -16,6 +16,7 @@ PUBLISHED_ROOT = RUN_SERVICES_ROOT / ".codex-studio" / "published"
 COMPLETION_ROOT = Path("/docker/chummercomplete/_completion")
 ARTIFACT_ROOT_NAME = os.environ.get("CHUMMER_FINAL_GOLD_ARTIFACT_ROOT", "full_product_reaudit_v20")
 ARTIFACT_ROOT = COMPLETION_ROOT / ARTIFACT_ROOT_NAME
+UI_LAYOUT_COMPLETION_ROOT = COMPLETION_ROOT / "chummer_run_redesign_closure"
 DEFAULT_BASE_URL = os.environ.get("CHUMMER_FINAL_GOLD_BASE_URL", "https://chummer.run")
 RECRAWL_MAX_AGE_HOURS = 24
 
@@ -30,6 +31,7 @@ REQUIRED_RECEIPTS = {
     "external_distribution_mirror_proof": PUBLISHED_ROOT / "EXTERNAL_DISTRIBUTION_MIRROR_PROOF.generated.json",
     "public_copy_leak_gate": PUBLISHED_ROOT / "PUBLIC_COPY_LEAK_GATE.generated.json",
     "design_quality_gate": PUBLISHED_ROOT / "DESIGN_QUALITY_GATE.generated.json",
+    "ui_layout_exit_gate": UI_LAYOUT_COMPLETION_ROOT / "UI_LAYOUT_EXIT_GATE.generated.json",
     "operator_release_dashboard": PUBLISHED_ROOT / "OPERATOR_RELEASE_DASHBOARD.generated.json",
     "release_ready": PUBLISHED_ROOT / "RELEASE_READY.generated.json",
 }
@@ -43,6 +45,7 @@ MATERIALIZERS = [
     ["python3", "scripts/verify_table_pulse_scenario_replay.py", "--base-url", DEFAULT_BASE_URL],
     ["python3", "scripts/materialize_external_distribution_mirror_proof.py", "--base-url", os.environ.get("CHUMMER_PUBLIC_BASE_URL", "http://127.0.0.1:8091")],
     ["python3", "scripts/verify_public_copy_leak_gate.py", "--base-url", DEFAULT_BASE_URL],
+    ["python3", "scripts/ui_layout_exit_gate.py", "--completion-dir", str(UI_LAYOUT_COMPLETION_ROOT)],
     ["python3", "scripts/materialize_design_quality_gate.py"],
     ["python3", "scripts/materialize_operator_release_dashboard.py"],
     ["python3", "scripts/materialize_release_ready_receipt.py"],

@@ -406,10 +406,10 @@ if normalized_token(payload.get("status")) == "published" and trust_supportabili
     payload["supportabilityState"] = trust_supportability_state
     if trust_supportability_state == "review_required":
         payload["supportabilitySummary"] = (
-            "Proof freshness is missing or stale on this shelf, so review is still required before this release can be treated as supportable."
+            "Release checks are missing or stale on this shelf, so review is still required before this release can be treated as supportable."
         )
         payload["knownIssueSummary"] = (
-            "Proof freshness is missing or stale on this shelf, so preview publication is visible but not yet gold-ready."
+            "Release checks are missing or stale on this shelf, so preview publication is visible but not yet gold-ready."
         )
 
 coverage = payload.get("desktopTupleCoverage")

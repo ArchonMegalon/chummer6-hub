@@ -59,6 +59,7 @@ FORBIDDEN_PATTERNS = [
     r"\bopen-public artifacts\b",
     r"\blocal edge proof\b",
     r"\bproof freshness\b",
+    r"\bproof-freshness\b",
     r"\bproof recency\b",
     r"\bproof is green\b",
     r"\bcreate an account first\b",

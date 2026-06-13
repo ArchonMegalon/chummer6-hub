@@ -24,3 +24,5 @@ npx playwright test \
   mobile-pwa-public.spec.ts \
   public-responsive-gold.spec.ts \
   tests/public/ui-frame-integrity.spec.ts
+
+python3 scripts/ui_layout_exit_gate.py
