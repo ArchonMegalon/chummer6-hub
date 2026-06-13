@@ -100,6 +100,7 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("proof view", "current status view", StringComparison.OrdinalIgnoreCase)
             .Replace("proof page", "current status page", StringComparison.OrdinalIgnoreCase)
             .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof is green", "checks are clear", StringComparison.OrdinalIgnoreCase)
             .Replace("proof recency", "release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("journey proofs", "tested journeys", StringComparison.OrdinalIgnoreCase)
             .Replace("proofs", "checks", StringComparison.OrdinalIgnoreCase)
@@ -124,7 +125,9 @@ static string CustomerStatusText(string? value, string fallback)
             .Replace("human signoff", "final human review", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("Proof freshness", "Release checks")
-            .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase);
+            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof freshness", "release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("proof recency", "release checks", StringComparison.OrdinalIgnoreCase);
 }
 
     static string NormalizeLaunchHealthLabel(string? label)
@@ -138,6 +141,8 @@ static string CustomerStatusText(string? value, string fallback)
             .Trim()
             .Replace("proof freshness", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
+            .Replace("Proof freshness", "Release checks")
+            .Replace("Proof recency", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("release check", "Release checks", StringComparison.OrdinalIgnoreCase)
             .Replace("proof checks", "Release checks", StringComparison.OrdinalIgnoreCase);
 }
